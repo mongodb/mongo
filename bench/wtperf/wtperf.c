@@ -574,7 +574,8 @@ op_err:			lprintf(cfg, ret, 0,
 		}
 
 		/* Release the cursor, if we have multiple tables. */
-		if (cfg->table_count > 1) {
+		if (cfg->table_count > 1 && ret == 0 &&
+		    *op != WORKER_INSERT && *op != WORKER_INSERT_RMW) {
 			if ((ret = cursor->reset(cursor)) != 0) {
 				lprintf(cfg, ret, 0, "Cursor reset failed");
 				goto err;

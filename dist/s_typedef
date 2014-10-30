@@ -23,7 +23,7 @@ build() {
 	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{' $l | \
 	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
 	while read t n; do
-		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
+		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
 		echo "$t $n;"
 		echo "    typedef $t $n $upper;"
 	done

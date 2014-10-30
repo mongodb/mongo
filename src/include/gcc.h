@@ -79,64 +79,70 @@
  * atomic state changes, we rely on the WT_ATOMIC_ADD and WT_ATOMIC_CAS
  * (compare and swap) operations.
  */
-#define	WT_ATOMIC_ADD(v, val, n)					\
+#define	__WT_ATOMIC_ADD(v, val, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_add_and_fetch(&(v), val))
-#define	WT_ATOMIC_CAS(v, old, new, n)					\
+#define	__WT_ATOMIC_FETCH_ADD(v, val, n)				\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_fetch_and_add(&(v), val))
+#define	__WT_ATOMIC_CAS(v, old, new, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	__sync_bool_compare_and_swap(&(v), old, new))
-#define	WT_ATOMIC_CAS_VAL(v, old, new, n)				\
+#define	__WT_ATOMIC_CAS_VAL(v, old, new, n)				\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	__sync_val_compare_and_swap(&(v), old, new))
-#define	WT_ATOMIC_STORE(v, val, n)					\
+#define	__WT_ATOMIC_STORE(v, val, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	__sync_lock_test_and_set(&(v), val))
-#define	WT_ATOMIC_SUB(v, val, n)					\
+#define	__WT_ATOMIC_SUB(v, val, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_sub_and_fetch(&(v), val))
 
-#define	WT_ATOMIC_ADD1(v, val)		WT_ATOMIC_ADD(v, val, 1)
-#define	WT_ATOMIC_CAS1(v, old, new)	WT_ATOMIC_CAS(v, old, new, 1)
-#define	WT_ATOMIC_CAS_VAL1(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 1)
-#define	WT_ATOMIC_STORE1(v, val)	WT_ATOMIC_STORE(v, val, 1)
-#define	WT_ATOMIC_SUB1(v, val)		WT_ATOMIC_SUB(v, val, 1)
+#define	WT_ATOMIC_ADD1(v, val)		__WT_ATOMIC_ADD(v, val, 1)
+#define	WT_ATOMIC_FETCH_ADD1(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 1)
+#define	WT_ATOMIC_CAS1(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 1)
+#define	WT_ATOMIC_CAS_VAL1(v, old, new)	__WT_ATOMIC_CAS_VAL(v, old, new, 1)
+#define	WT_ATOMIC_STORE1(v, val)	__WT_ATOMIC_STORE(v, val, 1)
+#define	WT_ATOMIC_SUB1(v, val)		__WT_ATOMIC_SUB(v, val, 1)
 
-#define	WT_ATOMIC_ADD2(v, val)		WT_ATOMIC_ADD(v, val, 2)
-#define	WT_ATOMIC_CAS2(v, old, new)	WT_ATOMIC_CAS(v, old, new, 2)
-#define	WT_ATOMIC_CAS_VAL2(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 2)
-#define	WT_ATOMIC_STORE2(v, val)	WT_ATOMIC_STORE(v, val, 2)
-#define	WT_ATOMIC_SUB2(v, val)		WT_ATOMIC_SUB(v, val, 2)
+#define	WT_ATOMIC_ADD2(v, val)		__WT_ATOMIC_ADD(v, val, 2)
+#define	WT_ATOMIC_FETCH_ADD2(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 2)
+#define	WT_ATOMIC_CAS2(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 2)
+#define	WT_ATOMIC_CAS_VAL2(v, old, new)	__WT_ATOMIC_CAS_VAL(v, old, new, 2)
+#define	WT_ATOMIC_STORE2(v, val)	__WT_ATOMIC_STORE(v, val, 2)
+#define	WT_ATOMIC_SUB2(v, val)		__WT_ATOMIC_SUB(v, val, 2)
 
-#define	WT_ATOMIC_ADD4(v, val)		WT_ATOMIC_ADD(v, val, 4)
-#define	WT_ATOMIC_CAS4(v, old, new)	WT_ATOMIC_CAS(v, old, new, 4)
-#define	WT_ATOMIC_CAS_VAL4(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 4)
-#define	WT_ATOMIC_STORE4(v, val)	WT_ATOMIC_STORE(v, val, 4)
-#define	WT_ATOMIC_SUB4(v, val)		WT_ATOMIC_SUB(v, val, 4)
+#define	WT_ATOMIC_ADD4(v, val)		__WT_ATOMIC_ADD(v, val, 4)
+#define	WT_ATOMIC_FETCH_ADD4(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 4)
+#define	WT_ATOMIC_CAS4(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 4)
+#define	WT_ATOMIC_CAS_VAL4(v, old, new)	__WT_ATOMIC_CAS_VAL(v, old, new, 4)
+#define	WT_ATOMIC_STORE4(v, val)	__WT_ATOMIC_STORE(v, val, 4)
+#define	WT_ATOMIC_SUB4(v, val)		__WT_ATOMIC_SUB(v, val, 4)
 
-#define	WT_ATOMIC_ADD8(v, val)		WT_ATOMIC_ADD(v, val, 8)
-#define	WT_ATOMIC_CAS8(v, old, new)	WT_ATOMIC_CAS(v, old, new, 8)
-#define	WT_ATOMIC_CAS_VAL8(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 8)
-#define	WT_ATOMIC_STORE8(v, val)	WT_ATOMIC_STORE(v, val, 8)
-#define	WT_ATOMIC_SUB8(v, val)		WT_ATOMIC_SUB(v, val, 8)
+#define	WT_ATOMIC_ADD8(v, val)		__WT_ATOMIC_ADD(v, val, 8)
+#define	WT_ATOMIC_FETCH_ADD8(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 8)
+#define	WT_ATOMIC_CAS8(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 8)
+#define	WT_ATOMIC_CAS_VAL8(v, old, new)	__WT_ATOMIC_CAS_VAL(v, old, new, 8)
+#define	WT_ATOMIC_STORE8(v, val)	__WT_ATOMIC_STORE(v, val, 8)
+#define	WT_ATOMIC_SUB8(v, val)		__WT_ATOMIC_SUB(v, val, 8)
 
 /* Compile read-write barrier */
-#define	WT_BARRIER() asm volatile("" ::: "memory")
+#define	WT_BARRIER() __asm__ volatile("" ::: "memory")
 
 /* Pause instruction to prevent excess processor bus usage */
-#define	WT_PAUSE() asm volatile("pause\n" ::: "memory")
+#define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 
 #if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
-	asm volatile ("mfence" ::: "memory");				\
+	__asm__ volatile ("mfence" ::: "memory");			\
 } while (0)
 #define	WT_READ_BARRIER() do {						\
-	asm volatile ("lfence" ::: "memory");				\
+	__asm__ volatile ("lfence" ::: "memory");			\
 } while (0)
 #define	WT_WRITE_BARRIER() do {						\
-	asm volatile ("sfence" ::: "memory");				\
+	__asm__ volatile ("sfence" ::: "memory");			\
 } while (0)
 
 #elif defined(i386) || defined(__i386__)
 #define	WT_FULL_BARRIER() do {						\
-	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
+	__asm__ volatile ("lock; addl $0, 0(%%esp)" ::: "memory");	\
 } while (0)
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()

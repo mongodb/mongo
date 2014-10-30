@@ -435,7 +435,8 @@ void
 config_single(const char *s, int perm)
 {
 	CONFIG *cp;
-	int v;
+	u_long v;
+	char *p;
 	const char *ep;
 
 	if ((ep = strchr(s, '=')) == NULL) {
@@ -484,20 +485,25 @@ config_single(const char *s, int perm)
 		return;
 	}
 
-	v = atoi(ep);
+	v = strtoul(ep, &p, 10);
+	if (*p != '\0') {
+		fprintf(stderr, "%s: %s: illegal numeric value\n",
+		    g.progname, s);
+		exit(EXIT_FAILURE);
+	}
 	if (cp->flags & C_BOOL) {
 		if (v != 0 && v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if (v < 0 || (u_int)v < cp->min || (u_int)v > cp->maxset) {
+	} else if ((uint32_t)v < cp->min || (uint32_t)v > cp->maxset) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
 		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
 		    g.progname, s, *cp->v, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
-	*cp->v = (u_int)v;
+	*cp->v = (uint32_t)v;
 }
 
 /*

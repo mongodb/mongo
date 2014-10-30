@@ -45,14 +45,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 void
 __wt_thread_id(char* buf, size_t buflen)
 {
-	DWORD self;
-	size_t len;
-
-	len = (size_t)snprintf(
-	    buf, buflen, "%" PRIu64, (uint64_t)GetCurrentProcessId());
-	if (len < buflen) {
-		self = GetCurrentThreadId();
-		__wt_raw_to_hex_mem((const uint8_t *)&self,
-		    sizeof(self), (uint8_t *)buf + len, buflen - len);
-	}
+	(void)snprintf(buf, buflen,
+	    "%" PRIu64 ":%" PRIu64,
+	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId);
 }

@@ -2395,7 +2395,7 @@ no_slots:
 
 	/* Check if a skipped update makes this a waste of time. */
 	if (last_block)
-		WT_RET (__rec_skipped_update_chk(session, r));
+		WT_RET(__rec_skipped_update_chk(session, r));
 
 	/* We have a block, update the boundary counter. */
 	++r->bnd_next;
@@ -2505,7 +2505,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	}
 
 	/* Check if a skipped update makes this a waste of time. */
-	WT_RET (__rec_skipped_update_chk(session, r));
+	WT_RET(__rec_skipped_update_chk(session, r));
 
 	/*
 	 * We only arrive here with no entries to write if the page was entirely
@@ -2542,7 +2542,7 @@ __rec_split_finish_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	/* Check if a skipped update makes this a waste of time. */
 	if (r->entries == 0)
-		WT_RET (__rec_skipped_update_chk(session, r));
+		WT_RET(__rec_skipped_update_chk(session, r));
 
 	while (r->entries != 0)
 		WT_RET(__rec_split_raw_worker(session, r, 1));
@@ -4825,10 +4825,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * Display the actual split keys: not turned on because it's a
-		 * lot of output and not generally useful.
-		 */
+		/* Display the actual split keys. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;

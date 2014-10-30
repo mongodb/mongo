@@ -36,13 +36,6 @@ except ImportError:
             in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
 
-try:
-    from stat_data import no_scale_per_second_list
-except ImportError:
-    print >>sys.stderr, "Could not import stat_data.py, it should be in\
-            the same directory as %s" % sys.argv[0]
-    sys.exit(-1)
-
 def timesort(s):
     # Sort the timestr via its parsetime() value so that the year gets
     # added and it properly sorts.  Times are only %b %d %H:%M:%S and

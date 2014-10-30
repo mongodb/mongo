@@ -32,6 +32,7 @@
 
 %include "enums.swg"
 %include "typemaps.i"
+%include "stdint.i"
 
 %pragma(java) jniclasscode=%{
   static {
@@ -492,7 +493,7 @@ err:		__wt_err(session, ret, "Java async callback error");
 	__wt_free(session, jcb);
 
 	if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
-	        return (0);
+		return (0);
 	else
 		return (1);
 }
@@ -960,7 +961,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The status of the operation.
 	 */
 	public int insert()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -974,7 +975,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The status of the operation.
 	 */
 	public int update()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -988,7 +989,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The status of the operation.
 	 */
 	public int remove()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		keyPacker.reset();
 		return remove_wrap(key);
@@ -1000,7 +1001,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public int search()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1516,7 +1517,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The status of the operation.
 	 */
 	public int update()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		byte[] value = valuePacker.getValue();
 		keyPacker.reset();
@@ -1530,7 +1531,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The status of the operation.
 	 */
 	public int remove()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		byte[] key = keyPacker.getValue();
 		keyPacker.reset();
 		return remove_wrap(key);
@@ -1542,7 +1543,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public int compare(Cursor other)
-        throws WiredTigerException {
+	throws WiredTigerException {
 		return compare_wrap(other);
 	}
 
@@ -1552,7 +1553,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public int next()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		int ret = next_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1569,7 +1570,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public int prev()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		int ret = prev_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1586,7 +1587,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public int search()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1603,7 +1604,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 * \return The result of the comparison.
 	 */
 	public SearchStatus search_near()
-        throws WiredTigerException {
+	throws WiredTigerException {
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
@@ -1684,6 +1685,16 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 
 %ignore __wt_connection::open_session;
 %rename(open_session) __wt_connection::open_session_wrap;
+
+%ignore __wt_session::transaction_pinned_range;
+%rename(transaction_pinned_range) __wt_session::transaction_pinned_range_wrap;
+%javamethodmodifiers __wt_session::transaction_pinned_range_wrap "
+  /**
+   * @copydoc WT_SESSION::transaction_pinned_range
+   */
+  public ";
+
+%rename(open_cursor) __wt_session::open_cursor_wrap;
 %ignore __wt_session::open_cursor;
 %javamethodmodifiers __wt_session::open_cursor_wrap "
   /**
@@ -1833,5 +1844,16 @@ err:		if (ret != 0)
 err:		if (ret != 0)
 			throwWiredTigerException(jenv, ret);
 		return cursor;
+	}
+}
+
+%extend __wt_session {
+	long transaction_pinned_range_wrap(JNIEnv *jenv) {
+		int ret;
+		uint64_t range = 0;
+		ret = self->transaction_pinned_range(self, &range);
+err:		if (ret != 0)
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		return range;
 	}
 }

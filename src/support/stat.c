@@ -21,104 +21,117 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->block_reuse_bytes.desc =
 	    "block manager: file bytes available for reuse";
 	stats->block_size.desc = "block manager: file size in bytes";
-	stats->bloom_count.desc = "bloom filters in the LSM tree";
-	stats->bloom_false_positive.desc = "bloom filter false positives";
-	stats->bloom_hit.desc = "bloom filter hits";
-	stats->bloom_miss.desc = "bloom filter misses";
-	stats->bloom_page_evict.desc = "bloom filter pages evicted from cache";
-	stats->bloom_page_read.desc = "bloom filter pages read into cache";
-	stats->bloom_size.desc = "total size of bloom filters";
+	stats->bloom_count.desc = "LSM: bloom filters in the LSM tree";
+	stats->bloom_false_positive.desc = "LSM: bloom filter false positives";
+	stats->bloom_hit.desc = "LSM: bloom filter hits";
+	stats->bloom_miss.desc = "LSM: bloom filter misses";
+	stats->bloom_page_evict.desc =
+	    "LSM: bloom filter pages evicted from cache";
+	stats->bloom_page_read.desc =
+	    "LSM: bloom filter pages read into cache";
+	stats->bloom_size.desc = "LSM: total size of bloom filters";
 	stats->btree_column_deleted.desc =
-	    "column-store variable-size deleted values";
-	stats->btree_column_fix.desc = "column-store fixed-size leaf pages";
-	stats->btree_column_internal.desc = "column-store internal pages";
+	    "btree: column-store variable-size deleted values";
+	stats->btree_column_fix.desc =
+	    "btree: column-store fixed-size leaf pages";
+	stats->btree_column_internal.desc =
+	    "btree: column-store internal pages";
 	stats->btree_column_variable.desc =
-	    "column-store variable-size leaf pages";
-	stats->btree_compact_rewrite.desc = "pages rewritten by compaction";
-	stats->btree_entries.desc = "number of key/value pairs";
-	stats->btree_fixed_len.desc = "fixed-record size";
-	stats->btree_maximum_depth.desc = "maximum tree depth";
-	stats->btree_maxintlitem.desc = "maximum internal page item size";
-	stats->btree_maxintlpage.desc = "maximum internal page size";
-	stats->btree_maxleafitem.desc = "maximum leaf page item size";
-	stats->btree_maxleafpage.desc = "maximum leaf page size";
-	stats->btree_overflow.desc = "overflow pages";
-	stats->btree_row_internal.desc = "row-store internal pages";
-	stats->btree_row_leaf.desc = "row-store leaf pages";
-	stats->cache_bytes_read.desc = "bytes read into cache";
-	stats->cache_bytes_write.desc = "bytes written from cache";
+	    "btree: column-store variable-size leaf pages";
+	stats->btree_compact_rewrite.desc =
+	    "btree: pages rewritten by compaction";
+	stats->btree_entries.desc = "btree: number of key/value pairs";
+	stats->btree_fixed_len.desc = "btree: fixed-record size";
+	stats->btree_maximum_depth.desc = "btree: maximum tree depth";
+	stats->btree_maxintlitem.desc =
+	    "btree: maximum internal page item size";
+	stats->btree_maxintlpage.desc = "btree: maximum internal page size";
+	stats->btree_maxleafitem.desc = "btree: maximum leaf page item size";
+	stats->btree_maxleafpage.desc = "btree: maximum leaf page size";
+	stats->btree_overflow.desc = "btree: overflow pages";
+	stats->btree_row_internal.desc = "btree: row-store internal pages";
+	stats->btree_row_leaf.desc = "btree: row-store leaf pages";
+	stats->cache_bytes_read.desc = "cache: bytes read into cache";
+	stats->cache_bytes_write.desc = "cache: bytes written from cache";
 	stats->cache_eviction_checkpoint.desc =
 	    "cache: checkpoint blocked page eviction";
-	stats->cache_eviction_clean.desc = "unmodified pages evicted";
-	stats->cache_eviction_dirty.desc = "modified pages evicted";
+	stats->cache_eviction_clean.desc = "cache: unmodified pages evicted";
+	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
-	    "data source pages selected for eviction unable to be evicted";
+	    "cache: data source pages selected for eviction unable to be evicted";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
-	stats->cache_eviction_internal.desc = "internal pages evicted";
-	stats->cache_overflow_value.desc = "overflow values cached in memory";
-	stats->cache_read.desc = "pages read into cache";
-	stats->cache_read_overflow.desc = "overflow pages read into cache";
-	stats->cache_write.desc = "pages written from cache";
+	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
+	stats->cache_overflow_value.desc =
+	    "cache: overflow values cached in memory";
+	stats->cache_read.desc = "cache: pages read into cache";
+	stats->cache_read_overflow.desc =
+	    "cache: overflow pages read into cache";
+	stats->cache_write.desc = "cache: pages written from cache";
 	stats->compress_raw_fail.desc =
-	    "raw compression call failed, no additional data available";
+	    "compression: raw compression call failed, no additional data available";
 	stats->compress_raw_fail_temporary.desc =
-	    "raw compression call failed, additional data available";
-	stats->compress_raw_ok.desc = "raw compression call succeeded";
-	stats->compress_read.desc = "compressed pages read";
-	stats->compress_write.desc = "compressed pages written";
-	stats->compress_write_fail.desc = "page written failed to compress";
+	    "compression: raw compression call failed, additional data available";
+	stats->compress_raw_ok.desc =
+	    "compression: raw compression call succeeded";
+	stats->compress_read.desc = "compression: compressed pages read";
+	stats->compress_write.desc = "compression: compressed pages written";
+	stats->compress_write_fail.desc =
+	    "compression: page written failed to compress";
 	stats->compress_write_too_small.desc =
-	    "page written was too small to compress";
-	stats->cursor_create.desc = "cursor creation";
-	stats->cursor_insert.desc = "cursor insert calls";
-	stats->cursor_insert_bulk.desc = "bulk-loaded cursor-insert calls";
+	    "compression: page written was too small to compress";
+	stats->cursor_create.desc = "cursor: create calls";
+	stats->cursor_insert.desc = "cursor: insert calls";
+	stats->cursor_insert_bulk.desc =
+	    "cursor: bulk-loaded cursor-insert calls";
 	stats->cursor_insert_bytes.desc =
-	    "cursor-insert key and value bytes inserted";
-	stats->cursor_next.desc = "cursor next calls";
-	stats->cursor_prev.desc = "cursor prev calls";
-	stats->cursor_remove.desc = "cursor remove calls";
-	stats->cursor_remove_bytes.desc = "cursor-remove key bytes removed";
-	stats->cursor_reset.desc = "cursor reset calls";
-	stats->cursor_search.desc = "cursor search calls";
-	stats->cursor_search_near.desc = "cursor search near calls";
-	stats->cursor_update.desc = "cursor update calls";
-	stats->cursor_update_bytes.desc = "cursor-update value bytes updated";
+	    "cursor: cursor-insert key and value bytes inserted";
+	stats->cursor_next.desc = "cursor: next calls";
+	stats->cursor_prev.desc = "cursor: prev calls";
+	stats->cursor_remove.desc = "cursor: remove calls";
+	stats->cursor_remove_bytes.desc =
+	    "cursor: cursor-remove key bytes removed";
+	stats->cursor_reset.desc = "cursor: reset calls";
+	stats->cursor_search.desc = "cursor: search calls";
+	stats->cursor_search_near.desc = "cursor: search near calls";
+	stats->cursor_update.desc = "cursor: update calls";
+	stats->cursor_update_bytes.desc =
+	    "cursor: cursor-update value bytes updated";
 	stats->lsm_checkpoint_throttle.desc =
-	    "sleep for LSM checkpoint throttle";
-	stats->lsm_chunk_count.desc = "chunks in the LSM tree";
+	    "LSM: sleep for LSM checkpoint throttle";
+	stats->lsm_chunk_count.desc = "LSM: chunks in the LSM tree";
 	stats->lsm_generation_max.desc =
-	    "highest merge generation in the LSM tree";
+	    "LSM: highest merge generation in the LSM tree";
 	stats->lsm_lookup_no_bloom.desc =
-	    "queries that could have benefited from a Bloom filter that did not exist";
-	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
-	stats->rec_dictionary.desc = "reconciliation dictionary matches";
+	    "LSM: queries that could have benefited from a Bloom filter that did not exist";
+	stats->lsm_merge_throttle.desc = "LSM: sleep for LSM merge throttle";
+	stats->rec_dictionary.desc = "reconciliation: dictionary matches";
 	stats->rec_multiblock_internal.desc =
-	    "reconciliation internal page multi-block writes";
+	    "reconciliation: internal page multi-block writes";
 	stats->rec_multiblock_leaf.desc =
-	    "reconciliation leaf page multi-block writes";
+	    "reconciliation: leaf page multi-block writes";
 	stats->rec_multiblock_max.desc =
-	    "reconciliation maximum blocks required for a page";
+	    "reconciliation: maximum blocks required for a page";
 	stats->rec_overflow_key_internal.desc =
-	    "reconciliation internal-page overflow keys";
+	    "reconciliation: internal-page overflow keys";
 	stats->rec_overflow_key_leaf.desc =
-	    "reconciliation leaf-page overflow keys";
+	    "reconciliation: leaf-page overflow keys";
 	stats->rec_overflow_value.desc =
-	    "reconciliation overflow values written";
-	stats->rec_page_delete.desc = "reconciliation pages deleted";
-	stats->rec_page_match.desc = "reconciliation page checksum matches";
-	stats->rec_pages.desc = "page reconciliation calls";
+	    "reconciliation: overflow values written";
+	stats->rec_page_delete.desc = "reconciliation: pages deleted";
+	stats->rec_page_match.desc = "reconciliation: page checksum matches";
+	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
-	    "page reconciliation calls for eviction";
+	    "reconciliation: page reconciliation calls for eviction";
 	stats->rec_prefix_compression.desc =
-	    "leaf page key bytes discarded using prefix compression";
+	    "reconciliation: leaf page key bytes discarded using prefix compression";
 	stats->rec_skipped_update.desc =
-	    "reconciliation failed because an update could not be included";
+	    "reconciliation:  failed because an update could not be included";
 	stats->rec_suffix_compression.desc =
-	    "internal page key bytes discarded using suffix compression";
-	stats->session_compact.desc = "object compaction";
-	stats->session_cursor_open.desc = "open cursor count";
-	stats->txn_update_conflict.desc = "update conflicts";
+	    "reconciliation: internal page key bytes discarded using suffix compression";
+	stats->session_compact.desc = "session: object compaction";
+	stats->session_cursor_open.desc = "session: open cursor count";
+	stats->txn_update_conflict.desc = "txn: update conflicts";
 }
 
 void
@@ -318,12 +331,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_max_queue.desc = "async: maximum work queue length";
 	stats->async_nowork.desc =
 	    "async: number of times worker found no work";
-	stats->async_op_alloc.desc = "async op allocation";
-	stats->async_op_compact.desc = "async op compact calls";
-	stats->async_op_insert.desc = "async op insert calls";
-	stats->async_op_remove.desc = "async op remove calls";
-	stats->async_op_search.desc = "async op search calls";
-	stats->async_op_update.desc = "async op update calls";
+	stats->async_op_alloc.desc = "async: op allocations";
+	stats->async_op_compact.desc = "async: op compact calls";
+	stats->async_op_insert.desc = "async: op insert calls";
+	stats->async_op_remove.desc = "async: op remove calls";
+	stats->async_op_search.desc = "async: op search calls";
+	stats->async_op_update.desc = "async: op update calls";
 	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
 	stats->block_byte_read.desc = "block manager: bytes read";
 	stats->block_byte_write.desc = "block manager: bytes written";
@@ -371,19 +384,19 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: pages currently held in the cache";
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_write.desc = "cache: pages written from cache";
-	stats->cond_wait.desc = "pthread mutex condition wait calls";
-	stats->cursor_create.desc = "cursor creation";
-	stats->cursor_insert.desc = "Btree cursor insert calls";
-	stats->cursor_next.desc = "Btree cursor next calls";
-	stats->cursor_prev.desc = "Btree cursor prev calls";
-	stats->cursor_remove.desc = "Btree cursor remove calls";
-	stats->cursor_reset.desc = "Btree cursor reset calls";
-	stats->cursor_search.desc = "Btree cursor search calls";
-	stats->cursor_search_near.desc = "Btree cursor search near calls";
-	stats->cursor_update.desc = "Btree cursor update calls";
+	stats->cond_wait.desc = "conn: pthread mutex condition wait calls";
+	stats->cursor_create.desc = "Btree: cursor create calls";
+	stats->cursor_insert.desc = "Btree: cursor insert calls";
+	stats->cursor_next.desc = "Btree: cursor next calls";
+	stats->cursor_prev.desc = "Btree: cursor prev calls";
+	stats->cursor_remove.desc = "Btree: cursor remove calls";
+	stats->cursor_reset.desc = "Btree: cursor reset calls";
+	stats->cursor_search.desc = "Btree: cursor search calls";
+	stats->cursor_search_near.desc = "Btree: cursor search near calls";
+	stats->cursor_update.desc = "Btree: cursor update calls";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "dhandle: session sweep attempts";
-	stats->file_open.desc = "files currently open";
+	stats->file_open.desc = "conn: files currently open";
 	stats->log_buffer_grow.desc = "log: log buffer size increases";
 	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
@@ -410,47 +423,52 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_sync.desc = "log: log sync operations";
 	stats->log_writes.desc = "log: log write operations";
 	stats->lsm_checkpoint_throttle.desc =
-	    "sleep for LSM checkpoint throttle";
-	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
-	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
-	stats->lsm_work_queue_app.desc = "LSM App work units currently queued";
+	    "LSM: sleep for LSM checkpoint throttle";
+	stats->lsm_merge_throttle.desc = "LSM: sleep for LSM merge throttle";
+	stats->lsm_rows_merged.desc = "LSM: rows merged in an LSM tree";
+	stats->lsm_work_queue_app.desc =
+	    "LSM: App work units currently queued";
 	stats->lsm_work_queue_manager.desc =
-	    "LSM Merge work units currently queued";
-	stats->lsm_work_queue_max.desc = "LSM tree queue hit maximum";
+	    "LSM: Merge work units currently queued";
+	stats->lsm_work_queue_max.desc = "LSM: tree queue hit maximum";
 	stats->lsm_work_queue_switch.desc =
-	    "LSM Switch work units currently queued";
+	    "LSM: Switch work units currently queued";
 	stats->lsm_work_units_created.desc =
-	    "LSM tree maintenance operations scheduled";
+	    "LSM: tree maintenance operations scheduled";
 	stats->lsm_work_units_discarded.desc =
-	    "LSM tree maintenance operations discarded";
+	    "LSM: tree maintenance operations discarded";
 	stats->lsm_work_units_done.desc =
-	    "LSM tree maintenance operations executed";
-	stats->memory_allocation.desc = "memory allocations";
-	stats->memory_free.desc = "memory frees";
-	stats->memory_grow.desc = "memory re-allocations";
-	stats->read_io.desc = "total read I/Os";
-	stats->rec_pages.desc = "page reconciliation calls";
+	    "LSM: tree maintenance operations executed";
+	stats->memory_allocation.desc = "conn: memory allocations";
+	stats->memory_free.desc = "conn: memory frees";
+	stats->memory_grow.desc = "conn: memory re-allocations";
+	stats->read_io.desc = "conn: total read I/Os";
+	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
-	    "page reconciliation calls for eviction";
+	    "reconciliation: page reconciliation calls for eviction";
 	stats->rec_skipped_update.desc =
-	    "reconciliation failed because an update could not be included";
+	    "reconciliation: reconciliation failed because an update could not be included";
 	stats->rec_split_stashed_bytes.desc =
-	    "split bytes currently awaiting free";
+	    "reconciliation: split bytes currently awaiting free";
 	stats->rec_split_stashed_objects.desc =
-	    "split objects currently awaiting free";
-	stats->rwlock_read.desc = "pthread mutex shared lock read-lock calls";
+	    "reconciliation: split objects currently awaiting free";
+	stats->rwlock_read.desc =
+	    "conn: pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
-	    "pthread mutex shared lock write-lock calls";
-	stats->session_cursor_open.desc = "open cursor count";
-	stats->txn_begin.desc = "transactions";
-	stats->txn_checkpoint.desc = "transaction checkpoints";
+	    "conn: pthread mutex shared lock write-lock calls";
+	stats->session_cursor_open.desc = "session: open cursor count";
+	stats->session_open.desc = "session: open session count";
+	stats->txn_begin.desc = "txn: transaction begins";
+	stats->txn_checkpoint.desc = "txn: transaction checkpoints";
 	stats->txn_checkpoint_running.desc =
-	    "transaction checkpoint currently running";
-	stats->txn_commit.desc = "transactions committed";
+	    "txn: transaction checkpoint currently running";
+	stats->txn_commit.desc = "txn: transactions committed";
 	stats->txn_fail_cache.desc =
-	    "transaction failures due to cache overflow";
-	stats->txn_rollback.desc = "transactions rolled back";
-	stats->write_io.desc = "total write I/Os";
+	    "txn: transaction failures due to cache overflow";
+	stats->txn_pinned_range.desc =
+	    "txn: transaction range of IDs currently pinned";
+	stats->txn_rollback.desc = "txn: transactions rolled back";
+	stats->write_io.desc = "conn: total write I/Os";
 }
 
 void

@@ -46,12 +46,14 @@ void
 __wt_thread_id(char *buf, size_t buflen)
 {
 	pthread_t self;
-	size_t len;
 
-	len = (size_t)snprintf(buf, buflen, "%" PRIu64, (uint64_t)getpid());
-	if (len < buflen) {
-		self = pthread_self();
-		__wt_raw_to_hex_mem((const uint8_t *)&self,
-		    sizeof(self), (uint8_t *)buf + len, buflen - len);
-	}
+	/*
+	 * POSIX 1003.1 allows pthread_t to be an opaque type, but on systems
+	 * where it's a pointer, we'd rather print out the pointer and match
+	 * gdb output. Since we don't yet run on any systems where pthread_t
+	 * is not a pointer, do it that way for now.
+	 */
+	self = pthread_self();
+	(void)snprintf(buf, buflen,
+	    "%" PRIu64 ":%p", (uint64_t)getpid(), (void *)self);
 }

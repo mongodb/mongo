@@ -88,18 +88,28 @@ __wt_block_buffer_to_addr(WT_BLOCK *block,
  */
 int
 __wt_block_addr_valid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live)
 {
 	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(session);
 	WT_UNUSED(addr_size);
+	WT_UNUSED(live);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	/* All we care about is if it's past the end of the file. */
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * In diagnostic mode, verify the address isn't on the available list,
+	 * or for live systems, the discard list.
+	 */
+	WT_RET(__wt_block_misplaced(
+	    session, block, "addr-valid", offset, size, live));
+#endif
+
+	/* Check if it's past the end of the file. */
 	return (offset + size > block->fh->size ? 0 : 1);
 }
 

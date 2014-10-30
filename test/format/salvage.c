@@ -73,24 +73,28 @@ corrupt(void)
 	 */
 	(void)snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
-		(void)snprintf(copycmd, sizeof(copycmd),
 #ifdef _WIN32
+		(void)snprintf(copycmd, sizeof(copycmd),
 		    "copy %s\\%s %s\\slvg.copy\\%s.corrupted",
-#else
-		    "cp %s/%s %s/slvg.copy/%s.corrupted",
-#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
+#else
+		(void)snprintf(copycmd, sizeof(copycmd),
+		    "cp %s/%s %s/slvg.copy/%s.corrupted",
+		    g.home, WT_NAME, g.home, WT_NAME);
+#endif
 		goto found;
 	}
 	(void)snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
-		(void)snprintf(copycmd, sizeof(copycmd),
 #ifdef _WIN32
+		(void)snprintf(copycmd, sizeof(copycmd),
 		    "copy %s\\%s.wt %s\\slvg.copy\\%s.wt.corrupted",
-#else
-		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
-#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
+#else
+		(void)snprintf(copycmd, sizeof(copycmd),
+		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
+		    g.home, WT_NAME, g.home, WT_NAME);
+#endif
 		goto found;
 	}
 	return (0);

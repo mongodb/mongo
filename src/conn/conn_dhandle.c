@@ -42,7 +42,7 @@ __conn_dhandle_open_lock(
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 				return (0);
-			WT_RET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_RET(__wt_readunlock(session, dhandle->rwlock));
 		}
 
 		/*
@@ -58,7 +58,8 @@ __conn_dhandle_open_lock(
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
-				WT_RET(__wt_rwunlock(session, dhandle->rwlock));
+				WT_RET(
+				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;
 			}
 
@@ -168,7 +169,7 @@ err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
  *	Sync and close the underlying btree handle.
  */
 int
-__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
+__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -207,7 +208,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(__wt_checkpoint_close(session));
+		WT_ERR(__wt_checkpoint_close(session, force));
 
 	if (dhandle->checkpoint == NULL)
 		--S2C(session)->open_btree_count;
@@ -324,7 +325,7 @@ __conn_btree_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_btree_sync_and_close(session));
+		WT_RET(__wt_conn_btree_sync_and_close(session, 0));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
@@ -346,7 +347,7 @@ __conn_btree_open(
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_ERR(__wt_rwunlock(session, dhandle->rwlock));
+			WT_ERR(__wt_writeunlock(session, dhandle->rwlock));
 			WT_ERR(
 			    __conn_dhandle_open_lock(session, dhandle, flags));
 		}
@@ -363,7 +364,7 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 		if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
 			__wt_conn_btree_close(session);
 		else if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			WT_TRET(__wt_conn_btree_sync_and_close(session));
+			WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
 	}
 
 	return (ret);
@@ -392,7 +393,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
 		if ((ret = __conn_btree_open(session, op_cfg, flags)) != 0) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		}
 
 	WT_ASSERT(session, ret != 0 ||
@@ -512,7 +513,8 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
  *	checkpoint handles).
  */
 int
-__wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
+__wt_conn_dhandle_close_all(
+    WT_SESSION_IMPL *session, const char *name, int force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -541,9 +543,9 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 		 * open at this point.  Close the handle, if necessary.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			ret = __wt_meta_track_sub_on(session);
-			if (ret == 0)
-				ret = __wt_conn_btree_sync_and_close(session);
+			if ((ret = __wt_meta_track_sub_on(session)) == 0)
+				ret = __wt_conn_btree_sync_and_close(
+				    session, force);
 
 			/*
 			 * If the close succeeded, drop any locks it acquired.
@@ -590,7 +592,7 @@ __wt_conn_dhandle_discard_single(
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 		if (!final)
 			WT_ERR(EBUSY);
-		WT_ERR(__wt_conn_btree_sync_and_close(session));
+		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
 	}
 
 	/* 
