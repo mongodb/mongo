@@ -557,17 +557,15 @@ namespace mongo {
 
         output->appendNumber( "nrecords", nrecords );
 
-        if (full) {
-            WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
-            WT_SESSION* s = session->getSession();
-            BSONObjBuilder bob(output->subobjStart("wiredtiger"));
-            Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
-                                                              "statistics=(all)", &bob);
-            if (!status.isOK()) {
-                bob.append("error", "unable to retrieve statistics");
-                bob.append("code", static_cast<int>(status.code()));
-                bob.append("reason", status.reason());
-            }
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WT_SESSION* s = session->getSession();
+        BSONObjBuilder bob(output->subobjStart("wiredtiger"));
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+                                                          "statistics=(fast)", &bob);
+        if (!status.isOK()) {
+            bob.append("error", "unable to retrieve statistics");
+            bob.append("code", static_cast<int>(status.code()));
+            bob.append("reason", status.reason());
         }
         return Status::OK();
     }
