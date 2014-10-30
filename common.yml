@@ -166,24 +166,6 @@ functions:
         . ./${set_gopath|set_gopath.sh}
         go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
-  "create mongod users":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -e
-        if [ "Windows_NT" = "$OS" ]; then
-            set -o igncr
-            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
-        fi;
-        . ./${set_gopath|set_gopath.sh}
-        if [ "${library_path}" != "" ]; then
-            export ${library_path}
-        fi
-        cd common/testutil
-        go test -v
-        cd ..
-
   "download mongod":
     command: shell.exec
     params:
@@ -337,7 +319,13 @@ functions:
         . ./${set_gopath|set_gopath.sh}
         if [ "${library_path}" != "" ]; then
             export ${library_path}
-        fi
+        fi;
+
+        if [ "${create_mongod_users}" = "true" ]; then
+          cd common/testutil
+          go test -v
+          cd ../..
+        fi;
 
         # mongodump
         cd mongodump
@@ -633,7 +621,7 @@ tasks:
       vars:
         tool: mongotop
 
-- name: integration-2222
+- name: integration
   commands:
     - command: git.get_project
       params:
@@ -656,7 +644,7 @@ tasks:
           sleep 2s
     - func: "run tool integration tests"
 
-- name: integration
+- name: integration-auth
   commands:
     - command: git.get_project
       params:
@@ -672,6 +660,8 @@ tasks:
             value: "-test.types=${integration_test_args},auth"
           - key: "mongodb_args"
             concat: *auth_startup_args_string
+          - key: "create_mongod_users"
+            value: "true"
     - func: "download mongod"
     - func: "start mongod"
     - command: shell.exec
@@ -680,7 +670,6 @@ tasks:
         script: |
           # Give mongod a chance to start
           sleep 2s
-    - func: "create mongod users"
     - func: "run tool integration tests"
 
 - name: json
