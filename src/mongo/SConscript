@@ -777,7 +777,6 @@ mongosLibraryFiles = [
     "s/balance.cpp",
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
-    "s/mongos_persistence_stubs.cpp",
     ]
 
 env.Library( "mongoscore",
