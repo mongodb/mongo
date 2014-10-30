@@ -152,11 +152,16 @@ namespace mongo {
         if ( !_sizeStorer )
             return;
 
-        WiredTigerSession session( _conn, -1 );
-        WT_SESSION* s = session.getSession();
-        invariantWTOK( s->begin_transaction( s, "sync=true" ) );
-        _sizeStorer->storeInto( &session, _sizeStorerUri );
-        invariantWTOK( s->commit_transaction( s, NULL ) );
+        try {
+            WiredTigerSession session( _conn, -1 );
+            WT_SESSION* s = session.getSession();
+            invariantWTOK( s->begin_transaction( s, "sync=true" ) );
+            _sizeStorer->storeInto( &session, _sizeStorerUri );
+            invariantWTOK( s->commit_transaction( s, NULL ) );
+        }
+        catch ( const DeadLockException& de ) {
+            // ignore, it means someone else is doing it
+        }
     }
 
     RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {

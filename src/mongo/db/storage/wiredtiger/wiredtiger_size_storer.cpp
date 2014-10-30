@@ -135,7 +135,7 @@ namespace mongo {
                         entry.dirty = true;
                     }
                 }
-                
+
                 if ( !entry.dirty )
                     continue;
                 myMap[uri] = entry;

@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/deadlock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -55,8 +56,10 @@ namespace mongo {
             return Status::OK();
 
 
-        if ( retCode == WT_ROLLBACK )
+        if ( retCode == WT_ROLLBACK ) {
+            //printStackTrace();
             throw DeadLockException();
+        }
 
         // TODO convert specific codes rather than just using INTERNAL_ERROR for everything.
         return Status(ErrorCodes::InternalError,
