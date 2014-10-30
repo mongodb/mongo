@@ -299,6 +299,31 @@ namespace {
         IndexCatalogEntryContainer* _entries;
         const IndexDescriptor* _desc;
     };
+
+    class IndexRemoveChange : public RecoveryUnit::Change {
+    public:
+        IndexRemoveChange(Collection* collection,
+                               IndexCatalogEntryContainer* entries,
+                               IndexCatalogEntry* entry)
+            : _collection(collection),
+              _entries(entries),
+              _entry(entry) {
+        }
+
+        virtual void commit() {
+            delete _entry;
+        }
+
+        virtual void rollback() {
+            _entries->add(_entry);
+            _collection->infoCache()->reset();
+        }
+
+    private:
+        Collection* _collection;
+        IndexCatalogEntryContainer* _entries;
+        IndexCatalogEntry* _entry;
+    };
 } // namespace
 
     Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
@@ -751,7 +776,8 @@ namespace {
 
         audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
 
-        _entries.remove( entry->descriptor() );
+        invariant(_entries.release(entry->descriptor()) == entry);
+        txn->recoveryUnit()->registerChange(new IndexRemoveChange(_collection, &_entries, entry));
         entry = NULL;
 
         try {
