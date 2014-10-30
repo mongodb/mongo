@@ -53,21 +53,6 @@ __wt_raw_to_hex(
 }
 
 /*
- * __wt_raw_to_hex_mem --
- *	Convert a chunk of data to a nul-terminated printable hex string.
- */
-void
-__wt_raw_to_hex_mem(
-    const uint8_t *from, size_t size, uint8_t *dest, size_t dest_size)
-{
-	/*
-	 * Every byte takes up 2 spaces, plus a trailing nul byte.
-	 * The user must provide a large enough destination buffer.
-	 */
-	__fill_hex(from, size, dest, dest_size, NULL);
-}
-
-/*
  * __wt_raw_to_esc_hex --
  *	Convert a chunk of data to a nul-terminated printable string using
  * escaped hex, as necessary.
