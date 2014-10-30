@@ -35,6 +35,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/client/native_sasl_client_session.h"
+#include "mongo/client/sasl_scramsha1_client_conversation.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_state.h"
@@ -114,6 +116,7 @@ namespace mongo {
         scope->injectV8Method("auth", mongoAuth, proto);
         scope->injectV8Method("logout", mongoLogout, proto);
         scope->injectV8Method("cursorFromId", mongoCursorFromId, proto);
+        scope->injectV8Method("copyDatabaseWithSCRAM", mongoCopyDatabaseWithSCRAM, proto);
 
         fassert(16468, _mongoPrototypeManipulatorsFrozen);
         for (size_t i = 0; i < _mongoPrototypeManipulators.size(); ++i)
@@ -384,6 +387,94 @@ namespace mongo {
         BSONObj ret;
         conn->logout(db, ret);
         return scope->mongoToLZV8(ret, false);
+    }
+
+    v8::Handle<v8::Value> mongoCopyDatabaseWithSCRAM(V8Scope* scope, const v8::Arguments& args) {
+        boost::shared_ptr<DBClientBase> conn = getConnection(scope, args);
+        if (NULL == conn)
+            return v8AssertionException("no connection");
+
+        argumentCheck(args.Length() == 5, "copyDatabase needs 5 arg");
+
+        // copyDatabase(fromdb, todb, fromhost, username, password);
+        std::string fromDb = toSTLString(args[0]);
+        std::string toDb = toSTLString(args[1]);
+        std::string fromHost = toSTLString(args[2]);
+        std::string user = toSTLString(args[3]);
+        std::string hashedPwd = DBClientWithCommands::createPasswordDigest(user,
+                                                                           toSTLString(args[4]));
+
+        boost::scoped_ptr<SaslClientSession> session(new NativeSaslClientSession());
+
+        session->setParameter(SaslClientSession::parameterMechanism, "SCRAM-SHA-1");
+        session->setParameter(SaslClientSession::parameterUser, user);
+        session->setParameter(SaslClientSession::parameterPassword, hashedPwd);
+        session->initialize();
+
+        BSONObj saslFirstCommandPrefix = BSON(
+                "copydbsaslstart" << 1 <<
+                "fromhost" << fromHost <<
+                "fromdb" << fromDb <<
+                saslCommandMechanismFieldName << "SCRAM-SHA-1");
+
+        BSONObj saslFollowupCommandPrefix = BSON("copydb" << 1 <<
+                                                 "fromhost" << fromHost <<
+                                                 "fromdb" << fromDb <<
+                                                 "todb" << toDb);
+
+        BSONObj saslCommandPrefix = saslFirstCommandPrefix;
+        BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
+        bool isServerDone = false;
+
+        while (!session->isDone()) {
+            std::string payload;
+            BSONType type;
+
+            Status status = saslExtractPayload(inputObj, &payload, &type);
+            if (!status.isOK()) {
+                return v8AssertionException(status.reason());
+            }
+
+            std::string responsePayload;
+            status = session->step(payload, &responsePayload);
+            if (!status.isOK()) {
+                return v8AssertionException(status.reason());
+            }
+
+            BSONObjBuilder commandBuilder;
+
+            commandBuilder.appendElements(saslCommandPrefix);
+            commandBuilder.appendBinData(saslCommandPayloadFieldName,
+                                         int(responsePayload.size()),
+                                         BinDataGeneral,
+                                         responsePayload.c_str());
+            BSONElement conversationId = inputObj[saslCommandConversationIdFieldName];
+            if (!conversationId.eoo())
+                commandBuilder.append(conversationId);
+
+            BSONObj command = commandBuilder.obj();
+
+            bool ok = conn->runCommand("admin", command, inputObj);
+
+            ErrorCodes::Error code = ErrorCodes::fromInt(
+                    inputObj[saslCommandCodeFieldName].numberInt());
+
+            if (!ok || code != ErrorCodes::OK) {
+                if (code == ErrorCodes::OK)
+                    code = ErrorCodes::UnknownError;
+
+                return scope->mongoToLZV8(inputObj, true);
+            }
+
+            isServerDone = inputObj[saslCommandDoneFieldName].trueValue();
+            saslCommandPrefix = saslFollowupCommandPrefix;
+        }
+
+        if (!isServerDone) {
+            return v8AssertionException("copydb client finished before server.");
+        }
+
+        return scope->mongoToLZV8(inputObj, true);
     }
 
     /**

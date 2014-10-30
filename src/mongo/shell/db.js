@@ -265,12 +265,25 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password)
     assert( isString(fromdb) && fromdb.length );
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
-    if ( username && password ) {
-        var n = this._adminCommand( { copydbgetnonce : 1, fromhost:fromhost } );
-        return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb, username:username, nonce:n.nonce, key:this.__pwHash( n.nonce, username, password ) } );
-    } else {
+
+    var mechanism = this._getDefaultAuthenticationMechanism();
+    assert(mechanism == "SCRAM-SHA-1" || mechanism == "MONGODB-CR");
+
+    // Check for no auth
+    if (!username || !password) {
         return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
     }
+
+    // Use the copyDatabase native helper for SCRAM-SHA-1
+    if (mechanism == "SCRAM-SHA-1") {
+        return this.getMongo().copyDatabaseWithSCRAM(fromdb, todb, fromhost, username, password);
+    }
+
+    // Fall back to MONGODB-CR
+    var n = this._adminCommand({ copydbgetnonce : 1, fromhost:fromhost});
+    return this._adminCommand({ copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb,
+                                username:username, nonce:n.nonce,
+                                key:this.__pwHash(n.nonce, username, password) });
 }
 
 /**
