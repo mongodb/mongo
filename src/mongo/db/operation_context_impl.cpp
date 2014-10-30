@@ -169,9 +169,9 @@ namespace {
             return;
         }
 
-        uassert(ErrorCodes::InterruptedAtShutdown,
-                "interrupted at shutdown",
-                !getGlobalEnvironment()->getKillAllOperations());
+        if (getGlobalEnvironment()->getKillAllOperations()) {
+            uasserted(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
+        }
 
         if (c->curop()->maxTimeHasExpired()) {
             c->curop()->kill();

@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -806,7 +807,7 @@ namespace {
 
         dbresponse.response = resp;
         dbresponse.responseTo = m.header().getId();
-        
+
         if( exhaust ) {
             curop.debug().exhaust = true;
             dbresponse.exhaustNS = ns;
@@ -819,50 +820,6 @@ namespace {
                         Client::Context& ctx,
                         const char *ns,
                         /*modifies*/BSONObj& js) {
-
-        if ( nsToCollectionSubstring( ns ) == "system.indexes" ) {
-            string targetNS = js["ns"].String();
-            uassertStatusOK( userAllowedWriteNS( targetNS ) );
-
-            Collection* collection = ctx.db()->getCollection( txn, targetNS );
-            if ( !collection ) {
-                // implicitly create
-                WriteUnitOfWork wunit(txn);
-                collection = ctx.db()->createCollection( txn, targetNS );
-                verify( collection );
-                repl::logOp(txn,
-                            "c",
-                            (ctx.db()->name() + ".$cmd").c_str(),
-                            BSON("create" << nsToCollectionSubstring(targetNS)));
-                wunit.commit();
-            }
-
-            // Only permit interrupting an (index build) insert if the
-            // insert comes from a socket client request rather than a
-            // parent operation using the client interface.  The parent
-            // operation might not support interrupts.
-            const bool mayInterrupt = txn->getCurOp()->parent() == NULL;
-
-            txn->getCurOp()->setQuery(js);
-
-            MultiIndexBlock indexer(txn, collection);
-            indexer.allowBackgroundBuilding();
-            if (mayInterrupt)
-                indexer.allowInterruption();
-
-            Status status = indexer.init(js);
-            if ( status.code() == ErrorCodes::IndexAlreadyExists )
-                return; // inserting an existing index is a no-op.
-            uassertStatusOK(status);
-            uassertStatusOK(indexer.insertAllDocumentsInCollection());
-
-            WriteUnitOfWork wunit(txn);
-            indexer.commit();
-            repl::logOp(txn, "i", ns, js);
-            wunit.commit();
-
-            return;
-        }
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert( js );
         uassertStatusOK( fixed.getStatus() );
@@ -911,13 +868,93 @@ namespace {
         op.debug().ninserted = i;
     }
 
+    static void convertSystemIndexInsertsToCommands(
+            DbMessage& d,
+            BSONArrayBuilder* allCmdsBuilder) {
+        while (d.moreJSObjs()) {
+            BSONObj spec = d.nextJsObj();
+            BSONElement indexNsElement = spec["ns"];
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "Missing \"ns\" field while inserting into " << d.getns(),
+                    !indexNsElement.eoo());
+            uassert(ErrorCodes::TypeMismatch,
+                    str::stream() << "Expected \"ns\" field to have type String, not " <<
+                    typeName(indexNsElement.type()) << " while inserting into " << d.getns(),
+                    indexNsElement.type() == String);
+            const StringData nsToIndex(indexNsElement.valueStringData());
+            BSONObjBuilder cmdObjBuilder(allCmdsBuilder->subobjStart());
+            cmdObjBuilder << "createIndexes" << nsToCollectionSubstring(nsToIndex);
+            BSONArrayBuilder specArrayBuilder(cmdObjBuilder.subarrayStart("indexes"));
+            while (true) {
+                BSONObjBuilder specBuilder(specArrayBuilder.subobjStart());
+                BSONElement specNsElement = spec["ns"];
+                if ((specNsElement.type() != String) ||
+                    (specNsElement.valueStringData() != nsToIndex)) {
+
+                    break;
+                }
+                for (BSONObjIterator iter(spec); iter.more();) {
+                    BSONElement element = iter.next();
+                    if (element.fieldNameStringData() != "ns") {
+                        specBuilder.append(element);
+                    }
+                }
+                if (!d.moreJSObjs()) {
+                    break;
+                }
+                spec = d.nextJsObj();
+            }
+        }
+    }
+
+    static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curOp) {
+        BSONArrayBuilder allCmdsBuilder;
+        try {
+            convertSystemIndexInsertsToCommands(d, &allCmdsBuilder);
+        }
+        catch (const DBException& ex) {
+            setLastError(ex.getCode(), ex.getInfo().msg.c_str());
+            curOp.debug().exceptionInfo = ex.getInfo();
+            return;
+        }
+        BSONArray allCmds(allCmdsBuilder.done());
+        Command* createIndexesCmd = Command::findCommand("createIndexes");
+        invariant(createIndexesCmd);
+        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+        for (BSONObjIterator iter(allCmds); iter.more();) {
+            try {
+                BSONObjBuilder resultBuilder;
+                BSONObj cmdObj = iter.next().Obj();
+                Command::execCommand(
+                        txn,
+                        createIndexesCmd,
+                        0, /* what should I use for query option? */
+                        d.getns(),
+                        cmdObj,
+                        resultBuilder,
+                        false /* fromRepl */);
+                uassertStatusOK(Command::getStatusFromCommandResult(resultBuilder.done()));
+            }
+            catch (const DBException& ex) {
+                setLastError(ex.getCode(), ex.getInfo().msg.c_str());
+                curOp.debug().exceptionInfo = ex.getInfo();
+                if (!keepGoing) {
+                    return;
+                }
+            }
+        }
+    }
+
     void receivedInsert(OperationContext* txn, Message& m, CurOp& op) {
         DbMessage d(m);
         const char *ns = d.getns();
-        const NamespaceString nsString(ns);
         op.debug().ns = ns;
-
         uassertStatusOK( userAllowedWriteNS( ns ) );
+        if (nsToCollectionSubstring(ns) == "system.indexes") {
+            insertSystemIndexes(txn, d, op);
+            return;
+        }
+        const NamespaceString nsString(ns);
 
         if( !d.moreJSObjs() ) {
             // strange.  should we complain?

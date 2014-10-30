@@ -657,7 +657,6 @@ namespace mongo {
 
     static void singleCreateIndex( OperationContext* txn,
                                    const BSONObj& indexDesc,
-                                   Collection* collection,
                                    WriteOpResult* result );
 
     static void multiUpdate( OperationContext* txn,
@@ -1028,13 +1027,13 @@ namespace mongo {
             normalizedInsert.getValue();
 
         try {
-            if (state->lockAndCheck(result)) {
-                if (!state->request->isInsertIndexRequest()) {
+            if (!state->request->isInsertIndexRequest()) {
+                if (state->lockAndCheck(result)) {
                     singleInsert(state->txn, insertDoc, state->getCollection(), result);
                 }
-                else {
-                    singleCreateIndex(state->txn, insertDoc, state->getCollection(), result);
-                }
+            }
+            else {
+                singleCreateIndex(state->txn, insertDoc, result);
             }
         }
         catch (const DBException& ex) {
@@ -1107,45 +1106,57 @@ namespace mongo {
     }
 
     /**
-     * Perform a single index insert into a collection.  Requires the index descriptor be
-     * preprocessed and the collection already has been created.
+     * Perform a single index creation on a collection.  Requires the index descriptor be
+     * preprocessed.
      *
      * Might fault or error, otherwise populates the result.
      */
-    static void singleCreateIndex( OperationContext* txn,
-                                   const BSONObj& indexDesc,
-                                   Collection* collection,
-                                   WriteOpResult* result ) {
+    static void singleCreateIndex(OperationContext* txn,
+                                  const BSONObj& indexDesc,
+                                  WriteOpResult* result) {
 
-        const string indexNS = collection->ns().getSystemIndexesCollection();
-
-        txn->lockState()->assertWriteLocked( indexNS );
-
-        MultiIndexBlock indexer(txn, collection);
-        indexer.allowBackgroundBuilding();
-        indexer.allowInterruption();
-
-        Status status = indexer.init(indexDesc);
-        if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
+        BSONElement nsElement = indexDesc["ns"];
+        uassert(ErrorCodes::NoSuchKey,
+                "Missing \"ns\" field in index description",
+                !nsElement.eoo());
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Expected \"ns\" field of index description to be a " "string, "
+                "but found a " << typeName(nsElement.type()),
+                nsElement.type() == String);
+        const NamespaceString ns(nsElement.valueStringData());
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder << "createIndexes" << ns.coll();
+        cmdBuilder << "indexes" << BSON_ARRAY(indexDesc);
+        BSONObj cmd = cmdBuilder.done();
+        Command* createIndexesCmd = Command::findCommand("createIndexes");
+        invariant(createIndexesCmd);
+        std::string errmsg;
+        BSONObjBuilder resultBuilder;
+        const bool success = createIndexesCmd->run(
+                txn,
+                ns.db().toString(),
+                cmd,
+                0,
+                errmsg,
+                resultBuilder,
+                false /* fromrepl */);
+        Command::appendCommandStatus(resultBuilder, success, errmsg);
+        BSONObj cmdResult = resultBuilder.done();
+        uassertStatusOK(Command::getStatusFromCommandResult(cmdResult));
+        const long long numIndexesBefore = cmdResult["numIndexesBefore"].safeNumberLong();
+        const long long numIndexesAfter = cmdResult["numIndexesAfter"].safeNumberLong();
+        if (numIndexesAfter - numIndexesBefore == 1) {
+            result->getStats().n = 1;
+        }
+        else if (numIndexesAfter != 0 && numIndexesAfter != numIndexesBefore) {
+            severe() <<
+                "Created multiple indexes while attempting to create only 1; numIndexesBefore = " <<
+                numIndexesBefore << "; numIndexesAfter = " << numIndexesAfter;
+            fassertFailed(28547);
+        }
+        else {
             result->getStats().n = 0;
-            return; // inserting an existing index is a no-op.
         }
-        if (!status.isOK()) {
-            result->setError(toWriteError(status));
-            return;
-        }
-
-        status = indexer.insertAllDocumentsInCollection();
-        if (!status.isOK()) {
-            result->setError(toWriteError(status));
-            return;
-        }
-
-        WriteUnitOfWork wunit(txn);
-        indexer.commit();
-        repl::logOp( txn, "i", indexNS.c_str(), indexDesc );
-        result->getStats().n = 1;
-        wunit.commit();
     }
 
     static void multiUpdate( OperationContext* txn,
