@@ -231,7 +231,7 @@ add_option( "ssl" , "Enable SSL" , 0 , True )
 add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "rocksdb" , "Enable RocksDB" , 0 , False )
 add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
-            type="choice", choices=["on", "off"], const="on" )
+            type="choice", choices=["on", "off"], const="on", default="on")
 add_option( "replication-implementation",
             "Controls what implementation is used for the replication system", "?", False,
             type="choice", choices=["impl", "legacy"], const="impl", default="impl" )
