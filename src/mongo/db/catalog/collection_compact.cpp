@@ -112,7 +112,7 @@ namespace mongo {
 
 
         // same data, but might perform a little different after compact?
-        _infoCache.reset();
+        _infoCache.reset( txn );
 
         vector<BSONObj> indexSpecs;
         {

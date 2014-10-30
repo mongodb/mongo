@@ -181,7 +181,7 @@ namespace mongo {
 
         // this is so that operations examining the list of indexes know there are more keys to look
         // at when doing things like in place updates, etc...
-        _collection->infoCache()->addedIndex();
+        _collection->infoCache()->addedIndex(_txn);
 
         if (_buildInBackground)
             _backgroundOperation.reset(new BackgroundOperation(ns));
@@ -293,7 +293,7 @@ namespace mongo {
         }
 
         // this one is so operations examining the list of indexes know that the index is finished
-        _collection->infoCache()->addedIndex();
+        _collection->infoCache()->addedIndex(_txn);
 
         _txn->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));
         _needToCleanup = false;

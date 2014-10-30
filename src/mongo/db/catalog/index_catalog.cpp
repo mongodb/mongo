@@ -279,10 +279,12 @@ namespace {
         /**
          * None of these pointers are owned by this class.
          */
-        IndexCleanupOnRollback(Collection* collection,
+        IndexCleanupOnRollback(OperationContext* txn,
+                               Collection* collection,
                                IndexCatalogEntryContainer* entries,
                                const IndexDescriptor* desc)
-            : _collection(collection),
+            : _txn(txn),
+              _collection(collection),
               _entries(entries),
               _desc(desc) {
         }
@@ -291,10 +293,11 @@ namespace {
 
         virtual void rollback() {
             _entries->remove(_desc);
-            _collection->infoCache()->reset();
+            _collection->infoCache()->reset(_txn);
         }
 
     private:
+        OperationContext* _txn;
         Collection* _collection;
         IndexCatalogEntryContainer* _entries;
         const IndexDescriptor* _desc;
@@ -302,10 +305,12 @@ namespace {
 
     class IndexRemoveChange : public RecoveryUnit::Change {
     public:
-        IndexRemoveChange(Collection* collection,
-                               IndexCatalogEntryContainer* entries,
-                               IndexCatalogEntry* entry)
-            : _collection(collection),
+        IndexRemoveChange(OperationContext* txn,
+                          Collection* collection,
+                          IndexCatalogEntryContainer* entries,
+                          IndexCatalogEntry* entry)
+            : _txn(txn),
+              _collection(collection),
               _entries(entries),
               _entry(entry) {
         }
@@ -316,10 +321,11 @@ namespace {
 
         virtual void rollback() {
             _entries->add(_entry);
-            _collection->infoCache()->reset();
+            _collection->infoCache()->reset(_txn);
         }
 
     private:
+        OperationContext* _txn;
         Collection* _collection;
         IndexCatalogEntryContainer* _entries;
         IndexCatalogEntry* _entry;
@@ -365,7 +371,8 @@ namespace {
         if (!status.isOK())
             return status;
 
-        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(_collection,
+        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(txn,
+                                                                       _collection,
                                                                        &_entries,
                                                                        entry->descriptor()));
         indexBuildBlock.success();
@@ -473,7 +480,7 @@ namespace {
 
         _catalog->_collection->getCatalogEntry()->indexBuildSuccess( _txn, _indexName );
 
-        _catalog->_collection->infoCache()->addedIndex();
+        _catalog->_collection->infoCache()->addedIndex( _txn );
 
         IndexDescriptor* desc = _catalog->findIndexByName( _txn, _indexName, true );
         fassert( 17330, desc );
@@ -767,7 +774,7 @@ namespace {
         _collection->cursorCache()->invalidateAll( false );
 
         // wipe out stats
-        _collection->infoCache()->reset();
+        _collection->infoCache()->reset(txn);
 
         string indexNamespace = entry->descriptor()->indexNamespace();
         string indexName = entry->descriptor()->indexName();
@@ -777,7 +784,8 @@ namespace {
         audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
 
         invariant(_entries.release(entry->descriptor()) == entry);
-        txn->recoveryUnit()->registerChange(new IndexRemoveChange(_collection, &_entries, entry));
+        txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, _collection,
+                                                                  &_entries, entry));
         entry = NULL;
 
         try {
