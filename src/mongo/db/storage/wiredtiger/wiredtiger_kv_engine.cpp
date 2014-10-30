@@ -124,6 +124,11 @@ namespace mongo {
     int WiredTigerKVEngine::flushAllFiles( bool sync ) {
         LOG(1) << "WiredTigerKVEngine::flushAllFiles";
         syncSizeInfo();
+
+        WiredTigerSession session( _conn, -1 );
+        WT_SESSION* s = session.getSession();
+        invariantWTOK( s->checkpoint(s, NULL ) );
+
         return 1;
     }
 
