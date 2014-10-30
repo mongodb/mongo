@@ -52,7 +52,7 @@ namespace mongo {
         /*
          * Resets entire cache state. Must be called under exclusive DB lock.
          */
-        void reset();
+        void reset( OperationContext* txn );
 
         //
         // New Query Execution
@@ -84,7 +84,7 @@ namespace mongo {
         /**
          * Called when an index is added to this collection.
          */
-        void addedIndex() { reset(); }
+        void addedIndex( OperationContext* txn ) { reset( txn ); }
 
         void clearQueryCache();
 
