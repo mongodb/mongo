@@ -4,6 +4,9 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -72,13 +75,26 @@ namespace mongo {
             }
         }
 
+        boost::filesystem::path journalPath = path;
+        journalPath /= "journal";
+        if ( !boost::filesystem::exists( journalPath ) ) {
+            try {
+                boost::filesystem::create_directory( journalPath );
+            }
+            catch( std::exception& e) {
+                log() << "error creating journal dir " << journalPath.string() << ' ' << e.what();
+                throw;
+            }
+        }
+
         std::stringstream ss;
         ss << "create,";
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(all),";
-        ss << "log=(enabled),";
+        ss << "log=(enabled=true,archive=true,path=journal),";
+        ss << "checkpoint=(wait=60,log_size=2GB),";
         ss << extraOpenOptions;
         string config = ss.str();
         LOG(1) << "wiredtiger_open config: " << config;
