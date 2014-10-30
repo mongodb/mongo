@@ -398,7 +398,7 @@ namespace {
             status = getGlobalReplicationCoordinator()->stepDown(
                     txn,
                     force,
-                    ReplicationCoordinator::Milliseconds(0),
+                    ReplicationCoordinator::Milliseconds(1000),
                     ReplicationCoordinator::Milliseconds(secs * 1000));
             return appendCommandStatus(result, status);
         }
