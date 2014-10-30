@@ -601,7 +601,8 @@ namespace mongo {
                           << endl;
                 }
                 else {
-                    fassert(18507, !"File is closing while there are unwritten changes.");
+                    // File is closing while there are unwritten changes
+                    fassertFailed(18507);
                 }
             }
         }
