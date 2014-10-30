@@ -635,7 +635,15 @@ namespace {
                           "Our set name of " << ourSetName << " does not match name " << rshb <<
                           " reported by remote node");
         }
-        if (_selfIndex != -1) {
+
+        const MemberState myState = getMemberState();
+        if (_selfIndex == -1) {
+            if (myState.removed()) {
+                return Status(ErrorCodes::InvalidReplicaSetConfig,
+                              "Our replica set configuration is invalid or does not include us");
+            }
+        }
+        else {
             invariant(_currentConfig.getReplSetName() == args.getSetName());
             if (args.getSenderId() == _selfConfig().getId()) {
                 return Status(ErrorCodes::BadValue,
@@ -647,8 +655,6 @@ namespace {
         // This is a replica set
         response->noteReplSet();
         response->setSetName(ourSetName);
-
-        const MemberState myState = getMemberState();
         response->setState(myState.s);
         if (myState.primary()) {
             response->setElectionTime(_electionTime);
@@ -1250,6 +1256,24 @@ namespace {
         vector<BSONObj> membersOut;
         const MemberState myState = getMemberState();
 
+        if (_selfIndex == -1) {
+            // We're REMOVED or have an invalid config
+            response->append("state", static_cast<int>(myState.s));
+            response->append("stateStr", myState.toString());
+            response->append("uptime", selfUptime);
+            response->append("optime", lastOpApplied);
+            response->appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
+            if (_maintenanceModeCalls) {
+                response->append("maintenanceMode", _maintenanceModeCalls);
+            }
+            std::string s = _getHbmsg();
+            if( !s.empty() )
+                response->append("infoMessage", s);
+            *result = Status(ErrorCodes::InvalidReplicaSetConfig,
+                             "Our replica set config is invalid or we are not a member of it");
+            return;
+        }
+
         for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
              it != _hbdata.end(); 
              ++it) {
@@ -1260,9 +1284,8 @@ namespace {
                 bb.append("_id", _selfConfig().getId());
                 bb.append("name", _selfConfig().getHostAndPort().toString());
                 bb.append("health", 1.0);
-                const MemberState state = getMemberState();
-                bb.append("state", static_cast<int>(state.s));
-                bb.append("stateStr", state.toString());
+                bb.append("state", static_cast<int>(myState.s));
+                bb.append("stateStr", myState.toString());
                 bb.append("uptime", selfUptime);
                 if (!_selfConfig().isArbiter()) {
                     bb.append("optime", lastOpApplied);
@@ -1281,7 +1304,7 @@ namespace {
                 if( !s.empty() )
                     bb.append("infoMessage", s);
 
-                if (state.primary()) {
+                if (myState.primary()) {
                     bb.append("electionTime", _electionTime);
                     bb.appendDate("electionDate", Date_t(_electionTime.getSecs() * 1000ULL));
                 }
