@@ -725,14 +725,17 @@ namespace {
                 DeleteExecutor executor(&request);
                 uassertStatusOK(executor.prepare());
 
-                Lock::DBLock dbLocklk(txn->lockState(), ns.db(), MODE_IX);
+                AutoGetDb autoDb(txn, ns.db(), MODE_IX);
+                if (!autoDb.getDb()) break;
+
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
 
                 long long n = executor.execute(ctx.db());
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
-                return;
+
+                break;
             }
             catch ( const DeadLockException& dle ) {
                 log(LogComponent::kWrites) << "got deadlock doing delete on " << ns

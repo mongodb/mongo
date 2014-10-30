@@ -254,7 +254,9 @@ namespace mongo {
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
+            AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
+            if (!autoDb.getDb()) return Status::OK();
+
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
             Client::Context ctx(txn, nsString);
 
