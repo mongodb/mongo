@@ -785,6 +785,7 @@ func TestImportDocuments(t *testing.T) {
 				BatchSize:              &batchSize,
 				NumProcessingThreads:   &numProcessingThreads,
 				NumIngestionThreads:    &numIngestionThreads,
+				WriteConcern:           "1",
 				MaintainInsertionOrder: true,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)

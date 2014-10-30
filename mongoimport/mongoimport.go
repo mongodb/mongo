@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -28,6 +29,7 @@ const (
 
 var (
 	errNsNotFound = errors.New("ns not found")
+	errNoReplSet  = errors.New("norepl")
 )
 
 // ingestion constants
@@ -387,7 +389,7 @@ func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error
 func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	ignoreBlanks := mongoImport.IngestOptions.IgnoreBlanks && mongoImport.InputOptions.Type != JSON
 	documentBytes := make([]byte, 0)
-	documents := make([]interface{}, 0)
+	documents := make([]bson.Raw, 0)
 	numMessageBytes := 0
 
 	// TODO: mgo driver does not reestablish connections once lost
@@ -405,17 +407,24 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	if err != nil {
 		return fmt.Errorf("error checking if server supports write commands: %v", err)
 	}
-	log.Logf(log.Info, "using write concern: %v", mongoImport.IngestOptions.WriteConcern)
-	sessionSafety := &mgo.Safe{WMode: mongoImport.IngestOptions.WriteConcern}
+	log.Logf(log.Info, "using write commands: %v", mongoImport.supportsWriteCommands)
+	sessionSafety := &mgo.Safe{}
+
+	intWriteConcern, err := strconv.Atoi(mongoImport.IngestOptions.WriteConcern)
+	if err != nil {
+		log.Logf(log.DebugLow, "using wmode write concern: %v", mongoImport.IngestOptions.WriteConcern)
+		sessionSafety.WMode = mongoImport.IngestOptions.WriteConcern
+	} else {
+		log.Logf(log.DebugLow, "using w write concern: %v", mongoImport.IngestOptions.WriteConcern)
+		sessionSafety.W = intWriteConcern
+	}
 
 	// handle fire-and-forget write concern
-	if sessionSafety.WMode == "0" {
+	if sessionSafety.W == 0 {
 		session.SetSafe(nil)
 	} else {
 		session.SetSafe(sessionSafety)
 	}
-
-	log.Logf(log.Info, "using write commands: %v", mongoImport.supportsWriteCommands)
 
 	collection := session.DB(mongoImport.ToolOptions.DB).
 		C(mongoImport.ToolOptions.Collection)
@@ -438,7 +447,7 @@ readLoop:
 				break readLoop
 			}
 			// the mgo driver doesn't currently respect the maxBatchSize
-			// limit so we self imposse a limit by using maxMessageSizeBytes
+			// limit so we self impose a limit by using maxMessageSizeBytes
 			// and send documents over the wire when we hit the batch size
 			// or when we're at/over the maximum message size threshold
 			if len(documents) == batchSize || numMessageBytes >= maxMessageSize {
@@ -477,7 +486,7 @@ readLoop:
 // ingester performs the actual insertion/updates. If no upsert fields are
 // present in the document to be inserted, it simply inserts the documents
 // into the given collection
-func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection) (err error) {
+func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.Collection) (err error) {
 	numInserted := 0
 	stopOnError := mongoImport.IngestOptions.StopOnError
 	writeConcern := mongoImport.IngestOptions.WriteConcern
@@ -494,7 +503,7 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 		document := bson.M{}
 		upsertFields := strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
 		for _, rawBsonDocument := range documents {
-			err = bson.Unmarshal(rawBsonDocument.(bson.Raw).Data, &document)
+			err = bson.Unmarshal(rawBsonDocument.Data, &document)
 			if err != nil {
 				return fmt.Errorf("error unmarshaling document: %v", err)
 			}
@@ -504,7 +513,10 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 			} else {
 				_, err = collection.Upsert(selector, document)
 			}
-			if err != nil {
+			// If you pass a write concern of "majority" to a pre-2.6 mongod, it throws
+			// a "norepl" error if it's not run against a replica set. The extra check
+			// is here to allow users run mongoimport against a pre-2.6 mongod
+			if err != nil && err.Error() != errNoReplSet.Error() {
 				errMsg := err.Error()
 				if err == io.EOF {
 					errMsg = "lost connection to server"
@@ -529,14 +541,16 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 			writeConcern,
 		)
 	} else {
-		// Without write commands, we can't say for sure how many documents were
+		// without write commands, we can't say for sure how many documents were
 		// inserted when we use bulk inserts so we assume the entire batch
 		// succeeded - even if an error is returned. The result is that we may
 		// report that more documents - than were actually inserted - were
 		// inserted into the database. This will change as soon as BulkResults
 		// are supported by the driver
 		bulk := collection.Bulk()
-		bulk.Insert(documents...)
+		for _, document := range documents {
+			bulk.Insert(document)
+		}
 		if !maintainInsertionOrder {
 			bulk.Unordered()
 		}
@@ -545,7 +559,7 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 		_, err = bulk.Run()
 		numInserted = len(documents)
 	}
-	if err != nil {
+	if err != nil && err.Error() != errNoReplSet.Error() {
 		errMsg := err.Error()
 		if err == io.EOF {
 			errMsg = "lost connection to server"

@@ -298,25 +298,23 @@ func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan cha
 // ordered and unordered writes. If both a write error and a write concern error
 // are encountered, the write error is returned. If the target server is not
 // capable of handling write commands, it returns an error.
-func insertDocuments(documents []interface{}, collection *mgo.Collection, ordered bool, writeConcern string) (int, error) {
+func insertDocuments(documents []bson.Raw, collection *mgo.Collection, ordered bool, writeConcern string) (int, error) {
 	// mongod v2.6 requires you to explicitly pass an integer for numeric write
 	// concerns
 	var wc interface{}
-	intWriteConcern, err := strconv.Atoi(writeConcern)
-	if err != nil {
+	if intWriteConcern, err := strconv.Atoi(writeConcern); err != nil {
 		wc = writeConcern
 	} else {
 		wc = intWriteConcern
 	}
 
 	response := &db.WriteCommandResponse{}
-	err = collection.Database.Run(
+	err := collection.Database.Run(
 		bson.D{
 			bson.DocElem{"insert", collection.Name},
 			bson.DocElem{"ordered", ordered},
 			bson.DocElem{"documents", documents},
-			bson.DocElem{"writeConcern",
-				bson.D{bson.DocElem{"w", wc}}},
+			bson.DocElem{"writeConcern", bson.D{bson.DocElem{"w", wc}}},
 		}, response)
 	if err != nil {
 		return 0, err

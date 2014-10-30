@@ -78,6 +78,16 @@ var (
 	}
 )
 
+func convertBSONDToRaw(documents []bson.D) []bson.Raw {
+	rawBSONDocuments := []bson.Raw{}
+	for _, document := range documents {
+		rawBytes, err := bson.Marshal(document)
+		So(err, ShouldBeNil)
+		rawBSONDocuments = append(rawBSONDocuments, bson.Raw{3, rawBytes})
+	}
+	return rawBSONDocuments
+}
+
 func TestValidateHeaders(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
@@ -534,14 +544,14 @@ func TestInsertDocuments(t *testing.T) {
 		writeConcern := "majority"
 
 		Convey("an error should be returned if there are duplicate _ids", func() {
-			documents := []interface{}{
+			documents := []bson.D{
 				bson.D{bson.DocElem{"_id", 1}},
 				bson.D{bson.DocElem{"a", 3}},
 				bson.D{bson.DocElem{"_id", 1}},
 				bson.D{bson.DocElem{"a", 4}},
 			}
 			numInserted, err := insertDocuments(
-				documents,
+				convertBSONDToRaw(documents),
 				collection,
 				false,
 				writeConcern,
@@ -550,14 +560,14 @@ func TestInsertDocuments(t *testing.T) {
 			So(numInserted, ShouldEqual, 3)
 		})
 		Convey("no error should be returned if the documents are valid", func() {
-			documents := []interface{}{
+			documents := []bson.D{
 				bson.D{bson.DocElem{"a", 1}},
 				bson.D{bson.DocElem{"a", 2}},
 				bson.D{bson.DocElem{"a", 3}},
 				bson.D{bson.DocElem{"a", 4}},
 			}
 			numInserted, err := insertDocuments(
-				documents,
+				convertBSONDToRaw(documents),
 				collection,
 				false,
 				writeConcern,
@@ -566,14 +576,14 @@ func TestInsertDocuments(t *testing.T) {
 			So(numInserted, ShouldEqual, 4)
 		})
 		Convey("ordered inserts with duplicates should error out", func() {
-			documents := []interface{}{
+			documents := []bson.D{
 				bson.D{bson.DocElem{"_id", 1}},
 				bson.D{bson.DocElem{"a", 2}},
 				bson.D{bson.DocElem{"_id", 1}},
 				bson.D{bson.DocElem{"a", 4}},
 			}
 			numInserted, err := insertDocuments(
-				documents,
+				convertBSONDToRaw(documents),
 				collection,
 				true,
 				writeConcern,
@@ -582,14 +592,14 @@ func TestInsertDocuments(t *testing.T) {
 			So(numInserted, ShouldEqual, 2)
 		})
 		Convey("ordered inserts without duplicates should work without errors", func() {
-			documents := []interface{}{
+			documents := []bson.D{
 				bson.D{bson.DocElem{"a", 1}},
 				bson.D{bson.DocElem{"a", 2}},
 				bson.D{bson.DocElem{"a", 3}},
 				bson.D{bson.DocElem{"a", 4}},
 			}
 			numInserted, err := insertDocuments(
-				documents,
+				convertBSONDToRaw(documents),
 				collection,
 				true,
 				writeConcern,
