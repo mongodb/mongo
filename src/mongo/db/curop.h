@@ -32,7 +32,6 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -315,9 +314,6 @@ namespace mongo {
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
         void recordGlobalTime(bool isWriteLocked, long long micros) const;
-        
-        const LockStat& lockStat() const { return _lockStat; }
-        LockStat& lockStat() { return _lockStat; }
 
         /**
          * this should be used very sparingly
@@ -350,7 +346,6 @@ namespace mongo {
         ProgressMeter _progressMeter;
         AtomicInt32 _killPending;
         int _numYields;
-        LockStat _lockStat;
         
         // this is how much "extra" time a query might take
         // a writebacklisten for example will block for 30s 

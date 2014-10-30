@@ -81,7 +81,6 @@ namespace mongo {
         _killPending.store(0);
         _numYields = 0;
         _expectedLatencyMs = 0;
-        _lockStat.reset();
     }
 
     void CurOp::reset() {
@@ -208,7 +207,6 @@ namespace mongo {
             builder->append("killPending", true);
 
         builder->append( "numYields" , _numYields );
-        builder->append( "lockStats" , _lockStat.report() );
     }
 
     BSONObj CurOp::description() {
