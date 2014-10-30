@@ -25,9 +25,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 	defer restore.progressManager.Stop()
 
 	if restore.OutputOptions.JobThreads > 0 {
-		errChan := make(chan error)
-		doneChan := make(chan struct{})
-		doneCount := 0
+		resultChan := make(chan error)
 
 		// start a goroutine for each job thread
 		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
@@ -40,28 +38,26 @@ func (restore *MongoRestore) RestoreIntents() error {
 					}
 					err := restore.RestoreIntent(intent)
 					if err != nil {
-						errChan <- err
+						resultChan <- err
 						return
 					}
 					restore.manager.Finish(intent)
 				}
 				log.Logf(log.DebugHigh, "ending restore routine with id=%v, no more work to do", id)
-				doneChan <- struct{}{}
+				resultChan <- nil // done
 			}(i)
 		}
 
 		// wait until all goroutines are done or one of them errors out
-		for {
+		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
 			select {
-			case err := <-errChan:
-				return err
-			case <-doneChan:
-				doneCount++
-				if doneCount == restore.OutputOptions.JobThreads {
-					return nil
+			case err := <-resultChan:
+				if err != nil {
+					return err
 				}
 			}
 		}
+		return nil
 	}
 
 	// single-threaded
@@ -237,19 +233,24 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	docChan := make(chan bson.Raw, BulkBufferSize*MaxInsertThreads)
 	resultChan := make(chan error, MaxInsertThreads)
 	killChan := make(chan struct{})
+	// make sure goroutines clean up on error
+	defer close(killChan)
 
 	// start a goroutine for adding up the number of bytes read
 	bytesReadChan := make(chan int, BulkBufferSize*MaxInsertThreads)
 	go func() {
 		for {
-			size, alive := <-bytesReadChan
-			if !alive {
+			select {
+			case size, alive := <-bytesReadChan:
+				if !alive {
+					return
+				}
+				bytesRead += size
+			case <-killChan:
 				return
 			}
-			bytesRead += size
 		}
 	}()
-	defer close(bytesReadChan)
 
 	go func() {
 		doc := bson.Raw{}
@@ -299,8 +300,6 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	for done := 0; done < MaxInsertThreads; done++ {
 		err := <-resultChan
 		if err != nil {
-			close(killChan)
-			//TODO actually wait for things to end?
 			return err
 		}
 	}
