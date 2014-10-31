@@ -531,6 +531,7 @@ namespace mongo {
     Status CanonicalQuery::init(LiteParsedQuery* lpq,
                                 const MatchExpressionParser::WhereCallback& whereCallback,
                                 MatchExpression* root) {
+        _isForWrite = false;
         _pq.reset(lpq);
 
         // Normalize, sort and validate tree.
