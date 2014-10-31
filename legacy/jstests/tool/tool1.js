@@ -1,7 +1,5 @@
 // mongo tool tests, very basic to start with
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 baseName = "jstests_tool_tool1";
 dbPath = MongoRunner.dataPath + baseName + "/";

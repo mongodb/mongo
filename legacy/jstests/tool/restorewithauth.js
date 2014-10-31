@@ -14,8 +14,6 @@
  * 9) Try restore with correct auth credentials. The restore should succeed this time.
  */
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 var port = allocatePorts(1)[0];
 baseName = "jstests_restorewithauth";

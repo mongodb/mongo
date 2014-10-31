@@ -14,8 +14,6 @@
  * 12. Make sure that the oplog was played
 */
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 // Load utility methods for replica set tests
 load("jstests/replsets/rslib.js");

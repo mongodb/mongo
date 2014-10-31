@@ -1,7 +1,5 @@
 // Test importing collections represented as a single line array above the maximum document size
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 var tt = new ToolTest('exportimport_bigarray_test');
 

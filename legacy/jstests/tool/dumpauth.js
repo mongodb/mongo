@@ -1,8 +1,6 @@
 // dumpauth.js
 // test mongodump with authentication
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 port = allocatePorts( 1 )[ 0 ];
 baseName = "tool_dumpauth";

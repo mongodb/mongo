@@ -1,7 +1,5 @@
 // Tests for mongodump options for excluding collections
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 var testBaseName = "jstests_tool_dumprestore_excludecollections";
 

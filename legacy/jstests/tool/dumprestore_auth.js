@@ -1,7 +1,5 @@
 // dumprestore_auth.js
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 t = new ToolTest("dumprestore_auth", { auth : "" });
 

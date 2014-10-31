@@ -2,8 +2,6 @@
 // Tests that mongodump and mongorestore properly handle access control information when doing
 // single-db dumps and restores
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 // Runs the tool with the given name against the given mongod.
 function runTool(toolName, mongod, options) {

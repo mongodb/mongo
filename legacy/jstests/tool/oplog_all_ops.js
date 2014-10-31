@@ -4,8 +4,6 @@
  * Correctness is verified using the dbhash command.
  */
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 var repl1 = new ReplSetTest({ name: 'rs1', nodes: [{ nopreallocj: '' },
     { arbiter: true }, { arbiter: true }]});

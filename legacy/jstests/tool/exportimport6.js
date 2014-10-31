@@ -1,8 +1,6 @@
 // exportimport6.js
 // test export with skip, limit and sort
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 t = new ToolTest("exportimport6");
 

@@ -1,7 +1,5 @@
 //dumpfilename1.js
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 //Test designed to make sure error that dumping a collection with "/" in the name doesn't crash the system.
 //An error is logged and given to the user, but the other collections should dump and restore OK.  

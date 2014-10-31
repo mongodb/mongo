@@ -1,8 +1,6 @@
 // stat1.js
 // test mongostat with authentication SERVER-3875
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 port = allocatePorts( 1 )[ 0 ];
 baseName = "tool_stat1";

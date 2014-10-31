@@ -2,8 +2,6 @@
 // Tests that mongodump and mongorestore properly handle access control information
 // Tests that the default auth roles of backup and restore work properly.
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 t = new ToolTest("dumprestore_auth2", {auth: ""});
 

@@ -1,7 +1,5 @@
 // dumprestore4.js -- see SERVER-2186
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 // The point of this test is to ensure that mongorestore successfully
 // constructs indexes when the database being restored into has a

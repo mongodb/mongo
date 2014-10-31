@@ -1,7 +1,5 @@
 var name = "dumprestore7";
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 function step(msg) {
     msg = msg || "";

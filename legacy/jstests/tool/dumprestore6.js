@@ -1,8 +1,6 @@
 // dumprestore6.js
 // Test restoring from a dump with an old index version
 
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 t = new ToolTest( "dumprestore6" );
 

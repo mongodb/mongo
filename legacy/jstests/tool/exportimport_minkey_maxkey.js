@@ -1,5 +1,3 @@
-load("jstests/libs/servers.js");
-load("jstests/libs/servers_misc.js");
 
 var tt = new ToolTest('exportimport_minkey_maxkey_test');
 
