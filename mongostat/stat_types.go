@@ -2,6 +2,7 @@ package mongostat
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/text"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -367,7 +368,119 @@ func formatOpcount(opcount, opcountRepl int64, both bool) string {
 	return "*0"
 }
 
-func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
+// A LineFormatter formats StatLines for printing
+type LineFormatter interface {
+	// FormatLines returns the string representation of the StatLines that
+	// are passed in. It also takes in whether or not to include the header
+	// line in the output (meaningless for some formatters) and whether or
+	// not cluster discovery is in use.
+	FormatLines(lines []StatLine, includeHeader bool, discover bool) string
+}
+
+// Implementation of LineFormatter - converts the StatLines to json
+type JSONLineFormatter struct{}
+
+// Satisfy the LineFormatter interface. Formats the StatLines as json.
+func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
+	discover bool) string {
+
+	repl := false
+	all := false
+	// if any of the nodes being monitored are part of a replset,
+	// enable the printing of replset-specific columns
+	for _, line := range lines {
+		if line.ReplSetName != "" || line.NodeType == "RTR" {
+			repl = true
+		}
+		if line.NonMapped >= 0 {
+			all = true
+		}
+	}
+
+	// middle ground b/t the StatLines and the json string to be returned
+	jsonFormat := map[string]interface{}{}
+
+	// convert each StatLine to json
+	for _, line := range lines {
+		// each line can just be a string->string map (header->value)
+		lineJson := map[string]string{}
+
+		// check for error
+		if line.Error != nil {
+			lineJson["error"] = line.Error.Error()
+			jsonFormat["error for host '"+line.Host+"':"] = lineJson
+			continue
+		}
+
+		// put all the appropriate values into the stat line's json
+		// representation
+		lineJson["insert"] = formatOpcount(line.Insert, line.InsertR, false)
+		lineJson["query"] = formatOpcount(line.Query, line.QueryR, false)
+		lineJson["update"] = formatOpcount(line.Update, line.UpdateR, false)
+		lineJson["delete"] = formatOpcount(line.Delete, line.DeleteR, false)
+		lineJson["getmore"] = fmt.Sprintf("%v", line.GetMore)
+		lineJson["command"] = formatOpcount(line.Command, line.CommandR, true)
+		lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
+		lineJson["vsize"] = formatMegs(int64(line.Virtual))
+		lineJson["res"] = formatMegs(int64(line.Resident))
+		lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
+		lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
+			line.QueuedWriters)
+		lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders,
+			line.ActiveWriters)
+		lineJson["netIn"] = formatNet(line.NetIn)
+		lineJson["netOut"] = formatNet(line.NetOut)
+		lineJson["conn"] = fmt.Sprintf("%v", line.NumConnections)
+		lineJson["time"] = fmt.Sprintf("%v", line.Time.Format("15:04:05"))
+
+		mappedVal := ""      // empty for mongos
+		if line.Mapped > 0 { // not mongos, update accordingly
+			mappedVal = formatMegs(int64(line.Mapped))
+		}
+		lineJson["mapped"] = mappedVal
+
+		if all {
+			nonMappedVal := ""       // empty for mongos
+			if line.NonMapped >= 0 { // not mongos, update accordingly
+				nonMappedVal = formatMegs(int64(line.NonMapped))
+			}
+			lineJson["non-mapped"] = nonMappedVal
+		}
+
+		lineJson["faults"] = fmt.Sprintf("%v", line.Faults)
+
+		highestLockedVal := "" // empty for mongos
+		if line.HighestLocked != nil && !line.IsMongos {
+			highestLockedVal = fmt.Sprintf("%v:%.1f%%",
+				line.HighestLocked.DBName, line.HighestLocked.Percentage)
+		}
+		lineJson["locked"] = highestLockedVal
+
+		if discover || repl {
+			lineJson["set"] = line.ReplSetName
+			lineJson["repl"] = line.NodeType
+		}
+
+		// add the line to the final json
+		jsonFormat[line.Host] = lineJson
+	}
+
+	// convert the json format of the lines to a json string to be returned
+	linesAsJsonBytes, err := json.Marshal(jsonFormat)
+	if err != nil {
+		return fmt.Sprintf(`{"json error": "%v"}`, err.Error())
+	}
+
+	return string(linesAsJsonBytes)
+}
+
+// Implementation of LineFormatter - uses a common/text.GridWriter to format
+// the StatLines as a grid.
+type GridLineFormatter struct{}
+
+// Satisfy the LineFormatter interface. Formats the StatLines as a grid.
+func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
+	discover bool) string {
 	buf := &bytes.Buffer{}
 	out := &text.GridWriter{ColumnPadding: 1}
 

@@ -81,6 +81,18 @@ type ClusterMonitor struct {
 
 	//Mutex to protect access to LastStatLines and LastPollTimes
 	mapLock sync.Mutex
+
+	//Used to format the StatLines for printing
+	formatter LineFormatter
+}
+
+//initialize the formatter that will be used
+func (cluster *ClusterMonitor) initializeFormatter(useJson bool) {
+	if useJson {
+		cluster.formatter = &JSONLineFormatter{}
+	} else {
+		cluster.formatter = &GridLineFormatter{}
+	}
 }
 
 //updateHostInfo updates the internal map with the given StatLine data.
@@ -102,7 +114,7 @@ func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool)
 		}
 		lines = append(lines, *stat)
 	}
-	out := FormatLines(lines, includeHeaders, discover)
+	out := cluster.formatter.FormatLines(lines, includeHeaders, discover)
 
 	//Mark all the host lines that we encountered as having been printed
 	for _, stat := range cluster.LastStatLines {
@@ -266,6 +278,10 @@ func (mstat *MongoStat) AddNewNode(fullhost string) {
 //Run is the top-level function that starts the monitoring
 //and discovery goroutines
 func (mstat *MongoStat) Run() error {
+
+	// initialize the correct formatter for the data
+	mstat.Cluster.initializeFormatter(mstat.StatOptions.Json)
+
 	if mstat.Discovered != nil {
 		go func() {
 			for {
