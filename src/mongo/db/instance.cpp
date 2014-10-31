@@ -576,6 +576,10 @@ namespace {
 
                 //  Tentatively take an intent lock, fix up if we need to create the collection
                 Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
+                if (dbHolder().get(txn, ns.db()) == NULL) {
+                    //  If DB doesn't exist, don't implicitly create it in Client::Context
+                    break;
+                }
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
 
@@ -942,17 +946,21 @@ namespace {
             uassert(notMasterCodeForInsert, "not master",
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
-            Client::Context ctx(txn, ns);
-            if (mode == MODE_X || ctx.db()->getCollection(txn, nsString)) {
-                if (multi.size() > 1) {
-                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(txn, ctx, keepGoing, ns, multi, op);
-                } else {
-                    checkAndInsert(txn, ctx, ns, multi[0]);
-                    globalOpCounters.incInsertInWriteLock(1);
-                    op.debug().ninserted = 1;
+            // Client::Context may implicitly create a database, so check existence
+            if (dbHolder().get(txn, nsString.db()) != NULL) {
+                Client::Context ctx(txn, ns);
+                if (mode == MODE_X || ctx.db()->getCollection(txn, nsString)) {
+                    if (multi.size() > 1) {
+                        const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+                        insertMulti(txn, ctx, keepGoing, ns, multi, op);
+                    }
+                    else {
+                        checkAndInsert(txn, ctx, ns, multi[0]);
+                        globalOpCounters.incInsertInWriteLock(1);
+                        op.debug().ninserted = 1;
+                    }
+                    return;
                 }
-                return;
             }
         }
 

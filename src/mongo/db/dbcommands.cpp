@@ -195,6 +195,9 @@ namespace mongo {
             {
                 // TODO: SERVER-4328 Don't lock globally
                 Lock::GlobalWrite lk(txn->lockState());
+                if (dbHolder().get(txn, dbname) == NULL) {
+                    return true; // didn't exist, was no-op
+                }
                 Client::Context context(txn, dbname);
 
                 log() << "dropDatabase " << dbname << " starting" << endl;

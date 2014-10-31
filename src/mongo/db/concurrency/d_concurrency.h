@@ -171,12 +171,20 @@ namespace mongo {
             DBLock(Locker* lockState, const StringData& db, const LockMode mode);
             virtual ~DBLock();
 
+            /**
+             * Releases the DBLock and reacquires it with the new mode. The global intent
+             * lock is retained (so the database can't disappear). Relocking from MODE_IS or
+             * MODE_S to MODE_IX or MODE_X is not allowed to avoid violating the global intent.
+             * Use relockWithMode() instead of upgrading to avoid deadlock.
+             */
+            void relockWithMode(const LockMode newMode);
+
         private:
             void lockDB();
             void unlockDB();
 
             const ResourceId _id;
-            const LockMode _mode;
+            LockMode _mode; // may be changed through relockWithMode
 
         protected:
             // Still need to override these for ScopedLock::tempRelease() and relock().
