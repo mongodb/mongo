@@ -146,7 +146,7 @@ namespace mongo {
     int64_t WiredTigerKVEngine::getIdentSize( OperationContext* opCtx,
                                               const StringData& ident ) {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
-        return WiredTigerUtil::getIdentSize(session->getSession(), _uri(ident).toString() );
+        return WiredTigerUtil::getIdentSize(session->getSession(), _uri(ident) );
     }
 
     Status WiredTigerKVEngine::repairIdent( OperationContext* opCtx,
