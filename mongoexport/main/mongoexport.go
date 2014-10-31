@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongoexport", "<options> <sleeptime>")
+	opts := commonopts.New("mongoexport", "<options>")
 
 	outputOpts := &options.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)
