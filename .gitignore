@@ -73,21 +73,10 @@ scratch
 /mongogrid
 /mongos
 
-/mongodump
-/mongorestore
-
-/mongofiles
-/mongoexport
-
-/mongoimport
 /mongosniff
 /mongobridge
-/mongostat
-/mongotop
-/mongooplog
 /mongoperf
 /mongoshim
-/bsondump
 /loadgen
 /docgen
 
