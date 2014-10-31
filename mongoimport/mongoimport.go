@@ -496,7 +496,7 @@ func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *m
 		if err == nil {
 			*numInserted += 1
 		}
-		if err = handleErr(stopOnError, err); err != nil {
+		if err = filterIngestError(stopOnError, err); err != nil {
 			return err
 		}
 		document = bson.M{}
@@ -541,7 +541,7 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		_, err = bulk.Run()
 		numInserted = len(documents)
 	}
-	return handleErr(stopOnError, err)
+	return filterIngestError(stopOnError, err)
 }
 
 // getInputReader returns an implementation of InputReader which can handle

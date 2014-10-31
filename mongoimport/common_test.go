@@ -627,23 +627,23 @@ func TestHandlErr(t *testing.T) {
 	Convey("Given a boolean 'stopOnError' and an error...", t, func() {
 
 		Convey("an error should be returned if stopOnError is true the err is not nil", func() {
-			So(handleErr(true, fmt.Errorf("")), ShouldNotBeNil)
+			So(filterIngestError(true, fmt.Errorf("")), ShouldNotBeNil)
 		})
 
 		Convey("errLostConnection should be returned if stopOnError is true the err is io.EOF", func() {
-			So(handleErr(true, io.EOF), ShouldEqual, errLostConnection)
+			So(filterIngestError(true, io.EOF), ShouldEqual, errLostConnection)
 		})
 
 		Convey("no error should be returned if stopOnError is false the err is not nil", func() {
-			So(handleErr(false, fmt.Errorf("")), ShouldBeNil)
+			So(filterIngestError(false, fmt.Errorf("")), ShouldBeNil)
 		})
 
 		Convey("no error should be returned if stopOnError is false the err is nil", func() {
-			So(handleErr(false, nil), ShouldBeNil)
+			So(filterIngestError(false, nil), ShouldBeNil)
 		})
 
 		Convey("no error should be returned if stopOnError is true the err is nil", func() {
-			So(handleErr(true, nil), ShouldBeNil)
+			So(filterIngestError(true, nil), ShouldBeNil)
 		})
 	})
 }
