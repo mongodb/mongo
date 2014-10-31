@@ -292,7 +292,7 @@ add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, 
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
-add_option( "use-system-wiredtiger", "use system version of wiredtiger library", 0, True, default=True )
+add_option( "use-system-wiredtiger", "use system version of wiredtiger library", 0, True)
 
 # library choices
 boost_choices = ['1.49', '1.56']
