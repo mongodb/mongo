@@ -63,7 +63,6 @@ namespace mongo {
         // override values in the prefix, but not values in the suffix.
         str::stream ss;
         ss << "type=file,";
-        ss << "leaf_page_max=2m,";
         ss << "memory_page_max=100m,";
 
         ss << extraStrings << ",";
