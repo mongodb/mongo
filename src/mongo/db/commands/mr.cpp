@@ -1356,7 +1356,10 @@ namespace mongo {
                         }
 
                         Database* db = dbHolder().get(txn, nss.db());
-                        invariant(db);
+                        if (!db) {
+                            errmsg = "ns doesn't exist";
+                            return false;
+                        }
 
                         PlanExecutor* rawExec;
                         if (!getExecutor(txn,
