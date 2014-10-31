@@ -43,11 +43,11 @@
 #include "mongo/db/repl/master_slave.h"
 
 #include <pcrecpp.h>
-
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"

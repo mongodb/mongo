@@ -41,7 +41,9 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
@@ -53,7 +55,6 @@
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
-#include "mongo/db/repl/rs_initiate.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/write_concern.h"
@@ -753,6 +754,112 @@ namespace {
         return Status::OK();
     }
 
+namespace {
+    void _checkMembersUpForConfigChange(const ReplSetConfig& cfg, BSONObjBuilder& result, bool initial) {
+        int failures = 0, allVotes = 0, allowableFailures = 0;
+        int me = 0;
+        stringstream selfs;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
+            if (isSelf(i->h)) {
+                me++;
+                if( me > 1 )
+                    selfs << ',';
+                selfs << i->h.toString();
+                if( !i->potentiallyHot() ) {
+                    uasserted(13420, "initiation and reconfiguration of a replica set must be sent to a node that can become primary");
+                }
+            }
+            allVotes += i->votes;
+        }
+        allowableFailures = allVotes - (allVotes/2 + 1);
+
+        uassert(13278, "bad config: isSelf is true for multiple hosts: " + selfs.str(), me <= 1); // dups?
+        if( me != 1 ) {
+            stringstream ss;
+            ss << "can't find self in the replset config";
+            if (!serverGlobalParams.isDefaultPort()) ss << " my port: " << serverGlobalParams.port;
+            if( me != 0 ) ss << " found: " << me;
+            uasserted(13279, ss.str());
+        }
+
+        vector<string> down;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = cfg.members.begin(); i != cfg.members.end(); i++ ) {
+            // we know we're up
+            if (isSelf(i->h)) {
+                continue;
+            }
+
+            BSONObj res;
+            {
+                bool ok = false;
+                try {
+                    int theirVersion = -1000;
+                    ok = requestHeartbeat(cfg._id, "", i->h.toString(), res, -1, theirVersion, initial/*check if empty*/);
+                    if( theirVersion >= cfg.version ) {
+                        stringstream ss;
+                        ss << "replSet member " << i->h.toString() << " has too new a config version (" << theirVersion << ") to reconfigure";
+                        uasserted(13259, ss.str());
+                    }
+                }
+                catch(DBException& e) {
+                    log() << "replSet cmufcc requestHeartbeat " << i->h.toString() << " : " << e.toString() << rsLog;
+                }
+                catch(...) {
+                    log() << "replSet cmufcc error exception in requestHeartbeat?" << rsLog;
+                }
+                if( res.getBoolField("mismatch") )
+                    uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
+                if( *res.getStringField("set") ) {
+                    if( cfg.version <= 1 ) {
+                        // this was to be initiation, no one should be initiated already.
+                        uasserted(13256, "member " + i->h.toString() + " is already initiated");
+                    }
+                    else {
+                        // Assure no one has a newer config.
+                        if( res["v"].Int() >= cfg.version ) {
+                            uasserted(13341, "member " + i->h.toString() + " has a config version >= to the new cfg version; cannot change config");
+                        }
+                    }
+                }
+                if( !ok && !res["rs"].trueValue() ) {
+                    down.push_back(i->h.toString());
+
+                    if( !res.isEmpty() ) {
+                        /* strange.  got a response, but not "ok". log it. */
+                        log() << "replSet warning " << i->h.toString() << " replied: " << res.toString() << rsLog;
+                    }
+
+                    bool allowFailure = false;
+                    failures += i->votes;
+                    if( !initial && failures <= allowableFailures ) {
+                        const Member* m = theReplSet->findById( i->_id );
+                        if( m ) {
+                            verify( m->h().toString() == i->h.toString() );
+                        }
+                        // it's okay if the down member isn't part of the config,
+                        // we might be adding a new member that isn't up yet
+                        allowFailure = true;
+                    }
+
+                    if( !allowFailure ) {
+                        string msg = string("need all members up to initiate, not ok : ") + i->h.toString();
+                        if( !initial )
+                            msg = string("need most members up to reconfigure, not ok : ") + i->h.toString();
+                        uasserted(13144, msg);
+                    }
+                }
+            }
+            if( initial ) {
+                bool hasData = res["hasData"].Bool();
+                uassert(13311, "member " + i->h.toString() + " has data already, cannot initiate set.  All members except initiator must be empty.",
+                        !hasData || isSelf(i->h));
+            }
+        }
+        if (down.size() > 0) {
+            result.append("down", down);
+        }
+    }
+} // namespace
     Status LegacyReplicationCoordinator::processReplSetReconfig(OperationContext* txn,
                                                                 const ReplSetReconfigArgs& args,
                                                                 BSONObjBuilder* resultObj) {
@@ -789,7 +896,7 @@ namespace {
                 return status;
             }
 
-            checkMembersUpForConfigChange(*newConfig, *resultObj, false);
+            _checkMembersUpForConfigChange(*newConfig, *resultObj, false);
 
             log() << "replSet replSetReconfig [2]" << rsLog;
 
@@ -874,7 +981,7 @@ namespace {
             log() << "replSet replSetInitiate config object parses ok, " <<
                     newConfig->members.size() << " members specified" << rsLog;
 
-            checkMembersUpForConfigChange(*newConfig, *resultObj, true);
+            _checkMembersUpForConfigChange(*newConfig, *resultObj, true);
 
             log() << "replSet replSetInitiate all members seem up" << rsLog;
 
