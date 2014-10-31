@@ -236,8 +236,6 @@ namespace {
             return;
         }
 
-        init.setHostname(r.getHost().toString());
-
         BSONObj lastOp = r.getLastOp(rsoplog);
         if ( lastOp.isEmpty() ) {
             log() << "initial sync couldn't read remote oplog";
