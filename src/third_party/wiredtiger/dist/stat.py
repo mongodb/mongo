@@ -160,17 +160,24 @@ compare_srcfile(tmp_file, '../src/support/stat.c')
 
 # Update the statlog file with the entries we can scale per second.
 scale_info = 'no_scale_per_second_list = [\n'
+clear_info = 'no_clear_list = [\n'
 for l in sorted(connection_stats):
 	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
+	if 'no_clear' in l.flags:
+		clear_info += '    \'' + l.desc + '\',\n'
 for l in sorted(dsrc_stats):
 	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
+	if 'no_clear' in l.flags:
+		clear_info += '    \'' + l.desc + '\',\n'
 scale_info += ']\n'
+clear_info += ']\n'
 
 tmp_file = '__tmp'
 f = open(tmp_file, 'w')
 f.write('# DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write(scale_info)
+f.write(clear_info)
 f.close()
 compare_srcfile(tmp_file, '../tools/stat_data.py')

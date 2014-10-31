@@ -32,7 +32,7 @@ from time import mktime
 from subprocess import call
 
 try:
-    from stat_data import no_scale_per_second_list
+    from stat_data import no_scale_per_second_list, no_clear_list
 except ImportError:
     print >>sys.stderr, "Could not import stat_data.py, it should be\
             in the same directory as %s" % sys.argv[0]
@@ -74,8 +74,13 @@ def munge(title, values):
         if seconds == 0:
             seconds = 1
 
+    stats_cleared = False
+    if args.clear or title.split(' ', 1)[1] in no_clear_list:
+        stats_cleared = True
+
     # Split the values into a dictionary of y-axis values keyed by the x axis
     ydata = {}
+    last_value = 0.0
     for t, v in sorted(values):
         if args.abstime:
             # Build the time series, milliseconds since the epoch
@@ -83,7 +88,16 @@ def munge(title, values):
         else:
             # Build the time series as seconds since the start of the data
             x = (parsetime(t) - start_time).seconds
-        ydata[x] = float(v) / seconds
+
+        float_v = float(v)
+        if not stats_cleared:
+            float_v = float_v - last_value
+            # Sometimes WiredTiger stats go backwards without clear, assume
+            # that means nothing happened
+            if float_v < 0:
+                float_v = 0.0
+            last_value = float(v)
+        ydata[x] = float_v / seconds
 
     return ylabel, ydata
 
@@ -93,6 +107,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Create graphs from WiredTiger statistics.')
 parser.add_argument('--abstime', action='store_true',
     help='use absolute time on the x axis')
+parser.add_argument('--clear', action='store_true',
+    help='WiredTiger stats gathered with clear set')
 parser.add_argument('--focus', action='store_true',
     help='generate a chart with focus slider')
 parser.add_argument('--include', '-I', metavar='regexp',
