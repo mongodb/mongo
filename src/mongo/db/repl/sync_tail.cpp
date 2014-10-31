@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/sync_tail.h"
 
+#include <boost/functional/hash.hpp>
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
@@ -82,6 +84,115 @@ namespace repl {
             replLocalAuth();
         }
     }
+    namespace {
+        bool isCrudOpType( const char* field ) {
+            switch ( field[0] ) {
+            case 'd':
+            case 'i':
+            case 'u':
+                return field[1] == 0;
+            }
+            return false;
+        }
+
+        size_t hashBSONObj(const BSONObj& obj);
+
+        size_t hashBSONElement(const BSONElement& elem) {
+            size_t hash = 0;
+
+            boost::hash_combine(hash, elem.canonicalType());
+
+            const StringData fieldName = elem.fieldNameStringData();
+            if (!fieldName.empty()) {
+                boost::hash_combine(hash, StringData::Hasher()(fieldName));
+            }
+
+            switch (elem.type()) {
+                // Order of types is the same as in compareElementValues().
+
+            case mongo::EOO:
+            case mongo::Undefined:
+            case mongo::jstNULL:
+            case mongo::MaxKey:
+            case mongo::MinKey:
+                // These are valueless types
+                break;
+
+            case mongo::Bool:
+                boost::hash_combine(hash, elem.boolean());
+                break;
+
+            case mongo::Timestamp:
+            case mongo::Date:
+                // Need to treat these the same until SERVER-3304 is resolved.
+                boost::hash_combine(hash, elem.date().asInt64());
+                break;
+
+            case mongo::NumberDouble:
+            case mongo::NumberLong:
+            case mongo::NumberInt: {
+                // This converts all numbers to doubles for compatibility with woCompare.
+                // This ignores // the low-order bits of NumberLongs > 2**53, but that is required
+                // until SERVER-3719 is resolved.
+                const double dbl = elem.numberDouble();
+                if (isNaN(dbl)) {
+                    boost::hash_combine(hash, numeric_limits<double>::quiet_NaN());
+                }
+                else {
+                    boost::hash_combine(hash, dbl);
+                }
+                break;
+            }
+
+            case mongo::jstOID:
+                elem.__oid().hash_combine(hash);
+                break;
+
+            case mongo::Code:
+            case mongo::Symbol:
+            case mongo::String:
+                boost::hash_combine(hash, StringData::Hasher()(elem.valueStringData()));
+                break;
+
+            case mongo::Object:
+            case mongo::Array:
+                boost::hash_combine(hash, hashBSONObj(elem.embeddedObject()));
+                break;
+
+            case mongo::DBRef:
+            case mongo::BinData:
+                // All bytes of the value are required to be identical.
+                boost::hash_combine(hash, StringData::Hasher()(StringData(elem.value(),
+                                                                          elem.valuesize())));
+                break;
+
+            case mongo::RegEx:
+                boost::hash_combine(hash, StringData::Hasher()(elem.regex()));
+                boost::hash_combine(hash, StringData::Hasher()(elem.regexFlags()));
+                break;
+
+            case mongo::CodeWScope: {
+                // SERVER-7804
+                // Intentionally not using codeWScopeCodeLen for compatibility with
+                // compareElementValues. Using codeWScopeScopeDataUnsafe (as a string!) for the same
+                // reason.
+                boost::hash_combine(hash, StringData::Hasher()(elem.codeWScopeCode()));
+                boost::hash_combine(hash, StringData::Hasher()(elem.codeWScopeScopeDataUnsafe()));
+                break;
+            }
+            }
+            return hash;
+        }
+
+        size_t hashBSONObj(const BSONObj& obj) {
+            size_t hash = 0;
+            BSONForEach(elem, obj) {
+                boost::hash_combine(hash, hashBSONElement(elem));
+            }
+            return hash;
+        }
+
+    }
 
     SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
         Sync(""), 
@@ -114,27 +225,53 @@ namespace repl {
             return true;
         }
 
-        bool isCommand(op["op"].valuestrsafe()[0] == 'c');
+        const char* opType = op["op"].valuestrsafe();
 
-        boost::scoped_ptr<Lock::ScopedLock> lk;
+        bool isCommand(opType[0] == 'c');
 
-        if(isCommand) {
-            // a command may need a global write lock. so we will conservatively go 
-            // ahead and grab one here. suboptimal. :-(
-            lk.reset(new Lock::GlobalWrite(txn->lockState()));
-        } else {
-            // DB level lock for this operation
-            lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+        for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
+
+            boost::scoped_ptr<Lock::ScopedLock> lk;
+            boost::scoped_ptr<Lock::CollectionLock> lk2;
+
+            bool isIndexBuild = opType[0] == 'i' &&
+                nsToCollectionSubstring( ns ) == "system.indexes";
+
+            if(isCommand) {
+                // a command may need a global write lock. so we will conservatively go
+                // ahead and grab one here. suboptimal. :-(
+                lk.reset(new Lock::GlobalWrite(txn->lockState()));
+            } else if (isCrudOpType(opType)) {
+                LockMode mode = createCollection ? MODE_X : MODE_IX;
+                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
+                lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+            } else if (isIndexBuild) {
+                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, MODE_X));
+            } else {
+                // DB level lock for this operation
+                log() << "non command or crup op: " << op;
+                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+            }
+
+            Client::Context ctx(txn, ns);
+            ctx.getClient()->curop()->reset();
+
+            if ( createCollection == 0 &&
+                 isCrudOpType(opType) &&
+                 ctx.db()->getCollection(txn,ns) == NULL ) {
+                // uh, oh, we need to create collection
+                // try again
+                continue;
+            }
+
+            // For non-initial-sync, we convert updates to upserts
+            // to suppress errors when replaying oplog entries.
+            bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
+            opsAppliedStats.increment();
+            return ok;
         }
-
-        Client::Context ctx(txn, ns);
-        ctx.getClient()->curop()->reset();
-        // For non-initial-sync, we convert updates to upserts
-        // to suppress errors when replaying oplog entries.
-        bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
-        opsAppliedStats.increment();
-
-        return ok;
+        invariant(!"impossible");
     }
 
     // The pool threads call this to prefetch each op
@@ -213,8 +350,9 @@ namespace repl {
     }
 
 
-    void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops, 
-                                              std::vector< std::vector<BSONObj> >* writerVectors) {
+    void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
+                                     std::vector< std::vector<BSONObj> >* writerVectors) {
+
         for (std::deque<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
              ++it) {
@@ -224,6 +362,26 @@ namespace repl {
             int len = e.valuestrsize();
             uint32_t hash = 0;
             MurmurHash3_x86_32( ns, len, 0, &hash);
+
+            const char* opType = it->getField( "op" ).value();
+
+            if (getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking() &&
+                isCrudOpType(opType)) {
+                BSONElement id;
+                switch (opType[0]) {
+                case 'u':
+                    id = it->getField("o2").Obj()["_id"];
+                    break;
+                case 'd':
+                case 'i':
+                    id = it->getField("o").Obj()["_id"];
+                    break;
+                }
+
+                size_t idHash = hashBSONElement( id );
+                boost::hash_combine(idHash, hash);
+                hash = idHash;
+            }
 
             (*writerVectors)[hash % writerVectors->size()].push_back(*it);
         }
