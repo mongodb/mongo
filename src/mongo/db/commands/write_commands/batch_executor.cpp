@@ -218,6 +218,11 @@ namespace mongo {
             return;
         }
 
+        if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
+             writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
+            _txn->recoveryUnit()->goingToAwaitCommit();
+        }
+
         if ( request.sizeWriteOps() == 0u ) {
             toBatchError( Status( ErrorCodes::InvalidLength,
                                   "no write ops were included in the batch" ),

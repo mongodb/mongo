@@ -107,6 +107,11 @@ namespace mongo {
          */
         virtual bool supportsDocLocking() const = 0;
 
+        /**
+         * Returns if the engine supports a journalling concept.
+         * This controls whether awaitCommit gets called or fsync to ensure data is on disk.
+         */
+        virtual bool isDurable() const = 0;
 
         /**
          * Only MMAPv1 should override this and return true to trigger MMAPv1-specific behavior.

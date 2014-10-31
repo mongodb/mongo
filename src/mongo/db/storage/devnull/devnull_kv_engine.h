@@ -78,5 +78,9 @@ namespace mongo {
         virtual bool supportsDocLocking() const {
             return true;
         }
+
+        virtual bool isDurable() const {
+            return true;
+        }
     };
 }

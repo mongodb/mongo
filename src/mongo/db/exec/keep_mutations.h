@@ -83,10 +83,14 @@ namespace mongo {
         // stream.
         bool _doneReturningFlagged;
 
-        // Stats
+        // Stats.
         CommonStats _commonStats;
 
-        unordered_set<WorkingSetID>::const_iterator _flaggedIterator;
+        // Our copy of the working set's flagged results.
+        std::vector<WorkingSetID> _flagged;
+
+        // Iterator pointing into _flagged.
+        std::vector<WorkingSetID>::const_iterator _flaggedIterator;
     };
 
 }  // namespace mongo
