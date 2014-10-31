@@ -99,7 +99,7 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	if hasSetName || hasHosts {
 		return true, nil
 	}
-	return false, err
+	return false, nil
 }
 
 func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {

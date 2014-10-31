@@ -630,6 +630,7 @@ func TestImportDocuments(t *testing.T) {
 				NumProcessingThreads:   &numProcessingThreads,
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
+				WriteConcern:           "majority",
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)

@@ -17,7 +17,10 @@ import (
 )
 
 var (
-	errLostConnection = errors.New("lost connection to server")
+	errLostConnection    = errors.New("lost connection to server")
+	errNoReachableServer = errors.New("no reachable servers")
+	errNsNotFound        = errors.New("ns not found")
+	errNoReplSet         = errors.New("norepl")
 )
 
 // ConvertibleDoc is an interface implemented by special types which wrap data
@@ -132,16 +135,72 @@ func getUpsertValue(field string, document bson.M) interface{} {
 // io.EOF - indicating a lost connection to the server, it sets the error as
 // such. In any case, it unconditionally returns an error which may/may not be nil
 func handleErr(stopOnError bool, err error) error {
-	if err != nil {
-		if err == io.EOF {
-			err = errLostConnection
-		}
-		log.Logf(log.Always, "error inserting documents: %v", err)
-		if stopOnError || err == errLostConnection {
-			return err
-		}
+	if err == nil {
+		return nil
+	}
+	if err.Error() == errNoReachableServer.Error() {
+		return err
+	}
+	if err.Error() == errNoReplSet.Error() {
+		log.Logf(log.Info, "write concern 'majority' run against standalone")
+		return nil
+	}
+	if err == io.EOF {
+		err = errLostConnection
+	}
+	log.Logf(log.Always, "error inserting documents: %v", err)
+	if stopOnError || err == errLostConnection {
+		return err
 	}
 	return nil
+}
+
+// insertDocuments writes the given documents to the specified collection and
+// returns the number of documents inserted and an error. It can handle both
+// ordered and unordered writes. If both a write error and a write concern error
+// are encountered, the write error is returned. If the target server is not
+// capable of handling write commands, it returns an error.
+func insertDocuments(documents []bson.Raw, collection *mgo.Collection, ordered bool, writeConcern string) (int, error) {
+	// mongod v2.6 requires you to explicitly pass an integer for numeric write
+	// concerns
+	var wc interface{}
+	if intWriteConcern, err := strconv.Atoi(writeConcern); err != nil {
+		wc = writeConcern
+	} else {
+		wc = intWriteConcern
+	}
+
+	response := &db.WriteCommandResponse{}
+	err := collection.Database.Run(
+		bson.D{
+			bson.DocElem{"insert", collection.Name},
+			bson.DocElem{"ordered", ordered},
+			bson.DocElem{"documents", documents},
+			bson.DocElem{"writeConcern", bson.D{bson.DocElem{"w", wc}}},
+		}, response)
+	if err != nil {
+		return 0, err
+	}
+	// if the write concern is 0, n is not present in the response document
+	// so we return immediately with no errors
+	if response.NumAffected == nil {
+		return len(documents), nil
+	}
+	if response.Ok == 0 {
+		// the command itself failed (authentication failed.., syntax error)
+		return 0, fmt.Errorf("write command failed")
+	} else if len(response.WriteErrors) != 0 {
+		// happens if the server couldn't write the data; e.g. because of a
+		// duplicate key, running out of disk space, etc
+		for _, writeError := range response.WriteErrors {
+			log.Logf(log.Always, writeError.Errmsg)
+		}
+		return *response.NumAffected, fmt.Errorf("encountered write errors")
+	} else if response.WriteConcernError.Errmsg != "" {
+		log.Logf(log.Always, response.WriteConcernError.Errmsg)
+		return 0, fmt.Errorf("encountered write concern error")
+	}
+	return *response.NumAffected, nil
 }
 
 // removeBlankFields removes empty/blank fields in csv and tsv
@@ -178,6 +237,47 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 	if !existingKey {
 		*document = append(*document, bson.DocElem{keyName, subDocument})
 	}
+}
+
+// streamDocuments concurrently processes data gotten from the inputChan
+// channel in parallel and then sends over the processed data to the outputChan
+// channel - either in sequence or concurrently (depending on the value of
+// ordered) - in which the data was received
+func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan chan bson.D, errChan chan error) {
+	var importWorkers []*ImportWorker
+	// initialize all our concurrent processing threads
+	wg := &sync.WaitGroup{}
+	inChan := inputChan
+	outChan := outputChan
+	for i := 0; i < numProcessingThreads; i++ {
+		if ordered {
+			// TODO: experiment with buffered channel size; the buffer size of
+			// inChan should always be the same as that of outChan
+			workerBufferSize := 100
+			inChan = make(chan ConvertibleDoc, workerBufferSize)
+			outChan = make(chan bson.D, workerBufferSize)
+		}
+		importWorker := &ImportWorker{
+			unprocessedDataChan:   inChan,
+			processedDocumentChan: outChan,
+		}
+		importWorkers = append(importWorkers, importWorker)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := importWorker.processDocuments(ordered); err != nil {
+				errChan <- err
+			}
+		}()
+	}
+
+	// if ordered, we have to coordinate the sequence in which processed
+	// documents are passed to the main read channel
+	if ordered {
+		doSequentialStreaming(importWorkers, inputChan, outputChan)
+	}
+	wg.Wait()
+	close(outputChan)
 }
 
 // tokensToBSON reads in slice of records - along with ordered fields names -
@@ -273,93 +373,4 @@ func (importWorker *ImportWorker) processDocuments(ordered bool) error {
 		close(importWorker.processedDocumentChan)
 	}
 	return nil
-}
-
-// streamDocuments concurrently processes data gotten from the inputChan
-// channel in parallel and then sends over the processed data to the outputChan
-// channel - either in sequence or concurrently (depending on the value of
-// ordered) - in which the data was received
-func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan chan bson.D, errChan chan error) {
-	var importWorkers []*ImportWorker
-	// initialize all our concurrent processing threads
-	wg := &sync.WaitGroup{}
-	inChan := inputChan
-	outChan := outputChan
-	for i := 0; i < numProcessingThreads; i++ {
-		if ordered {
-			// TODO: experiment with buffered channel size; the buffer size of
-			// inChan should always be the same as that of outChan
-			workerBufferSize := 100
-			inChan = make(chan ConvertibleDoc, workerBufferSize)
-			outChan = make(chan bson.D, workerBufferSize)
-		}
-		importWorker := &ImportWorker{
-			unprocessedDataChan:   inChan,
-			processedDocumentChan: outChan,
-		}
-		importWorkers = append(importWorkers, importWorker)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := importWorker.processDocuments(ordered); err != nil {
-				errChan <- err
-			}
-		}()
-	}
-
-	// if ordered, we have to coordinate the sequence in which processed
-	// documents are passed to the main read channel
-	if ordered {
-		doSequentialStreaming(importWorkers, inputChan, outputChan)
-	}
-	wg.Wait()
-	close(outputChan)
-}
-
-// insertDocuments writes the given documents to the specified collection and
-// returns the number of documents inserted and an error. It can handle both
-// ordered and unordered writes. If both a write error and a write concern error
-// are encountered, the write error is returned. If the target server is not
-// capable of handling write commands, it returns an error.
-func insertDocuments(documents []bson.Raw, collection *mgo.Collection, ordered bool, writeConcern string) (int, error) {
-	// mongod v2.6 requires you to explicitly pass an integer for numeric write
-	// concerns
-	var wc interface{}
-	if intWriteConcern, err := strconv.Atoi(writeConcern); err != nil {
-		wc = writeConcern
-	} else {
-		wc = intWriteConcern
-	}
-
-	response := &db.WriteCommandResponse{}
-	err := collection.Database.Run(
-		bson.D{
-			bson.DocElem{"insert", collection.Name},
-			bson.DocElem{"ordered", ordered},
-			bson.DocElem{"documents", documents},
-			bson.DocElem{"writeConcern", bson.D{bson.DocElem{"w", wc}}},
-		}, response)
-	if err != nil {
-		return 0, err
-	}
-	// if the write concern is 0, n is not present in the response document
-	// so we return immediately with no errors
-	if response.NumAffected == nil {
-		return len(documents), nil
-	}
-	if response.Ok == 0 {
-		// the command itself failed (authentication failed.., syntax error)
-		return 0, fmt.Errorf("write command failed")
-	} else if len(response.WriteErrors) != 0 {
-		// happens if the server couldn't write the data; e.g. because of a
-		// duplicate key, running out of disk space, etc
-		for _, writeError := range response.WriteErrors {
-			log.Logf(log.Always, writeError.Errmsg)
-		}
-		return *response.NumAffected, fmt.Errorf("encountered write errors")
-	} else if response.WriteConcernError.Errmsg != "" {
-		log.Logf(log.Always, response.WriteConcernError.Errmsg)
-		return 0, fmt.Errorf("encountered write concern error")
-	}
-	return *response.NumAffected, nil
 }

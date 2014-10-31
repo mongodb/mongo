@@ -1,7 +1,6 @@
 package mongoimport
 
 import (
-	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
@@ -27,16 +26,10 @@ const (
 	JSON = "json"
 )
 
-var (
-	errNsNotFound = errors.New("ns not found")
-)
-
 // ingestion constants
 const (
-	maxBSONSize              = 16 * (1024 * 1024)
-	maxMessageSizeBytes      = 2 * maxBSONSize
-	maxWriteCommandSizeBytes = maxBSONSize / 2
-	updateAfterNumInserts    = 10000
+	maxBSONSize         = 16 * (1024 * 1024)
+	maxMessageSizeBytes = 2 * maxBSONSize
 )
 
 // variables used by the input/ingestion goroutines
@@ -70,10 +63,6 @@ type MongoImport struct {
 	// the tomb is used to synchronize ingestion goroutines and causes
 	// other sibling goroutines to terminate immediately if one errors out
 	tomb *tomb.Tomb
-
-	// indicates if the underlying connected server on the session suports
-	// write commands
-	supportsWriteCommands bool
 }
 
 // InputReader is an interface that specifies how an input source should be
@@ -350,13 +339,6 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	// initialize insertion lock
 	mongoImport.insertionLock = &sync.Mutex{}
 
-	// check if the server supports write commands
-	mongoImport.supportsWriteCommands, err = mongoImport.SessionProvider.SupportsWriteCommands()
-	if err != nil {
-		return 0, fmt.Errorf("error checking if server supports write commands: %v", err)
-	}
-	log.Logf(log.Info, "using write commands: %v", mongoImport.supportsWriteCommands)
-
 	// return immediately on ingest errors - these will be triggered
 	// either by an issue ingesting data or if the read channel is
 	// closed so we can block here while reads happen in a goroutine
@@ -448,13 +430,6 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	documents := make([]bson.Raw, 0)
 	numMessageBytes := 0
 
-	// set the max message size bytes based on whether or not we're using
-	// write commands
-	maxMessageSize := maxMessageSizeBytes
-	if mongoImport.supportsWriteCommands {
-		maxMessageSize = maxWriteCommandSizeBytes
-	}
-
 readLoop:
 	for {
 		select {
@@ -466,12 +441,12 @@ readLoop:
 			// limit so we self impose a limit by using maxMessageSizeBytes
 			// and send documents over the wire when we hit the batch size
 			// or when we're at/over the maximum message size threshold
-			if len(documents) == batchSize || numMessageBytes >= maxMessageSize {
+			if len(documents) == batchSize || numMessageBytes >= maxMessageSizeBytes {
 				if err = mongoImport.ingester(documents, collection); err != nil {
 					return err
 				}
 				// TODO: TOOLS-313; better to use a progress bar here
-				if mongoImport.insertionCount%updateAfterNumInserts == 0 {
+				if mongoImport.insertionCount%10000 == 0 {
 					log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
 				}
 				documents = documents[:0]
@@ -535,7 +510,6 @@ func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *m
 func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.Collection) (err error) {
 	numInserted := 0
 	stopOnError := mongoImport.IngestOptions.StopOnError
-	writeConcern := mongoImport.IngestOptions.WriteConcern
 	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
 
 	defer func() {
@@ -546,12 +520,9 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 
 	if mongoImport.IngestOptions.Upsert {
 		return mongoImport.handleUpsert(documents, collection, &numInserted)
-	} else if mongoImport.supportsWriteCommands {
-		// note that this count may not be entirely accurate if some
-		// ingester threads insert when another errors out. however,
-		// any/all errors will be logged if/when they are encountered
-		numInserted, err = insertDocuments(documents, collection, stopOnError, writeConcern)
 	} else {
+		// note that this count may not be entirely accurate if some
+		// ingester threads insert when another errors out.
 		// without write commands, we can't say for sure how many documents were
 		// inserted when we use bulk inserts so we assume the entire batch
 		// succeeded - even if an error is returned. The result is that we may
