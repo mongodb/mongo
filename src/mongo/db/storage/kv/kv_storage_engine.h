@@ -71,6 +71,8 @@ namespace mongo {
 
         virtual int flushAllFiles( bool sync );
 
+        virtual bool isDurable() const;
+
         virtual Status repairDatabase( OperationContext* txn,
                                        const std::string& dbName,
                                        bool preserveClonedFilesOnFailure = false,

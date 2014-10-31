@@ -209,6 +209,10 @@ namespace mongo {
         return _engine->flushAllFiles( sync );
     }
 
+    bool KVStorageEngine::isDurable() const {
+        return _engine->isDurable();
+    }
+
     Status KVStorageEngine::repairDatabase( OperationContext* txn,
                                             const std::string& dbName,
                                             bool preserveClonedFilesOnFailure,

@@ -68,6 +68,11 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const { return false; }
 
+        /**
+         * This is sort of strange since "durable" has no meaning...
+         */
+        virtual bool isDurable() const { return true; }
+
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;
 

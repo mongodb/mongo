@@ -383,6 +383,10 @@ namespace {
         return MongoFile::flushAll( sync );
     }
 
+    bool MMAPV1Engine::isDurable() const {
+        return getDur().isDurable();
+    }
+
     void MMAPV1Engine::cleanShutdown(OperationContext* txn) {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a

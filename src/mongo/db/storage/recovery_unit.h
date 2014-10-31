@@ -86,6 +86,11 @@ namespace mongo {
          */
         virtual bool awaitCommit() = 0;
 
+        // This is a hint to the engine that this transaction is going to call awaitCommit at the
+        // end.  This should be called before any work is done so that transactions can be
+        // configured correctly.
+        virtual void goingToAwaitCommit() { }
+
         /**
          * When this is called, if there is an open transaction, it is commited and a new one is
          * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
