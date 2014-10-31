@@ -39,16 +39,22 @@ printjson(conf2);
 var admin = conns[0].getDB("admin");
 var response = admin.runCommand({replSetReconfig: conf2});
 printjson(response);
-printjson(replTest.status());
 
-jsTestLog('Waiting up to 30 seconds for secondary....');
+assert.soon(function() {
+    try {
+        var status = replTest.status();
+        return (status.members.length == 2
+            && status.members[1].state == replTest.DOWN
+            && (/configuration is invalid/i).test(status.members[1].lastHeartbeatMessage));
+    } catch (exc) {
+        // Not ready.
+        print(exc);
+        return false;
+    }
+});
 
-var secondary = replTest.getSecondary(30 * 1000);
-
-jsTestLog('Secondary is up: ' + secondary.host);
-
-// Secondary should see bad config and remove itself.
-replTest.waitForState(secondary, replTest.REMOVED);
+// Primary should step down -- probably already has.
+replTest.waitForState(primary, replTest.SECONDARY);
 
 // Since we added the new secondary directly we must stop it directly.
 MongoRunner.stopMongod(newSecondary.port);
