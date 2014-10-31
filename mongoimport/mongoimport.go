@@ -518,8 +518,11 @@ func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *m
 		} else {
 			_, err = collection.Upsert(selector, document)
 		}
-		if handleErr(stopOnError, err) == nil {
+		if err == nil {
 			*numInserted += 1
+		}
+		if err = handleErr(stopOnError, err); err != nil {
+			return err
 		}
 		document = bson.M{}
 	}

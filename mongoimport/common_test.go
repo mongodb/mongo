@@ -630,7 +630,7 @@ func TestHandlErr(t *testing.T) {
 			So(handleErr(true, fmt.Errorf("")), ShouldNotBeNil)
 		})
 
-		Convey("errLostConnection should be returned if stopOnError is true the err io.EOF", func() {
+		Convey("errLostConnection should be returned if stopOnError is true the err is io.EOF", func() {
 			So(handleErr(true, io.EOF), ShouldEqual, errLostConnection)
 		})
 

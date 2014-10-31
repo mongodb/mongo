@@ -136,7 +136,7 @@ func handleErr(stopOnError bool, err error) error {
 		if err == io.EOF {
 			err = errLostConnection
 		}
-		log.Logf(log.Always, "error updating documents: %v", err)
+		log.Logf(log.Always, "error inserting documents: %v", err)
 		if stopOnError || err == errLostConnection {
 			return err
 		}
