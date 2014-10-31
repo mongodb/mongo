@@ -202,10 +202,10 @@ namespace {
             // Update the cached member state if different than the current topology member state
             if (_currentState != _topCoord->getMemberState()) {
                 boost::unique_lock<boost::mutex> lk(_mutex);
-                const PostMemberStateUpdateAction action =
+                const PostMemberStateUpdateAction postUpdateAction =
                     _updateCurrentMemberStateFromTopologyCoordinator_inlock();
                 lk.unlock();
-                _performPostMemberStateUpdateAction(action);
+                _performPostMemberStateUpdateAction(postUpdateAction);
             }
             break;
         case HeartbeatResponseAction::Reconfig:
@@ -406,21 +406,27 @@ namespace {
             lk.unlock();
         }
 
-        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
-        Status status = _externalState->storeLocalConfigDocument(txn.get(), newConfig.toBSON());
+        if (!myIndex.getStatus().isOK() && myIndex.getStatus() != ErrorCodes::NodeNotFound) {
+            warning() << "Not persisting new configuration in heartbeat response to disk because "
+                    "it is invalid: "<< myIndex.getStatus();
+        }
+        else {
+            boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+            Status status = _externalState->storeLocalConfigDocument(txn.get(), newConfig.toBSON());
 
-        lk.lock();
-        if (!status.isOK()) {
-            error() << "Ignoring new configuration in heartbeat response because we failed to"
-                " write it to stable storage; " << status;
-            invariant(_rsConfigState == kConfigHBReconfiguring);
-            if (_rsConfig.isInitialized()) {
-                _setConfigState_inlock(kConfigSteady);
+            lk.lock();
+            if (!status.isOK()) {
+                error() << "Ignoring new configuration in heartbeat response because we failed to"
+                    " write it to stable storage; " << status;
+                invariant(_rsConfigState == kConfigHBReconfiguring);
+                if (_rsConfig.isInitialized()) {
+                    _setConfigState_inlock(kConfigSteady);
+                }
+                else {
+                    _setConfigState_inlock(kConfigUninitialized);
+                }
+                return;
             }
-            else {
-                _setConfigState_inlock(kConfigUninitialized);
-            }
-            return;
         }
 
         const stdx::function<void (const ReplicationExecutor::CallbackData&)> reconfigFinishFn(

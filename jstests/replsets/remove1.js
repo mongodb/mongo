@@ -73,6 +73,7 @@ wait(function() {
         print(e);
     }
     reconnect(master);
+    replTest.awaitReplication();
 
     printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
     master.setSlaveOk();

@@ -48,9 +48,6 @@ namespace mongo {
 
     // static
     void Yield::yieldAllLocks(OperationContext* txn, int micros) {
-        // This is a convenient place to do this.
-        txn->checkForInterrupt();
-
         Locker* locker = txn->lockState();
 
         // If we had the read lock, we yield extra hard so that we don't starve writers.

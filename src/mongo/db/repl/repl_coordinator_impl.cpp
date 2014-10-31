@@ -1624,7 +1624,8 @@ namespace {
                 _settings.ourSetName(),
                 getMyLastOptime(),
                 response);
-        if (outStatus->isOK() && _thisMembersConfigIndex < 0) {
+        if ((outStatus->isOK() || *outStatus == ErrorCodes::InvalidReplicaSetConfig) &&
+                _thisMembersConfigIndex < 0) {
             // If this node does not belong to the configuration it knows about, send heartbeats
             // back to any node that sends us a heartbeat, in case one of those remote nodes has
             // a configuration that contains us.  Chances are excellent that it will, since that
