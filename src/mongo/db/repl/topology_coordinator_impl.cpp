@@ -1266,7 +1266,7 @@ namespace {
             if (_maintenanceModeCalls) {
                 response->append("maintenanceMode", _maintenanceModeCalls);
             }
-            std::string s = _getHbmsg();
+            std::string s = _getHbmsg(now);
             if( !s.empty() )
                 response->append("infoMessage", s);
             *result = Status(ErrorCodes::InvalidReplicaSetConfig,
