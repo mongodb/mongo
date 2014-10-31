@@ -38,15 +38,17 @@
 namespace mongo {
 
     Status WiredTigerGlobalOptions::add(moe::OptionSection* options) {
+        moe::OptionSection wiredTigerOptions("WiredTiger options");
+
         // Add WiredTiger storage engine specific options.
-        options->addOptionChaining("storage.wiredtiger.databaseConfig",
+        wiredTigerOptions.addOptionChaining("storage.wiredtiger.databaseConfig",
                 "wiredTigerDatabaseConfig", moe::String, "WiredTiger database configuration settings");
-        options->addOptionChaining("storage.wiredtiger.collectionConfig",
+        wiredTigerOptions.addOptionChaining("storage.wiredtiger.collectionConfig",
                 "wiredTigerCollectionConfig", moe::String, "WiredTiger collection configuration settings");
-        options->addOptionChaining("storage.wiredtiger.indexConfig",
+        wiredTigerOptions.addOptionChaining("storage.wiredtiger.indexConfig",
                 "wiredTigerIndexConfig", moe::String, "WiredTiger index configuration settings");
 
-        return Status::OK();
+        return options->addSection(wiredTigerOptions);
     }
 
     void WiredTigerGlobalOptions::printHelp(std::ostream* out) {
