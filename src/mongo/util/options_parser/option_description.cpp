@@ -27,6 +27,8 @@
 
 #include "mongo/util/options_parser/option_description.h"
 
+#include <algorithm>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -92,6 +94,59 @@ namespace optionenvironment {
             }
         }
     } // namespace
+
+    OptionDescription::OptionDescription(const std::string& dottedName,
+                                         const std::string& singleName,
+                                         const OptionType type,
+                                         const std::string& description)
+        : _dottedName(dottedName),
+          _singleName(singleName),
+          _type(type),
+          _description(description),
+          _isVisible(true),
+          _default(Value()),
+          _implicit(Value()),
+          _isComposing(false),
+          _sources(SourceAll),
+          _positionalStart(-1),
+          _positionalEnd(-1),
+          _constraints(),
+          _deprecatedDottedNames() { }
+
+    OptionDescription::OptionDescription(const std::string& dottedName,
+                                         const std::string& singleName,
+                                         const OptionType type,
+                                         const std::string& description,
+                                         const std::vector<std::string>& deprecatedDottedNames)
+        : _dottedName(dottedName),
+          _singleName(singleName),
+          _type(type),
+          _description(description),
+          _isVisible(true),
+          _default(Value()),
+          _implicit(Value()),
+          _isComposing(false),
+          _sources(SourceAll),
+          _positionalStart(-1),
+          _positionalEnd(-1),
+          _constraints(),
+          _deprecatedDottedNames(deprecatedDottedNames) {
+
+        // Verify deprecated dotted names.
+        // No empty deprecated dotted names.
+        if (std::count(_deprecatedDottedNames.begin(), _deprecatedDottedNames.end(), "")) {
+            StringBuilder sb;
+            sb << "Attempted to register option with empty string for deprecated dotted name";
+            throw DBException(sb.str(), ErrorCodes::BadValue);
+        }
+        // Should not be the same as _dottedName.
+        if (std::count(_deprecatedDottedNames.begin(), _deprecatedDottedNames.end(), dottedName)) {
+            StringBuilder sb;
+            sb << "Attempted to register option with conflict between dottedName and deprecated "
+               << "dotted name: " << _dottedName;
+            throw DBException(sb.str(), ErrorCodes::BadValue);
+        }
+    }
 
     OptionDescription& OptionDescription::hidden() {
         _isVisible = false;
