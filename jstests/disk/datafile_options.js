@@ -6,18 +6,22 @@ jsTest.log("Testing \"noprealloc\" command line option");
 var expectedResult = {
     "parsed" : {
         "storage" : {
-            "preallocDataFiles" : false
+            "mmapv1" : {
+                "preallocDataFiles" : false
+            }
         }
     }
 };
 testGetCmdLineOptsMongod({ noprealloc : "" }, expectedResult);
 
-jsTest.log("Testing \"storage.preallocDataFiles\" config file option");
+jsTest.log("Testing \"storage.mmapv1.preallocDataFiles\" config file option");
 expectedResult = {
     "parsed" : {
         "config" : "jstests/libs/config_files/enable_prealloc.json",
         "storage" : {
-            "preallocDataFiles" : true
+            "mmapv1" : {
+                "preallocDataFiles" : true
+            }
         }
     }
 };
@@ -38,7 +42,9 @@ expectedResult = {
     "parsed" : {
         "config" : "jstests/libs/config_files/disable_noprealloc.ini",
         "storage" : {
-            "preallocDataFiles" : true
+            "mmapv1" : {
+                "preallocDataFiles" : true
+            }
         }
     }
 };

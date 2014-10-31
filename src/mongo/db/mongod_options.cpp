@@ -88,6 +88,7 @@ namespace mongo {
         moe::OptionSection rs_options("Replica set options");
         moe::OptionSection replication_options("Replication options");
         moe::OptionSection sharding_options("Sharding options");
+        moe::OptionSection storage_options("Storage options");
 
         // Authentication Options
 
@@ -158,7 +159,7 @@ namespace mongo {
 
         // Storage Options
 
-        general_options.addOptionChaining("storage.engine", "storageEngine", moe::String,
+        storage_options.addOptionChaining("storage.engine", "storageEngine", moe::String,
                                           "what storage engine to use")
             .setDefault(moe::Value(std::string("mmapv1")));
 
@@ -168,19 +169,21 @@ namespace mongo {
 
         std::string defaultPath = currentPath.root_name().string()
                                   + storageGlobalParams.kDefaultDbPath;
-        general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
+        storage_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
                 std::string("directory for datafiles - defaults to ")
                 + storageGlobalParams.kDefaultDbPath
                 + " which is " + defaultPath + " based on the current working drive");
 
 #else
-        general_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
+        storage_options.addOptionChaining("storage.dbPath", "dbpath", moe::String,
                 std::string("directory for datafiles - defaults to ")
                 + storageGlobalParams.kDefaultDbPath);
 
 #endif
-        general_options.addOptionChaining("storage.directoryPerDB", "directoryperdb", moe::Switch,
-                "each database will be stored in a separate directory");
+        storage_options.addOptionChaining("storage.mmapv1.directoryPerDB", "directoryperdb",
+                moe::Switch,
+                "each database will be stored in a separate directory",
+                "storage.directoryPerDB");
 
         general_options.addOptionChaining("noIndexBuildRetry", "noIndexBuildRetry", moe::Switch,
                 "don't retry any index builds that were interrupted by shutdown")
@@ -190,43 +193,51 @@ namespace mongo {
                 "don't retry any index builds that were interrupted by shutdown")
                                          .setSources(moe::SourceYAMLConfig);
 
-        general_options.addOptionChaining("noprealloc", "noprealloc", moe::Switch,
+        storage_options.addOptionChaining("noprealloc", "noprealloc", moe::Switch,
                 "disable data file preallocation - will often hurt performance")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("storage.preallocDataFiles", "", moe::Bool,
-                "disable data file preallocation - will often hurt performance")
+        storage_options.addOptionChaining("storage.mmapv1.preallocDataFiles", "", moe::Bool,
+                "disable data file preallocation - will often hurt performance",
+                "storage.preallocDataFiles")
                                          .setSources(moe::SourceYAMLConfig);
 
-        general_options.addOptionChaining("storage.nsSize", "nssize", moe::Int,
-                ".ns file size (in MB) for new databases")
+        storage_options.addOptionChaining("storage.mmapv1.nsSize", "nssize", moe::Int,
+                ".ns file size (in MB) for new databases",
+                "storage.nsSize")
                                          .setDefault(moe::Value(16));
 
-        general_options.addOptionChaining("storage.quota.enforced", "quota", moe::Switch,
-                "limits each database to a certain number of files (8 default)")
+        storage_options.addOptionChaining("storage.mmapv1.quota.enforced", "quota", moe::Switch,
+                "limits each database to a certain number of files (8 default)",
+                "storage.quota.enforced")
                                          .incompatibleWith("keyFile");
 
-        general_options.addOptionChaining("storage.quota.maxFilesPerDB", "quotaFiles", moe::Int,
-                "number of files allowed per db, implies --quota");
+        storage_options.addOptionChaining("storage.mmapv1.quota.maxFilesPerDB", "quotaFiles",
+                moe::Int,
+                "number of files allowed per db, implies --quota",
+                "storage.quota.maxFilesPerDB");
 
-        general_options.addOptionChaining("storage.smallFiles", "smallfiles", moe::Switch,
-                "use a smaller default file size");
+        storage_options.addOptionChaining("storage.mmapv1.smallFiles", "smallfiles", moe::Switch,
+                "use a smaller default file size",
+                "storage.smallFiles");
 
-        general_options.addOptionChaining("storage.syncPeriodSecs", "syncdelay", moe::Double,
-                "seconds between disk syncs (0=never, but not recommended)")
+        storage_options.addOptionChaining("storage.mmapv1.syncPeriodSecs", "syncdelay",
+                moe::Double,
+                "seconds between disk syncs (0=never, but not recommended)",
+                "storage.syncPeriodSecs")
                                          .setDefault(moe::Value(60.0));
 
         // Upgrade and repair are disallowed in JSON configs since they trigger very heavyweight
         // actions rather than specify configuration data
-        general_options.addOptionChaining("upgrade", "upgrade", moe::Switch,
+        storage_options.addOptionChaining("upgrade", "upgrade", moe::Switch,
                 "upgrade db if needed")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("repair", "repair", moe::Switch,
+        storage_options.addOptionChaining("repair", "repair", moe::Switch,
                 "run repair on all dbs")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("storage.repairPath", "repairpath", moe::String,
+        storage_options.addOptionChaining("storage.repairPath", "repairpath", moe::String,
                 "root directory for repair files - defaults to dbpath");
 
         // Javascript Options
@@ -248,18 +259,18 @@ namespace mongo {
         // Journaling Options
 
         // Way to enable or disable journaling on command line and in Legacy config file
-        general_options.addOptionChaining("journal", "journal", moe::Switch, "enable journaling")
+        storage_options.addOptionChaining("journal", "journal", moe::Switch, "enable journaling")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("nojournal", "nojournal", moe::Switch,
+        storage_options.addOptionChaining("nojournal", "nojournal", moe::Switch,
                 "disable journaling (journaling is on by default for 64 bit)")
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("dur", "dur", moe::Switch, "enable journaling")
+        storage_options.addOptionChaining("dur", "dur", moe::Switch, "enable journaling")
                                          .hidden()
                                          .setSources(moe::SourceAllLegacy);
 
-        general_options.addOptionChaining("nodur", "nodur", moe::Switch, "disable journaling")
+        storage_options.addOptionChaining("nodur", "nodur", moe::Switch, "disable journaling")
                                          .hidden()
                                          .setSources(moe::SourceAllLegacy);
 
@@ -269,21 +280,24 @@ namespace mongo {
                                          .setSources(moe::SourceYAMLConfig);
 
         // Two ways to set durability diagnostic options.  durOptions is deprecated
-        general_options.addOptionChaining("storage.journal.debugFlags", "journalOptions", moe::Int,
-                "journal diagnostic options")
+        storage_options.addOptionChaining("storage.mmapv1.journal.debugFlags", "journalOptions",
+                moe::Int,
+                "journal diagnostic options",
+                "storage.journal.debugFlags")
                                          .incompatibleWith("durOptions");
 
-        general_options.addOptionChaining("durOptions", "durOptions", moe::Int,
+        storage_options.addOptionChaining("durOptions", "durOptions", moe::Int,
                 "durability diagnostic options")
                                          .hidden()
                                          .setSources(moe::SourceAllLegacy)
-                                         .incompatibleWith("storage.journal.debugFlags");
+                                         .incompatibleWith("storage.mmapv1.journal.debugFlags");
 
-        general_options.addOptionChaining("storage.journal.commitIntervalMs",
-                "journalCommitInterval", moe::Unsigned, "how often to group/batch commit (ms)");
+        storage_options.addOptionChaining("storage.mmapv1.journal.commitIntervalMs",
+                "journalCommitInterval", moe::Unsigned, "how often to group/batch commit (ms)",
+                "storage.journal.commitIntervalMs");
 
         // Deprecated option that we don't want people to use for performance reasons
-        options->addOptionChaining("nopreallocj", "nopreallocj", moe::Switch,
+        storage_options.addOptionChaining("nopreallocj", "nopreallocj", moe::Switch,
                 "don't preallocate journal files")
                                   .hidden()
                                   .setSources(moe::SourceAllLegacy);
@@ -403,6 +417,7 @@ namespace mongo {
 #ifdef MONGO_SSL
         options->addSection(ssl_options);
 #endif
+        options->addSection(storage_options);
 
         // The following are legacy options that are disallowed in the JSON config file
 
@@ -652,15 +667,15 @@ namespace mongo {
             }
         }
 
-        // "storage.journal.durOptions" comes from the config file, so override it if "durOptions"
-        // is set since that comes from the command line.
+        // "storage.mmapv1.journal.durOptions" comes from the config file, so override it
+        // if "durOptions" is set since that comes from the command line.
         if (params->count("durOptions")) {
             int durOptions;
             Status ret = params->get("durOptions", &durOptions);
             if (!ret.isOK()) {
                 return ret;
             }
-            ret = params->set("storage.journal.debugFlags", moe::Value(durOptions));
+            ret = params->set("storage.mmapv1.journal.debugFlags", moe::Value(durOptions));
             if (!ret.isOK()) {
                 return ret;
             }
@@ -699,10 +714,10 @@ namespace mongo {
             }
         }
 
-        // "storage.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
+        // "storage.mmapv1.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
         // set since that comes from the command line.
         if (params->count("noprealloc")) {
-            Status ret = params->set("storage.preallocDataFiles",
+            Status ret = params->set("storage.mmapv1.preallocDataFiles",
                                      moe::Value(!(*params)["noprealloc"].as<bool>()));
             if (!ret.isOK()) {
                 return ret;
@@ -912,12 +927,12 @@ namespace mongo {
             serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
         }
 
-        if ( params.count("storage.syncPeriodSecs")) {
-            mmapv1GlobalOptions.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+        if ( params.count("storage.mmapv1.syncPeriodSecs")) {
+            mmapv1GlobalOptions.syncdelay = params["storage.mmapv1.syncPeriodSecs"].as<double>();
         }
 
-        if (params.count("storage.directoryPerDB")) {
-            mmapv1GlobalOptions.directoryperdb = params["storage.directoryPerDB"].as<bool>();
+        if (params.count("storage.mmapv1.directoryPerDB")) {
+            mmapv1GlobalOptions.directoryperdb = params["storage.mmapv1.directoryPerDB"].as<bool>();
         }
         if (params.count("cpu")) {
             serverGlobalParams.cpu = params["cpu"].as<bool>();
@@ -930,32 +945,34 @@ namespace mongo {
             params["security.authorization"].as<std::string>() == "enabled") {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
-        if (params.count("storage.quota.enforced")) {
-            mmapv1GlobalOptions.quota = params["storage.quota.enforced"].as<bool>();
+        if (params.count("storage.mmapv1.quota.enforced")) {
+            mmapv1GlobalOptions.quota = params["storage.mmapv1.quota.enforced"].as<bool>();
         }
-        if (params.count("storage.quota.maxFilesPerDB")) {
+        if (params.count("storage.mmapv1.quota.maxFilesPerDB")) {
             mmapv1GlobalOptions.quota = true;
-            mmapv1GlobalOptions.quotaFiles = params["storage.quota.maxFilesPerDB"].as<int>() - 1;
+            mmapv1GlobalOptions.quotaFiles =
+                params["storage.mmapv1.quota.maxFilesPerDB"].as<int>() - 1;
         }
 
         if (params.count("storage.journal.enabled")) {
             storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
         }
 
-        if (params.count("storage.journal.commitIntervalMs")) {
+        if (params.count("storage.mmapv1.journal.commitIntervalMs")) {
             // don't check if dur is false here as many will just use the default, and will default
             // to off on win32.  ie no point making life a little more complex by giving an error on
             // a dev environment.
             mmapv1GlobalOptions.journalCommitInterval =
-                params["storage.journal.commitIntervalMs"].as<unsigned>();
+                params["storage.mmapv1.journal.commitIntervalMs"].as<unsigned>();
             if (mmapv1GlobalOptions.journalCommitInterval <= 1 ||
                 mmapv1GlobalOptions.journalCommitInterval > 300) {
                 return Status(ErrorCodes::BadValue,
                               "--journalCommitInterval out of allowed range (0-300ms)");
             }
         }
-        if (params.count("storage.journal.debugFlags")) {
-            mmapv1GlobalOptions.journalOptions = params["storage.journal.debugFlags"].as<int>();
+        if (params.count("storage.mmapv1.journal.debugFlags")) {
+            mmapv1GlobalOptions.journalOptions =
+                params["storage.mmapv1.journal.debugFlags"].as<int>();
         }
         if (params.count("nopreallocj")) {
             mmapv1GlobalOptions.preallocj = !params["nopreallocj"].as<bool>();
@@ -970,12 +987,12 @@ namespace mongo {
         if (params.count("security.javascriptEnabled")) {
             mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
         }
-        if (params.count("storage.preallocDataFiles")) {
-            mmapv1GlobalOptions.prealloc = params["storage.preallocDataFiles"].as<bool>();
+        if (params.count("storage.mmapv1.preallocDataFiles")) {
+            mmapv1GlobalOptions.prealloc = params["storage.mmapv1.preallocDataFiles"].as<bool>();
             cout << "note: noprealloc may hurt performance in many applications" << endl;
         }
-        if (params.count("storage.smallFiles")) {
-            mmapv1GlobalOptions.smallfiles = params["storage.smallFiles"].as<bool>();
+        if (params.count("storage.mmapv1.smallFiles")) {
+            mmapv1GlobalOptions.smallfiles = params["storage.mmapv1.smallFiles"].as<bool>();
         }
         if (params.count("diaglog")) {
             warning() << "--diaglog is deprecated and will be removed in a future release"
@@ -1047,8 +1064,8 @@ namespace mongo {
         if (params.count("only")) {
             replSettings.only = params["only"].as<string>().c_str();
         }
-        if( params.count("storage.nsSize") ) {
-            int x = params["storage.nsSize"].as<int>();
+        if( params.count("storage.mmapv1.nsSize") ) {
+            int x = params["storage.mmapv1.nsSize"].as<int>();
             if (x <= 0 || x > (0x7fffffff/1024/1024)) {
                 return Status(ErrorCodes::BadValue, "bad --nssize arg");
             }

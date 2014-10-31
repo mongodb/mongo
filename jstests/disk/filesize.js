@@ -24,7 +24,7 @@ if (db.serverBuildInfo().bits == 32) {
 
     // Find log message like:
     // "openExisting file size 16777216 but
-    // storageGlobalParams.smallfiles=false: /data/db/filesize/local.0"
+    // mmapv1GlobalOptions.smallfiles=false: /data/db/filesize/local.0"
     var found = false, logline = '';
     for ( i=log.length - 1; i>= 0; i-- ) {
         logline = log[i];
