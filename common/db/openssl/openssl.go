@@ -54,12 +54,12 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:      connectionAddrs,
 		Timeout:    DefaultSSLDialTimeout,
+		Direct:     opts.Direct,
 		DialServer: dialer,
-
-		Username:  opts.Auth.Username,
-		Password:  opts.Auth.Password,
-		Source:    opts.GetAuthenticationDatabase(),
-		Mechanism: opts.Auth.Mechanism,
+		Username:   opts.Auth.Username,
+		Password:   opts.Auth.Password,
+		Source:     opts.GetAuthenticationDatabase(),
+		Mechanism:  opts.Auth.Mechanism,
 	}
 
 	return nil
