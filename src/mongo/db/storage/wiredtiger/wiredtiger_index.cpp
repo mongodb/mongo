@@ -159,7 +159,6 @@ namespace {
     Status dupKeyError(const BSONObj& key) {
         StringBuilder sb;
         sb << "E11000 duplicate key error ";
-        // sb << "index: " << _indexName << " "; // TODO
         sb << "dup key: " << key;
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
@@ -285,8 +284,23 @@ namespace {
     }
 
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const {
-        // todo
-        return 1;
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WT_SESSION* s = session->getSession();
+        BSONObjBuilder b;
+        Status status = WiredTigerUtil::exportTableToBSON(s,
+                                                          "statistics:" + _uri,
+                                                          "statistics=(fast)",
+                                                          &b);
+        uassertStatusOK( status );
+        BSONObj obj = b.obj();
+        BSONObj sub = obj["block manager"].Obj();
+        BSONElement e = sub["file size in bytes"];
+        invariant( e.type() );
+
+        if ( e.isNumber() )
+            return e.safeNumberLong();
+
+        return strtoll( e.valuestrsafe(), NULL, 10 );
     }
 
     bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc ) {
