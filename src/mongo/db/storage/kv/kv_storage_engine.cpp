@@ -161,7 +161,7 @@ namespace mongo {
 
     Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
         invariant( _initialized );
-        // todo: do I have to suppor this?
+        // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 

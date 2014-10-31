@@ -73,6 +73,9 @@ namespace mongo {
          */
         virtual bool isDurable() const { return true; }
 
+        virtual int64_t getIdentSize( OperationContext* opCtx,
+                                      const StringData& ident );
+
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;
 
