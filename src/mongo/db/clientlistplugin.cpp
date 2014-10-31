@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -163,6 +165,19 @@ namespace {
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool slaveOk() const { return true; }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            if ( client->getAuthorizationSession()
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::inprog) ) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+
+        }
 
         bool run( OperationContext* txn,
                   const string& dbname,
