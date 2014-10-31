@@ -67,6 +67,9 @@ namespace mongo {
 
         virtual int flushAllFiles( bool sync );
 
+        virtual int64_t getIdentSize( OperationContext* opCtx,
+                                      const StringData& ident );
+
         // wiredtiger specific
 
         WT_CONNECTION* getConnection() { return _conn; }

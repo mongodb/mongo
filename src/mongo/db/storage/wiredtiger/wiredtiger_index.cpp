@@ -285,22 +285,8 @@ namespace {
 
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
-        WT_SESSION* s = session->getSession();
-        BSONObjBuilder b;
-        Status status = WiredTigerUtil::exportTableToBSON(s,
-                                                          "statistics:" + _uri,
-                                                          "statistics=(fast)",
-                                                          &b);
-        uassertStatusOK( status );
-        BSONObj obj = b.obj();
-        BSONObj sub = obj["block manager"].Obj();
-        BSONElement e = sub["file size in bytes"];
-        invariant( e.type() );
-
-        if ( e.isNumber() )
-            return e.safeNumberLong();
-
-        return strtoll( e.valuestrsafe(), NULL, 10 );
+        return static_cast<long long>( WiredTigerUtil::getIdentSize( session->getSession(),
+                                                                     _uri ) );
     }
 
     bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc ) {

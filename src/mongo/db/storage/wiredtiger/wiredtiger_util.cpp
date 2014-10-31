@@ -44,6 +44,26 @@ namespace mongo {
 
     using std::string;
 
+    int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s,
+                                         const std::string& uri ) {
+        BSONObjBuilder b;
+        Status status = WiredTigerUtil::exportTableToBSON(s,
+                                                          "statistics:" + uri,
+                                                          "statistics=(fast)",
+                                                          &b);
+        uassertStatusOK( status );
+        BSONObj obj = b.obj();
+        BSONObj sub = obj["block manager"].Obj();
+        BSONElement e = sub["file size in bytes"];
+        invariant( e.type() );
+
+        if ( e.isNumber() )
+            return e.safeNumberLong();
+
+        return strtoull( e.valuestrsafe(), NULL, 10 );
+    }
+
+
     Status WiredTigerUtil::exportTableToBSON(WT_SESSION* s,
                                              const std::string& uri, const std::string& config,
                                              BSONObjBuilder* bob) {

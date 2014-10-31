@@ -103,6 +103,9 @@ namespace mongo {
         static Status exportTableToBSON(WT_SESSION* s,
                                         const std::string& uri, const std::string& config,
                                         BSONObjBuilder* bob);
+
+        static int64_t getIdentSize(WT_SESSION* s,
+                                    const std::string& uri );
     };
 
 }
