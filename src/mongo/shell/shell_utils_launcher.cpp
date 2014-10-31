@@ -604,7 +604,7 @@ namespace mongo {
             boost::filesystem::directory_iterator i( from );
             while( i != end ) {
                 boost::filesystem::path p = *i;
-                if ( p.leaf() != "mongod.lock" ) {
+                if ( p.leaf() != "mongod.lock" && p.leaf() != "WiredTiger.lock" ) {
                     if ( boost::filesystem::is_directory( p ) ) {
                         boost::filesystem::path newDir = to / p.leaf();
                         boost::filesystem::create_directory( newDir );
