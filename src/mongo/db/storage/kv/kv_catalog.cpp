@@ -345,5 +345,18 @@ namespace {
         return Status::OK();
     }
 
+    std::vector<std::string> KVCatalog::getAllIdentsForDB( const StringData& db ) const {
+        std::vector<std::string> v;
+
+        boost::mutex::scoped_lock lk( _identsLock );
+        for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
+            NamespaceString ns( it->first );
+            if ( ns.db() != db )
+                continue;
+            v.push_back( it->second.ident );
+        }
+
+        return v;
+    }
 
 }
