@@ -33,6 +33,7 @@
 #include "mongo/db/exec/update.h"
 
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/db/concurrency/deadlock.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -488,10 +489,6 @@ namespace mongo {
             }
         }
 
-
-        // Save state before making changes
-        saveState();
-
         {
             WriteUnitOfWork wunit(request->getOpCtx());
 
@@ -558,14 +555,6 @@ namespace mongo {
             }
             wunit.commit();
         }
-
-
-        // Restore state after modification
-
-        // As restoreState may restore (recreate) cursors, make sure to restore the
-        // state outside of the WritUnitOfWork.
-
-        restoreState(request->getOpCtx());
 
         // Only record doc modifications if they wrote (exclude no-ops). Explains get
         // recorded as if they wrote.
@@ -753,8 +742,45 @@ namespace mongo {
 
             ++_specificStats.nMatched;
 
+            // Save state before making changes
+            saveState();
+
             // Do the update and return.
-            transformAndUpdate(oldObj, loc);
+            BSONObj reFetched;
+            while ( 1 ) {
+                try {
+                    transformAndUpdate(reFetched.isEmpty() ? oldObj : reFetched , loc);
+                    break;
+                }
+                catch ( const DeadLockException& de ) {
+                    if ( !_params.request->isMulti() ) {
+                        // for single cases, we just restart.
+                        throw;
+                    }
+
+                    log() << "got deadlock in the middle of a multi-update, redoing the doc";
+                    OperationContext* txn = _params.request->getOpCtx();
+                    txn->recoveryUnit()->commitAndRestart();
+                    if ( !_collection->findDoc( txn, loc, &reFetched ) ) {
+                        // document was deleted, we're done here
+                        break;
+                    }
+                    // we have to re-match the doc as it might not match anymore
+                    if ( !_params.canonicalQuery->root()->matchesBSON( reFetched, NULL ) ) {
+                        // doesn't match!
+                        break;
+                    }
+                    // now we try again!
+                }
+            }
+
+            // Restore state after modification
+
+            // As restoreState may restore (recreate) cursors, make sure to restore the
+            // state outside of the WritUnitOfWork.
+
+            restoreState(_params.request->getOpCtx());
+
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }

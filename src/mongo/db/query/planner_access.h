@@ -106,6 +106,7 @@ namespace mongo {
                               const std::vector<IndexEntry>& indexList)
                 : root(theRoot),
                   inArrayOperator(inArrayOp),
+                  canTrimExpression(true),
                   indices(indexList),
                   currentScan(NULL),
                   curChild(0),
@@ -138,6 +139,9 @@ namespace mongo {
 
             // Are we inside an array operator such as $elemMatch or $all?
             bool inArrayOperator;
+
+            // Are we allowed to trip the match expression for indexes, or should we re-eval.
+            bool canTrimExpression;
 
             // A list of relevant indices which 'root' may be tagged to use.
             const std::vector<IndexEntry>& indices;
