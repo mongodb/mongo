@@ -1043,18 +1043,23 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
 
     print( "ReplSetTest waitForIndicator final status:" )
     printjson( status )
-}
+};
 
-ReplSetTest.Health = {}
-ReplSetTest.Health.UP = 1
-ReplSetTest.Health.DOWN = 0
+ReplSetTest.Health = {};
+ReplSetTest.Health.UP = 1;
+ReplSetTest.Health.DOWN = 0;
 
-ReplSetTest.State = {}
-ReplSetTest.State.PRIMARY = 1
-ReplSetTest.State.SECONDARY = 2
-ReplSetTest.State.RECOVERING = 3
-ReplSetTest.State.ARBITER = 7
-ReplSetTest.State.REMOVED = 10
+ReplSetTest.State = {};
+ReplSetTest.State.PRIMARY = 1;
+ReplSetTest.State.SECONDARY = 2;
+ReplSetTest.State.RECOVERING = 3;
+// Note there is no state 4.
+ReplSetTest.State.STARTUP_2 = 5;
+ReplSetTest.State.UNKNOWN = 6;
+ReplSetTest.State.ARBITER = 7;
+ReplSetTest.State.DOWN = 8;
+ReplSetTest.State.ROLLBACK = 9;
+ReplSetTest.State.REMOVED = 10;
 
 /** 
  * Overflows a replica set secondary or secondaries, specified by id or conn.
