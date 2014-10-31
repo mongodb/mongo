@@ -48,7 +48,9 @@ func simpleMongoDumpInstance() *MongoDump {
 		Auth:       &commonOpts.Auth{},
 		Verbosity:  &commonOpts.Verbosity{},
 	}
-	outputOptions := &options.OutputOptions{}
+	outputOptions := &options.OutputOptions{
+		JobThreads: 1,
+	}
 	inputOptions := &options.InputOptions{}
 
 	log.SetVerbosity(toolOptions.Verbosity)
