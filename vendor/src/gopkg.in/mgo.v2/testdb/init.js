@@ -32,6 +32,10 @@ for (var i = 0; i != 60; i++) {
 	sleep(1000)
 }
 
+function hasSSL() {
+    return db1.serverBuildInfo().OpenSSLVersion != ""
+}
+
 rs1a.runCommand({replSetInitiate: rs1cfg})
 rs2a.runCommand({replSetInitiate: rs2cfg})
 rs3a.runCommand({replSetInitiate: rs3cfg})
@@ -50,6 +54,9 @@ function configShards() {
 
 function configAuth() {
     var addrs = ["127.0.0.1:40002", "127.0.0.1:40203", "127.0.0.1:40031"]
+    if (hasSSL()) {
+        addrs.push("127.0.0.1:40003")
+    }
     for (var i in addrs) {
         var db = new Mongo(addrs[i]).getDB("admin")
         var v = db.serverBuildInfo().versionArray

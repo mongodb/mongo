@@ -124,13 +124,14 @@ func (cluster *mongoCluster) removeServer(server *mongoServer) {
 }
 
 type isMasterResult struct {
-	IsMaster  bool
-	Secondary bool
-	Primary   string
-	Hosts     []string
-	Passives  []string
-	Tags      bson.D
-	Msg       string
+	IsMaster       bool
+	Secondary      bool
+	Primary        string
+	Hosts          []string
+	Passives       []string
+	Tags           bson.D
+	Msg            string
+	MaxWireVersion int `bson:"maxWireVersion"`
 }
 
 func (cluster *mongoCluster) isMaster(socket *mongoSocket, result *isMasterResult) error {
@@ -214,9 +215,10 @@ func (cluster *mongoCluster) syncServer(server *mongoServer) (info *mongoServerI
 	}
 
 	info = &mongoServerInfo{
-		Master: result.IsMaster,
-		Mongos: result.Msg == "isdbgrid",
-		Tags:   result.Tags,
+		Master:         result.IsMaster,
+		Mongos:         result.Msg == "isdbgrid",
+		Tags:           result.Tags,
+		MaxWireVersion: result.MaxWireVersion,
 	}
 
 	hosts = make([]string, 0, 1+len(result.Hosts)+len(result.Passives))

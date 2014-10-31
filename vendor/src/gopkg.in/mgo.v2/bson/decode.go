@@ -73,35 +73,39 @@ const (
 	setterAddr
 )
 
-var setterStyle map[reflect.Type]int
+var setterStyles map[reflect.Type]int
 var setterIface reflect.Type
 var setterMutex sync.RWMutex
 
 func init() {
 	var iface Setter
 	setterIface = reflect.TypeOf(&iface).Elem()
-	setterStyle = make(map[reflect.Type]int)
+	setterStyles = make(map[reflect.Type]int)
 }
 
-func getSetter(outt reflect.Type, out reflect.Value) Setter {
+func setterStyle(outt reflect.Type) int {
 	setterMutex.RLock()
-	style := setterStyle[outt]
+	style := setterStyles[outt]
 	setterMutex.RUnlock()
-	if style == setterNone {
-		return nil
-	}
 	if style == setterUnknown {
 		setterMutex.Lock()
 		defer setterMutex.Unlock()
 		if outt.Implements(setterIface) {
-			setterStyle[outt] = setterType
+			setterStyles[outt] = setterType
 		} else if reflect.PtrTo(outt).Implements(setterIface) {
-			setterStyle[outt] = setterAddr
+			setterStyles[outt] = setterAddr
 		} else {
-			setterStyle[outt] = setterNone
-			return nil
+			setterStyles[outt] = setterNone
 		}
-		style = setterStyle[outt]
+		style = setterStyles[outt]
+	}
+	return style
+}
+
+func getSetter(outt reflect.Type, out reflect.Value) Setter {
+	style := setterStyle(outt)
+	if style == setterNone {
+		return nil
 	}
 	if style == setterAddr {
 		if !out.CanAddr() {
@@ -434,20 +438,28 @@ func (d *decoder) readElemTo(out reflect.Value, kind byte) (good bool) {
 	start := d.i
 
 	if kind == '\x03' {
-		// Special case for documents. Delegate to readDocTo().
-		switch out.Kind() {
+		// Delegate unmarshaling of documents.
+		outt := out.Type()
+		outk := out.Kind()
+		switch outk {
 		case reflect.Interface, reflect.Ptr, reflect.Struct, reflect.Map:
 			d.readDocTo(out)
-		default:
-			switch out.Interface().(type) {
-			case D:
-				out.Set(d.readDocElems(out.Type()))
-			case RawD:
-				out.Set(d.readRawDocElems(out.Type()))
-			default:
-				d.readDocTo(blackHole)
-			}
+			return true
 		}
+		if setterStyle(outt) != setterNone {
+			d.readDocTo(out)
+			return true
+		}
+		if outk == reflect.Slice {
+			switch outt.Elem() {
+			case typeDocElem:
+				out.Set(d.readDocElems(outt))
+			case typeRawDocElem:
+				out.Set(d.readRawDocElems(outt))
+			}
+			return true
+		}
+		d.readDocTo(blackHole)
 		return true
 	}
 

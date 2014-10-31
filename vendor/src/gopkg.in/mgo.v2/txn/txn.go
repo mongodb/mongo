@@ -9,11 +9,13 @@ package txn
 import (
 	"encoding/binary"
 	"fmt"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
+
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	crand "crypto/rand"
 	mrand "math/rand"
@@ -455,38 +457,6 @@ func (r *Runner) load(id bson.ObjectId) (*transaction, error) {
 	return &t, nil
 }
 
-type docKey struct {
-	C  string
-	Id interface{}
-}
-
-type docKeys []docKey
-
-func (ks docKeys) Len() int      { return len(ks) }
-func (ks docKeys) Swap(i, j int) { ks[i], ks[j] = ks[j], ks[i] }
-func (ks docKeys) Less(i, j int) bool {
-	a, b := ks[i], ks[j]
-	if a.C != b.C {
-		return a.C < b.C
-	}
-	av, an := valueNature(a.Id)
-	bv, bn := valueNature(b.Id)
-	if an != bn {
-		return an < bn
-	}
-	switch an {
-	case natureString:
-		return av.(string) < bv.(string)
-	case natureInt:
-		return av.(int64) < bv.(int64)
-	case natureFloat:
-		return av.(float64) < bv.(float64)
-	case natureBool:
-		return !av.(bool) && bv.(bool)
-	}
-	panic("unreachable")
-}
-
 type typeNature int
 
 const (
@@ -498,6 +468,7 @@ const (
 	natureInt
 	natureFloat
 	natureBool
+	natureStruct
 )
 
 func valueNature(v interface{}) (value interface{}, nature typeNature) {
@@ -513,6 +484,126 @@ func valueNature(v interface{}) (value interface{}, nature typeNature) {
 		return rv.Float(), natureFloat
 	case reflect.Bool:
 		return rv.Bool(), natureBool
+	case reflect.Struct:
+		return v, natureStruct
 	}
 	panic("document id type unsupported by txn: " + rv.Kind().String())
+}
+
+type docKey struct {
+	C  string
+	Id interface{}
+}
+
+type docKeys []docKey
+
+func (ks docKeys) Len() int      { return len(ks) }
+func (ks docKeys) Swap(i, j int) { ks[i], ks[j] = ks[j], ks[i] }
+func (ks docKeys) Less(i, j int) bool {
+	a, b := ks[i], ks[j]
+	if a.C != b.C {
+		return a.C < b.C
+	}
+	return valuecmp(a.Id, b.Id) == -1
+}
+
+func valuecmp(a, b interface{}) int {
+	av, an := valueNature(a)
+	bv, bn := valueNature(b)
+	if an < bn {
+		return -1
+	}
+	if an > bn {
+		return 1
+	}
+
+	if av == bv {
+		return 0
+	}
+	var less bool
+	switch an {
+	case natureString:
+		less = av.(string) < bv.(string)
+	case natureInt:
+		less = av.(int64) < bv.(int64)
+	case natureFloat:
+		less = av.(float64) < bv.(float64)
+	case natureBool:
+		less = !av.(bool) && bv.(bool)
+	case natureStruct:
+		less = structcmp(av, bv) == -1
+	default:
+		panic("unreachable")
+	}
+	if less {
+		return -1
+	}
+	return 1
+}
+
+func structcmp(a, b interface{}) int {
+	av := reflect.ValueOf(a)
+	bv := reflect.ValueOf(b)
+
+	var ai, bi = 0, 0
+	var an, bn = av.NumField(), bv.NumField()
+	var avi, bvi interface{}
+	var af, bf reflect.StructField
+	for {
+		for ai < an {
+			af = av.Type().Field(ai)
+			if isExported(af.Name) {
+				avi = av.Field(ai).Interface()
+				ai++
+				break
+			}
+			ai++
+		}
+		for bi < bn {
+			bf = bv.Type().Field(bi)
+			if isExported(bf.Name) {
+				bvi = bv.Field(bi).Interface()
+				bi++
+				break
+			}
+			bi++
+		}
+		if n := valuecmp(avi, bvi); n != 0 {
+			return n
+		}
+		nameA := getFieldName(af)
+		nameB := getFieldName(bf)
+		if nameA < nameB {
+			return -1
+		}
+		if nameA > nameB {
+			return 1
+		}
+		if ai == an && bi == bn {
+			return 0
+		}
+		if ai == an || bi == bn {
+			if ai == bn {
+				return -1
+			}
+			return 1
+		}
+	}
+	panic("unreachable")
+}
+
+func isExported(name string) bool {
+	a := name[0]
+	return a >= 'A' && a <= 'Z'
+}
+
+func getFieldName(f reflect.StructField) string {
+	name := f.Tag.Get("bson")
+	if i := strings.Index(name, ","); i >= 0 {
+		name = name[:i]
+	}
+	if name == "" {
+		name = strings.ToLower(f.Name)
+	}
+	return name
 }

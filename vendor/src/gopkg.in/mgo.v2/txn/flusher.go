@@ -2,7 +2,6 @@ package txn
 
 import (
 	"fmt"
-	"sort"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -225,10 +224,9 @@ func (f *flusher) prepare(t *transaction, force bool) (revnos []int64, err error
 	}
 	f.debugf("Preparing %s", t)
 
-	// Iterate in a stable way across all runners. This isn't
-	// strictly required, but reduces the chances of cycles.
+	// dkeys being sorted means stable iteration across all runners. This
+	// isn't strictly required, but reduces the chances of cycles.
 	dkeys := t.docKeys()
-	sort.Sort(dkeys)
 
 	revno := make(map[docKey]int64)
 	info := txnInfo{}
@@ -380,10 +378,10 @@ func (f *flusher) rescan(t *transaction, force bool) (revnos []int64, err error)
 		panic(fmt.Errorf("rescanning transaction in invalid state: %q", t.State))
 	}
 
-	// Iterate in a stable way across all runners. This isn't
-	// strictly required, but reduces the chances of cycles.
+	// dkeys being sorted means stable iteration across all
+	// runners. This isn't strictly required, but reduces the chances
+	// of cycles.
 	dkeys := t.docKeys()
-	sort.Sort(dkeys)
 
 	tt := t.token()
 	if !force {

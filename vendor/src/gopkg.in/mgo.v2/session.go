@@ -372,7 +372,8 @@ func DialWithInfo(info *DialInfo) (*Session, error) {
 	}
 	if info.Username != "" {
 		source := session.sourcedb
-		if info.Source == "" && (info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN") {
+		if info.Source == "" &&
+			(info.Mechanism == "GSSAPI" || info.Mechanism == "PLAIN" || info.Mechanism == "MONGODB-X509") {
 			source = "$external"
 		}
 		session.dialCred = &Credential{
@@ -779,8 +780,8 @@ func (db *Database) UpsertUser(user *User) error {
 	if (user.Password != "" || user.PasswordHash != "") && user.UserSource != "" {
 		return fmt.Errorf("user has both Password/PasswordHash and UserSource set")
 	}
-	if len(user.OtherDBRoles) > 0 && db.Name != "admin" {
-		return fmt.Errorf("user with OtherDBRoles is only supported in admin database")
+	if len(user.OtherDBRoles) > 0 && db.Name != "admin" && db.Name != "$external" {
+		return fmt.Errorf("user with OtherDBRoles is only supported in the admin or $external databases")
 	}
 
 	// Attempt to run this using 2.6+ commands.
@@ -790,7 +791,8 @@ func (db *Database) UpsertUser(user *User) error {
 		rundb = db.Session.DB(user.UserSource)
 	}
 	err := rundb.runUserCmd("updateUser", user)
-	if isNotFound(err) {
+	// retry with createUser when isAuthError in order to enable the "localhost exception"
+	if isNotFound(err) || isAuthError(err) {
 		return rundb.runUserCmd("createUser", user)
 	}
 	if !isNoCmd(err) {
@@ -842,6 +844,11 @@ func isNoCmd(err error) bool {
 func isNotFound(err error) bool {
 	e, ok := err.(*QueryError)
 	return ok && e.Code == 11
+}
+
+func isAuthError(err error) bool {
+	e, ok := err.(*QueryError)
+	return ok && e.Code == 13
 }
 
 func (db *Database) runUserCmd(cmdName string, user *User) error {
@@ -921,14 +928,17 @@ func (db *Database) RemoveUser(user string) error {
 }
 
 type indexSpec struct {
-	Name, NS       string
-	Key            bson.D
-	Unique         bool ",omitempty"
-	DropDups       bool "dropDups,omitempty"
-	Background     bool ",omitempty"
-	Sparse         bool ",omitempty"
-	Bits, Min, Max int  ",omitempty"
-	ExpireAfter    int  "expireAfterSeconds,omitempty"
+	Name, NS         string
+	Key              bson.D
+	Unique           bool   ",omitempty"
+	DropDups         bool   "dropDups,omitempty"
+	Background       bool   ",omitempty"
+	Sparse           bool   ",omitempty"
+	Bits, Min, Max   int    ",omitempty"
+	ExpireAfter      int    "expireAfterSeconds,omitempty"
+	Weights          bson.D ",omitempty"
+	DefaultLanguage  string "default_language,omitempty"
+	LanguageOverride string "language_override,omitempty"
 }
 
 type Index struct {
@@ -938,19 +948,35 @@ type Index struct {
 	Background bool     // Build index in background and return immediately
 	Sparse     bool     // Only index documents containing the Key fields
 
-	ExpireAfter time.Duration // Periodically delete docs with indexed time.Time older than that.
+	// If ExpireAfter is defined the server will periodically delete
+	// documents with indexed time.Time older than the provided delta.
+	ExpireAfter time.Duration
 
-	Name string // Index name, computed by EnsureIndex
+	// Index name computed by EnsureIndex during creation.
+	Name string
 
-	Bits, Min, Max int // Properties for spatial indexes
+	// Properties for spatial indexes.
+	Bits, Min, Max int
+
+	// Properties for text indexes.
+	DefaultLanguage  string
+	LanguageOverride string
 }
 
-func parseIndexKey(key []string) (name string, realKey bson.D, err error) {
+type indexKeyInfo struct {
+	name    string
+	key     bson.D
+	weights bson.D
+}
+
+func parseIndexKey(key []string) (*indexKeyInfo, error) {
+	var keyInfo indexKeyInfo
+	isText := false
 	var order interface{}
 	for _, field := range key {
 		raw := field
-		if name != "" {
-			name += "_"
+		if keyInfo.name != "" {
+			keyInfo.name += "_"
 		}
 		var kind string
 		if field != "" {
@@ -958,7 +984,7 @@ func parseIndexKey(key []string) (name string, realKey bson.D, err error) {
 				if c := strings.Index(field, ":"); c > 1 && c < len(field)-1 {
 					kind = field[1:c]
 					field = field[c+1:]
-					name += field + "_" + kind
+					keyInfo.name += field + "_" + kind
 				}
 			}
 			switch field[0] {
@@ -971,32 +997,40 @@ func parseIndexKey(key []string) (name string, realKey bson.D, err error) {
 				// The shell used to render this field as key_ instead of key_2d,
 				// and mgo followed suit. This has been fixed in recent server
 				// releases, and mgo followed as well.
-				name += field + "_2d"
+				keyInfo.name += field + "_2d"
 			case '-':
 				order = -1
 				field = field[1:]
-				name += field + "_-1"
+				keyInfo.name += field + "_-1"
 			case '+':
 				field = field[1:]
 				fallthrough
 			default:
 				if kind == "" {
 					order = 1
-					name += field + "_1"
+					keyInfo.name += field + "_1"
 				} else {
 					order = kind
 				}
 			}
 		}
 		if field == "" || kind != "" && order != kind {
-			return "", nil, fmt.Errorf(`invalid index key: want "[$<kind>:][-]<field name>", got %q`, raw)
+			return nil, fmt.Errorf(`invalid index key: want "[$<kind>:][-]<field name>", got %q`, raw)
 		}
-		realKey = append(realKey, bson.DocElem{field, order})
+		if kind == "text" {
+			if !isText {
+				keyInfo.key = append(keyInfo.key, bson.DocElem{"_fts", "text"}, bson.DocElem{"_ftsx", 1})
+				isText = true
+			}
+			keyInfo.weights = append(keyInfo.weights, bson.DocElem{field, 1})
+		} else {
+			keyInfo.key = append(keyInfo.key, bson.DocElem{field, order})
+		}
 	}
-	if name == "" {
-		return "", nil, errors.New("invalid index key: no fields provided")
+	if keyInfo.name == "" {
+		return nil, errors.New("invalid index key: no fields provided")
 	}
-	return
+	return &keyInfo, nil
 }
 
 // EnsureIndexKey ensures an index with the given key exists, creating it
@@ -1083,29 +1117,32 @@ func (c *Collection) EnsureIndexKey(key ...string) error {
 //     http://www.mongodb.org/display/DOCS/Multikeys
 //
 func (c *Collection) EnsureIndex(index Index) error {
-	name, realKey, err := parseIndexKey(index.Key)
+	keyInfo, err := parseIndexKey(index.Key)
 	if err != nil {
 		return err
 	}
 
 	session := c.Database.Session
-	cacheKey := c.FullName + "\x00" + name
+	cacheKey := c.FullName + "\x00" + keyInfo.name
 	if session.cluster().HasCachedIndex(cacheKey) {
 		return nil
 	}
 
 	spec := indexSpec{
-		Name:        name,
-		NS:          c.FullName,
-		Key:         realKey,
-		Unique:      index.Unique,
-		DropDups:    index.DropDups,
-		Background:  index.Background,
-		Sparse:      index.Sparse,
-		Bits:        index.Bits,
-		Min:         index.Min,
-		Max:         index.Max,
-		ExpireAfter: int(index.ExpireAfter / time.Second),
+		Name:             keyInfo.name,
+		NS:               c.FullName,
+		Key:              keyInfo.key,
+		Unique:           index.Unique,
+		DropDups:         index.DropDups,
+		Background:       index.Background,
+		Sparse:           index.Sparse,
+		Bits:             index.Bits,
+		Min:              index.Min,
+		Max:              index.Max,
+		ExpireAfter:      int(index.ExpireAfter / time.Second),
+		Weights:          keyInfo.weights,
+		DefaultLanguage:  index.DefaultLanguage,
+		LanguageOverride: index.LanguageOverride,
 	}
 
 	session = session.Clone()
@@ -1134,13 +1171,13 @@ func (c *Collection) EnsureIndex(index Index) error {
 //
 // See the EnsureIndex method for more details on indexes.
 func (c *Collection) DropIndex(key ...string) error {
-	name, _, err := parseIndexKey(key)
+	keyInfo, err := parseIndexKey(key)
 	if err != nil {
 		return err
 	}
 
 	session := c.Database.Session
-	cacheKey := c.FullName + "\x00" + name
+	cacheKey := c.FullName + "\x00" + keyInfo.name
 	session.cluster().CacheIndex(cacheKey, false)
 
 	session = session.Clone()
@@ -1152,7 +1189,7 @@ func (c *Collection) DropIndex(key ...string) error {
 		ErrMsg string
 		Ok     bool
 	}{}
-	err = db.Run(bson.D{{"dropIndexes", c.Name}, {"index", name}}, &result)
+	err = db.Run(bson.D{{"dropIndexes", c.Name}, {"index", keyInfo.name}}, &result)
 	if err != nil {
 		return err
 	}
@@ -1179,6 +1216,23 @@ func (c *Collection) DropIndex(key ...string) error {
 //
 // See the EnsureIndex method for more details on indexes.
 func (c *Collection) Indexes() (indexes []Index, err error) {
+	// Try with a command.
+	var cmdResult struct {
+		Indexes []indexSpec
+	}
+	err = c.Database.Run(bson.D{{"listIndexes", c.Name}}, &cmdResult)
+	if err == nil {
+		for _, spec := range cmdResult.Indexes {
+			indexes = append(indexes, indexFromSpec(spec))
+		}
+		sort.Sort(indexSlice(indexes))
+		return indexes, nil
+	}
+	if err != nil && !isNoCmd(err) {
+		return nil, err
+	}
+
+	// Command not yet supported. Query the database instead.
 	query := c.Database.C("system.indexes").Find(bson.M{"ns": c.FullName})
 	iter := query.Sort("name").Iter()
 	for {
@@ -1186,20 +1240,30 @@ func (c *Collection) Indexes() (indexes []Index, err error) {
 		if !iter.Next(&spec) {
 			break
 		}
-		index := Index{
-			Name:        spec.Name,
-			Key:         simpleIndexKey(spec.Key),
-			Unique:      spec.Unique,
-			DropDups:    spec.DropDups,
-			Background:  spec.Background,
-			Sparse:      spec.Sparse,
-			ExpireAfter: time.Duration(spec.ExpireAfter) * time.Second,
-		}
-		indexes = append(indexes, index)
+		indexes = append(indexes, indexFromSpec(spec))
 	}
 	err = iter.Close()
-	return
+	sort.Sort(indexSlice(indexes))
+	return indexes, nil
 }
+
+func indexFromSpec(spec indexSpec) Index {
+	return Index{
+		Name:        spec.Name,
+		Key:         simpleIndexKey(spec.Key),
+		Unique:      spec.Unique,
+		DropDups:    spec.DropDups,
+		Background:  spec.Background,
+		Sparse:      spec.Sparse,
+		ExpireAfter: time.Duration(spec.ExpireAfter) * time.Second,
+	}
+}
+
+type indexSlice []Index
+
+func (idxs indexSlice) Len() int           { return len(idxs) }
+func (idxs indexSlice) Less(i, j int) bool { return idxs[i].Name < idxs[j].Name }
+func (idxs indexSlice) Swap(i, j int)      { idxs[i], idxs[j] = idxs[j], idxs[i] }
 
 func simpleIndexKey(realKey bson.D) (key []string) {
 	for i := range realKey {
@@ -1765,6 +1829,20 @@ type Pipe struct {
 	session    *Session
 	collection *Collection
 	pipeline   interface{}
+	allowDisk  bool
+	batchSize  int
+}
+
+type pipeCmd struct {
+	Aggregate string
+	Pipeline  interface{}
+	Cursor    *pipeCmdCursor ",omitempty"
+	Explain   bool           ",omitempty"
+	AllowDisk bool           "allowDiskUse,omitempty"
+}
+
+type pipeCmdCursor struct {
+	BatchSize int `bson:"batchSize,omitempty"`
 }
 
 // Pipe prepares a pipeline to aggregate. The pipeline document
@@ -1783,29 +1861,80 @@ type Pipe struct {
 //
 func (c *Collection) Pipe(pipeline interface{}) *Pipe {
 	session := c.Database.Session
+	session.m.Lock()
+	batchSize := int(session.queryConfig.op.limit)
+	session.m.Unlock()
 	return &Pipe{
 		session:    session,
 		collection: c,
 		pipeline:   pipeline,
+		batchSize:  batchSize,
 	}
 }
 
 // Iter executes the pipeline and returns an iterator capable of going
 // over all the generated results.
 func (p *Pipe) Iter() *Iter {
+
+	// Clone session and set it to strong mode so that the server
+	// used for the query may be safely obtained afterwards, if
+	// necessary for iteration when a cursor is received.
+	cloned := p.session.Clone()
+	cloned.SetMode(Strong, false)
+	defer cloned.Close()
+	c := p.collection.With(cloned)
+
 	iter := &Iter{
 		session: p.session,
 		timeout: -1,
 	}
 	iter.gotReply.L = &iter.m
-	var result struct{ Result []bson.Raw }
-	c := p.collection
-	iter.err = c.Database.Run(bson.D{{"aggregate", c.Name}, {"pipeline", p.pipeline}}, &result)
+
+	var result struct {
+		// 2.4, no cursors.
+		Result []bson.Raw
+
+		// 2.6+, with cursors.
+		Cursor struct {
+			FirstBatch []bson.Raw "firstBatch"
+			Id         int64
+		}
+	}
+
+	cmd := pipeCmd{
+		Aggregate: c.Name,
+		Pipeline:  p.pipeline,
+		AllowDisk: p.allowDisk,
+		Cursor:    &pipeCmdCursor{p.batchSize},
+	}
+	iter.err = c.Database.Run(cmd, &result)
+	if e, ok := iter.err.(*QueryError); ok && e.Message == `unrecognized field "cursor` {
+		cmd.Cursor = nil
+		cmd.AllowDisk = false
+		iter.err = c.Database.Run(cmd, &result)
+	}
 	if iter.err != nil {
 		return iter
 	}
-	for i := range result.Result {
-		iter.docData.Push(result.Result[i].Data)
+	docs := result.Result
+	if docs == nil {
+		docs = result.Cursor.FirstBatch
+	}
+	for i := range docs {
+		iter.docData.Push(docs[i].Data)
+	}
+	if result.Cursor.Id != 0 {
+		socket, err := cloned.acquireSocket(true)
+		if err != nil {
+			// Cloned session is in strong mode, and the query
+			// above succeeded. Should have a reserved socket.
+			panic("internal error: " + err.Error())
+		}
+		iter.server = socket.Server()
+		socket.Release()
+		iter.op.cursorId = result.Cursor.Id
+		iter.op.collection = c.FullName
+		iter.op.replyFunc = iter.replyFunc()
 	}
 	return iter
 }
@@ -1827,6 +1956,47 @@ func (p *Pipe) One(result interface{}) error {
 		return err
 	}
 	return ErrNotFound
+}
+
+// Explain returns a number of details about how the MongoDB server would
+// execute the requested pipeline, such as the number of objects examined,
+// the number of times the read lock was yielded to allow writes to go in,
+// and so on.
+//
+// For example:
+//
+//     var m bson.M
+//     err := collection.Pipe(pipeline).Explain(&m)
+//     if err == nil {
+//         fmt.Printf("Explain: %#v\n", m)
+//     }
+//
+func (p *Pipe) Explain(result interface{}) error {
+	c := p.collection
+	cmd := pipeCmd{
+		Aggregate: c.Name,
+		Pipeline:  p.pipeline,
+		AllowDisk: p.allowDisk,
+		Explain:   true,
+	}
+	return c.Database.Run(cmd, result)
+}
+
+// AllowDiskUse enables writing to the "<dbpath>/_tmp" server directory so
+// that aggregation pipelines do not have to be held entirely in memory.
+func (p *Pipe) AllowDiskUse() *Pipe {
+	p.allowDisk = true
+	return p
+}
+
+// Batch sets the batch size used when fetching documents from the database.
+// It's possible to change this setting on a per-session basis as well, using
+// the Batch method of Session.
+//
+// The default batch size is defined by the database server.
+func (p *Pipe) Batch(n int) *Pipe {
+	p.batchSize = n
+	return p
 }
 
 type LastError struct {
@@ -2182,18 +2352,25 @@ func (q *Query) Select(selector interface{}) *Query {
 //     query1 := collection.Find(nil).Sort("firstname", "lastname")
 //     query2 := collection.Find(nil).Sort("-age")
 //     query3 := collection.Find(nil).Sort("$natural")
+//     query4 := collection.Find(nil).Select(bson.M{"score": bson.M{"$meta": "textScore"}}).Sort("$textScore:score")
 //
 // Relevant documentation:
 //
 //     http://www.mongodb.org/display/DOCS/Sorting+and+Natural+Order
 //
 func (q *Query) Sort(fields ...string) *Query {
-	// TODO //     query4 := collection.Find(nil).Sort("score:{$meta:textScore}")
 	q.m.Lock()
 	var order bson.D
 	for _, field := range fields {
 		n := 1
+		var kind string
 		if field != "" {
+			if field[0] == '$' {
+				if c := strings.Index(field, ":"); c > 1 && c < len(field)-1 {
+					kind = field[1:c]
+					field = field[c+1:]
+				}
+			}
 			switch field[0] {
 			case '+':
 				field = field[1:]
@@ -2205,7 +2382,11 @@ func (q *Query) Sort(fields ...string) *Query {
 		if field == "" {
 			panic("Sort: empty field name")
 		}
-		order = append(order, bson.DocElem{field, n})
+		if kind == "textScore" {
+			order = append(order, bson.DocElem{field, bson.M{"$meta": kind}})
+		} else {
+			order = append(order, bson.DocElem{field, n})
+		}
 	}
 	q.op.options.OrderBy = order
 	q.op.hasOptions = true
@@ -2215,7 +2396,7 @@ func (q *Query) Sort(fields ...string) *Query {
 
 // Explain returns a number of details about how the MongoDB server would
 // execute the requested query, such as the number of objects examined,
-// the number of time the read lock was yielded to allow writes to go in,
+// the number of times the read lock was yielded to allow writes to go in,
 // and so on.
 //
 // For example:
@@ -2265,8 +2446,8 @@ func (q *Query) Explain(result interface{}) error {
 //
 func (q *Query) Hint(indexKey ...string) *Query {
 	q.m.Lock()
-	_, realKey, err := parseIndexKey(indexKey)
-	q.op.options.Hint = realKey
+	keyInfo, err := parseIndexKey(indexKey)
+	q.op.options.Hint = keyInfo.key
 	q.op.hasOptions = true
 	q.m.Unlock()
 	if err != nil {
@@ -2472,14 +2653,33 @@ func (s *Session) FindRef(ref *DBRef) *Query {
 	return c.FindId(ref.Id)
 }
 
-// CollectionNames returns the collection names present in database.
+// CollectionNames returns the collection names present in the db database.
 func (db *Database) CollectionNames() (names []string, err error) {
-	c := len(db.Name) + 1
+	// Try with a command.
+	var cmdResult struct {
+		Collections []struct {
+			Name string
+		}
+	}
+	err = db.Run(bson.D{{"listCollections", 1}}, &cmdResult)
+	if err == nil {
+		for _, coll := range cmdResult.Collections {
+			names = append(names, coll.Name)
+		}
+		sort.Strings(names)
+		return names, err
+	}
+	if err != nil && !isNoCmd(err) {
+		return nil, err
+	}
+
+	// Command not yet supported. Query the database instead.
+	nameIndex := len(db.Name) + 1
 	iter := db.C("system.namespaces").Find(nil).Iter()
 	var result *struct{ Name string }
 	for iter.Next(&result) {
 		if strings.Index(result.Name, "$") < 0 || strings.Index(result.Name, ".oplog.$") >= 0 {
-			names = append(names, result.Name[c:])
+			names = append(names, result.Name[nameIndex:])
 		}
 	}
 	if err := iter.Close(); err != nil {
@@ -3353,13 +3553,14 @@ func (q *Query) Apply(change Change, result interface{}) (info *ChangeInfo, err 
 // internally assembled from the Version information for previous versions.
 // In both cases, VersionArray is guaranteed to have at least 4 entries.
 type BuildInfo struct {
-	Version       string
-	VersionArray  []int  `bson:"versionArray"` // On MongoDB 2.0+; assembled from Version otherwise
-	GitVersion    string `bson:"gitVersion"`
-	SysInfo       string `bson:"sysInfo"`
-	Bits          int
-	Debug         bool
-	MaxObjectSize int `bson:"maxBsonObjectSize"`
+	Version        string
+	VersionArray   []int  `bson:"versionArray"` // On MongoDB 2.0+; assembled from Version otherwise
+	GitVersion     string `bson:"gitVersion"`
+	OpenSSLVersion string `bson:"OpenSSLVersion"`
+	SysInfo        string `bson:"sysInfo"`
+	Bits           int
+	Debug          bool
+	MaxObjectSize  int `bson:"maxBsonObjectSize"`
 }
 
 // VersionAtLeast returns whether the BuildInfo version is greater than or
@@ -3392,6 +3593,11 @@ func (s *Session) BuildInfo() (info BuildInfo, err error) {
 	}
 	for len(info.VersionArray) < 4 {
 		info.VersionArray = append(info.VersionArray, 0)
+	}
+	if i := strings.IndexByte(info.GitVersion, ' '); i >= 0 {
+		// Strip off the " modules: enterprise" suffix. This is a _git version_.
+		// That information may be moved to another field if people need it.
+		info.GitVersion = info.GitVersion[:i]
 	}
 	return
 }

@@ -160,6 +160,9 @@ func (socket *mongoSocket) resetNonce() {
 
 func (socket *mongoSocket) Login(cred Credential) error {
 	socket.Lock()
+	if cred.Mechanism == "" && socket.serverInfo.MaxWireVersion >= 3 {
+		cred.Mechanism = "SCRAM-SHA-1"
+	}
 	for _, sockCred := range socket.creds {
 		if sockCred == cred {
 			debugf("Socket %p to %s: login: db=%q user=%q (already logged in)", socket, socket.addr, cred.Source, cred.Username)
@@ -179,12 +182,12 @@ func (socket *mongoSocket) Login(cred Credential) error {
 
 	var err error
 	switch cred.Mechanism {
-	case "", "MONGODB-CR":
+	case "", "MONGODB-CR", "MONGO-CR": // Name changed to MONGODB-CR in SERVER-8501.
 		err = socket.loginClassic(cred)
 	case "PLAIN":
 		err = socket.loginPlain(cred)
-	case "MONGO-X509":
-		err = fmt.Errorf("unsupported authentication mechanism: %s", cred.Mechanism)
+	case "MONGODB-X509":
+		err = socket.loginX509(cred)
 	default:
 		// Try SASL for everything else, if it is available.
 		err = socket.loginSASL(cred)
@@ -219,6 +222,27 @@ func (socket *mongoSocket) loginClassic(cred Credential) error {
 	key := hex.EncodeToString(ksum.Sum(nil))
 
 	cmd := authCmd{Authenticate: 1, User: cred.Username, Nonce: nonce, Key: key}
+	res := authResult{}
+	return socket.loginRun(cred.Source, &cmd, &res, func() error {
+		if !res.Ok {
+			return errors.New(res.ErrMsg)
+		}
+		socket.Lock()
+		socket.dropAuth(cred.Source)
+		socket.creds = append(socket.creds, cred)
+		socket.Unlock()
+		return nil
+	})
+}
+
+type authX509Cmd struct {
+	Authenticate int
+	User         string
+	Mechanism    string
+}
+
+func (socket *mongoSocket) loginX509(cred Credential) error {
+	cmd := authX509Cmd{Authenticate: 1, User: cred.Username, Mechanism: "MONGODB-X509"}
 	res := authResult{}
 	return socket.loginRun(cred.Source, &cmd, &res, func() error {
 		if !res.Ok {

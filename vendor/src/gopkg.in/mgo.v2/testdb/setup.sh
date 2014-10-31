@@ -3,13 +3,17 @@
 start() {
     mkdir _testdb
     cd _testdb
-    mkdir db1 db2 rs1a rs1b rs1c rs2a rs2b rs2c rs3a rs3b rs3c rs4a cfg1 cfg2 cfg3
-    ln -s ../testdb/supervisord.conf supervisord.conf
+    mkdir db1 db2 db3 rs1a rs1b rs1c rs2a rs2b rs2c rs3a rs3b rs3c rs4a cfg1 cfg2 cfg3
+    cp ../testdb/supervisord.conf supervisord.conf
+    cp ../testdb/server.pem server.pem
     echo keyfile > keyfile
     chmod 600 keyfile
+    COUNT=$(grep '^\[program' supervisord.conf | wc -l | tr -d ' ')
+    if ! mongod --help | grep -q -- --ssl; then
+        COUNT=$(($COUNT - 1))
+    fi
     echo "Running supervisord..."
     supervisord || ( echo "Supervisord failed executing ($?)" && exit 1 )
-    COUNT=$(grep '^\[program' supervisord.conf | wc -l | tr -d ' ')
     echo "Supervisord is up, starting $COUNT processes..."
     for i in $(seq 10); do
         RUNNING=$(supervisorctl status | grep RUNNING | wc -l | tr -d ' ')
@@ -42,11 +46,11 @@ fi
 case "$1" in
 
     start)
-        start
+        start $2
         ;;
 
     stop)
-        stop
+        stop $2
         ;;
 
 esac

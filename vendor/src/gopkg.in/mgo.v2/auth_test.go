@@ -27,8 +27,11 @@
 package mgo_test
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"runtime"
@@ -53,7 +56,7 @@ func (s *S) TestAuthLoginDatabase(c *C) {
 		admindb := session.DB("admin")
 
 		err = admindb.Login("root", "wrong")
-		c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+		c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 
 		err = admindb.Login("root", "rapadura")
 		c.Assert(err, IsNil)
@@ -79,7 +82,7 @@ func (s *S) TestAuthLoginSession(c *C) {
 			Password: "wrong",
 		}
 		err = session.Login(&cred)
-		c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+		c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 
 		cred.Password = "rapadura"
 
@@ -160,7 +163,7 @@ func (s *S) TestAuthUpsertUserErrors(c *C) {
 	c.Assert(err, ErrorMatches, "user has both Password/PasswordHash and UserSource set")
 
 	err = mydb.UpsertUser(&mgo.User{Username: "user", Password: "pass", OtherDBRoles: map[string][]mgo.Role{"db": nil}})
-	c.Assert(err, ErrorMatches, "user with OtherDBRoles is only supported in admin database")
+	c.Assert(err, ErrorMatches, "user with OtherDBRoles is only supported in the admin or \\$external databases")
 }
 
 func (s *S) TestAuthUpsertUser(c *C) {
@@ -241,7 +244,7 @@ func (s *S) TestAuthUpsertUser(c *C) {
 
 	// Can't login directly into the database using UserSource, though.
 	err = myotherdb.Login("myrwuser", "mypass")
-	c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 }
 
 func (s *S) TestAuthUpsertUserOtherDBRoles(c *C) {
@@ -386,7 +389,7 @@ func (s *S) TestAuthAddUserReplaces(c *C) {
 	admindb.Logout()
 
 	err = mydb.Login("myuser", "myoldpass")
-	c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 	err = mydb.Login("myuser", "mynewpass")
 	c.Assert(err, IsNil)
 
@@ -413,7 +416,7 @@ func (s *S) TestAuthRemoveUser(c *C) {
 	c.Assert(err, Equals, mgo.ErrNotFound)
 
 	err = mydb.Login("myuser", "mypass")
-	c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 }
 
 func (s *S) TestAuthLoginTwiceDoesNothing(c *C) {
@@ -731,7 +734,7 @@ func (s *S) TestAuthURLWrongCredentials(c *C) {
 	if session != nil {
 		session.Close()
 	}
-	c.Assert(err, ErrorMatches, "auth fail(s|ed)")
+	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
 	c.Assert(session, IsNil)
 }
 
@@ -842,12 +845,9 @@ func (s *S) TestAuthDirectWithLogin(c *C) {
 	}
 }
 
-// TODO SCRAM-SHA-1 will become the default, and this flag will go away.
-var scramFlag = flag.String("scram", "", "Host to test SCRAM-SHA-1 authentication against (depends on custom environment)")
-
 func (s *S) TestAuthScramSha1Cred(c *C) {
-	if *scramFlag == "" {
-		c.Skip("no -plain")
+	if !s.versionAtLeast(2, 7, 7) {
+		c.Skip("SCRAM-SHA-1 tests depend on 2.7.7")
 	}
 	cred := &mgo.Credential{
 		Username:  "root",
@@ -855,8 +855,9 @@ func (s *S) TestAuthScramSha1Cred(c *C) {
 		Mechanism: "SCRAM-SHA-1",
 		Source:    "admin",
 	}
-	c.Logf("Connecting to %s...", *scramFlag)
-	session, err := mgo.Dial(*scramFlag)
+	host := "localhost:40002"
+	c.Logf("Connecting to %s...", host)
+	session, err := mgo.Dial(host)
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -874,6 +875,92 @@ func (s *S) TestAuthScramSha1Cred(c *C) {
 	c.Logf("Connected! Testing the need for authentication...")
 	err = mycoll.Find(nil).One(nil)
 	c.Assert(err, Equals, mgo.ErrNotFound)
+}
+
+func (s *S) TestAuthScramSha1URL(c *C) {
+	if !s.versionAtLeast(2, 7, 7) {
+		c.Skip("SCRAM-SHA-1 tests depend on 2.7.7")
+	}
+	host := "localhost:40002"
+	c.Logf("Connecting to %s...", host)
+	session, err := mgo.Dial(fmt.Sprintf("root:rapadura@%s?authMechanism=SCRAM-SHA-1", host))
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	mycoll := session.DB("admin").C("mycoll")
+
+	c.Logf("Connected! Testing the need for authentication...")
+	err = mycoll.Find(nil).One(nil)
+	c.Assert(err, Equals, mgo.ErrNotFound)
+}
+
+func (s *S) TestAuthX509Cred(c *C) {
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+	binfo, err := session.BuildInfo()
+	c.Assert(err, IsNil)
+	if binfo.OpenSSLVersion == "" {
+		c.Skip("server does not support SSL")
+	}
+
+	clientCertPEM, err := ioutil.ReadFile("testdb/client.pem")
+	c.Assert(err, IsNil)
+
+	clientCert, err := tls.X509KeyPair(clientCertPEM, clientCertPEM)
+	c.Assert(err, IsNil)
+
+	tlsConfig := &tls.Config{
+		// Isolating tests to client certs, don't care about server validation.
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{clientCert},
+	}
+
+	var host = "localhost:40003"
+	c.Logf("Connecting to %s...", host)
+	session, err = mgo.DialWithInfo(&mgo.DialInfo{
+		Addrs: []string{host},
+		DialServer: func(addr *mgo.ServerAddr) (net.Conn, error) {
+			return tls.Dial("tcp", addr.String(), tlsConfig)
+		},
+	})
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	err = session.Login(&mgo.Credential{Username: "root", Password: "rapadura"})
+	c.Assert(err, IsNil)
+
+	// This needs to be kept in sync with client.pem
+	x509Subject := "CN=localhost,OU=Client,O=MGO,L=MGO,ST=MGO,C=GO"
+
+	externalDB := session.DB("$external")
+	var x509User mgo.User = mgo.User{
+		Username:     x509Subject,
+		OtherDBRoles: map[string][]mgo.Role{"admin": []mgo.Role{mgo.RoleRoot}},
+	}
+	err = externalDB.UpsertUser(&x509User)
+	c.Assert(err, IsNil)
+
+	session.LogoutAll()
+
+	c.Logf("Connected! Ensuring authentication is required...")
+	names, err := session.DatabaseNames()
+	c.Assert(err, ErrorMatches, "not authorized .*")
+
+	cred := &mgo.Credential{
+		Username:  x509Subject,
+		Mechanism: "MONGODB-X509",
+		Source:    "$external",
+	}
+
+	c.Logf("Authenticating...")
+	err = session.Login(cred)
+	c.Assert(err, IsNil)
+	c.Logf("Authenticated!")
+
+	names, err = session.DatabaseNames()
+	c.Assert(err, IsNil)
+	c.Assert(len(names) > 0, Equals, true)
 }
 
 var (

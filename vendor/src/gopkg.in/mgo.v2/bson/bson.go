@@ -386,9 +386,10 @@ type JavaScript struct {
 	Scope interface{}
 }
 
-// DBPointer is a type that refers to a document in some namespace by wrapping
-// a string containing the namespace itself, and the ObjectId in which the _id
-// of the document is contained
+// DBPointer refers to a document id in a namespace.
+//
+// This type is deprecated in the BSON specification and should not be used
+// except for backwards compatibility with ancient applications.
 type DBPointer struct {
 	Namespace string
 	Id        ObjectId

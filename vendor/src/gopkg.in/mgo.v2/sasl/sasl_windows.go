@@ -36,7 +36,6 @@ type saslSession struct {
 
 	// Keep track of pointers we need to explicitly free
 	stringsToFree []*C.char
-	buffersToFree []C.PVOID
 }
 
 var initError error
@@ -93,9 +92,6 @@ func (ss *saslSession) Close() {
 	for _, cstr := range ss.stringsToFree {
 		C.free(unsafe.Pointer(cstr))
 	}
-	for _, cbuf := range ss.buffersToFree {
-		C.free(unsafe.Pointer(cbuf))
-	}
 }
 
 func (ss *saslSession) Step(serverData []byte) (clientData []byte, done bool, err error) {
@@ -113,11 +109,12 @@ func (ss *saslSession) Step(serverData []byte) (clientData []byte, done bool, er
 	if ss.authComplete {
 		// Step 3: last bit of magic to use the correct server credentials
 		status = C.sspi_send_client_authz_id(&ss.context, &buffer, &bufferLength, ss.cstr(ss.userPlusRealm))
-		ss.buffersToFree = append(ss.buffersToFree, buffer)
 	} else {
 		// Step 1 + Step 2: set up security context with the server and TGT
 		status = C.sspi_step(&ss.credHandle, ss.hasContext, &ss.context, &buffer, &bufferLength, ss.cstr(ss.target))
-		ss.buffersToFree = append(ss.buffersToFree, buffer)
+	}
+	if buffer != C.PVOID(nil) {
+		defer C.free(unsafe.Pointer(buffer))
 	}
 	if status != C.SEC_E_OK && status != C.SEC_I_CONTINUE_NEEDED {
 		ss.errored = true

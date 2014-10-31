@@ -107,6 +107,31 @@ func (s *S) TestInsert(c *C) {
 	c.Assert(account.Balance, Equals, 200)
 }
 
+func (s *S) TestInsertStructID(c *C) {
+	type id struct {
+		FirstName string
+		LastName  string
+	}
+	ops := []txn.Op{{
+		C:      "accounts",
+		Id:     id{FirstName: "John", LastName: "Jones"},
+		Assert: txn.DocMissing,
+		Insert: M{"balance": 200},
+	}, {
+		C:      "accounts",
+		Id:     id{FirstName: "Sally", LastName: "Smith"},
+		Assert: txn.DocMissing,
+		Insert: M{"balance": 800},
+	}}
+
+	err := s.runner.Run(ops, "", nil)
+	c.Assert(err, IsNil)
+
+	n, err := s.accounts.Find(nil).Count()
+	c.Assert(err, IsNil)
+	c.Assert(n, Equals, 2)
+}
+
 func (s *S) TestRemove(c *C) {
 	err := s.accounts.Insert(M{"_id": 0, "balance": 300})
 	c.Assert(err, IsNil)
@@ -577,8 +602,6 @@ func (s *S) TestTxnQueueStressTest(c *C) {
 
 	const runners = 4
 	const changes = 1000
-
-	txn.SetDebug(true)
 
 	var wg sync.WaitGroup
 	wg.Add(runners)

@@ -67,7 +67,7 @@ func makeZeroDoc(value interface{}) (zero interface{}) {
 	case reflect.Ptr:
 		pv := reflect.New(v.Type().Elem())
 		zero = pv.Interface()
-	case reflect.Slice:
+	case reflect.Slice, reflect.Int:
 		zero = reflect.New(t).Interface()
 	default:
 		panic("unsupported doc type")
@@ -1026,6 +1026,36 @@ type inlineBadKeyMap struct {
 	M map[int]int ",inline"
 }
 
+type getterSetterD bson.D
+
+func (s getterSetterD) GetBSON() (interface{}, error) {
+	if len(s) == 0 {
+		return bson.D{}, nil
+	}
+	return bson.D(s[:len(s)-1]), nil
+}
+
+func (s *getterSetterD) SetBSON(raw bson.Raw) error {
+	var doc bson.D
+	err := raw.Unmarshal(&doc)
+	doc = append(doc, bson.DocElem{"suffix", true})
+	*s = getterSetterD(doc)
+	return err
+}
+
+type getterSetterInt int
+
+func (i getterSetterInt) GetBSON() (interface{}, error) {
+	return bson.D{{"a", int(i)}}, nil
+}
+
+func (i *getterSetterInt) SetBSON(raw bson.Raw) error {
+	var doc struct{ A int }
+	err := raw.Unmarshal(&doc)
+	*i = getterSetterInt(doc.A)
+	return err
+}
+
 type (
 	MyString string
 	MyBytes  []byte
@@ -1043,6 +1073,8 @@ var (
 	int64ptr = &int64var
 	intvar   = int(42)
 	intptr   = &intvar
+
+	gsintvar = getterSetterInt(42)
 )
 
 func parseURL(s string) *url.URL {
@@ -1228,6 +1260,7 @@ var twoWayCrossItems = []crossTypeItem{
 	// bson.D <=> []DocElem
 	{&bson.D{{"a", bson.D{{"b", 1}, {"c", 2}}}}, &bson.D{{"a", bson.D{{"b", 1}, {"c", 2}}}}},
 	{&bson.D{{"a", bson.D{{"b", 1}, {"c", 2}}}}, &MyD{{"a", MyD{{"b", 1}, {"c", 2}}}}},
+	{&struct{ V MyD }{MyD{{"a", 1}}}, &bson.D{{"v", bson.D{{"a", 1}}}}},
 
 	// bson.RawD <=> []RawDocElem
 	{&bson.RawD{{"a", bson.Raw{0x08, []byte{0x01}}}}, &bson.RawD{{"a", bson.Raw{0x08, []byte{0x01}}}}},
@@ -1244,6 +1277,10 @@ var twoWayCrossItems = []crossTypeItem{
 	{&struct{ N json.Number }{"5"}, map[string]interface{}{"n": int64(5)}},
 	{&struct{ N json.Number }{"5.05"}, map[string]interface{}{"n": 5.05}},
 	{&struct{ N json.Number }{"9223372036854776000"}, map[string]interface{}{"n": float64(1 << 63)}},
+
+	// bson.D <=> non-struct getter/setter
+	{&bson.D{{"a", 1}}, &getterSetterD{{"a", 1}, {"suffix", true}}},
+	{&bson.D{{"a", 42}}, &gsintvar},
 }
 
 // Same thing, but only one way (obj1 => obj2).

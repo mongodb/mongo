@@ -140,7 +140,7 @@ func Setup(procname string, config SetupConfig) error {
 			t = ColorTemplate
 		}
 		textout = NewWriterOutput(os.Stdout)
-	case "stderr":
+	case "stderr", "":
 		if t == nil {
 			t = ColorTemplate
 		}
@@ -171,6 +171,9 @@ func Setup(procname string, config SetupConfig) error {
 	}
 	SetHandler(nil, NewTextHandler(t, textout))
 	log.SetFlags(log.Lshortfile)
+	if config.Stdlevel == "" {
+		config.Stdlevel = "warn"
+	}
 	stdlog_level_val, err := LevelFromString(config.Stdlevel)
 	if err != nil {
 		return err

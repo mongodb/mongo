@@ -183,6 +183,34 @@ func (s *S) TestGridFSFileDetails(c *C) {
 	c.Assert(result, DeepEquals, expected)
 }
 
+func (s *S) TestGridFSSetUploadDate(c *C) {
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	db := session.DB("mydb")
+
+	gfs := db.GridFS("fs")
+	file, err := gfs.Create("")
+	c.Assert(err, IsNil)
+
+	t := time.Date(2014, 1, 1, 1, 1, 1, 0, time.Local)
+	file.SetUploadDate(t)
+
+	err = file.Close()
+	c.Assert(err, IsNil)
+
+	// Check the file information.
+	result := M{}
+	err = db.C("fs.files").Find(nil).One(result)
+	c.Assert(err, IsNil)
+
+	ud := result["uploadDate"].(time.Time)
+	if !ud.Equal(t) {
+		c.Fatalf("want upload date %s, got %s", t, ud)
+	}
+}
+
 func (s *S) TestGridFSCreateWithChunking(c *C) {
 	session, err := mgo.Dial("localhost:40011")
 	c.Assert(err, IsNil)

@@ -481,6 +481,17 @@ func (file *GridFile) UploadDate() time.Time {
 	return file.doc.UploadDate
 }
 
+// SetUploadDate changes the file upload time.
+//
+// It is a runtime error to call this function when the file is not open
+// for writing.
+func (file *GridFile) SetUploadDate(t time.Time) {
+	file.assertMode(gfsWriting)
+	file.m.Lock()
+	file.doc.UploadDate = t
+	file.m.Unlock()
+}
+
 // Close flushes any pending changes in case the file is being written
 // to, waits for any background operations to finish, and closes the file.
 //
@@ -515,7 +526,9 @@ func (file *GridFile) completeWrite() {
 		return
 	}
 	hexsum := hex.EncodeToString(file.wsum.Sum(nil))
-	file.doc.UploadDate = bson.Now()
+	if file.doc.UploadDate.IsZero() {
+		file.doc.UploadDate = bson.Now()
+	}
 	file.doc.MD5 = hexsum
 	file.err = file.gfs.Files.Insert(file.doc)
 	file.gfs.Chunks.EnsureIndexKey("files_id", "n")
