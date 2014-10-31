@@ -202,10 +202,10 @@ namespace {
             // Update the cached member state if different than the current topology member state
             if (_currentState != _topCoord->getMemberState()) {
                 boost::unique_lock<boost::mutex> lk(_mutex);
-                const PostMemberStateUpdateAction action =
+                const PostMemberStateUpdateAction postUpdateAction =
                     _updateCurrentMemberStateFromTopologyCoordinator_inlock();
                 lk.unlock();
-                _performPostMemberStateUpdateAction(action);
+                _performPostMemberStateUpdateAction(postUpdateAction);
             }
             break;
         case HeartbeatResponseAction::Reconfig:
