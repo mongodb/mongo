@@ -84,6 +84,9 @@ namespace mongo {
 
         Status dropCollection( OperationContext* opCtx,
                                const StringData& ns );
+
+        std::vector<std::string> getAllIdentsForDB( const StringData& db ) const;
+
     private:
         class AddIdentChange;
         class RemoveIdentChange;

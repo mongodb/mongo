@@ -147,7 +147,16 @@ namespace mongo {
             if ( !coll )
                 continue;
             size += coll->getRecordStore()->storageSize( opCtx );
-            // todo: indexes
+
+            vector<string> indexNames;
+            coll->getAllIndexes( opCtx, &indexNames );
+
+            for ( size_t i = 0; i < indexNames.size(); i++ ) {
+                string ident = _engine->getCatalog()->getIndexIdent( opCtx,
+                                                                     coll->ns().ns(),
+                                                                     indexNames[i] );
+                size += _engine->getEngine()->getIdentSize( opCtx, ident );
+            }
         }
 
         return size;
@@ -156,7 +165,6 @@ namespace mongo {
     void KVDatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
                                                    BSONObjBuilder* out,
                                                    double scale ) const {
-        // todo
     }
 
     bool KVDatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {

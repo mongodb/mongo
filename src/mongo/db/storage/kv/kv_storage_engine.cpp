@@ -161,7 +161,7 @@ namespace mongo {
 
     Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
         invariant( _initialized );
-        // todo: do I have to suppor this?
+        // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 
@@ -217,7 +217,19 @@ namespace mongo {
                                             const std::string& dbName,
                                             bool preserveClonedFilesOnFailure,
                                             bool backupOriginalFiles ) {
-        // todo: do I have to support this?
+        if ( preserveClonedFilesOnFailure ) {
+            return Status( ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported" );
+        }
+        if ( backupOriginalFiles ) {
+            return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
+        }
+
+        vector<string> idents = _catalog->getAllIdentsForDB( dbName );
+        for ( size_t i = 0; i < idents.size(); i++ ) {
+            Status status = _engine->repairIdent( txn, idents[i] );
+            if ( !status.isOK() )
+                return status;
+        }
         return Status::OK();
     }
 
