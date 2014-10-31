@@ -87,5 +87,11 @@ namespace mongo {
                                       const StringData& ident ) {
             return 1;
         }
+
+        virtual Status repairIdent( OperationContext* opCtx,
+                                    const StringData& ident ) {
+            return Status::OK();
+        }
+
     };
 }
