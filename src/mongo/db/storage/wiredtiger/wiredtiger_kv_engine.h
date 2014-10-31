@@ -22,7 +22,8 @@ namespace mongo {
     class WiredTigerKVEngine : public KVEngine {
     public:
         WiredTigerKVEngine( const std::string& path,
-                            const std::string& extraOpenOptions = "" );
+                            const std::string& extraOpenOptions = "",
+                            bool durable = true );
         virtual ~WiredTigerKVEngine();
 
         void setRecordStoreExtraOptions( const std::string& options );
@@ -30,7 +31,7 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const;
 
-        virtual bool isDurable() const { return true; }
+        virtual bool isDurable() const { return _durable; }
 
         virtual RecoveryUnit* newRecoveryUnit();
 
@@ -84,6 +85,7 @@ namespace mongo {
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;
         boost::scoped_ptr<WiredTigerSessionCache> _sessionCache;
+        bool _durable;
 
         string _rsOptions;
         string _indexOptions;

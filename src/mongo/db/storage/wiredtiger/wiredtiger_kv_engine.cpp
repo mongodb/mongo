@@ -47,8 +47,10 @@ namespace mongo {
     }
 
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
-                                            const std::string& extraOpenOptions )
-        : _epoch( 0 ),
+                                            const std::string& extraOpenOptions,
+                                            bool durable )
+        : _durable( durable ),
+          _epoch( 0 ),
           _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
 
         _eventHandler.handle_error = mdb_handle_error;
@@ -75,15 +77,17 @@ namespace mongo {
             }
         }
 
-        boost::filesystem::path journalPath = path;
-        journalPath /= "journal";
-        if ( !boost::filesystem::exists( journalPath ) ) {
-            try {
-                boost::filesystem::create_directory( journalPath );
-            }
-            catch( std::exception& e) {
-                log() << "error creating journal dir " << journalPath.string() << ' ' << e.what();
-                throw;
+        if ( _durable ) {
+            boost::filesystem::path journalPath = path;
+            journalPath /= "journal";
+            if ( !boost::filesystem::exists( journalPath ) ) {
+                try {
+                    boost::filesystem::create_directory( journalPath );
+                }
+                catch( std::exception& e) {
+                    log() << "error creating journal dir " << journalPath.string() << ' ' << e.what();
+                    throw;
+                }
             }
         }
 
@@ -93,7 +97,9 @@ namespace mongo {
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(all),";
-        ss << "log=(enabled=true,archive=true,path=journal),";
+        if ( _durable ) {
+            ss << "log=(enabled=true,archive=true,path=journal),";
+        }
         ss << "checkpoint=(wait=60,log_size=2GB),";
         ss << extraOpenOptions;
         string config = ss.str();

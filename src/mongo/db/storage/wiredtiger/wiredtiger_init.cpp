@@ -47,7 +47,8 @@ namespace mongo {
             virtual ~WiredTigerFactory(){}
             virtual StorageEngine* create( const StorageGlobalParams& params ) const {
                 WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
-                                                                 wiredTigerGlobalOptions.databaseConfig );
+                                                                 wiredTigerGlobalOptions.databaseConfig,
+                                                                 params.dur );
                 kv->setRecordStoreExtraOptions( wiredTigerGlobalOptions.collectionConfig );
                 kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
                 // Intentionally leaked.
