@@ -91,6 +91,8 @@ namespace mongo {
         // optional
         virtual int flushAllFiles( bool sync ) { return 0; }
 
+        virtual bool isDurable() const = 0;
+
         /**
          * This must not change over the lifetime of the engine.
          */
