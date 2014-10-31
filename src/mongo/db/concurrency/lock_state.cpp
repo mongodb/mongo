@@ -170,37 +170,6 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    BSONObj LockerImpl<IsForMMAPV1>::reportState() {
-        BSONObjBuilder b;
-        reportState(&b);
-
-        return b.obj();
-    }
-    
-    /** Note: this is is called by the currentOp command, which is a different 
-              thread. So be careful about thread safety here. For example reading 
-              this->otherName would not be safe as-is!
-    */
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::reportState(BSONObjBuilder* res) {
-        BSONObjBuilder b;
-        if (isLocked()) {
-            char buf[2];
-            buf[0] = legacyModeName(getLockMode(resourceIdGlobal));
-            buf[1] = 0;
-            b.append("^", buf);
-        }
-
-        // SERVER-14978: Report state from the Locker
-
-        BSONObj o = b.obj();
-        if (!o.isEmpty()) {
-            res->append("locks", o);
-        }
-        res->append("waitingForLock", hasLockPending());
-    }
-
-    template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::dump() const {
         StringBuilder ss;
         ss << "lock status: ";

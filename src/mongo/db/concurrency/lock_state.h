@@ -185,9 +185,6 @@ namespace mongo {
 
         virtual void dump() const;
 
-        virtual BSONObj reportState();
-        virtual void reportState(BSONObjBuilder* b);
-
         virtual unsigned recursiveCount() const { return _recursive; }
 
         virtual bool isW() const;

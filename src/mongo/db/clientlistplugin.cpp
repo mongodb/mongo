@@ -59,7 +59,7 @@ namespace mongo {
 
             tablecell(_stringStream, co.opNum());
             tablecell(_stringStream, co.active());
-            tablecell(_stringStream, txn->lockState()->reportState());
+            // tablecell(_stringStream, txn->lockState()->reportState());
             if (co.active()) {
                 tablecell(_stringStream, co.elapsedSeconds());
             }
@@ -138,7 +138,7 @@ namespace {
                 StringBuilder ss;
                 ss << txn->lockState();
                 b.append( "lockStatePointer", ss.str() );
-                b.append( "lockState", txn->lockState()->reportState() );
+                // b.append( "lockState", txn->lockState()->reportState() );
             }
             if ( txn->recoveryUnit() )
                 txn->recoveryUnit()->reportState( &b );

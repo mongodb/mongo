@@ -223,9 +223,6 @@ namespace mongo {
 
         virtual void dump() const = 0;
 
-        virtual BSONObj reportState() = 0;
-        virtual void reportState(BSONObjBuilder* b) = 0;
-
         virtual unsigned recursiveCount() const = 0;
 
         virtual bool isW() const = 0;
