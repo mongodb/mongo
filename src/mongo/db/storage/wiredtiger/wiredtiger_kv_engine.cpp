@@ -149,6 +149,13 @@ namespace mongo {
         return WiredTigerUtil::getIdentSize(session->getSession(), ident.toString() );
     }
 
+    Status WiredTigerKVEngine::repairIdent( OperationContext* opCtx,
+                                            const StringData& ident ) {
+        WiredTigerSession session( _conn, -1 );
+        WT_SESSION* s = session.getSession();
+        string uri = _uri(ident);
+        return wtRCToStatus( s->compact(s, uri.c_str(), NULL ) );
+    }
 
     int WiredTigerKVEngine::flushAllFiles( bool sync ) {
         LOG(1) << "WiredTigerKVEngine::flushAllFiles";
