@@ -63,6 +63,7 @@ namespace mongo {
         virtual void endUnitOfWork();
 
         virtual bool awaitCommit();
+        virtual void goingToAwaitCommit();
 
         virtual void registerChange(Change *);
 
@@ -101,6 +102,7 @@ namespace mongo {
         bool _everStartedWrite;
         Timer _timer;
         bool _currentlySquirreled;
+        bool _syncing;
 
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;

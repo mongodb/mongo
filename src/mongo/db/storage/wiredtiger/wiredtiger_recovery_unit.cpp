@@ -31,6 +31,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include <boost/thread/condition.hpp>
+#include <boost/thread/mutex.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -40,13 +43,45 @@
 
 namespace mongo {
 
+    namespace {
+        struct AwaitCommitData {
+            AwaitCommitData() :
+                numWaitingForSync(0),
+                lastSyncTime(0) {
+            }
+
+            void syncHappend() {
+                boost::mutex::scoped_lock lk( mutex );
+                lastSyncTime++;
+                condvar.notify_all();
+            }
+
+            // return true if happened
+            bool awaitCommit() {
+                boost::mutex::scoped_lock lk( mutex );
+                long long start = lastSyncTime;
+                numWaitingForSync.fetchAndAdd(1);
+                condvar.timed_wait(lk,boost::posix_time::milliseconds(50));
+                numWaitingForSync.fetchAndAdd(-1);
+                return lastSyncTime > start;
+            }
+
+            AtomicUInt32 numWaitingForSync;
+
+            boost::mutex mutex; // this just protects lastSyncTime
+            boost::condition condvar;
+            long long lastSyncTime;
+        } awaitCommitData;
+    }
+
     WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc) :
         _sessionCache( sc ),
         _session( NULL ),
         _depth(0),
         _active( false ),
         _everStartedWrite( false ),
-        _currentlySquirreled( false ) {
+        _currentlySquirreled( false ),
+        _syncing( false ) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
@@ -108,8 +143,21 @@ namespace mongo {
         }
     }
 
+    void WiredTigerRecoveryUnit::goingToAwaitCommit() {
+        if ( _active ) {
+            // too late, can't change config
+            return;
+        }
+        // yay, we've configured ourselves for sync
+        _syncing = true;
+    }
+
     bool WiredTigerRecoveryUnit::awaitCommit() {
-        // TODO need to block until data is on disk.
+        if ( _syncing && _everStartedWrite ) {
+            // we did a sync, so we're good
+            return true;
+        }
+        awaitCommitData.awaitCommit();
         return true;
     }
 
@@ -147,6 +195,8 @@ namespace mongo {
         if ( commit ) {
             invariantWTOK( s->commit_transaction(s, NULL) );
             LOG(2) << "WT commit_transaction";
+            if ( _syncing )
+                awaitCommitData.syncHappend();
         }
         else {
             invariantWTOK( s->rollback_transaction(s, NULL) );
@@ -158,7 +208,8 @@ namespace mongo {
     void WiredTigerRecoveryUnit::_txnOpen() {
         invariant( !_active );
         WT_SESSION *s = _session->getSession();
-        invariantWTOK( s->begin_transaction(s, NULL) );
+        _syncing = _syncing || awaitCommitData.numWaitingForSync.load() > 0;
+        invariantWTOK( s->begin_transaction(s, _syncing ? "sync=true" : NULL) );
         LOG(2) << "WT begin_transaction";
         _timer.reset();
         _active = true;

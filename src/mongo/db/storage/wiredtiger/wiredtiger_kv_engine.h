@@ -30,6 +30,8 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const;
 
+        virtual bool isDurable() const { return true; }
+
         virtual RecoveryUnit* newRecoveryUnit();
 
         virtual Status createRecordStore( OperationContext* opCtx,
