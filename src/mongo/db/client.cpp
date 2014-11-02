@@ -167,22 +167,34 @@ namespace mongo {
     BSONObj CachedBSONObjBase::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
 
     Client::Context::Context(OperationContext* txn, const std::string& ns, Database * db)
-        : _client( currentClient.get() ), 
+        : _client(currentClient.get()),
           _justCreated(false),
-          _doVersion( true ),
-          _ns( ns ), 
+          _doVersion(true),
+          _ns(ns),
           _db(db),
           _txn(txn) {
+    }
 
+    Client::Context::Context(OperationContext* txn,
+                             const std::string& ns,
+                             Database* db,
+                             bool justCreated)
+        : _client(currentClient.get()),
+          _justCreated(justCreated),
+          _doVersion(true),
+          _ns(ns),
+          _db(db),
+          _txn(txn) {
+        _finishInit();
     }
 
     Client::Context::Context(OperationContext* txn,
                              const string& ns,
                              bool doVersion)
-        : _client( currentClient.get() ), 
+        : _client(currentClient.get()),
           _justCreated(false), // set for real in finishInit
           _doVersion(doVersion),
-          _ns( ns ), 
+          _ns(ns),
           _db(NULL),
           _txn(txn) {
 
@@ -196,6 +208,22 @@ namespace mongo {
 
     }
 
+    AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn,
+                                         const StringData& ns,
+                                         LockMode mode)
+            : _dbLock(txn->lockState(), ns, mode),
+              _db(dbHolder().get(txn, ns)) {
+        invariant(mode == MODE_IX || mode == MODE_X);
+        _justCreated = false;
+        // If the database didn't exist, relock in MODE_X
+        if (_db == NULL) {
+            if (mode != MODE_X) {
+                _dbLock.relockWithMode(MODE_X);
+            }
+            _db = dbHolder().openDb(txn, ns);
+            _justCreated = true;
+        }
+    }
 
     AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                        const std::string& ns)
@@ -245,13 +273,13 @@ namespace mongo {
         _txn->getCurOp()->recordGlobalTime(false, _timer.micros());
     }
 
-
     Client::WriteContext::WriteContext(OperationContext* opCtx, const std::string& ns)
         : _txn(opCtx),
           _nss(ns),
-          _dblk(opCtx->lockState(), _nss.db(), MODE_IX),
+          _autodb(opCtx, _nss.db(), MODE_IX),
           _collk(opCtx->lockState(), ns, MODE_IX),
-          _c(opCtx, ns) { }
+          _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
+          }
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {
@@ -266,8 +294,15 @@ namespace mongo {
     }
        
     void Client::Context::_finishInit() {
-        _db = dbHolder().openDb(_txn, _ns, &_justCreated);
-        invariant(_db);
+        _db = dbHolder().get(_txn, _ns);
+        if (_db) {
+            _justCreated = false;
+        }
+        else {
+            invariant(_txn->lockState()->isDbLockedForMode(nsToDatabaseSubstring(_ns), MODE_X));
+            _db = dbHolder().openDb(_txn, _ns, &_justCreated);
+            invariant(_db);
+        }
 
         if( _doVersion ) checkNotStale();
 

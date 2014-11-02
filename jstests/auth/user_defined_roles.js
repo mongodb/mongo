@@ -123,7 +123,7 @@ function runTest(conn) {
 
 
     // Test privileges on the cluster resource
-    assert.commandFailed(testDB.serverStatus());
+    assert.commandFailed(testDB.runCommand({serverStatus:1}));
     adminUserAdmin.grantPrivilegesToRole('adminRole', [{resource: {cluster: true},
                                                         actions:['serverStatus']}]);
     assert.commandWorked(testDB.serverStatus());

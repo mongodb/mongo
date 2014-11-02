@@ -87,7 +87,7 @@ namespace {
                                      bool* justCreated) {
 
         const StringData dbname = _todb(ns);
-        invariant(txn->lockState()->isWriteLocked(dbname));
+        invariant(txn->lockState()->isDbLockedForMode(dbname, MODE_X));
 
         Database* db = get(txn, ns);
         if (db) {

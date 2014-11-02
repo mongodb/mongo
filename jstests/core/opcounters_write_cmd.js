@@ -147,7 +147,7 @@ t.drop();
 t.insert({_id:0})
 
 // Command, recognized, no error.
-serverStatus = newdb.serverStatus();
+serverStatus = newdb.runCommand({serverStatus: 1});
 opCounters = serverStatus.opcounters
 metricsObj = serverStatus.metrics.commands
 assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
