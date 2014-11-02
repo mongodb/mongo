@@ -359,7 +359,8 @@ namespace mongo {
             virtual void setupTests();
 
         private:
-            typedef std::vector<TestHolder *> TestHolderList;
+            // TODO(C++11): Make this hold unique_ptrs.
+            typedef std::vector< boost::shared_ptr<TestHolder> > TestHolderList;
 
             template <typename T>
             static void runTestObject() {
@@ -378,6 +379,20 @@ namespace mongo {
             bool _ran;
 
             void registerSuite( const std::string& name , Suite* s );
+        };
+
+        // A type that makes it easy to declare a self registering suite for old style test
+        // declarations. Suites are self registering so this is *not* a memory leak.
+        template<typename T>
+        struct SuiteInstance {
+            SuiteInstance() {
+                new T;
+            }
+
+            template<typename U>
+            SuiteInstance(const U& u) {
+                new T(u);
+            }
         };
 
         /**

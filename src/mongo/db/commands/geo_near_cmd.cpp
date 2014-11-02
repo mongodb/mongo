@@ -183,7 +183,7 @@ namespace mongo {
 
             PlanExecutor* rawExec;
             if (!getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, 0).isOK()) {
-                errmsg = "can't get query runner";
+                errmsg = "can't get query executor";
                 return false;
             }
 

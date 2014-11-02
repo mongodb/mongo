@@ -37,12 +37,13 @@
 #include <sstream>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"  // For ScopedConn::keepOpen
-#include "mongo/db/repl/oplogreader.h"  // For replAuthenticate
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -271,35 +272,50 @@ namespace {
             const HostAndPort& target,
             Seconds timeout) {
         boost::unique_lock<boost::mutex> lk(_mutex);
-        HostConnectionMap::iterator hostConns = _connections.find(target);
-        if (hostConns == _connections.end() || hostConns->second.empty()) {
-            // No free connection in the pool; make a new one.
+        for (HostConnectionMap::iterator hostConns;
+             ((hostConns = _connections.find(target)) != _connections.end()) &&
+                 !hostConns->second.empty();) {
+
+            _inUseConnections.splice(_inUseConnections.begin(),
+                                     hostConns->second,
+                                     hostConns->second.begin());
+            const ConnectionList::iterator candidate = _inUseConnections.begin();
             lk.unlock();
-            std::auto_ptr<DBClientConnection> conn(new DBClientConnection);
-            conn->setSoTimeout(timeout.total_seconds());
-            std::string errmsg;
-            uassert(18915,
-                    str::stream() << "Failed attempt to connect to " << target.toString() << "; " <<
-                    errmsg,
-                    conn->connect(target, errmsg));
-            conn->port().tag |= ScopedConn::keepOpen;
-            uassert(ErrorCodes::AuthenticationFailed,
-                    str::stream() << "Failed to authenticate as cluster member to " <<
-                    target.toString(),
-                    replAuthenticate(conn.get()));
+            try {
+                if (candidate->conn->isStillConnected()) {
+                    candidate->conn->setSoTimeout(timeout.total_seconds());
+                    return candidate;
+                }
+            }
+            catch (...) {
+                lk.lock();
+                _inUseConnections.erase(candidate);
+                throw;
+            }
             lk.lock();
-            return _inUseConnections.insert(
-                    _inUseConnections.begin(),
-                    ConnectionInfo(conn.release(), Date_t(0)));
+            _inUseConnections.erase(candidate);
         }
-        ConnectionList::iterator result = hostConns->second.begin();
-        _inUseConnections.splice(_inUseConnections.begin(), hostConns->second, result);
-        if (hostConns->second.empty()) {
-            _connections.erase(hostConns);
-        }
+
+        // No free connection in the pool; make a new one.
         lk.unlock();
-        result->conn->setSoTimeout(timeout.total_seconds());
-        return result;
+        std::auto_ptr<DBClientConnection> conn(new DBClientConnection);
+        conn->setSoTimeout(timeout.total_seconds());
+        std::string errmsg;
+        uassert(18915,
+                str::stream() << "Failed attempt to connect to " << target.toString() << "; " <<
+                errmsg,
+                conn->connect(target, errmsg));
+        conn->port().tag |= ScopedConn::keepOpen;
+        if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+            uassert(ErrorCodes::AuthenticationFailed,
+                    "Missing credentials for authenticating as internal user",
+                    isInternalAuthSet());
+            conn->auth(getInternalUserAuthParamsWithFallback());
+        }
+        lk.lock();
+        return _inUseConnections.insert(
+                _inUseConnections.begin(),
+                ConnectionInfo(conn.release(), Date_t(0)));
     }
 
     void NetworkInterfaceImpl::ConnectionPool::releaseConnection(ConnectionList::iterator iter) {
@@ -321,7 +337,8 @@ namespace {
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
         _isExecutorRunnable(false),
-        _inShutdown(false) {
+        _inShutdown(false),
+        _nextThreadId(0) {
         ConnectionPool::Options options;
         _connPool.reset(new ConnectionPool(options));
     }
@@ -497,12 +514,19 @@ namespace {
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
             const stdx::function<void (OperationContext*)>& callback) {
 
-        std::ostringstream sb;
-        sb << "repl" << boost::this_thread::get_id();
-        Client::initThreadIfNotAlready(sb.str().c_str());
+        stdx::function<std::string ()> f;
+        f = stdx::bind(&NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName, this);
+        Client::initThreadIfNotAlready(f);
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
         callback(&txn);
+    }
+
+    std::string NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName() {
+        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
+        std::ostringstream sb;
+        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
+        return sb.str();
     }
 
 }  // namespace repl

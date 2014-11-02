@@ -2,6 +2,11 @@
 
 var st = new ShardingTest({ shards : 2, mongos : 1, verbose : 1 })
 
+// First, test that shell helpers require an argument
+assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
+assert.throws(sh.enableBalancing, [], "sh.enableBalancing requires a collection");
+
+
 // Initially stop balancing
 st.stopBalancer()
 

@@ -42,7 +42,7 @@ namespace mongo {
         : _txn(txn),
           _workingSet(workingSet),
           _collection(collection),
-          _searchState(SearchState_Buffering),
+          _searchState(SearchState_Initializing),
           _stats(stats),
           _nextInterval(NULL) {
 
@@ -68,6 +68,27 @@ namespace mongo {
         inclusiveMax(inclusiveMax) {
     }
 
+
+    PlanStage::StageState NearStage::initNext() {
+        PlanStage::StageState state = initialize(_txn, _workingSet, _collection);
+        if (state == PlanStage::IS_EOF) {
+            _searchState = SearchState_Buffering;
+            return PlanStage::NEED_TIME;
+        }
+
+        invariant(state != PlanStage::ADVANCED);
+
+        // Propagate NEED_TIME or errors upward.
+        return state;
+    }
+
+    PlanStage::StageState NearStage::initialize(OperationContext* txn,
+                                                WorkingSet* workingSet,
+                                                Collection* collection)
+    {
+        return PlanStage::IS_EOF;
+    }
+
     PlanStage::StageState NearStage::work(WorkingSetID* out) {
 
         ++_stats->common.works;
@@ -80,7 +101,10 @@ namespace mongo {
         // Work the search
         //
 
-        if (SearchState_Buffering == _searchState) {
+        if (SearchState_Initializing == _searchState) {
+            nextState = initNext();
+        }
+        else if (SearchState_Buffering == _searchState) {
             nextState = bufferNext(&error);
         }
         else if (SearchState_Advancing == _searchState) {
@@ -156,6 +180,9 @@ namespace mongo {
             _childrenIntervals.push_back(intervalStatus.getValue());
             _nextInterval = _childrenIntervals.back();
             _nextIntervalStats.reset(new IntervalStats());
+            _nextIntervalStats->minDistanceAllowed = _nextInterval->minDistance;
+            _nextIntervalStats->maxDistanceAllowed = _nextInterval->maxDistance;
+            _nextIntervalStats->inclusiveMaxDistanceAllowed = _nextInterval->inclusiveMax;
         }
 
         WorkingSetID nextMemberID;

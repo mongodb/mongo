@@ -93,8 +93,10 @@ namespace mongo {
                              const std::string& ns );
 
     private:
+        class AddCollectionChange;
+        class RemoveCollectionChange;
+
         KVStorageEngine* _engine; // not owned here
-        bool _used;
 
         typedef std::map<std::string,KVCollectionCatalogEntry*> CollectionMap;
         CollectionMap _collections;

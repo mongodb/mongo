@@ -545,5 +545,7 @@ namespace mongo {
             add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/false> >(); // spills
             add<SorterTests::LotsOfDataWithLimit<5000,/*random=*/true> >(); // spills
         }
-    } extSortTests;
+    };
+
+    mongo::unittest::SuiteInstance<SorterSuite> extSortTests;
 }

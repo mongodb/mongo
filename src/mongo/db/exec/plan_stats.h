@@ -35,7 +35,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/geo/hash.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
@@ -379,9 +378,6 @@ namespace mongo {
         // used.
         BSONObj indexBounds;
 
-        // Contains same information as indexBounds with the addition of inclusivity of bounds.
-        std::string indexBoundsVerbose;
-
         // >1 if we're traversing the index along with its order. <1 if we're traversing it
         // against the order.
         int direction;
@@ -413,6 +409,14 @@ namespace mongo {
         }
 
         size_t limit;
+    };
+
+    struct MockStats : public SpecificStats {
+        MockStats() { }
+
+        virtual SpecificStats* clone() const {
+            return new MockStats(*this);
+        }
     };
 
     struct MultiPlanStats : public SpecificStats {
@@ -532,6 +536,9 @@ namespace mongo {
         IntervalStats() :
             numResultsFound(0),
             numResultsBuffered(0),
+            minDistanceAllowed(-1),
+            maxDistanceAllowed(-1),
+            inclusiveMaxDistanceAllowed(false),
             minDistanceFound(-1),
             maxDistanceFound(-1),
             minDistanceBuffered(-1),
@@ -540,6 +547,10 @@ namespace mongo {
 
         long long numResultsFound;
         long long numResultsBuffered;
+
+        double minDistanceAllowed;
+        double maxDistanceAllowed;
+        bool inclusiveMaxDistanceAllowed;
 
         double minDistanceFound;
         double maxDistanceFound;

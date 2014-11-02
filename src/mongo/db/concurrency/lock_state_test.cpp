@@ -39,7 +39,7 @@ namespace mongo {
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
         locker.lockGlobal(MODE_IX);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
@@ -57,7 +57,7 @@ namespace mongo {
     TEST(LockerImpl, ReLockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
         locker.lockGlobal(MODE_IX);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_S));
@@ -75,11 +75,11 @@ namespace mongo {
     TEST(LockerImpl, ConflictWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1(1);
+        MMAPV1LockerImpl locker1(1);
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IX));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_X));
 
-        LockerImpl<true> locker2(2);
+        MMAPV1LockerImpl locker2(2);
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
         ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
 
@@ -94,11 +94,11 @@ namespace mongo {
     TEST(LockerImpl, ConflictUpgradeWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1(1);
+        MMAPV1LockerImpl locker1(1);
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_S));
 
-        LockerImpl<true> locker2(2);
+        MMAPV1LockerImpl locker2(2);
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
 
@@ -110,7 +110,7 @@ namespace mongo {
     }
 
     TEST(LockerImpl, ReadTransaction) {
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
 
         locker.lockGlobal(MODE_IS);
         locker.unlockAll();
@@ -121,60 +121,16 @@ namespace mongo {
         locker.lockGlobal(MODE_IX);
         locker.lockGlobal(MODE_IS);
         locker.unlockAll();
-        locker.unlockAll();
-    }
-
-    TEST(LockerImpl, WriteTransactionWithCommit) {
-        const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
-        const ResourceId resIdRecordS(RESOURCE_DOCUMENT, 1);
-        const ResourceId resIdRecordX(RESOURCE_DOCUMENT, 2);
-
-        LockerImpl<true> locker(1);
-
-        locker.lockGlobal(MODE_IX);
-        {
-            ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_IX, 0));
-
-            locker.beginWriteUnitOfWork();
-
-            ASSERT(LOCK_OK == locker.lock(resIdRecordS, MODE_S, 0));
-            ASSERT(locker.getLockMode(resIdRecordS) == MODE_S);
-
-            ASSERT(LOCK_OK == locker.lock(resIdRecordX, MODE_X, 0));
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_X);
-
-            ASSERT(locker.unlock(resIdRecordS));
-            ASSERT(locker.getLockMode(resIdRecordS) == MODE_NONE);
-
-            ASSERT(!locker.unlock(resIdRecordX));
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_X);
-
-            locker.endWriteUnitOfWork();
-
-            {
-                AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
-
-                // This block simulates the flush/remap thread
-                {
-                    LockerImpl<true> flushLocker(2);
-                    AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
-                }
-            }
-
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_NONE);
-
-            ASSERT(locker.unlock(resIdCollection));
-        }
         locker.unlockAll();
     }
 
     /**
-     * Test that saveLockerImpl<true> works by examining the output.
+     * Test that saveMMAPV1LockerImpl works by examining the output.
      */
     TEST(LockerImpl, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
 
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -187,7 +143,6 @@ namespace mongo {
         locker.saveLockStateAndUnlock(&lockInfo);
         ASSERT(!locker.isLocked());
         ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
-        ASSERT_EQUALS(1U, lockInfo.globalRecursiveCount);
 
         // Restore the lock(s) we had.
         locker.restoreLockState(lockInfo);
@@ -202,7 +157,7 @@ namespace mongo {
     TEST(LockerImpl, saveAndRestoreGlobalAcquiredTwice) {
         Locker::LockSnapshot lockInfo;
 
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -223,12 +178,12 @@ namespace mongo {
     }
 
     /**
-     * Tests that restoreLockerImpl<true> works by locking a db and collection and saving + restoring.
+     * Tests that restoreMMAPV1LockerImpl works by locking a db and collection and saving + restoring.
      */
     TEST(LockerImpl, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
 
-        LockerImpl<true> locker(1);
+        MMAPV1LockerImpl locker(1);
 
         const ResourceId resIdDatabase(RESOURCE_DATABASE, std::string("TestDB"));
         const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));

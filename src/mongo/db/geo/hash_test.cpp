@@ -376,4 +376,88 @@ namespace {
         mongo::Box box = converter.unhashToBoxCovering(hash);
         ASSERT(box.inside(p));
     }
+
+    TEST(GeoHash, NeighborsBasic) {
+        vector<GeoHash> neighbors;
+
+        // Top level
+        GeoHash hashAtLevel3("100001");
+        hashAtLevel3.appendVertexNeighbors(0u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)1);
+        ASSERT_EQUALS(neighbors.front(), GeoHash(""));
+
+        // Level 1
+        neighbors.clear();
+        hashAtLevel3.appendVertexNeighbors(1u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)2);
+        std::sort(neighbors.begin(), neighbors.end());
+        ASSERT_EQUALS(neighbors[0], GeoHash("00"));
+        ASSERT_EQUALS(neighbors[1], GeoHash("10"));
+
+        // Level 2
+        neighbors.clear();
+        hashAtLevel3.appendVertexNeighbors(2u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)4);
+        std::sort(neighbors.begin(), neighbors.end());
+        ASSERT_EQUALS(neighbors[0], GeoHash("0010"));
+        ASSERT_EQUALS(neighbors[1], GeoHash("0011"));
+        ASSERT_EQUALS(neighbors[2], GeoHash("1000"));
+        ASSERT_EQUALS(neighbors[3], GeoHash("1001"));
+    }
+
+    TEST(GeoHash, NeighborsAtFinestLevel) {
+        std::vector<GeoHash> neighbors;
+
+        std::string zeroBase = "00000000000000000000000000000000000000000000000000000000";
+        // At finest level
+        GeoHash cellHash(zeroBase + "00011110");
+        neighbors.clear();
+        cellHash.appendVertexNeighbors(31u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)4);
+        std::sort(neighbors.begin(), neighbors.end());
+        ASSERT_EQUALS(neighbors[0], GeoHash(zeroBase + "000110"));
+        ASSERT_EQUALS(neighbors[1], GeoHash(zeroBase + "000111"));
+        ASSERT_EQUALS(neighbors[2], GeoHash(zeroBase + "001100"));
+        ASSERT_EQUALS(neighbors[3], GeoHash(zeroBase + "001101"));
+
+        // Level 30
+        neighbors.clear();
+        cellHash.appendVertexNeighbors(30u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)4);
+        std::sort(neighbors.begin(), neighbors.end());
+        ASSERT_EQUALS(neighbors[0], GeoHash(zeroBase + "0001"));
+        ASSERT_EQUALS(neighbors[1], GeoHash(zeroBase + "0011"));
+        ASSERT_EQUALS(neighbors[2], GeoHash(zeroBase + "0100"));
+        ASSERT_EQUALS(neighbors[3], GeoHash(zeroBase + "0110"));
+
+        // Level 29, only two neighbors including the parent.
+        // ^
+        // |
+        // +-+
+        // +-+
+        // +-+-------> x
+        neighbors.clear();
+        cellHash.appendVertexNeighbors(29u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)2);
+        std::sort(neighbors.begin(), neighbors.end());
+        ASSERT_EQUALS(neighbors[0], GeoHash(zeroBase + "00"));
+        ASSERT_EQUALS(neighbors[1], GeoHash(zeroBase + "01"));
+
+        // Level 28, only one neighbor (the parent) at the left bottom corner.
+        // ^
+        // |
+        // +---+
+        // |   |
+        // +---+-----> x
+        neighbors.clear();
+        cellHash.appendVertexNeighbors(28u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)1);
+        ASSERT_EQUALS(neighbors[0], GeoHash(zeroBase));
+
+        // Level 1
+        neighbors.clear();
+        cellHash.appendVertexNeighbors(1u, &neighbors);
+        ASSERT_EQUALS(neighbors.size(), (size_t)1);
+        ASSERT_EQUALS(neighbors[0], GeoHash("00"));
+    }
 }

@@ -671,6 +671,8 @@ namespace ShardingTests {
             add< ChunkDiffUnitTestNormal >();
             add< ChunkDiffUnitTestInverse >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 }

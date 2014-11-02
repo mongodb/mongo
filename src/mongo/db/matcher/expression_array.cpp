@@ -28,13 +28,10 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/db/matcher/expression_array.h"
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

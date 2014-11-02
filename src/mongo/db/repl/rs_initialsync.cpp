@@ -164,6 +164,36 @@ namespace {
         return true;
     }
 
+    void _tryToApplyOpWithRetry(OperationContext* txn, InitialSync* init, const BSONObj& op) {
+        try {
+            if (!init->syncApply(txn, op)) {
+                bool retry;
+                {
+                    Lock::GlobalWrite lk(txn->lockState());
+                    retry = init->shouldRetry(txn, op);
+                }
+
+                if (retry) {
+                    // retry
+                    if (!init->syncApply(txn, op)) {
+                        uasserted(28542,
+                                  str::stream() << "During initial sync, failed to apply op: "
+                                                << op);
+                    }
+                }
+                // If shouldRetry() returns false, fall through.
+                // This can happen if the document that was moved and missed by Cloner
+                // subsequently got deleted and no longer exists on the Sync Target at all
+            }
+        }
+        catch (const DBException& e) {
+            error() << "exception: " << causedBy(e) << " on: " << op.toString();
+            uasserted(28541,
+                      str::stream() << "During initial sync, failed to apply op: "
+                                    << op);
+        }
+    }
+
     /**
      * Do the initial sync for this member.  There are several steps to this process:
      *
@@ -219,7 +249,7 @@ namespace {
             log() << "fastsync: skipping database clone" << rsLog;
 
             // prime oplog
-            init.syncApply(&txn, lastOp, false);
+            _tryToApplyOpWithRetry(&txn, &init, lastOp);
             _logOpObjRS(&txn, lastOp);
             return;
         }
@@ -242,7 +272,7 @@ namespace {
         log() << "initial sync data copy, starting syncup";
 
         // prime oplog
-        init.syncApply(&txn, lastOp, false);
+        _tryToApplyOpWithRetry(&txn, &init, lastOp);
         _logOpObjRS(&txn, lastOp);
 
         log() << "oplog sync 1 of 3" << endl;

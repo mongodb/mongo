@@ -39,6 +39,21 @@
 
 namespace mongo {
 
+    /**
+     * Lists the indexes for a given collection.
+     *
+     * Format:
+     * {
+     *   listIndexes: <collection name>
+     * }
+     *
+     * Return format:
+     * {
+     *   indexes: [
+     *     ...
+     *   ]
+     * }
+     */
     class CmdListIndexes : public Command {
     public:
         virtual bool slaveOk() const { return true; }

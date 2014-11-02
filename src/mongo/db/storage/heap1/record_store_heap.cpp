@@ -31,16 +31,59 @@
 
 #include "mongo/db/storage/heap1/record_store_heap.h"
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+    class HeapRecordStore::InsertChange : public RecoveryUnit::Change {
+    public:
+        InsertChange(Data* data, DiskLoc loc) :_data(data), _loc(loc) {}
+        virtual void commit() {}
+        virtual void rollback() {
+            Records::iterator it = _data->records.find(_loc);
+            if (it != _data->records.end()) {
+                _data->dataSize -= it->second.size;
+                _data->records.erase(it);
+            }
+        }
+
+    private:
+        Data* const _data;
+        const DiskLoc _loc;
+    };
+
+    // Works for both removes and updates
+    class HeapRecordStore::RemoveChange : public RecoveryUnit::Change {
+    public:
+        RemoveChange(Data* data, DiskLoc loc, const HeapRecord& rec)
+            :_data(data), _loc(loc), _rec(rec)
+        {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            Records::iterator it = _data->records.find(_loc);
+            if (it != _data->records.end()) {
+                _data->dataSize -= it->second.size;
+            }
+
+            _data->dataSize += _rec.size;
+            _data->records[_loc] = _rec;
+        }
+
+    private:
+        Data* const _data;
+        const DiskLoc _loc;
+        const HeapRecord _rec;
+    };
 
     //
     // RecordStore
     //
 
     HeapRecordStore::HeapRecordStore(const StringData& ns,
+                                     boost::shared_ptr<void>* dataInOut,
                                      bool isCapped,
                                      int64_t cappedMaxSize,
                                      int64_t cappedMaxDocs,
@@ -50,8 +93,11 @@ namespace mongo {
               _cappedMaxSize(cappedMaxSize),
               _cappedMaxDocs(cappedMaxDocs),
               _cappedDeleteCallback(cappedDeleteCallback),
-              _dataSize(0),
-              _nextId(1) { // DiskLoc(0,0) isn't valid for records.
+              _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data()) {
+
+        if (!*dataInOut) {
+            dataInOut->reset(_data); // takes ownership
+        }
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -69,35 +115,46 @@ namespace mongo {
         return recordFor(loc)->toRecordData();
     }
 
-    HeapRecordStore::HeapRecord* HeapRecordStore::recordFor(const DiskLoc& loc) const {
-        Records::const_iterator it = _records.find(loc);
-        if ( it == _records.end() ) {
+    const HeapRecordStore::HeapRecord* HeapRecordStore::recordFor(const DiskLoc& loc) const {
+        Records::const_iterator it = _data->records.find(loc);
+        if ( it == _data->records.end() ) {
             error() << "HeapRecordStore::recordFor cannot find record for " << ns() << ":" << loc;
         }
-        invariant(it != _records.end());
-        return reinterpret_cast<HeapRecord*>(it->second.get());
+        invariant(it != _data->records.end());
+        return &it->second;
+    }
+
+    HeapRecordStore::HeapRecord* HeapRecordStore::recordFor(const DiskLoc& loc) {
+        Records::iterator it = _data->records.find(loc);
+        if ( it == _data->records.end() ) {
+            error() << "HeapRecordStore::recordFor cannot find record for " << ns() << ":" << loc;
+        }
+        invariant(it != _data->records.end());
+        return &it->second;
     }
 
     bool HeapRecordStore::findRecord( OperationContext* txn,
                                       const DiskLoc& loc, RecordData* rd ) const {
-        Records::const_iterator it = _records.find(loc);
-        if ( it == _records.end() ) {
+        Records::const_iterator it = _data->records.find(loc);
+        if ( it == _data->records.end() ) {
             return false;
         }
-        *rd = reinterpret_cast<HeapRecord*>(it->second.get())->toRecordData();
+        *rd = it->second.toRecordData();
         return true;
     }
 
     void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc, const RecordData *rec) {
-        _dataSize -= recordFor(loc)->netLength();
-        invariant(_records.erase(loc) == 1);
+        HeapRecord* hrec = recordFor(loc);
+        txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *hrec));
+        _data->dataSize -= hrec->size;
+        invariant(_data->records.erase(loc) == 1);
     }
 
     bool HeapRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
         if (!_isCapped)
             return false;
 
-        if (_dataSize > _cappedMaxSize)
+        if (_data->dataSize > _cappedMaxSize)
             return true;
 
         if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
@@ -108,9 +165,9 @@ namespace mongo {
 
     void HeapRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         while (cappedAndNeedDelete(txn)) {
-            invariant(!_records.empty());
+            invariant(!_data->records.empty());
 
-            DiskLoc oldest = _records.begin()->first;
+            DiskLoc oldest = _data->records.begin()->first;
 
             if (_cappedDeleteCallback)
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -130,16 +187,13 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize");
         }
 
-        // TODO padding?
-        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
-        boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
-        rec->lengthWithHeaders() = lengthWithHeaders;
-        memcpy(rec->data(), data, len);
+        HeapRecord rec(len);
+        memcpy(rec.data.get(), data, len);
 
         const DiskLoc loc = allocateLoc();
-        _records[loc] = buf;
-        _dataSize += len;
+        txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+        _data->dataSize += len;
+        _data->records[loc] = rec;
 
         cappedDeleteAsNeeded(txn);
 
@@ -157,16 +211,13 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize");
         }
 
-        // TODO padding?
-        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
-        boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
-        rec->lengthWithHeaders() = lengthWithHeaders;
-        doc->writeDocument(rec->data());
+        HeapRecord rec(len);
+        doc->writeDocument(rec.data.get());
 
         const DiskLoc loc = allocateLoc();
-        _records[loc] = buf;
-        _dataSize += len;
+        txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
+        _data->dataSize += len;
+        _data->records[loc] = rec;
 
         cappedDeleteAsNeeded(txn);
 
@@ -174,43 +225,30 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> HeapRecordStore::updateRecord(OperationContext* txn,
-                                                      const DiskLoc& oldLocation,
+                                                      const DiskLoc& loc,
                                                       const char* data,
                                                       int len,
                                                       bool enforceQuota,
                                                       UpdateMoveNotifier* notifier ) {
-        HeapRecord* oldRecord = recordFor( oldLocation );
-        int oldLen = oldRecord->netLength();
+        HeapRecord* oldRecord = recordFor( loc );
+        int oldLen = oldRecord->size;
 
-        // If the length of the new data is <= the length of the old data then just
-        // memcopy into the old space
-        if ( len <= oldLen) {
-            memcpy(oldRecord->data(), data, len);
-            _dataSize += len - oldLen;
-            return StatusWith<DiskLoc>(oldLocation);
-        }
-
-        if ( _isCapped ) {
+        if (_isCapped && len > oldLen) {
             return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                         "failing update: objects in a capped ns cannot grow",
                                         10003 );
         }
 
-        // If the length of the new data exceeds the size of the old Record, we need to allocate
-        // a new Record, and delete the old one
+        HeapRecord newRecord(len);
+        memcpy(newRecord.data.get(), data, len);
 
-        const int lengthWithHeaders = len + HeapRecord::HeaderSize;
-        boost::shared_array<char> buf(new char[lengthWithHeaders]);
-        HeapRecord* rec = reinterpret_cast<HeapRecord*>(buf.get());
-        rec->lengthWithHeaders() = lengthWithHeaders;
-        memcpy(rec->data(), data, len);
-
-        _records[oldLocation] = buf;
-        _dataSize += len - oldLen;
+        txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+        _data->dataSize += len - oldLen;
+        *oldRecord = newRecord;
 
         cappedDeleteAsNeeded(txn);
 
-        return StatusWith<DiskLoc>(oldLocation);
+        return StatusWith<DiskLoc>(loc);
     }
 
     Status HeapRecordStore::updateWithDamages( OperationContext* txn,
@@ -218,10 +256,18 @@ namespace mongo {
                                                const RecordData& oldRec,
                                                const char* damageSource,
                                                const mutablebson::DamageVector& damages ) {
-        HeapRecord* rec = recordFor( loc );
-        char* root = rec->data();
+        HeapRecord* oldRecord = recordFor( loc );
+        const int len = oldRecord->size;
 
-        // All updates were in place. Apply them via durability and writing pointer.
+        HeapRecord newRecord(len);
+        memcpy(newRecord.data.get(), oldRecord->data.get(), len);
+
+        txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *oldRecord));
+        *oldRecord = newRecord;
+
+        cappedDeleteAsNeeded(txn);
+
+        char* root = newRecord.data.get();
         mutablebson::DamageVector::const_iterator where = damages.begin();
         const mutablebson::DamageVector::const_iterator end = damages.end();
         for( ; where != end; ++where ) {
@@ -229,6 +275,8 @@ namespace mongo {
             char* targetPtr = root + where->targetOffset;
             std::memcpy(targetPtr, sourcePtr, where->size);
         }
+
+        *oldRecord = newRecord;
 
         return Status::OK();
     }
@@ -238,39 +286,40 @@ namespace mongo {
                                                  const CollectionScanParams::Direction& dir) const {
 
         if (dir == CollectionScanParams::FORWARD) {
-            return new HeapRecordIterator(txn, _records, *this, start, false);
+            return new HeapRecordIterator(txn, _data->records, *this, start, false);
         }
         else {
-            return new HeapRecordReverseIterator(txn, _records, *this, start);
+            return new HeapRecordReverseIterator(txn, _data->records, *this, start);
         }
     }
 
     RecordIterator* HeapRecordStore::getIteratorForRepair(OperationContext* txn) const {
         // TODO maybe make different from HeapRecordIterator
-        return new HeapRecordIterator(txn, _records, *this);
+        return new HeapRecordIterator(txn, _data->records, *this);
     }
 
     std::vector<RecordIterator*> HeapRecordStore::getManyIterators(OperationContext* txn) const {
         std::vector<RecordIterator*> out;
         // TODO maybe find a way to return multiple iterators.
-        out.push_back(new HeapRecordIterator(txn, _records, *this));
+        out.push_back(new HeapRecordIterator(txn, _data->records, *this));
         return out;
     }
 
     Status HeapRecordStore::truncate(OperationContext* txn) {
-        _records.clear();
-        _dataSize = 0;
+        _data->records.clear();
+        _data->dataSize = 0;
         return Status::OK();
     }
 
     void HeapRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
                                                    DiskLoc end,
                                                    bool inclusive) {
-        Records::iterator it = inclusive ? _records.lower_bound(end)
-                                         : _records.upper_bound(end);
-        while(it != _records.end()) {
-            _dataSize -= reinterpret_cast<HeapRecord*>(it->second.get())->netLength();
-            _records.erase(it++);
+        Records::iterator it = inclusive ? _data->records.lower_bound(end)
+                                         : _data->records.upper_bound(end);
+        while(it != _data->records.end()) {
+            txn->recoveryUnit()->registerChange(new RemoveChange(_data, it->first, it->second));
+            _data->dataSize -= it->second.size;
+            _data->records.erase(it++);
         }
     }
 
@@ -293,10 +342,10 @@ namespace mongo {
                                      BSONObjBuilder* output) const {
         results->valid = true;
         if (scanData && full) {
-            for (Records::const_iterator it = _records.begin(); it != _records.end(); ++it) {
-                HeapRecord* rec = reinterpret_cast<HeapRecord*>(it->second.get());
+            for (Records::const_iterator it = _data->records.begin(); it != _data->records.end(); ++it) {
+                const HeapRecord& rec = it->second;
                 size_t dataSize;
-                const Status status = adaptor->validate(rec->toRecordData(), &dataSize);
+                const Status status = adaptor->validate(rec.toRecordData(), &dataSize);
                 if (!status.isOK()) {
                     results->valid = false;
                     results->errors.push_back("invalid object detected (see logs)");
@@ -305,7 +354,7 @@ namespace mongo {
             }
         }
 
-        output->appendNumber( "nrecords", _records.size() );
+        output->appendNumber( "nrecords", _data->records.size() );
 
         return Status::OK();
 
@@ -352,12 +401,12 @@ namespace mongo {
                                          BSONObjBuilder* extraInfo,
                                          int infoLevel) const {
         // Note: not making use of extraInfo or infoLevel since we don't have extents
-        const int64_t recordOverhead = numRecords(txn) * HeapRecord::HeaderSize;
-        return _dataSize + recordOverhead;
+        const int64_t recordOverhead = numRecords(txn) * sizeof(HeapRecord);
+        return _data->dataSize + recordOverhead;
     }
 
     DiskLoc HeapRecordStore::allocateLoc() {
-        const int64_t id = _nextId++;
+        const int64_t id = _data->nextId++;
         // This is a hack, but both the high and low order bits of DiskLoc offset must be 0, and the
         // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
         invariant(id < (1LL << 53));
@@ -499,23 +548,39 @@ namespace mongo {
     }
 
     void HeapRecordReverseIterator::invalidate(const DiskLoc& loc) {
-        if (isEOF())
+        if (_killedByInvalidate)
             return;
 
-        if (_it->first == loc) {
+        if (_savedLoc == loc) {
             if (_rs.isCapped()) {
                 // Capped iterators die on invalidation rather than advancing.
                 _killedByInvalidate = true;
                 return;
             }
+
+            restoreState(_txn);
+            invariant(_it->first == _savedLoc);
             ++_it;
+            saveState();
         }
     }
 
     void HeapRecordReverseIterator::saveState() {
+        if (isEOF()) {
+            _savedLoc = DiskLoc();
+        }
+        else {
+            _savedLoc = _it->first;
+        }
     }
 
     bool HeapRecordReverseIterator::restoreState(OperationContext* txn) {
+        if (_savedLoc.isNull()) {
+            _it = _records.rend();
+        }
+        else {
+            _it = HeapRecordStore::Records::const_reverse_iterator(++_records.find(_savedLoc));
+        }
         return !_killedByInvalidate;
     }
 

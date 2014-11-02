@@ -138,6 +138,9 @@ namespace mongo {
 
         void deleteRecord( OperationContext* txn, const DiskLoc& dl, const RecordData* rec = NULL );
 
+        virtual bool recordLikelyInPhysicalMem( OperationContext* txn,
+                                                const DiskLoc& loc ) const;
+
         StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                           const char* data,
                                           int len,

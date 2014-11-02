@@ -508,6 +508,8 @@ namespace QueryPlanExecutor {
             add<ClientCursor::InvalidatePinned>();
             add<ClientCursor::Timeout>();
         }
-    }  queryPlanExecutorAll;
+    };
+
+    SuiteInstance<All> queryPlanExecutorAll;
 
 }  // namespace QueryPlanExecutor

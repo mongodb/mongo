@@ -39,9 +39,9 @@ namespace mongo {
 namespace repl {
 
 
-    UpdatePositionArgs::UpdateInfo::UpdateInfo(const OID& anRid, const OpTime& aTs)
-        : rid(anRid), ts(aTs) {
-    }
+    UpdatePositionArgs::UpdateInfo::UpdateInfo(
+            const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberID)
+        : rid(anRid), ts(aTs), cfgver(aCfgver), memberID(aMemberID) {}
 
 namespace {
 
@@ -53,14 +53,18 @@ namespace {
         kUpdateArrayFieldName,
     };
 
-    const std::string kMemberIdFieldName = "_id";
+    const std::string kMemberRIDFieldName = "_id";
     const std::string kMemberConfigFieldName = "config";
     const std::string kOpTimeFieldName = "optime";
+    const std::string kMemberIDFieldName = "memberID";
+    const std::string kConfigVersionFieldName = "cfgver";
 
     const std::string kLegalUpdateInfoFieldNames[] = {
         kMemberConfigFieldName,
-        kMemberIdFieldName,
+        kMemberRIDFieldName,
         kOpTimeFieldName,
+        kMemberIDFieldName,
+        kConfigVersionFieldName,
     };
 
 } // namespace
@@ -89,18 +93,29 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            OID rid;
-            status = bsonExtractOIDField(entry, kMemberIdFieldName, &rid);
-            
-            if (!status.isOK())
-                return status;
-
             OpTime ts;
             status = bsonExtractOpTimeField(entry, kOpTimeFieldName, &ts);
             if (!status.isOK())
                 return status;
 
-            _updates.push_back(UpdateInfo(rid, ts));
+            // TODO(spencer): The following three fields are optional in 2.8, but should be made
+            // required or ignored in 3.0
+            long long cfgver;
+            status = bsonExtractIntegerFieldWithDefault(entry, kConfigVersionFieldName, -1, &cfgver);
+            if (!status.isOK())
+                return status;
+
+            OID rid;
+            status = bsonExtractOIDFieldWithDefault(entry, kMemberRIDFieldName, OID(), &rid);
+            if (!status.isOK())
+                return status;
+
+            long long memberID;
+            status = bsonExtractIntegerFieldWithDefault(entry, kMemberIDFieldName, -1, &memberID);
+            if (!status.isOK())
+                return status;
+
+            _updates.push_back(UpdateInfo(rid, ts, cfgver, memberID));
         }
 
         return Status::OK();
@@ -117,8 +132,10 @@ namespace {
             for (UpdatePositionArgs::UpdateIterator update = updatesBegin();
                     update != updatesEnd();
                     ++update) {
-                updateArray.append(BSON(kMemberIdFieldName << update->rid <<
-                                        kOpTimeFieldName << update->ts));
+                updateArray.append(BSON(kMemberRIDFieldName << update->rid <<
+                                        kOpTimeFieldName << update->ts <<
+                                        kConfigVersionFieldName << update->cfgver <<
+                                        kMemberIDFieldName << update->memberID));
             }
             updateArray.doneFast();
         }

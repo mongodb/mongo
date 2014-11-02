@@ -824,6 +824,12 @@ namespace mongo {
     // isStillConnected() polls the socket at max every Socket::errorPollIntervalSecs to determine
     // if any disconnection-type events have happened on the socket.
     bool Socket::isStillConnected() {
+        if (_fd == -1) {
+            // According to the man page, poll will respond with POLLVNAL for invalid or
+            // unopened descriptors, but it doesn't seem to be properly implemented in
+            // some platforms - it can return 0 events and 0 for revent. Hence this workaround.
+            return false;
+        }
 
         if ( errorPollIntervalSecs < 0 ) return true;
         if ( ! isPollSupported() ) return true; // nothing we can do

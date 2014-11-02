@@ -1642,7 +1642,9 @@ namespace QueryTests {
 
             add< OrderingTest >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace QueryTests
 

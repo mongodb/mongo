@@ -20,7 +20,7 @@ assert.writeOK(bulk.execute());
 
 var avgObjSize = db.data.stats().avgObjSize;
 var dataSize = db.data.stats().size;
-assert.lt(totalSize, dataSize);
+assert.lte(totalSize, dataSize);
 
 s.adminCommand( { enablesharding : "test" } );
 res = s.adminCommand( { shardcollection : "test.data" , key : { _id : 1 } } );

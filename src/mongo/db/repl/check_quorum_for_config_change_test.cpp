@@ -750,7 +750,6 @@ namespace {
         ASSERT_REASON_CONTAINS(status, "no electable nodes responded");
     }
 
-    // TODO: Succeed with minimal quorum.
     TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
         // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" can vote.
         // This test should succeed as soon as h1 and h2 respond, so we block

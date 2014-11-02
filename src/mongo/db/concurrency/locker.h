@@ -50,7 +50,7 @@ namespace mongo {
     public:
         virtual ~Locker() {}
 
-        virtual uint64_t getId() const = 0;
+        virtual LockerId getId() const = 0;
 
         /**
          * This should be the first method invoked for a particular Locker object. It acquires the
@@ -124,12 +124,21 @@ namespace mongo {
          *              returning LOCK_TIMEOUT. This parameter defaults to UINT_MAX, which means
          *              wait infinitely. If 0 is passed, the request will return immediately, if
          *              the request could not be granted right away.
+         * @param checkDeadlock Whether to enable deadlock detection for this acquisition. This
+         *              parameter is put in place until we can handle deadlocks at all places,
+         *              which acquire locks.
          *
          * @return All LockResults except for LOCK_WAITING, because it blocks.
          */
         virtual LockResult lock(const ResourceId& resId,
-                                       LockMode mode,
-                                       unsigned timeoutMs = UINT_MAX) = 0;
+                                LockMode mode,
+                                unsigned timeoutMs = UINT_MAX,
+                                bool checkDeadlock = false) = 0;
+
+        /**
+         * Downgrades the specified resource's lock mode without changing the reference count.
+         */
+        virtual void downgrade(const ResourceId& resId, LockMode newMode) = 0;
 
         /**
          * Releases a lock previously acquired through a lock call. It is an error to try to
@@ -151,6 +160,18 @@ namespace mongo {
         virtual bool isLockHeldForMode(const ResourceId& resId,
                                        LockMode mode) const = 0;
 
+        // These are shortcut methods for the above calls. They however check that the entire
+        // hierarchy is properly locked and because of this they are very expensive to call.
+        // Do not use them in performance critical code paths.
+        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const = 0;
+        virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const = 0;
+
+        /**
+         * Returns the resource that this locker is waiting/blocked on (if any). If the locker is
+         * not waiting for a resource the returned value will be invalid (isValid() == false).
+         */
+        virtual ResourceId getWaitingResource() const = 0;
+
         /**
          * LockSnapshot captures the state of all resources that are locked, what modes they're
          * locked in, and how many times they've been locked in that mode.
@@ -159,20 +180,12 @@ namespace mongo {
             // The global lock is handled differently from all other locks.
             LockMode globalMode;
 
-            // One can acquire the global lock repeatedly.
-            unsigned globalRecursiveCount;
-
             struct OneLock {
                 // What lock resource is held?
                 ResourceId resourceId;
 
                 // In what mode is it held?
                 LockMode mode;
-
-                // What's the recursive count of this lock?  Note that we don't store any state
-                // about how we got this lock (eg upgrade), just how many times we've locked it
-                // in this mode.
-                unsigned recursiveCount;
             };
 
             // The non-global non-flush locks held, sorted by granularity.  That is, locks[i] is
@@ -222,13 +235,16 @@ namespace mongo {
         virtual bool isLocked() const = 0;
         virtual bool isWriteLocked() const = 0;
         virtual bool isWriteLocked(const StringData& ns) const = 0;
-        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const = 0;
-        virtual bool isAtLeastReadLocked(const StringData& ns) const = 0;
+        
+
         virtual bool isRecursive() const = 0;
 
         virtual void assertWriteLocked(const StringData& ns) const = 0;
 
-        /** pending means we are currently trying to get a lock */
+        /**
+         * Pending means we are currently trying to get a lock (could be the parallel batch writer
+         * lock).
+         */
         virtual bool hasLockPending() const = 0;
 
         // ----

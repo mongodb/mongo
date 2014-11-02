@@ -240,8 +240,6 @@ namespace repl {
         WriteUnitOfWork wunit(txn);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
-            if ( strncmp(ns, "local.slaves", 12) == 0 )
-                resetSlaveCache();
             return;
         }
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
@@ -325,9 +323,6 @@ namespace repl {
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
-            if ( strncmp(ns, "local.slaves", 12) == 0 ) {
-                resetSlaveCache();
-            }
             return;
         }
 

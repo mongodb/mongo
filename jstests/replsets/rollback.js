@@ -17,6 +17,7 @@
  * Finally, we expect either A or B to roll back its 3 divergent documents and acquire the other
  * node's.
  */
+load("jstests/replsets/rslib.js");
 
 (function () {
     "use strict";
@@ -33,7 +34,7 @@
 
     var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
     var nodes = replTest.nodeList();
-    //print(tojson(nodes));
+    //jsTest.log(tojson(nodes));
 
     var conns = replTest.startSet();
     var r = replTest.initiate({ "_id": "unicomplex",
@@ -61,7 +62,7 @@
 
     /* force the oplog to roll */
     if (new Date() % 2 == 0) {
-        print("ROLLING OPLOG AS PART OF TEST (we only do this sometimes)");
+        jsTest.log("ROLLING OPLOG AS PART OF TEST (we only do this sometimes)");
         var pass = 1;
         var first = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];
         a.roll.insert({ x: 1 });
@@ -81,10 +82,10 @@
             }
             pass++;
         }
-        print("PASSES FOR OPLOG ROLL: " + pass);
+        jsTest.log("PASSES FOR OPLOG ROLL: " + pass);
     }
     else {
-        print("NO ROLL");
+        jsTest.log("NO ROLL");
     }
 
     assert.writeOK(a.bar.insert({ q: 1, a: "foo" }));
@@ -105,27 +106,29 @@
 
     // a should not have the new data as it was partitioned.
     replTest.partition(1, 2);
-    print("*************** wait for server to reconnect ****************");
+    jsTest.log("*************** wait for server to reconnect ****************");
     replTest.unPartition(0, 2);
 
-    print("*************** B ****************");
+    jsTest.log("*************** B ****************");
     assert.soon(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
-    print("*************** A ****************");
+    jsTest.log("*************** A ****************");
     assert.soon(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
 
     assert(a.bar.count() == 3, "t is 3");
-    a.bar.insert({ q: 7 });
-    a.bar.insert({ q: 8 });
+    assert.writeOK(a.bar.insert({ q: 7 }));
+    assert.writeOK(a.bar.insert({ q: 8 }));
+
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6
 
     // bring B back online
     replTest.unPartition(0, 1);
     replTest.unPartition(1, 2);
+
+    awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);
 
     replTest.stopSet(15);
 }());
-

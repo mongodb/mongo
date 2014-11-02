@@ -30,8 +30,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -39,7 +41,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
-#include "mongo/db/commands/copydb_getnonce.h"
+#include "mongo/db/commands/copydb_start_commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
@@ -156,9 +158,12 @@ namespace mongo {
             }
 
             Cloner cloner;
+
+            // Get MONGODB-CR parameters
             string username = cmdObj.getStringField( "username" );
             string nonce = cmdObj.getStringField( "nonce" );
             string key = cmdObj.getStringField( "key" );
+
             if ( !username.empty() && !nonce.empty() && !key.empty() ) {
                 uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
                 BSONObj ret;
@@ -170,6 +175,26 @@ namespace mongo {
                         return false;
                     }
                 }
+                cloner.setConnection( authConn_.release() );
+            }
+            else if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
+                     cmdObj.hasField(saslCommandPayloadFieldName)) {
+                BSONObj ret;
+                if ( !authConn_->runCommand( cloneOptions.fromDB,
+                                             BSON( "saslContinue" << 1 <<
+                                                   cmdObj[saslCommandConversationIdFieldName] <<
+                                                   cmdObj[saslCommandPayloadFieldName] ),
+                                             ret ) ) {
+                    errmsg = "unable to login " + ret.toString();
+                    return false;
+                }
+
+                if (!ret["done"].Bool()) {
+                    result.appendElements( ret );
+                    return true;
+                }
+
+                result.append("done", true);
                 cloner.setConnection( authConn_.release() );
             }
             else if (!fromSelf) {

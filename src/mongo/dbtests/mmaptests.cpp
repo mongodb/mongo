@@ -28,11 +28,12 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
@@ -63,7 +64,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            LockerImpl<true> lockState;
+            MMAPV1LockerImpl lockState(1);
             Lock::GlobalWrite lk(&lockState);
 
             {
@@ -173,13 +174,15 @@ namespace MMapTests {
     public:
         All() : Suite( "mmap" ) {}
         void setupTests() {
-            if (storageGlobalParams.engine != "mmapv1")
+            if (!getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1())
                 return;
 
             add< LeakTest >();
             add< ExtentSizing >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 #if 0
 

@@ -26,12 +26,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
+#pragma once
 
 namespace mongo {
-    IndexAccessMethod* Heap1DatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                            const CollectionCatalogEntry* collection,
-                                                            IndexCatalogEntry* index ) {
-        invariant( !"no indexes in test" );
-    }
-}
+
+    struct DbResponse;
+    class Message;
+    class OperationContext;
+
+    /**
+     * Executes the db.currentOp() command. Currently not an actual "command" object, but should
+     * be converted to one at some point.
+     */
+    void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse);
+
+} // namespace mongo

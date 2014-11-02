@@ -60,8 +60,6 @@ namespace mongo {
         //  The recovery unit takes ownership of change.
         virtual void registerChange(Change* change);
 
-        virtual void syncDataAndTruncateJournal();
-
     private:
         void recordPreimage(char* data, size_t len);
         void publishChanges();

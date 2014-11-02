@@ -118,7 +118,8 @@ namespace mongo {
         scoped_ptr<PlanExecutor> exec(rawExec);
 
         // Got the execution tree. Explain it.
-        return Explain::explainStages(exec.get(), verbosity, out);
+        Explain::explainStages(exec.get(), verbosity, out);
+        return Status::OK();
     }
 
     bool FindCmd::run(OperationContext* txn,

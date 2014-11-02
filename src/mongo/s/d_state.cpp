@@ -593,9 +593,10 @@ namespace mongo {
         } installType = InstallType_None; // compiler complains otherwise
 
         {
-            // DBLock needed since we're now potentially changing the metadata, and don't want
-            // reads/writes to be ongoing.
-            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+            // Exclusive collection lock needed since we're now potentially changing the metadata,
+            // and don't want reads/writes to be ongoing.
+            Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
             //
             // Get the metadata now that the load has completed
@@ -828,7 +829,6 @@ namespace mongo {
 
     ShardedConnectionInfo::ShardedConnectionInfo() {
         _forceVersionOk = false;
-        _id.clear();
     }
 
     ShardedConnectionInfo* ShardedConnectionInfo::get( bool create ) {
@@ -871,10 +871,6 @@ namespace mongo {
             shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
         }
-    }
-
-    void ShardedConnectionInfo::setID( const OID& id ) {
-        _id = id;
     }
 
     class MongodShardCommand : public Command {
@@ -984,31 +980,6 @@ namespace mongo {
             Lock::GlobalWrite lk(txn->lockState());
             return checkConfigOrInit(txn, configdb, authoritative, errmsg, result, true);
         }
-        
-        bool checkMongosID( ShardedConnectionInfo* info, const BSONElement& id, string& errmsg ) {
-            if ( id.type() != jstOID ) {
-                if ( ! info->hasID() ) {
-                    warning() << "bad serverID set in setShardVersion and none in info: " << id << endl;
-                }
-                // TODO: fix this
-                //errmsg = "need serverID to be an OID";
-                //return 0;
-                return true;
-            }
-            
-            OID clientId = id.__oid();
-            if ( ! info->hasID() ) {
-                info->setID( clientId );
-                return true;
-            }
-            
-            if ( clientId != info->getID() ) {
-                errmsg = "server id has changed!";
-                return false;
-            }
-
-            return true;
-        }
 
         bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
@@ -1022,10 +993,6 @@ namespace mongo {
 
             lastError.disableForCommand();
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
-
-            // make sure we have the mongos id for writebacks
-            if ( ! checkMongosID( info , cmdObj["serverID"] , errmsg ) ) 
-                return false;
 
             bool authoritative = cmdObj.getBoolField( "authoritative" );
             

@@ -51,7 +51,7 @@ namespace mongo {
         /**
          * @param rs - does NOT take ownership
          */
-        KVCatalog( RecordStore* rs );
+        KVCatalog( RecordStore* rs, bool isRsThreadSafe );
         ~KVCatalog();
 
         void init( OperationContext* opCtx );
@@ -84,14 +84,28 @@ namespace mongo {
 
         Status dropCollection( OperationContext* opCtx,
                                const StringData& ns );
+
+        std::vector<std::string> getAllIdentsForDB( const StringData& db ) const;
+
     private:
+        class AddIdentChange;
+        class RemoveIdentChange;
 
         BSONObj _findEntry( OperationContext* opCtx,
                             const StringData& ns,
-                            DiskLoc* out ) const;
+                            DiskLoc* out=NULL ) const;
+
+        std::string _newUniqueIdent(const char* kind);
+
+        // Helpers only used by constructor and init(). Don't call from elsewhere.
+        static std::string _newRand();
+        bool _hasEntryCollidingWithRand() const;
 
         RecordStore* _rs; // not owned
-        int64_t _rand;
+        const bool _isRsThreadSafe;
+
+        // These two are only used for ident generation inside _newUniqueIdent.
+        std::string _rand; // effectively const after init() returns
         AtomicUInt64 _next;
 
         struct Entry {

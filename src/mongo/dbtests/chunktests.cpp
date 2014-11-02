@@ -274,6 +274,8 @@ namespace ChunkTests {
             add<ChunkManagerTests::OrEqualityUnsatisfiableInequality>();
             add<ChunkManagerTests::InMultiShard>();
         }
-    } myall;
-    
+    };
+
+    SuiteInstance<All> myAll;
+
 } // namespace ChunkTests

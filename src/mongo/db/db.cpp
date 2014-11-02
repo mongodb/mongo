@@ -410,7 +410,7 @@ namespace mongo {
 
         {
             ProcessId pid = ProcessId::getCurrent();
-            LogstreamBuilder l = log(LogComponent::kDefault);
+            LogstreamBuilder l = log(LogComponent::kControl);
             l << "MongoDB starting : pid=" << pid
               << " port=" << serverGlobalParams.port
               << " dbpath=" << storageGlobalParams.dbpath;
@@ -421,7 +421,7 @@ namespace mongo {
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
 
-        DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
+        DEV log(LogComponent::kControl) << "_DEBUG build (which is slower)" << endl;
         logMongodStartupWarnings();
 
 #if defined(_WIN32)
@@ -779,14 +779,14 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
         if ( b != 0x78 ) {
-            mongo::log(LogComponent::kDefault) << "big endian cpus not yet supported" << endl;
+            mongo::log(LogComponent::kControl) << "big endian cpus not yet supported" << endl;
             return 33;
         }
     }
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
-        severe(LogComponent::kDefault) << "Failed global initialization: " << status;
+        severe(LogComponent::kControl) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
     }
 

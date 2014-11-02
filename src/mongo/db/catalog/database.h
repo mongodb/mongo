@@ -128,11 +128,12 @@ namespace mongo {
         const std::string& getSystemIndexesName() const { return _indexesName; }
     private:
 
-        void _clearCollectionCache( const StringData& fullns );
+        void _clearCollectionCache(OperationContext* txn, const StringData& fullns );
 
-        void _clearCollectionCache_inlock( const StringData& fullns );
+        void _clearCollectionCache_inlock(OperationContext* txn, const StringData& fullns );
 
-        class CollectionCacheChange; // to allow rollback actions for invalidating above cache
+        class AddCollectionChange;
+        class RemoveCollectionChange;
 
         const std::string _name; // "alleyinsider"
 

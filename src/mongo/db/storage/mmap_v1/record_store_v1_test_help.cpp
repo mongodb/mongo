@@ -259,6 +259,10 @@ namespace mongo {
         invariant(false);
     }
 
+    bool DummyExtentManager::likelyInPhysicalMem( const DiskLoc& loc ) const {
+        return true;
+    }
+
     Record* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {
         if ( static_cast<size_t>( loc.a() ) >= _extents.size() )
             return NULL;

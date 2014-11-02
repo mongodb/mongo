@@ -121,7 +121,10 @@ namespace {
     }
 
     void BackgroundSync::shutdown() {
-        notify();
+        boost::lock_guard<boost::mutex> lock(_mutex);
+
+        // Wake up producerThread so it notices that we're in shutdown
+        _condvar.notify_all();
     }
 
     void BackgroundSync::notify() {
@@ -144,11 +147,13 @@ namespace {
                 _producerThread();
             }
             catch (const DBException& e) {
-                sethbmsg(str::stream() << "sync source problem: " << e.toString());
+                std::string msg(str::stream() << "sync producer problem: " << e.toString());
+                error() << msg << rsLog;
+                _replCoord->setMyHeartbeatMessage(msg);
             }
             catch (const std::exception& e2) {
-                sethbmsg(str::stream() << "exception in producer: " << e2.what());
-                sleepsecs(60);
+                severe() << "sync producer exception: " << e2.what() << rsLog;
+                fassertFailed(28546);
             }
         }
 
@@ -203,8 +208,11 @@ namespace {
             }
 
             // Wait until we've applied the ops we have before we choose a sync target
-            while (!_appliedBuffer) {
+            while (!_appliedBuffer && !inShutdown()) {
                 _condvar.wait(lock);
+            }
+            if (inShutdown()) {
+                return;
             }
         }
 

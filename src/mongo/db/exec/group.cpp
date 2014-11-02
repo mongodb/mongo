@@ -35,7 +35,6 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
@@ -82,7 +81,96 @@ namespace mongo {
           _commonStats(kStageType),
           _specificStats(),
           _child(child),
-          _groupCompleted(false) {}
+          _groupState(GroupState_Initializing),
+          _reduceFunction(0),
+          _keyFunction(0) {}
+
+    void GroupStage::initGroupScripting() {
+        // Initialize _scope.
+        const std::string userToken =
+            ClientBasic::getCurrent()->getAuthorizationSession()
+                                     ->getAuthenticatedUserNamesToken();
+
+        const NamespaceString nss(_request.ns);
+        _scope = globalScriptEngine->getPooledScope(_txn, nss.db().toString(), "group" + userToken);
+        if (!_request.reduceScope.isEmpty()) {
+            _scope->init(&_request.reduceScope);
+        }
+        _scope->setObject("$initial", _request.initial, true);
+        _scope->exec("$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true,
+                     100);
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+
+        // Initialize _reduceFunction.
+        _reduceFunction = _scope->createFunction("function(){ "
+                                                 "  if ( $arr[n] == null ){ "
+                                                 "    next = {}; "
+                                                 "    Object.extend( next , $key ); "
+                                                 "    Object.extend( next , $initial , true ); "
+                                                 "    $arr[n] = next; "
+                                                 "    next = null; "
+                                                 "  } "
+                                                 "  $reduce( obj , $arr[n] ); "
+                                                 "}");
+
+        // Initialize _keyFunction, if a key function was provided.
+        if (_request.keyFunctionCode.size()) {
+            _keyFunction = _scope->createFunction(_request.keyFunctionCode.c_str());
+        }
+    }
+
+    Status GroupStage::processObject(const BSONObj& obj) {
+        BSONObj key;
+        Status getKeyStatus = getKey(obj, _request.keyPattern, _keyFunction, _scope.get(),
+                                     &key);
+        if (!getKeyStatus.isOK()) {
+            return getKeyStatus;
+        }
+
+        int& n = _groupMap[key];
+        if (n == 0) {
+            n = _groupMap.size();
+            _scope->setObject("$key", key, true);
+            if (n > 20000) {
+                return Status(ErrorCodes::BadValue,
+                              "group() can't handle more than 20000 unique keys");
+            }
+        }
+
+        _scope->setObject("obj", obj, true);
+        _scope->setNumber("n", n - 1);
+        if (_scope->invoke(_reduceFunction, 0, 0, 0, true)) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "reduce invoke failed: " << _scope->getError());
+        }
+
+        return Status::OK();
+    }
+
+    BSONObj GroupStage::finalizeResults() {
+        if (!_request.finalize.empty()) {
+            _scope->exec("$finalize = " + _request.finalize, "$group finalize define", false,
+                         true, true, 100);
+            ScriptingFunction finalizeFunction =
+                _scope->createFunction("function(){ "
+                                       "  for(var i=0; i < $arr.length; i++){ "
+                                       "  var ret = $finalize($arr[i]); "
+                                       "  if (ret !== undefined) "
+                                       "    $arr[i] = ret; "
+                                       "  } "
+                                       "}");
+            _scope->invoke(finalizeFunction, 0, 0, 0, true);
+        }
+
+        _specificStats.nGroups = _groupMap.size();
+
+        BSONObj results = _scope->getObject("$arr").getOwned();
+
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+        _scope->gc();
+
+        return results;
+    }
 
     PlanStage::StageState GroupStage::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -91,156 +179,92 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-        // Set the completed flag; this stage returns all results in a single call to work.
-        // Subsequent calls will return EOF.
-        _groupCompleted = true;
-
-        // Initialize the Scope object.
-        const std::string userToken =
-            ClientBasic::getCurrent()->getAuthorizationSession()
-                                     ->getAuthenticatedUserNamesToken();
-
-        const NamespaceString nss(_request.ns);
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope(
-                                    _txn, nss.db().toString(), "group" + userToken);
-        if (!_request.reduceScope.isEmpty()) {
-            s->init(&_request.reduceScope);
-        }
-        s->setObject("$initial", _request.initial, true);
-        s->exec("$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true, 100);
-        s->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
-        ScriptingFunction f =
-            s->createFunction("function(){ "
-                              "  if ( $arr[n] == null ){ "
-                              "    next = {}; "
-                              "    Object.extend( next , $key ); "
-                              "    Object.extend( next , $initial , true ); "
-                              "    $arr[n] = next; "
-                              "    next = null; "
-                              "  } "
-                              "  $reduce( obj , $arr[n] ); "
-                              "}");
-        ScriptingFunction keyFunction = 0;
-        if (_request.keyFunctionCode.size()) {
-            keyFunction = s->createFunction(_request.keyFunctionCode.c_str());
+        // On the first call to work(), call initGroupScripting().
+        if (_groupState == GroupState_Initializing) {
+            initGroupScripting();
+            _groupState = GroupState_ReadingFromChild;
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
         }
 
-        // Construct the set of groups.
-        map<BSONObj, int, BSONObjCmp> map;
-        while (!_child->isEOF()) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            StageState status = _child->work(&id);
+        // Otherwise, read from our child.
+        invariant(_groupState == GroupState_ReadingFromChild);
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        StageState state = _child->work(&id);
 
-            if (PlanStage::IS_EOF == status) {
-                break;
+        if (PlanStage::NEED_TIME == state) {
+            ++_commonStats.needTime;
+            return state;
+        }
+        else if (PlanStage::FAILURE == state) {
+            *out = id;
+            // If a stage fails, it may create a status WSM to indicate why it failed, in which
+            // case 'id' is valid.  If ID is invalid, we create our own error message.
+            if (WorkingSet::INVALID_ID == id) {
+                const std::string errmsg = "group stage failed to read in results from child";
+                *out = WorkingSetCommon::allocateStatusMember(_ws,
+                                                              Status(ErrorCodes::InternalError,
+                                                                     errmsg));
             }
-            else if (PlanStage::NEED_TIME == status) {
-                continue;
-            }
-            else if (PlanStage::FAILURE == status) {
-                *out = id;
-                // If a stage fails, it may create a status WSM to indicate why it failed, in which
-                // case 'id' is valid.  If ID is invalid, we create our own error message.
-                if (WorkingSet::INVALID_ID == id) {
-                    const std::string errmsg = "group stage failed to read in results from child";
-                    *out = WorkingSetCommon::allocateStatusMember(_ws,
-                                                                  Status(ErrorCodes::InternalError,
-                                                                         errmsg));
-                }
-                return status;
-            }
-            else if (PlanStage::DEAD == status) {
-                return status;
-            }
-            invariant(PlanStage::ADVANCED == status);
-
+            return state;
+        }
+        else if (PlanStage::DEAD == state) {
+            return state;
+        }
+        else if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
             // Group queries can't have projections. This means that covering analysis will always
             // add a fetch. We should always get fetched data, and never just key data.
             invariant(member->hasObj());
-            BSONObj obj = member->obj;
+
+            Status status = processObject(member->obj);
+            if (!status.isOK()) {
+                *out = WorkingSetCommon::allocateStatusMember(_ws, status);
+                return PlanStage::FAILURE;
+            }
+
             _ws->free(id);
 
-            BSONObj key;
-            Status getKeyStatus = getKey(obj, _request.keyPattern, keyFunction, s.get(), &key);
-            if (!getKeyStatus.isOK()) {
-                *out = WorkingSetCommon::allocateStatusMember(_ws, getKeyStatus);
-                return PlanStage::FAILURE;
-            }
-
-            int& n = map[key];
-            if (n == 0) {
-                n = map.size();
-                s->setObject("$key", key, true);
-                if (n > 20000) {
-                    const std::string errmsg = "group() can't handle more than 20000 unique keys";
-                    *out = WorkingSetCommon::allocateStatusMember(_ws, Status(ErrorCodes::BadValue,
-                                                                              errmsg));
-                    return PlanStage::FAILURE;
-                }
-            }
-
-            s->setObject("obj", obj, true);
-            s->setNumber("n", n - 1);
-            if (s->invoke(f, 0, 0, 0, true)) {
-                const std::string errmsg = str::stream() << "reduce invoke failed: "
-                                                         << s->getError();
-                *out = WorkingSetCommon::allocateStatusMember(_ws, Status(ErrorCodes::BadValue,
-                                                                          errmsg));
-                return PlanStage::FAILURE;
-            }
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
         }
-        _specificStats.nGroups = map.size();
+        else {
+            // We're done reading from our child.
+            invariant(PlanStage::IS_EOF == state);
 
-        // Invoke the finalize function.
-        if (!_request.finalize.empty()) {
-            s->exec("$finalize = " + _request.finalize, "$group finalize define", false, true,
-                    true, 100);
-            ScriptingFunction g =
-                s->createFunction("function(){ "
-                                  "  for(var i=0; i < $arr.length; i++){ "
-                                  "  var ret = $finalize($arr[i]); "
-                                  "  if (ret !== undefined) "
-                                  "    $arr[i] = ret; "
-                                  "  } "
-                                  "}");
-            s->invoke(g, 0, 0, 0, true);
+            // Transition to state "done."  Future calls to work() will return IS_EOF.
+            _groupState = GroupState_Done;
+
+            BSONObj results = finalizeResults();
+
+            *out = _ws->allocate();
+            WorkingSetMember* member = _ws->get(*out);
+            member->obj = results;
+            member->state = WorkingSetMember::OWNED_OBJ;
+
+            ++_commonStats.advanced;
+            return PlanStage::ADVANCED;
         }
-
-        // Return array of results.
-        *out = _ws->allocate();
-        WorkingSetMember* member = _ws->get(*out);
-        member->obj = s->getObject("$arr").getOwned();
-        member->state = WorkingSetMember::OWNED_OBJ;
-
-        s->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
-        s->gc();
-
-        ++_commonStats.advanced;
-        return PlanStage::ADVANCED;
     }
 
     bool GroupStage::isEOF() {
-        return _groupCompleted;
+        return _groupState == GroupState_Done;
     }
 
     void GroupStage::saveState() {
         ++_commonStats.yields;
         _child->saveState();
-        return;
     }
 
     void GroupStage::restoreState(OperationContext* opCtx) {
         _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);
-        return;
     }
 
     void GroupStage::invalidate(const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(dl, type);
-        return;
     }
 
     vector<PlanStage*> GroupStage::getChildren() const {

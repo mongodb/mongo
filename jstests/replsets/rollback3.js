@@ -11,6 +11,7 @@
  * 6. B rejoins the set and goes through the rollback process.
  * 7. The contents of A and B are compare to ensure the rollback results in consistent nodes.
  */
+load("jstests/replsets/rslib.js");
 
 (function () {
     "use strict";
@@ -128,9 +129,9 @@
     // put B back in contact with A and arbiter, as A is primary, B will rollback and then catch up
     replTest.unPartition(1, 2);
     replTest.unPartition(0, 1);
-    
-    assert.soon(function () { try { return B.isMaster().secondary; } catch(e) { return false; } });
-    
+
+    awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
+
     // await steady state and ensure the two nodes have the same contents
     replTest.awaitReplication();
     checkFinalResults(a);

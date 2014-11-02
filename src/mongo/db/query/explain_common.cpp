@@ -55,16 +55,16 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "explain command requires a nested object");
         }
 
-        *verbosity = ExplainCommon::EXEC_STATS;
+        *verbosity = ExplainCommon::EXEC_ALL_PLANS;
         if (!cmdObj["verbosity"].eoo()) {
             const char* verbStr = cmdObj["verbosity"].valuestrsafe();
             if (mongoutils::str::equals(verbStr, "queryPlanner")) {
                 *verbosity = ExplainCommon::QUERY_PLANNER;
             }
-            else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
-                *verbosity = ExplainCommon::EXEC_ALL_PLANS;
+            else if (mongoutils::str::equals(verbStr, "executionStats")) {
+                *verbosity = ExplainCommon::EXEC_STATS;
             }
-            else if (!mongoutils::str::equals(verbStr, "executionStats")) {
+            else if (!mongoutils::str::equals(verbStr, "allPlansExecution")) {
                 return Status(ErrorCodes::BadValue, "verbosity string must be one of "
                     "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
             }

@@ -1507,6 +1507,8 @@ namespace DocumentTests {
             add<Value::SubFields>();
             add<Value::SerializationOfMissingForSorter>();
         }
-    } myall;
-    
+    };
+
+    SuiteInstance<All> myall;
+
 } // namespace DocumentTests

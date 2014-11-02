@@ -211,6 +211,8 @@ namespace QueryStageFetch {
             add<FetchStageAlreadyFetched>();
             add<FetchStageFilter>();
         }
-    }  queryStageFetchAll;
+    };
+
+    SuiteInstance<All> queryStageFetchAll;
 
 }  // namespace QueryStageFetch

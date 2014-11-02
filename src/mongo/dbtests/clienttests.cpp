@@ -272,5 +272,7 @@ namespace ClientTests {
             add<ConnectionStringTests>();
         }
 
-    } all;
+    };
+
+    SuiteInstance<All> all;
 }

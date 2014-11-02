@@ -44,6 +44,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
@@ -240,7 +241,8 @@ namespace mongo {
                   << "db: " << _dbName << " path: " << _pathString;
 
             try {
-                _txn->recoveryUnit()->syncDataAndTruncateJournal();
+                getDur().syncDataAndTruncateJournal(_txn);
+
                 // need both in case journaling is disabled
                 MongoFile::flushAll(true);
 
@@ -279,7 +281,8 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
-        txn->recoveryUnit()->syncDataAndTruncateJournal(); // Must be done before and after repair
+        // Must be done before and after repair
+        getDur().syncDataAndTruncateJournal(txn);
 
         intmax_t totalSize = dbSize( dbName );
         intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
@@ -314,9 +317,8 @@ namespace mongo {
             scoped_ptr<MMAPV1DatabaseCatalogEntry> dbEntry;
             scoped_ptr<Database> tempDatabase;
 
-            // Must syncDataAndTruncateJournal before closing files as done by
-            // MMAPV1DatabaseCatalogEntry's destructor.
-            ON_BLOCK_EXIT(&RecoveryUnit::syncDataAndTruncateJournal, txn->recoveryUnit());
+            // Must call this before MMAPV1DatabaseCatalogEntry's destructor closes the DB files
+            ON_BLOCK_EXIT(&dur::DurableInterface::syncDataAndTruncateJournal, &getDur(), txn);
 
             {
                 dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
@@ -431,7 +433,8 @@ namespace mongo {
 
             }
 
-            txn->recoveryUnit()->syncDataAndTruncateJournal();
+            getDur().syncDataAndTruncateJournal(txn);
+
             // need both in case journaling is disabled
             MongoFile::flushAll(true);
 

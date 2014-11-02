@@ -136,6 +136,8 @@ namespace mongo {
 
         virtual Record* recordForV1( const DiskLoc& loc ) const;
 
+        virtual bool likelyInPhysicalMem( const DiskLoc& loc ) const;
+
         virtual Extent* extentForV1( const DiskLoc& loc ) const;
 
         virtual DiskLoc extentLocForV1( const DiskLoc& loc ) const;

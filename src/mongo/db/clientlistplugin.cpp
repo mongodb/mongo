@@ -29,15 +29,17 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/stringutils.h"
-
 
 namespace mongo {
 
@@ -122,6 +124,10 @@ namespace {
 
     class CommandHelper : public GlobalEnvironmentExperiment::ProcessOperationContext {
     public:
+        CommandHelper( MatchExpression* me )
+            : matcher( me ) {
+        }
+
         virtual void processOpContext(OperationContext* txn) {
             BSONObjBuilder b;
             if ( txn->getClient() )
@@ -136,19 +142,42 @@ namespace {
             }
             if ( txn->recoveryUnit() )
                 txn->recoveryUnit()->reportState( &b );
-            array.append( b.obj() );
+
+            BSONObj obj = b.obj();
+
+            if ( matcher && !matcher->matchesBSON( obj ) ) {
+                return;
+            }
+
+            array.append( obj );
         }
 
         BSONArrayBuilder array;
+        MatchExpression* matcher;
     };
 
     class CurrentOpContexts : public Command {
     public:
-        CurrentOpContexts() : Command( "currentOpCtx" ) { }
+        CurrentOpContexts()
+            : Command( "currentOpCtx" ) {
+        }
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
         virtual bool slaveOk() const { return true; }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            if ( client->getAuthorizationSession()
+                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                    ActionType::inprog) ) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
+
+        }
 
         bool run( OperationContext* txn,
                   const string& dbname,
@@ -158,13 +187,24 @@ namespace {
                   BSONObjBuilder& result,
                   bool fromRepl) {
 
-            CommandHelper helper;
+            scoped_ptr<MatchExpression> filter;
+            if ( cmdObj["filter"].isABSONObj() ) {
+                StatusWithMatchExpression res =
+                    MatchExpressionParser::parse( cmdObj["filter"].Obj() );
+                if ( !res.isOK() ) {
+                    return appendCommandStatus( result, res.getStatus() );
+                }
+                filter.reset( res.getValue() );
+            }
+
+            CommandHelper helper( filter.get() );
             getGlobalEnvironment()->forEachOperationContext(&helper);
 
             result.appendArray( "operations", helper.array.arr() );
 
             return true;
         }
+
     } currentOpContexts;
 
 }  // namespace
