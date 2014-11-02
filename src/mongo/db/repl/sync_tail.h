@@ -88,13 +88,6 @@ namespace repl {
         // returns true if we should continue waiting for BSONObjs, false if we should
         // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
         bool tryPopAndWaitForMore(OpQueue* ops, ReplicationCoordinator* replCoord);
-        
-        // After ops have been written to db, call this
-        // to update local oplog.rs, as well as notify the primary
-        // that we have applied the ops.
-        // Ops are removed from the deque.
-        // Returns the optime of the last op applied.
-        OpTime applyOpsToOplog(std::deque<BSONObj>* ops);
 
     protected:
         // Cap the batches using the limit on journal commits.
@@ -105,7 +98,8 @@ namespace repl {
 
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
-        void multiApply(std::deque<BSONObj>& ops);
+        // Returns the last OpTime applied.
+        OpTime multiApply(std::deque<BSONObj>& ops);
 
         /**
          * Applies oplog entries until reaching "endOpTime".
@@ -115,6 +109,13 @@ namespace repl {
         void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
 
     private:
+        // After ops have been written to db, call this
+        // to update local oplog.rs, as well as notify the primary
+        // that we have applied the ops.
+        // Ops are removed from the deque.
+        // Returns the optime of the last op applied.
+        OpTime applyOpsToOplog(std::deque<BSONObj>* ops);
+
         BackgroundSyncInterface* _networkQueue;
 
         // Function to use during applyOps

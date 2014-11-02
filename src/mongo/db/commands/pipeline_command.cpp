@@ -189,12 +189,15 @@ namespace mongo {
             Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
-        virtual bool run(OperationContext* txn, const string &db, BSONObj &cmdObj, int options, string &errmsg,
-                         BSONObjBuilder &result, bool fromRepl) {
+        virtual bool run(OperationContext* txn, const string &db, BSONObj &cmdObj, int options,
+                         string &errmsg, BSONObjBuilder &result, bool fromRepl) {
+            NamespaceString nss(parseNs(db, cmdObj));
+            if (nss.coll().empty()) {
+                errmsg = "missing collection name";
+                return false;
+            }
 
-            string ns = parseNs(db, cmdObj);
-
-            intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, NamespaceString(ns));
+            intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, nss);
             pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
             /* try to parse the command; if this fails, then we didn't run */
@@ -227,7 +230,7 @@ namespace mongo {
                 // sharding version that we synchronize on here. This is also why we always need to
                 // create a ClientCursor even when we aren't outputting to a cursor. See the comment
                 // on ShardFilterStage for more details.
-                AutoGetCollectionForRead ctx(txn, ns);
+                AutoGetCollectionForRead ctx(txn, nss.ns());
 
                 Collection* collection = ctx.getCollection();
 
@@ -250,7 +253,7 @@ namespace mongo {
                     execStatus = PlanExecutor::make(txn,
                                                     ws.release(),
                                                     proxy.release(),
-                                                    ns,
+                                                    nss.ns(),
                                                     PlanExecutor::YIELD_MANUAL,
                                                     &exec);
                 }
@@ -290,7 +293,7 @@ namespace mongo {
                     result << "stages" << Value(pPipeline->writeExplainOps());
                 }
                 else if (isCursorCommand(cmdObj)) {
-                    handleCursorCommand(txn, ns, pin.get(), exec, cmdObj, result);
+                    handleCursorCommand(txn, nss.ns(), pin.get(), exec, cmdObj, result);
                     keepCursor = true;
                 }
                 else {

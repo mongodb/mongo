@@ -52,10 +52,11 @@ namespace mongo {
           _planCache(new PlanCache(collection->ns().ns())),
           _querySettings(new QuerySettings()) { }
 
-    void CollectionInfoCache::reset() {
+    void CollectionInfoCache::reset( OperationContext* txn ) {
         LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
         clearQueryCache();
         _keysComputed = false;
+        computeIndexKeys( txn );
         // query settings is not affected by info cache reset.
         // index filters should persist throughout life of collection
     }

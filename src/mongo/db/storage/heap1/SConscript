@@ -59,3 +59,13 @@ env.CppUnitTest(
         ]
    )
 
+env.CppUnitTest(
+    target='storage_heap1_engine_test',
+    source=['heap1_engine_test.cpp',
+            ],
+    LIBDEPS=[
+        'storage_heap1_core',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        ],
+    )
+

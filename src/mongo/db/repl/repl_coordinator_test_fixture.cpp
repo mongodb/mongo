@@ -76,6 +76,11 @@ namespace {
         }
     }
 
+    void ReplCoordTest::assertRunUntil(Date_t newTime) {
+        this->_net->runUntil(newTime);
+        ASSERT_EQUALS(newTime, getNet()->now());
+    }
+
     void ReplCoordTest::enterNetwork() {
         getNet()->enterNetwork();
     }

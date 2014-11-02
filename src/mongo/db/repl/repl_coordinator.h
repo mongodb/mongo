@@ -190,19 +190,11 @@ namespace repl {
          * ErrorCodes::NotMaster if you are no longer primary when trying to step down,
          * ErrorCodes::SecondaryAheadOfPrimary if we are primary but there is another node that
          * seems to be ahead of us in replication, and Status::OK otherwise.
-         * TODO(spencer): SERVER-14251 This should block writes while waiting for other nodes to
-         * catch up, and then should wait till a secondary is completely caught up rather than
-         * within 10 seconds.
          */
         virtual Status stepDown(OperationContext* txn,
                                 bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime) = 0;
-
-        /**
-         * TODO a way to trigger an action on replication of a given operation
-         */
-        // handle_t onReplication(OpTime ts, writeConcern, callbackFunction); // TODO
 
         /**
          * Returns true if the node can be considered master for the purpose of introspective
@@ -247,24 +239,22 @@ namespace repl {
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx) = 0;
 
         /**
-         * Updates our internal tracking of the last OpTime applied for the given member of the set
-         * identified by "rid".  Also updates all bookkeeping related to tracking what the last
-         * OpTime applied by all tag groups that "rid" is a part of.  This is called when
-         * secondaries notify the member they are syncing from of their progress in replication.
-         * This information is used by awaitReplication to satisfy write concerns.  It is *not* used
-         * in elections, we maintain a separate view of member optimes in the topology coordinator
-         * based on incoming heartbeat messages, which is used in elections.
-         *
-         * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
-         * @returns Status::OK() otherwise
+         * Updates our internal tracking of the last OpTime applied for the given slave
+         * identified by "rid".  Only valid to call in master/slave mode
          * TODO(spencer): Remove txn argument and make into a void function when legacy is gone.
          */
-        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptimeForSlave(
+                OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
 
         /**
-         * Delegates to setLastOptime using our RID as the rid argument.
+         * Updates our internal tracking of the last OpTime applied to this node.
          */
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
+
+        /**
+         * Updates our the message we include in heartbeat responses.
+         */
+        virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
 
         /**
          * Returns the last optime recorded by setMyLastOptime.
@@ -355,6 +345,12 @@ namespace repl {
          * called on a master-slave or standalone node.
          */
         virtual void fillIsMasterForReplSet(IsMasterResponse* result) = 0;
+
+        /**
+         * Adds to "result" a description of the slaveInfo data structure used to map RIDs to their
+         * last known optimes.
+         */
+        virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
 
         /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
@@ -467,10 +463,14 @@ namespace repl {
                                            BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetUpdatePosition command, updating each nodes oplog progress.
-         * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
-         * if any updating node cannot be found in the config, or any of the normal replset
-         * command ErrorCodes.
+         * Handles an incoming replSetUpdatePosition command, updating each node's oplog progress.
+         * Returns Status::OK() if all updates are processed correctly, NodeNotFound
+         * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the
+         * "cfgver" sent in any of the updates doesn't match our config version, or
+         * NotMasterOrSecondaryCode if we are in state REMOVED or otherwise don't have a valid
+         * replica set config.
+         * If a non-OK status is returned, it is unspecified whether none or some of the updates
+         * were applied.
          */
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
                                                     const UpdatePositionArgs& updates) = 0;
@@ -482,6 +482,8 @@ namespace repl {
          * node is being chained through.
          *
          * Returns ErrorCodes::NodeNotFound if no replica set member exists with the given member ID
+         * and ErrorCodes::NotMasterOrSecondaryCode if we're in state REMOVED or otherwise don't
+         * have a valid config.
          */
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake) = 0;

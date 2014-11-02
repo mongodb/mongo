@@ -42,6 +42,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 
@@ -74,10 +75,24 @@ namespace mongo {
         */
         static void initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
+        /**
+         * Inits a thread if that thread has not already been init'd, setting the thread name to
+         * "desc".
+         */
         static void initThreadIfNotAlready(const char *desc) { 
-            if( currentClient.get() )
+            if (currentClient.get())
                 return;
             initThread(desc);
+        }
+
+        /**
+         * Inits a thread if that thread has not already been init'd, setting the thread name to
+         * the string returned by "nameCallback".
+         */
+        static void initThreadIfNotAlready(stdx::function<std::string ()>& nameCallback) { 
+            if (currentClient.get())
+                return;
+            initThread(nameCallback().c_str());
         }
 
         /** this has to be called as the client goes away, but before thread termination
@@ -99,8 +114,8 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
 
-        void setRemoteID(const OID& rid) { _remoteId = rid;  }
-        OID getRemoteID() const { return _remoteId; }
+        void setRemoteID(const OID& rid) { _remoteId = rid;  } // Only used for master/slave
+        OID getRemoteID() const { return _remoteId; } // Only used for master/slave
         ConnectionId getConnectionId() const { return _connectionId; }
         const std::string& getThreadId() const { return _threadId; }
 
@@ -242,7 +257,7 @@ namespace mongo {
         ~AutoGetCollectionForRead();
 
         Database* getDb() const {
-            return _db;
+            return _db.getDb();
         }
 
         Collection* getCollection() const {
@@ -255,9 +270,9 @@ namespace mongo {
         const Timer _timer;
         OperationContext* const _txn;
         const NamespaceString _nss;
-        const Lock::DBLock _dbLock;
+        const AutoGetDb _db;
+        const Lock::CollectionLock _collLock;
 
-        Database* _db;
         Collection* _coll;
     };
 

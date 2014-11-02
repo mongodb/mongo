@@ -265,12 +265,25 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password)
     assert( isString(fromdb) && fromdb.length );
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
-    if ( username && password ) {
-        var n = this._adminCommand( { copydbgetnonce : 1, fromhost:fromhost } );
-        return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb, username:username, nonce:n.nonce, key:this.__pwHash( n.nonce, username, password ) } );
-    } else {
+
+    var mechanism = this._getDefaultAuthenticationMechanism();
+    assert(mechanism == "SCRAM-SHA-1" || mechanism == "MONGODB-CR");
+
+    // Check for no auth
+    if (!username || !password) {
         return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
     }
+
+    // Use the copyDatabase native helper for SCRAM-SHA-1
+    if (mechanism == "SCRAM-SHA-1") {
+        return this.getMongo().copyDatabaseWithSCRAM(fromdb, todb, fromhost, username, password);
+    }
+
+    // Fall back to MONGODB-CR
+    var n = this._adminCommand({ copydbgetnonce : 1, fromhost:fromhost});
+    return this._adminCommand({ copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb,
+                                username:username, nonce:n.nonce,
+                                key:this.__pwHash(n.nonce, username, password) });
 }
 
 /**
@@ -821,12 +834,41 @@ DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
 }
 
+// Used to trim entries from the metrics.commands that have never been executed
+pruneServerStatus = function(tree) {
+    var result = { };
+    for (var i in tree) {
+        if (!tree.hasOwnProperty(i))
+            continue;
+        if (tree[i].hasOwnProperty("total")) {
+            if (tree[i].total > 0) {
+                result[i] = tree[i];
+            }
+            continue;
+        }
+        if (i == "<UNKNOWN>") {
+            if(tree[i] > 0) {
+                result[i] = tree[i];
+            }
+            continue;
+        }
+        // Handles nested commands
+        var subStatus = pruneServerStatus(tree[i]);
+        if (Object.keys(subStatus).length > 0) {
+            result[i] = tree[i];
+        }
+    }
+    return result;
+}
+
 DB.prototype.serverStatus = function( options ){
     var cmd = { serverStatus : 1 };
     if ( options ) {
         Object.extend( cmd, options );
     }
-    return this._adminCommand( cmd );
+    var res = this._adminCommand( cmd );
+    res.metrics.commands = pruneServerStatus(res.metrics.commands);
+    return res;
 }
 
 DB.prototype.hostInfo = function(){

@@ -37,6 +37,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/xtime.hpp>
 
+#include "mongo/bson/inline_decls.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/heapcheck.h"
 #include "mongo/util/concurrency/threadlocal.h"
@@ -82,7 +83,9 @@ namespace mongo {
     class mutex : boost::noncopyable {
     public:
         const char * const _name;
-        mutex(const char *name) : _name(name)
+        // NOINLINE so that 'mutex::mutex' is always in the frame, this makes
+        // it easier for us to suppress the leaks caused by the static observer.
+        NOINLINE_DECL mutex(const char *name) : _name(name)
         {
             _m = new boost::timed_mutex();
             IGNORE_OBJECT( _m  );   // Turn-off heap checking on _m

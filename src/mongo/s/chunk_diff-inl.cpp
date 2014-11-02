@@ -90,15 +90,12 @@ namespace mongo {
         return RangeOverlap( low, high );
     }
 
-    template < class ValType, class ShardType >
-    int ConfigDiffTracker<ValType,ShardType>::
-        calculateConfigDiff( string config,
-                             const set<ChunkVersion>& extraMinorVersions )
-    {
+    template<class ValType, class ShardType>
+    int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(const string& config) {
         verifyAttached();
 
         // Get the diff query required
-        Query diffQuery = configDiffQuery( extraMinorVersions );
+        Query diffQuery = configDiffQuery();
 
         ScopedDbConnection conn(config, 30.0);
 
@@ -229,10 +226,9 @@ namespace mongo {
         return _validDiffs;
     }
 
-    template < class ValType, class ShardType >
-    Query ConfigDiffTracker<ValType,ShardType>::
-        configDiffQuery( const set<ChunkVersion>& extraMinorVersions ) const
-    {
+    template<class ValType, class ShardType>
+    Query ConfigDiffTracker<ValType, ShardType>::configDiffQuery() const {
+
         verifyAttached();
 
         //

@@ -64,6 +64,8 @@ namespace repl {
         virtual OperationContext* createOperationContext();
         virtual void dropAllTempCollections(OperationContext* txn);
 
+        std::string getNextOpContextThreadName();
+
     private:
 
         // The SyncSourceFeedback class is responsible for sending replSetUpdatePosition commands
@@ -75,10 +77,15 @@ namespace repl {
         boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
 
         // Thread running runSyncThread().
-        boost::scoped_ptr<boost::thread> _backgroundSyncThread;
+        boost::scoped_ptr<boost::thread> _applierThread;
 
         // Thread running BackgroundSync::producerThread().
         boost::scoped_ptr<boost::thread> _producerThread;
+
+        // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
+        boost::mutex _nextThreadIdMutex;
+        // Number used to uniquely name threads.
+        long long _nextThreadId;
     };
 
 } // namespace repl

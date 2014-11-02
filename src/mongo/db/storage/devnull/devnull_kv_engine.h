@@ -78,5 +78,20 @@ namespace mongo {
         virtual bool supportsDocLocking() const {
             return true;
         }
+
+        virtual bool isDurable() const {
+            return true;
+        }
+
+        virtual int64_t getIdentSize( OperationContext* opCtx,
+                                      const StringData& ident ) {
+            return 1;
+        }
+
+        virtual Status repairIdent( OperationContext* opCtx,
+                                    const StringData& ident ) {
+            return Status::OK();
+        }
+
     };
 }

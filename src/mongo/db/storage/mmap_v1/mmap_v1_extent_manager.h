@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/lock_mgr_defs.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/record_access_tracker.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -123,6 +124,8 @@ namespace mongo {
          */
         Record* recordForV1( const DiskLoc& loc ) const;
 
+        bool likelyInPhysicalMem( const DiskLoc& loc ) const;
+
         /**
          * @param loc - has to be for a specific Record (not an Extent)
          * Note(erh) see comment on recordFor
@@ -164,6 +167,13 @@ namespace mongo {
 
         DataFile* _addAFile( OperationContext* txn, int sizeNeeded, bool preallocateNextFile );
 
+
+        /**
+         * Shared record retrieval logic used by the public recordForV1() and likelyInPhysicalMem()
+         * above.
+         */
+        Record* _recordForV1( const DiskLoc& loc ) const;
+
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;
         void _setFreeListStart( OperationContext* txn, DiskLoc loc );
@@ -186,6 +196,7 @@ namespace mongo {
         const std::string _path; // i.e. "/data/db"
         const bool _directoryPerDB;
         const ResourceId _rid;
+        mutable RecordAccessTracker _recordAccessTracker;
 
         /**
          * Simple wrapper around an array object to allow append-only modification of the array,

@@ -174,8 +174,11 @@ namespace mongo {
 #if defined(__linux__)
 // these are from <linux/magic.h> but that isn't available on all systems
 # define NFS_SUPER_MAGIC 0x6969
+# define TMPFS_MAGIC 0x01021994
 
-        return (fs_stats.f_type == NFS_SUPER_MAGIC);
+        return (fs_stats.f_type == NFS_SUPER_MAGIC)
+            || (fs_stats.f_type == TMPFS_MAGIC)
+            ;
 
 #elif defined(__freebsd__)
 

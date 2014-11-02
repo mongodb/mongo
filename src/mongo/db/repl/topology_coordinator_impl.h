@@ -133,7 +133,7 @@ namespace repl {
         virtual void clearSyncSourceBlacklist();
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
         virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
-        virtual void setStepDownTime(Date_t newTime);
+        virtual void setElectionSleepUntil(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
@@ -182,6 +182,7 @@ namespace repl {
         virtual void processWinElection(OID electionId, OpTime electionOpTime);
         virtual void processLoseElection();
         virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
+        virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
         virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied);
         virtual Date_t getStepDownTime() const;
 
@@ -329,18 +330,13 @@ namespace repl {
         // How far this node must fall behind before considering switching sync sources
         Seconds _maxSyncSourceLagSecs;
 
-        // insanity follows
-
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
         std::string _hbmsg;
         Date_t _hbmsgTime; // when it was logged
-        void _sethbmsg(const std::string& s, int logLevel = 0);
+
         // heartbeat msg to send to others; descriptive diagnostic info
-        std::string _getHbmsg() const {
-            if ( time(0)-_hbmsgTime > 120 ) return "";
-            return _hbmsg;
-        }
+        std::string _getHbmsg(Date_t now) const;
 
         int _selfIndex; // this node's index in _members and _currentConfig
 
@@ -352,6 +348,9 @@ namespace repl {
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;
+
+        // A time before which this node will not stand for election.
+        Date_t _electionSleepUntil;
 
         // The number of calls we have had to enter maintenance mode
         int _maintenanceModeCalls;

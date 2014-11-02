@@ -43,11 +43,6 @@ namespace mongo {
     const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
 
-
-    bool isJournalingEnabled() {
-        return storageGlobalParams.dur;
-    }
-
     class JournalCommitIntervalSetting : public ServerParameter {
     public:
         JournalCommitIntervalSetting() :

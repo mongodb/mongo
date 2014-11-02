@@ -26,12 +26,16 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -49,6 +53,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -127,4 +132,98 @@ namespace mongo {
 
     } cmdCopyDBGetNonce;
 
+    /* Usage:
+     * admindb.$cmd.findOne( { copydbsaslstart: 1,
+     *                         fromhost: <connection string>,
+     *                         mechanism: <String>,
+     *                         payload: <BinaryOrString> } );
+     *
+     * Run against the mongod that is the intended target for the "copydb" command.  Used to
+     * initialize a SASL auth session for a "copydb" operation for authentication purposes.
+     */
+    class CmdCopyDbSaslStart : public Command {
+    public:
+        CmdCopyDbSaslStart() : Command("copydbsaslstart") { }
+
+        virtual bool adminOnly() const {
+            return true;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual bool isWriteCommandForConfigServer() const { return false; }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            // No auth required
+            return Status::OK();
+        }
+
+        virtual void help( stringstream &help ) const {
+            help << "Initialize a SASL auth session for subsequent copy db request "
+                    "from secure server\n";
+        }
+
+        virtual bool run(OperationContext* txn,
+                         const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+
+            string fromDb = cmdObj.getStringField("fromdb");
+            string fromHost = cmdObj.getStringField("fromhost");
+            if ( fromHost.empty() ) {
+                /* copy from self */
+                stringstream ss;
+                ss << "localhost:" << serverGlobalParams.port;
+                fromHost = ss.str();
+            }
+
+            ConnectionString cs = ConnectionString::parse(fromHost, errmsg);
+            if (!cs.isValid()) {
+                appendCommandStatus(result, false, errmsg);
+                return false;
+            }
+
+            BSONElement mechanismElement;
+            Status status = bsonExtractField(cmdObj,
+                                             saslCommandMechanismFieldName,
+                                             &mechanismElement);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            BSONElement payloadElement;
+            status = bsonExtractField(cmdObj, saslCommandPayloadFieldName, &payloadElement);
+            if (!status.isOK()) {
+                log() << "Failed to extract payload: " << status;
+                return false;
+            }
+
+            authConn_.reset(cs.connect(errmsg));
+            if (!authConn_.get()) {
+                return false;
+            }
+
+            BSONObj ret;
+            if( !authConn_->runCommand( fromDb,
+                                        BSON( "saslStart" << 1 <<
+                                              mechanismElement <<
+                                              payloadElement),
+                                        ret ) ) {
+                return appendCommandStatus(result,
+                                           Command::getStatusFromCommandResult(ret));
+
+            }
+
+            result.appendElements( ret );
+            return true;
+        }
+
+    } cmdCopyDBSaslStart;
 } // namespace mongo

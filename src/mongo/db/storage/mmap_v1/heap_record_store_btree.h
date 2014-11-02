@@ -199,8 +199,6 @@ namespace mongo {
 
         virtual void* writingPtr(void* data, size_t len);
 
-        virtual void syncDataAndTruncateJournal() {}
-
         // -----------------------
 
         void notifyInsert( HeapRecordStoreBtree* rs, const DiskLoc& loc );

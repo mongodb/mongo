@@ -537,6 +537,15 @@ namespace {
                           BSON("_id" << "rs0" <<
                                "version" << 1 <<
                                "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                            "host" << "localhost:12345")) <<
+                               "settings" << BSON(
+                                       "getLastErrorDefaults" << BSON("w" << 0)))));
+        ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+
+        ASSERT_OK(config.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
                                                             "host" << "localhost:12345" <<
                                                             "tags" << BSON("a" << "v"))) <<
                                "settings" << BSON(

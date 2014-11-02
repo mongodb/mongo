@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
@@ -72,7 +71,7 @@ namespace {
                                   const StringData& ns) const {
 
         const StringData db = _todb(ns);
-        invariant(txn->lockState()->isAtLeastReadLocked(db));
+        invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
 
         SimpleMutex::scoped_lock lk(_m);
         DBs::const_iterator it = _dbs.find(db);

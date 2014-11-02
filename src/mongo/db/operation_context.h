@@ -149,30 +149,39 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(WriteUnitOfWork);
     public:
         WriteUnitOfWork(OperationContext* txn)
-                 : _txn(txn) {
+                 : _txn(txn),
+                   _ended(false) {
+
             if ( _txn->lockState() ) {
                 _txn->lockState()->beginWriteUnitOfWork();
             }
+
             _txn->recoveryUnit()->beginUnitOfWork();
         }
 
         ~WriteUnitOfWork() {
             _txn->recoveryUnit()->endUnitOfWork();
-            if ( _txn->lockState() ) {
+
+            if (_txn->lockState() && !_ended) {
                 _txn->lockState()->endWriteUnitOfWork();
             }
         }
 
         void commit() {
+            invariant(!_ended);
+
             _txn->recoveryUnit()->commitUnitOfWork();
-            if ( _txn->lockState() ) {
+
+            if (_txn->lockState()) {
                 _txn->lockState()->endWriteUnitOfWork();
-                _txn->lockState()->beginWriteUnitOfWork();
+                _ended = true;
             }
         }
 
     private:
         OperationContext* const _txn;
+
+        bool _ended;
     };
 
 }  // namespace mongo

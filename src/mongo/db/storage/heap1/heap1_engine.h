@@ -68,6 +68,19 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const { return false; }
 
+        /**
+         * This is sort of strange since "durable" has no meaning...
+         */
+        virtual bool isDurable() const { return true; }
+
+        virtual int64_t getIdentSize( OperationContext* opCtx,
+                                      const StringData& ident );
+
+        virtual Status repairIdent( OperationContext* opCtx,
+                                    const StringData& ident ) {
+            return Status::OK();
+        }
+
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;
 

@@ -279,10 +279,12 @@ namespace {
         /**
          * None of these pointers are owned by this class.
          */
-        IndexCleanupOnRollback(Collection* collection,
+        IndexCleanupOnRollback(OperationContext* txn,
+                               Collection* collection,
                                IndexCatalogEntryContainer* entries,
                                const IndexDescriptor* desc)
-            : _collection(collection),
+            : _txn(txn),
+              _collection(collection),
               _entries(entries),
               _desc(desc) {
         }
@@ -291,13 +293,42 @@ namespace {
 
         virtual void rollback() {
             _entries->remove(_desc);
-            _collection->infoCache()->reset();
+            _collection->infoCache()->reset(_txn);
         }
 
     private:
+        OperationContext* _txn;
         Collection* _collection;
         IndexCatalogEntryContainer* _entries;
         const IndexDescriptor* _desc;
+    };
+
+    class IndexRemoveChange : public RecoveryUnit::Change {
+    public:
+        IndexRemoveChange(OperationContext* txn,
+                          Collection* collection,
+                          IndexCatalogEntryContainer* entries,
+                          IndexCatalogEntry* entry)
+            : _txn(txn),
+              _collection(collection),
+              _entries(entries),
+              _entry(entry) {
+        }
+
+        virtual void commit() {
+            delete _entry;
+        }
+
+        virtual void rollback() {
+            _entries->add(_entry);
+            _collection->infoCache()->reset(_txn);
+        }
+
+    private:
+        OperationContext* _txn;
+        Collection* _collection;
+        IndexCatalogEntryContainer* _entries;
+        IndexCatalogEntry* _entry;
     };
 } // namespace
 
@@ -340,7 +371,8 @@ namespace {
         if (!status.isOK())
             return status;
 
-        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(_collection,
+        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(txn,
+                                                                       _collection,
                                                                        &_entries,
                                                                        entry->descriptor()));
         indexBuildBlock.success();
@@ -448,7 +480,7 @@ namespace {
 
         _catalog->_collection->getCatalogEntry()->indexBuildSuccess( _txn, _indexName );
 
-        _catalog->_collection->infoCache()->addedIndex();
+        _catalog->_collection->infoCache()->addedIndex( _txn );
 
         IndexDescriptor* desc = _catalog->findIndexByName( _txn, _indexName, true );
         fassert( 17330, desc );
@@ -570,7 +602,8 @@ namespace {
 
                 // Index already exists with the same options, so no need to build a new
                 // one (not an error). Most likely requested by a client using ensureIndex.
-                return Status( ErrorCodes::IndexAlreadyExists, name );
+                return Status( ErrorCodes::IndexAlreadyExists, str::stream() << 
+                               "index already exists: " << name );
             }
         }
 
@@ -589,7 +622,8 @@ namespace {
                                    str::stream() << "Index with pattern: " << key
                                    << " already exists with different options" );
 
-                return Status( ErrorCodes::IndexAlreadyExists, name );
+                return Status( ErrorCodes::IndexAlreadyExists, str::stream() << 
+                               "index already exists: " << name );
             }
         }
 
@@ -740,7 +774,7 @@ namespace {
         _collection->cursorCache()->invalidateAll( false );
 
         // wipe out stats
-        _collection->infoCache()->reset();
+        _collection->infoCache()->reset(txn);
 
         string indexNamespace = entry->descriptor()->indexNamespace();
         string indexName = entry->descriptor()->indexName();
@@ -749,7 +783,9 @@ namespace {
 
         audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
 
-        _entries.remove( entry->descriptor() );
+        invariant(_entries.release(entry->descriptor()) == entry);
+        txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, _collection,
+                                                                  &_entries, entry));
         entry = NULL;
 
         try {
@@ -767,12 +803,12 @@ namespace {
                   << " going to leak some memory to be safe";
 
 
-            _collection->_database->_clearCollectionCache( indexNamespace );
+            _collection->_database->_clearCollectionCache( txn, indexNamespace );
 
             throw;
         }
 
-        _collection->_database->_clearCollectionCache( indexNamespace );
+        _collection->_database->_clearCollectionCache( txn, indexNamespace );
 
         _checkMagic();
 

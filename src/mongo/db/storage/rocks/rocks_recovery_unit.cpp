@@ -113,10 +113,6 @@ namespace mongo {
         return data;
     }
 
-    void RocksRecoveryUnit::syncDataAndTruncateJournal() {
-        log() << "RocksRecoveryUnit::syncDataAndTruncateJournal() does nothing";
-    }
-
     // lazily initialized because Recovery Units are sometimes initialized just for reading,
     // which does not require write batches
     rocksdb::WriteBatchWithIndex* RocksRecoveryUnit::writeBatch() {

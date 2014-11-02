@@ -172,14 +172,16 @@ namespace ThreadedTests {
                         int q = i % 11;
                         if( q == 0 ) { 
                             Lock::DBRead r(&lockState, "foo");
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
                             ASSERT(!lockState.isRecursive());
+
                             Lock::DBRead r2(&lockState, "foo");
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
                             ASSERT(lockState.isRecursive());
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+
                             Lock::DBRead r3(&lockState, "local");
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
-                            ASSERT(lockState.isAtLeastReadLocked("local"));
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
+                            ASSERT(lockState.isDbLockedForMode("local", MODE_S));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock

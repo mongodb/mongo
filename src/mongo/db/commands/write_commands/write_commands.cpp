@@ -212,9 +212,10 @@ namespace mongo {
                 return prepStatus;
             }
 
-            // Explains of write commands are read-only, but we take an exclusive lock so
+            // Explains of write commands are read-only, but we take write locks so
             // that timing info is more accurate.
             Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
+            Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
             Client::Context ctx(txn, nsString);
 
             Status prepInLockStatus = updateExecutor.prepareInLock(ctx.db());
@@ -226,7 +227,8 @@ namespace mongo {
             PlanExecutor* exec = updateExecutor.getPlanExecutor();
 
             // Explain the plan tree.
-            return Explain::explainStages( exec, verbosity, out );
+            Explain::explainStages( exec, verbosity, out );
+            return Status::OK();
         }
         else {
             invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
@@ -250,9 +252,12 @@ namespace mongo {
                 return prepStatus;
             }
 
-            // Explains of write commands are read-only, but we take a write lock so that timing
+            // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
+            AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
+            if (!autoDb.getDb()) return Status::OK();
+
+            Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
             Client::Context ctx(txn, nsString);
 
             Status prepInLockStatus = deleteExecutor.prepareInLock(ctx.db());
@@ -264,7 +269,8 @@ namespace mongo {
             PlanExecutor* exec = deleteExecutor.getPlanExecutor();
 
             // Explain the plan tree.
-            return Explain::explainStages( exec, verbosity, out );
+            Explain::explainStages( exec, verbosity, out );
+            return Status::OK();
         }
     }
 

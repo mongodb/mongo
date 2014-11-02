@@ -206,7 +206,8 @@ namespace mongo {
 
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
 
-        return Explain::explainStages(planExecutor.get(), verbosity, out);
+        Explain::explainStages(planExecutor.get(), verbosity, out);
+        return Status::OK();
     }
 
 }  // namespace mongo

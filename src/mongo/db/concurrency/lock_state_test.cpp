@@ -124,50 +124,6 @@ namespace mongo {
         locker.unlockAll();
     }
 
-    TEST(LockerImpl, WriteTransactionWithCommit) {
-        const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
-        const ResourceId resIdRecordS(RESOURCE_DOCUMENT, 1);
-        const ResourceId resIdRecordX(RESOURCE_DOCUMENT, 2);
-
-        MMAPV1LockerImpl locker(1);
-
-        locker.lockGlobal(MODE_IX);
-        {
-            ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_IX, 0));
-
-            locker.beginWriteUnitOfWork();
-
-            ASSERT(LOCK_OK == locker.lock(resIdRecordS, MODE_S, 0));
-            ASSERT(locker.getLockMode(resIdRecordS) == MODE_S);
-
-            ASSERT(LOCK_OK == locker.lock(resIdRecordX, MODE_X, 0));
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_X);
-
-            ASSERT(locker.unlock(resIdRecordS));
-            ASSERT(locker.getLockMode(resIdRecordS) == MODE_NONE);
-
-            ASSERT(!locker.unlock(resIdRecordX));
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_X);
-
-            locker.endWriteUnitOfWork();
-
-            {
-                AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
-
-                // This block simulates the flush/remap thread
-                {
-                    MMAPV1LockerImpl flushLocker(2);
-                    AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
-                }
-            }
-
-            ASSERT(locker.getLockMode(resIdRecordX) == MODE_NONE);
-
-            ASSERT(locker.unlock(resIdCollection));
-        }
-        locker.unlockAll();
-    }
-
     /**
      * Test that saveMMAPV1LockerImpl works by examining the output.
      */

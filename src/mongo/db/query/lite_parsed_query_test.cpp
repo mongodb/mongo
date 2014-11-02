@@ -265,7 +265,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandBasic) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query: {a: 3},"
+                                   "filter: {a: 3},"
                                    "sort: {a: 1},"
                                    "projection: {_id: 0, a: 1}}");
 
@@ -278,7 +278,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandWithOptions) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query: {a: 3},"
+                                   "filter: {a: 3},"
                                    "sort: {a: 1},"
                                    "projection: {_id: 0, a: 1},"
                                    "options: {showDiskLoc: true, maxScan: 1000}}");
@@ -296,7 +296,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandHintAsString) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "hint: 'foo_1'}");
 
         LiteParsedQuery* rawLpq;
@@ -381,7 +381,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query: {a: 1},"
+                                   "filter: {a: 1},"
                                    "sort: {b: 1},"
                                    "projection: {c: 1},"
                                    "hint: {d: 1},"
@@ -417,7 +417,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandQueryWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  3}");
+                                   "filter: 3}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -427,7 +427,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSortWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "sort: 3}");
 
         LiteParsedQuery* rawLpq;
@@ -438,7 +438,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandProjWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "projection: 'foo'}");
 
         LiteParsedQuery* rawLpq;
@@ -449,7 +449,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSkipWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "skip: '5',"
                                    "projection: {a: 1}}");
 
@@ -461,7 +461,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandLimitWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "limit: '5',"
                                    "projection: {a: 1}}");
 
@@ -473,7 +473,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSingleBatchWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "singleBatch: 'false',"
                                    "projection: {a: 1}}");
 
@@ -485,7 +485,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandOptionsWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: [{snapshot: true}],"
                                    "projection: {a: 1}}");
 
@@ -497,7 +497,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandCommentWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {comment: 1}}");
 
         LiteParsedQuery* rawLpq;
@@ -508,7 +508,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandMaxScanWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {maxScan: true, comment: 'foo'}}");
 
         LiteParsedQuery* rawLpq;
@@ -519,7 +519,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandMaxTimeMSWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {maxTimeMS: true}}");
 
         LiteParsedQuery* rawLpq;
@@ -530,7 +530,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandMaxWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {max: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -541,7 +541,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandMinWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {min: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -552,7 +552,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandReturnKeyWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {returnKey: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -564,7 +564,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandShowDiskLocWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {showDiskLoc: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -575,7 +575,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSnapshotWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {snapshot: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -586,7 +586,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandTailableWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {tailable: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -597,7 +597,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandSlaveOkWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {slaveOk: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -608,7 +608,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandOplogReplayWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {oplogReplay: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -619,7 +619,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandNoCursorTimeoutWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {noCursorTimeout: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -630,7 +630,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandAwaitDataWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {awaitData: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -641,7 +641,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandExhaustWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {exhaust: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -652,7 +652,7 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseFromCommandPartialWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
-                                   "query:  {a: 1},"
+                                   "filter:  {a: 1},"
                                    "options: {exhaust: 3}}");
 
         LiteParsedQuery* rawLpq;
@@ -668,7 +668,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandNegativeSkipError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "skip: -3,"
-                                   "query: {a: 3}}");
+                                   "filter: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -679,7 +679,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandNegativeLimitError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "limit: -3,"
-                                   "query: {a: 3}}");
+                                   "filter: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;
@@ -690,7 +690,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandNegativeBatchSizeError) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "batchSize: -10,"
-                                   "query: {a: 3}}");
+                                   "filter: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
         bool isExplain = false;

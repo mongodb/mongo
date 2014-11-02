@@ -613,12 +613,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult::Value));
 
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(exec.get(),
-                                                          ExplainCommon::EXEC_ALL_PLANS,
-                                                          &explainBob);
-            if (!explainStatus.isOK()) {
-                uasserted(18521, "Explain error: " + explainStatus.reason());
-            }
+            Explain::explainStages(exec.get(), ExplainCommon::EXEC_ALL_PLANS, &explainBob);
 
             // Add the resulting object to the return buffer.
             BSONObj explainObj = explainBob.obj();

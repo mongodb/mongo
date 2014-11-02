@@ -59,7 +59,6 @@ assert.eq( 10 , filtered2.results.length , "B3" );
 filtered2.results.forEach( function(z){ assert.eq( 2 , z.obj.a , "B4: " + tojson( z ) ); } )
 
 assert.eq( filtered1.stats.avgDistance , filtered2.stats.avgDistance , "C1" )
-assert.eq( filtered1.stats.nscanned , filtered2.stats.nscanned , "C3" )
 assert.gt( filtered1.stats.objectsLoaded , filtered2.stats.objectsLoaded , "C3" )
 
 testFiltering( "loc and a" );

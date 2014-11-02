@@ -141,6 +141,9 @@ namespace mongo {
             else if (NEED_TIME == state) {
                 return "NEED_TIME";
             }
+            else if (DEAD == state) {
+                return "DEAD";
+            }
             else {
                 verify(FAILURE == state);
                 return "FAILURE";

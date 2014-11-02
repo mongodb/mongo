@@ -28,6 +28,7 @@
 
 #include "mongo/db/concurrency/yield.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -47,9 +48,6 @@ namespace mongo {
 
     // static
     void Yield::yieldAllLocks(OperationContext* txn, int micros) {
-        // This is a convenient place to do this.
-        txn->checkForInterrupt();
-
         Locker* locker = txn->lockState();
 
         // If we had the read lock, we yield extra hard so that we don't starve writers.
@@ -61,6 +59,9 @@ namespace mongo {
         if (!locker->saveLockStateAndUnlock(&snapshot)) {
             return;
         }
+
+        // Track the number of yields in CurOp.
+        txn->getCurOp()->yielded();
 
         if (hadReadLock) {
             // TODO(kal): Is this still relevant?  Probably not?

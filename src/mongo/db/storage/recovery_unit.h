@@ -86,6 +86,11 @@ namespace mongo {
          */
         virtual bool awaitCommit() = 0;
 
+        // This is a hint to the engine that this transaction is going to call awaitCommit at the
+        // end.  This should be called before any work is done so that transactions can be
+        // configured correctly.
+        virtual void goingToAwaitCommit() { }
+
         /**
          * When this is called, if there is an open transaction, it is commited and a new one is
          * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
@@ -130,18 +135,6 @@ namespace mongo {
          * Declare that the data at [x, x + len) is being written.
          */
         virtual void* writingPtr(void* data, size_t len) = 0;
-
-        /**
-         * Commits pending changes, flushes all changes to main data files, then removes the
-         * journal.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         *
-         * This is useful as a "barrier" to ensure that writes before this call will never go
-         * through recovery and be applied to files that have had changes made after this call
-         * applied.
-         */
-        virtual void syncDataAndTruncateJournal() = 0;
 
         //
         // Syntactic sugar

@@ -183,7 +183,7 @@ namespace repl {
             return;
         }
 
-        if (!hbStatus.isOK()) {
+        if (!hbStatus.isOK() && hbStatus != ErrorCodes::InvalidReplicaSetConfig) {
             warning() << "Got error (" << hbStatus
                       << ") response on heartbeat request to " << request.target
                       << "; " << hbResp;
@@ -213,7 +213,7 @@ namespace repl {
         }
 
         for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
-        const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
+            const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
             if (memberConfig.getHostAndPort() != request.target) {
                 continue;
             }

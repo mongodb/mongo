@@ -92,4 +92,10 @@ namespace mongo {
         _dataMap.erase(ident);
         return Status::OK();
     }
+
+    int64_t Heap1Engine::getIdentSize( OperationContext* opCtx,
+                                       const StringData& ident ) {
+        return 1;
+    }
+
 }

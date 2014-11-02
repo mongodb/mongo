@@ -96,7 +96,7 @@ namespace mongo {
 
             bool okForConfigChanges( string& errmsg ) {
                 string e;
-                if ( ! configServer.allUp(e) ) {
+                if (!configServer.allUp(false, e)) {
                     errmsg = str::stream() << "not all config servers are up: " << e;
                     return false;
                 }

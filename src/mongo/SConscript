@@ -564,6 +564,12 @@ env.Library('global_environment_experiment',
 # Memory-mapped files support.  Used by mongod and some tools.
 env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
 
+env.Library('elapsed_tracker',
+            ['util/elapsed_tracker.cpp'],
+            LIBDEPS=['foundation',
+                     'network'] # this is for using listener to check elapsed time
+            )
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [ "db/background.cpp",
@@ -587,7 +593,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/commands/collection_to_capped.cpp",
                     "db/commands/compact.cpp",
                     "db/commands/copydb.cpp",
-                    "db/commands/copydb_getnonce.cpp",
+                    "db/commands/copydb_start_commands.cpp",
                     "db/commands/count.cpp",
                     "db/commands/create_indexes.cpp",
                     "db/commands/dbhash.cpp",
@@ -617,6 +623,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/commands/write_commands/batch_executor.cpp",
                     "db/commands/write_commands/write_commands.cpp",
                     "db/curop.cpp",
+                    "db/currentop_command.cpp",
                     "db/dbcommands.cpp",
                     "db/dbcommands_admin.cpp",
                     "db/dbdirectclient.cpp",
@@ -677,7 +684,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/repl/rs.cpp",
                     "db/repl/rs_config.cpp",
                     "db/repl/rs_initialsync.cpp",
-                    "db/repl/rs_initiate.cpp",
                     "db/repl/rs_rollback.cpp",
                     "db/repl/rs_sync.cpp",
                     "db/repl/state_box.cpp",
@@ -701,7 +707,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "s/distlock_test.cpp",
                     "util/alignedbuilder.cpp",
                     "util/compress.cpp",
-                    "util/elapsed_tracker.cpp",
                     "util/logfile.cpp",
                 ]
 
@@ -774,7 +779,6 @@ mongosLibraryFiles = [
     "s/balance.cpp",
     "s/version_manager.cpp",
     "s/version_mongos.cpp",
-    "s/mongos_persistence_stubs.cpp",
     ]
 
 env.Library( "mongoscore",
@@ -948,6 +952,7 @@ serveronlyLibdeps = ["coreshard",
                      'db/storage/heap1/storage_heap1',
                      'db/storage/kv_heap/storage_kv_heap',
                      'mmap',
+                     'elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy']
 
 if has_option("rocksdb" ):

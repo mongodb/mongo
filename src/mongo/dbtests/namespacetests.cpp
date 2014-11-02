@@ -36,7 +36,7 @@
 #include <string>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/db.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/index_names.h"

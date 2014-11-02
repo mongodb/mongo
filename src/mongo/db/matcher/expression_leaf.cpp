@@ -28,8 +28,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/db/matcher/expression_leaf.h"
 
 #include <pcrecpp.h>
@@ -40,7 +38,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <deque>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 
@@ -38,11 +39,6 @@
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
-
-
-/**
- * Event-driven LockManager implementation.
- */
 
 namespace mongo {
 
@@ -234,6 +230,10 @@ namespace mongo {
 
     private:
 
+        // The deadlock detector needs to access the buckets and locks directly
+        friend class DeadlockDetector;
+
+        // These types describe the locks hash table
         typedef unordered_map<ResourceId, LockHead*> LockHeadMap;
         typedef LockHeadMap::value_type LockHeadPair;
 
@@ -242,6 +242,7 @@ namespace mongo {
             SimpleMutex mutex;
             LockHeadMap data;
         };
+
 
         /**
          * Retrieves the bucket in which the particular resource must reside. There is no need to
@@ -267,8 +268,111 @@ namespace mongo {
          */
         void _onLockModeChanged(LockHead* lock, bool checkConflictQueue);
 
+
         unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
+    };
+
+
+    /**
+     * Iteratively builds the wait-for graph, starting from a given blocked Locker and stops either
+     * when all reachable nodes have been checked or if a cycle is detected. This class is
+     * thread-safe. Because locks may come and go in parallel with deadlock detection, it may
+     * report false positives, but if there is a stable cycle it will be discovered.
+     *
+     * Implemented as a separate class in order to facilitate diagnostics and also unit-testing for
+     * cases where locks come and go in parallel with deadlock detection.
+     */
+    class DeadlockDetector {
+    public:
+
+        /**
+         * Initializes the wait-for graph builder with the LM to operate on and a locker object
+         * from which to start the search. Deadlock will only be reported if there is a wait cycle
+         * in which the initial locker participates.
+         */
+        DeadlockDetector(const LockManager& lockMgr, const Locker* initialLocker);
+
+        DeadlockDetector& check() {
+            while (next()) {
+
+            }
+
+            return *this;
+        }
+
+        /**
+         * Processes the next wait for node and queues up its set of owners to the unprocessed
+         * queue.
+         *
+         * @return true if there are more unprocessed nodes and no cycle has been discovered yet;
+         *          false if either all reachable nodes have been processed or 
+         */
+        bool next();
+
+        /**
+         * Checks whether a cycle exists in the wait-for graph, which has been built so far. It's
+         * only useful to call this after next() has returned false.
+         */
+        bool hasCycle() const;
+
+        /**
+         * Produces a string containing the wait-for graph that has been built so far.
+         */
+        std::string toString() const;
+
+    private:
+
+        // An entry in the owners list below means that some locker L is blocked on some resource
+        // resId, which is currently held by the given set of owners. The reason to store it in
+        // such form is in order to avoid storing pointers to the lockers or to have to look them
+        // up by id, both of which require some form of synchronization other than locking the
+        // bucket for the resource. Instead, given the resId, we can lock the bucket for the lock
+        // and find the respective LockRequests and continue our scan forward.
+        typedef std::vector<LockerId> ConflictingOwnersList;
+
+        struct Edges {
+            Edges(const ResourceId& resId) : resId(resId) { }
+
+            // Resource id indicating the lock node
+            ResourceId resId;
+
+            // List of lock owners/pariticipants with which the initial locker conflicts for
+            // obtaining the lock
+            ConflictingOwnersList owners;
+        };
+
+        typedef std::map<LockerId, Edges> WaitForGraph;
+        typedef WaitForGraph::value_type WaitForGraphPair;
+
+
+        // We don't want to hold locks between iteration cycles, so just store the resourceId and
+        // the lockerId so we can directly find them from the lock manager.
+        struct UnprocessedNode {
+            UnprocessedNode(LockerId lockerId, ResourceId resId)
+                : lockerId(lockerId),
+                  resId(resId) {
+
+            }
+
+            LockerId lockerId;
+            ResourceId resId;
+        };
+
+        typedef std::deque<UnprocessedNode> UnprocessedNodesQueue;
+
+
+        void _processNextNode(const UnprocessedNode& node);
+
+
+        // Not owned. Lifetime must be longer than that of the graph builder.
+        const LockManager& _lockMgr;
+        const LockerId _initialLockerId;
+
+        UnprocessedNodesQueue _queue;
+        WaitForGraph _graph;
+
+        bool _foundCycle;
     };
 
 } // namespace mongo

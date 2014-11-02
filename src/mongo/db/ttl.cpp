@@ -208,14 +208,11 @@ namespace mongo {
             {
                 const string ns = idx["ns"].String();
 
-                Lock::DBLock dbLock( txn->lockState(), dbName, MODE_IX );
-                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
+                AutoGetDb autoDb(txn, dbName, MODE_IX);
+                Database* db = autoDb.getDb();
+                if (!db) return false;
 
-                Database* db = dbHolder().get( txn, dbName );
-                if ( !db ) {
-                    // database was dropped
-                    return false;
-                }
+                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
 
                 Collection* collection = db->getCollection( txn, ns );
                 if ( !collection ) {

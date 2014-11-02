@@ -145,8 +145,11 @@ namespace repl {
 
         /**
          * Sets the earliest time the current node will stand for election to "newTime".
+         *
+         * Until this time, while the node may report itself as electable, it will not stand
+         * for election.
          */
-        virtual void setStepDownTime(Date_t newTime) = 0;
+        virtual void setElectionSleepUntil(Date_t newTime) = 0;
 
         /**
          * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
@@ -328,6 +331,11 @@ namespace repl {
          * if the node has transitioned to candidate role as a result of the call.
          */
         virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
+
+        /**
+         * Set the outgoing heartbeat message from self
+         */
+        virtual void setMyHeartbeatMessage(const Date_t now, const std::string& s) = 0;
 
     protected:
         TopologyCoordinator() {}

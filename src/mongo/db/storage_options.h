@@ -108,8 +108,6 @@ namespace mongo {
 
     extern StorageGlobalParams storageGlobalParams;
 
-    bool isJournalingEnabled();
-
     // This is not really related to persistence, but mongos and the other executables share code
     // and we use this function to determine at runtime which executable we are in.
     bool isMongos();

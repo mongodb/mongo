@@ -37,7 +37,6 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 
@@ -52,7 +51,7 @@ namespace mongo {
                                                                   &gleWtimeouts );
 
     Status validateWriteConcern( const WriteConcernOptions& writeConcern ) {
-        const bool isJournalEnabled = getDur().isDurable();
+        const bool isJournalEnabled = getGlobalEnvironment()->getGlobalStorageEngine()->isDurable();
 
         if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled ) {
             return Status( ErrorCodes::BadValue,
@@ -153,9 +152,9 @@ namespace mongo {
         switch( writeConcern.syncMode ) {
         case WriteConcernOptions::NONE:
             break;
-        case WriteConcernOptions::FSYNC:
-            if ( !getDur().isDurable() ) {
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        case WriteConcernOptions::FSYNC: {
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if ( !storageEngine->isDurable() ) {
                 result->fsyncFiles = storageEngine->flushAllFiles( true );
             }
             else {
@@ -163,6 +162,7 @@ namespace mongo {
                 txn->recoveryUnit()->awaitCommit();
             }
             break;
+        }
         case WriteConcernOptions::JOURNAL:
             txn->recoveryUnit()->awaitCommit();
             break;

@@ -164,7 +164,7 @@ namespace mongo {
 
     Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
         invariant( _initialized );
-        // todo: do I have to suppor this?
+        // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 
@@ -179,6 +179,13 @@ namespace mongo {
                 return Status( ErrorCodes::NamespaceNotFound, "db not found to drop" );
             entry = it->second;
         }
+
+        // This is called outside of a WUOW since MMAPv1 has unfortunate behavior around dropping
+        // databases. We need to create one here since we want db dropping to all-or-nothing
+        // wherever possible. Eventually we want to move this up so that it can include the logOp
+        // inside of the WUOW, but that would require making DB dropping happen inside the Dur
+        // system for MMAPv1.
+        WriteUnitOfWork wuow(txn);
 
         std::list<std::string> toDrop;
         entry->getCollectionNamespaces( &toDrop );
@@ -196,19 +203,36 @@ namespace mongo {
             txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }
+
+        wuow.commit();
         return Status::OK();
     }
 
     int KVStorageEngine::flushAllFiles( bool sync ) {
-        // todo: do I have to support this?
-        return 0;
+        return _engine->flushAllFiles( sync );
+    }
+
+    bool KVStorageEngine::isDurable() const {
+        return _engine->isDurable();
     }
 
     Status KVStorageEngine::repairDatabase( OperationContext* txn,
                                             const std::string& dbName,
                                             bool preserveClonedFilesOnFailure,
                                             bool backupOriginalFiles ) {
-        // todo: do I have to support this?
+        if ( preserveClonedFilesOnFailure ) {
+            return Status( ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported" );
+        }
+        if ( backupOriginalFiles ) {
+            return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
+        }
+
+        vector<string> idents = _catalog->getAllIdentsForDB( dbName );
+        for ( size_t i = 0; i < idents.size(); i++ ) {
+            Status status = _engine->repairIdent( txn, idents[i] );
+            if ( !status.isOK() )
+                return status;
+        }
         return Status::OK();
     }
 
