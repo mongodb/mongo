@@ -61,6 +61,7 @@ namespace {
     }
 
     void ReplicationExecutor::run() {
+        setThreadName("ReplicationExecutor");
         _networkInterface->startup();
         _dblockWorkers.startThreads();
         std::pair<WorkItem, CallbackHandle> work;

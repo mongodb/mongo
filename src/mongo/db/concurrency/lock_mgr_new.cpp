@@ -72,6 +72,16 @@ namespace mongo {
             "NONE", "IS", "IX", "S", "X"
         };
 
+        static const char LegacyLockNames[] = {
+            '\0', 'r', 'w', 'R', 'W'
+        };
+
+        // Ensure we do not add new modes without updating the names array
+        BOOST_STATIC_ASSERT((sizeof(LockNames) / sizeof(LockNames[0])) == LockModesCount);
+        BOOST_STATIC_ASSERT(
+            (sizeof(LegacyLockNames) / sizeof(LegacyLockNames[0])) == LockModesCount);
+
+
         // Helper functions for the lock modes
         inline bool conflicts(LockMode newMode, uint32_t existingModesMask) {
             return (LockConflictsTable[newMode] & existingModesMask) != 0;
@@ -81,9 +91,6 @@ namespace mongo {
             return 1 << mode;
         }
 
-        inline const char* modeName(LockMode mode) {
-            return LockNames[mode];
-        }
 
         /**
          * Maps the resource id to a human-readable string.
@@ -95,11 +102,14 @@ namespace mongo {
             "Database",
             "Collection",
             "Document",
+            "MMAPV1ExtentManager"
         };
 
-        inline const char* resourceTypeName(ResourceType resourceType) {
-            return ResourceTypeNames[resourceType];
-        }
+        // Ensure we do not add new types without updating the names array
+        BOOST_STATIC_ASSERT(
+            (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
+
+
     }
 
 
@@ -111,7 +121,12 @@ namespace mongo {
     struct LockHead {
 
         LockHead(const ResourceId& resId);
-        ~LockHead();
+
+        /**
+         * Locates the request corresponding to the particular locker or returns NULL. Must be
+         * called with the bucket holding this lock head locked.
+         */
+        LockRequest* findRequest(LockerId lockerId) const;
 
         // Used by the changeGrantedModeCount/changeConflictModeCount methods to indicate whether
         // the particular mode is coming or going away.
@@ -138,8 +153,10 @@ namespace mongo {
         // Granted queue
         //
 
-        // The head of the doubly-linked list of granted or converting requests
-        LockRequest* grantedQueue;
+        // Doubly-linked list of requests, which have been granted. Newly granted requests go to
+        // the end of the queue. Conversion requests are granted from the beginning forward.
+        LockRequest* grantedQueueBegin;
+        LockRequest* grantedQueueEnd;
 
         // Counts the grants and coversion counts for each of the supported lock modes. These
         // counts should exactly match the aggregated modes on the granted list.
@@ -155,8 +172,9 @@ namespace mongo {
         //
 
         // Doubly-linked list of requests, which have not been granted yet because they conflict
-        // with the set of granted modes. The reason to have both begin and end pointers is to make
-        // the FIFO scheduling easier (queue at begin and take from the end).
+        // with the set of granted modes. Requests are queued at the end of the queue and are
+        // granted from the beginning forward, which gives these locks FIFO ordering. Exceptions
+        // are high-priorty locks, such as the MMAP V1 flush lock.
         LockRequest* conflictQueueBegin;
         LockRequest* conflictQueueEnd;
 
@@ -225,7 +243,7 @@ namespace mongo {
                 LockConflictsTable[mode]);
 
         LockBucket* bucket = _getBucket(resId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
         LockHead* lock;
 
@@ -251,15 +269,9 @@ namespace mongo {
         if (request->status == LockRequest::STATUS_NEW) {
             invariant(request->recursiveCount == 1);
 
-            // The flush lock must be FIFO ordered or else we will starve the dur threads and not
-            // block new writers. This means that if anyone is blocking on a mustFIFO resource we
-            // must get in line, even if we don't conflict with the grantedModes and could take the
-            // lock immediately.
-            const bool mustFIFO = (resId.getType() == RESOURCE_MMAPV1_FLUSH);
-
-            // New lock request
-            if (conflicts(mode, lock->grantedModes)
-                    || (mustFIFO && conflicts(mode, lock->conflictModes))) {
+            // New lock request. Queue after all granted modes and after any already requested
+            // conflicting modes.
+            if (conflicts(mode, lock->grantedModes) || conflicts(mode, lock->conflictModes)) {
                 request->status = LockRequest::STATUS_WAITING;
                 request->mode = mode;
                 request->convertMode = MODE_NONE;
@@ -347,9 +359,10 @@ namespace mongo {
         LockHead* lock = request->lock;
 
         LockBucket* bucket = _getBucket(lock->resourceId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
-        invariant(lock->grantedQueue != NULL);
+        invariant(lock->grantedQueueBegin != NULL);
+        invariant(lock->grantedQueueEnd != NULL);
         invariant(lock->grantedModes != 0);
 
         if (request->status == LockRequest::STATUS_WAITING) {
@@ -406,9 +419,10 @@ namespace mongo {
         LockHead* lock = request->lock;
 
         LockBucket* bucket = _getBucket(lock->resourceId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
-        invariant(lock->grantedQueue != NULL);
+        invariant(lock->grantedQueueBegin != NULL);
+        invariant(lock->grantedQueueEnd != NULL);
         invariant(lock->grantedModes != 0);
 
         lock->changeGrantedModeCount(newMode, LockHead::Increment);
@@ -421,14 +435,15 @@ namespace mongo {
     void LockManager::cleanupUnusedLocks() {
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            scoped_spinlock scopedLock(bucket->mutex);
+            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
             LockHeadMap::iterator it = bucket->data.begin();
             while (it != bucket->data.end()) {
                 LockHead* lock = it->second;
                 if (lock->grantedModes == 0) {
                     invariant(lock->grantedModes == 0);
-                    invariant(lock->grantedQueue == NULL);
+                    invariant(lock->grantedQueueBegin == NULL);
+                    invariant(lock->grantedQueueEnd == NULL);
                     invariant(lock->conflictModes == 0);
                     invariant(lock->conflictQueueBegin == NULL);
                     invariant(lock->conflictQueueEnd == NULL);
@@ -447,7 +462,7 @@ namespace mongo {
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
         // Unblock any converting requests (because conversions are still counted as granted and
         // are on the granted queue).
-        for (LockRequest* iter = lock->grantedQueue;
+        for (LockRequest* iter = lock->grantedQueueBegin;
             (iter != NULL) && (lock->conversionsCount > 0);
             iter = iter->next) {
 
@@ -516,11 +531,11 @@ namespace mongo {
 
         // This is a convenient place to check that the state of the two request queues is in sync
         // with the bitmask on the modes.
-        invariant((lock->grantedModes == 0) ^ (lock->grantedQueue != NULL));
+        invariant((lock->grantedModes == 0) ^ (lock->grantedQueueBegin != NULL));
         invariant((lock->conflictModes == 0) ^ (lock->conflictQueueBegin != NULL));
     }
 
-    LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) {
+    LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) const {
         return &_lockBuckets[resId % _numLockBuckets];
     }
 
@@ -529,9 +544,11 @@ namespace mongo {
 
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            scoped_spinlock scopedLock(bucket->mutex);
+            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
-            _dumpBucket(bucket);
+            if (!bucket->data.empty()) {
+                _dumpBucket(bucket);
+            }
         }
     }
 
@@ -544,7 +561,10 @@ namespace mongo {
             sb << "Lock @ " << lock << ": " << lock->resourceId.toString() << '\n';
 
             sb << "GRANTED:\n";
-            for (const LockRequest* iter = lock->grantedQueue; iter != NULL; iter = iter->next) {
+            for (const LockRequest* iter = lock->grantedQueueBegin;
+                 iter != NULL;
+                 iter = iter->next) {
+
                 sb << '\t'
                     << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                     << "Mode = " << modeName(iter->mode) << "; "
@@ -576,6 +596,158 @@ namespace mongo {
 
 
     //
+    // DeadlockDetector
+    //
+
+    DeadlockDetector::DeadlockDetector(const LockManager& lockMgr, const Locker* initialLocker)
+            : _lockMgr(lockMgr),
+              _initialLockerId(initialLocker->getId()),
+              _foundCycle(false) {
+
+        const ResourceId resId = initialLocker->getWaitingResource();
+
+        // If there is no resource waiting there is nothing to do
+        if (resId.isValid()) {
+            _queue.push_front(UnprocessedNode(_initialLockerId, resId));
+        }
+    }
+
+    bool DeadlockDetector::next() {
+        if (_queue.empty()) return false;
+
+        UnprocessedNode front = _queue.front();
+        _queue.pop_front();
+
+        _processNextNode(front);
+
+        return !_queue.empty();
+    }
+
+    bool DeadlockDetector::hasCycle() const {
+        invariant(_queue.empty());
+
+        return _foundCycle;
+    }
+
+    string DeadlockDetector::toString() const {
+        StringBuilder sb;
+
+        for (WaitForGraph::const_iterator it = _graph.begin(); it != _graph.end(); it++) {
+            sb << "Locker " << it->first << " waits for resource " << it->second.resId.toString()
+               << " held by [";
+
+            const ConflictingOwnersList owners = it->second.owners;
+            for (ConflictingOwnersList::const_iterator itW = owners.begin();
+                 itW != owners.end();
+                 itW++) {
+
+                sb << *itW << ", ";
+            }
+
+            sb << "]\n";
+        }
+
+        return sb.str();
+    }
+
+    void DeadlockDetector::_processNextNode(const UnprocessedNode& node) {
+        // Locate the request
+        LockManager::LockBucket* bucket = _lockMgr._getBucket(node.resId);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+
+        LockManager::LockHeadMap::const_iterator iter = bucket->data.find(node.resId);
+        if (iter == bucket->data.end()) {
+            return;
+        }
+
+        const LockHead* lock = iter->second;
+
+        LockRequest* request = lock->findRequest(node.lockerId);
+
+        // It is possible that a request which was thought to be waiting suddenly became
+        // granted, so check that before proceeding
+        if (!request || (request->status == LockRequest::STATUS_GRANTED)) {
+            return;
+        }
+
+        std::pair<WaitForGraph::iterator, bool> val =
+            _graph.insert(WaitForGraphPair(node.lockerId, Edges(node.resId)));
+        if (!val.second) {
+            // We already saw this locker id, which means we have a cycle.
+            if (!_foundCycle) {
+                _foundCycle = (node.lockerId == _initialLockerId);
+            }
+
+            return;
+        }
+
+        Edges& edges = val.first->second;
+
+        bool seen = false;
+        for (LockRequest* it = lock->grantedQueueEnd; it != NULL; it = it->prev) {
+            // We can't conflict with ourselves
+            if (it == request) {
+                seen = true;
+                continue;
+            }
+
+            // If we are a regular conflicting request, both granted and conversion modes need to
+            // be checked for conflict, since conversions will be granted first.
+            if (request->status == LockRequest::STATUS_WAITING) {
+                if (conflicts(request->mode, modeMask(it->mode)) ||
+                    conflicts(request->mode, modeMask(it->convertMode))) {
+
+                    const LockerId lockerId = it->locker->getId();
+                    const ResourceId waitResId = it->locker->getWaitingResource();
+
+                    if (waitResId.isValid()) {
+                        _queue.push_front(UnprocessedNode(lockerId, waitResId));
+                        edges.owners.push_back(lockerId);
+                    }
+                }
+
+                continue;
+            }
+
+            // If we are a conversion request, only requests, which are before us need to be
+            // accounted for.
+            invariant(request->status == LockRequest::STATUS_CONVERTING);
+
+            if (conflicts(request->convertMode, modeMask(it->mode)) ||
+                (seen && conflicts(request->convertMode, modeMask(it->convertMode)))) {
+
+                const LockerId lockerId = it->locker->getId();
+                const ResourceId waitResId = it->locker->getWaitingResource();
+
+                if (waitResId.isValid()) {
+                    _queue.push_front(UnprocessedNode(lockerId, waitResId));
+                    edges.owners.push_back(lockerId);
+                }
+            }
+        }
+
+        // All conflicting waits, which would be granted before us
+        for (LockRequest* it = request->prev;
+             (request->status == LockRequest::STATUS_WAITING) &&  (it != NULL);
+             it = it->prev) {
+
+            // We started from the previous element, so we should never see ourselves
+            invariant(it != request);
+
+            if (conflicts(request->mode, modeMask(it->mode))) {
+                const LockerId lockerId = it->locker->getId();
+                const ResourceId waitResId = it->locker->getWaitingResource();
+
+                if (waitResId.isValid()) {
+                    _queue.push_front(UnprocessedNode(lockerId, waitResId));
+                    edges.owners.push_back(lockerId);
+                }
+            }
+        }
+    }
+
+
+    //
     // ResourceId
     //
 
@@ -590,7 +762,7 @@ namespace mongo {
 #endif
     }
 
-    ResourceId::ResourceId(ResourceType type, const std::string& ns) {
+    ResourceId::ResourceId(ResourceType type, const string& ns) {
         _type = type;
         _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
 
@@ -625,7 +797,8 @@ namespace mongo {
 
     LockHead::LockHead(const ResourceId& resId)
         : resourceId(resId),
-          grantedQueue(NULL),
+          grantedQueueBegin(NULL),
+          grantedQueueEnd(NULL),
           grantedModes(0),
           conflictQueueBegin(NULL),
           conflictQueueEnd(NULL),
@@ -636,12 +809,22 @@ namespace mongo {
         memset(conflictCounts, 0, sizeof(conflictCounts));
     }
 
-    LockHead::~LockHead() {
-        invariant(grantedQueue == NULL);
-        invariant(grantedModes == 0);
-        invariant(conflictQueueBegin == NULL);
-        invariant(conflictQueueEnd == NULL);
-        invariant(conflictModes == 0);
+    LockRequest* LockHead::findRequest(LockerId lockerId) const {
+        // Check the granted queue first
+        for (LockRequest* it = grantedQueueBegin; it != NULL; it = it->next) {
+            if (it->locker->getId() == lockerId) {
+                return it;
+            }
+        }
+
+        // Check the conflict queue second
+        for (LockRequest* it = conflictQueueBegin; it != NULL; it = it->next) {
+            if (it->locker->getId() == lockerId) {
+                return it;
+            }
+        }
+
+        return NULL;
     }
 
     void LockHead::changeGrantedModeCount(LockMode mode, ChangeModeCountAction action) {
@@ -683,14 +866,24 @@ namespace mongo {
     void LockHead::addToGrantedQueue(LockRequest* request) {
         invariant(request->next == NULL);
         invariant(request->prev == NULL);
+        if (grantedQueueBegin == NULL) {
+            invariant(grantedQueueEnd == NULL);
 
-        request->next = grantedQueue;
+            request->prev = NULL;
+            request->next = NULL;
 
-        if (grantedQueue != NULL) {
-            grantedQueue->prev = request;
+            grantedQueueBegin = request;
+            grantedQueueEnd = request;
         }
+        else {
+            invariant(grantedQueueEnd != NULL);
 
-        grantedQueue = request;
+            request->prev = grantedQueueEnd;
+            request->next = NULL;
+
+            grantedQueueEnd->next = request;
+            grantedQueueEnd = request;
+        }
     }
 
     void LockHead::removeFromGrantedQueue(LockRequest* request) {
@@ -698,11 +891,14 @@ namespace mongo {
             request->prev->next = request->next;
         }
         else {
-            grantedQueue = request->next;
+            grantedQueueBegin = request->next;
         }
 
         if (request->next != NULL) {
             request->next->prev = request->prev;
+        }
+        else {
+            grantedQueueEnd = request->prev;
         }
 
         request->prev = NULL;
@@ -712,6 +908,7 @@ namespace mongo {
     void LockHead::addToConflictQueue(LockRequest* request) {
         invariant(request->next == NULL);
         invariant(request->prev == NULL);
+
         if (conflictQueueBegin == NULL) {
             invariant(conflictQueueEnd == NULL);
 
@@ -724,24 +921,11 @@ namespace mongo {
         else {
             invariant(conflictQueueEnd != NULL);
 
-            // durThread always jumps to the front of the queue
-            const bool queueAtFront = (request->lock->resourceId.getType() == RESOURCE_MMAPV1_FLUSH)
-                                   && (request->mode == MODE_X || request->mode == MODE_S);
-            if (queueAtFront) {
-                request->next = conflictQueueBegin;
-                request->prev = NULL;
+            request->prev = conflictQueueEnd;
+            request->next = NULL;
 
-                conflictQueueBegin->prev = request;
-                conflictQueueBegin = request;
-            }
-            else {
-                request->prev = conflictQueueEnd;
-                request->next = NULL;
-
-                conflictQueueEnd->next = request;
-                conflictQueueEnd = request;
-            }
-
+            conflictQueueEnd->next = request;
+            conflictQueueEnd = request;
         }
     }
 
@@ -780,6 +964,28 @@ namespace mongo {
         mode = MODE_NONE;
         convertMode = MODE_NONE;
         recursiveCount = 0;
+    }
+
+
+    //
+    // Helper calls
+    //
+
+    const char* modeName(LockMode mode) {
+        return LockNames[mode];
+    }
+
+    char legacyModeName(LockMode mode) {
+        return LegacyLockNames[mode];
+    }
+
+    bool isModeCovered(LockMode mode, LockMode coveringMode) {
+        return (LockConflictsTable[coveringMode] | LockConflictsTable[mode]) ==
+                                                        LockConflictsTable[coveringMode];
+    }
+
+    const char* resourceTypeName(ResourceType resourceType) {
+        return ResourceTypeNames[resourceType];
     }
 
 } // namespace mongo

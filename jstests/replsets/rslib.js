@@ -1,8 +1,10 @@
-
+var wait, occasionally, reconnect, getLatestOp, waitForAllMembers, reconfig, awaitOpTime;
+(function () {
+"use strict";
 var count = 0;
 var w = 0;
 
-var wait = function(f,msg) {
+wait = function(f,msg) {
     w++;
     var n = 0;
     while (!f()) {
@@ -25,16 +27,17 @@ var wait = function(f,msg) {
  * }
  * </pre>
  */
-var occasionally = function(f, n) {
+occasionally = function(f, n) {
   var interval = n || 4;
   if (count % interval == 0) {
     f();
   }
   count++;
 };
-  
-var reconnect = function(a) {
-  wait(function() { 
+
+reconnect = function(a) {
+  wait(function() {
+      var db;
       try {
         // make this work with either dbs or connections
         if (typeof(a.getDB) == "function") {
@@ -56,7 +59,7 @@ var reconnect = function(a) {
 };
 
 
-var getLatestOp = function(server) {
+getLatestOp = function(server) {
     server.getDB("admin").getMongo().setSlaveOk();
     var log = server.getDB("local")['oplog.rs'];
     var cursor = log.find({}).sort({'$natural': -1}).limit(1);
@@ -67,7 +70,7 @@ var getLatestOp = function(server) {
 };
 
 
-var waitForAllMembers = function(master, timeout) {
+waitForAllMembers = function(master, timeout) {
     var failCount = 0;
 
     assert.soon( function() {
@@ -97,7 +100,7 @@ var waitForAllMembers = function(master, timeout) {
     print( "All members are now in state PRIMARY, SECONDARY, or ARBITER" );
 };
 
-var reconfig = function(rs, config) {
+reconfig = function(rs, config) {
     "use strict";
     var admin = rs.getMaster().getDB("admin");
     var e;
@@ -111,8 +114,36 @@ var reconfig = function(rs, config) {
         }
     }
 
-    master = rs.getMaster().getDB("admin");
+    var master = rs.getMaster().getDB("admin");
     waitForAllMembers(master);
 
     return master;
 };
+
+awaitOpTime = function (node, opTime) {
+    var ts, ex;
+    assert.soon(function () {
+        try {
+            // The following statement extracts the timestamp field from the most recent element of
+            // the oplog, and stores it in "ts".
+            ts = node.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next().ts;
+            if ((ts.t == opTime.t) && (ts.i == opTime.i)) {
+                return true;
+            }
+            ex = null;
+            return false;
+        }
+        catch (ex) {
+            return false;
+        }
+    }, function () {
+        var message = "Node " + node + " only reached optime " + tojson(ts) + " not " +
+            tojson(opTime);
+        if (ex) {
+            message += "; last attempt failed with exception " + tojson(ex);
+        }
+        return message;
+    });
+};
+
+}());

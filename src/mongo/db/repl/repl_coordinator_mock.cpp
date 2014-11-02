@@ -122,12 +122,16 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::setLastOptime(OperationContext* txn,
-                                                     const OID& rid,
-                                                     const OpTime& ts) {
+    Status ReplicationCoordinatorMock::setLastOptimeForSlave(OperationContext* txn,
+                                                             const OID& rid,
+                                                             const OpTime& ts) {
         return Status::OK();
     }
     
+    void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
+        // TODO
+    }
+
     Status ReplicationCoordinatorMock::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         return Status::OK();
     }
@@ -180,6 +184,8 @@ namespace repl {
     }
 
     void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
+
+    void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
     Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         return Status::OK();

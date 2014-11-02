@@ -195,6 +195,7 @@ namespace mongo {
         std::string.  a stack trace is logged.
     */
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const std::string &msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 

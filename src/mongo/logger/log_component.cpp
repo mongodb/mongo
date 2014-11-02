@@ -93,6 +93,8 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kDefault: return createStringData("default");
         case kAccessControl: return createStringData("accessControl");
         case kCommands: return createStringData("commands");
+        case kControl: return createStringData("control");
+        case kGeo: return createStringData("geo");
         case kIndexing: return createStringData("indexing");
         case kNetworking: return createStringData("networking");
         case kQuery: return createStringData("query");
@@ -101,7 +103,6 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kStorage: return createStringData("storage");
         case kJournaling: return createStringData("journaling");
         case kWrites: return createStringData("writes");
-        case kGeo: return createStringData("geo");
         case kNumLogComponents: return createStringData("total");
         // No default. Compiler should complain if there's a log component that's not handled.
         }
@@ -137,6 +138,8 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kDefault:              return createStringData("-       ");
         case kAccessControl:        return createStringData("ACCESS  ");
         case kCommands:             return createStringData("COMMANDS");
+        case kControl:              return createStringData("CONTROL ");
+        case kGeo:                  return createStringData("GEO     ");
         case kIndexing:             return createStringData("INDEXING");
         case kNetworking:           return createStringData("NETWORK ");
         case kQuery:                return createStringData("QUERY   ");
@@ -145,7 +148,6 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kStorage:              return createStringData("STORAGE ");
         case kJournaling:           return createStringData("JOURNAL ");
         case kWrites:               return createStringData("WRITES  ");
-        case kGeo:                  return createStringData("GEO     ");
         case kNumLogComponents:     return createStringData("TOTAL   ");
         // No default. Compiler should complain if there's a log component that's not handled.
         }

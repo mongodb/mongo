@@ -237,6 +237,11 @@ namespace mongo {
         return result;
     }
 
+    bool RecordStoreV1Base::recordLikelyInPhysicalMem( OperationContext* txn,
+                                                       const DiskLoc& loc ) const {
+        return _extentManager->likelyInPhysicalMem( loc );
+    }
+
 
     StatusWith<DiskLoc> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                          const DocWriter* doc,

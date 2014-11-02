@@ -1552,7 +1552,9 @@ def doConfigure(myenv):
 
         sanitizer_list = get_option('sanitize').split(',')
 
-        using_asan = 'address' in sanitizer_list or 'leak' in sanitizer_list
+        using_lsan = 'leak' in sanitizer_list
+        using_asan = 'address' in sanitizer_list or using_lsan
+
         if using_asan:
             if get_option('allocator') == 'tcmalloc':
                 print("Cannot use address or leak sanitizer with tcmalloc")
@@ -1566,8 +1568,10 @@ def doConfigure(myenv):
         # --sanitize=address,leak:   -fsanitize=address, detect_leaks=1
         # --sanitize=address:        -fsanitize=address
         #
-        if 'leak' in sanitizer_list:
-            myenv['ENV']['ASAN_OPTIONS'] = "detect_leaks=1"
+        if using_lsan:
+            if using_asan:
+                myenv['ENV']['ASAN_OPTIONS'] = "detect_leaks=1"
+            myenv['ENV']['LSAN_OPTIONS'] = "suppressions=%s" % myenv.File("#etc/lsan.suppressions").abspath
             if 'address' in sanitizer_list:
                 sanitizer_list.remove('leak')
 
@@ -1580,12 +1584,34 @@ def doConfigure(myenv):
             print( 'Failed to enable sanitizers with flag: ' + sanitizer_option )
             Exit(1)
 
+        blackfiles_map = {
+            "address" : myenv.File("#etc/asan.blacklist"),
+            "leak" : myenv.File("#etc/asan.blacklist"),
+            "thread" : myenv.File("#etc/tsan.blacklist"),
+            "undefined" : myenv.File("#etc/ubsan.blacklist"),
+        }
+
+        blackfiles = set([v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list])
+        blacklist_options=["-fsanitize-blacklist=%s" % blackfile for blackfile in blackfiles]
+
+        for blacklist_option in blacklist_options:
+            if AddToCCFLAGSIfSupported(myenv, blacklist_option):
+                myenv.Append(LINKFLAGS=[blacklist_option])
+
         llvm_symbolizer = get_option('llvm-symbolizer')
-        if not os.path.isabs(llvm_symbolizer):
+        if os.path.isabs(llvm_symbolizer):
+            if not myenv.File(llvm_symbolizer).exists():
+                print("WARNING: Specified symbolizer '%s' not found" % llvm_symbolizer)
+                llvm_symbolizer = None
+        else:
             llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
+
         if llvm_symbolizer:
-            if using_asan:
-                myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+            myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+            myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+        elif using_lsan:
+            print("Using the leak sanitizer requires a valid symbolizer")
+            Exit(1)
 
     # When using msvc,
     # check for min version of VS2013 for fixes in std::list::splice

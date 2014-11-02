@@ -71,11 +71,12 @@ namespace {
     const char tsFieldName[] = "ts";
 }  // namespace
 
-    ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
+    ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() :
+        _nextThreadId(0) {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
     void ReplicationCoordinatorExternalStateImpl::startThreads() {
-        _backgroundSyncThread.reset(new boost::thread(runSyncThread));
+        _applierThread.reset(new boost::thread(runSyncThread));
         BackgroundSync* bgsync = BackgroundSync::get();
         _producerThread.reset(new boost::thread(stdx::bind(&BackgroundSync::producerThread,
                                                            bgsync)));
@@ -90,10 +91,10 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
         _syncSourceFeedback.shutdown();
+        _syncSourceFeedbackThread->join();
+        _applierThread->join();
         BackgroundSync* bgsync = BackgroundSync::get();
         bgsync->shutdown();
-        _syncSourceFeedbackThread->join();
-        _backgroundSyncThread->join();
         _producerThread->join();
     }
 
@@ -218,10 +219,17 @@ namespace {
     }
 
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
-        std::ostringstream sb;
-        sb << "repl" << boost::this_thread::get_id();
-        Client::initThreadIfNotAlready(sb.str().c_str());
+        stdx::function<std::string ()> f;
+        f = stdx::bind(&ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName,this);
+        Client::initThreadIfNotAlready(f);
         return new OperationContextImpl;
+    }
+
+    std::string ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName() {
+        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
+        std::ostringstream sb;
+        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
+        return sb.str();
     }
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {

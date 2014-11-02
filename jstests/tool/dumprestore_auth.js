@@ -14,7 +14,7 @@ adminDB.createUser({user: 'restore', pwd: 'password', roles: ['restore']});
 
 // Add user defined roles & users with those roles
 var testUserAdmin = c.getDB().getSiblingDB(dbName);
-var backupActions = ["find","listCollections"];
+var backupActions = ["find","listCollections", "listIndexes"];
 testUserAdmin.createRole({role: "backupFoo",
    privileges: [{resource: {db: dbName, collection: "foo"}, actions:backupActions},
                 {resource: {db: dbName, collection: "system.indexes"},

@@ -98,6 +98,11 @@ namespace repl {
         void addSelf(const HostAndPort& selfHost);
 
         /**
+         * Moves time forward in the network until the new time, and asserts if now!=newTime after
+         */
+        void assertRunUntil(Date_t newTime);
+
+        /**
          * Shorthand for getNet()->enterNetwork()
          */
         void enterNetwork();

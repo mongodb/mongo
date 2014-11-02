@@ -31,6 +31,7 @@
 #pragma once
 
 #include <boost/shared_array.hpp>
+#include <boost/shared_ptr.hpp>
 #include <map>
 
 #include "mongo/db/storage/capped_callback.h"
@@ -48,6 +49,7 @@ namespace mongo {
     class HeapRecordStore : public RecordStore {
     public:
         explicit HeapRecordStore(const StringData& ns,
+                                 boost::shared_ptr<void>* dataInOut,
                                  bool isCapped = false,
                                  int64_t cappedMaxSize = -1,
                                  int64_t cappedMaxDocs = -1,
@@ -124,38 +126,30 @@ namespace mongo {
                                      BSONObjBuilder* extraInfo = NULL,
                                      int infoLevel = 0) const;
 
-        virtual long long dataSize( OperationContext* txn ) const { return _dataSize; }
+        virtual long long dataSize( OperationContext* txn ) const { return _data->dataSize; }
 
-        virtual long long numRecords( OperationContext* txn ) const { return _records.size(); }
+        virtual long long numRecords( OperationContext* txn ) const { return _data->records.size(); }
 
     protected:
-        class HeapRecord {
-        public:
-            enum HeaderSizeValue { HeaderSize = 16 };
+        struct HeapRecord {
+            HeapRecord() :size(0) {}
+            HeapRecord(int size) :size(size), data(new char[size]) {}
 
-            int lengthWithHeaders() const {  return _lengthWithHeaders; }
-            int& lengthWithHeaders() {  return _lengthWithHeaders; }
+            RecordData toRecordData() const { return RecordData(data.get(), size); }
 
-            const char* data() const { return _data; }
-            char* data() { return _data; }
-
-            int netLength() const { return _lengthWithHeaders - HeaderSize; }
-
-            RecordData toRecordData() const { return RecordData(_data, netLength()); }
-
-        private:
-            int _lengthWithHeaders;
-            char _data[4];
+            int size;
+            boost::shared_array<char> data;
         };
 
-        virtual HeapRecord* recordFor( const DiskLoc& loc ) const;
+        virtual const HeapRecord* recordFor( const DiskLoc& loc ) const;
+        virtual HeapRecord* recordFor( const DiskLoc& loc );
 
     public:
         //
         // Not in RecordStore interface
         //
 
-        typedef std::map<DiskLoc, boost::shared_array<char> > Records;
+        typedef std::map<DiskLoc, HeapRecord> Records;
 
         bool isCapped() const { return _isCapped; }
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
@@ -163,6 +157,9 @@ namespace mongo {
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
     private:
+        class InsertChange;
+        class RemoveChange;
+
         DiskLoc allocateLoc();
         bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
@@ -172,10 +169,17 @@ namespace mongo {
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
-        int64_t _dataSize;
 
-        Records _records;
-        int64_t _nextId;
+        // This is the "persistant" data.
+        struct Data {
+            Data() :dataSize(0), nextId(1) {}
+
+            int64_t dataSize;
+            Records records;
+            int64_t nextId;
+        };
+
+        Data* const _data;
     };
 
     class HeapRecordIterator : public RecordIterator {
@@ -236,6 +240,7 @@ namespace mongo {
         OperationContext* _txn; // not owned
         HeapRecordStore::Records::const_reverse_iterator _it;
         bool _killedByInvalidate;
+        DiskLoc _savedLoc; // isNull if saved at EOF
 
         const HeapRecordStore::Records& _records;
         const HeapRecordStore& _rs;

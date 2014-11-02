@@ -150,7 +150,7 @@ t.drop();
 t.insert({_id:0})
 
 // Command, recognized, no error.
-serverStatus = db.serverStatus();
+serverStatus = db.runCommand({serverStatus:1});
 opCounters = serverStatus.opcounters
 metricsObj = serverStatus.metrics.commands
 assert.eq(opCounters.command + 1, db.serverStatus().opcounters.command); // "serverStatus" counted
@@ -163,7 +163,7 @@ assert.eq( metricsObj.serverStatus.failed,
     "failed ServerStatus command counter incremented!" )
 
 // Command, recognized, with error.
-serverStatus = db.serverStatus();
+serverStatus = db.runCommand({serverStatus:1});
 opCounters = serverStatus.opcounters
 metricsObj = serverStatus.metrics.commands
 var countVal = { "total" : 0, "failed" : 0 };
@@ -183,7 +183,7 @@ assert.eq( countVal.failed + 1,
     "failed count command counter did not increment" )
 
 // Command, unrecognized.
-serverStatus = db.serverStatus();
+serverStatus = db.runCommand({serverStatus:1});
 opCounters = serverStatus.opcounters
 metricsObj = serverStatus.metrics.commands
 res = t.runCommand("invalid");

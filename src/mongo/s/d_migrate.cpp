@@ -55,6 +55,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -277,11 +278,14 @@ namespace mongo {
             log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
                     "section" << endl;
 
-
             _deleteNotifyExec.reset( NULL );
 
-            Lock::GlobalWrite lk(txn->lockState());
-            log() << "MigrateFromStatus::done Global lock acquired" << endl;
+            // TODO: Change this. This is a bad hack for protecting some of the data structures
+            // below that were not properly synchronized with the intended latches in some
+            // usages.
+            Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(_ns), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), _ns, MODE_X);
+            log() << "MigrateFromStatus::done coll lock for " << _ns << " acquired" << endl;
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -847,11 +851,17 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            // 1. parse options
-            // 2. make sure my view is complete and lock
-            // 3. start migrate
-            //    in a read lock, get all DiskLoc and sort so we can do as little seeking as possible
-            //    tell to start transferring
+            // 1. Parse options
+            // 2. Make sure my view is complete and lock the distributed lock to ensure shard
+            //    metadata stability.
+            // 3. Migration
+            //    Retrieve all DiskLocs, which need to be migrated in order to do as little seeking
+            //    as possible during transfer. Retrieval of the DiskLocs happens under a collection
+            //    lock, but then the collection lock is dropped. This opens up an opportunity for
+            //    repair or compact to invalidate these DiskLocs, because these commands do not
+            //    synchronized with migration. Note that data modifications are not a problem,
+            //    because we are registered for change notifications.
+            //
             // 4. pause till migrate caught up
             // 5. LOCK
             //    a) update my config, essentially locking
@@ -1109,7 +1119,8 @@ namespace mongo {
             }
 
             {
-                // this gets a read lock, so we know we have a checkpoint for mods
+                // See comment at the top of the function for more information on what
+                // synchronization is used here.
                 if (!migrateFromStatus.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
                     warning() << errmsg << endl;
                     return false;
@@ -1282,7 +1293,8 @@ namespace mongo {
                 myVersion.incMajor();
 
                 {
-                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                    Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
                     verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the metadata's version up and "forget" about the chunk being moved
@@ -1317,7 +1329,9 @@ namespace mongo {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                           << " resetting shard version to: " << origShardVersion << migrateLog;
                     {
-                        Lock::GlobalWrite lk(txn->lockState());
+                        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                         log() << "moveChunk global lock acquired to reset shard version from "
                               "failed migration"
                               << endl;
@@ -1489,7 +1503,8 @@ namespace mongo {
                           << "failed migration" << endl;
 
                     {
-                        Lock::GlobalWrite lk(txn->lockState());
+                        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
@@ -1696,7 +1711,9 @@ namespace mongo {
 
             if ( getState() != DONE ) {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
-                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                 string errMsg;
                 if (!shardingState.forgetPending(txn, ns, min, max, epoch, &errMsg)) {
                     warning() << errMsg << endl;
@@ -1840,7 +1857,9 @@ namespace mongo {
 
                 {
                     // Protect the range by noting that we're now starting a migration to it
-                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                    Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                    Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                     if (!shardingState.notePending(txn, ns, min, max, epoch, &errmsg)) {
                         warning() << errmsg << endl;
                         setState(FAIL);
@@ -2251,6 +2270,7 @@ namespace mongo {
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
+                // Get global lock to wait for write to be commited to journal.
                 Lock::GlobalRead lk(txn->lockState());
 
                 // if durability is on, force a write to journal

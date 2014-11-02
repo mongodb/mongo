@@ -113,7 +113,7 @@ namespace ThreadedTests {
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
 
-            LockerImpl<true> lockState;
+            MMAPV1LockerImpl lockState(1);
             mongo::unittest::log().stream() 
                 << "Thread "
                 << boost::this_thread::get_id()
@@ -172,14 +172,16 @@ namespace ThreadedTests {
                         int q = i % 11;
                         if( q == 0 ) { 
                             Lock::DBRead r(&lockState, "foo");
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
                             ASSERT(!lockState.isRecursive());
+
                             Lock::DBRead r2(&lockState, "foo");
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
                             ASSERT(lockState.isRecursive());
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+
                             Lock::DBRead r3(&lockState, "local");
-                            ASSERT(lockState.isAtLeastReadLocked("foo"));
-                            ASSERT(lockState.isAtLeastReadLocked("local"));
+                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
+                            ASSERT(lockState.isDbLockedForMode("local", MODE_S));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock
@@ -234,11 +236,11 @@ namespace ThreadedTests {
 
         virtual void validate() {
             {
-                LockerImpl<true> ls;
+                MMAPV1LockerImpl ls(1);
                 Lock::GlobalWrite w(&ls);
             }
             {
-                LockerImpl<true> ls;
+                MMAPV1LockerImpl ls(1);
                 Lock::GlobalRead r(&ls);
             }
         }
@@ -893,5 +895,7 @@ namespace ThreadedTests {
             add< MongoMutexTest >();
             add< TicketHolderWaits >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }

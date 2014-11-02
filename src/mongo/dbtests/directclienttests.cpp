@@ -194,5 +194,7 @@ namespace DirectClientTests {
             add< BadNSUpdate >();
             add< BadNSRemove >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }

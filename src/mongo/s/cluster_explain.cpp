@@ -270,6 +270,18 @@ namespace mongo {
             BSONObj execStages = execStats["executionStages"].Obj();
 
             singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
+
+            // Append error-related fields, if present.
+            if (!execStats["executionSuccess"].eoo()) {
+                singleShardBob.append(execStats["executionSuccess"]);
+            }
+            if (!execStats["errorMessage"].eoo()) {
+                singleShardBob.append(execStats["errorMessage"]);
+            }
+            if (!execStats["errorCode"].eoo()) {
+                singleShardBob.append(execStats["errorCode"]);
+            }
+
             appendIfRoom(&singleShardBob, execStages, "executionStages");
 
             singleShardBob.doneFast();

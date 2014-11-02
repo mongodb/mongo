@@ -195,7 +195,10 @@ namespace Insert {
             add< OneIndexReverse >();
             add< OneIndexHighLow >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
+
 } // namespace Insert
 
 namespace Update {
@@ -277,7 +280,10 @@ namespace Update {
             add< Set >();
             add< SetGrow >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
+
 } // namespace Update
 
 namespace BSON {
@@ -391,7 +397,9 @@ namespace BSON {
             add< Copy<1000> >();
             add< Copy<10*1000> >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace BSON
 
@@ -461,7 +469,9 @@ namespace Index {
             add< String >();
             add< Object >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace Index
 
@@ -604,7 +614,9 @@ namespace QueryTests {
             add< GetMoreIndex >();
             add< GetMoreKeyMatchHelps >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace QueryTests
 
@@ -660,7 +672,9 @@ namespace Count {
             add< CountIndex >();
             add< CountSimpleIndex >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace Count
 
@@ -743,7 +757,10 @@ namespace Plan {
             add< Sort >();
             add< Query >();
         }
-    } all;
+    };
+
+    SuiteInstance<all> all;
+
 #endif
 } // namespace Plan
 
@@ -775,7 +792,10 @@ namespace Misc {
             add< TimeMicros64 >();
             add< JSTime >();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
+
 }
 
 int main( int argc, char **argv, char** envp ) {

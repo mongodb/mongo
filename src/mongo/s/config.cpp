@@ -198,7 +198,9 @@ namespace mongo {
                                               vector<Shard>* initShards) {
 
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
-        uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
+        uassert(13648,
+                str::stream() << "can't shard collection because not all config servers are up",
+                configServer.allUp(false));
 
         ChunkManagerPtr manager;
         
@@ -648,7 +650,7 @@ namespace mongo {
         configServer.logChange( "dropDatabase.start" , _name , BSONObj() );
 
         // 1
-        if ( ! configServer.allUp( errmsg ) ) {
+        if (!configServer.allUp(false, errmsg)) {
             LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
             return 0;
         }
@@ -667,7 +669,7 @@ namespace mongo {
             return false;
         }
 
-        if ( ! configServer.allUp( errmsg ) ) {
+        if (!configServer.allUp(false, errmsg)) {
             log() << "error removing from config server even after checking!" << endl;
             return 0;
         }
@@ -995,21 +997,38 @@ namespace mongo {
         return true;
     }
 
-    bool ConfigServer::allUp() {
+    bool ConfigServer::allUp(bool localCheckOnly) {
         string errmsg;
-        return allUp( errmsg );
+        return allUp(localCheckOnly, errmsg);
     }
 
-    bool ConfigServer::allUp( string& errmsg ) {
+    bool ConfigServer::allUp(bool localCheckOnly, string& errmsg) {
         try {
             ScopedDbConnection conn(_primary.getConnString(), 30.0);
+
+            // Note: SyncClusterConnection is different from normal connection types in
+            // that it can be instantiated even if all the config servers are down.
+            if (!conn->isStillConnected()) {
+                errmsg = str::stream() << "Not all config servers "
+                                       << _primary.toString() << " are reachable";
+                LOG(1) << errmsg;
+                return false;
+            }
+
+            if (localCheckOnly) {
+                return true;
+            }
+
+            // Note: For SyncClusterConnection, gle will only be sent to the first
+            // node, and it is not even guaranteed to be invoked.
             conn->getLastError();
             conn.done();
             return true;
         }
-        catch ( DBException& ) {
-            log() << "ConfigServer::allUp : " << _primary.toString() << " seems down!" << endl;
-            errmsg = _primary.toString() + " seems down";
+        catch (const DBException& excep) {
+            errmsg = str::stream() << "Not all config servers "
+                                   << _primary.toString() << " are reachable"
+                                   << causedBy(excep);
             return false;
         }
 

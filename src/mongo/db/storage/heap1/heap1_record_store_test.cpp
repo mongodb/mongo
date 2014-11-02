@@ -41,12 +41,14 @@ namespace mongo {
         }
 
         virtual RecordStore* newNonCappedRecordStore() {
-            return new HeapRecordStore( "a.b" );
+            return new HeapRecordStore( "a.b", &data);
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
             return new Heap1RecoveryUnit();
         }
+
+        boost::shared_ptr<void> data;
     };
 
     HarnessHelper* newHarnessHelper() {

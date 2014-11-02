@@ -53,12 +53,6 @@ namespace repl {
     // open during stepdowns
     const unsigned ScopedConn::keepOpen = 1;
 
-    void sethbmsg(const string& s, const int level) {
-        if (theReplSet) {
-            theReplSet->sethbmsg(s, level);
-        }
-    }
-
     ReplSet::ReplSet() {
     }
 

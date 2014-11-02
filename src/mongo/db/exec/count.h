@@ -66,7 +66,7 @@ namespace mongo {
      * Stage used by the count command. This stage sits at the root of a plan tree
      * and counts the number of results returned by its child stage.
      *
-     * This should not be confused with the CountStan stage. CountScan is a special
+     * This should not be confused with the CountScan stage. CountScan is a special
      * index access stage which can optimize index access for count operations in
      * some cases. On the other hand, *every* count op has a CountStage at its root.
      *

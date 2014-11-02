@@ -452,18 +452,6 @@ namespace mongo {
         ClientConnections::threadInstance()->sync();
     }
 
-    bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ) {
-        verify( _conn );
-        bool ok = _conn->runCommand( db , cmd , res );
-        if ( ! ok ) {
-            if ( res["code"].numberInt() == SendStaleConfigCode ) {
-                done();
-                throw RecvStaleConfigException( res["errmsg"].String(), res );
-            }
-        }
-        return ok;
-    }
-
     void ShardConnection::checkMyConnectionVersions( const string & ns ) {
         ClientConnections::threadInstance()->checkVersions( ns );
     }

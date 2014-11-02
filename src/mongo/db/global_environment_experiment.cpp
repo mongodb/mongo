@@ -70,4 +70,16 @@ namespace mongo {
         return false;
     }
 
+    bool isMMAPV1() {
+        if (hasGlobalEnvironment()) {
+            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if (globalStorageEngine != NULL) {
+                return globalStorageEngine->isMmapV1();
+            }
+        }
+
+        // For the purpose of unit-tests, which were written to assume MMAP V1-like behaviour
+        return true;
+    }
+
 }  // namespace mongo

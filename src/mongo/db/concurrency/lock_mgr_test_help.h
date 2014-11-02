@@ -33,6 +33,19 @@
 
 namespace mongo {
 
+    class LockerForTests : public LockerImpl<false> {
+    public:
+
+        LockerForTests(LockerId lockerId) : LockerImpl<false>(lockerId) {
+            lockGlobal(MODE_S);
+        }
+
+        ~LockerForTests() {
+            unlockAll();
+        }
+    };
+
+
     class TrackingLockGrantNotification : public LockGrantNotification {
     public:
         TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {

@@ -39,7 +39,7 @@ namespace mongo {
         explicit PlanYieldPolicy(PlanExecutor* exec);
 
         /**
-         * Used by AUTO_YIELD plan executors in order to check whether it is time to yield.
+         * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
          * PlanExecutors give up their locks periodically in order to be fair to other
          * threads.
          */
@@ -56,7 +56,7 @@ namespace mongo {
          * Returns true if the executor was restored successfully and is still alive. Returns false
          * if the executor got killed during yield.
          */
-        bool yield(bool registerPlan = false);
+        bool yield();
 
     private:
         // Default constructor disallowed in order to ensure initialization of '_planYielding'.

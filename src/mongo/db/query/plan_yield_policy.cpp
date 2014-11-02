@@ -45,10 +45,20 @@ namespace mongo {
         return _elapsedTracker.intervalHasElapsed();
     }
 
-    bool PlanYieldPolicy::yield(bool registerPlan) {
-        // This is a no-op if document-level locking is supported. Doc-level locking systems
-        // should not need to yield.
+    bool PlanYieldPolicy::yield() {
+        invariant(_planYielding);
+
+        OperationContext* opCtx = _planYielding->getOpCtx();
+        invariant(opCtx);
+
+        // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that it's
+        // time to yield. Whether or not we will actually yield (doc-level locking systems won't),
+        // we need to check if this operation has been interrupted. Throws if the interrupt flag is
+        // set.
+        opCtx->checkForInterrupt();
+
         if (supportsDocLocking()) {
+            // Doc-level locking is supported, so no need to release locks.
             return true;
         }
 
@@ -57,24 +67,12 @@ namespace mongo {
             return true;
         }
 
-        invariant(_planYielding);
-
-        if (registerPlan) {
-            _planYielding->registerExec();
-        }
-
-        OperationContext* opCtx = _planYielding->getOpCtx();
-        invariant(opCtx);
-
         _planYielding->saveState();
 
-        // Note that this call checks for interrupt, and thus can throw if interrupt flag is set.
+        // Release and reacquire locks.
         Yield::yieldAllLocks(opCtx, 1);
-        _elapsedTracker.resetLastTime();
 
-        if (registerPlan) {
-            _planYielding->deregisterExec();
-        }
+        _elapsedTracker.resetLastTime();
 
         return _planYielding->restoreState(opCtx);
     }

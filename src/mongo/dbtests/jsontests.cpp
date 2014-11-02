@@ -2931,7 +2931,9 @@ namespace JsonTests {
             add< FromJsonTests::MinKey >();
             add< FromJsonTests::MaxKey >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace JsonTests
 

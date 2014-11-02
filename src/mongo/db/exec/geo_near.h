@@ -45,7 +45,7 @@ namespace mongo {
     struct GeoNearParams {
 
         GeoNearParams() :
-            filter(NULL), addPointMeta(false), addDistMeta(false) {
+            filter(NULL), nearQuery(NULL), addPointMeta(false), addDistMeta(false) {
         }
 
         // MatchExpression to apply to the index keys and fetched documents
@@ -82,8 +82,10 @@ namespace mongo {
 
         virtual StatusWith<double> computeDistance(WorkingSetMember* member);
 
+        virtual PlanStage::StageState initialize(OperationContext* txn,
+                                                 WorkingSet* workingSet,
+                                                 Collection* collection);
     private:
-
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over
@@ -98,6 +100,9 @@ namespace mongo {
 
         // Amount to increment the next bounds by
         double _boundsIncrement;
+
+        class DensityEstimator;
+        scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
     /**
@@ -122,8 +127,10 @@ namespace mongo {
 
         virtual StatusWith<double> computeDistance(WorkingSetMember* member);
 
+        virtual PlanStage::StageState initialize(OperationContext* txn,
+                                                 WorkingSet* workingSet,
+                                                 Collection* collection);
     private:
-
         const GeoNearParams _nearParams;
 
         // The 2D index we're searching over
@@ -138,6 +145,9 @@ namespace mongo {
 
         // Amount to increment the next bounds by
         double _boundsIncrement;
+
+        class DensityEstimator;
+        scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
 } // namespace mongo

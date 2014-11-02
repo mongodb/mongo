@@ -40,11 +40,35 @@
 namespace mongo {
 
     namespace {
-        std::string catalogInfo = "_mdb_catalog";
+        const std::string catalogInfo = "_mdb_catalog";
     }
 
+    class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
+    public:
+        RemoveDBChange(KVStorageEngine* engine, const StringData& db, KVDatabaseCatalogEntry* entry)
+            : _engine(engine)
+            , _db(db.toString())
+            , _entry(entry)
+        {}
+
+        virtual void commit() {
+            delete _entry;
+        }
+
+        virtual void rollback() {
+            boost::mutex::scoped_lock lk(_engine->_dbsLock);
+            _engine->_dbs[_db] = _entry;
+        }
+
+        KVStorageEngine* const _engine;
+        const std::string _db;
+        KVDatabaseCatalogEntry* const _entry;
+    };
+
     KVStorageEngine::KVStorageEngine( KVEngine* engine )
-        : _engine( engine ), _initialized( false ) {
+        : _engine( engine )
+        , _initialized( false )
+        , _supportsDocLocking(_engine->supportsDocLocking()) {
     }
 
     void KVStorageEngine::cleanShutdown(OperationContext* txn) {
@@ -80,7 +104,7 @@ namespace mongo {
                                                             catalogInfo,
                                                             catalogInfo,
                                                             CollectionOptions() ) );
-        _catalog.reset( new KVCatalog( _catalogRecordStore.get() ) );
+        _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
         _catalog->init( &opCtx );
 
         std::vector<std::string> collections;
@@ -91,6 +115,7 @@ namespace mongo {
             NamespaceString nss( coll );
             string dbName = nss.db().toString();
 
+            // No rollback since this is only for committed dbs.
             KVDatabaseCatalogEntry*& db = _dbs[dbName];
             if ( !db ) {
                 db = new KVDatabaseCatalogEntry( dbName, this );
@@ -128,6 +153,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _dbsLock );
         KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
+            // Not registering change since db creation is implicit and never rolled back.
             db = new KVDatabaseCatalogEntry( dbName, this );
         }
         return db;
@@ -135,7 +161,7 @@ namespace mongo {
 
     Status KVStorageEngine::closeDatabase( OperationContext* txn, const StringData& db ) {
         invariant( _initialized );
-        // todo: do I have to suppor this?
+        // This is ok to be a no-op as there is no database layer in kv.
         return Status::OK();
     }
 
@@ -151,6 +177,13 @@ namespace mongo {
             entry = it->second;
         }
 
+        // This is called outside of a WUOW since MMAPv1 has unfortunate behavior around dropping
+        // databases. We need to create one here since we want db dropping to all-or-nothing
+        // wherever possible. Eventually we want to move this up so that it can include the logOp
+        // inside of the WUOW, but that would require making DB dropping happen inside the Dur
+        // system for MMAPv1.
+        WriteUnitOfWork wuow(txn);
+
         std::list<std::string> toDrop;
         entry->getCollectionNamespaces( &toDrop );
 
@@ -164,21 +197,39 @@ namespace mongo {
 
         {
             boost::mutex::scoped_lock lk( _dbsLock );
+            txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }
+
+        wuow.commit();
         return Status::OK();
     }
 
     int KVStorageEngine::flushAllFiles( bool sync ) {
-        // todo: do I have to support this?
-        return 0;
+        return _engine->flushAllFiles( sync );
+    }
+
+    bool KVStorageEngine::isDurable() const {
+        return _engine->isDurable();
     }
 
     Status KVStorageEngine::repairDatabase( OperationContext* txn,
                                             const std::string& dbName,
                                             bool preserveClonedFilesOnFailure,
                                             bool backupOriginalFiles ) {
-        // todo: do I have to support this?
+        if ( preserveClonedFilesOnFailure ) {
+            return Status( ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported" );
+        }
+        if ( backupOriginalFiles ) {
+            return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
+        }
+
+        vector<string> idents = _catalog->getAllIdentsForDB( dbName );
+        for ( size_t i = 0; i < idents.size(); i++ ) {
+            Status status = _engine->repairIdent( txn, idents[i] );
+            if ( !status.isOK() )
+                return status;
+        }
         return Status::OK();
     }
 

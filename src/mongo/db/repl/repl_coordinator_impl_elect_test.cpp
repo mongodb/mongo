@@ -32,6 +32,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
@@ -138,6 +139,17 @@ namespace {
 
         ASSERT(getReplCoord()->getCurrentMemberState().primary()) <<
             getReplCoord()->getCurrentMemberState().toString();
+        ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+
+        // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+        IsMasterResponse imResponse;
+        getReplCoord()->fillIsMasterForReplSet(&imResponse);
+        ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
+        ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+        getReplCoord()->signalDrainComplete();
+        getReplCoord()->fillIsMasterForReplSet(&imResponse);
+        ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
+        ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
     }
 
     TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
@@ -170,9 +182,8 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OID selfRID = getReplCoord()->getMyRID();
         OpTime time1(100, 1);
-        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        getReplCoord()->setMyLastOptime(&txn, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();
@@ -218,9 +229,8 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OID selfRID = getReplCoord()->getMyRID();
         OpTime time1(100, 1);
-        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        getReplCoord()->setMyLastOptime(&txn, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();

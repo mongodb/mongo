@@ -75,12 +75,12 @@ namespace mongo {
         };
 
         /**
-         * The yielding policy of the plan executor.  By default, a runner does not yield itself
+         * The yielding policy of the plan executor.  By default, an executor does not yield itself
          * (YIELD_MANUAL).
          */
         enum YieldPolicy {
-            // Any call to getNext() may yield.  In particular, the runner may be killed during any
-            // call to getNext().  If this occurs, getNext() will return RUNNER_DEAD.
+            // Any call to getNext() may yield. In particular, the executor may be killed during any
+            // call to getNext().  If this occurs, getNext() will return DEAD.
             YIELD_AUTO,
 
             // Owner must yield manually if yields are requested.  How to yield yourself:
@@ -109,13 +109,13 @@ namespace mongo {
         //
         // On success, return a new PlanExecutor, owned by the caller, through 'out'.
         //
-        // Passing YIELD_AUTO to any of these factories will construct a yielding runner which
+        // Passing YIELD_AUTO to any of these factories will construct a yielding executor which
         // may yield in the following circumstances:
         //   1) During plan selection inside the call to make().
         //   2) On any call to getNext().
         //   3) While executing the plan inside executePlan().
         //
-        // The runner will also be automatically registered to receive notifications in the
+        // The executor will also be automatically registered to receive notifications in the
         // case of YIELD_AUTO, so no further calls to registerExec() or setYieldPolicy() are
         // necessary.
         //
@@ -245,7 +245,7 @@ namespace mongo {
          *
          * For write operations, the return depends on the particulars of the write stage.
          *
-         * If an AUTO_YIELD policy is set, then this method may yield.
+         * If a YIELD_AUTO policy is set, then this method may yield.
          */
         ExecState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
@@ -261,7 +261,7 @@ namespace mongo {
          * Execute the plan to completion, throwing out the results.  Used when you want to work the
          * underlying tree without getting results back.
          *
-         * If an AUTO_YIELD policy is set on this executor, then this will automatically yield.
+         * If a YIELD_AUTO policy is set on this executor, then this will automatically yield.
          */
         Status executePlan();
 
@@ -367,7 +367,7 @@ namespace mongo {
          * If the tree contains plan selection stages, such as MultiPlanStage or SubplanStage,
          * this calls into their underlying plan selection facilities. Otherwise, does nothing.
          *
-         * If an AUTO_YIELD policy is set (and document-level locking is not supported), then
+         * If a YIELD_AUTO policy is set (and document-level locking is not supported), then
          * locks are yielded during plan selection.
          */
         Status pickBestPlan(YieldPolicy policy);

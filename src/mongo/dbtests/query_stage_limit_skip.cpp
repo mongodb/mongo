@@ -98,6 +98,8 @@ namespace {
         void setupTests() {
             add<QueryStageLimitSkipBasicTest>();
         }
-    }  queryStageLimitSkipAll;
+    };
+
+    SuiteInstance<All> queryStageLimitSkipAll;
 
 }  // namespace

@@ -125,6 +125,10 @@ namespace mongo {
             for (size_t i = 0; i < iterators.size(); i++) {
                 PlanExecutor* theExec = execs[i % execs.size()];
                 MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
+
+                // This wasn't called above as they weren't assigned yet
+                iterators[i]->saveState();
+
                 mis->addIterator(iterators.releaseAt(i));
             }
 

@@ -128,6 +128,20 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
+                                          const StringData& fieldName,
+                                          const OID& defaultValue,
+                                          OID* out) {
+        Status status = bsonExtractOIDField(object, fieldName, out);
+        if (status == ErrorCodes::NoSuchKey) {
+            *out = defaultValue;
+        }
+        else if (!status.isOK()) {
+            return status;
+        }
+        return Status::OK();
+    }
+
     Status bsonExtractStringFieldWithDefault(const BSONObj& object,
                                              const StringData& fieldName,
                                              const StringData& defaultValue,

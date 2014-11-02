@@ -57,6 +57,10 @@ namespace repl {
             IsMasterResponse isMasterResponse;
             replCoord->fillIsMasterForReplSet(&isMasterResponse);
             result.appendElements(isMasterResponse.toBSON());
+            replCoord->processReplSetGetRBID(&result);
+            if (level) {
+                replCoord->appendSlaveInfoData(&result);
+            }
             return;
         }
         
@@ -126,6 +130,8 @@ namespace repl {
             }
             
             sources.done();
+
+            replCoord->appendSlaveInfoData(&result);
         }
     }
     

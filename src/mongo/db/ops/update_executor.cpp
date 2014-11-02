@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrites
 
 #include "mongo/platform/basic.h"
 
@@ -115,7 +115,9 @@ namespace mongo {
 
         // The update stage does not create its own collection.  As such, if the update is
         // an upsert, create the collection that the update stage inserts into beforehand.
-        if (!collection && _request->isUpsert()) {
+        // We can only create the collection if this is not an explain, as explains should not
+        // alter the state of the database.
+        if (!collection && _request->isUpsert() && !_request->isExplain()) {
             OperationContext* const txn = _request->getOpCtx();
 
             // We have to have an exclsive lock on the db to be allowed to create the collection.
@@ -268,6 +270,7 @@ namespace mongo {
                                                      &cqRaw,
                                                      whereCallback);
         if (status.isOK()) {
+            cqRaw->setIsForWrite( true );
             _canonicalQuery.reset(cqRaw);
             _isQueryParsed = true;
         }

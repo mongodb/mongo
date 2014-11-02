@@ -295,11 +295,6 @@ namespace mongo {
         
         bool ok() const { return _conn != NULL; }
 
-        /**
-           this just passes through excpet it checks for stale configs
-         */
-        bool runCommand( const std::string& db , const BSONObj& cmd , BSONObj& res );
-
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const std::string & ns );
 

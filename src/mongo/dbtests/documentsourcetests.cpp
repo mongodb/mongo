@@ -1986,6 +1986,8 @@ namespace DocumentSourceTests {
             add<DocumentSourceMatch::RedactSafePortion>();
             add<DocumentSourceMatch::Coalesce>();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace DocumentSourceTests

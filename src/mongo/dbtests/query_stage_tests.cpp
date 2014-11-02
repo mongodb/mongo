@@ -227,6 +227,8 @@ namespace QueryStageTests {
             add<QueryStageIXScanLowerUpperInclFilter>();
             add<QueryStageIXScanCantMatch>();
         }
-    }  queryStageTestsAll;
+    };
+
+    SuiteInstance<All> queryStageTestsAll;
 
 }  // namespace

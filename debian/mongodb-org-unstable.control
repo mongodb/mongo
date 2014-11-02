@@ -1,5 +1,5 @@
 Source: mongodb-org-unstable
-Section: devel
+Section: database
 Priority: optional
 Maintainer: Ernie Hershey <ernie.hershey@mongodb.com>
 Build-Depends: 

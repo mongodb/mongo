@@ -297,6 +297,22 @@ namespace mongo {
                 bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             }
         }
+        else if (STAGE_GEO_NEAR_2D == stats.stageType
+                || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
+            NearStats* spec = static_cast<NearStats*>(stats.specific.get());
+
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
+                BSONArrayBuilder intervalsBob(bob->subarrayStart("searchIntervals"));
+                for (vector<IntervalStats>::const_iterator it = spec->intervalStats.begin();
+                        it != spec->intervalStats.end(); ++it) {
+                    BSONObjBuilder intervalBob(intervalsBob.subobjStart());
+                    intervalBob.append("minDistance", it->minDistanceAllowed);
+                    intervalBob.append("maxDistance", it->maxDistanceAllowed);
+                    intervalBob.append("maxInclusive", it->inclusiveMaxDistanceAllowed);
+                }
+                intervalsBob.doneFast();
+            }
+        }
         else if (STAGE_GROUP == stats.stageType) {
             GroupStats* spec = static_cast<GroupStats*>(stats.specific.get());
             if (verbosity >= ExplainCommon::EXEC_STATS) {
@@ -317,9 +333,12 @@ namespace mongo {
             bob->appendBool("isMultiKey", spec->isMultiKey);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-            // Bounds can get large. Truncate to 1 MB.
-            static const int kMaxBoundsSize = 1024 * 1024;
-            bob->append("indexBounds", spec->indexBoundsVerbose.substr(0, kMaxBoundsSize));
+            if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
+                bob->append("warning", "index bounds omitted due to BSON size limit");
+            }
+            else {
+                bob->append("indexBounds", spec->indexBounds);
+            }
 
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("keysExamined", spec->keysExamined);
@@ -535,9 +554,9 @@ namespace mongo {
     }
 
     // static
-    Status Explain::explainStages(PlanExecutor* exec,
-                                  ExplainCommon::Verbosity verbosity,
-                                  BSONObjBuilder* out) {
+    void Explain::explainStages(PlanExecutor* exec,
+                                ExplainCommon::Verbosity verbosity,
+                                BSONObjBuilder* out) {
         //
         // Step 1: run the stages as required by the verbosity level.
         //
@@ -554,11 +573,9 @@ namespace mongo {
         }
 
         // If we need execution stats, then run the plan in order to gather the stats.
+        Status executePlanStatus = Status::OK();
         if (verbosity >= ExplainCommon::EXEC_STATS) {
-            Status s = exec->executePlan();
-            if (!s.isOK()) {
-                return s;
-            }
+            executePlanStatus = exec->executePlan();
         }
 
         //
@@ -585,6 +602,14 @@ namespace mongo {
 
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             BSONObjBuilder execBob(out->subobjStart("executionStats"));
+
+            // If there is an execution error while running the query, the error is reported under
+            // the "executionStats" section and the explain as a whole succeeds.
+            execBob.append("executionSuccess", executePlanStatus.isOK());
+            if (!executePlanStatus.isOK()) {
+                execBob.append("errorMessage", executePlanStatus.reason());
+                execBob.append("errorCode", executePlanStatus.code());
+            }
 
             // Generate exec stats BSON for the winning plan.
             OperationContext* opCtx = exec->getOpCtx();
@@ -616,8 +641,6 @@ namespace mongo {
         }
 
         generateServerInfo(out);
-
-        return Status::OK();
     }
 
     // static
