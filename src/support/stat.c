@@ -446,8 +446,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "reconciliation: page reconciliation calls for eviction";
-	stats->rec_skipped_update.desc =
-	    "reconciliation: reconciliation failed because an update could not be included";
 	stats->rec_split_stashed_bytes.desc =
 	    "reconciliation: split bytes currently awaiting free";
 	stats->rec_split_stashed_objects.desc =
@@ -562,7 +560,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->read_io.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
-	stats->rec_skipped_update.v = 0;
 	stats->rwlock_read.v = 0;
 	stats->rwlock_write.v = 0;
 	stats->txn_begin.v = 0;
