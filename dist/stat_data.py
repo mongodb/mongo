@@ -18,9 +18,9 @@ import sys
 
 class Stat:
     def __init__(self, name, tag, desc, flags=''):
-        self.name = name
-        self.desc = tag + ': ' + desc
-        self.flags = flags
+	self.name = name
+	self.desc = tag + ': ' + desc
+	self.flags = flags
 
     def __cmp__(self, other):
 	return cmp(self.name, other.name)
