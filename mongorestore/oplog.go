@@ -9,20 +9,21 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const OplogMaxCommandSize = 1024 * 1024 * 16.5
 
-//TODO move this to common if any of the other tools need it
 type Oplog struct {
-	Timestamp bson.MongoTimestamp `bson:"ts"`
-	HistoryID int64               `bson:"h"`
-	Version   int                 `bson:"v"`
-	Operation string              `bson:"op"`
-	Namespace string              `bson:"ns"`
-	Object    bson.M              `bson:"o"`
-	Query     bson.M              `bson:"o2"`
+	Timestamp bson.MongoTimestamp `bson:"ts,omitempty"`
+	HistoryID int64               `bson:"h,omitempty"`
+	Version   int                 `bson:"v,omitempty"`
+	Operation string              `bson:"op,omitempty"`
+	Namespace string              `bson:"ns,omitempty"`
+	Object    bson.M              `bson:"o,omitempty"`
+	Query     bson.M              `bson:"o2,omitempty"`
 }
 
 func (restore *MongoRestore) RestoreOplog() error {
@@ -53,6 +54,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	var totalBytes, entrySize, bufferedBytes int
 
 	bar := progress.ProgressBar{
+		Name:       "oplog",
 		Max:        int(size),
 		CounterPtr: &totalBytes,
 		WaitTime:   3 * time.Second,
@@ -83,15 +85,24 @@ func (restore *MongoRestore) RestoreOplog() error {
 			bufferedBytes = 0
 		}
 
-		entryAsD := bson.D{}
-		err = bson.Unmarshal(rawOplogEntry.Data, &entryAsD)
+		entryAsOplog := Oplog{}
+		err = bson.Unmarshal(rawOplogEntry.Data, &entryAsOplog)
 		if err != nil {
 			return fmt.Errorf("error reading oplog: %v", err)
+		}
+		if !restore.TimestampBeforeLimit(entryAsOplog.Timestamp) {
+			log.Logf(
+				log.DebugLow,
+				"timestamp %v is not below limit of %v; ending oplog restoration",
+				entryAsOplog.Timestamp,
+				restore.oplogLimit,
+			)
+			break
 		}
 
 		bufferedBytes += entrySize
 		totalBytes += entrySize
-		entryArray = append(entryArray, entryAsD)
+		entryArray = append(entryArray, entryAsOplog)
 	}
 	// finally, flush the remaining entries
 	if len(entryArray) > 0 {
@@ -118,4 +129,47 @@ func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{
 	}
 
 	return nil
+}
+
+// OplogTimestampIsValid returns whether the given timestamp is allowed to be
+// applied to mongorestore's target database.
+func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
+	if restore.oplogLimit == 0 {
+		// always valid if there is no --oplogLimit set
+		return true
+	}
+	return ts < restore.oplogLimit
+}
+
+// ParseTimestampFlag takes in a string the form of <time_t>:<ordinal>,
+// where <time_t> is the seconds since the UNIX epoch, and <ordinal> represents
+// a counter of operations in the oplog that occurred in the specified second.
+// It parses this timestamp string and returns a bson.MongoTimestamp type.
+func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
+	var seconds, increment int
+	timestampFields := strings.Split(ts, ":")
+	if len(timestampFields) > 2 {
+		return 0, fmt.Errorf("too many : characters")
+	}
+
+	seconds, err := strconv.Atoi(timestampFields[0])
+	if err != nil {
+		return 0, fmt.Errorf("error parsing timestamp seconds: %v", err)
+	}
+
+	// parse the increment field if it exists
+	if len(timestampFields) == 2 {
+		if len(timestampFields[1]) > 0 {
+			increment, err = strconv.Atoi(timestampFields[1])
+			if err != nil {
+				return 0, fmt.Errorf("error parsing timestamp increment: %v", err)
+			}
+		} else {
+			// handle the case where the user writes "<time_t>:" with no ordinal
+			increment = 0
+		}
+	}
+
+	timestamp := (int64(seconds) << 32) | int64(increment)
+	return bson.MongoTimestamp(timestamp), nil
 }

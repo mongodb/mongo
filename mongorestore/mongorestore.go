@@ -9,6 +9,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type MongoRestore struct {
@@ -28,6 +29,7 @@ type MongoRestore struct {
 	safety          *mgo.Safe
 	progressManager *progress.Manager
 	objCheck        bool
+	oplogLimit      bson.MongoTimestamp
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {
@@ -51,6 +53,17 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 	if restore.ToolOptions.DB == "" && restore.ToolOptions.Collection != "" {
 		return fmt.Errorf("cannot dump a collection without a specified database")
+	}
+
+	if restore.InputOptions.OplogLimit != "" {
+		if !restore.InputOptions.OplogReplay {
+			return fmt.Errorf("cannot use --oplogLimit without --oplogReplay enabled")
+		}
+		var err error
+		restore.oplogLimit, err = ParseTimestampFlag(restore.InputOptions.OplogLimit)
+		if err != nil {
+			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err) //TODO help text?
+		}
 	}
 
 	if restore.OutputOptions.WriteConcern > 0 {
