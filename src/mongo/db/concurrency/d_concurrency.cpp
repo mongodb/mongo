@@ -287,6 +287,19 @@ namespace mongo {
         }
     }
 
+    void Lock::CollectionLock::relockWithMode(LockMode mode, Lock::DBLock& dbLock ) {
+        if (supportsDocLocking() || enableCollectionLocking) {
+            _lockState->unlock(_id);
+        }
+
+        dbLock.relockWithMode( mode );
+
+        if (supportsDocLocking() || enableCollectionLocking) {
+            _lockState->lock(_id, mode);
+        }
+
+    }
+
     Lock::ResourceLock::ResourceLock(Locker* lockState, ResourceId rid, LockMode mode)
             : _rid(rid),
               _lockState(lockState) {

@@ -279,7 +279,14 @@ namespace mongo {
           _autodb(opCtx, _nss.db(), MODE_IX),
           _collk(opCtx->lockState(), ns, MODE_IX),
           _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
-          }
+        _collection = _c.db()->getCollection( _txn, ns );
+        if ( !_collection && !_autodb.justCreated() ) {
+            // relock in MODE_X
+            _collk.relockWithMode( MODE_X, _autodb.lock() );
+            Database* db = dbHolder().get(_txn, ns );
+            invariant( db == _c.db() );
+        }
+    }
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {
