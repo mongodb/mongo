@@ -72,8 +72,11 @@ wait(function() {
     catch(e) {
         print(e);
     }
-    reconnect(master);
+    // master will likely step down (and close all connections) sometime after the reconfig if it
+    // thinks the newly re-added secondary is down.  So wait for that then reconnect the connection
+    // we are using.
     replTest.awaitReplication();
+    reconnect(master);
 
     printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
     master.setSlaveOk();
