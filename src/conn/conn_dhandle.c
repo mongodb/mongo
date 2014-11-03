@@ -37,8 +37,7 @@ __conn_dhandle_open_lock(
 	 * and WT_DHANDLE_OPEN is still not set, we need to do the open.
 	 */
 	for (;;) {
-		if (!want_exclusive &&
-		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+		if (!want_exclusive && F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
 
 		/*
