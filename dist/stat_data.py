@@ -23,7 +23,7 @@ class Stat:
 	self.flags = flags
 
     def __cmp__(self, other):
-	return cmp(self.name, other.name)
+	return cmp(self.desc.lower(), other.desc.lower())
 
 class AsyncStat(Stat):
     def __init__(self, name, desc, flags=''):
