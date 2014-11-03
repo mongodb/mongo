@@ -364,10 +364,10 @@ namespace PerfTests {
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
+            Client::initThreadIfNotAlready("perftestthr");
             OperationContextImpl txn;
             DBDirectClient c(&txn);
 
-            Client::initThreadIfNotAlready("perftestthr");
             const unsigned int Batch = batchSize();
             while( 1 ) {
                 unsigned int i = 0;

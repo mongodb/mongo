@@ -59,11 +59,11 @@ namespace mongo {
     }
 
     void IndexBuilder::run() {
+        Client::initThread(name().c_str());
         LOG(2) << "IndexBuilder building index " << _index;
 
         OperationContextImpl txn;
 
-        Client::initThread(name().c_str());
         Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
 
         txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
