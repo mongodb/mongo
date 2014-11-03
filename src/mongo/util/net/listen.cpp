@@ -235,6 +235,13 @@ namespace mongo {
         _logListen(_port, false);
 #endif
 
+        {
+            // Wake up any threads blocked in waitUntilListening()
+            boost::lock_guard<boost::mutex> lock(_readyMutex);
+            _ready = true;
+            _readyCondition.notify_all();
+        }
+
         struct timeval maxSelectTime;
         while ( ! inShutdown() ) {
             fd_set fds[1];
@@ -403,6 +410,13 @@ namespace mongo {
         _logListen(_port, false);
 #endif
 
+        {
+            // Wake up any threads blocked in waitUntilListening()
+            boost::lock_guard<boost::mutex> lock(_readyMutex);
+            _ready = true;
+            _readyCondition.notify_all();
+        }
+
         OwnedPointerVector<EventHolder> eventHolders;
         boost::scoped_array<WSAEVENT> events(new WSAEVENT[_socks.size()]);
         
@@ -546,6 +560,12 @@ namespace mongo {
         log() << _name << ( _name.size() ? " " : "" ) << "waiting for connections on port " << port << ( ssl ? " ssl" : "" ) << endl;
     }
 
+    void Listener::waitUntilListening() const {
+        boost::unique_lock<boost::mutex> lock(_readyMutex);
+        while (!_ready) {
+            _readyCondition.wait(lock);
+        }
+    }
 
     void Listener::accepted(boost::shared_ptr<Socket> psocket, long long connectionId ) {
         MessagingPort* port = new MessagingPort(psocket);

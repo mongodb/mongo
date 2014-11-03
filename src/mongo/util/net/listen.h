@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <set>
 #include <string>
 #include <vector>
@@ -81,6 +83,8 @@ namespace mongo {
             _timeTracker = this;
         }
 
+        // TODO(spencer): Remove this and get the global Listener via the
+        // globalEnvironmentExperiment
         static const Listener* getTimeTracker() {
             return _timeTracker;
         }
@@ -93,6 +97,12 @@ namespace mongo {
             return 0;
         }
 
+        /**
+         * Blocks until initAndListen has been called on this instance and gotten far enough that
+         * it is ready to receive incoming network requests.
+         */
+        void waitUntilListening() const;
+
     private:
         std::vector<SockAddr> _mine;
         std::vector<SOCKET> _socks;
@@ -101,6 +111,10 @@ namespace mongo {
         bool _setupSocketsSuccessful;
         bool _logConnect;
         long long _elapsedTime;
+        mutable boost::mutex _readyMutex; // Protects _ready
+        mutable boost::condition_variable _readyCondition; // Used to wait for changes to _ready
+        // Boolean that indicates whether this Listener is ready to accept incoming network requests
+        bool _ready;
         
 #ifdef MONGO_SSL
         SSLManagerInterface* _ssl;
