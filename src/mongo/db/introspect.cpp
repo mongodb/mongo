@@ -81,7 +81,10 @@ namespace {
     }
 } // namespace
 
-    static void _profile(OperationContext* txn,
+    /**
+     * @return if collection existed or was created
+     */
+    static bool _profile(OperationContext* txn,
                          const Client& c,
                          Database* db,
                          CurOp& currentOp,
@@ -128,7 +131,9 @@ namespace {
         Collection* profileCollection = getOrCreateProfileCollection(txn, db);
         if ( profileCollection ) {
             profileCollection->insertDocument( txn, p, false );
+            return true;
         }
+        return false;
     }
 
     void profile(OperationContext* txn, const Client& c, int op, CurOp& currentOp) {
@@ -136,32 +141,45 @@ namespace {
         // doing this outside the dblock to improve performance
         BufBuilder profileBufBuilder(1024);
 
-        try {
-            // NOTE: It's kind of weird that we lock the op's namespace, but have to for now
-            // since we're sometimes inside the lock already
-            const string dbname(nsToDatabase(currentOp.getNS()));
-            scoped_ptr<Lock::DBLock> lk;
-            if ( !txn->lockState()->isDbLockedForMode( dbname, MODE_IX ) ) {
-                lk.reset( new Lock::DBLock( txn->lockState(), dbname, MODE_IX) );
+        bool tryAgain = false;
+        while ( 1 ) {
+            try {
+                // NOTE: It's kind of weird that we lock the op's namespace, but have to for now
+                // since we're sometimes inside the lock already
+                const string dbname(nsToDatabase(currentOp.getNS()));
+                scoped_ptr<Lock::DBLock> lk;
+
+                // todo: this can be slow, perhaps can re-work
+                if ( !txn->lockState()->isDbLockedForMode( dbname, MODE_IX ) ) {
+                    lk.reset( new Lock::DBLock( txn->lockState(),
+                                                dbname,
+                                                tryAgain ? MODE_X : MODE_IX) );
+                }
+                Database* db = dbHolder().get(txn, dbname);
+                if (db != NULL) {
+                    // We want the profiling to happen in a different WUOW from the actual op.
+                    Lock::CollectionLock clk(txn->lockState(), db->getProfilingNS(), MODE_X);
+                    WriteUnitOfWork wunit(txn);
+                    Client::Context cx(txn, currentOp.getNS(), false);
+                    if ( !_profile(txn, c, cx.db(), currentOp, profileBufBuilder ) && lk.get() ) {
+                        // we took an IX lock, so now we try again with an X lock
+                        tryAgain = true;
+                        continue;
+                    }
+                    wunit.commit();
+                }
+                else {
+                    mongo::log() << "note: not profiling because db went away - "
+                                 << "probably a close on: " << currentOp.getNS();
+                }
+                return;
             }
-            Database* db = dbHolder().get(txn, dbname);
-            if (db != NULL) {
-                // We are ok with the profiling happening in a different WUOW from the actual op.
-                Lock::CollectionLock clk(txn->lockState(), db->getProfilingNS(), MODE_X);
-                WriteUnitOfWork wunit(txn);
-                Client::Context cx(txn, currentOp.getNS(), false);
-                _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
-                wunit.commit();
+            catch (const AssertionException& assertionEx) {
+                warning() << "Caught Assertion while trying to profile " << opToString(op)
+                          << " against " << currentOp.getNS()
+                          << ": " << assertionEx.toString() << endl;
+                return;
             }
-            else {
-                mongo::log() << "note: not profiling because db went away - probably a close on: "
-                             << currentOp.getNS() << endl;
-            }
-        }
-        catch (const AssertionException& assertionEx) {
-            warning() << "Caught Assertion while trying to profile " << opToString(op)
-                      << " against " << currentOp.getNS()
-                      << ": " << assertionEx.toString() << endl;
         }
     }
 
@@ -193,6 +211,11 @@ namespace {
                 log() << "profile: warning ns " << profileName << " does not exist" << endl;
                 last = time(0);
             }
+            return NULL;
+        }
+
+        if ( !txn->lockState()->isDbLockedForMode( db->name(), MODE_X ) ) {
+            // can't create here
             return NULL;
         }
 
