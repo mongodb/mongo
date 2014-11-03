@@ -382,15 +382,13 @@ func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error
 	return mongoImport.tomb.Wait()
 }
 
-// newSession establishes a new session with properly configured settings. It
-// returns the session created with if there are no errors. If an error is
-// encountered, it returns nil and the error
-func (mongoImport *MongoImport) newSession() (session *mgo.Session, err error) {
-	session, err = mongoImport.SessionProvider.GetSession()
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to mongod: %v", err)
-	}
-
+// configureSession takes in a session and modifies it with properly configured
+// settings. It does the following configurations:
+//
+// 1. Sets the session to not timeout
+// 2. Sets 'w' for the write concern
+//
+func (mongoImport *MongoImport) configureSession(session *mgo.Session) {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
 
@@ -414,20 +412,18 @@ func (mongoImport *MongoImport) newSession() (session *mgo.Session, err error) {
 		sessionSafety.WMode = ""
 	}
 	session.SetSafe(sessionSafety)
-	return session, nil
 }
 
 // ingestDocuments is a helper to IngestDocuments - it reads document off the
 // read channel and prepares then for insertion into the database
 func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
-	session, err := mongoImport.newSession()
+	session, err := mongoImport.SessionProvider.GetSession()
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to mongod: %v", err)
 	}
 	defer session.Close()
-
+	mongoImport.configureSession(session)
 	collection := session.DB(mongoImport.ToolOptions.DB).C(mongoImport.ToolOptions.Collection)
-
 	ignoreBlanks := mongoImport.IngestOptions.IgnoreBlanks && mongoImport.InputOptions.Type != JSON
 	documentBytes := make([]byte, 0)
 	documents := make([]bson.Raw, 0)
