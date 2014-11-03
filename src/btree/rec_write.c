@@ -2487,7 +2487,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * the parent's reconciliation.  A page with skipped updates isn't truly
 	 * empty, continue on.
 	 */
-	if (r->entries == 0 && r->skip == NULL)
+	if (r->entries == 0 && r->skip_next == 0)
 		return (0);
 
 	/* Set the boundary reference and increment the count. */
@@ -2514,10 +2514,10 @@ static int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	/* We're done reconciling - write the final page */
-	if (r->raw_compression) {
+	if (r->raw_compression && r->entries != 0) {
 		while (r->entries != 0)
 			WT_RET(__rec_split_raw_worker(session, r, 1));
-	} else if (r->entries != 0)
+	} else
 		WT_RET(__rec_split_finish_std(session, r));
 
 	return (0);
