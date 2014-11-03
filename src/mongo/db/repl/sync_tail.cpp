@@ -37,6 +37,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -245,6 +246,12 @@ namespace repl {
                 LockMode mode = createCollection ? MODE_X : MODE_IX;
                 lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
                 lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+
+                if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
+                    // need to create database, try again
+                    continue;
+                }
+
             } else if (isIndexBuild) {
                 lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
                 lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, MODE_X));

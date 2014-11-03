@@ -42,6 +42,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/concurrency/deadlock.h"
 #include "mongo/db/ops/delete_executor.h"
@@ -940,9 +941,20 @@ namespace mongo {
             intentLock = false; // can't build indexes in intent mode
 
         invariant(!_context.get());
+        const NamespaceString nss(request->getNS());
+        _collLock.reset(); // give up locks if any
+        _writeLock.reset();
         _writeLock.reset(new Lock::DBLock(txn->lockState(),
-                                          nsToDatabase(request->getNS()),
+                                          nss.db(),
                                           intentLock ? MODE_IX : MODE_X));
+        if (intentLock && dbHolder().get(txn, nss.db()) == NULL) {
+            // Ensure exclusive lock in case the database doesn't yet exist
+            _writeLock.reset();
+            _writeLock.reset(new Lock::DBLock(txn->lockState(),
+                                              nss.db(),
+                                              MODE_X));
+            intentLock = false;
+        }
         _collLock.reset(new Lock::CollectionLock(txn->lockState(),
                                                  request->getNS(),
                                                  intentLock ? MODE_IX : MODE_X));
@@ -956,6 +968,7 @@ namespace mongo {
             return false;
         }
 
+        _context.reset();
         _context.reset(new Client::Context(txn, request->getNS(), false));
 
         Database* database = _context->db();
@@ -1190,9 +1203,33 @@ namespace mongo {
             if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
                 return;
 
+            Database* const db = dbHolder().get(txn, nsString.db());
+
+            if (db == NULL) {
+                if (createCollection) {
+                    // we raced with some, accept defeat
+                    result->getStats().nModified = 0;
+                    result->getStats().n = 0;
+                    return;
+                }
+
+                // Database not yet created
+                if (!request.isUpsert()) {
+                    // not an upsert, no database, nothing to do
+                    result->getStats().nModified = 0;
+                    result->getStats().n = 0;
+                    return;
+                }
+
+                //  upsert, don't try to get a context as no MODE_X lock is held
+                fakeLoop = -1;
+                createCollection = true;
+                continue;
+            }
+
             Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
 
-            if ( ctx.db()->getCollection( txn, nsString.ns() ) == NULL ) {
+            if ( db->getCollection( txn, nsString.ns() ) == NULL ) {
                 if ( createCollection ) {
                     // we raced with some, accept defeat
                     result->getStats().nModified = 0;
@@ -1201,7 +1238,7 @@ namespace mongo {
                 }
 
                 if ( !request.isUpsert() ) {
-                    // not an upsert, not collection, nothing to do
+                    // not an upsert, no collection, nothing to do
                     result->getStats().nModified = 0;
                     result->getStats().n = 0;
                     return;

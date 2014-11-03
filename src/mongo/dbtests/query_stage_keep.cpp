@@ -186,7 +186,8 @@ namespace QueryStageKeep {
             // Create a KeepMutationsStage with an EOF child, and flag 50 objects.  We expect these
             // objects to be returned by the KeepMutationsStage.
             MatchExpression* nullFilter = NULL;
-            KeepMutationsStage* keep = new KeepMutationsStage(nullFilter, &ws, new EOFStage());
+            std::auto_ptr<KeepMutationsStage> keep(new KeepMutationsStage(nullFilter, &ws,
+                                                                          new EOFStage()));
             for (size_t i = 0; i < 50; ++i) {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* member = ws.get(id);
@@ -198,7 +199,7 @@ namespace QueryStageKeep {
 
             // Call work() on the KeepMutationsStage.  The stage should start streaming the
             // already-flagged objects.
-            WorkingSetID id = getNextResult(keep);
+            WorkingSetID id = getNextResult(keep.get());
             resultIds.insert(id);
 
             // Flag more objects, then call work() again on the KeepMutationsStage, and expect none
@@ -219,7 +220,7 @@ namespace QueryStageKeep {
                 member->obj = BSON("x" << 1);
                 ws.flagForReview(id);
             }
-            while ((id = getNextResult(keep)) != WorkingSet::INVALID_ID) {
+            while ((id = getNextResult(keep.get())) != WorkingSet::INVALID_ID) {
                 resultIds.insert(id);
             }
 
