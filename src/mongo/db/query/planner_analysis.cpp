@@ -203,6 +203,11 @@ namespace mongo {
                 child->addKeyMetadata = isn->addKeyMetadata;
                 child->indexIsMultiKey = isn->indexIsMultiKey;
 
+                // Copy the filter, if there is one.
+                if (isn->filter.get()) {
+                    child->filter.reset(isn->filter->shallowClone());
+                }
+
                 // Create child bounds.
                 child->bounds.fields.resize(isn->bounds.fields.size());
                 for (size_t j = 0; j < fieldsToExplode; ++j) {
