@@ -96,10 +96,7 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	}
 	_, hasSetName := masterDoc["setName"]
 	_, hasHosts := masterDoc["hosts"]
-	if hasSetName || hasHosts {
-		return true, nil
-	}
-	return false, nil
+	return hasSetName || hasHosts, nil
 }
 
 func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {

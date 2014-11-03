@@ -131,7 +131,7 @@ func getUpsertValue(field string, document bson.M) interface{} {
 }
 
 // filterIngestError accepts a boolean indicating if a non-nil error should be,
-// returned and an actual error.
+// returned as an actual error.
 //
 // If the error indicates an unreachable server, it returns that immediately.
 //
@@ -139,8 +139,6 @@ func getUpsertValue(field string, document bson.M) interface{} {
 //
 // If the error is not nil, it logs the error. If the error is an io.EOF error -
 // indicating a lost connection to the server, it sets the error as such.
-//
-// In any case, it unconditionally returns an error which may or may not be nil.
 //
 func filterIngestError(stopOnError bool, err error) error {
 	if err == nil {

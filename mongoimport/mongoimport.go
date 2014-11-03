@@ -60,6 +60,9 @@ type MongoImport struct {
 	// been inserted into the database
 	insertionCount uint64
 
+	// indicates whether the connected server is part of a replica set
+	isReplicaSet bool
+
 	// the tomb is used to synchronize ingestion goroutines and causes
 	// other sibling goroutines to terminate immediately if one errors out
 	tomb *tomb.Tomb
@@ -352,6 +355,13 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 // IngestDocuments takes a slice of documents and either inserts/upserts them -
 // based on whether an upsert is requested - into the given collection
 func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error) {
+	// check if the server is a replica set
+	mongoImport.isReplicaSet, err = mongoImport.SessionProvider.IsReplicaSet()
+	if err != nil {
+		return fmt.Errorf("error checking if server is part of a replicaset: %v", err)
+	}
+	log.Logf(log.Info, "is replica set: %v", mongoImport.isReplicaSet)
+
 	numIngestionThreads := *mongoImport.IngestOptions.NumIngestionThreads
 	// initialize the tomb where all goroutines go to die
 	mongoImport.tomb = &tomb.Tomb{}
@@ -384,13 +394,6 @@ func (mongoImport *MongoImport) newSession() (session *mgo.Session, err error) {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
 
-	// check if the server is a replica set
-	isReplicaSet, err := mongoImport.SessionProvider.IsReplicaSet()
-	if err != nil {
-		return nil, fmt.Errorf("error checking if server is part of a replicaset: %v", err)
-	}
-	log.Logf(log.Info, "is replica set: %v", isReplicaSet)
-
 	sessionSafety := &mgo.Safe{}
 	intWriteConcern, err := strconv.Atoi(mongoImport.IngestOptions.WriteConcern)
 	if err != nil {
@@ -404,7 +407,7 @@ func (mongoImport *MongoImport) newSession() (session *mgo.Session, err error) {
 	// handle fire-and-forget write concern
 	if sessionSafety.WMode == "" && sessionSafety.W == 0 {
 		sessionSafety = nil
-	} else if !isReplicaSet {
+	} else if !mongoImport.isReplicaSet {
 		// for standalone mongod, only a write concern of 0/1 is needed
 		log.Logf(log.Info, "standalone server: setting write concern to 1")
 		sessionSafety.W = 1
@@ -476,32 +479,29 @@ readLoop:
 // TODO: TOOLS-317: add tests/update this to be more efficient
 // handleUpsert upserts documents into the database - used if --upsert is passed
 // to mongoimport
-func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *mgo.Collection, numInserted *int) (err error) {
-	selector := bson.M{}
-	document := bson.M{}
+func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *mgo.Collection) (numInserted int, err error) {
 	stopOnError := mongoImport.IngestOptions.StopOnError
-
 	upsertFields := strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
 	for _, rawBsonDocument := range documents {
+		document := bson.M{}
 		err = bson.Unmarshal(rawBsonDocument.Data, &document)
 		if err != nil {
-			return fmt.Errorf("error unmarshaling document: %v", err)
+			return numInserted, fmt.Errorf("error unmarshaling document: %v", err)
 		}
-		selector = constructUpsertDocument(upsertFields, document)
+		selector := constructUpsertDocument(upsertFields, document)
 		if selector == nil {
 			err = collection.Insert(document)
 		} else {
 			_, err = collection.Upsert(selector, document)
 		}
 		if err == nil {
-			*numInserted += 1
+			numInserted += 1
 		}
 		if err = filterIngestError(stopOnError, err); err != nil {
-			return err
+			return numInserted, err
 		}
-		document = bson.M{}
 	}
-	return nil
+	return numInserted, nil
 }
 
 // ingester performs the actual insertion/updates. If no upsert fields are
@@ -519,7 +519,8 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 	}()
 
 	if mongoImport.IngestOptions.Upsert {
-		return mongoImport.handleUpsert(documents, collection, &numInserted)
+		numInserted, err = mongoImport.handleUpsert(documents, collection)
+		return err
 	} else {
 		// note that this count may not be entirely accurate if some
 		// ingester threads insert when another errors out.
