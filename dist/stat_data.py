@@ -30,7 +30,7 @@ class AsyncStat(Stat):
 	Stat.__init__(self, name, 'async', desc, flags)
 class BlockStat(Stat):
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'block manager', desc, flags)
+	Stat.__init__(self, name, 'block-manager', desc, flags)
 class BtreeStat(Stat):
     def __init__(self, name, desc, flags=''):
 	Stat.__init__(self, name, 'btree', desc, flags)
@@ -45,10 +45,10 @@ class CursorStat(Stat):
 	Stat.__init__(self, name, 'cursor', desc, flags)
 class ConnStat(Stat):
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'conn', desc, flags)
+	Stat.__init__(self, name, 'connection', desc, flags)
 class DhandleStat(Stat):
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'dhandle', desc, flags)
+	Stat.__init__(self, name, 'data-handle', desc, flags)
 class LogStat(Stat):
     def __init__(self, name, desc, flags=''):
 	Stat.__init__(self, name, 'log', desc, flags)
@@ -63,7 +63,7 @@ class SessionStat(Stat):
 	Stat.__init__(self, name, 'session', desc, flags)
 class TxnStat(Stat):
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'txn', desc, flags)
+	Stat.__init__(self, name, 'transaction', desc, flags)
 
 ##########################################
 # CONNECTION statistics

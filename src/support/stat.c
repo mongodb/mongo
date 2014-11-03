@@ -9,18 +9,18 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 
 	stats->allocation_size.desc =
-	    "block manager: file allocation unit size";
-	stats->block_alloc.desc = "block manager: blocks allocated";
-	stats->block_checkpoint_size.desc = "block manager: checkpoint size";
+	    "block-manager: file allocation unit size";
+	stats->block_alloc.desc = "block-manager: blocks allocated";
+	stats->block_checkpoint_size.desc = "block-manager: checkpoint size";
 	stats->block_extension.desc =
-	    "block manager: allocations requiring file extension";
-	stats->block_free.desc = "block manager: blocks freed";
-	stats->block_magic.desc = "block manager: file magic number";
-	stats->block_major.desc = "block manager: file major version number";
-	stats->block_minor.desc = "block manager: minor version number";
+	    "block-manager: allocations requiring file extension";
+	stats->block_free.desc = "block-manager: blocks freed";
+	stats->block_magic.desc = "block-manager: file magic number";
+	stats->block_major.desc = "block-manager: file major version number";
+	stats->block_minor.desc = "block-manager: minor version number";
 	stats->block_reuse_bytes.desc =
-	    "block manager: file bytes available for reuse";
-	stats->block_size.desc = "block manager: file size in bytes";
+	    "block-manager: file bytes available for reuse";
+	stats->block_size.desc = "block-manager: file size in bytes";
 	stats->bloom_count.desc = "LSM: bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc = "LSM: bloom filter false positives";
 	stats->bloom_hit.desc = "LSM: bloom filter hits";
@@ -129,7 +129,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "reconciliation: internal page key bytes discarded using suffix compression";
 	stats->session_compact.desc = "session: object compaction";
 	stats->session_cursor_open.desc = "session: open cursor count";
-	stats->txn_update_conflict.desc = "txn: update conflicts";
+	stats->txn_update_conflict.desc = "transaction: update conflicts";
 }
 
 void
@@ -333,13 +333,13 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_op_remove.desc = "async: op remove calls";
 	stats->async_op_search.desc = "async: op search calls";
 	stats->async_op_update.desc = "async: op update calls";
-	stats->block_byte_map_read.desc = "block manager: mapped bytes read";
-	stats->block_byte_read.desc = "block manager: bytes read";
-	stats->block_byte_write.desc = "block manager: bytes written";
-	stats->block_map_read.desc = "block manager: mapped blocks read";
-	stats->block_preload.desc = "block manager: blocks pre-loaded";
-	stats->block_read.desc = "block manager: blocks read";
-	stats->block_write.desc = "block manager: blocks written";
+	stats->block_byte_map_read.desc = "block-manager: mapped bytes read";
+	stats->block_byte_read.desc = "block-manager: bytes read";
+	stats->block_byte_write.desc = "block-manager: bytes written";
+	stats->block_map_read.desc = "block-manager: mapped blocks read";
+	stats->block_preload.desc = "block-manager: blocks pre-loaded";
+	stats->block_read.desc = "block-manager: blocks read";
+	stats->block_write.desc = "block-manager: blocks written";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
@@ -380,7 +380,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: pages currently held in the cache";
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_write.desc = "cache: pages written from cache";
-	stats->cond_wait.desc = "conn: pthread mutex condition wait calls";
+	stats->cond_wait.desc =
+	    "connection: pthread mutex condition wait calls";
 	stats->cursor_create.desc = "btree: cursor create calls";
 	stats->cursor_insert.desc = "btree: cursor insert calls";
 	stats->cursor_next.desc = "btree: cursor next calls";
@@ -390,9 +391,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "btree: cursor search calls";
 	stats->cursor_search_near.desc = "btree: cursor search near calls";
 	stats->cursor_update.desc = "btree: cursor update calls";
-	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
-	stats->dh_session_sweeps.desc = "dhandle: session sweep attempts";
-	stats->file_open.desc = "conn: files currently open";
+	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
+	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
+	stats->file_open.desc = "connection: files currently open";
 	stats->log_buffer_grow.desc = "log: log buffer size increases";
 	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
@@ -435,10 +436,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "LSM: tree maintenance operations discarded";
 	stats->lsm_work_units_done.desc =
 	    "LSM: tree maintenance operations executed";
-	stats->memory_allocation.desc = "conn: memory allocations";
-	stats->memory_free.desc = "conn: memory frees";
-	stats->memory_grow.desc = "conn: memory re-allocations";
-	stats->read_io.desc = "conn: total read I/Os";
+	stats->memory_allocation.desc = "connection: memory allocations";
+	stats->memory_free.desc = "connection: memory frees";
+	stats->memory_grow.desc = "connection: memory re-allocations";
+	stats->read_io.desc = "connection: total read I/Os";
 	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "reconciliation: page reconciliation calls for eviction";
@@ -447,22 +448,22 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rec_split_stashed_objects.desc =
 	    "reconciliation: split objects currently awaiting free";
 	stats->rwlock_read.desc =
-	    "conn: pthread mutex shared lock read-lock calls";
+	    "connection: pthread mutex shared lock read-lock calls";
 	stats->rwlock_write.desc =
-	    "conn: pthread mutex shared lock write-lock calls";
+	    "connection: pthread mutex shared lock write-lock calls";
 	stats->session_cursor_open.desc = "session: open cursor count";
 	stats->session_open.desc = "session: open session count";
-	stats->txn_begin.desc = "txn: transaction begins";
-	stats->txn_checkpoint.desc = "txn: transaction checkpoints";
+	stats->txn_begin.desc = "transaction: transaction begins";
+	stats->txn_checkpoint.desc = "transaction: transaction checkpoints";
 	stats->txn_checkpoint_running.desc =
-	    "txn: transaction checkpoint currently running";
-	stats->txn_commit.desc = "txn: transactions committed";
+	    "transaction: transaction checkpoint currently running";
+	stats->txn_commit.desc = "transaction: transactions committed";
 	stats->txn_fail_cache.desc =
-	    "txn: transaction failures due to cache overflow";
+	    "transaction: transaction failures due to cache overflow";
 	stats->txn_pinned_range.desc =
-	    "txn: transaction range of IDs currently pinned";
-	stats->txn_rollback.desc = "txn: transactions rolled back";
-	stats->write_io.desc = "conn: total write I/Os";
+	    "transaction: transaction range of IDs currently pinned";
+	stats->txn_rollback.desc = "transaction: transactions rolled back";
+	stats->write_io.desc = "connection: total write I/Os";
 }
 
 void
