@@ -393,8 +393,6 @@ dsrc_stats = [
     Stat('rec_suffix_compression',
         'reconciliation: internal page key bytes discarded using' + 
         ' suffix compression'),
-    Stat('rec_skipped_update',
-        'reconciliation:  failed because an update could not be included'),
     Stat('rec_multiblock_internal',
         'reconciliation: internal page multi-block writes'),
     Stat('rec_multiblock_leaf',

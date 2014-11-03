@@ -3403,17 +3403,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_PAGES_EVICTION			2079
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
 #define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2080
-/*! reconciliation:  failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2081
 /*! reconciliation: internal page key bytes discarded using suffix
  * compression */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2082
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2081
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2083
+#define	WT_STAT_DSRC_SESSION_COMPACT			2082
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2084
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2083
 /*! txn: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2085
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2084
 /*! @} */
 /*
  * Statistics section: END
