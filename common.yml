@@ -31,10 +31,6 @@ mongo_tools_variables:
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
       mongo26_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.6.5.zip"
 
-  auth_suite_user:
-    username: &auth_username "passwordIsTaco"
-    password: &auth_password "Taco"
-
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
     osx_108_task_list: &osx_108_tasks
@@ -630,9 +626,9 @@ tasks:
           - key: "mongodb_args"
             concat: *auth_startup_args_string
           - key: "auth_username"
-            value: *auth_username
+            value: "passwordIsTaco"
           - key: "auth_password"
-            value: *auth_password
+            value: "Taco"
           - key: "create_mongod_users_command"
             value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
     - func: "download mongod"
