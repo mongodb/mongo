@@ -80,7 +80,7 @@ func (tsvInputReader *TSVInputReader) ReadHeadersFromSource() ([]string, error) 
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	tsvRecordChan := make(chan ConvertibleDoc, numProcessingThreads)
+	tsvRecordChan := make(chan ConvertibleDoc, numDecodingWorkers)
 	var err error
 
 	go func() {

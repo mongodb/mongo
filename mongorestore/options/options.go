@@ -20,10 +20,11 @@ type OutputOptions struct {
 	NoOptionsRestore bool `long:"noOptionsRestore" description:"Don't restore options"`
 	KeepIndexVersion bool `long:"keepIndexVersion" description:"Don't update index version"`
 
-	JobThreads       int  `long:"numProcessingThreads" short:"j" description:"Number of collections to restore in parallel"`
-	BulkWriters      int  `long:"numIngestionThreads" description:"Number of insert connections per collection"`
-	BulkBufferSize   int  `long:"batchSize" description:"Buffer size, in bytes, of each bulk buffer"`
+	JobThreads       int  `long:"numParallelCollections" short:"j" description:"Number of collections to restore in parallel" default:"4"`
+	BulkWriters      int  `long:"numInsertionWorkersPerCollection" description:"Number of insert connections per collection" default:"1"`
+	BulkBufferSize   int  `long:"batchSize" description:"Maximum number of documents to coalesce into a single bulk insertion" default:"10000"`
 	PreserveDocOrder bool `long:"preserveOrder" description:"Preserve order of documents during restoration"`
+	// TODO: add hidden option for NumOSThreads to set GOMAXPROCS on CLI
 }
 
 func (self *OutputOptions) Name() string {

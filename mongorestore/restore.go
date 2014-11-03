@@ -224,21 +224,14 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	if restore.OutputOptions.PreserveDocOrder {
 		MaxInsertThreads = 1
 	}
-	if MaxInsertThreads == 0 {
-		MaxInsertThreads = 4 //default
-	}
-	BulkBufferSize := restore.OutputOptions.BulkBufferSize
-	if BulkBufferSize == 0 {
-		BulkBufferSize = 2048
-	}
-	docChan := make(chan bson.Raw, BulkBufferSize*MaxInsertThreads)
+	docChan := make(chan bson.Raw, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
 	resultChan := make(chan error, MaxInsertThreads)
 	killChan := make(chan struct{})
 	// make sure goroutines clean up on error
 	defer close(killChan)
 
 	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int, BulkBufferSize*MaxInsertThreads)
+	bytesReadChan := make(chan int, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
 	go func() {
 		for {
 			select {
@@ -265,7 +258,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	for i := 0; i < MaxInsertThreads; i++ {
 		go func() {
-			bulk := db.NewBufferedBulkInserter(collection, BulkBufferSize, false)
+			bulk := db.NewBufferedBulkInserter(collection, restore.OutputOptions.BulkBufferSize, false)
 			for {
 				select {
 				case rawDoc, alive := <-docChan:

@@ -37,10 +37,9 @@ func main() {
 
 	log.SetVerbosity(opts.Verbosity)
 
-	if outputOpts.JobThreads > 0 {
-		log.Logf(log.Info, "running mongorestore with %v job threads", outputOpts.JobThreads)
-		runtime.GOMAXPROCS(outputOpts.JobThreads)
-	}
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	log.Logf(log.Info, "running mongorestore with %v job threads", outputOpts.JobThreads)
 
 	targetDir := ""
 	if inputOpts.Directory != "" {

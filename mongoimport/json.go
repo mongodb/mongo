@@ -90,7 +90,7 @@ func (jsonInputReader *JSONInputReader) ReadHeadersFromSource() ([]string, error
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	rawChan := make(chan ConvertibleDoc, numProcessingThreads)
+	rawChan := make(chan ConvertibleDoc, numDecodingWorkers)
 	var err error
 	go func() {
 		for {

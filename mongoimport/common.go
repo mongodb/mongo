@@ -262,7 +262,7 @@ func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan cha
 	wg := &sync.WaitGroup{}
 	inChan := inputChan
 	outChan := outputChan
-	for i := 0; i < numProcessingThreads; i++ {
+	for i := 0; i < numDecodingWorkers; i++ {
 		if ordered {
 			// TODO: experiment with buffered channel size; the buffer size of
 			// inChan should always be the same as that of outChan

@@ -68,7 +68,7 @@ func (csvInputReader *CSVInputReader) ReadHeadersFromSource() ([]string, error) 
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	csvRecordChan := make(chan ConvertibleDoc, numProcessingThreads)
+	csvRecordChan := make(chan ConvertibleDoc, numDecodingWorkers)
 	var err error
 
 	go func() {
