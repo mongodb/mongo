@@ -26,6 +26,8 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/Session.java \
 		$(JAVADESTFULL)/WiredTigerException.java \
 		$(JAVADESTFULL)/WiredTigerPackingException.java \
+		$(JAVADESTFULL)/WiredTigerPanicException.java \
+		$(JAVADESTFULL)/WiredTigerRollbackException.java \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
@@ -44,6 +46,7 @@ JAVA_JUNIT = \
 		$(JAVATEST)/AsyncTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
+		$(JAVATEST)/ExceptionTest.java \
 		$(JAVATEST)/PackTest.java \
 		$(JAVATEST)/WiredTigerSuite.java
 

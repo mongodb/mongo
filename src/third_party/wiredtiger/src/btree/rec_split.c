@@ -654,23 +654,16 @@ __split_inmem_build(
 
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
-	 * cannot be written.  We could fail those evictions, but if the page is
-	 * never quiescent and is growing too large for the cache, we can only
-	 * avoid the problem for so long.  The solution is to split those pages
-	 * into many on-disk chunks we write, plus some on-disk chunks we don't
-	 * write.  This code deals with the latter: any chunk we didn't write is
-	 * re-created as an in-memory page, then we apply the unresolved updates
-	 * to that page.
-	 */
-	WT_RET(__wt_page_inmem(
-	    session, ref, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
-
-	/*
+	 * can't be written. This code re-creates the in-memory page and applies
+	 * the unresolved updates to that page.
+	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
 	 * when discarding the original page, and our caller will discard the
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
+	WT_RET(__wt_page_inmem(
+	    session, ref, multi->skip_dsk, WT_PAGE_DISK_ALLOC, &page));
 	multi->skip_dsk = NULL;
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
@@ -811,11 +804,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_split_evict --
- *	Resolve a page split, inserting new information into the parent.
+ * __split_evict_multi --
+ *	Resolve a multi-page split, inserting new information into the parent.
  */
-int
-__wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+static int
+__split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1064,4 +1057,65 @@ err:	if (locked)
 	 * nothing really bad can have happened.
 	 */
 	return (ret == WT_PANIC || !complete ? ret : 0);
+}
+
+/*
+ * __split_evict_single --
+ *	Resolve a single page split, replacing a page with a new version.
+ */
+static int
+__split_evict_single(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
+	WT_REF new;
+
+	page = ref->page;
+	mod = page->modify;
+
+	/* Build the new page. */
+	memset(&new, 0, sizeof(new));
+	WT_RET(__split_inmem_build(session, page, &new, &mod->mod_multi[0]));
+
+	/*
+	 * Discard the original page. Pages with unresolved changes are not
+	 * marked clean during reconciliation, do it now.
+	 */
+	mod->write_gen = 0;
+	__wt_cache_dirty_decr(session, page);
+	__wt_page_out(session, &page);
+
+	/* Swap the new page into place. */
+	ref->page = new.page;
+	WT_PUBLISH(ref->state, WT_REF_MEM);
+
+	return (0);
+}
+
+/*
+ * __wt_split_evict --
+ *	Resolve a page split.
+ */
+int
+__wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+{
+	uint32_t split_entries;
+
+	/*
+	 * There are two cases entering this code. First, an in-memory page that
+	 * got too large, we forcibly evicted it, and there wasn't anything to
+	 * write. (Imagine two threads updating a small set keys on a leaf page.
+	 * The page is too large so we try to evict it, but after reconciliation
+	 * there's only a small amount of data (so it's a single page we can't
+	 * split), and because there are two threads, there's some data we can't
+	 * write (so we can't evict it). In that case, we take advantage of the
+	 * fact we have exclusive access to the page and rewrite it in memory.)
+	 *
+	 * Second, a real split where we reconciled a page and it turned into a
+	 * lot of pages.
+	 */
+	split_entries = ref->page->modify->mod_multi_entries;
+	return (split_entries == 1 ?
+	    __split_evict_single(session, ref) :
+	    __split_evict_multi(session, ref, exclusive));
 }

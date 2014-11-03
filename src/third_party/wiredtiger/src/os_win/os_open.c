@@ -84,7 +84,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		f |= FILE_FLAG_RANDOM_ACCESS;
 
-	filehandle = CreateFile(path,
+	filehandle = CreateFileA(path,
 				(GENERIC_READ | GENERIC_WRITE),
 				share_mode,
 				NULL,
@@ -93,7 +93,7 @@ __wt_open(WT_SESSION_IMPL *session,
 				NULL);
 	if (filehandle == INVALID_HANDLE_VALUE) {
 		if (GetLastError() == ERROR_FILE_EXISTS && ok_create)
-			filehandle = CreateFile(path,
+			filehandle = CreateFileA(path,
 						(GENERIC_READ | GENERIC_WRITE),
 						share_mode,
 						NULL,
@@ -114,7 +114,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	 * concurrently with reads on the file. Writes would also move the file
 	 * pointer.
 	 */
-	filehandle_secondary = CreateFile(path,
+	filehandle_secondary = CreateFileA(path,
 	    (GENERIC_READ | GENERIC_WRITE),
 	    share_mode,
 	    NULL,

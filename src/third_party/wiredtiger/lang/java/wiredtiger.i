@@ -87,10 +87,22 @@ typedef struct {
 	jmethodID notify_mid;	/* cached AsyncCallback.notify mid in conn */
 } JAVA_CALLBACK;
 
-static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
-	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/WiredTigerException");
+static void throwWiredTigerException(JNIEnv *jenv, int err) {
+	const char *clname;
+	jclass excep;
+
+	clname = NULL;
+	excep = NULL;
+	if (err == WT_PANIC)
+		clname = "com/wiredtiger/db/WiredTigerPanicException";
+	else if (err == WT_ROLLBACK)
+		clname = "com/wiredtiger/db/WiredTigerRollbackException";
+	else
+		clname = "com/wiredtiger/db/WiredTigerException";
+	if (clname)
+		excep = (*jenv)->FindClass(jenv, clname);
 	if (excep)
-		(*jenv)->ThrowNew(jenv, excep, msg);
+		(*jenv)->ThrowNew(jenv, excep, wiredtiger_strerror(err));
 }
 
 %}
@@ -149,7 +161,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 
 %typemap(out) int %{
 	if ($1 != 0 && $1 != WT_NOTFOUND) {
-		throwWiredTigerException(jenv, wiredtiger_strerror($1));
+		throwWiredTigerException(jenv, $1);
 		return $null;
 	}
 	$result = $1;
@@ -270,7 +282,6 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op, )
 %rename (getKeyFormat) __wt_async_op::getKey_format;
 %rename (getValueFormat) __wt_async_op::getValue_format;
 %rename (getType) __wt_async_op::get_type;
-%rename (getId) __wt_async_op::get_id;
 
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -497,7 +508,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret;
 		k.data = NULL;
 		if ((ret = $self->get_key($self, &k)) != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return k;
 	}
 
@@ -507,7 +518,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret;
 		v.data = NULL;
 		if ((ret = $self->get_value($self, &v)) != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return v;
 	}
 
@@ -1032,7 +1043,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret;
 		k.data = NULL;
 		if ((ret = $self->get_key($self, &k)) != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return k;
 	}
 
@@ -1042,7 +1053,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret;
 		v.data = NULL;
 		if ((ret = $self->get_value($self, &v)) != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return v;
 	}
 
@@ -1072,7 +1083,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		$self->set_key($self, k);
 		ret = $self->search_near(self, &cmp);
 		if (ret != 0 && ret != WT_NOTFOUND)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		if (ret == 0)
 			return (cmp == 0 ? FOUND : cmp < 0 ? SMALLER : LARGER);
 		return (NOTFOUND);
@@ -1088,7 +1099,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	int compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return cmp;
 	}
 
@@ -1655,41 +1666,25 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %ignore wiredtiger_extension_init;
 %ignore wiredtiger_extension_terminate;
 
-%ignore wiredtiger_open;
-%javamethodmodifiers wiredtiger_open_wrap "
+%define REQUIRE_WRAP(typedefname, name, javaname)
+%ignore name;
+%javamethodmodifiers name##_wrap "
   /**
-   * @copydoc ::wiredtiger_open
+   * @copydoc typedefname
    */
   public ";
+%rename(javaname) name##_wrap;
+%enddef
 
-%rename(open) wiredtiger_open_wrap;
-%ignore __wt_connection::async_new_op;
-%javamethodmodifiers __wt_connection::async_new_op_wrap "
-  /**
-   * @copydoc WT_CONNECTION::async_new_op
-   */
-  public ";
-%rename(async_new_op) __wt_connection::async_new_op_wrap;
-
-%ignore __wt_connection::open_session;
-%rename(open_session) __wt_connection::open_session_wrap;
-
-%ignore __wt_session::transaction_pinned_range;
-%rename(transaction_pinned_range) __wt_session::transaction_pinned_range_wrap;
-%javamethodmodifiers __wt_session::transaction_pinned_range_wrap "
-  /**
-   * @copydoc WT_SESSION::transaction_pinned_range
-   */
-  public ";
-
-%rename(open_cursor) __wt_session::open_cursor_wrap;
-%ignore __wt_session::open_cursor;
-%javamethodmodifiers __wt_session::open_cursor_wrap "
-  /**
-   * @copydoc WT_SESSION::open_cursor
-   */
-  public ";
-%rename(open_cursor) __wt_session::open_cursor_wrap;
+REQUIRE_WRAP(::wiredtiger_open, wiredtiger_open, open)
+REQUIRE_WRAP(WT_CONNECTION::async_new_op,
+    __wt_connection::async_new_op, async_new_op)
+REQUIRE_WRAP(WT_CONNECTION::open_session,
+    __wt_connection::open_session, open_session)
+REQUIRE_WRAP(WT_SESSION::transaction_pinned_range,
+    __wt_session::transaction_pinned_range, transaction_pinned_range)
+REQUIRE_WRAP(WT_SESSION::open_cursor, __wt_session::open_cursor, open_cursor)
+REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
@@ -1753,7 +1748,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 	connimpl->lang_private = jcb;
 
 err:	if (ret != 0)
-		throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		throwWiredTigerException(jenv, ret);
 	return conn;
 }
 }
@@ -1782,7 +1777,7 @@ err:	if (ret != 0)
 		asyncop->c.flags |= WT_CURSTD_RAW;
 
 err:		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return asyncop;
 	}
 }
@@ -1806,7 +1801,7 @@ err:		if (ret != 0)
 		sessionimpl->lang_private = jcb;
 
 err:		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return session;
 	}
 }
@@ -1830,8 +1825,15 @@ err:		if (ret != 0)
 		cursor->lang_private = jcb;
 
 err:		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, ret);
 		return cursor;
+	}
+}
+
+%extend __wt_async_op {
+	long get_id_wrap(JNIEnv *jenv) {
+		WT_UNUSED(jenv);
+		return (self->get_id(self));
 	}
 }
 
@@ -1840,8 +1842,8 @@ err:		if (ret != 0)
 		int ret;
 		uint64_t range = 0;
 		ret = self->transaction_pinned_range(self, &range);
-err:		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		if (ret != 0)
+			throwWiredTigerException(jenv, ret);
 		return range;
 	}
 }

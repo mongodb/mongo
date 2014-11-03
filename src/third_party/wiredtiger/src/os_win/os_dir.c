@@ -52,7 +52,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	    pathbuf->data, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
 	    prefix == NULL ? "all" : prefix));
 
-	findhandle = FindFirstFile(pathbuf->data, &finddata);
+	findhandle = FindFirstFileA(pathbuf->data, &finddata);
 
 	if (INVALID_HANDLE_VALUE == findhandle)
 		WT_ERR_MSG(session, __wt_errno(), "%s: FindFirstFile",
@@ -85,7 +85,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 				WT_ERR(__wt_strdup(session,
 				    finddata.cFileName, &entries[count - 1]));
 			}
-		} while (FindNextFile(findhandle, &finddata) != 0);
+		} while (FindNextFileA(findhandle, &finddata) != 0);
 	}
 
 	if (count > 0)

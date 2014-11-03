@@ -56,7 +56,7 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 
 	WT_RET(__wt_filename(session, name, &path));
 
-	if ((ret = DeleteFile(path)) == FALSE)
+	if ((ret = DeleteFileA(path)) == FALSE)
 		lasterror = __wt_errno();
 
 	__wt_free(session, path);
