@@ -279,41 +279,6 @@ namespace mongo {
         return res;
     }
 
-    Status AuthzManagerExternalStateMongos::createIndex(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& pattern,
-            bool unique,
-            const BSONObj& writeConcern) {
-        return clusterCreateIndex(collectionName, pattern, unique, writeConcern, NULL);
-    }
-
-    Status AuthzManagerExternalStateMongos::dropIndexes(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& writeConcern) {
-
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-        try {
-            conn->get()->dropIndexes(collectionName.ns());
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string errstr = conn->get()->getLastErrorString(res);
-            if (!errstr.empty()) {
-                conn->done();
-                return Status(ErrorCodes::UnknownError, errstr);
-            }
-            conn->done();
-            return Status::OK();
-        }
-        catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }
-
     bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(const StringData& why) {
         boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
         if (_authzDataUpdateLock.get()) {

@@ -215,22 +215,6 @@ namespace mongo {
                               int* numRemoved) = 0;
 
         /**
-         * Creates an index with the given pattern on "collectionName".
-         */
-        virtual Status createIndex(OperationContext* txn,
-                                   const NamespaceString& collectionName,
-                                   const BSONObj& pattern,
-                                   bool unique,
-                                   const BSONObj& writeConcern) = 0;
-
-        /**
-         * Drops indexes other than the _id index on "collectionName".
-         */
-        virtual Status dropIndexes(OperationContext* txn,
-                                   const NamespaceString& collectionName,
-                                   const BSONObj& writeConcern) = 0;
-
-        /**
          * Tries to acquire the global lock guarding modifications to all persistent data related
          * to authorization, namely the admin.system.users, admin.system.roles, and
          * admin.system.version collections.  This serializes all writers to the authorization

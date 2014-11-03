@@ -176,57 +176,6 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongod::createIndex(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& pattern,
-            bool unique,
-            const BSONObj& writeConcern) {
-        DBDirectClient client(txn);
-        try {
-            if (client.ensureIndex(collectionName.ns(),
-                                   pattern,
-                                   unique)) {
-                BSONObjBuilder gleBuilder;
-                gleBuilder.append("getLastError", 1);
-                gleBuilder.appendElements(writeConcern);
-                BSONObj res;
-                client.runCommand("admin", gleBuilder.done(), res);
-                string errstr = client.getLastErrorString(res);
-                if (!errstr.empty()) {
-                    return Status(ErrorCodes::UnknownError, errstr);
-                }
-            }
-            return Status::OK();
-        }
-        catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongod::dropIndexes(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& writeConcern) {
-        DBDirectClient client(txn);
-        try {
-            client.dropIndexes(collectionName.ns());
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            client.runCommand("admin", gleBuilder.done(), res);
-            string errstr = client.getLastErrorString(res);
-            if (!errstr.empty()) {
-                return Status(ErrorCodes::UnknownError, errstr);
-            }
-            return Status::OK();
-        }
-        catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }
-
     bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
         LOG(2) << "Attempting to lock user data for: " << why << endl;
         return _authzDataUpdateLock.timed_lock(

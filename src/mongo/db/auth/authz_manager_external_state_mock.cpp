@@ -256,22 +256,6 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::createIndex(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& pattern,
-            bool unique,
-            const BSONObj&) {
-        return Status::OK();
-    }
-
-    Status AuthzManagerExternalStateMock::dropIndexes(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& writeConcern) {
-        return Status::OK();
-    }
-
     bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(const StringData&) {
         return true;
     }
