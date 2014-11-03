@@ -200,7 +200,7 @@ func TestStatLine(t *testing.T) {
 		},
 	}
 
-	statsLine := NewStatLine(serverStatusOld, serverStatusNew, false)
+	statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false)
 
 	Convey("StatsLine should accurately calculate opcounter diffs", t, func() {
 		So(statsLine.Insert, ShouldEqual, 10)

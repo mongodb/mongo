@@ -72,7 +72,7 @@ func main() {
 		SleepInterval: time.Duration(sleepInterval) * time.Second,
 		Cluster: &mongostat.ClusterMonitor{
 			ReportChan:    make(chan mongostat.StatLine),
-			LastStatLines: map[string]mongostat.StatLine{},
+			LastStatLines: map[string]*mongostat.StatLine{},
 			NoHeaders:     statOpts.NoHeaders,
 		},
 	}

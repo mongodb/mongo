@@ -71,13 +71,16 @@ type ClusterMonitor struct {
 	ReportChan chan StatLine
 
 	//Map of hostname -> latest stat data for the host
-	LastStatLines map[string]StatLine
+	LastStatLines map[string]*StatLine
+
+	//Map of hostname -> timestamp of most recent poll event
+	LastPollTimes map[string]time.Time
 
 	//Disable printing of column headers
 	NoHeaders bool
 
-	//Mutex to protect access to LastStatLines
-	mapLock sync.RWMutex
+	//Mutex to protect access to LastStatLines and LastPollTimes
+	mapLock sync.Mutex
 }
 
 //updateHostInfo updates the internal map with the given StatLine data.
@@ -85,18 +88,26 @@ type ClusterMonitor struct {
 func (cluster *ClusterMonitor) updateHostInfo(stat StatLine) {
 	cluster.mapLock.Lock()
 	defer cluster.mapLock.Unlock()
-	cluster.LastStatLines[stat.Host] = stat
+	cluster.LastStatLines[stat.Host] = &stat
 }
 
 //printSnapshot formats + dumps the current state of all the stats collected
 func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool) {
-	cluster.mapLock.RLock()
-	defer cluster.mapLock.RUnlock()
+	cluster.mapLock.Lock()
+	defer cluster.mapLock.Unlock()
 	lines := make([]StatLine, 0, len(cluster.LastStatLines))
 	for _, stat := range cluster.LastStatLines {
-		lines = append(lines, stat)
+		if stat.LastPrinted == stat.Time && stat.Error == nil {
+			stat.Error = fmt.Errorf("no data")
+		}
+		lines = append(lines, *stat)
 	}
 	out := FormatLines(lines, includeHeaders, discover)
+
+	//Mark all the host lines that we encountered as having been printed
+	for _, stat := range cluster.LastStatLines {
+		stat.LastPrinted = stat.Time
+	}
 	fmt.Print(out)
 }
 
@@ -165,7 +176,8 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 	if err != nil {
 		node.Err = err
 		node.LastStatus = nil
-		out <- StatLine{Host: node.host, Error: err}
+		statLine := StatLine{Host: node.host, Error: err}
+		out <- statLine
 		return
 	}
 
@@ -178,7 +190,9 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
 		result = nil
-		out <- StatLine{Host: node.host, Error: err}
+		statLine := StatLine{Host: node.host, Error: err}
+
+		out <- statLine
 		return
 	}
 
@@ -187,7 +201,7 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 
 	var statLine *StatLine
 	if node.LastStatus != nil && result != nil {
-		statLine = NewStatLine(*node.LastStatus, *result, all)
+		statLine = NewStatLine(*node.LastStatus, *result, node.host, all)
 		out <- *statLine
 	}
 
@@ -221,7 +235,6 @@ func (node *NodeMonitor) Watch(sleep time.Duration, discover chan string, out ch
 	go func() {
 		cycle := uint64(0)
 		for {
-			//TODO hook up --all option here.
 			node.Report(discover, node.All, out, cycle%10 == 1)
 			time.Sleep(sleep)
 			cycle++

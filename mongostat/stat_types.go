@@ -294,6 +294,12 @@ type StatLine struct {
 	IsMongos bool
 	Host     string
 
+	//The time at which this StatLine was generated.
+	Time time.Time
+
+	//The last time at which this StatLine was printed to output.
+	LastPrinted time.Time
+
 	//Opcounter fields
 	Insert, Query, Update, Delete, GetMore, Command int64
 
@@ -308,7 +314,6 @@ type StatLine struct {
 	ActiveReaders, ActiveWriters                          int64
 	NetIn, NetOut                                         int64
 	NumConnections                                        int64
-	Time                                                  time.Time
 	ReplSetName                                           string
 	NodeType                                              string
 }
@@ -437,7 +442,9 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 		}
 		out.WriteCell(fmt.Sprintf("%v", line.Faults))
 		if line.HighestLocked != nil && !line.IsMongos {
-			out.WriteCell(fmt.Sprintf("%v:%.1f%%", line.HighestLocked.DBName, line.HighestLocked.Percentage))
+			lockCell := fmt.Sprintf("%v:%.1f", line.HighestLocked.DBName,
+				line.HighestLocked.Percentage) + "%"
+			out.WriteCell(lockCell)
 		} else {
 			//don't write any lock status for mongos nodes
 			out.WriteCell("")
@@ -477,9 +484,9 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 }
 
 //NewStatLine constructs a StatLine object from two ServerStatus objects.
-func NewStatLine(oldStat, newStat ServerStatus, all bool) *StatLine {
+func NewStatLine(oldStat, newStat ServerStatus, host string, all bool) *StatLine {
 	returnVal := &StatLine{
-		Host:      newStat.Host,
+		Host:      host,
 		Mapped:    -1,
 		Virtual:   -1,
 		Resident:  -1,
