@@ -125,8 +125,6 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "reconciliation: page reconciliation calls for eviction";
 	stats->rec_prefix_compression.desc =
 	    "reconciliation: leaf page key bytes discarded using prefix compression";
-	stats->rec_skipped_update.desc =
-	    "reconciliation:  failed because an update could not be included";
 	stats->rec_suffix_compression.desc =
 	    "reconciliation: internal page key bytes discarded using suffix compression";
 	stats->session_compact.desc = "session: object compaction";
@@ -221,7 +219,6 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->rec_prefix_compression.v = 0;
-	stats->rec_skipped_update.v = 0;
 	stats->rec_suffix_compression.v = 0;
 	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
@@ -308,7 +305,6 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
 	p->rec_prefix_compression.v += c->rec_prefix_compression.v;
-	p->rec_skipped_update.v += c->rec_skipped_update.v;
 	p->rec_suffix_compression.v += c->rec_suffix_compression.v;
 	p->session_compact.v += c->session_compact.v;
 	p->session_cursor_open.v += c->session_cursor_open.v;
@@ -446,8 +442,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "reconciliation: page reconciliation calls for eviction";
-	stats->rec_skipped_update.desc =
-	    "reconciliation: reconciliation failed because an update could not be included";
 	stats->rec_split_stashed_bytes.desc =
 	    "reconciliation: split bytes currently awaiting free";
 	stats->rec_split_stashed_objects.desc =
@@ -562,7 +556,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->read_io.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
-	stats->rec_skipped_update.v = 0;
 	stats->rwlock_read.v = 0;
 	stats->rwlock_write.v = 0;
 	stats->txn_begin.v = 0;

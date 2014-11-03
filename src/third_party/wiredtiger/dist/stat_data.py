@@ -162,9 +162,6 @@ connection_stats = [
     Stat('rec_pages', 'reconciliation: page reconciliation calls'),
     Stat('rec_pages_eviction',
         'reconciliation: page reconciliation calls for eviction'),
-    Stat('rec_skipped_update',
-        'reconciliation: reconciliation failed because an update' +
-        ' could not be included'),
     Stat('rec_split_stashed_bytes',
         'reconciliation: split bytes currently awaiting free',
         'no_clear,no_scale'),
@@ -396,8 +393,6 @@ dsrc_stats = [
     Stat('rec_suffix_compression',
         'reconciliation: internal page key bytes discarded using' + 
         ' suffix compression'),
-    Stat('rec_skipped_update',
-        'reconciliation:  failed because an update could not be included'),
     Stat('rec_multiblock_internal',
         'reconciliation: internal page multi-block writes'),
     Stat('rec_multiblock_leaf',

@@ -3205,37 +3205,34 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_PAGES				1092
 /*! reconciliation: page reconciliation calls for eviction */
 #define	WT_STAT_CONN_REC_PAGES_EVICTION			1093
-/*! reconciliation: reconciliation failed because an update could not be
- * included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1094
 /*! reconciliation: split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1095
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1094
 /*! reconciliation: split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1096
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1095
 /*! conn: pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1097
+#define	WT_STAT_CONN_RWLOCK_READ			1096
 /*! conn: pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1098
+#define	WT_STAT_CONN_RWLOCK_WRITE			1097
 /*! session: open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1099
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1098
 /*! session: open session count */
-#define	WT_STAT_CONN_SESSION_OPEN			1100
+#define	WT_STAT_CONN_SESSION_OPEN			1099
 /*! txn: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1101
+#define	WT_STAT_CONN_TXN_BEGIN				1100
 /*! txn: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1102
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1101
 /*! txn: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1103
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1102
 /*! txn: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1104
+#define	WT_STAT_CONN_TXN_COMMIT				1103
 /*! txn: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1105
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1104
 /*! txn: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1106
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1105
 /*! txn: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1107
+#define	WT_STAT_CONN_TXN_ROLLBACK			1106
 /*! conn: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1108
+#define	WT_STAT_CONN_WRITE_IO				1107
 
 /*!
  * @}
@@ -3406,17 +3403,15 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_PAGES_EVICTION			2079
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
 #define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2080
-/*! reconciliation:  failed because an update could not be included */
-#define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			2081
 /*! reconciliation: internal page key bytes discarded using suffix
  * compression */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2082
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2081
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2083
+#define	WT_STAT_DSRC_SESSION_COMPACT			2082
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2084
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2083
 /*! txn: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2085
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2084
 /*! @} */
 /*
  * Statistics section: END
