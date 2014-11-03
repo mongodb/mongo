@@ -5,11 +5,14 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"os"
 )
 
 var (
-	UserAdmin         = "uAdmin"
-	UserAdminPassword = "password"
+	UserAdmin              = "uAdmin"
+	UserAdminPassword      = "password"
+	CreatedUserNameEnv     = "AUTH_USERNAME"
+	CreatedUserPasswordEnv = "AUTH_PASSWORD"
 )
 
 // Initialize a user admin, using the already-connected session passed in.
@@ -63,8 +66,8 @@ func CreateUserWithRole(session *mgo.Session, user,
 func GetAuthOptions() options.Auth {
 	if HasTestType(AUTH_TEST_TYPE) {
 		return options.Auth{
-			Username:  "passwordIsTaco",
-			Password:  "Taco",
+			Username:  os.Getenv(CreatedUserNameEnv),
+			Password:  os.Getenv(CreatedUserPasswordEnv),
 			Source:    "admin",
 			Mechanism: "MONGODB-CR",
 		}

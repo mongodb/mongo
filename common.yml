@@ -31,6 +31,10 @@ mongo_tools_variables:
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
       mongo26_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.6.5.zip"
 
+  auth_suite_user:
+    username: &auth_username "passwordIsTaco"
+    password: &auth_password "Taco"
+
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
     osx_108_task_list: &osx_108_tasks
@@ -331,10 +335,10 @@ functions:
             export ${library_path}
         fi;
 
-        if [ "${create_mongod_users}" = "true" ]; then
-          cd common/testutil
-          go test -v
-          cd ../..
+        if [ "${create_mongod_users_command}" != "" ]; then
+          export AUTH_USERNAME=${auth_username}
+          export AUTH_PASSWORD=${auth_password}
+          echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
         fi;
 
         # mongodump
@@ -625,8 +629,12 @@ tasks:
             value: "-test.types=${integration_test_args},auth"
           - key: "mongodb_args"
             concat: *auth_startup_args_string
-          - key: "create_mongod_users"
-            value: "true"
+          - key: "auth_username"
+            value: *auth_username
+          - key: "auth_password"
+            value: *auth_password
+          - key: "create_mongod_users_command"
+            value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
     - func: "download mongod"
     - func: "start mongod"
     - command: shell.exec
