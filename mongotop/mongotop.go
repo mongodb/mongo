@@ -38,6 +38,8 @@ type MongoTop struct {
 // the results appropriately.
 func (self *MongoTop) Run() error {
 
+	self.initializeOutputter()
+
 	// test the connection
 	session, err := self.SessionProvider.GetSession()
 	if err != nil {
@@ -103,4 +105,14 @@ func (self *MongoTop) Run() error {
 
 	}
 
+}
+
+// initializeOutputter creates the appropriate type of Outputter to be used,
+// based on whether or not the output is specified as json.
+func (self *MongoTop) initializeOutputter() {
+	if self.OutputOptions.Json {
+		self.Outputter = &output.JSONOutputter{}
+	} else {
+		self.Outputter = &output.GridOutputter{}
+	}
 }

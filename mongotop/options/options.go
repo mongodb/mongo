@@ -7,6 +7,7 @@ import ()
 type Output struct {
 	Locks bool `long:"locks" description:"Report on use of per-database locks"`
 	Once  bool `long:"once" description:"Only output stats page once, then quit"`
+	Json  bool `long:"json" description:"Format output as json"`
 }
 
 func (self *Output) Name() string {

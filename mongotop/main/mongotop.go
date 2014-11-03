@@ -7,7 +7,6 @@ import (
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongotop"
 	"github.com/mongodb/mongo-tools/mongotop/options"
-	"github.com/mongodb/mongo-tools/mongotop/output"
 	"os"
 	"strconv"
 	"time"
@@ -65,7 +64,6 @@ func main() {
 	top := &mongotop.MongoTop{
 		Options:         opts,
 		OutputOptions:   outputOpts,
-		Outputter:       &output.TerminalOutputter{},
 		SessionProvider: sessionProvider,
 		Sleeptime:       time.Duration(sleeptime) * time.Second,
 		Once:            outputOpts.Once,
