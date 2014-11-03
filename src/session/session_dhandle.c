@@ -65,11 +65,16 @@ __session_add_btree(
 }
 
 /*
- * __wt_session_lock_btree --
- *	Lock a btree handle.
+ * __wt_session_lock_dhandle --
+ *	Try to lock a handle that is cached in this session.  This is the fast
+ *	path that tries to lock a handle without the need for the schema lock.
+ *
+ *	If the handle can't be locked in the required state, release it and
+ *	fail with WT_NOTFOUND: we have to take the slow path after acquiring
+ *	the schema lock.
  */
 int
-__wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
+__wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	enum { NOLOCK, READLOCK, WRITELOCK } locked;
 	WT_BTREE *btree;
@@ -368,12 +373,11 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t hash;
-	int candidate;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
+	WT_ASSERT(session, !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	dhandle = NULL;
-	candidate = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
@@ -389,7 +393,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	}
 
 	if (dhandle_cache != NULL) {
-		candidate = 1;
 		/* We found the data handle, don't try to get it again. */
 		LF_SET(WT_DHANDLE_HAVE_REF);
 		session->dhandle = dhandle;
@@ -398,7 +401,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * Try to lock the file; if we succeed, our "exclusive" state
 		 * must match.
 		 */
-		ret = __wt_session_lock_btree(session, flags);
+		ret = __wt_session_lock_dhandle(session, flags);
 		if (ret == WT_NOTFOUND)
 			dhandle_cache = NULL;
 		else
@@ -417,7 +420,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 		WT_RET(ret);
 
-		if (!candidate)
+		if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
 			WT_RET(__session_add_btree(session, NULL));
 		WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 		    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));

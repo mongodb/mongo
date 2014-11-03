@@ -11,7 +11,8 @@
  * __conn_dhandle_open_lock --
  *	Spin on the current data handle until either (a) it is open, read
  *	locked; or (b) it is closed, write locked.  If exclusive access is
- *	requested and cannot be granted immediately, fail with EBUSY.
+ *	requested and cannot be granted immediately because the handle is
+ *	in use, fail with EBUSY.
  */
 static int
 __conn_dhandle_open_lock(
@@ -45,7 +46,9 @@ __conn_dhandle_open_lock(
 		 *
 		 * Wait for a read lock if we want exclusive access and failed
 		 * to get it: the sweep server may be closing this handle, and
-		 * we need to wait for it to complete.
+		 * we need to wait for it to complete.  If we want exclusive
+		 * access and find the handle open once we get the read lock,
+		 * give up: some other thread has it locked for real.
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
@@ -68,13 +71,9 @@ __conn_dhandle_open_lock(
 		 * exclusive lock.  There is some subtlety here: if we race
 		 * with another thread that successfully opens the file, we
 		 * don't want to block waiting to get exclusive access.
-		 *
-		 * If we want exclusive access and fail to get it, only
-		 * give up if we saw the file open last time we looked:
-		 * the sweep server may have selected this handle to close
-		 * and that should not disrupt application operations.
 		 */
 		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
+			lock_busy = 0;
 			/*
 			 * If it was opened while we waited, drop the write
 			 * lock and get a read lock instead.
@@ -91,7 +90,7 @@ __conn_dhandle_open_lock(
 			return (0);
 		} else if (ret != EBUSY)
 			return (ret);
-		else if (want_exclusive)
+		else
 			lock_busy = 1;
 
 		/* Give other threads a chance to make progress. */
