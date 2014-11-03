@@ -144,7 +144,7 @@ namespace {
                                      const StringData& ns,
                                      const CollectionOptions& options ) {
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe)
+        if (!_isRsThreadSafe && opCtx->lockState())
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
 
         const string ident = _newUniqueIdent("collection");
@@ -198,7 +198,7 @@ namespace {
                                    DiskLoc* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe)
+        if (!_isRsThreadSafe && opCtx->lockState())
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_S));
 
         DiskLoc dl;
@@ -232,7 +232,7 @@ namespace {
                                  const StringData& ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe)
+        if (!_isRsThreadSafe && opCtx->lockState())
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
 
         DiskLoc loc;
@@ -281,7 +281,7 @@ namespace {
                                         const StringData& toNS,
                                         bool stayTemp ) {
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe)
+        if (!_isRsThreadSafe && opCtx->lockState())
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
 
         DiskLoc loc;
@@ -327,7 +327,7 @@ namespace {
     Status KVCatalog::dropCollection( OperationContext* opCtx,
                                       const StringData& ns ) {
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe)
+        if (!_isRsThreadSafe && opCtx->lockState())
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
 
         boost::mutex::scoped_lock lk( _identsLock );
