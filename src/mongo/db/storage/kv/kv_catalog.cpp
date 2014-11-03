@@ -143,6 +143,8 @@ namespace {
     Status KVCatalog::newCollection( OperationContext* opCtx,
                                      const StringData& ns,
                                      const CollectionOptions& options ) {
+        invariant( opCtx->lockState() == NULL ||
+                   opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
         boost::scoped_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe)
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
@@ -210,7 +212,13 @@ namespace {
         }
 
         LOG(1) << "looking up metadata for: " << ns << " @ " << dl;
-        RecordData data = _rs->dataFor( opCtx, dl );
+        RecordData data;
+        if ( !_rs->findRecord( opCtx, dl, &data ) ) {
+            // since the in memory meta data isn't managed with mvcc
+            // its possible for different transactions to see slightly
+            // different things, which is ok via the locking above.
+            return BSONObj();
+        }
 
         if (out)
             *out = dl;
@@ -326,6 +334,8 @@ namespace {
 
     Status KVCatalog::dropCollection( OperationContext* opCtx,
                                       const StringData& ns ) {
+        invariant( opCtx->lockState() == NULL ||
+                   opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
         boost::scoped_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe)
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
