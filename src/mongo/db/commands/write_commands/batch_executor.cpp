@@ -44,7 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/concurrency/deadlock.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
@@ -1264,13 +1264,13 @@ namespace mongo {
                 result->getStats().n = didInsert ? 1 : numMatched;
                 result->getStats().upsertedID = resUpsertedID;
             }
-            catch ( const DeadLockException& dle ) {
+            catch ( const WriteConflictException& dle ) {
                 if ( isMulti ) {
-                    log() << "got deadlock during multi update, aborting";
+                    log() << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
                 else if ( attempt++ > 1 ) {
-                    log() << "got deadlock doing update on " << nsString
+                    log() << "Had WriteConflict doing update on " << nsString
                           << ", attempt: " << attempt << " retrying";
                     createCollection = false;
                     fakeLoop = -1;
@@ -1337,9 +1337,9 @@ namespace mongo {
 
                 break;
             }
-            catch ( const DeadLockException& dle ) {
+            catch ( const WriteConflictException& dle ) {
                 if ( attempt++ > 1 ) {
-                    log() << "got deadlock doing delete on " << nss
+                    log() << "Had WriteConflict doing delete on " << nss
                           << ", attempt: " << attempt << " retrying";
                 }
             }

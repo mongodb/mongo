@@ -1,4 +1,4 @@
-// deadlock.h
+// write_conflict_exception.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -36,9 +36,14 @@
 
 namespace mongo {
 
-    class DeadLockException : public DBException {
+    /**
+     * This is thrown if during a write, two or more operations conflict with each other.
+     * For example if two operations get the same version of a document, and then both try to
+     * modify that document, this exception will get thrown by one of them.
+     */
+    class WriteConflictException : public DBException {
     public:
-        DeadLockException() : DBException( "deadlock", ErrorCodes::DeadLock ){}
+        WriteConflictException() : DBException( "WriteConflict", ErrorCodes::WriteConflict ){}
     };
 
 }

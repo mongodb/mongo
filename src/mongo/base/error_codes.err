@@ -111,7 +111,7 @@ error_code("InconsistentReplicaSetNames", 108)
 error_code("ConfigurationInProgress", 109)
 error_code("CannotInitializeNodeWithData", 110)
 error_code("NotExactValueField", 111)
-error_code("DeadLock", 112)
+error_code("WriteConflict", 112)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h
