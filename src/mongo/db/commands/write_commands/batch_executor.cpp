@@ -1269,9 +1269,9 @@ namespace mongo {
                     log() << "got deadlock during multi update, aborting";
                     throw;
                 }
-                else {
+                else if ( attempt++ > 1 ) {
                     log() << "got deadlock doing update on " << nsString
-                          << ", attempt: " << attempt++ << " retrying";
+                          << ", attempt: " << attempt << " retrying";
                     createCollection = false;
                     fakeLoop = -1;
                 }
@@ -1338,8 +1338,10 @@ namespace mongo {
                 break;
             }
             catch ( const DeadLockException& dle ) {
-                log() << "got deadlock doing delete on " << nss
-                      << ", attempt: " << attempt++ << " retrying";
+                if ( attempt++ > 1 ) {
+                    log() << "got deadlock doing delete on " << nss
+                          << ", attempt: " << attempt << " retrying";
+                }
             }
             catch ( const DBException& ex ) {
                 Status status = ex.toStatus();

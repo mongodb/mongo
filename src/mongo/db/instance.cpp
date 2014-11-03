@@ -598,9 +598,9 @@ namespace {
                     log(LogComponent::kWrites) << "got deadlock during multi update, aborting";
                     throw;
                 }
-                else {
+                else if ( attempt++ > 1 ) {
                     log(LogComponent::kWrites) << "got deadlock doing update on " << ns
-                                               << ", attempt: " << attempt++ << " retrying";
+                                               << ", attempt: " << attempt << " retrying";
                 }
             }
         }
@@ -676,8 +676,10 @@ namespace {
                 break;
             }
             catch ( const DeadLockException& dle ) {
-                log(LogComponent::kWrites) << "got deadlock doing delete on " << ns
-                                           << ", attempt: " << attempt++ << " retrying";
+                if ( attempt++ > 1 ) {
+                    log(LogComponent::kWrites) << "got deadlock doing delete on " << ns
+                                               << ", attempt: " << attempt << " retrying";
+                }
             }
         }
     }
