@@ -388,8 +388,9 @@ namespace {
                             OpTime(0, 0), Milliseconds(300));
         ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 
-        // h3 is primary and should be chosen as sync source, despite being further away than h2.
-        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        // h3 is primary and should be chosen as sync source, despite being further away than h2
+        // and the primary (h3) being behind our most recently applied optime
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(10,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     }
