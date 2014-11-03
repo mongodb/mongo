@@ -2513,14 +2513,13 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	/*
-	 * We're done reconciling a page.
-	 */
-	if (r->entries == 0 || !r->raw_compression)
-		return (__rec_split_finish_std(session, r));
+	/* We're done reconciling - write the final page */
+	if (r->raw_compression) {
+		while (r->entries != 0)
+			WT_RET(__rec_split_raw_worker(session, r, 1));
+	} else if (r->entries != 0)
+		WT_RET(__rec_split_finish_std(session, r));
 
-	while (r->entries != 0)
-		WT_RET(__rec_split_raw_worker(session, r, 1));
 	return (0);
 }
 
