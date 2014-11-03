@@ -31,10 +31,7 @@ class AsyncStat(Stat):
 class BlockStat(Stat):
     def __init__(self, name, desc, flags=''):
 	Stat.__init__(self, name, 'block manager', desc, flags)
-class BtreeStat1(Stat):
-    def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'Btree', desc, flags)
-class BtreeStat2(Stat):
+class BtreeStat(Stat):
     def __init__(self, name, desc, flags=''):
 	Stat.__init__(self, name, 'btree', desc, flags)
 class CacheStat(Stat):
@@ -243,15 +240,15 @@ connection_stats = [
     ##########################################
     # Total Btree cursor operations
     ##########################################
-    BtreeStat1('cursor_create', 'cursor create calls'),
-    BtreeStat1('cursor_insert', 'cursor insert calls'),
-    BtreeStat1('cursor_next', 'cursor next calls'),
-    BtreeStat1('cursor_prev', 'cursor prev calls'),
-    BtreeStat1('cursor_remove', 'cursor remove calls'),
-    BtreeStat1('cursor_reset', 'cursor reset calls'),
-    BtreeStat1('cursor_search', 'cursor search calls'),
-    BtreeStat1('cursor_search_near', 'cursor search near calls'),
-    BtreeStat1('cursor_update', 'cursor update calls'),
+    BtreeStat('cursor_create', 'cursor create calls'),
+    BtreeStat('cursor_insert', 'cursor insert calls'),
+    BtreeStat('cursor_next', 'cursor next calls'),
+    BtreeStat('cursor_prev', 'cursor prev calls'),
+    BtreeStat('cursor_remove', 'cursor remove calls'),
+    BtreeStat('cursor_reset', 'cursor reset calls'),
+    BtreeStat('cursor_search', 'cursor search calls'),
+    BtreeStat('cursor_search_near', 'cursor search near calls'),
+    BtreeStat('cursor_update', 'cursor update calls'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('name'))
@@ -288,30 +285,30 @@ dsrc_stats = [
     ##########################################
     # Btree statistics
     ##########################################
-    BtreeStat2('btree_column_deleted',
+    BtreeStat('btree_column_deleted',
         'column-store variable-size deleted values', 'no_scale'),
-    BtreeStat2('btree_column_fix',
+    BtreeStat('btree_column_fix',
         'column-store fixed-size leaf pages', 'no_scale'),
-    BtreeStat2('btree_column_internal',
+    BtreeStat('btree_column_internal',
         'column-store internal pages', 'no_scale'),
-    BtreeStat2('btree_column_variable',
+    BtreeStat('btree_column_variable',
         'column-store variable-size leaf pages', 'no_scale'),
-    BtreeStat2('btree_compact_rewrite', 'pages rewritten by compaction'),
-    BtreeStat2('btree_entries', 'number of key/value pairs', 'no_scale'),
-    BtreeStat2('btree_fixed_len', 'fixed-record size', 'no_aggregate,no_scale'),
-    BtreeStat2('btree_maximum_depth',
+    BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
+    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale'),
+    BtreeStat('btree_fixed_len', 'fixed-record size', 'no_aggregate,no_scale'),
+    BtreeStat('btree_maximum_depth',
         'maximum tree depth', 'max_aggregate,no_scale'),
-    BtreeStat2('btree_maxintlitem',
+    BtreeStat('btree_maxintlitem',
         'maximum internal page item size', 'no_aggregate,no_scale'),
-    BtreeStat2('btree_maxintlpage',
+    BtreeStat('btree_maxintlpage',
         'maximum internal page size', 'no_aggregate,no_scale'),
-    BtreeStat2('btree_maxleafitem',
+    BtreeStat('btree_maxleafitem',
         'maximum leaf page item size', 'no_aggregate,no_scale'),
-    BtreeStat2('btree_maxleafpage',
+    BtreeStat('btree_maxleafpage',
         'maximum leaf page size', 'no_aggregate,no_scale'),
-    BtreeStat2('btree_overflow', 'overflow pages', 'no_scale'),
-    BtreeStat2('btree_row_internal', 'row-store internal pages', 'no_scale'),
-    BtreeStat2('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
+    BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
+    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
+    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),
 
     ##########################################
     # LSM statistics

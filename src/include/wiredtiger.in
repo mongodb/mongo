@@ -3109,23 +3109,23 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_WRITE			1044
 /*! conn: pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				1045
-/*! Btree: cursor create calls */
+/*! btree: cursor create calls */
 #define	WT_STAT_CONN_CURSOR_CREATE			1046
-/*! Btree: cursor insert calls */
+/*! btree: cursor insert calls */
 #define	WT_STAT_CONN_CURSOR_INSERT			1047
-/*! Btree: cursor next calls */
+/*! btree: cursor next calls */
 #define	WT_STAT_CONN_CURSOR_NEXT			1048
-/*! Btree: cursor prev calls */
+/*! btree: cursor prev calls */
 #define	WT_STAT_CONN_CURSOR_PREV			1049
-/*! Btree: cursor remove calls */
+/*! btree: cursor remove calls */
 #define	WT_STAT_CONN_CURSOR_REMOVE			1050
-/*! Btree: cursor reset calls */
+/*! btree: cursor reset calls */
 #define	WT_STAT_CONN_CURSOR_RESET			1051
-/*! Btree: cursor search calls */
+/*! btree: cursor search calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH			1052
-/*! Btree: cursor search near calls */
+/*! btree: cursor search near calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1053
-/*! Btree: cursor update calls */
+/*! btree: cursor update calls */
 #define	WT_STAT_CONN_CURSOR_UPDATE			1054
 /*! dhandle: session dhandles swept */
 #define	WT_STAT_CONN_DH_SESSION_HANDLES			1055
