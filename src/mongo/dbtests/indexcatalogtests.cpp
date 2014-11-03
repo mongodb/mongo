@@ -33,7 +33,8 @@ namespace IndexCatalogTests {
     public:
         IndexIteratorTests() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db = ctx.db();
@@ -44,7 +45,8 @@ namespace IndexCatalogTests {
 
         ~IndexIteratorTests() {
             OperationContextImpl txn;
-            Client::WriteContext ctx(&txn, _ns);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
 
             _db->dropCollection(&txn, _ns);

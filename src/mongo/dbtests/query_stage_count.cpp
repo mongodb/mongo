@@ -47,7 +47,8 @@ namespace QueryStageCount {
     class CountStageTest {
     public:
         CountStageTest()
-            : _ctx(&_txn, ns())
+            : _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X)
+            , _ctx(&_txn, ns())
             , _coll(NULL)
         {}
 
@@ -217,7 +218,8 @@ namespace QueryStageCount {
     protected:
         vector<DiskLoc> _locs;
         OperationContextImpl _txn;
-        Client::WriteContext _ctx;
+        Lock::DBLock _dbLock;
+        Client::Context _ctx;
         Collection* _coll;
     };
 
