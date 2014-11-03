@@ -424,12 +424,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->lsm_merge_throttle.desc = "LSM: sleep for LSM merge throttle";
 	stats->lsm_rows_merged.desc = "LSM: rows merged in an LSM tree";
 	stats->lsm_work_queue_app.desc =
-	    "LSM: App work units currently queued";
+	    "LSM: application work units currently queued";
 	stats->lsm_work_queue_manager.desc =
-	    "LSM: Merge work units currently queued";
+	    "LSM: merge work units currently queued";
 	stats->lsm_work_queue_max.desc = "LSM: tree queue hit maximum";
 	stats->lsm_work_queue_switch.desc =
-	    "LSM: Switch work units currently queued";
+	    "LSM: switch work units currently queued";
 	stats->lsm_work_units_created.desc =
 	    "LSM: tree maintenance operations scheduled";
 	stats->lsm_work_units_discarded.desc =

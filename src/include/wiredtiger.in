@@ -3179,13 +3179,13 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1079
 /*! LSM: rows merged in an LSM tree */
 #define	WT_STAT_CONN_LSM_ROWS_MERGED			1080
-/*! LSM: App work units currently queued */
+/*! LSM: application work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_APP			1081
-/*! LSM: Merge work units currently queued */
+/*! LSM: merge work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_MANAGER		1082
 /*! LSM: tree queue hit maximum */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1083
-/*! LSM: Switch work units currently queued */
+/*! LSM: switch work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_SWITCH		1084
 /*! LSM: tree maintenance operations scheduled */
 #define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1085
