@@ -70,17 +70,10 @@ namespace mongo {
         // Delete documents while we are over-full and the iterator has more.
         for (boost::scoped_ptr<RecordIterator> iter(getIterator(txn));
              needsDelete(txn) && !iter->isEOF(); ) {
-
             const DiskLoc oldest = iter->getNext();
-            if (_cappedDeleteCallback) {
-                // need to notify higher layers that a diskloc is about to be deleted
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
-            }
-
             deleteRecord(txn, oldest);
         }
     }
-
 
     StatusWith<DiskLoc> KVRecordStoreCapped::insertRecord( OperationContext* txn,
                                                            const char* data,
@@ -106,7 +99,17 @@ namespace mongo {
                                                            const DocWriter* doc,
                                                            bool enforceQuota ) {
         // We need to override every insertRecord overload, otherwise the compiler gets mad.
-        return KVRecordStore::insertRecord(txn, doc, enforceQuota);
+        Slice value(doc->documentSize());
+        doc->writeDocument(value.mutableData());
+        return insertRecord(txn, value.data(), value.size(), enforceQuota);
+    }
+
+    void KVRecordStoreCapped::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
+        if (_cappedDeleteCallback) {
+            // need to notify higher layers that a diskloc is about to be deleted
+            uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, dl));
+        }
+        KVRecordStore::deleteRecord(txn, dl);
     }
 
     void KVRecordStoreCapped::appendCustomStats( OperationContext* txn,

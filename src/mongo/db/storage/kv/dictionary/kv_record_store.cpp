@@ -150,7 +150,7 @@ namespace mongo {
     int64_t KVRecordStore::_getStats(OperationContext *opCtx, const std::string &key) const {
         Slice valSlice;
         Status s = _metadataDict->get(opCtx, Slice(key), valSlice);
-        invariant(s.isOK());
+        massert(28548, str::stream() << "KVRecordStore: error getting stats: " << s.toString(), s.isOK());
         return mongo::endian::littleToNative(valSlice.as<int64_t>());
     }
 
@@ -158,11 +158,11 @@ namespace mongo {
         if (_metadataDict) {
             KVUpdateIncrementMessage nrMessage(numRecordsDelta);
             Status s = _metadataDict->update(opCtx, Slice(_numRecordsMetadataKey), nrMessage);
-            invariant(s.isOK());
+            massert(28554, str::stream() << "KVRecordStore: error updating numRecords: " << s.toString(), s.isOK());
 
             KVUpdateIncrementMessage dsMessage(dataSizeDelta);
             s = _metadataDict->update(opCtx, Slice(_dataSizeMetadataKey), dsMessage);
-            invariant(s.isOK());
+            massert(28555, str::stream() << "KVRecordStore: error updating dataSize: " << s.toString(), s.isOK());
         }
     }
 
@@ -184,9 +184,9 @@ namespace mongo {
 
     void KVRecordStore::deleteMetadataKeys(OperationContext *opCtx, KVDictionary *metadataDict, const StringData &ident) {
         Status s = metadataDict->remove(opCtx, Slice(numRecordsMetadataKey(ident)));
-        invariant(s.isOK());
+        massert(28550, str::stream() << "KVRecordStore: error deleting numRecords metadata: " << s.toString(), s.isOK());
         s = metadataDict->remove(opCtx, Slice(dataSizeMetadataKey(ident)));
-        invariant(s.isOK());
+        massert(28551, str::stream() << "KVRecordStore: error deleting dataSize metadata: " << s.toString(), s.isOK());
     }
 
     long long KVRecordStore::dataSize( OperationContext* txn ) const {
@@ -219,9 +219,10 @@ namespace mongo {
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::NoSuchKey) {
                 return RecordData(nullptr, 0);
+            } else {
+                log() << "storage engine get() failed, operation will fail: " << status.toString();
+                uasserted(28549, status.toString());
             }
-            log() << "storage engine get() failed, blowing up: " << status.toString();
-            invariant(status.isOK());
         }
 
         // Return an owned RecordData that uses the shared array from `value'
@@ -251,7 +252,7 @@ namespace mongo {
 
         Slice val;
         Status status = _db->get(txn, key.key(), val);
-        invariant(status.isOK());
+        massert(28553, str::stream() << "KVRecordStore: couldn't find record " << loc.toString() << " for delete: " << status.toString(), status.isOK());
 
         _updateStats(txn, -1, -val.size());
 

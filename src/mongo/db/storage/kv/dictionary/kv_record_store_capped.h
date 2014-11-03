@@ -57,6 +57,8 @@ namespace mongo {
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
 
+        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
+
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
                                         double scale ) const;
