@@ -162,6 +162,10 @@ namespace {
                     WriteUnitOfWork wunit(txn);
                     Client::Context cx(txn, currentOp.getNS(), false);
                     if ( !_profile(txn, c, cx.db(), currentOp, profileBufBuilder ) && lk.get() ) {
+                        if ( tryAgain ) {
+                            // we couldn't profile, but that's ok, we should have logged already
+                            break;
+                        }
                         // we took an IX lock, so now we try again with an X lock
                         tryAgain = true;
                         continue;
