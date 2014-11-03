@@ -61,6 +61,17 @@ namespace mongo {
         const unsigned DeadlockTimeoutMs = 100;
 
         /**
+         * Used to sort locks by granularity when snapshotting lock state. We must report and
+         * reacquire locks in the same granularity in which they are acquired (i.e. global, flush,
+         * database, collection, etc).
+         */
+        struct SortByGranularity {
+            inline bool operator()(const Locker::OneLock& lhs, const Locker::OneLock& rhs) {
+                return lhs.resourceId.getType() < rhs.resourceId.getType();
+            }
+        };
+
+        /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
          */
         bool isSharedMode(LockMode mode) {
@@ -285,14 +296,16 @@ namespace mongo {
         if (!it) {
             // Global lock should be the first lock on any operation
             invariant(_requests.empty());
+
+            // Start counting time since first global lock acquisition (that's when effectively
+            // any timing for the locker counts from).
+            _timer.reset();
         }
         else {
             // No upgrades on the GlobalLock are currently necessary. Should not be used until we
             // are handling deadlocks on anything other than the flush thread.
             invariant(it->mode >= mode);
         }
-
-        Timer timer;
 
         LockResult globalLockResult = lock(resourceIdGlobal, mode, timeoutMs);
         if (globalLockResult != LOCK_OK) {
@@ -304,7 +317,7 @@ namespace mongo {
         // Special-handling for MMAP V1 concurrency control
         if (IsForMMAPV1 && !it) {
             // Obey the requested timeout
-            const unsigned elapsedTimeMs = timer.millis();
+            const unsigned elapsedTimeMs = _timer.millis();
             const unsigned remainingTimeMs =
                 elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
 
@@ -554,19 +567,31 @@ namespace mongo {
         return ResourceId();
     }
 
-    namespace {
-        /**
-         * Used to sort locks by granularity when snapshotting lock state.
-         * We must restore locks in increasing granularity
-         * (ie global, then database, then collection...)
-         */
-        struct SortByGranularity {
-            inline bool operator()(const Locker::LockSnapshot::OneLock& lhs,
-                                   const Locker::LockSnapshot::OneLock& rhs) {
+    template<bool IsForMMAPV1>
+    void LockerImpl<IsForMMAPV1>::getLockerInfo(LockerInfo* lockerInfo) const {
+        invariant(lockerInfo);
 
-                return lhs.resourceId.getType() < rhs.resourceId.getType();
-            }
-        };
+        // Zero-out the contents
+        lockerInfo->locks.clear();
+        lockerInfo->waitingResource = ResourceId();
+
+        if (!isLocked()) return;
+
+        _lock.lock();
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            OneLock info;
+            info.resourceId = it.key();
+            info.mode = it->mode;
+
+            lockerInfo->locks.push_back(info);
+            it.next();
+        }
+        _lock.unlock();
+
+        std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end(), SortByGranularity());
+
+        lockerInfo->waitingResource = getWaitingResource();
     }
 
     template<bool IsForMMAPV1>
@@ -610,7 +635,7 @@ namespace mongo {
                       RESOURCE_COLLECTION == resId.getType());
 
             // And, stuff the info into the out parameter.
-            Locker::LockSnapshot::OneLock info;
+            OneLock info;
             info.resourceId = resId;
             info.mode = it->mode;
 
@@ -632,7 +657,7 @@ namespace mongo {
 
         lockGlobal(state.globalMode); // also handles MMAPV1Flush
 
-        std::vector<LockSnapshot::OneLock>::const_iterator it = state.locks.begin();
+        std::vector<OneLock>::const_iterator it = state.locks.begin();
         for (; it != state.locks.end(); it++) {
             invariant(LOCK_OK == lock(it->resourceId, it->mode));
         }

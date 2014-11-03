@@ -175,6 +175,7 @@ namespace mongo {
      * This implementation is used for the server-side code.
      */
     class WhereCallbackReal : public MatchExpressionParser::WhereCallback {
+        MONGO_DISALLOW_COPYING(WhereCallbackReal);
     public:
 
         /**
