@@ -4,6 +4,7 @@ Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris 
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
+zlibSuffix = '-1.2.8'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -25,6 +26,10 @@ if not use_system_version_of_library('boost'):
 if not use_system_version_of_library('snappy'):
     thirdPartyIncludePathList.append(
         ('snappy', '#/src/third_party/snappy' + snappySuffix))
+
+if not use_system_version_of_library('zlib'):
+    thirdPartyIncludePathList.append(
+        ('zlib', '#/src/third_party/zlib' + zlibSuffix))
 
 if not use_system_version_of_library('v8'):
     thirdPartyIncludePathList.append(
@@ -141,6 +146,26 @@ snappyEnv.Library(
         'shim_snappy.cpp',
     ])
 
+if use_system_version_of_library("zlib"):
+    zlibEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_ZLIB_SYSLIBDEP'],
+        ])
+else:
+    zlibEnv = env.Clone()
+    zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+    zlibEnv.InjectMongoIncludePaths()
+    zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
+    zlibEnv = zlibEnv.Clone(
+        LIBDEPS=[
+            'zlib' + zlibSuffix + '/zlib',
+        ])
+
+zlibEnv.Library(
+    target="shim_zlib",
+    source=[
+        'shim_zlib.cpp',
+    ])
 
 if usev8:
     if use_system_version_of_library("v8"):

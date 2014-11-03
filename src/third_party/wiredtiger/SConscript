@@ -5,7 +5,7 @@ import textwrap
 Import("env windows darwin solaris linux freebsd")
 
 env = env.Clone()
-env.InjectThirdPartyIncludePaths(libraries=['snappy'])
+env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
 
 env.Append(CPPPATH=[
         "src/include",
@@ -27,7 +27,7 @@ else:
         "Please generate an approriate wiredtiger_config.h")
     Exit(1)
 
-useZlib = False
+useZlib = True
 useSnappy = True
 
 version_file = 'build_posix/aclocal/version-set.m4'

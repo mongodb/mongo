@@ -4,6 +4,7 @@ Import("wiredtiger")
 if wiredtiger:
     wtEnv = env.Clone()
     wtEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
+    wtEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
 
     # This is the smallest possible set of files that wraps WT
     wtEnv.Library(
@@ -28,6 +29,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/processinfo',
             '$BUILD_DIR/third_party/shim_wiredtiger',
             '$BUILD_DIR/third_party/shim_snappy',
+            '$BUILD_DIR/third_party/shim_zlib',
             ],
         )
 

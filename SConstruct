@@ -303,6 +303,8 @@ add_option( "use-system-boost", "use system version of boost libraries", 0, True
 
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
 
+add_option( "use-system-zlib", "use system version of zlib library", 0, True )
+
 add_option( "use-system-v8", "use system version of v8 library", 0, True )
 
 add_option( "use-system-stemmer", "use system version of stemmer", 0, True )
@@ -1892,6 +1894,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("snappy"):
         conf.FindSysLibDep("snappy", ["snappy"])
+
+    if use_system_version_of_library("zlib"):
+        conf.FindSysLibDep("zlib", ["zlib" if windows else "z"])
 
     if use_system_version_of_library("stemmer"):
         conf.FindSysLibDep("stemmer", ["stemmer"])
