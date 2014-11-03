@@ -114,8 +114,8 @@ namespace mongo {
          * of the operation. See the details for LockResult for more information on what the
          * different results mean.
          *
-         * Acquiring the same resource twice increments the reference count of the lock so each
-         * call to lock, which doesn't time out (return value LOCK_TIMEOUT) must be matched with a
+         * Each successful acquisition of a lock on a given resource increments the reference count
+         * of the lock. Therefore, each call, which returns LOCK_OK must be matched with a
          * corresponding call to unlock.
          *
          * @param resId Id of the resource to be locked.

@@ -414,8 +414,6 @@ namespace mongo {
                 if (result == LOCK_OK) break;
 
                 invariant(result == LOCK_DEADLOCK);
-
-                invariant(unlock(resourceIdMMAPV1Flush));
             }
         }
     }

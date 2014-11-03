@@ -85,10 +85,10 @@ namespace mongo {
 
             /**
              * Returns whether the iterator has been exhausted through calls to next. This value
-             * can be used to determine whether a previous call to find ahs found something.
+             * can be used to determine whether a previous call to find has found something.
              */
             bool finished() const {
-                return (MONGO_likely(_idx == PreallocCount));
+                return (MONGO_unlikely(_idx == PreallocCount));
             }
 
             /**
