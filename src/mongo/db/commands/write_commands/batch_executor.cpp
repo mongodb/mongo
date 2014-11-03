@@ -1251,6 +1251,13 @@ namespace mongo {
             }
 
             try {
+                UpdateExecutor executor(&request, &txn->getCurOp()->debug());
+                Status status = executor.prepare();
+                if (!status.isOK()) {
+                    result->setError(toWriteError(status));
+                    return;
+                }
+
                 UpdateResult res = executor.execute(ctx.db());
 
                 const long long numDocsModified = res.numDocsModified;
