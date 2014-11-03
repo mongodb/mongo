@@ -137,10 +137,12 @@ namespace mongo {
 
         boost::scoped_ptr<PlanStage> _child;
 
-        // We do the subquery planning up front, and keep the resulting
-        // query solutions here. Lists of query solutions are dequeued
-        // and ownership is transferred to the underlying runners one
-        // at a time.
+        // We do the subquery planning up front, and keep the resulting query solutions here. Lists
+        // of query solutions are dequeued and ownership is transferred to the underlying
+        // MultiPlanStages one at a time.
+        //
+        // If we fall back on regular planning and find that there is only a single query solution,
+        // then the SubplanStage retains ownership of that solution here.
         std::queue< std::vector<QuerySolution*> > _solutions;
 
         // Holds the canonicalized subqueries. Ownership is transferred
