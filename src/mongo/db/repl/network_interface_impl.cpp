@@ -337,8 +337,7 @@ namespace {
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
         _isExecutorRunnable(false),
-        _inShutdown(false),
-        _nextThreadId(0) {
+        _inShutdown(false) {
         ConnectionPool::Options options;
         _connPool.reset(new ConnectionPool(options));
     }
@@ -352,11 +351,14 @@ namespace {
             return;
         }
         for (size_t i = 0; i < kNumThreads; ++i) {
+            const std::string threadName(str::stream() << "ReplExecNetThread-" << i);
             _threads.push_back(
                     boost::shared_ptr<boost::thread>(
                             new boost::thread(
                                     stdx::bind(&NetworkInterfaceImpl::_consumeNetworkRequests,
-                                               this))));
+                                               this,
+                                               threadName
+                                              ))));
         }
     }
 
@@ -403,7 +405,8 @@ namespace {
         _isExecutorRunnable = false;
     }
 
-    void NetworkInterfaceImpl::_consumeNetworkRequests() {
+    void NetworkInterfaceImpl::_consumeNetworkRequests(const std::string& threadName) {
+        setThreadName(threadName);
         boost::unique_lock<boost::mutex> lk(_mutex);
         while (!_inShutdown) {
             if (_pending.empty()) {
@@ -513,20 +516,10 @@ namespace {
 
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
             const stdx::function<void (OperationContext*)>& callback) {
-
-        stdx::function<std::string ()> f;
-        f = stdx::bind(&NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName, this);
-        Client::initThreadIfNotAlready(f);
+        Client::initThreadIfNotAlready();
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
         callback(&txn);
-    }
-
-    std::string NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName() {
-        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
-        std::ostringstream sb;
-        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
-        return sb.str();
     }
 
 }  // namespace repl

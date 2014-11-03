@@ -36,8 +36,9 @@
 
 #include <boost/thread/thread.hpp>
 
-#include "mongo/util/log.h"
 #include "mongo/util/concurrency/mvar.h"
+#include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     namespace threadpool {
@@ -45,10 +46,10 @@ namespace mongo {
         // Worker thread
         class Worker : boost::noncopyable {
         public:
-            explicit Worker(ThreadPool& owner)
+            explicit Worker(ThreadPool& owner, const std::string& threadName)
                 : _owner(owner)
                 , _is_done(true)
-                , _thread(stdx::bind(&Worker::loop, this))
+                , _thread(stdx::bind(&Worker::loop, this, threadName))
             {}
 
             // destructor will block until current operation is completed
@@ -72,7 +73,8 @@ namespace mongo {
             bool _is_done; // only used for error detection
             boost::thread _thread;
 
-            void loop() {
+            void loop(const std::string& threadName) {
+                setThreadName(threadName);
                 while (true) {
                     Task task = _task.take();
                     if (!task)
@@ -96,21 +98,28 @@ namespace mongo {
             }
         };
 
-        ThreadPool::ThreadPool(int nThreads)
+        ThreadPool::ThreadPool(int nThreads, const std::string& threadNamePrefix)
             : _mutex("ThreadPool"), _tasksRemaining(0)
-            , _nThreads(nThreads) {
+            , _nThreads(nThreads)
+            , _threadNamePrefix(threadNamePrefix) {
             startThreads();
         }
 
-        ThreadPool::ThreadPool(const DoNotStartThreadsTag&, int nThreads)
+        ThreadPool::ThreadPool(const DoNotStartThreadsTag&,
+                               int nThreads,
+                               const std::string& threadNamePrefix)
             : _mutex("ThreadPool"), _tasksRemaining(0)
-            , _nThreads(nThreads) {
+            , _nThreads(nThreads)
+            , _threadNamePrefix(threadNamePrefix) {
         }
 
         void ThreadPool::startThreads() {
             scoped_lock lock(_mutex);
             for (int i = 0; i < _nThreads; ++i) {
-                Worker* worker = new Worker(*this);
+                const std::string threadName(_threadNamePrefix.empty() ?
+                                                        _threadNamePrefix :
+                                                        str::stream() << _threadNamePrefix << i);
+                Worker* worker = new Worker(*this, threadName);
                 if (_tasks.empty()) {
                     _freeWorkers.push_front(worker);
                 }

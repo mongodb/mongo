@@ -156,6 +156,7 @@ namespace {
             OperationContext* txn,
             const BSONObj& config) {
         try {
+            Client::initThreadIfNotAlready("WriteReplSetConfig");
             Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
@@ -219,17 +220,7 @@ namespace {
     }
 
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
-        stdx::function<std::string ()> f;
-        f = stdx::bind(&ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName,this);
-        Client::initThreadIfNotAlready(f);
         return new OperationContextImpl;
-    }
-
-    std::string ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName() {
-        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
-        std::ostringstream sb;
-        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
-        return sb.str();
     }
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {

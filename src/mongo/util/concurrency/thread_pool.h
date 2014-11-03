@@ -48,8 +48,10 @@ namespace mongo {
         public:
             struct DoNotStartThreadsTag {};
 
-            explicit ThreadPool(int nThreads=8);
-            explicit ThreadPool(const DoNotStartThreadsTag&, int nThreads=8);
+            explicit ThreadPool(int nThreads=8, const std::string& threadNamePrefix="");
+            explicit ThreadPool(const DoNotStartThreadsTag&,
+                                int nThreads=8,
+                                const std::string& threadNamePrefix="");
 
             // blocks until all tasks are complete (tasks_remaining() == 0)
             // You should not call schedule while in the destructor
@@ -90,6 +92,7 @@ namespace mongo {
             std::list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
             int _tasksRemaining; // in queue + currently processing
             int _nThreads; // only used for sanity checking. could be removed in the future.
+            const std::string _threadNamePrefix; // used for logging/diagnostics
 
             // should only be called by a worker from the worker's thread
             void task_done(Worker* worker);

@@ -50,7 +50,9 @@ namespace {
         _networkInterface(netInterface),
         _totalEventWaiters(0),
         _inShutdown(false),
-        _dblockWorkers(threadpool::ThreadPool::DoNotStartThreadsTag(), 1),
+        _dblockWorkers(threadpool::ThreadPool::DoNotStartThreadsTag(),
+                       1,
+                       "replCallbackWithGlobalLock-"),
         _nextId(0) {
     }
 

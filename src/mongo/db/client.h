@@ -176,13 +176,12 @@ namespace mongo {
         }
 
         /**
-         * Inits a thread if that thread has not already been init'd, setting the thread name to
-         * the string returned by "nameCallback".
+         * Inits a thread if that thread has not already been init'd, using the existing thread name
          */
-        static void initThreadIfNotAlready(stdx::function<std::string ()>& nameCallback) { 
+        static void initThreadIfNotAlready() {
             if (currentClient.get())
                 return;
-            initThread(nameCallback().c_str());
+            initThread(getThreadName().c_str());
         }
 
         /** this has to be called as the client goes away, but before thread termination
