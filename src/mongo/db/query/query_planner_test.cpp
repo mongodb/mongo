@@ -2682,6 +2682,26 @@ namespace {
                                     "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}");
     }
 
+    // SERVER-15696: Make sure explodeForSort copies filters on IXSCAN stages to all of the
+    // scans resulting from the explode. Regex is the easiest way to have the planner create
+    // an index scan which filters using the index key.
+    TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuerySortProj(fromjson("{$and: [{b: {$regex: 'foo', $options: 'i'}},"
+                                          "{a: {$in: [1, 2]}}]}"),
+                         BSON("b" << 1), BSONObj());
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{sort: {pattern: {b: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{fetch: {node: {mergeSort: {nodes: "
+                                "[{ixscan: {pattern: {a:1, b:1},"
+                                           "filter: {b: {$regex: 'foo', $options: 'i'}}}},"
+                                 "{ixscan: {pattern: {a:1, b:1},"
+                                           "filter: {b: {$regex: 'foo', $options: 'i'}}}}]}}}}");
+
+    }
+
     TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
         addIndex(BSON("a" << 1 << "b" << -1 << "c" << 1));
         runQuerySortProjSkipLimit(fromjson("{a: {$in: [1, 2]}, b: {$gte: 0}}"),
