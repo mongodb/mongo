@@ -19,8 +19,11 @@ __conn_dhandle_open_lock(
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
+	int is_open, lock_busy, want_exclusive;
 
 	btree = dhandle->handle;
+	lock_busy = 0;
+	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
 
 	/*
 	 * Check that the handle is open.  We've already incremented
@@ -33,16 +36,31 @@ __conn_dhandle_open_lock(
 	 * and WT_DHANDLE_OPEN is still not set, we need to do the open.
 	 */
 	for (;;) {
-		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) &&
+		if (!want_exclusive &&
 		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
 
+		/*
+		 * If the handle is open, get a read lock and recheck.
+		 *
+		 * Wait for a read lock if we want exclusive access and failed
+		 * to get it: the sweep server may be closing this handle, and
+		 * we need to wait for it to complete.
+		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
+		    (!want_exclusive || lock_busy)) {
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
+			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
+
+			/*
+			 * If we're trying to get exclusive access and the file
+			 * is open, give up.
+			 */
+			if (is_open && want_exclusive && lock_busy)
+				return (EBUSY);
 		}
 
 		/*
@@ -50,6 +68,11 @@ __conn_dhandle_open_lock(
 		 * exclusive lock.  There is some subtlety here: if we race
 		 * with another thread that successfully opens the file, we
 		 * don't want to block waiting to get exclusive access.
+		 *
+		 * If we want exclusive access and fail to get it, only
+		 * give up if we saw the file open last time we looked:
+		 * the sweep server may have selected this handle to close
+		 * and that should not disrupt application operations.
 		 */
 		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
 			/*
@@ -57,7 +80,7 @@ __conn_dhandle_open_lock(
 			 * lock and get a read lock instead.
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-			    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
+			    !want_exclusive) {
 				WT_RET(
 				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;
@@ -66,8 +89,10 @@ __conn_dhandle_open_lock(
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			return (0);
-		} else if (ret != EBUSY || LF_ISSET(WT_DHANDLE_EXCLUSIVE))
-			return (EBUSY);
+		} else if (ret != EBUSY)
+			return (ret);
+		else if (want_exclusive)
+			lock_busy = 1;
 
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
