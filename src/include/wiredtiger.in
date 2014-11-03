@@ -3019,29 +3019,29 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 /*! async: number of allocation state races */
 #define	WT_STAT_CONN_ASYNC_ALLOC_RACE			1000
-/*! async: number of op slots viewed for alloc */
+/*! async: number of operation slots viewed for allocation */
 #define	WT_STAT_CONN_ASYNC_ALLOC_VIEW			1001
 /*! async: current work queue length */
 #define	WT_STAT_CONN_ASYNC_CUR_QUEUE			1002
-/*! async: number of async flush calls */
+/*! async: number of flush calls */
 #define	WT_STAT_CONN_ASYNC_FLUSH			1003
-/*! async: number of times op allocation failed */
+/*! async: number of times operation allocation failed */
 #define	WT_STAT_CONN_ASYNC_FULL				1004
 /*! async: maximum work queue length */
 #define	WT_STAT_CONN_ASYNC_MAX_QUEUE			1005
 /*! async: number of times worker found no work */
 #define	WT_STAT_CONN_ASYNC_NOWORK			1006
-/*! async: op allocations */
+/*! async: total allocations */
 #define	WT_STAT_CONN_ASYNC_OP_ALLOC			1007
-/*! async: op compact calls */
+/*! async: total compact calls */
 #define	WT_STAT_CONN_ASYNC_OP_COMPACT			1008
-/*! async: op insert calls */
+/*! async: total insert calls */
 #define	WT_STAT_CONN_ASYNC_OP_INSERT			1009
-/*! async: op remove calls */
+/*! async: total remove calls */
 #define	WT_STAT_CONN_ASYNC_OP_REMOVE			1010
-/*! async: op search calls */
+/*! async: total search calls */
 #define	WT_STAT_CONN_ASYNC_OP_SEARCH			1011
-/*! async: op update calls */
+/*! async: total update calls */
 #define	WT_STAT_CONN_ASYNC_OP_UPDATE			1012
 /*! block-manager: mapped bytes read */
 #define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		1013

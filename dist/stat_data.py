@@ -86,19 +86,20 @@ connection_stats = [
     # Async API statistics
     ##########################################
     AsyncStat('async_alloc_race', 'number of allocation state races'),
-    AsyncStat('async_alloc_view', 'number of op slots viewed for alloc'),
-    AsyncStat('async_flush', 'number of async flush calls'),
-    AsyncStat('async_full', 'number of times op allocation failed'),
+    AsyncStat('async_alloc_view',
+        'number of operation slots viewed for allocation'),
+    AsyncStat('async_flush', 'number of flush calls'),
+    AsyncStat('async_full', 'number of times operation allocation failed'),
     AsyncStat('async_cur_queue', 'current work queue length'),
     AsyncStat('async_max_queue',
         'maximum work queue length', 'max_aggregate,no_scale'),
     AsyncStat('async_nowork', 'number of times worker found no work'),
-    AsyncStat('async_op_alloc', 'op allocations'),
-    AsyncStat('async_op_compact', 'op compact calls'),
-    AsyncStat('async_op_insert', 'op insert calls'),
-    AsyncStat('async_op_remove', 'op remove calls'),
-    AsyncStat('async_op_search', 'op search calls'),
-    AsyncStat('async_op_update', 'op update calls'),
+    AsyncStat('async_op_alloc', 'total allocations'),
+    AsyncStat('async_op_compact', 'total compact calls'),
+    AsyncStat('async_op_insert', 'total insert calls'),
+    AsyncStat('async_op_remove', 'total remove calls'),
+    AsyncStat('async_op_search', 'total search calls'),
+    AsyncStat('async_op_update', 'total update calls'),
 
     ##########################################
     # Block manager statistics

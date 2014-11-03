@@ -321,18 +321,19 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->async_max_queue.desc = "async: maximum work queue length";
 	stats->async_alloc_race.desc =
 	    "async: number of allocation state races";
-	stats->async_flush.desc = "async: number of async flush calls";
+	stats->async_flush.desc = "async: number of flush calls";
 	stats->async_alloc_view.desc =
-	    "async: number of op slots viewed for alloc";
-	stats->async_full.desc = "async: number of times op allocation failed";
+	    "async: number of operation slots viewed for allocation";
+	stats->async_full.desc =
+	    "async: number of times operation allocation failed";
 	stats->async_nowork.desc =
 	    "async: number of times worker found no work";
-	stats->async_op_alloc.desc = "async: op allocations";
-	stats->async_op_compact.desc = "async: op compact calls";
-	stats->async_op_insert.desc = "async: op insert calls";
-	stats->async_op_remove.desc = "async: op remove calls";
-	stats->async_op_search.desc = "async: op search calls";
-	stats->async_op_update.desc = "async: op update calls";
+	stats->async_op_alloc.desc = "async: total allocations";
+	stats->async_op_compact.desc = "async: total compact calls";
+	stats->async_op_insert.desc = "async: total insert calls";
+	stats->async_op_remove.desc = "async: total remove calls";
+	stats->async_op_search.desc = "async: total search calls";
+	stats->async_op_update.desc = "async: total update calls";
 	stats->block_preload.desc = "block-manager: blocks pre-loaded";
 	stats->block_read.desc = "block-manager: blocks read";
 	stats->block_write.desc = "block-manager: blocks written";
