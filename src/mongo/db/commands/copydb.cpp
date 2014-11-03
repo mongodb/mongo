@@ -179,6 +179,7 @@ namespace mongo {
             }
             else if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
                      cmdObj.hasField(saslCommandPayloadFieldName)) {
+                uassert( 25487, "must call copydbsaslstart first", authConn_.get() );
                 BSONObj ret;
                 if ( !authConn_->runCommand( cloneOptions.fromDB,
                                              BSON( "saslContinue" << 1 <<

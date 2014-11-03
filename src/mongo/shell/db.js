@@ -269,8 +269,8 @@ DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password)
     var mechanism = this._getDefaultAuthenticationMechanism();
     assert(mechanism == "SCRAM-SHA-1" || mechanism == "MONGODB-CR");
 
-    // Check for no auth
-    if (!username || !password) {
+    // Check for no auth or copying from localhost
+    if (!username || !password || fromhost == "") {
         return this._adminCommand( { copydb:1, fromhost:fromhost, fromdb:fromdb, todb:todb } );
     }
 
