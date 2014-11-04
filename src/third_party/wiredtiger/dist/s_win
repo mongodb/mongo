@@ -1,0 +1,21 @@
+#!/bin/sh
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+egrep '#define|#undef' \
+    ../build_posix/config.hin \
+    ../build_win/wiredtiger_config.h |
+    sed 's/^.*#//' |
+    awk '{print $2}' |
+    egrep -v '^(LT_OBJDIR|PACKAGE|VERSION)' |
+    sort | uniq -u > $t
+
+test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'Windows #defines missing from build_win/wiredtiger_config.h'
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	cat $t
+	exit 1
+}
+exit 0

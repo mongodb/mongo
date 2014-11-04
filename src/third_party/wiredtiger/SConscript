@@ -1,0 +1,105 @@
+# -*- mode: python; -*-
+import re
+import textwrap
+
+Import("env windows darwin solaris linux freebsd")
+
+env = env.Clone()
+env.InjectThirdPartyIncludePaths(libraries=['snappy'])
+
+env.Append(CPPPATH=[
+        "src/include",
+    ])
+
+if windows:
+    env.Append(CPPPATH=["build_win"])
+elif darwin:
+    env.Append(CPPPATH=["build_darwin"])
+elif solaris:
+    env.Append(CPPPATH=["build_solaris"])
+elif freebsd:
+    env.Append(CPPPATH=["build_freebsd"])
+elif linux:
+    env.Append(CPPPATH=["build_linux"])
+    env.Append(CPPDEFINES=["_GNU_SOURCE"])
+else:
+    print("Wiredtiger is not supported on this platform. " +
+        "Please generate an approriate wiredtiger_config.h")
+    Exit(1)
+
+useZlib = False
+useSnappy = True
+
+version_file = 'build_posix/aclocal/version-set.m4'
+
+VERSION_MAJOR = None
+VERSION_MINOR = None
+VERSION_PATCH = None
+VERSION_STRING = None
+
+# Read the version information from the version-set.m4 file
+for l in open(File(version_file).srcnode().abspath):
+    if re.match(r'^VERSION_[A-Z]+', l):
+        exec(l)
+
+if (VERSION_MAJOR == None or
+    VERSION_MINOR == None or
+    VERSION_PATCH == None or
+    VERSION_STRING == None):
+    print "Failed to find version variables in " + version_file
+    Exit(1)
+
+wiredtiger_includes = """
+        #include <sys/types.h>
+        #ifndef _WIN32
+        #include <inttypes.h>
+        #endif
+        #include <stdarg.h>
+        #include <stdint.h>
+        #include <stdio.h>
+    """
+wiredtiger_includes = textwrap.dedent(wiredtiger_includes)
+replacements = {
+    '@VERSION_MAJOR@' : VERSION_MAJOR,
+    '@VERSION_MINOR@' : VERSION_MINOR,
+    '@VERSION_PATCH@' : VERSION_PATCH,
+    '@VERSION_STRING@' : VERSION_STRING,
+    '@uintmax_t_decl@': "",
+    '@uintptr_t_decl@': "",
+    '@off_t_decl@' : 'typedef int64_t wt_off_t;' if windows else "typedef off_t wt_off_t;",
+    '@wiredtiger_includes_decl@': wiredtiger_includes
+}
+
+env.Substfile(
+    target='wiredtiger.h',
+    source=[
+        'src/include/wiredtiger.in',
+    ],
+    SUBST_DICT=replacements)
+
+#
+# WiredTiger library
+#
+filelistfile = "dist/filelist.win" if windows else 'dist/filelist'
+
+wtsources = []
+
+with open(File(filelistfile).srcnode().abspath) as filelist:
+    wtsources = [line.strip()
+                 for line in filelist
+                 if not line.startswith("#") and len(line.strip()) >= 1]
+
+if useZlib:
+    env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZLIB'])
+    wtsources.append("ext/compressors/zlib/zlib_compress.c")
+
+if useSnappy:
+    env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
+    wtsources.append("ext/compressors/snappy/snappy_compress.c")
+
+wtlib = env.Library(
+    target="wiredtiger",
+    source=wtsources)
+
+env.Depends(wtlib, [filelistfile, version_file])
+

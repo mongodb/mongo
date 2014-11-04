@@ -1,0 +1,16 @@
+# A btree configuration with ten databases, each with a single reader and
+# single writer. Throttled to 4000 ops/second.
+# This configuration is set to run for 10 hours.
+conn_config="cache_size=100MB,log=(enabled=false)"
+database_count=10
+table_config="leaf_page_max=4k,internal_page_max=16k,leaf_item_max=1433,internal_item_max=3100,type=file"
+icount=50000
+populate_threads=1
+random_range=10000000
+checkpoint_interval=120
+checkpoint_threads=1
+report_interval=5
+run_time=36000
+threads=((count=1,throttle=1000,reads=1),(count=1,throttle=1000,inserts=1))
+value_sz=100
+warmup=10

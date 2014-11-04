@@ -1,0 +1,9 @@
+# Exclusions from release packages.
+# Each non-comment line is passed as an "--exclude" argument to "hg archive".
+lang/python/src
+src/server
+test/format
+test/packing
+test/salvage
+test/snapshot
+test/thread

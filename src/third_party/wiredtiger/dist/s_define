@@ -1,0 +1,34 @@
+#! /bin/sh
+
+# Complain about unused #defines.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# List of files to search.
+l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
+l="$l `echo ../src/include/*.i ../src/utilities/*.c ../test/*/*.c`"
+
+(
+# Copy out the list of #defines we don't use, but it's OK.
+sed -e '/^$/d' -e '/^#/d' < s_define.list
+
+# Get the list of #defines.
+# Ignore the list of configuration objects
+# Ignore the list of statistic "keys" generated for applications.
+search=`cat ../src/include/*.[hi] ../src/include/*.in |
+    sed -e '/configuration section: BEGIN/,/configuration section: END/d' \
+        -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
+    egrep '^#define' |
+    sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
+    sort -u`
+
+# Print the list of macros, followed by the occurrences: we're looking for
+# macros that only appear once.
+echo "$search"
+fgrep -who "$search" $l
+
+) | sort | uniq -u > $t
+
+test -s $t && cat $t
+
+exit 0
