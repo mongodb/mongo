@@ -271,8 +271,7 @@ namespace mongo {
           _lockState(lockState) {
         const bool isRead = (mode == MODE_S || mode == MODE_IS);
         massert(28538, "need a non-empty collection name", nsIsFull(ns));
-        dassert(_lockState->isLockHeldForMode(ResourceId(RESOURCE_DATABASE,
-                                                         nsToDatabaseSubstring(ns)),
+        dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
                                               isRead ? MODE_IS : MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
