@@ -56,6 +56,7 @@ type ServerStatus struct {
 	Mem                *MemStats              `bson:"mem"`
 	Repl               *ReplStatus            `bson:"repl"`
 	ShardCursorType    map[string]interface{} `bson:"shardCursorType"`
+	StorageEngine      map[string]string      `bson:"storageEngine"`
 }
 
 type ReplStatus struct {
@@ -291,7 +292,10 @@ type LockStatus struct {
 }
 
 type StatLine struct {
-	Key      string
+	Key string
+	// What storage engine is being used for the node with this stat line
+	StorageEngine string
+
 	Error    error
 	IsMongos bool
 	Host     string
@@ -409,7 +413,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		// check for error
 		if line.Error != nil {
 			lineJson["error"] = line.Error.Error()
-			jsonFormat["error for host '"+line.Host+"':"] = lineJson
+			jsonFormat[line.Key] = lineJson
 			continue
 		}
 
@@ -421,41 +425,46 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		lineJson["delete"] = formatOpcount(line.Delete, line.DeleteR, false)
 		lineJson["getmore"] = fmt.Sprintf("%v", line.GetMore)
 		lineJson["command"] = formatOpcount(line.Command, line.CommandR, true)
-		lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
-		lineJson["vsize"] = formatMegs(int64(line.Virtual))
-		lineJson["res"] = formatMegs(int64(line.Resident))
-		lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
-		lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
-			line.QueuedWriters)
-		lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders,
-			line.ActiveWriters)
 		lineJson["netIn"] = formatNet(line.NetIn)
 		lineJson["netOut"] = formatNet(line.NetOut)
 		lineJson["conn"] = fmt.Sprintf("%v", line.NumConnections)
 		lineJson["time"] = fmt.Sprintf("%v", line.Time.Format("15:04:05"))
+		lineJson["host"] = line.Host
 
-		mappedVal := ""      // empty for mongos
-		if line.Mapped > 0 { // not mongos, update accordingly
-			mappedVal = formatMegs(int64(line.Mapped))
-		}
-		lineJson["mapped"] = mappedVal
+		// add mmapv1-specific fields
+		if line.StorageEngine == "mmapv1" {
+			lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
+			lineJson["vsize"] = formatMegs(int64(line.Virtual))
+			lineJson["res"] = formatMegs(int64(line.Resident))
+			lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
+			lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
+				line.QueuedWriters)
+			lineJson["ar|aw"] = fmt.Sprintf("%v|%v", line.ActiveReaders,
+				line.ActiveWriters)
 
-		if all {
-			nonMappedVal := ""       // empty for mongos
-			if line.NonMapped >= 0 { // not mongos, update accordingly
-				nonMappedVal = formatMegs(int64(line.NonMapped))
+			mappedVal := ""      // empty for mongos
+			if line.Mapped > 0 { // not mongos, update accordingly
+				mappedVal = formatMegs(int64(line.Mapped))
 			}
-			lineJson["non-mapped"] = nonMappedVal
-		}
+			lineJson["mapped"] = mappedVal
 
-		lineJson["faults"] = fmt.Sprintf("%v", line.Faults)
+			if all {
+				nonMappedVal := ""       // empty for mongos
+				if line.NonMapped >= 0 { // not mongos, update accordingly
+					nonMappedVal = formatMegs(int64(line.NonMapped))
+				}
+				lineJson["non-mapped"] = nonMappedVal
+			}
 
-		highestLockedVal := "" // empty for mongos
-		if line.HighestLocked != nil && !line.IsMongos {
-			highestLockedVal = fmt.Sprintf("%v:%.1f%%",
-				line.HighestLocked.DBName, line.HighestLocked.Percentage)
+			lineJson["faults"] = fmt.Sprintf("%v", line.Faults)
+
+			highestLockedVal := "" // empty for mongos
+			if line.HighestLocked != nil && !line.IsMongos {
+				highestLockedVal = fmt.Sprintf("%v:%.1f%%",
+					line.HighestLocked.DBName, line.HighestLocked.Percentage)
+			}
+			lineJson["locked"] = highestLockedVal
 		}
-		lineJson["locked"] = highestLockedVal
 
 		if discover || repl {
 			lineJson["set"] = line.ReplSetName
@@ -472,7 +481,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		return fmt.Sprintf(`{"json error": "%v"}`, err.Error())
 	}
 
-	return string(linesAsJsonBytes)
+	return string(linesAsJsonBytes) + "\n"
 }
 
 // Implementation of LineFormatter - uses a common/text.GridWriter to format
@@ -522,6 +531,9 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 	out.EndRow()
 
 	for _, line := range lines {
+
+		mmap := line.StorageEngine == "mmapv1"
+
 		if discover {
 			out.WriteCell(line.Host)
 		}
@@ -537,37 +549,56 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
 		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
 
-		out.WriteCell(fmt.Sprintf("%v", line.Flushes))
-
-		if line.Mapped > 0 {
-			out.WriteCell(formatMegs(int64(line.Mapped)))
+		if mmap {
+			out.WriteCell(fmt.Sprintf("%v", line.Flushes))
 		} else {
-			//for mongos nodes, Mapped is empty, so write a blank cell.
-			out.WriteCell("")
+			out.WriteCell("n/a")
 		}
-		out.WriteCell(formatMegs(int64(line.Virtual)))
-		out.WriteCell(formatMegs(int64(line.Resident)))
-		if all {
-			if line.NonMapped >= 0 {
-				out.WriteCell(formatMegs(int64(line.NonMapped)))
+
+		// mmap-specific fields
+		if mmap {
+			if line.Mapped > 0 {
+				out.WriteCell(formatMegs(int64(line.Mapped)))
 			} else {
+				//for mongos nodes, Mapped is empty, so write a blank cell.
 				out.WriteCell("")
 			}
-		}
-		out.WriteCell(fmt.Sprintf("%v", line.Faults))
-		if line.HighestLocked != nil && !line.IsMongos {
-			lockCell := fmt.Sprintf("%v:%.1f", line.HighestLocked.DBName,
-				line.HighestLocked.Percentage) + "%"
-			out.WriteCell(lockCell)
+			out.WriteCell(formatMegs(int64(line.Virtual)))
+			out.WriteCell(formatMegs(int64(line.Resident)))
+			if all {
+				if line.NonMapped >= 0 {
+					out.WriteCell(formatMegs(int64(line.NonMapped)))
+				} else {
+					out.WriteCell("")
+				}
+			}
+			out.WriteCell(fmt.Sprintf("%v", line.Faults))
+			if line.HighestLocked != nil && !line.IsMongos {
+				lockCell := fmt.Sprintf("%v:%.1f", line.HighestLocked.DBName,
+					line.HighestLocked.Percentage) + "%"
+				out.WriteCell(lockCell)
+			} else {
+				//don't write any lock status for mongos nodes
+				out.WriteCell("")
+			}
+			out.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
+			out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
+			out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
 		} else {
-			//don't write any lock status for mongos nodes
-			out.WriteCell("")
+			// 8 empties for wiredtiger
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
+			out.WriteCell("n/a")
 		}
-		out.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
-		out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
-		out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
+
 		out.WriteCell(formatNet(line.NetIn))
 		out.WriteCell(formatNet(line.NetOut))
+
 		out.WriteCell(fmt.Sprintf("%v", line.NumConnections))
 		if discover || repl { //only show these fields when in discover or repl mode.
 			out.WriteCell(line.ReplSetName)
@@ -607,6 +638,13 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 		Resident:  -1,
 		NonMapped: -1,
 		Faults:    -1,
+	}
+
+	// set the storage engine appropriately
+	if newStat.StorageEngine != nil && newStat.StorageEngine["name"] != "" {
+		returnVal.StorageEngine = newStat.StorageEngine["name"]
+	} else {
+		returnVal.StorageEngine = "mmapv1"
 	}
 
 	if newStat.Opcounters != nil && oldStat.Opcounters != nil {
