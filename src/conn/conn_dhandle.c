@@ -37,7 +37,11 @@ __conn_dhandle_open_lock(
 	 * and WT_DHANDLE_OPEN is still not set, we need to do the open.
 	 */
 	for (;;) {
-		if (!want_exclusive && F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+		/*
+		 * If the handle is already open for a special operation,
+		 * give up.
+		 */
+		if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
 
 		/*
@@ -61,7 +65,7 @@ __conn_dhandle_open_lock(
 			 * If we're trying to get exclusive access and the file
 			 * is open, give up.
 			 */
-			if (is_open && want_exclusive && lock_busy)
+			if (is_open && want_exclusive)
 				return (EBUSY);
 		}
 
