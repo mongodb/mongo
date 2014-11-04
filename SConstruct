@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 import re
 import os
+import textwrap
 import distutils.sysconfig
 
 EnsureSConsVersion( 2, 0, 0 )
@@ -59,7 +60,7 @@ env = Environment(
         "/NXCOMPAT",
         ],
     LIBPATH=[ distutils.sysconfig.PREFIX + r"\libs"],
-    tools=["default", "swig"],
+    tools=["default", "swig", "textfile"],
     SWIGFLAGS=['-python',
                "-threads",
                "-O",
@@ -108,45 +109,56 @@ if useBdb:
 
 env = conf.Finish()
 
-def GenerateWiredTigerH(target, source, env):
-    # Read the version information from the RELEASE_INFO file
-    for l in open('build_posix/aclocal/version-set.m4'):
-        if re.match(r'^VERSION_', l):
-            exec(l)
 
-    print VERSION_STRING
+version_file = 'build_posix/aclocal/version-set.m4'
 
-    replacements = {
-        '@VERSION_MAJOR@' : VERSION_MAJOR,
-        '@VERSION_MINOR@' : VERSION_MINOR,
-        '@VERSION_PATCH@' : VERSION_PATCH,
-        '@VERSION_STRING@' : VERSION_STRING,
-        '@uintmax_t_decl@': "",
-        '@uintptr_t_decl@': "",
-        '@off_t_decl@' : 'typedef int64_t wt_off_t;',
-        '@wiredtiger_includes_decl@':
-        """#include <sys/types.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>"""
-        }
+VERSION_MAJOR = None
+VERSION_MINOR = None
+VERSION_PATCH = None
+VERSION_STRING = None
 
-    wt = open("src/include/wiredtiger.in")
-    out = open("wiredtiger.h", "w")
-    for l in wt:
-        lr = l
-        for r in replacements.items():
-            lr = lr.replace(r[0], str(r[1]))
-        out.write(lr)
+# Read the version information from the version-set.m4 file
+for l in open(File(version_file).srcnode().abspath):
+    if re.match(r'^VERSION_[A-Z]+', l):
+        exec(l)
 
-    wt.close()
-    out.close()
+if (VERSION_MAJOR == None or
+    VERSION_MINOR == None or
+    VERSION_PATCH == None or
+    VERSION_STRING == None):
+    print "Failed to find version variables in " + version_file
+    Exit(1)
 
+wiredtiger_includes = """
+        #include <sys/types.h>
+        #include <stdarg.h>
+        #include <stdint.h>
+        #include <stdio.h>
+    """
+wiredtiger_includes = textwrap.dedent(wiredtiger_includes)
+replacements = {
+    '@VERSION_MAJOR@' : VERSION_MAJOR,
+    '@VERSION_MINOR@' : VERSION_MINOR,
+    '@VERSION_PATCH@' : VERSION_PATCH,
+    '@VERSION_STRING@' : VERSION_STRING,
+    '@uintmax_t_decl@': "",
+    '@uintptr_t_decl@': "",
+    '@off_t_decl@' : 'typedef int64_t wt_off_t;',
+    '@wiredtiger_includes_decl@': wiredtiger_includes
+}
+
+env.Substfile(
+    target='wiredtiger.h',
+    source=[
+        'src/include/wiredtiger.in',
+    ],
+    SUBST_DICT=replacements)
 
 #
 # WiredTiger library
 #
-filelist = open(r"dist\filelist.win")
+filelistfile = r'dist\filelist.win'
+filelist = open(filelistfile)
 wtsources = [line.strip()
              for line in filelist
              if not line.startswith("#") and len(line) > 1]
@@ -158,9 +170,9 @@ if useZlib:
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
 
-env.Command('wiredtiger.h', 'src/include/wiredtiger.in', GenerateWiredTigerH)
-
 wtlib = env.Library("wiredtiger", wtsources)
+
+env.Depends(wtlib, [filelistfile, version_file])
 
 env.Program("wt", [
     "src/utilities/util_backup.c",

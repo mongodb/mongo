@@ -22,7 +22,7 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 
 	/* NULL means load from the current binary */
 	if (path == NULL) {
-		ret = GetModuleHandleEx(0, NULL, &dlh->handle);
+		ret = GetModuleHandleExA(0, NULL, &dlh->handle);
 		if (ret == FALSE)
 			WT_ERR_MSG(session,
 			    __wt_errno(), "GetModuleHandleEx(%s): %s", path, 0);

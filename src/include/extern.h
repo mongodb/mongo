@@ -541,7 +541,7 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_h
 extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
 extern void __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session);
-extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
+extern int __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], uint32_t flags);
 extern void __wt_session_close_cache(WT_SESSION_IMPL *session);
@@ -579,7 +579,6 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_close(WT_SESSION_IMPL *session);
 extern int __wt_raw_to_hex( WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to);
-extern void __wt_raw_to_hex_mem( const uint8_t *from, size_t size, uint8_t *dest, size_t dest_size);
 extern int __wt_raw_to_esc_hex( WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to);
 extern int __wt_hex2byte(const u_char *from, u_char *to);
 extern int __wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to);

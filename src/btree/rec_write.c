@@ -2011,30 +2011,6 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
- * __rec_skipped_update_chk --
- *	Return if a skipped update makes this a waste of time.
- */
-static inline int
-__rec_skipped_update_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
-{
-	/*
-	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, we'll be
-	 * able to evict something.  This should be unlikely (why did eviction
-	 * choose a recently written, small block), but it's possible.  Our
-	 * caller is responsible for calling us at the right moment, when all
-	 * of the rows have been reviewed and we're about to finalize a write.
-	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
-	    r->bnd_next == 0 && r->leave_dirty) {
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	}
-	return (0);
-}
-
-/*
  * __rec_split_raw_worker --
  *	Handle the raw compression page reconciliation bookkeeping.
  */
@@ -2393,10 +2369,6 @@ no_slots:
 		return (0);
 	}
 
-	/* Check if a skipped update makes this a waste of time. */
-	if (last_block)
-		WT_RET(__rec_skipped_update_chk(session, r));
-
 	/* We have a block, update the boundary counter. */
 	++r->bnd_next;
 
@@ -2501,20 +2473,21 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_RET(__rec_split_bnd_grow(session, r));
 		break;
 	case SPLIT_TRACKING_RAW:
+		/*
+		 * We were configured for raw compression, but never actually
+		 * wrote anything.
+		 */
+		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/* Check if a skipped update makes this a waste of time. */
-	WT_RET(__rec_skipped_update_chk(session, r));
-
 	/*
 	 * We only arrive here with no entries to write if the page was entirely
-	 * empty; if the page was empty, we merge it into its parent during the
-	 * parent's reconciliation.  This check is done after checking skipped
-	 * updates, we could have a page that's empty only because we skipped
-	 * all of the updates.
+	 * empty, and if the page is empty, we merge it into its parent during
+	 * the parent's reconciliation.  A page with skipped updates isn't truly
+	 * empty, continue on.
 	 */
-	if (r->entries == 0)
+	if (r->entries == 0 && r->skip_next == 0)
 		return (0);
 
 	/* Set the boundary reference and increment the count. */
@@ -2534,34 +2507,20 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
- * __rec_split_finish_raw --
- *	Finish processing page, raw compression version.
- */
-static inline int
-__rec_split_finish_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r)
-{
-	/* Check if a skipped update makes this a waste of time. */
-	if (r->entries == 0)
-		WT_RET(__rec_skipped_update_chk(session, r));
-
-	while (r->entries != 0)
-		WT_RET(__rec_split_raw_worker(session, r, 1));
-	return (0);
-}
-
-/*
  * __rec_split_finish --
  *	Finish processing a page.
  */
-static inline int
+static int
 __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
-	/*
-	 * We're done reconciling a page.
-	 */
-	return (r->raw_compression ?
-	    __rec_split_finish_raw(session, r) :
-	    __rec_split_finish_std(session, r));
+	/* We're done reconciling - write the final page */
+	if (r->raw_compression && r->entries != 0) {
+		while (r->entries != 0)
+			WT_RET(__rec_split_raw_worker(session, r, 1));
+	} else
+		WT_RET(__rec_split_finish_std(session, r));
+
+	return (0);
 }
 
 /*
@@ -2674,9 +2633,10 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	/* Set the zero-length value flag in the page header. */
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
 		F_CLR(dsk, WT_PAGE_EMPTY_V_ALL | WT_PAGE_EMPTY_V_NONE);
-		if (r->all_empty_value)
+
+		if (r->entries != 0 && r->all_empty_value)
 			F_SET(dsk, WT_PAGE_EMPTY_V_ALL);
-		if (!r->any_empty_value)
+		if (r->entries != 0 && !r->any_empty_value)
 			F_SET(dsk, WT_PAGE_EMPTY_V_NONE);
 	}
 
@@ -4677,6 +4637,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
+	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	size_t addr_size;
@@ -4783,13 +4744,28 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Because WiredTiger's pages grow without splitting, we're
 		 * replacing a single page with another single page most of
 		 * the time.
-		 *
-		 * We should not be saving/restoring changes for this page in
-		 * this case, we should have returned failure before writing
-		 * any blocks.
 		 */
 		bnd = &r->bnd[0];
-		WT_ASSERT(session, bnd->skip == NULL);
+
+		/*
+		 * If we're saving/restoring changes for this page, there's
+		 * nothing to write. Allocate, then initialize the array of
+		 * replacement blocks.
+		 */
+		if (bnd->skip != NULL) {
+			WT_RET(__wt_calloc_def(
+			    session, r->bnd_next, &mod->mod_multi));
+			multi = mod->mod_multi;
+			multi->skip = bnd->skip;
+			multi->skip_entries = bnd->skip_next;
+			bnd->skip = NULL;
+			multi->skip_dsk = bnd->dsk;
+			bnd->dsk = NULL;
+			mod->mod_multi_entries = 1;
+
+			F_SET(mod, WT_PM_REC_MULTIBLOCK);
+			break;
+		}
 
 		/*
 		 * If this is a root page, then we don't have an address and we
@@ -4825,10 +4801,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * Display the actual split keys: not turned on because it's a
-		 * lot of output and not generally useful.
-		 */
+		/* Display the actual split keys. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
@@ -4995,8 +4968,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 
 	/* Allocate, then initialize the array of replacement blocks. */
-	WT_RET(__wt_calloc(
-	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
+	WT_RET(__wt_calloc_def(session, r->bnd_next, &mod->mod_multi));
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
@@ -5037,8 +5009,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	mod = page->modify;
 
 	/* Allocate, then initialize the array of replacement blocks. */
-	WT_RET(__wt_calloc(
-	    session, r->bnd_next, sizeof(WT_MULTI), &mod->mod_multi));
+	WT_RET(__wt_calloc_def(session, r->bnd_next, &mod->mod_multi));
 
 	for (multi = mod->mod_multi,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {

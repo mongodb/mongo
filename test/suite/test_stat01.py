@@ -83,12 +83,12 @@ class test_stat01(wttest.WiredTigerTestCase):
     def test_basic_conn_stats(self):
         self.printVerbose(2, 'overall database stats:')
         allstat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.check_stats(allstat_cursor, 10, 'block manager: blocks written')
+        self.check_stats(allstat_cursor, 10, 'block-manager: blocks written')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
         values = allstat_cursor[stat.conn.block_write]
-        self.assertEqual(values[0], 'block manager: blocks written')
+        self.assertEqual(values[0], 'block-manager: blocks written')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         allstat_cursor.close()

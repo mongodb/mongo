@@ -19,7 +19,7 @@ __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp)
 
 	WT_RET(__wt_filename(session, filename, &path));
 
-	ret = GetFileAttributes(path);
+	ret = GetFileAttributesA(path);
 
 	__wt_free(session, path);
 
