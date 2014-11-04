@@ -397,8 +397,8 @@ func TestImportDocuments(t *testing.T) {
 	Convey("Given a mongoimport instance with which to import documents, on "+
 		"calling importDocuments", t, func() {
 		batchSize := 1
-		numProcessingThreads := 1
-		numIngestionThreads := 1
+		NumDecodingWorkers := 1
+		NumInsertionWorkers := 1
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
 			toolOptions := getBasicToolOptions()
@@ -408,9 +408,9 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "a,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				BatchSize:            &batchSize,
-				NumProcessingThreads: &numProcessingThreads,
-				NumIngestionThreads:  &numIngestionThreads,
+				BatchSize:           &batchSize,
+				NumDecodingWorkers:  &NumDecodingWorkers,
+				NumInsertionWorkers: &NumInsertionWorkers,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -431,10 +431,10 @@ func TestImportDocuments(t *testing.T) {
 				File: "testdata/test_plain2.json",
 			}
 			ingestOptions := &options.IngestOptions{
-				IgnoreBlanks:         true,
-				BatchSize:            &batchSize,
-				NumProcessingThreads: &numProcessingThreads,
-				NumIngestionThreads:  &numIngestionThreads,
+				IgnoreBlanks:        true,
+				BatchSize:           &batchSize,
+				NumDecodingWorkers:  &NumDecodingWorkers,
+				NumInsertionWorkers: &NumInsertionWorkers,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -460,8 +460,8 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					IgnoreBlanks:           true,
 					BatchSize:              &batchSize,
-					NumProcessingThreads:   &numProcessingThreads,
-					NumIngestionThreads:    &numIngestionThreads,
+					NumDecodingWorkers:     &NumDecodingWorkers,
+					NumInsertionWorkers:    &NumInsertionWorkers,
 					MaintainInsertionOrder: true,
 				}
 				sessionProvider, err = db.InitSessionProvider(*toolOptions)
@@ -493,8 +493,8 @@ func TestImportDocuments(t *testing.T) {
 				}
 				ingestOptions := &options.IngestOptions{
 					BatchSize:              &batchSize,
-					NumProcessingThreads:   &numProcessingThreads,
-					NumIngestionThreads:    &numIngestionThreads,
+					NumDecodingWorkers:     &NumDecodingWorkers,
+					NumInsertionWorkers:    &NumInsertionWorkers,
 					MaintainInsertionOrder: true,
 				}
 				sessionProvider, err = db.InitSessionProvider(*toolOptions)
@@ -526,8 +526,8 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Upsert:                 true,
 				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
+				NumDecodingWorkers:     &NumDecodingWorkers,
+				NumInsertionWorkers:    &NumInsertionWorkers,
 				MaintainInsertionOrder: true,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
@@ -560,8 +560,8 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					StopOnError:            true,
 					BatchSize:              &batchSize,
-					NumProcessingThreads:   &numProcessingThreads,
-					NumIngestionThreads:    &numIngestionThreads,
+					NumDecodingWorkers:     &NumDecodingWorkers,
+					NumInsertionWorkers:    &NumInsertionWorkers,
 					MaintainInsertionOrder: true,
 				}
 				sessionProvider, err = db.InitSessionProvider(*toolOptions)
@@ -591,10 +591,9 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
-				MaintainInsertionOrder: true,
+				BatchSize:           &batchSize,
+				NumDecodingWorkers:  &NumDecodingWorkers,
+				NumInsertionWorkers: &NumInsertionWorkers,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -627,9 +626,10 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Drop:                   true,
 				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
+				NumDecodingWorkers:     &NumDecodingWorkers,
+				NumInsertionWorkers:    &NumInsertionWorkers,
 				MaintainInsertionOrder: true,
+				WriteConcern:           "majority",
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -658,9 +658,9 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{
-				BatchSize:            &batchSize,
-				NumProcessingThreads: &numProcessingThreads,
-				NumIngestionThreads:  &numIngestionThreads,
+				BatchSize:           &batchSize,
+				NumDecodingWorkers:  &NumDecodingWorkers,
+				NumInsertionWorkers: &NumInsertionWorkers,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -686,9 +686,9 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{
-				BatchSize:            &batchSize,
-				NumProcessingThreads: &numProcessingThreads,
-				NumIngestionThreads:  &numIngestionThreads,
+				BatchSize:           &batchSize,
+				NumDecodingWorkers:  &NumDecodingWorkers,
+				NumInsertionWorkers: &NumInsertionWorkers,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
@@ -714,8 +714,8 @@ func TestImportDocuments(t *testing.T) {
 				Upsert:                 true,
 				UpsertFields:           "_id",
 				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
+				NumDecodingWorkers:     &NumDecodingWorkers,
+				NumInsertionWorkers:    &NumInsertionWorkers,
 				MaintainInsertionOrder: true,
 			}
 			sessionProvider, err = db.InitSessionProvider(*toolOptions)
@@ -748,8 +748,8 @@ func TestImportDocuments(t *testing.T) {
 				Upsert:                 true,
 				UpsertFields:           "_id",
 				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
+				NumDecodingWorkers:     &NumDecodingWorkers,
+				NumInsertionWorkers:    &NumInsertionWorkers,
 				MaintainInsertionOrder: true,
 			}
 			toolOptions := getBasicToolOptions()
@@ -783,8 +783,8 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				StopOnError:            true,
 				BatchSize:              &batchSize,
-				NumProcessingThreads:   &numProcessingThreads,
-				NumIngestionThreads:    &numIngestionThreads,
+				NumDecodingWorkers:     &NumDecodingWorkers,
+				NumInsertionWorkers:    &NumInsertionWorkers,
 				WriteConcern:           "1",
 				MaintainInsertionOrder: true,
 			}
@@ -816,8 +816,8 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					StopOnError:            true,
 					BatchSize:              &batchSize,
-					NumProcessingThreads:   &numProcessingThreads,
-					NumIngestionThreads:    &numIngestionThreads,
+					NumDecodingWorkers:     &NumDecodingWorkers,
+					NumInsertionWorkers:    &NumInsertionWorkers,
 					MaintainInsertionOrder: true,
 				}
 				sessionProvider, err = db.InitSessionProvider(*toolOptions)

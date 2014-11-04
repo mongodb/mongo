@@ -33,7 +33,6 @@ type CommandRunner interface {
 	Remove(DB, Collection string, Query interface{}) error
 	DatabaseNames() ([]string, error)
 	CollectionNames(dbName string) ([]string, error)
-	SupportsWriteCommands() (bool, error)
 }
 
 func (sp *SessionProvider) Remove(DB, Collection string, Query interface{}) error {
@@ -82,6 +81,22 @@ func (sp *SessionProvider) FindDocs(DB, Collection string, Skip, Limit int, Quer
 	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip).Limit(Limit)
 	q = ApplyFlags(q, session, flags)
 	return &CursorDocSource{q.Iter(), session}, nil
+}
+
+func (sp *SessionProvider) IsReplicaSet() (bool, error) {
+	session, err := sp.GetSession()
+	if err != nil {
+		return false, err
+	}
+	defer session.Close()
+	masterDoc := bson.M{}
+	err = session.Run("isMaster", &masterDoc)
+	if err != nil {
+		return false, err
+	}
+	_, hasSetName := masterDoc["setName"]
+	_, hasHosts := masterDoc["hosts"]
+	return hasSetName || hasHosts, nil
 }
 
 func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {

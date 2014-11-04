@@ -1,7 +1,7 @@
 package mongoimport
 
 import (
-	"github.com/mongodb/mongo-tools/common/db"
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
@@ -532,88 +532,29 @@ func TestStreamDocuments(t *testing.T) {
 	})
 }
 
-// This test will only pass with a version of mongod that supports write commands
-func TestInsertDocuments(t *testing.T) {
-	Convey("Given a set of documents to insert", t, func() {
-		toolOptions := getBasicToolOptions()
-		sessionProvider, err := db.InitSessionProvider(*toolOptions)
-		So(err, ShouldBeNil)
-		session, err := sessionProvider.GetSession()
-		So(err, ShouldBeNil)
-		collection := session.DB(testDB).C(testCollection)
-		writeConcern := "majority"
+func TestFilterIngestError(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
-		Convey("an error should be returned if there are duplicate _ids", func() {
-			documents := []bson.D{
-				bson.D{bson.DocElem{"_id", 1}},
-				bson.D{bson.DocElem{"a", 3}},
-				bson.D{bson.DocElem{"_id", 1}},
-				bson.D{bson.DocElem{"a", 4}},
-			}
-			numInserted, err := insertDocuments(
-				convertBSONDToRaw(documents),
-				collection,
-				false,
-				writeConcern,
-			)
-			So(err, ShouldNotBeNil)
-			So(numInserted, ShouldEqual, 3)
+	Convey("Given a boolean 'stopOnError' and an error...", t, func() {
+
+		Convey("an error should be returned if stopOnError is true the err is not nil", func() {
+			So(filterIngestError(true, fmt.Errorf("")), ShouldNotBeNil)
 		})
-		Convey("no error should be returned if the documents are valid", func() {
-			documents := []bson.D{
-				bson.D{bson.DocElem{"a", 1}},
-				bson.D{bson.DocElem{"a", 2}},
-				bson.D{bson.DocElem{"a", 3}},
-				bson.D{bson.DocElem{"a", 4}},
-			}
-			numInserted, err := insertDocuments(
-				convertBSONDToRaw(documents),
-				collection,
-				false,
-				writeConcern,
-			)
-			So(err, ShouldBeNil)
-			So(numInserted, ShouldEqual, 4)
+
+		Convey("errLostConnection should be returned if stopOnError is true the err is io.EOF", func() {
+			So(filterIngestError(true, io.EOF), ShouldEqual, errLostConnection)
 		})
-		Convey("ordered inserts with duplicates should error out", func() {
-			documents := []bson.D{
-				bson.D{bson.DocElem{"_id", 1}},
-				bson.D{bson.DocElem{"a", 2}},
-				bson.D{bson.DocElem{"_id", 1}},
-				bson.D{bson.DocElem{"a", 4}},
-			}
-			numInserted, err := insertDocuments(
-				convertBSONDToRaw(documents),
-				collection,
-				true,
-				writeConcern,
-			)
-			So(err, ShouldNotBeNil)
-			So(numInserted, ShouldEqual, 2)
+
+		Convey("no error should be returned if stopOnError is false the err is not nil", func() {
+			So(filterIngestError(false, fmt.Errorf("")), ShouldBeNil)
 		})
-		Convey("ordered inserts without duplicates should work without errors", func() {
-			documents := []bson.D{
-				bson.D{bson.DocElem{"a", 1}},
-				bson.D{bson.DocElem{"a", 2}},
-				bson.D{bson.DocElem{"a", 3}},
-				bson.D{bson.DocElem{"a", 4}},
-			}
-			numInserted, err := insertDocuments(
-				convertBSONDToRaw(documents),
-				collection,
-				true,
-				writeConcern,
-			)
-			So(err, ShouldBeNil)
-			So(numInserted, ShouldEqual, 4)
+
+		Convey("no error should be returned if stopOnError is false the err is nil", func() {
+			So(filterIngestError(false, nil), ShouldBeNil)
 		})
-		Reset(func() {
-			session, err := sessionProvider.GetSession()
-			if err != nil {
-				t.Fatalf("error getting session: %v", err)
-			}
-			defer session.Close()
-			session.DB(testDB).C(testCollection).DropCollection()
+
+		Convey("no error should be returned if stopOnError is true the err is nil", func() {
+			So(filterIngestError(true, nil), ShouldBeNil)
 		})
 	})
 }
