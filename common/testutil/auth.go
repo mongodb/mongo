@@ -66,10 +66,9 @@ func CreateUserWithRole(session *mgo.Session, user,
 func GetAuthOptions() options.Auth {
 	if HasTestType(AUTH_TEST_TYPE) {
 		return options.Auth{
-			Username:  os.Getenv(CreatedUserNameEnv),
-			Password:  os.Getenv(CreatedUserPasswordEnv),
-			Source:    "admin",
-			Mechanism: "MONGODB-CR",
+			Username: os.Getenv(CreatedUserNameEnv),
+			Password: os.Getenv(CreatedUserPasswordEnv),
+			Source:   "admin",
 		}
 	}
 
