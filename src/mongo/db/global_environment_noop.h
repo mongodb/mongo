@@ -39,8 +39,6 @@ namespace mongo {
         void registerStorageEngine(const std::string& name,
                                    const StorageEngine::Factory* factory);
 
-        bool isRegisteredStorageEngine(const std::string& name);
-
         bool killOperation(unsigned int opId);
 
         void setKillAllOperations();

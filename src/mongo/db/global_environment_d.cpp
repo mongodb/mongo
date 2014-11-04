@@ -91,10 +91,6 @@ namespace mongo {
         _storageFactories[name] = factory;
     }
 
-    bool GlobalEnvironmentMongoD::isRegisteredStorageEngine(const std::string& name) {
-        return _storageFactories.count(name);
-    }
-
     void GlobalEnvironmentMongoD::setKillAllOperations() {
         scoped_lock clientLock(Client::clientsMutex);
         _globalKill = true;

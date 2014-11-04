@@ -44,10 +44,6 @@ namespace mongo {
     void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
                                                       const StorageEngine::Factory* factory) { }
 
-    bool GlobalEnvironmentNoop::isRegisteredStorageEngine(const std::string& name) {
-        return false;
-    }
-
     void GlobalEnvironmentNoop::setKillAllOperations() { }
 
     void GlobalEnvironmentNoop::unsetKillAllOperations() { }

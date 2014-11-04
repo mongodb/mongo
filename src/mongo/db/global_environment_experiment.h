@@ -72,11 +72,6 @@ namespace mongo {
                                            const StorageEngine::Factory* factory) = 0;
 
         /**
-         * Returns true if "name" refers to a registered storage engine.
-         */
-        virtual bool isRegisteredStorageEngine(const std::string& name) = 0;
-
-        /**
          * Set the storage engine.  The engine must have been registered via registerStorageEngine.
          */
         virtual void setGlobalStorageEngine(const std::string& name) = 0;
