@@ -69,7 +69,8 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 		t.Fatalf("error dialing server: %v", err)
 	}
 
-	testutil.CreateUserAdmin(t, session)
+	err = testutil.CreateUserAdmin(session)
+	So(err, ShouldBeNil)
 	err = testutil.CreateUserWithRole(session, "cAdmin", "password",
 		mgo.RoleClusterAdmin, true)
 	So(err, ShouldBeNil)
