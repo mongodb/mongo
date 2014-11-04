@@ -170,7 +170,12 @@ namespace repl {
                     "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" 
                       << rsLog;
                 setMinValid(txn, oldestOpTimeSeen);
-                replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+                bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+                if (!worked) {
+                    warning() << "Failed to transition into "
+                              << MemberState(MemberState::RS_RECOVERING)
+                              << ". Current state: " << replCoord->getCurrentMemberState();
+                }
                 return;
             }
 

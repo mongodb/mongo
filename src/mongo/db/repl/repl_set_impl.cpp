@@ -436,7 +436,8 @@ namespace {
         }
 
 
-        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
+        bool worked = getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
+        invariant(worked);
         startThreads();
         newReplUp(); // oplog.cpp
     }

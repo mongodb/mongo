@@ -473,7 +473,11 @@ namespace {
             return;
         }
 
-        replCoord->setFollowerMode(MemberState::RS_SECONDARY);
+        bool worked = replCoord->setFollowerMode(MemberState::RS_SECONDARY);
+        if (!worked) {
+            warning() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
+                      << ". Current state: " << replCoord->getCurrentMemberState();
+        }
     }
 }
 
