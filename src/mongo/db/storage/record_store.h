@@ -281,6 +281,19 @@ namespace mongo {
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL ) = 0;
+
+        /**
+         * Return the DiskLoc of an oplog entry as close to startingPosition as possible without
+         * being higher. If there are no entries <= startingPosition, return DiskLoc().
+         *
+         * If you don't implement the oplogStartHack, just use the default implementation which
+         * returns an Invalid DiskLoc.
+         */
+        virtual DiskLoc oplogStartHack(OperationContext* txn,
+                                       const DiskLoc& startingPosition) const {
+            return DiskLoc().setInvalid();
+        }
+
     protected:
         std::string _ns;
     };

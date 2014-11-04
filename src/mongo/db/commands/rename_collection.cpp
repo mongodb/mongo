@@ -127,6 +127,12 @@ namespace mongo {
                 return false;
             }
 
+            if (NamespaceString::oplog(source) != NamespaceString::oplog(target)) {
+                errmsg =
+                    "If either the source or target of a rename is an oplog name, both must be";
+                return false;
+            }
+
             if (!fromRepl) { // If it got through on the master, need to allow it here too
                 Status sourceStatus = userAllowedWriteNS(source);
                 if (!sourceStatus.isOK()) {

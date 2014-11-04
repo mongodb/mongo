@@ -258,8 +258,8 @@ namespace mongo {
         //
 
         enum { 
-            // first bit of offsets used in _KeyNode we don't use -1 here.
-            OurNullOfs = -2
+            OurNullOfs = -2, // first bit of offsets used in _KeyNode we don't use -1 here
+            OurMaxA = 0xffffff, // highest 3-byte value
         };
 
         void Null() { 

@@ -32,8 +32,10 @@
 #include "mongo/db/storage/heap1/record_store_heap.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/log.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -93,8 +95,8 @@ namespace mongo {
               _cappedMaxSize(cappedMaxSize),
               _cappedMaxDocs(cappedMaxDocs),
               _cappedDeleteCallback(cappedDeleteCallback),
-              _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data()) {
-
+              _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
+                               : new Data(NamespaceString::oplog(ns))) {
         if (!*dataInOut) {
             dataInOut->reset(_data); // takes ownership
         }
@@ -176,6 +178,18 @@ namespace mongo {
         }
     }
 
+    StatusWith<DiskLoc> HeapRecordStore::extractAndCheckLocForOplog(const char* data,
+                                                                    int len) const {
+        StatusWith<DiskLoc> status = oploghack::extractKey(data, len);
+        if (!status.isOK())
+            return status;
+
+        if (!_data->records.empty() && status.getValue() <= _data->records.rbegin()->first)
+            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts not higher than highest");
+
+        return status;
+    }
+
     StatusWith<DiskLoc> HeapRecordStore::insertRecord(OperationContext* txn,
                                                       const char* data,
                                                       int len,
@@ -190,7 +204,17 @@ namespace mongo {
         HeapRecord rec(len);
         memcpy(rec.data.get(), data, len);
 
-        const DiskLoc loc = allocateLoc();
+        DiskLoc loc;
+        if (_data->isOplog) {
+            StatusWith<DiskLoc> status = extractAndCheckLocForOplog(data, len);
+            if (!status.isOK())
+                return status;
+            loc = status.getValue();
+        }
+        else {
+            loc = allocateLoc();
+        }
+
         txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
         _data->dataSize += len;
         _data->records[loc] = rec;
@@ -214,7 +238,17 @@ namespace mongo {
         HeapRecord rec(len);
         doc->writeDocument(rec.data.get());
 
-        const DiskLoc loc = allocateLoc();
+        DiskLoc loc;
+        if (_data->isOplog) {
+            StatusWith<DiskLoc> status = extractAndCheckLocForOplog(rec.data.get(), len);
+            if (!status.isOK())
+                return status;
+            loc = status.getValue();
+        }
+        else {
+            loc = allocateLoc();
+        }
+
         txn->recoveryUnit()->registerChange(new InsertChange(_data, loc));
         _data->dataSize += len;
         _data->records[loc] = rec;
@@ -411,6 +445,23 @@ namespace mongo {
         // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
         invariant(id < (1LL << 53));
         return DiskLoc(int(id >> 30), int((id << 1) & ~(1<<31)));
+    }
+
+    DiskLoc HeapRecordStore::oplogStartHack(OperationContext* txn,
+                                            const DiskLoc& startingPosition) const {
+        if (!_data->isOplog)
+            return DiskLoc().setInvalid();
+
+        const Records& records = _data->records;
+
+        if (records.empty())
+            return DiskLoc();
+
+        Records::const_iterator it = records.lower_bound(startingPosition);
+        if (it == records.end() || it->first > startingPosition)
+            --it;
+
+        return it->first;
     }
 
     //

@@ -50,7 +50,7 @@ namespace mongo {
     }
 
     inline bool NamespaceString::oplog(const StringData& ns) {
-        return ns == "local.oplog.rs" || ns == "local.oplog.$main";
+        return ns.startsWith("local.oplog.");
     }
 
     inline bool NamespaceString::special(const StringData& ns) {

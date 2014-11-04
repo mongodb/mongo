@@ -24,7 +24,7 @@ assert.eq( "i", lastop().op );
 op = lastop();
 printjson( op );
 op.ts.t = op.ts.t + 600000 // 10 minutes
-m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} );
+assert.commandWorked(m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} ));
 
 rt.stop( true );
 m = rt.start( true, null, true );
@@ -36,9 +36,9 @@ assert.eq( op.ts.i + 1, lastop().ts.i );
 
 op = lastop();
 printjson( op );
-op.ts.i = Math.pow(2,31);
+op.ts.i = Math.pow(2,31)-1;
 printjson( op );
-m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} );
+assert.commandWorked(m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} ));
 
 rt.stop( true );
 m = rt.start( true, null, true );

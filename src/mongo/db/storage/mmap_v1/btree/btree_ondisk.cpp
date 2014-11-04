@@ -40,7 +40,11 @@ namespace mongo {
     void DiskLoc56Bit::operator=(const DiskLoc& loc) {
         ofs = loc.getOfs();
         int la = loc.a();
-        invariant( la <= 0xffffff ); // must fit in 3 bytes
+        if (la == maxDiskLoc.a()) {
+            invariant(ofs == maxDiskLoc.getOfs());
+            la = OurMaxA;
+        }
+        invariant( la <= OurMaxA ); // must fit in 3 bytes
         if( la < 0 ) {
             if ( la != -1 ) {
                 log() << "btree diskloc isn't negative 1: " << la << std::endl;

@@ -138,9 +138,6 @@ namespace mongo {
                 return x;
             return ofs - b.ofs;
         }
-        bool operator<(const DiskLoc& b) const {
-            return compare(b) < 0;
-        }
 
         /**
          * Hash value for this disk location.  The hash implementation may be modified, and its
@@ -161,6 +158,11 @@ namespace mongo {
     };
 #pragma pack()
 
+    inline bool operator< (const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) <  0; }
+    inline bool operator<=(const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) <= 0; }
+    inline bool operator> (const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) >  0; }
+    inline bool operator>=(const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) >= 0; }
+
     inline size_t DiskLoc::Hasher::operator()( DiskLoc loc ) const {
         size_t hash = 0;
         boost::hash_combine(hash, loc.a());
@@ -176,10 +178,9 @@ namespace mongo {
     // headers must precede Records in a file.
     const DiskLoc minDiskLoc(0, 0);
 
-    // Maximum allowed DiskLoc.  Note that only three bytes are used to represent the file number
-    // for consistency with the v1 index DiskLoc storage format, which uses only 7 bytes total.
+    // Maximum allowed DiskLoc.
     // No Record may begin at this location because the minimum size of a Record is larger than one
     // byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
-    const DiskLoc maxDiskLoc(0x00ffffff, 0x7ffffffe);
+    const DiskLoc maxDiskLoc(0x7fffffff, 0x7ffffffe);
 
 } // namespace mongo

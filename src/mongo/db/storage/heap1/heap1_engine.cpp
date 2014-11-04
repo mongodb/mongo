@@ -55,14 +55,14 @@ namespace mongo {
                                              const CollectionOptions& options) {
         boost::mutex::scoped_lock lk(_mutex);
         if (options.capped) {
-            return new HeapRecordStore(ident,
+            return new HeapRecordStore(ns,
                                        &_dataMap[ident],
                                        true,
                                        options.cappedSize ? options.cappedSize : 4096,
                                        options.cappedMaxDocs ? options.cappedMaxDocs : -1);
         }
         else {
-            return new HeapRecordStore(ident, &_dataMap[ident]);
+            return new HeapRecordStore(ns, &_dataMap[ident]);
         }
     }
 

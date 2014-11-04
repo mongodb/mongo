@@ -50,6 +50,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
@@ -103,6 +104,11 @@ namespace {
         }
 
         return mongoutils::str::equals(me->path().rawData(), "ts");
+    }
+
+    mongo::BSONElement extractOplogTsOptime(const mongo::MatchExpression* me) {
+        invariant(isOplogTsPred(me));
+        return static_cast<const mongo::ComparisonMatchExpression*>(me)->getData();
     }
 
 }  // namespace
@@ -451,31 +457,48 @@ namespace mongo {
                           "$gt or $gte over the 'ts' field.");
         }
 
-        // Make an oplog start finding stage.
-        WorkingSet* oplogws = new WorkingSet();
-        OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
+        DiskLoc startLoc = DiskLoc().setInvalid();
 
-        PlanExecutor* rawExec;
-        // Takes ownership of ws and stage.
-        Status execStatus = PlanExecutor::make(txn, oplogws, stage, collection,
-                                               PlanExecutor::YIELD_AUTO, &rawExec);
-        invariant(execStatus.isOK());
-        scoped_ptr<PlanExecutor> exec(rawExec);
-
-        // The stage returns a DiskLoc of where to start.
-        DiskLoc startLoc;
-        PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
-
-        // This is normal.  The start of the oplog is the beginning of the collection.
-        if (PlanExecutor::IS_EOF == state) {
-            return getExecutor(txn, collection, autoCq.release(), PlanExecutor::YIELD_AUTO,
-                               execOut);
+        // See if the RecordStore supports the oplogStartHack
+        const BSONElement tsElem = extractOplogTsOptime(tsExpr);
+        if (tsElem.type() == Timestamp) {
+            StatusWith<DiskLoc> goal = oploghack::keyForOptime(tsElem._opTime());
+            if (goal.isOK()) {
+                startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
+            }
         }
 
-        // This is not normal.  An error was encountered.
-        if (PlanExecutor::ADVANCED != state) {
-            return Status(ErrorCodes::InternalError,
-                          "quick oplog start location had error...?");
+        if (startLoc.isValid()) {
+            LOG(3) << "Using direct oplog seek";
+        }
+        else {
+            LOG(3) << "Using OplogStart stage";
+
+            // Fallback to trying the OplogStart stage.
+            WorkingSet* oplogws = new WorkingSet();
+            OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
+            PlanExecutor* rawExec;
+
+            // Takes ownership of oplogws and stage.
+            Status execStatus = PlanExecutor::make(txn, oplogws, stage, collection,
+                                                   PlanExecutor::YIELD_AUTO, &rawExec);
+            invariant(execStatus.isOK());
+            scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // The stage returns a DiskLoc of where to start.
+            PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
+
+            // This is normal.  The start of the oplog is the beginning of the collection.
+            if (PlanExecutor::IS_EOF == state) {
+                return getExecutor(txn, collection, autoCq.release(), PlanExecutor::YIELD_AUTO,
+                                   execOut);
+            }
+
+            // This is not normal.  An error was encountered.
+            if (PlanExecutor::ADVANCED != state) {
+                return Status(ErrorCodes::InternalError,
+                              "quick oplog start location had error...?");
+            }
         }
 
         // cout << "diskloc is " << startLoc.toString() << endl;

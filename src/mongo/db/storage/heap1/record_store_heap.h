@@ -129,6 +129,9 @@ namespace mongo {
 
         virtual long long numRecords( OperationContext* txn ) const { return _data->records.size(); }
 
+        virtual DiskLoc oplogStartHack(OperationContext* txn,
+                                       const DiskLoc& startingPosition) const;
+
     protected:
         struct HeapRecord {
             HeapRecord() :size(0) {}
@@ -159,6 +162,8 @@ namespace mongo {
         class InsertChange;
         class RemoveChange;
 
+        StatusWith<DiskLoc> extractAndCheckLocForOplog(const char* data, int len) const;
+
         DiskLoc allocateLoc();
         bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
@@ -171,11 +176,12 @@ namespace mongo {
 
         // This is the "persistant" data.
         struct Data {
-            Data() :dataSize(0), nextId(1) {}
+            Data(bool isOplog) :dataSize(0), nextId(1), isOplog(isOplog) {}
 
             int64_t dataSize;
             Records records;
             int64_t nextId;
+            const bool isOplog;
         };
 
         Data* const _data;
