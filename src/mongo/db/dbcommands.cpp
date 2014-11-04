@@ -650,16 +650,18 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            // Check shard version at startup.
-            // This will throw before we've done any work if shard version is outdated
-            AutoGetCollectionForRead ctx(txn, ns);
-            Collection* coll = ctx.getCollection();
-
             CanonicalQuery* cq;
             if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return 0;
             }
+
+            // Check shard version at startup.
+            // This will throw before we've done any work if shard version is outdated
+            // We drop and re-acquire these locks every document because md5'ing is expensive
+            scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
+            Collection* coll = ctx->getCollection();
+            const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
             PlanExecutor* rawExec;
             if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
@@ -669,8 +671,8 @@ namespace mongo {
             }
 
             auto_ptr<PlanExecutor> exec(rawExec);
-
-            const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
+            // Process notifications when the lock is released/reacquired in the loop below
+            exec->registerExec();
 
             BSONObj obj;
             PlanExecutor::ExecState state;
@@ -687,13 +689,33 @@ namespace mongo {
                     uassert( 10040 ,  "chunks out of order" , n == myn );
                 }
 
-                // make a copy of obj since we access data in it while yielding
+                // make a copy of obj since we access data in it while yielding locks
                 BSONObj owned = obj.getOwned();
+                exec->saveState();
+                // UNLOCKED
+                ctx.reset();
+
                 int len;
                 const char * data = owned["data"].binDataClean( len );
-
+                // This is potentially an expensive operation, so do it out of the lock
                 md5_append( &st , (const md5_byte_t*)(data) , len );
                 n++;
+
+                try {
+                    // RELOCKED
+                    ctx.reset(new AutoGetCollectionForRead(txn, ns));
+                }
+                catch (const SendStaleConfigException& ex) {
+                    LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
+                    break;
+                }
+
+                // Have the lock again. See if we were killed.
+                if (!exec->restoreState(txn)) {
+                    if (!partialOk) {
+                        uasserted(13281, "File deleted during filemd5 command");
+                    }
+                }
             }
 
             if (partialOk)
