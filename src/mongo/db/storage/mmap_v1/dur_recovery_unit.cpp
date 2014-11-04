@@ -167,7 +167,9 @@ namespace mongo {
     }
 
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
-        invariant(len > 0);
+        if (len == 0)
+            return data; // Don't need to do anything for empty ranges.
+
 #if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
 
