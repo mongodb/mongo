@@ -164,7 +164,14 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
 
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
+	/*
+	 * If this is a file we are syncing, some filesystems require that we
+	 * sync the directory to be confident that the file will appear.
+	 */
+	if ((dio_type == WT_FILE_TYPE_DATA &&
+	    F_ISSET(conn, WT_CONN_CKPT_SYNC)) ||
+	    (dio_type == WT_FILE_TYPE_LOG &&
+	    FLD_ISSET(conn->txn_logsync, WT_LOG_FLUSH)))
 		WT_ERR(__open_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
