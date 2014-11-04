@@ -310,7 +310,7 @@ namespace repl {
          * This is an interface that allows the applier to reenable writes after
          * a successful election triggers the draining of the applier buffer.
          */
-        virtual void signalDrainComplete() = 0;
+        virtual void signalDrainComplete(OperationContext* txn) = 0;
 
         /**
          * Signals the sync source feedback thread to wake up and send a handshake and

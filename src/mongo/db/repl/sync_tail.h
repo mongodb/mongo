@@ -87,7 +87,9 @@ namespace repl {
 
         // returns true if we should continue waiting for BSONObjs, false if we should
         // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-        bool tryPopAndWaitForMore(OpQueue* ops, ReplicationCoordinator* replCoord);
+        bool tryPopAndWaitForMore(OperationContext* txn,
+                                  OpQueue* ops,
+                                  ReplicationCoordinator* replCoord);
 
     protected:
         // Cap the batches using the limit on journal commits.

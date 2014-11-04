@@ -491,7 +491,7 @@ namespace {
         return BackgroundSync::get()->isAssumingPrimary_inlock();
     }
 
-    void LegacyReplicationCoordinator::signalDrainComplete() {
+    void LegacyReplicationCoordinator::signalDrainComplete(OperationContext*) {
         // nothing further to do
     }
 

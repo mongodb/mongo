@@ -414,9 +414,8 @@ namespace repl {
         unsigned long long entriesApplied = 0;
         while (true) {
             OpQueue ops;
-            OperationContextImpl ctx;
 
-            while (!tryPopAndWaitForMore(&ops, getGlobalReplicationCoordinator())) {
+            while (!tryPopAndWaitForMore(txn, &ops, getGlobalReplicationCoordinator())) {
                 // nothing came back last time, so go again
                 if (ops.empty()) continue;
 
@@ -582,8 +581,9 @@ namespace {
                     }
                 }
                 // keep fetching more ops as long as we haven't filled up a full batch yet
-            } while (!tryPopAndWaitForMore(&ops, replCoord) && // tryPopAndWaitForMore returns true 
-                                                               // when we need to end a batch early
+            } while (!tryPopAndWaitForMore(&txn, &ops, replCoord) && // tryPopAndWaitForMore returns
+                                                                     // true when we need to end a
+                                                                     // batch early
                    (ops.getSize() < replBatchLimitBytes) &&
                    !inShutdown());
 
@@ -626,7 +626,9 @@ namespace {
     // This function also blocks 1 second waiting for new ops to appear in the bgsync
     // queue.  We can't block forever because there are maintenance things we need
     // to periodically check in the loop.
-    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops, ReplicationCoordinator* replCoord) {
+    bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
+                                        SyncTail::OpQueue* ops,
+                                        ReplicationCoordinator* replCoord) {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(&op);
@@ -634,7 +636,7 @@ namespace {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
-                replCoord->signalDrainComplete();
+                replCoord->signalDrainComplete(txn);
                 // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
@@ -688,21 +690,27 @@ namespace {
     OpTime SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
         OpTime lastOpTime;
         {
-            OperationContextImpl txn; // XXX?
-            Lock::DBLock lk(txn.lockState(), "local", MODE_X);
-            WriteUnitOfWork wunit(&txn);
+            OperationContextImpl txn;
+            {
+                Lock::DBLock lk(txn.lockState(), "local", MODE_X);
+                WriteUnitOfWork wunit(&txn);
 
-            while (!ops->empty()) {
-                const BSONObj& op = ops->front();
-                // this updates lastOpTimeApplied
-                lastOpTime = _logOpObjRS(&txn, op);
-                ops->pop_front();
-             }
-            wunit.commit();
+                while (!ops->empty()) {
+                    const BSONObj& op = ops->front();
+                    // this updates lastOpTimeApplied
+                    lastOpTime = _logOpObjRS(&txn, op);
+                    ops->pop_front();
+                 }
+                wunit.commit();
+            }
+
+            // This call may result in us assuming PRIMARY role if we'd been waiting for our sync
+            // buffer to drain and it's now empty.  This will acquire a global lock to drop all
+            // temp collections, so we must release the above lock on the local database before
+            // doing so.
+            BackgroundSync::get()->notify(&txn);
         }
 
-        // Update write concern on primary
-        BackgroundSync::get()->notify();
         return lastOpTime;
     }
 

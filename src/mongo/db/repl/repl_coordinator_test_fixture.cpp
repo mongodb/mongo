@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -170,6 +171,7 @@ namespace {
     }
 
     void ReplCoordTest::simulateSuccessfulElection() {
+        OperationContextReplMock txn;
         ReplicationCoordinatorImpl* replCoord = getReplCoord();
         NetworkInterfaceMock* net = getNet();
         ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
@@ -221,7 +223,7 @@ namespace {
         replCoord->fillIsMasterForReplSet(&imResponse);
         ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
         ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-        replCoord->signalDrainComplete();
+        replCoord->signalDrainComplete(&txn);
         replCoord->fillIsMasterForReplSet(&imResponse);
         ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
         ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
