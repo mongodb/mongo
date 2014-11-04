@@ -188,6 +188,7 @@ namespace mongo {
             // If we're a background index, replace exclusive db lock with an intent lock, so that
             // other readers and writers can proceed during this phase.  
             if (indexer.getBuildInBackground()) {
+                txn->recoveryUnit()->commitAndRestart();
                 dbLock.relockWithMode(MODE_IX);
             }
             try {
@@ -201,6 +202,7 @@ namespace mongo {
                     try {
                         // This function cannot throw today, but we will preemptively prepare for
                         // that day, to avoid data corruption due to lack of index cleanup.
+                        txn->recoveryUnit()->commitAndRestart();
                         dbLock.relockWithMode(MODE_X);
                     }
                     catch (...) {
@@ -211,6 +213,7 @@ namespace mongo {
             }
             // Need to return db lock back to exclusive, to complete the index build.
             if (indexer.getBuildInBackground()) {
+                txn->recoveryUnit()->commitAndRestart();
                 dbLock.relockWithMode(MODE_X);
                 Database* db = dbHolder().get(txn, ns.db());
                 uassert(28551, "database dropped during index build", db);

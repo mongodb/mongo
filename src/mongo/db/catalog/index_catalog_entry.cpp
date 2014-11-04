@@ -73,7 +73,8 @@ namespace mongo {
           _accessMethod( NULL ),
           _headManager(new HeadManagerImpl(this)),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
-          _isReady( false ) {
+          _isReady( false ),
+          _wantToSetIsMultikey( false ) {
         _descriptor->_cachedEntry = this;
     }
 
@@ -126,6 +127,15 @@ namespace mongo {
     void IndexCatalogEntry::setMultikey( OperationContext* txn ) {
         if ( isMultikey( txn ) )
             return;
+
+        if ( !_isReady && txn->lockState() &&
+             !txn->lockState()->isCollectionLockedForMode( _ns, MODE_X ) ) {
+            // We don't have an exclusive lock, so can't set is multi key.
+            // But, we're building it in an IX lock, so we keep track and will set it later
+            _wantToSetIsMultikey = true;
+            return;
+        }
+
         if ( _collection->setIndexIsMultikey( txn,
                                               _descriptor->indexName(),
                                               true ) ) {
@@ -135,6 +145,7 @@ namespace mongo {
                 _infoCache->clearQueryCache();
             }
         }
+
         _isMultikey = true;
     }
 
