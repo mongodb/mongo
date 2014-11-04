@@ -65,8 +65,9 @@ namespace mongo {
          * caller has to maintain ownership obj
          * the tree has views (BSONElement) into obj
          */
-        static StatusWithMatchExpression parse(const BSONObj& obj,
-                                        const WhereCallback& whereCallback = WhereCallback()) {
+        static StatusWithMatchExpression parse(
+                                            const BSONObj& obj,
+                                            const WhereCallback& whereCallback = WhereCallback()) {
             // The 0 initializes the match expression tree depth.
             return MatchExpressionParser(&whereCallback)._parse(obj, 0);
         }
@@ -175,7 +176,6 @@ namespace mongo {
      * This implementation is used for the server-side code.
      */
     class WhereCallbackReal : public MatchExpressionParser::WhereCallback {
-        MONGO_DISALLOW_COPYING(WhereCallbackReal);
     public:
 
         /**
@@ -188,8 +188,8 @@ namespace mongo {
         virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 
     private:
-        // 
-        OperationContext* _txn;
+        // Not owned here
+        OperationContext* const _txn;
         const StringData _dbName;
     };
 
