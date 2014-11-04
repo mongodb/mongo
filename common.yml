@@ -334,7 +334,12 @@ functions:
         if [ "${create_mongod_users_command}" != "" ]; then
           export AUTH_USERNAME=${auth_username}
           export AUTH_PASSWORD=${auth_password}
-          echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
+          if [ "${smoke_use_ssl}" != "" ]
+          then
+            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates admin
+          else
+            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
+          fi
         fi;
 
         # mongodump
