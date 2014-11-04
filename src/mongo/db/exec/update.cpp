@@ -766,7 +766,9 @@ namespace mongo {
                         break;
                     }
                     // we have to re-match the doc as it might not match anymore
-                    if ( !_params.canonicalQuery->root()->matchesBSON( reFetched, NULL ) ) {
+                    if ( _params.canonicalQuery &&
+                         _params.canonicalQuery->root() &&
+                         !_params.canonicalQuery->root()->matchesBSON( reFetched, NULL ) ) {
                         // doesn't match!
                         break;
                     }
