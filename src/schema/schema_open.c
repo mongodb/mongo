@@ -184,8 +184,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		npublic_cols = (u_int)cval.val;
 		WT_ASSERT(session, npublic_cols != 0);
 		for (i = 0; i < npublic_cols; i++)
-			WT_ERR(__wt_buf_catfmt(
-			    session, buf, "\"bad col\","));
+			WT_ERR(__wt_buf_catfmt(session, buf, "\"bad col\","));
 	}
 
 	/*
@@ -339,7 +338,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 err:	__wt_scr_free(&tmp);
 	if (idx != NULL)
-		__wt_schema_destroy_index(session, idx);
+		WT_TRET(__wt_schema_destroy_index(session, idx));
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 	return (ret);
@@ -439,7 +438,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (table != NULL)
-			__wt_schema_destroy_table(session, table);
+			WT_TRET(__wt_schema_destroy_table(session, table));
 	}
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));

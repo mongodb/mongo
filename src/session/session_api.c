@@ -122,7 +122,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_session_close_cache(session);
 
 	/* Close all tables. */
-	__wt_schema_close_tables(session);
+	WT_TRET(__wt_schema_close_tables(session));
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);

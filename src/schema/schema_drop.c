@@ -135,7 +135,7 @@ __drop_table(
 		WT_ERR(__wt_schema_drop(session, idx->source, cfg));
 	}
 
-	__wt_schema_remove_table(session, table);
+	WT_ERR(__wt_schema_remove_table(session, table));
 	table = NULL;
 
 	/* Remove the metadata entry (ignore missing items). */
