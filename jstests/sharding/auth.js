@@ -20,10 +20,8 @@ testUserReadOnly = {
 function login(userObj , thingToUse ) {
     if ( ! thingToUse )
         thingToUse = s;
-    
-    var n = thingToUse.getDB(userObj.db).runCommand({getnonce: 1});
-    var a = thingToUse.getDB(userObj.db).runCommand({authenticate: 1, user: userObj.username, nonce: n.nonce, key: thingToUse.getDB("admin").__pwHash(n.nonce, userObj.username, userObj.password)});
-    printjson(a);
+
+    thingToUse.getDB(userObj.db).auth(userObj.username, userObj.password);
 }
 
 function logout(userObj, thingToUse ) {
@@ -261,8 +259,9 @@ printjson(res);
 assert.commandWorked(res);
 
 // check that dump doesn't get stuck with auth
-var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);
-
+var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u",
+                         testUser.username, "-p", testUser.password, "--authenticationMechanism",
+                         "SCRAM-SHA-1");
 print("result: "+x);
 
 // test read only users
