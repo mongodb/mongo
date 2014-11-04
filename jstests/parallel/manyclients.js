@@ -9,7 +9,8 @@ Random.setRandomSeed();
 
 t = new ParallelTester();
 
-numThreads = 200;
+// v8 uses about 30M (res) per thread, so can't do many more on an 8GB system
+numThreads = 150;
 buildInfo = db.adminCommand( "buildInfo" )
 
 if ( buildInfo.bits < 64 ||
