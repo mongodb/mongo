@@ -96,6 +96,19 @@ namespace mongo {
             return true;
         }
 
+        virtual bool isDurable() const { return true; }
+
+        virtual int64_t getIdentSize(OperationContext* opCtx,
+                                      const StringData& ident) {
+          // TODO: return correct size.
+          return 1;
+        }
+
+        virtual Status repairIdent(OperationContext* opCtx,
+                                    const StringData& ident) {
+            return Status::OK();
+        }
+
         // rocks specific api
 
         rocksdb::DB* getDB() { return _db.get(); }
