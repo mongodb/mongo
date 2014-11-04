@@ -136,10 +136,9 @@ namespace mongo {
         invariant(_db != NULL);
 
         // Get the next id, which is one greater than the greatest stored.
-        boost::scoped_ptr<KVDictionary::Cursor> cursor(db->getCursor(opCtx, -1));
-        if (cursor->ok()) {
-            const RecordIdKey lastKey(cursor->currKey());
-            const DiskLoc lastLoc = lastKey.loc();
+        boost::scoped_ptr<RecordIterator> iter(getIterator(opCtx, DiskLoc(), CollectionScanParams::BACKWARD));
+        if (!iter->isEOF()) {
+            const DiskLoc lastLoc = iter->curr();
             _nextIdNum.store(lastLoc.getOfs() + (uint64_t(lastLoc.a()) << 32ULL) + 1);
         } else {
             // Need to start at 1 so we are always higher than minDiskLoc
@@ -267,6 +266,13 @@ namespace mongo {
         const DiskLoc loc = _nextId();
         const RecordIdKey key(loc);
         const Slice value(data, len);
+
+        DEV {
+            // Should never overwrite an existing record.
+            Slice v;
+            const Status status = _db->get(txn, key.key(), v);
+            invariant(status.code() == ErrorCodes::NoSuchKey);
+        }
 
         const Status status = _db->insert(txn, key.key(), value);
         if (!status.isOK()) {
