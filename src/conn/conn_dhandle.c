@@ -13,6 +13,30 @@
  *	locked; or (b) it is closed, write locked.  If exclusive access is
  *	requested and cannot be granted immediately because the handle is
  *	in use, fail with EBUSY.
+ *
+ *	Here is a brief summary of how different operations synchronize using
+ *	either the schema lock, handle locks or handle flags:
+ *
+ *	open -- holds the schema lock, one thread gets the handle exclusive,
+ *		reverts to a shared handle lock and drops the schema lock
+ *		once the handle is open;
+ *	bulk load -- sets bulk and exclusive;
+ *	salvage, truncate, update, verify -- hold the schema lock, set a
+ *		"special" flag;
+ *	sweep -- gets a write lock on the handle, doesn't set exclusive
+ *
+ *	The schema lock prevents a lot of potential conflicts: we should never
+ *	see handles being salvaged or verified because those operation hold the
+ *	schema lock.  However, it is possible to see a handle that is being
+ *	bulk loaded, or that the sweep server is closing.
+ *
+ *	The principle here is that application operations can cause other
+ *	application operations to fail (so attempting to open a cursor on a
+ *	file while it is being bulk-loaded will fail), but internal or
+ *	database-wide operations should not prevent application-initiated
+ *	operations.  For example, attempting to verify a file should not fail
+ *	because the sweep server happens to be in the process of closing that
+ *	file.
  */
 static int
 __conn_dhandle_open_lock(
