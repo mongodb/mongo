@@ -164,14 +164,15 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		runtime.GOMAXPROCS(*mongoImport.IngestOptions.NumOSThreads)
 	}
 
-	numDecodingWorkers = numCPU
-
 	// set the number of decoding workers to use for imports
 	if mongoImport.IngestOptions.NumDecodingWorkers != nil {
 		if *mongoImport.IngestOptions.NumDecodingWorkers < 1 {
 			return fmt.Errorf("--numDecodingWorkers argument must be > 0")
 		}
 		numDecodingWorkers = *mongoImport.IngestOptions.NumDecodingWorkers
+	} else {
+		mongoImport.IngestOptions.NumDecodingWorkers = &numCPU
+		numDecodingWorkers = numCPU
 	}
 
 	// set the number of insertion workers to use for imports
@@ -180,22 +181,29 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 			return fmt.Errorf("--numInsertionThreads argument must be > 0")
 		}
 		numInsertionWorkers = *mongoImport.IngestOptions.NumInsertionWorkers
+	} else {
+		mongoImport.IngestOptions.NumInsertionWorkers = &numInsertionWorkers
 	}
 
 	// if maintain --maintainInsertionOrder is true, we can only have one
-	// ingestion thread
+	// insertion worker
 	if mongoImport.IngestOptions.MaintainInsertionOrder {
 		if numInsertionWorkers > 1 {
-			return fmt.Errorf("Cannot specify --maintainInsertionOrder with more than 1 insertionWorker")
+			return fmt.Errorf("cannot specify --maintainInsertionOrder with more than 1 insertionWorker")
 		}
+		mongoImport.IngestOptions.NumInsertionWorkers = &numInsertionWorkers
 	}
 
-	// get the # of documents per batch
+	// get the number of documents per batch
 	if mongoImport.IngestOptions.BatchSize != nil {
 		if *mongoImport.IngestOptions.BatchSize < 1 {
 			return fmt.Errorf("--batchSize argument must be > 0")
 		}
 		batchSize = *mongoImport.IngestOptions.BatchSize
+	} else {
+		// TODO: TOOLS-335 replace use of global variables - batch size,
+		// numInsertionWorkers and numDecodingWorkers
+		mongoImport.IngestOptions.BatchSize = &batchSize
 	}
 
 	// ensure no more than one positional argument is supplied
@@ -332,7 +340,7 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	ordered := mongoImport.IngestOptions.MaintainInsertionOrder
 
 	// set the batch size for ingestion
-	readDocChanSize := *mongoImport.IngestOptions.BatchSize * numDecodingWorkers
+	readDocChanSize := batchSize * numDecodingWorkers
 
 	// readDocChan is buffered with readDocChanSize to ensure we only block
 	// accepting reads if processing is slow
@@ -374,7 +382,7 @@ func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error
 	// initialize the tomb where all goroutines go to die
 	mongoImport.tomb = &tomb.Tomb{}
 
-	// spawn all the worker threads, each in its own goroutine
+	// spawn all the worker goroutines, each in its own goroutine
 	for i := 0; i < numDecodingWorkers; i++ {
 		mongoImport.tomb.Go(func() error {
 			// Each ingest worker will return an error which may
@@ -527,7 +535,7 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		return err
 	} else {
 		// note that this count may not be entirely accurate if some
-		// ingester threads insert when another errors out.
+		// ingester workers insert when another errors out.
 		// without write commands, we can't say for sure how many documents were
 		// inserted when we use bulk inserts so we assume the entire batch
 		// succeeded - even if an error is returned. The result is that we may
