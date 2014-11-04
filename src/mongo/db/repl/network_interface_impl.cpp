@@ -337,12 +337,27 @@ namespace {
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
         _isExecutorRunnable(false),
-        _inShutdown(false) {
+        _inShutdown(false),
+        _numActiveNetworkRequests(0) {
         ConnectionPool::Options options;
         _connPool.reset(new ConnectionPool(options));
     }
 
     NetworkInterfaceImpl::~NetworkInterfaceImpl() { }
+
+    std::string NetworkInterfaceImpl::getDiagnosticString() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        str::stream output;
+        output << "NetworkImpl";
+        output << " threads:" << _threads.size();
+        output << " inShutdown:" << _inShutdown;
+        output << " active:" << _numActiveNetworkRequests;
+        output << " pending:" << _pending.size();
+        output << " execRunable:" << _isExecutorRunnable;
+        return output;
+
+    }
+
 
     void NetworkInterfaceImpl::startup() {
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -415,12 +430,14 @@ namespace {
             }
             CommandData todo = _pending.front();
             _pending.pop_front();
+            ++_numActiveNetworkRequests;
             lk.unlock();
             ResponseStatus result = _runCommand(todo.request);
             LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
                 " to " << todo.request.target << " was " << result.getStatus();
             todo.onFinish(result);
             lk.lock();
+            --_numActiveNetworkRequests;
             _signalWorkAvailable_inlock();
         }
     }
@@ -477,7 +494,7 @@ namespace {
                     return StatusWith<int>(ErrorCodes::ExceededTimeLimit,
                                                str::stream() << "Went to run command,"
                                                " but it was too late. Expiration was set to "
-                                                             << expDate);
+                                                             << dateToISOStringUTC(expDate));
                 }
             }
             return StatusWith<int>(timeout);

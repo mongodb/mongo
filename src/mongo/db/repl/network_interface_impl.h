@@ -49,6 +49,7 @@ namespace repl {
     public:
         explicit NetworkInterfaceImpl();
         virtual ~NetworkInterfaceImpl();
+        virtual std::string getDiagnosticString();
         virtual void startup();
         virtual void shutdown();
         virtual void waitForWork();
@@ -122,6 +123,8 @@ namespace repl {
         // requests.
         boost::scoped_ptr<ConnectionPool> _connPool;  // (R)
 
+        // Number of active network requests
+        int _numActiveNetworkRequests;
     };
 
 }  // namespace repl

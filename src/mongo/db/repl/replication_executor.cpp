@@ -58,6 +58,26 @@ namespace {
 
     ReplicationExecutor::~ReplicationExecutor() {}
 
+    std::string ReplicationExecutor::getDiagnosticString() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _getDiagnosticString_inlock();
+    }
+
+    std::string ReplicationExecutor::_getDiagnosticString_inlock() const {
+        str::stream output;
+        output << "ReplicationExecutor";
+        output << " networkInProgress:" << _networkInProgressQueue.size();
+        output << " exclusiveInProgress:" << _exclusiveLockInProgressQueue.size();
+        output << " sleeperQueue:" << _sleepersQueue.size();
+        output << " ready:" << _readyQueue.size();
+        output << " free:" << _freeQueue.size();
+        output << " unsignaledEvents:" << _unsignaledEvents.size();
+        output << " eventWaiters:" << _totalEventWaiters;
+        output << " shuttingDown:" << _inShutdown;
+        output << " networkInterface:" << _networkInterface->getDiagnosticString();
+        return output;
+    }
+
     Date_t ReplicationExecutor::now() {
         return _networkInterface->now();
     }
@@ -483,7 +503,7 @@ namespace {
         }
     }
 
-    std::string ReplicationExecutor::RemoteCommandRequest::toString() const {
+    std::string ReplicationExecutor::RemoteCommandRequest::getDiagnosticString() {
         str::stream out;
         out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
 

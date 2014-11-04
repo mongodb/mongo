@@ -67,6 +67,7 @@ namespace repl {
 
         NetworkInterfaceMock();
         virtual ~NetworkInterfaceMock();
+        virtual std::string getDiagnosticString();
 
         ////////////////////////////////////////////////////////////////////////////////
         //

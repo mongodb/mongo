@@ -57,6 +57,11 @@ namespace repl {
         invariant(_blackHoled.empty());
     }
 
+    std::string NetworkInterfaceMock::getDiagnosticString() {
+        // TODO something better.
+        return "NetworkInterfaceMock diagnostics here";
+    }
+
     Date_t NetworkInterfaceMock::now() {
         boost::lock_guard<boost::mutex> lk(_mutex);
         return _now_inlock();

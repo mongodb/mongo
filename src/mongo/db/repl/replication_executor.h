@@ -153,6 +153,11 @@ namespace repl {
         ~ReplicationExecutor();
 
         /**
+         * Returns diagnostic information.
+         */
+        std::string getDiagnosticString();
+
+        /**
          * Gets the current time as reported by the network interface.
          */
         Date_t now();
@@ -300,6 +305,10 @@ namespace repl {
          */
         typedef stdx::list<Event> EventList;
 
+        /**
+         * Returns diagnostic info
+         */
+        std::string _getDiagnosticString_inlock() const;
         /**
          * Implementation of makeEvent() for use when _mutex is already held.
          */
@@ -459,7 +468,8 @@ namespace repl {
                              const BSONObj& theCmdObj,
                              const Milliseconds timeoutMillis = kNoTimeout);
 
-        std::string toString() const;
+        // Returns diagnostic info.
+        std::string getDiagnosticString();
 
         HostAndPort target;
         std::string dbname;
@@ -488,6 +498,11 @@ namespace repl {
         typedef stdx::function<void (const ResponseStatus&)> RemoteCommandCompletionFn;
 
         virtual ~NetworkInterface();
+
+        /**
+         * Returns diagnostic info.
+         */
+        virtual std::string getDiagnosticString() = 0;
 
         /**
          * Starts up the network interface.
