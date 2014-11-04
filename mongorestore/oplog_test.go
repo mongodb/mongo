@@ -64,6 +64,8 @@ func TestTimestampStringParsing(t *testing.T) {
 
 func TestValidOplogLimitChecking(t *testing.T) {
 
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("With a MongoRestore instance with oplogLimit of 5:0", t, func() {
 		mr := &MongoRestore{
 			oplogLimit: bson.MongoTimestamp(int64(5) << 32),
