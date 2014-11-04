@@ -41,7 +41,7 @@ namespace CommandTests {
         struct Base {
             Base() : db(&_txn) {
                 db.dropCollection(ns());
-                db.ensureIndex(ns(), BSON( "files_id" << 1 << "n" << 1 ));
+                ASSERT_OK(dbtests::createIndex(&_txn, ns(),BSON( "files_id" << 1 << "n" << 1 )));
             }
 
             const char* ns() { return "test.fs.chunks"; }

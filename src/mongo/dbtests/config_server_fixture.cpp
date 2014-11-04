@@ -32,6 +32,7 @@
 
 #include <list>
 
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/s/config.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/type_changelog.h"
@@ -62,10 +63,10 @@ namespace mongo {
         client().dropCollection("config.test");
 
         // Create an index over the chunks, to allow correct diffing
-        client().ensureIndex( ChunkType::ConfigNS, // br
-                              BSON( ChunkType::ns() << 1 << // br
-                                      ChunkType::DEPRECATED_lastmod() << 1 ) );
-
+        ASSERT_OK(dbtests::createIndex(&_client._txn,
+                                       ChunkType::ConfigNS,
+                                       BSON( ChunkType::ns() << 1 <<
+                                             ChunkType::DEPRECATED_lastmod() << 1 )));
         configServer.init(configSvr().toString());
     }
 

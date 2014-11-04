@@ -117,9 +117,11 @@ namespace ShardingTests {
             Shard::installShard(_shard.getName(), _shard);
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
-            _client.ensureIndex( ChunkType::ConfigNS, // br
-                                  BSON( ChunkType::ns() << 1 << // br
-                                          ChunkType::DEPRECATED_lastmod() << 1 ) );
+            ASSERT_OK(dbtests::createIndex(
+                              &_txn,
+                              ChunkType::ConfigNS,
+                              BSON( ChunkType::ns() << 1 << // br
+                                    ChunkType::DEPRECATED_lastmod() << 1 ) ));
             configServer.init("$dummy:1000");
         }
 

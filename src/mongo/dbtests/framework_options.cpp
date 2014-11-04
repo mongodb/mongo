@@ -54,7 +54,7 @@ namespace mongo {
         options->addOptionChaining("dbpath", "dbpath", moe::String,
                 "db data path for this test run. NOTE: the contents of this directory will "
                 "be overwritten if it already exists")
-                                  .setDefault(moe::Value(default_test_dbpath));
+                                  .setDefault(moe::Value(dbtests::default_test_dbpath));
 
         options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
 

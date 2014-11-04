@@ -986,7 +986,7 @@ namespace mongo {
 
         virtual void reIndex( const std::string& ns );
 
-        std::string genIndexName( const BSONObj& keys );
+        static std::string genIndexName( const BSONObj& keys );
 
         /** Erase / drop an entire database */
         virtual bool dropDatabase(const std::string &dbname, BSONObj *info = 0) {

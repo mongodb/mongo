@@ -95,6 +95,7 @@ namespace PerfTests {
         }
 
         DBClientBase* client() { return &_client; }
+        OperationContext* txn() { return &_txn; }
 
     private:
         LastError* _prevError;
@@ -1039,7 +1040,7 @@ namespace PerfTests {
         string name() { return "random-inserts"; }
         void prep() {
             client()->insert( ns(), BSONObj() );
-            client()->ensureIndex(ns(), BSON("x"<<1));
+            ASSERT_OK(dbtests::createIndex(txn(), ns(), BSON("x"<<1)));
         }
         void timed() {
             int x = rand();
@@ -1059,7 +1060,7 @@ namespace PerfTests {
         virtual string name() { return "random-upserts"; }
         void prep() {
             client()->insert( ns(), BSONObj() );
-            client()->ensureIndex(ns(), BSON("x"<<1));
+            ASSERT_OK(dbtests::createIndex(txn(), ns(), BSON("x"<<1)));
         }
         void timed() {
             int x = rand();
@@ -1087,8 +1088,8 @@ namespace PerfTests {
         string name() { return T::name() + "-more-indexes"; }
         void prep() {
             T::prep();
-            this->client()->ensureIndex(this->ns(), BSON("y"<<1));
-            this->client()->ensureIndex(this->ns(), BSON("z"<<1));
+            ASSERT_OK(dbtests::createIndex(this->txn(), this->ns(), BSON("y"<<1)));
+            ASSERT_OK(dbtests::createIndex(this->txn(), this->ns(), BSON("z"<<1)));
         }
     };
 

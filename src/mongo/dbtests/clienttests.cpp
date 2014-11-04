@@ -71,58 +71,18 @@ namespace ClientTests {
             db.insert( ns() , BSON( "x" << 2 ) );
             ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
-            db.ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &txn, ns(), BSON( "x" << 1 ) ));
             ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             db.dropIndex( ns() , BSON( "x" << 1 ) );
             ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
-            db.ensureIndex( ns() , BSON( "x" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &txn, ns(), BSON( "x" << 1 ) ));
             ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             db.dropIndexes( ns() );
             ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
         }
-    };
-
-    class ReIndex : public Base {
-    public:
-        ReIndex() : Base( "reindex" ) {}
-        void run() {
-            OperationContextImpl txn;
-            DBDirectClient db(&txn);
-
-            db.insert( ns() , BSON( "x" << 2 ) );
-            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
-
-            db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
-
-            db.reIndex( ns() );
-            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
-        }
-
-    };
-
-    class ReIndex2 : public Base {
-    public:
-        ReIndex2() : Base( "reindex2" ) {}
-        void run() {
-            OperationContextImpl txn;
-            DBDirectClient db(&txn);
-
-            db.insert( ns() , BSON( "x" << 2 ) );
-            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
-
-            db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
-
-            BSONObj out;
-            ASSERT( db.runCommand( "test" , BSON( "reIndex" << "reindex2" ) , out ) );
-            ASSERT_EQUALS( 2 , out["nIndexes"].number() );
-            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
-        }
-
     };
 
     /**
@@ -150,12 +110,13 @@ namespace ClientTests {
             // _id index
             ASSERT_EQUALS(1U, db.getIndexSpecs(ns()).size());
 
-            db.ensureIndex(ns(), BSON("y" << 1), true);
+            ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                          dbtests::createIndex(&txn, ns(), BSON("y" << 1), true));
 
             ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&txn));
             ASSERT_EQUALS(1U, db.getIndexSpecs(ns()).size());
 
-            db.ensureIndex(ns(), BSON("x" << 1), true);
+            ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON("x" << 1), true));
 
             ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&txn));
             ASSERT_EQUALS(2U, db.getIndexSpecs(ns()).size());
@@ -174,7 +135,7 @@ namespace ClientTests {
                 db.insert(ns(), BSON("a" << i << "b" << longs));
             }
 
-            db.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON( "a" << 1 << "b" << 1 ) ));
 
             auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
             ASSERT_EQUALS( 1111, c->itcount() );
@@ -263,8 +224,6 @@ namespace ClientTests {
 
         void setupTests() {
             add<DropIndex>();
-            add<ReIndex>();
-            add<ReIndex2>();
             add<BuildIndex>();
             add<CS_10>();
             add<PushBack>();

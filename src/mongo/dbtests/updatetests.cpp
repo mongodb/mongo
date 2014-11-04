@@ -1632,7 +1632,7 @@ namespace UpdateTests {
     class IndexParentOfMod : public SetBase {
     public:
         void run() {
-            _client.ensureIndex( ns(), BSON( "a" << 1 ) );
+            ASSERT_OK(dbtests::createIndex( &_txn, ns(), BSON( "a" << 1 ) ));
             _client.insert( ns(), fromjson( "{'_id':0}" ) );
             _client.update( ns(), Query(), fromjson( "{$set:{'a.b':4}}" ) );
             ASSERT_EQUALS( fromjson( "{'_id':0,a:{b:4}}" ) , _client.findOne( ns(), Query() ) );

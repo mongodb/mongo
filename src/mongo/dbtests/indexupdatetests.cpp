@@ -93,6 +93,8 @@ namespace IndexUpdateTests {
         }
 #endif
 
+        Status createIndex(const std::string& dbname, const BSONObj& indexSpec);
+
         bool buildIndexInterrupted(const BSONObj& key, bool allowInterruption) {
             try {
                 MultiIndexBlock indexer(&_txn, collection());
@@ -600,31 +602,6 @@ namespace IndexUpdateTests {
         }
     };
 
-    /** DBDirectClient::ensureIndex() is not interrupted. */
-    class DirectClientEnsureIndexInterruptDisallowed : public IndexBuildBase {
-    public:
-        void run() {
-            // Insert some documents.
-            int32_t nDocs = 1000;
-            for( int32_t i = 0; i < nDocs; ++i ) {
-                _client.insert( _ns, BSON( "a" << i ) );
-            }
-            // Start with just _id
-            ASSERT_EQUALS( 1U, _client.getIndexSpecs(_ns).size());
-            // Initialize curop.
-            _txn.getCurOp()->reset();
-            // Request an interrupt.  killAll() rather than kill() is required because the direct
-            // client will build the index using a new opid.
-            getGlobalEnvironment()->setKillAllOperations();
-            // The call is not interrupted.
-            _client.ensureIndex( _ns, BSON( "a" << 1 ) );
-            // only want to interrupt the index build
-            getGlobalEnvironment()->unsetKillAllOperations();
-            // The new index is listed in getIndexSpecs because the index build completed.
-            ASSERT_EQUALS( 2U, _client.getIndexSpecs(_ns).size());
-        }
-    };
-
     /** Helpers::ensureIndex() is not interrupted. */
     class HelpersEnsureIndexInterruptDisallowed : public IndexBuildBase {
     public:
@@ -707,54 +684,78 @@ namespace IndexUpdateTests {
     };
 #endif
 
+    Status IndexBuildBase::createIndex(const std::string& dbname, const BSONObj& indexSpec) {
+        MultiIndexBlock indexer(&_txn, collection());
+        Status status = indexer.init(indexSpec);
+        if (status == ErrorCodes::IndexAlreadyExists) {
+            return Status::OK();
+        }
+        if (!status.isOK()) {
+            return status;
+        }
+        status = indexer.insertAllDocumentsInCollection();
+        if (!status.isOK()) {
+            return status;
+        }
+        WriteUnitOfWork wunit(&_txn);
+        indexer.commit();
+        wunit.commit();
+        return Status::OK();
+    }
+
     /**
      * Fixture class that has a basic compound index.
      */
     class SimpleCompoundIndex: public IndexBuildBase {
     public:
         SimpleCompoundIndex() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "x"
-                         << "ns" << _ns
-                         << "key" << BSON("x" << 1 << "y" << 1)));
+            ASSERT_OK(
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "x"
+                                 << "ns" << _ns
+                                 << "key" << BSON("x" << 1 << "y" << 1))));
         }
     };
 
     class SameSpecDifferentOption: public SimpleCompoundIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "x"
-                         << "ns" << _ns
-                         << "unique" << true
-                         << "key" << BSON("x" << 1 << "y" << 1)));
             // Cannot have same key spec with an option different from the existing one.
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
+            ASSERT_EQUALS(
+                    ErrorCodes::IndexOptionsConflict,
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "x"
+                                 << "ns" << _ns
+                                 << "unique" << true
+                                 << "key" << BSON("x" << 1 << "y" << 1))));
         }
     };
 
     class SameSpecSameOptions: public SimpleCompoundIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "x"
-                         << "ns" << _ns
-                         << "key" << BSON("x" << 1 << "y" << 1)));
-            // It is okay to try to create an index with the exact same specs (will be
-            // ignored, but should not raise an error).
-            ASSERT_EQUALS(_client.getLastError(), "");
+            ASSERT_OK(
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "x"
+                                 << "ns" << _ns
+                                 << "key" << BSON("x" << 1 << "y" << 1))));
         }
     };
 
     class DifferentSpecSameName: public SimpleCompoundIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "x"
-                         << "ns" << _ns
-                         << "key" << BSON("y" << 1 << "x" << 1)));
             // Cannot create a different index with the same name as the existing one.
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
+            ASSERT_EQUALS(
+                    ErrorCodes::IndexKeySpecsConflict,
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "x"
+                                 << "ns" << _ns
+                                 << "key" << BSON("y" << 1 << "x" << 1))));
         }
     };
 
@@ -764,13 +765,15 @@ namespace IndexUpdateTests {
     class ComplexIndex: public IndexBuildBase {
     public:
         ComplexIndex() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super"
-                         << "ns" << _ns
-                         << "unique" << 1
-                         << "sparse" << true
-                         << "expireAfterSeconds" << 3600
-                         << "key" << BSON("superIdx" << "2d")));
+            ASSERT_OK(
+                    createIndex(
+                            "unittests",
+                            BSON("name" << "super"
+                                 << "ns" << _ns
+                                 << "unique" << 1
+                                 << "sparse" << true
+                                 << "expireAfterSeconds" << 3600
+                                 << "key" << BSON("superIdx" << "2d"))));
         }
     };
 
@@ -779,14 +782,15 @@ namespace IndexUpdateTests {
         void run() {
             // Exactly the same specs with the existing one, only
             // specified in a different order than the original.
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "expireAfterSeconds" << 3600
-                         << "sparse" << true
-                         << "unique" << 1
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_EQUALS(_client.getLastError(), "");
+            ASSERT_OK(
+                    createIndex(
+                            "unittests",
+                            BSON("name" << "super2"
+                                 << "ns" << _ns
+                                 << "expireAfterSeconds" << 3600
+                                 << "sparse" << true
+                                 << "unique" << 1
+                                 << "key" << BSON("superIdx" << "2d"))));
         }
     };
 
@@ -796,43 +800,49 @@ namespace IndexUpdateTests {
     class SameSpecDifferentUnique: public ComplexIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "unique" << false
-                         << "sparse" << true
-                         << "expireAfterSeconds" << 3600
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
+            ASSERT_EQUALS(
+                    ErrorCodes::IndexOptionsConflict,
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "super2"
+                                 << "ns" << _ns
+                                 << "unique" << false
+                                 << "sparse" << true
+                                 << "expireAfterSeconds" << 3600
+                                 << "key" << BSON("superIdx" << "2d"))));
         }
     };
 
     class SameSpecDifferentSparse: public ComplexIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "unique" << 1
-                         << "sparse" << false
-                         << "background" << true
-                         << "expireAfterSeconds" << 3600
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
+            ASSERT_EQUALS(
+                    ErrorCodes::IndexOptionsConflict,
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "super2"
+                                 << "ns" << _ns
+                                 << "unique" << 1
+                                 << "sparse" << false
+                                 << "background" << true
+                                 << "expireAfterSeconds" << 3600
+                                 << "key" << BSON("superIdx" << "2d"))));
         }
     };
 
     class SameSpecDifferentTTL: public ComplexIndex {
     public:
         void run() {
-            _client.insert("unittests.system.indexes",
-                    BSON("name" << "super2"
-                         << "ns" << _ns
-                         << "unique" << 1
-                         << "sparse" << true
-                         << "expireAfterSeconds" << 2400
-                         << "key" << BSON("superIdx" << "2d")));
-            ASSERT_NOT_EQUALS(_client.getLastError(), "");
+            ASSERT_EQUALS(
+                    ErrorCodes::IndexOptionsConflict,
+                    createIndex(
+                            "unittest",
+                            BSON("name" << "super2"
+                                 << "ns" << _ns
+                                 << "unique" << 1
+                                 << "sparse" << true
+                                 << "expireAfterSeconds" << 2400
+                                 << "key" << BSON("superIdx" << "2d"))));
         }
     };
 
@@ -874,7 +884,6 @@ namespace IndexUpdateTests {
             add<InsertBuildIndexInterruptDisallowed>();
             add<InsertBuildIdIndexInterrupt>();
             add<InsertBuildIdIndexInterruptDisallowed>();
-            add<DirectClientEnsureIndexInterruptDisallowed>();
             add<HelpersEnsureIndexInterruptDisallowed>();
             //add<IndexBuildInProgressTest>();
             add<SameSpecDifferentOption>();

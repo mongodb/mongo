@@ -86,8 +86,7 @@ namespace PlanRankingTests {
         }
 
         void addIndex(const BSONObj& obj) {
-            Client::WriteContext ctx(&_txn, ns);
-            _client.ensureIndex(ns, obj);
+            ASSERT_OK(dbtests::createIndex(&_txn, ns, obj));
         }
 
         /**

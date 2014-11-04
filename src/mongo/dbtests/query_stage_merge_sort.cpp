@@ -57,7 +57,7 @@ namespace QueryStageMergeSortTests {
         }
 
         void addIndex(const BSONObj& obj) {
-            _client.ensureIndex(ns(), obj);
+            ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {

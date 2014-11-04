@@ -214,7 +214,7 @@ namespace ExecutorRegistry {
             auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
-            _client.ensureIndex(ns(), BSON("foo" << 1));
+            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
@@ -245,7 +245,7 @@ namespace ExecutorRegistry {
             auto_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
-            _client.ensureIndex(ns(), BSON("foo" << 1));
+            ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {

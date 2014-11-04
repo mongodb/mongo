@@ -1246,7 +1246,7 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 // Add an index on 'a'.  This prevents the update from running 'in place'.
-                _client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                ASSERT_OK(dbtests::createIndex( &_txn, ns(), BSON( "a" << 1 ) ));
                 insert( fromjson( "{'_id':0,z:1}" ) );
             }
         };
