@@ -220,7 +220,6 @@ namespace mongo {
         /** if this op is running */
         bool active() const { return _active; }
 
-        bool displayInCurop() const { return _active && ! _suppressFromCurop; }
         int getOp() const { return _op; }
 
         //
@@ -308,7 +307,6 @@ namespace mongo {
         bool killPending() const { return _killPending.loadRelaxed(); }
         void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
-        void suppressFromCurop() { _suppressFromCurop = true; }
         
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
@@ -333,7 +331,6 @@ namespace mongo {
         long long _start;
         long long _end;
         bool _active;
-        bool _suppressFromCurop; // unless $all is set
         int _op;
         bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all

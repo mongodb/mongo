@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/currentop_command.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
@@ -59,7 +60,18 @@ namespace mongo {
 
             tablecell(_stringStream, co.opNum());
             tablecell(_stringStream, co.active());
-            // tablecell(_stringStream, txn->lockState()->reportState());
+
+            // LockState
+            {
+                Locker::LockerInfo lockerInfo;
+                txn->lockState()->getLockerInfo(&lockerInfo);
+
+                BSONObjBuilder lockerInfoBuilder;
+                fillLockerInfo(lockerInfo, lockerInfoBuilder);
+
+                tablecell(_stringStream, lockerInfoBuilder.obj());
+            }
+
             if (co.active()) {
                 tablecell(_stringStream, co.elapsedSeconds());
             }
@@ -137,8 +149,18 @@ namespace {
             if ( txn->lockState() ) {
                 StringBuilder ss;
                 ss << txn->lockState();
-                b.append( "lockStatePointer", ss.str() );
-                // b.append( "lockState", txn->lockState()->reportState() );
+                b.append("lockStatePointer", ss.str());
+
+                // LockState
+                {
+                    Locker::LockerInfo lockerInfo;
+                    txn->lockState()->getLockerInfo(&lockerInfo);
+
+                    BSONObjBuilder lockerInfoBuilder;
+                    fillLockerInfo(lockerInfo, lockerInfoBuilder);
+
+                    b.append("lockState", lockerInfoBuilder.obj());
+                }
             }
             if ( txn->recoveryUnit() )
                 txn->recoveryUnit()->reportState( &b );
