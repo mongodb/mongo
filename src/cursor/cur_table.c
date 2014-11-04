@@ -50,9 +50,8 @@ __curextract_insert(WT_CURSOR *cursor) {
 	WT_RET(__wt_cursor_get_raw_key(cextract->ctable->cg_cursors[0], &pkey));
 
 	/*
-	 * TODO properly append primary key columns to the index key, taking
-	 * into account cases where the generated key already includes primary
-	 * key columns.
+	 * We have the index key in the format we need, and all of the primary
+	 * key columns are required: just append them.
 	 */
 	key = &cextract->idxc->key;
 	WT_RET(__wt_buf_grow(session, key, ikey.size + pkey.size));
@@ -60,6 +59,10 @@ __curextract_insert(WT_CURSOR *cursor) {
 	memcpy((uint8_t *)key->mem + ikey.size, pkey.data, pkey.size);
 	key->size = ikey.size + pkey.size;
 
+	/*
+	 * The index key is now set and the value is empty (it starts clear and
+	 * is never set).
+	 */
 	F_SET(cextract->idxc, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 
 	/* Call the underlying cursor function to update the index. */
@@ -123,6 +126,10 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
 			WT_RET(__wt_schema_project_merge(session,
 			    ctable->cg_cursors,
 			    idx->key_plan, idx->key_format, &(*cp)->key));
+			/*
+			 * The index key is now set and the value is empty
+			 * (it starts clear and is never set).
+			 */
 			F_SET(*cp, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 			WT_RET(f(*cp));
 		}

@@ -65,6 +65,10 @@ static const struct president_data example_data[] = {
 #define	YEAR_BASE	1981
 #define	YEAR_SPAN	(2014-1981)
 
+/*
+ * A custom index extractor function that adds an index entry for each year of
+ * the given president's term.
+ */
 static int
 my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
@@ -84,15 +88,16 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		return (ret);
 
 	/*
-	 * We have overlapping years, so we might return two records for the
-	 * same year with different data.
+	 * We have overlapping years, so multiple records may share the same
+	 * index key.
 	 */
 	for (year = term_start; year <= term_end; ++year) {
 		/*
 		 * Note that the extract callback is called for all operations
-		 * not just inserts.  The user sets the key and uses the
-		 * cursor->insert() method, but the underlying WT code will
-		 * perform the correct operation (such as a remove()).
+		 * that update the table, not just inserts.  The user sets the
+		 * key and uses the cursor->insert() method to return the index
+		 * key(s).  WiredTiger will perform the required operation
+		 * (such as a remove()).
 		 */
 		fprintf(stderr, "EXTRACTOR: index op for year %d: %s %s\n",
 		    year, first_name, last_name);
@@ -106,14 +111,16 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	return (0);
 }
 
+/*
+ * The terminate method is called to release any allocated resources when the
+ * table is closed.  In this example, no cleanup is required.
+ */
 static int
 my_extract_terminate(WT_EXTRACTOR *extractor, WT_SESSION *session)
 {
 	(void)extractor;
 	(void)session;
-	/*
-	 * XXX - Anything to do?
-	 */
+
 	return (0);
 }
 
@@ -143,7 +150,7 @@ read_index(WT_SESSION *session)
 
 	srandom((unsigned int)getpid());
 	ret = session->open_cursor(
-	    session, "index:presidents:termindex", NULL, NULL, &cursor);
+	    session, "index:presidents:term", NULL, NULL, &cursor);
 	/*
 	 * Pick 10 random years and read the data.
 	 */
@@ -211,11 +218,8 @@ setup_table(WT_SESSION *session)
 	 * Create the index that is generated with an extractor. The index
 	 * will generate an entry in the index for each year a president
 	 * was in office.
-	 *
-	 * TODO: switch column name to "term" -- the schema layer currently
-	 * requires that all columns are found in the table.
 	 */
-	ret = session->create(session, "index:presidents:termindex",
+	ret = session->create(session, "index:presidents:term",
 	    "key_format=H,columns=(term),extractor=my_extractor");
 
 	ret = session->open_cursor(

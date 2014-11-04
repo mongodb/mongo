@@ -378,13 +378,10 @@ __create_index(WT_SESSION_IMPL *session,
 	}
 
 	/* Calculate the key/value formats. */
-	if (__wt_config_getones(session, config, "columns", &icols) != 0) {
-		if (have_extractor)
-			WT_CLEAR(icols);
-		else
-			WT_ERR_MSG(session, EINVAL,
-			    "%s: requires 'columns' configuration", name);
-	}
+	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
+	    !have_extractor)
+		WT_ERR_MSG(session, EINVAL,
+		    "%s: requires 'columns' configuration", name);
 
 	/*
 	 * Count the public columns using the declared columns for normal
@@ -419,8 +416,13 @@ __create_index(WT_SESSION_IMPL *session,
 		 * If the primary key column is already in the secondary key,
 		 * don't add it again.
 		 */
-		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
+		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0) {
+			if (have_extractor)
+				WT_ERR_MSG(session, EINVAL,
+				    "an index with a custom extractor may not "
+				    "include primary key columns");
 			continue;
+		}
 		WT_ERR(__wt_buf_catfmt(
 		    session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
 	}

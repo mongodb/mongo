@@ -290,8 +290,8 @@ table_only_config = [
 
 index_only_config = [
 	Config('extractor', '', r'''
-	    configure custom extractor for indices.  Value must be a extractor
-	    name created with WT_CONNECTION::add_extractor'''),
+        configure custom extractor for indices.  Value must be an extractor
+        name created with WT_CONNECTION::add_extractor'''),
 ]
 
 colgroup_meta = common_meta + source_meta

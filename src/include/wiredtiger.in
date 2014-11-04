@@ -968,7 +968,7 @@ struct __wt_session {
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Value
-	 * must be a extractor name created with WT_CONNECTION::add_extractor.,
+	 * must be an extractor name created with WT_CONNECTION::add_extractor.,
 	 * a string; default empty.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
@@ -2974,14 +2974,18 @@ struct __wt_extractor {
 	 *
 	 * @snippet ex_all.c WT_EXTRACTOR
 	 *
+	 * @param extractor the WT_EXTRACTOR implementation
+	 * @param session the current WiredTiger session
+	 * @param key the table key in raw format, see @ref cursor_raw for
+	 *	details
+	 * @param value the table value in raw format, see @ref cursor_raw for
+	 *	details
 	 * @param[out] result_cursor the method should call WT_CURSOR::set_key
 	 *	and WT_CURSOR::insert on this cursor to return a key.  The \c
 	 *	key_format of the cursor will match that passed to
 	 *	WT_SESSION::create for the index.  Multiple index keys can be
 	 *	created for each record by calling WT_CURSOR::insert multiple
 	 *	times.
-	 * @param[out] emp if more than one index key is required, a
-	 *	WT_EXTRACTOR_MULTIPLE object should be set here.
 	 */
 	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	    const WT_ITEM *key, const WT_ITEM *value,

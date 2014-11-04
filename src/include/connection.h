@@ -55,7 +55,7 @@ struct __wt_named_data_source {
 
 /*
  * WT_NAMED_EXTRACTOR --
- *	A extractor list entry
+ *	An extractor list entry
  */
 struct __wt_named_extractor {
 	const char *name;		/* Name of extractor */
