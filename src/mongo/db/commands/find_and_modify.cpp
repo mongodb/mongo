@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/projection.h"
@@ -97,28 +98,42 @@ namespace mongo {
                 return false;
             }
 
-            bool ok = runNoDirectClient( txn, ns,
-                                         query, fields, update,
-                                         upsert, returnNew, remove,
-                                         result, errmsg );
+            bool ok = false;
+            int attempt = 0;
+            while ( 1 ) {
+                try {
+                    errmsg = "";
+                    // we can always retry because we only ever modify one document
+                    ok = runNoDirectClient( txn, ns,
+                                            query, fields, update,
+                                            upsert, returnNew, remove,
+                                            result, errmsg );
+                    break;
+                }
+                catch ( const WriteConflictException& ex ) {
+                    if ( attempt++ > 1 ) {
+                        log() << "got WriteConflictException on findAndModify for " << ns
+                              <<  " retrying attempt: " << attempt;
+                    }
+                }
+            }
 
             if ( !ok && errmsg == "no-collection" ) {
-                {
-                    Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-                    Client::Context ctx(txn, ns, false /* don't check version */);
-                    Database* db = ctx.db();
-                    if ( db->getCollection( txn, ns ) ) {
-                        // someone else beat us to it, that's ok
-                        // we might race while we unlock if someone drops
-                        // but that's ok, we'll just do nothing and error out
-                    }
-                    else {
-                        WriteUnitOfWork wuow(txn);
-                        uassertStatusOK( userCreateNS( txn, db,
-                                                       ns, BSONObj(),
-                                                       !fromRepl ) );
-                        wuow.commit();
-                    }
+                // Take X lock so we can create collection, then re-run operation.
+                Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
+                Client::Context ctx(txn, ns, false /* don't check version */);
+                Database* db = ctx.db();
+                if ( db->getCollection( txn, ns ) ) {
+                    // someone else beat us to it, that's ok
+                    // we might race while we unlock if someone drops
+                    // but that's ok, we'll just do nothing and error out
+                }
+                else {
+                    WriteUnitOfWork wuow(txn);
+                    uassertStatusOK( userCreateNS( txn, db,
+                                                   ns, BSONObj(),
+                                                   !fromRepl ) );
+                    wuow.commit();
                 }
                 errmsg = "";
                 ok = runNoDirectClient( txn, ns,
