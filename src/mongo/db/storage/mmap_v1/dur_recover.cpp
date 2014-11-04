@@ -52,6 +52,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
@@ -368,10 +369,10 @@ namespace mongo {
         }
 
         void RecoveryJob::applyEntries(const vector<ParsedJournalEntry> &entries) {
-            bool apply = (storageGlobalParams.durOptions &
-                          StorageGlobalParams::DurScanOnly) == 0;
-            bool dump = storageGlobalParams.durOptions &
-                        StorageGlobalParams::DurDumpJournal;
+            bool apply = (mmapv1GlobalOptions.journalOptions &
+                          MMAPV1Options::JournalScanOnly) == 0;
+            bool dump = mmapv1GlobalOptions.journalOptions &
+                        MMAPV1Options::JournalDumpJournal;
             if( dump )
                 log() << "BEGIN section" << endl;
 
@@ -474,8 +475,8 @@ namespace mongo {
                         uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
                     }
                     fileId = h.fileId;
-                    if (storageGlobalParams.durOptions &
-                        StorageGlobalParams::DurDumpJournal) {
+                    if (mmapv1GlobalOptions.journalOptions &
+                        MMAPV1Options::JournalDumpJournal) {
                         log() << "JHeader::fileId=" << fileId << endl;
                     }
                 }
@@ -485,8 +486,8 @@ namespace mongo {
                     JSectHeader h;
                     br.peek(h);
                     if( h.fileId != fileId ) {
-                        if (debug || (storageGlobalParams.durOptions &
-                                      StorageGlobalParams::DurDumpJournal)) {
+                        if (debug || (mmapv1GlobalOptions.journalOptions &
+                                      MMAPV1Options::JournalDumpJournal)) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
                             log() << "  sect len:" << h.sectionLen() << " seqnum:" << h.seqNumber << endl;
                         }
@@ -504,12 +505,12 @@ namespace mongo {
                 }
             }
             catch (const BufReader::eof&) {
-                if (storageGlobalParams.durOptions & StorageGlobalParams::DurDumpJournal)
+                if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal)
                     log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
             catch (const JournalSectionCorruptException&) {
-                if (storageGlobalParams.durOptions & StorageGlobalParams::DurDumpJournal)
+                if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal)
                     log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
@@ -558,9 +559,9 @@ namespace mongo {
 
             close();
 
-            if (storageGlobalParams.durOptions & StorageGlobalParams::DurScanOnly) {
+            if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalScanOnly) {
                 uasserted(13545, str::stream() << "--durOptions "
-                                               << (int) StorageGlobalParams::DurScanOnly
+                                               << (int) MMAPV1Options::JournalScanOnly
                                                << " (scan only) specified");
             }
 

@@ -89,6 +89,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/server.h"
 #include "mongo/util/log.h"
@@ -175,8 +176,8 @@ namespace mongo {
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
                            );
-            if (storageGlobalParams.journalCommitInterval != 0)
-                b << "journalCommitIntervalMs" << storageGlobalParams.journalCommitInterval;
+            if (mmapv1GlobalOptions.journalCommitInterval != 0)
+                b << "journalCommitIntervalMs" << mmapv1GlobalOptions.journalCommitInterval;
             return b.obj();
         }
 
@@ -372,7 +373,7 @@ namespace mongo {
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
         void debugValidateAllMapsMatch() {
-            if (!(storageGlobalParams.durOptions & StorageGlobalParams::DurParanoid))
+            if (!(mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid))
                 return;
 
             unsigned long long bytes = 0;
@@ -400,7 +401,7 @@ namespace mongo {
             // remapping.
             unsigned long long now = curTimeMicros64();
             double fraction = (now-lastRemap)/2000000.0;
-            if (storageGlobalParams.durOptions & StorageGlobalParams::DurAlwaysRemap)
+            if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap)
                 fraction = 1;
             lastRemap = now;
 
@@ -624,7 +625,7 @@ namespace mongo {
             }
 
             while (shutdownRequested.loadRelaxed() == 0) {
-                unsigned ms = storageGlobalParams.journalCommitInterval;
+                unsigned ms = mmapv1GlobalOptions.journalCommitInterval;
                 if( ms == 0 ) { 
                     ms = samePartition ? 100 : 30;
                 }

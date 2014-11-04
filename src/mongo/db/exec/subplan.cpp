@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/subplan.h"
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -367,13 +368,15 @@ namespace mongo {
         _ws->clear();
 
         // Use the query planning module to plan the whole query.
-        vector<QuerySolution*> solutions;
-        Status status = QueryPlanner::plan(*_query, _plannerParams, &solutions);
+        vector<QuerySolution*> rawSolutions;
+        Status status = QueryPlanner::plan(*_query, _plannerParams, &rawSolutions);
         if (!status.isOK()) {
             return Status(ErrorCodes::BadValue,
                           "error processing query: " + _query->toString() +
                           " planner returned error: " + status.reason());
         }
+
+        OwnedPointerVector<QuerySolution> solutions(rawSolutions);
 
         // We cannot figure out how to answer the query.  Perhaps it requires an index
         // we do not have?
@@ -390,6 +393,10 @@ namespace mongo {
             // Only one possible plan.  Run it.  Build the stages from the solution.
             verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &root));
             _child.reset(root);
+
+            // This SubplanStage takes ownership of the query solution.
+            _solutions.push(solutions.release());
+
             return Status::OK();
         }
         else {
@@ -409,8 +416,8 @@ namespace mongo {
                 verify(StageBuilder::build(_txn, _collection, *solutions[ix], _ws,
                                            &nextPlanRoot));
 
-                // Owns none of the arguments
-                multiPlanStage->addPlan(solutions[ix], nextPlanRoot, _ws);
+                // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
+                multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);
             }
 
             // Delegate the the MultiPlanStage's plan selection facility.

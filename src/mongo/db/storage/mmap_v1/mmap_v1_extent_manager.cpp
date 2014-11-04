@@ -41,6 +41,7 @@
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -244,7 +245,7 @@ namespace mongo {
         if ( !enforceQuota )
             return;
 
-        if ( fileNo < storageGlobalParams.quotaFiles )
+        if ( fileNo < mmapv1GlobalOptions.quotaFiles )
             return;
 
         // exceeded!

@@ -211,6 +211,8 @@ namespace mongo {
         public:
             CollectionLock(Locker* lockState, const StringData& ns, const LockMode);
             virtual ~CollectionLock();
+
+            void relockWithMode( const LockMode mode, Lock::DBLock& dblock );
         private:
             const ResourceId _id;
             Locker* _lockState;

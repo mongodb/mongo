@@ -65,21 +65,26 @@ namespace mongo {
             (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
         };
 
+        // Ensure we do not add new modes without updating the conflicts table
+        BOOST_STATIC_ASSERT(
+            (sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
+
+
         /**
          * Maps the mode id to a string.
          */
-        static const char* LockNames[] = {
+        static const char* LockModeNames[] = {
             "NONE", "IS", "IX", "S", "X"
         };
 
-        static const char LegacyLockNames[] = {
-            '\0', 'r', 'w', 'R', 'W'
+        static const char* LegacyLockModeNames[] = {
+            "", "r", "w", "R", "W"
         };
 
         // Ensure we do not add new modes without updating the names array
-        BOOST_STATIC_ASSERT((sizeof(LockNames) / sizeof(LockNames[0])) == LockModesCount);
+        BOOST_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
         BOOST_STATIC_ASSERT(
-            (sizeof(LegacyLockNames) / sizeof(LegacyLockNames[0])) == LockModesCount);
+            (sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) == LockModesCount);
 
 
         // Helper functions for the lock modes
@@ -108,7 +113,6 @@ namespace mongo {
         // Ensure we do not add new types without updating the names array
         BOOST_STATIC_ASSERT(
             (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
-
 
     }
 
@@ -972,11 +976,11 @@ namespace mongo {
     //
 
     const char* modeName(LockMode mode) {
-        return LockNames[mode];
+        return LockModeNames[mode];
     }
 
-    char legacyModeName(LockMode mode) {
-        return LegacyLockNames[mode];
+    const char* legacyModeName(LockMode mode) {
+        return LegacyLockModeNames[mode];
     }
 
     bool isModeCovered(LockMode mode, LockMode coveringMode) {

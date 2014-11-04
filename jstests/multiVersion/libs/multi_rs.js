@@ -106,3 +106,17 @@ ReplSetTest.prototype.reconnect = function( node ){
     
     return this.nodes[ nodeId ]
 }
+
+ReplSetTest.prototype.conf = function () {
+    var admin = this.getPrimary().getDB('admin');
+
+    var resp = admin.runCommand({replSetGetConfig:1});
+
+    if (resp.ok && !(resp.errmsg) && resp.config)
+        return resp.config;
+
+    else if (resp.errmsg && resp.errmsg.startsWith( "no such cmd" ))
+        return admin.getSisterDB("local").system.replset.findOne();
+
+    throw new Error("Could not retrieve replica set config: " + tojson(resp));
+}

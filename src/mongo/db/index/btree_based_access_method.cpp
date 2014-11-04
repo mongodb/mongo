@@ -100,10 +100,11 @@ namespace mongo {
                 }
             }
 
-            if (ErrorCodes::UniqueIndexViolation == status.code()) {
-                // We ignore it for some reason in BG indexing.
+            if (ErrorCodes::DuplicateKeyValue == status.code()) {
+                // A document might be indexed multiple times during a background index build
+                // if it moves ahead of the collection scan cursor (e.g. via an update).
                 if (!_btreeState->isReady(txn)) {
-                    DEV log() << "info: key already in index during bg indexing (ok)\n";
+                    LOG(3) << "key " << *i << " already in index during background indexing (ok)";
                     continue;
                 }
             }

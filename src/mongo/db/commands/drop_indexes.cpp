@@ -287,7 +287,6 @@ namespace mongo {
             }
 
             MultiIndexBlock indexer(txn, collection);
-            indexer.allowBackgroundBuilding();
             // do not want interruption as that will leave us without indexes.
 
             Status status = indexer.init(all);

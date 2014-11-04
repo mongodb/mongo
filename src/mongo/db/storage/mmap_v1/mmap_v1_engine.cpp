@@ -50,6 +50,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/file_allocator.h"
@@ -323,15 +324,30 @@ namespace {
 
     DatabaseCatalogEntry* MMAPV1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                  const StringData& db ) {
-        boost::mutex::scoped_lock lk( _entryMapMutex );
-        MMAPV1DatabaseCatalogEntry*& entry = _entryMap[db.toString()];
-        if ( !entry ) {
-            entry =  new MMAPV1DatabaseCatalogEntry( opCtx,
-                                                     db,
-                                                     storageGlobalParams.dbpath,
-                                                     storageGlobalParams.directoryperdb,
-                                                     false );
+        {
+            boost::mutex::scoped_lock lk(_entryMapMutex);
+            EntryMap::const_iterator iter = _entryMap.find(db.toString());
+            if (iter != _entryMap.end()) {
+                return iter->second;
+            }
         }
+
+        // This is an on-demand database create/open. At this point, we are locked under X lock for
+        // the database (MMAPV1DatabaseCatalogEntry's constructor checks that) so no two threads
+        // can be creating the same database concurrenty. We need to create the database outside of
+        // the _entryMapMutex so we do not deadlock (see SERVER-15880).
+        MMAPV1DatabaseCatalogEntry* entry =
+            new MMAPV1DatabaseCatalogEntry(opCtx,
+                                           db,
+                                           storageGlobalParams.dbpath,
+                                           mmapv1GlobalOptions.directoryperdb,
+                                           false);
+
+        boost::mutex::scoped_lock lk(_entryMapMutex);
+
+        // Sanity check that we are not overwriting something
+        invariant(_entryMap.insert(EntryMap::value_type(db.toString(), entry)).second);
+
         return entry;
     }
 
@@ -364,7 +380,7 @@ namespace {
         for ( boost::filesystem::directory_iterator i( path );
               i != boost::filesystem::directory_iterator();
               ++i ) {
-            if (storageGlobalParams.directoryperdb) {
+            if (mmapv1GlobalOptions.directoryperdb) {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );

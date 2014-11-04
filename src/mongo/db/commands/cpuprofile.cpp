@@ -153,11 +153,9 @@ namespace mongo {
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
             Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, db);
 
             ::ProfilerStop();
-            wunit.commit();
             return true;
         }
 

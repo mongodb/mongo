@@ -42,6 +42,7 @@ namespace mongo {
           _planYielding(exec) { }
 
     bool PlanYieldPolicy::shouldYield() {
+        invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
         return _elapsedTracker.intervalHasElapsed();
     }
 
@@ -61,6 +62,8 @@ namespace mongo {
             // Doc-level locking is supported, so no need to release locks.
             return true;
         }
+
+        invariant(_planYielding);
 
         // No need to yield if the collection is NULL.
         if (NULL == _planYielding->collection()) {

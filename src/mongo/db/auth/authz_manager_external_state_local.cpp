@@ -90,12 +90,7 @@ namespace mongo {
             }
         }
         else if (status == ErrorCodes::NoMatchingDocument) {
-            if (hasAnyPrivilegeDocuments(txn)) {
-                *outVersion = AuthorizationManager::schemaVersion24;
-            }
-            else {
-                *outVersion = AuthorizationManager::schemaVersion26Final;
-            }
+            *outVersion = AuthorizationManager::schemaVersion28SCRAM;
             return Status::OK();
         }
         else {

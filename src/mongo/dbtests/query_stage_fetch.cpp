@@ -147,8 +147,9 @@ namespace QueryStageFetch {
     class FetchStageFilter : public QueryStageFetchBase {
     public:
         void run() {
-            Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
+            Lock::DBLock lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
+            Client::Context ctx(&_txn, ns());
+            Database* db = ctx.db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);

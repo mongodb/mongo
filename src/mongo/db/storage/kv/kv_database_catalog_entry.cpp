@@ -65,6 +65,7 @@ namespace mongo {
             if (_dropOnRollback) {
                 // Intentionally ignoring failure
                 _dce->_engine->getEngine()->dropRecordStore(_opCtx, _ident);
+                _dce->_engine->getCatalog()->dropCollection(_opCtx, _collection );
             }
 
             boost::mutex::scoped_lock lk(_dce->_collectionsLock);
@@ -241,7 +242,8 @@ namespace mongo {
 
         {
             boost::mutex::scoped_lock lk( _collectionsLock );
-            if ( _collections[ns.toString()] ) {
+            if (_collections.count(ns.toString())) {
+                invariant(_collections[ns.toString()]);
                 return Status( ErrorCodes::NamespaceExists,
                                "collection already exists" );
             }
@@ -278,7 +280,7 @@ namespace mongo {
         invariant( rs );
 
         boost::mutex::scoped_lock lk( _collectionsLock );
-        invariant( !_collections[ns] );
+        invariant(!_collections.count(ns));
         // No change registration since this is only for committed collections
         _collections[ns] = new KVCollectionCatalogEntry( _engine->getEngine(),
                                                          _engine->getCatalog(),

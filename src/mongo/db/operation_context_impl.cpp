@@ -49,7 +49,9 @@ namespace {
     AtomicUInt64 idCounter(0);
 }
 
-    OperationContextImpl::OperationContextImpl() {
+    OperationContextImpl::OperationContextImpl() : _client(currentClient.get()) {
+        invariant(_client);
+
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
@@ -60,8 +62,6 @@ namespace {
         else {
             _locker.reset(new LockerImpl<false>(idCounter.addAndFetch(1)));
         }
-
-        _client = currentClient.get(); // may be NULL
 
         getGlobalEnvironment()->registerOperationContext(this);
     }
@@ -106,8 +106,6 @@ namespace {
     }
 
     Client* OperationContextImpl::getClient() const {
-        if ( _client == NULL )
-            return currentClient.get();
         return _client;
     }
 

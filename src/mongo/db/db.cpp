@@ -74,6 +74,7 @@
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
@@ -472,7 +473,7 @@ namespace mongo {
 
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
-        if (storageGlobalParams.durOptions & StorageGlobalParams::DurRecoverOnly)
+        if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalRecoverOnly)
             return;
 
         if (mongodGlobalParams.scriptingEnabled) {

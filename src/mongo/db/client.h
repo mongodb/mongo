@@ -106,6 +106,9 @@ namespace mongo {
         bool justCreated() {
             return _justCreated;
         }
+
+        Lock::DBLock& lock() { return _dbLock; }
+
     private:
         Lock::DBLock _dbLock; // not const, as we may need to relock for implicit create
         Database* _db;
@@ -309,6 +312,7 @@ namespace mongo {
             AutoGetOrCreateDb _autodb;
             Lock::CollectionLock _collk;
             Context _c;
+            Collection* _collection;
         };
     }; // class Client
 

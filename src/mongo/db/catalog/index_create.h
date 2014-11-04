@@ -64,6 +64,7 @@ namespace mongo {
          * Neither pointer is owned.
          */
         MultiIndexBlock(OperationContext* txn, Collection* collection);
+        ~MultiIndexBlock();
 
         /**
          * By default we ignore the 'background' flag in specs when building an index. If this is
@@ -100,11 +101,29 @@ namespace mongo {
          * Prepares the index(es) for building.
          *
          * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
+         *
+         * Requires holding an exclusive database lock.
          */
         Status init(const std::vector<BSONObj>& specs);
         Status init(const BSONObj& spec) {
             return init(std::vector<BSONObj>(1, spec));
         }
+
+        /**
+         * Manages in-progress background index builds.
+         * Call registerIndexBuild() after calling init() to record this build in the catalog's 
+         * in-progress map.
+         * The build must be a background build and it must be a single index build (the size of
+         * _indexes must be 1).
+         * registerIndexBuild() returns the descriptor for the index build. You must subsequently
+         * call unregisterIndexBuild() with that same descriptor before this MultiIndexBlock goes
+         * out of scope.
+         * These functions are only intended to be used by the replication system. No internal
+         * concurrency control is performed; it is expected that the code has already taken steps
+         * to ensure calls to these functions are serialized, for a particular IndexCatalog.
+         */
+        IndexDescriptor* registerIndexBuild();
+        void unregisterIndexBuild(IndexDescriptor* descriptor);
 
         /**
          * Inserts all documents in the Collection into the indexes and logs with timing info.
@@ -151,6 +170,8 @@ namespace mongo {
          *
          * Should be called inside of a WriteUnitOfWork. If the index building is to be logOp'd,
          * logOp() should be called from the same unit of work as commit().
+         *
+         * Requires holding an exclusive database lock.
          */
         void commit();
 
@@ -170,7 +191,7 @@ namespace mongo {
          */
         void abortWithoutCleanup();
 
-        ~MultiIndexBlock();
+        bool getBuildInBackground() const { return _buildInBackground; }
 
     private:
         class SetNeedToCleanupOnRollback;

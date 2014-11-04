@@ -236,8 +236,6 @@ namespace {
             return;
         }
 
-        init.setHostname(r.getHost().toString());
-
         BSONObj lastOp = r.getLastOp(rsoplog);
         if ( lastOp.isEmpty() ) {
             log() << "initial sync couldn't read remote oplog";
@@ -311,12 +309,12 @@ namespace {
 
         {
             AutoGetDb autodb(&txn, "local", MODE_X);
-            WriteUnitOfWork wunit(&txn);
             OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
             log() << "replSet set minValid=" << lastOpTimeWritten << rsLog;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.
+            WriteUnitOfWork wunit(&txn);
             setMinValid(&txn, lastOpTimeWritten);
 
             // Clear the initial sync flag.

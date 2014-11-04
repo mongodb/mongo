@@ -95,9 +95,7 @@ namespace QueryTests {
             Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
         void insert( const char *s ) {
-            WriteUnitOfWork wunit(&_txn);
             insert( fromjson( s ) );
-            wunit.commit();
         }
         void insert( const BSONObj &o ) {
             WriteUnitOfWork wunit(&_txn);
@@ -634,7 +632,6 @@ namespace QueryTests {
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
             Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
-            WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
             BSONObj info;
@@ -658,7 +655,6 @@ namespace QueryTests {
             
             ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns ), cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
-            wunit.commit();
         }
     };
 
@@ -1075,9 +1071,7 @@ namespace QueryTests {
         void run() {
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn, "unittests.DirectLocking");
-            WriteUnitOfWork wunit(&_txn);
             _client.remove( "a.b", BSONObj() );
-            wunit.commit();
             ASSERT_EQUALS( "unittests", ctx.db()->name() );
         }
         const char *ns;

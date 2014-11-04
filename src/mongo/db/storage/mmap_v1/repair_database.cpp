@@ -45,6 +45,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
@@ -69,7 +70,7 @@ namespace mongo {
                              const string& path = storageGlobalParams.dbpath);
 
     void _deleteDataFiles(const std::string& database) {
-        if (storageGlobalParams.directoryperdb) {
+        if (mmapv1GlobalOptions.directoryperdb) {
             FileAllocator::get()->waitUntilFinished();
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
                     boost::filesystem::remove_all(
@@ -102,7 +103,7 @@ namespace mongo {
     // back up original database files to 'temp' dir
     void _renameForBackup( const std::string& database, const Path &reservedPath ) {
         Path newPath( reservedPath );
-        if (storageGlobalParams.directoryperdb)
+        if (mmapv1GlobalOptions.directoryperdb)
             newPath /= database;
         class Renamer : public FileOp {
         public:
@@ -149,7 +150,7 @@ namespace mongo {
     // move temp files to standard data dir
     void _replaceWithRecovered( const string& database, const char *reservedPathString ) {
         Path newPath(storageGlobalParams.dbpath);
-        if (storageGlobalParams.directoryperdb)
+        if (mmapv1GlobalOptions.directoryperdb)
             newPath /= database;
         class Replacer : public FileOp {
         public:
@@ -191,7 +192,7 @@ namespace mongo {
         string c = database;
         c += '.';
         boost::filesystem::path p(path);
-        if (storageGlobalParams.directoryperdb)
+        if (mmapv1GlobalOptions.directoryperdb)
             p /= database;
         boost::filesystem::path q;
         q = p / (c+"ns");
@@ -324,7 +325,7 @@ namespace mongo {
                 dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
                                                              dbName,
                                                              reservedPathString,
-                                                             storageGlobalParams.directoryperdb,
+                                                             mmapv1GlobalOptions.directoryperdb,
                                                              true));
                 invariant(!dbEntry->exists());
                 tempDatabase.reset( new Database(dbName, dbEntry.get()));

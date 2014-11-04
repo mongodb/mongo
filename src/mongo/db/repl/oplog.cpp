@@ -121,9 +121,6 @@ namespace repl {
         */
     OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        // XXX soon this needs to be part of an outer WUOW not its own.
-        // We can't do this yet due to locking limitations.
-        WriteUnitOfWork wunit(txn);
 
         const OpTime ts = op["ts"]._opTime();
         long long hash = op["h"].numberLong();
@@ -140,6 +137,9 @@ namespace repl {
                         localOplogRSCollection);
             }
             Client::Context ctx(txn, rsoplog, localDB);
+            // TODO(geert): soon this needs to be part of an outer WUOW not its own.
+            // We can't do this yet due to locking limitations.
+            WriteUnitOfWork wunit(txn);
             checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
 
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
@@ -149,6 +149,7 @@ namespace repl {
                          << myLastOptime << " newest timestamp: " << ts;
                 fassertFailedNoTrace(18905);
             }
+            wunit.commit();
             
             BackgroundSync* bgsync = BackgroundSync::get();
             // Keep this up-to-date, in case we step up to primary.
@@ -160,7 +161,6 @@ namespace repl {
         }
 
         setNewOptime(ts);
-        wunit.commit();
         return ts;
     }
 
@@ -237,7 +237,6 @@ namespace repl {
                          bool *bb,
                          bool fromMigrate ) {
         Lock::DBLock lk1(txn->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(txn);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             return;
@@ -299,6 +298,7 @@ namespace repl {
         }
 
         Client::Context ctx(txn, rsoplog, localDB);
+        WriteUnitOfWork wunit(txn);
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
@@ -319,7 +319,6 @@ namespace repl {
                           bool *bb,
                           bool fromMigrate ) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(txn);
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -361,6 +360,7 @@ namespace repl {
         }
 
         Client::Context ctx(txn, logNS , localDB);
+        WriteUnitOfWork wunit(txn);
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
@@ -448,7 +448,6 @@ namespace repl {
 
     void createOplog(OperationContext* txn) {
         Lock::GlobalWrite lk(txn->lockState());
-        WriteUnitOfWork uow( txn );
 
         const char * ns = "local.oplog.$main";
 
@@ -478,7 +477,6 @@ namespace repl {
 
             if ( !rs )
                 initOpTimeFromOplog(txn, ns);
-            uow.commit();
             return;
         }
 
@@ -517,6 +515,7 @@ namespace repl {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
+        WriteUnitOfWork uow( txn );
         invariant(ctx.db()->createCollection(txn, ns, options));
         if( !rs )
             logOp(txn, "n", "", BSONObj() );
@@ -585,21 +584,7 @@ namespace repl {
                 else {
                     IndexBuilder builder(o);
                     Status status = builder.buildInForeground(txn, db);
-                    if ( status.isOK() ) {
-                        // yay
-                    }
-                    else if ( status.code() == ErrorCodes::IndexOptionsConflict ||
-                              status.code() == ErrorCodes::IndexKeySpecsConflict ) {
-                        // SERVER-13206, SERVER-13496
-                        // 2.4 (and earlier) will add an ensureIndex to an oplog if its ok or not
-                        // so in 2.6+ where we do stricter validation, it will fail
-                        // but we shouldn't care as the primary is responsible
-                        warning() << "index creation attempted on secondary that conflicts, "
-                                  << "skipping: " << status;
-                    }
-                    else {
-                        uassertStatusOK( status );
-                    }
+                    uassertStatusOK(status);
                 }
             }
             else {
@@ -627,20 +612,6 @@ namespace repl {
                     }
                 }
                 else {
-                    // probably don't need this since all replicated colls have _id indexes now
-                    // but keep it just in case
-                    RARELY if ( indexCatalog
-                                 && !collection->isCapped()
-                                 && !indexCatalog->haveIdIndex(txn) ) {
-                        try {
-                            Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
-                        }
-                        catch (const DBException& e) {
-                            warning() << "Ignoring error building id index on " << collection->ns()
-                                      << ": " << e.toString();
-                        }
-                    }
-
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
                               */
@@ -663,18 +634,6 @@ namespace repl {
         }
         else if ( *opType == 'u' ) {
             opCounters->gotUpdate();
-
-            // probably don't need this since all replicated colls have _id indexes now
-            // but keep it just in case
-            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex(txn) ) {
-                try {
-                    Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
-                }
-                catch (const DBException& e) {
-                    warning() << "Ignoring error building id index on " << collection->ns()
-                              << ": " << e.toString();
-                }
-            }
 
             OpDebug debug;
             BSONObj updateCriteria = o2;

@@ -7,7 +7,6 @@ env.Library(
     source=[
         'd_concurrency.cpp',
         'lock_mgr_new.cpp',
-        'lock_stat.cpp',
         'lock_state.cpp',
         'yield.cpp',
     ],

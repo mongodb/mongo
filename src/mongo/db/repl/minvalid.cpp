@@ -51,25 +51,19 @@ namespace {
 
     void clearInitialSyncFlag(OperationContext* txn) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
-        wunit.commit();
     }
 
     void setInitialSyncFlag(OperationContext* txn) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(txn);
         Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
-        wunit.commit();
     }
 
     bool getInitialSyncFlag() {
         OperationContextImpl txn;
         Lock::DBLock lk(txn.lockState(), "local", MODE_X);
-        WriteUnitOfWork uow( &txn );
         BSONObj mv;
         bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
-        uow.commit();
 
         if (found) {
             return mv[initialSyncFlagString].trueValue();
@@ -79,25 +73,17 @@ namespace {
 
     void setMinValid(OperationContext* ctx, OpTime ts) {
         Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
-        {
-            WriteUnitOfWork wunit(ctx);
-            Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
-            wunit.commit();
-        }
+        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
     }
 
     OpTime getMinValid(OperationContext* txn) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_S);
-        {
-            WriteUnitOfWork wunit(txn);
-            BSONObj mv;
-            bool found = Helpers::getSingleton(txn, minvalidNS, mv);
-            wunit.commit();
-            if (found) {
-                return mv["ts"]._opTime();
-            }
-            return OpTime();
+        BSONObj mv;
+        bool found = Helpers::getSingleton(txn, minvalidNS, mv);
+        if (found) {
+            return mv["ts"]._opTime();
         }
+        return OpTime();
     }
 
 }

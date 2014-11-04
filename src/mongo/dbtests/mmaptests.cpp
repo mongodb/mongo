@@ -39,6 +39,8 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
@@ -50,12 +52,12 @@ namespace MMapTests {
     public:
         LeakTest() :
             fn((boost::filesystem::path(storageGlobalParams.dbpath) / "testfile.map").string()),
-               optOld(storageGlobalParams.durOptions)
+               optOld(mmapv1GlobalOptions.journalOptions)
         { 
-            storageGlobalParams.durOptions = 0; // DurParanoid doesn't make sense with this test
+            mmapv1GlobalOptions.journalOptions = 0; // DurParanoid doesn't make sense with this test
         }
         ~LeakTest() {
-            storageGlobalParams.durOptions = optOld;
+            mmapv1GlobalOptions.journalOptions = optOld;
             try { boost::filesystem::remove(fn); }
             catch(...) { }
         }

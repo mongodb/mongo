@@ -521,11 +521,8 @@ namespace {
     long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         BSONObj oplogEntry;
         try {
-            // Uses WuoW because there is no way to demarcate a read transaction boundary.
             Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            WriteUnitOfWork uow(txn);
             bool success = Helpers::getLast(txn, rsoplog, oplogEntry);
-            uow.commit();
             if (!success) {
                 // This can happen when we are to do an initial sync.  lastHash will be set
                 // after the initial sync is complete.

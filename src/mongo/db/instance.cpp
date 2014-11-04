@@ -44,7 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/deadlock.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/currentop_command.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
@@ -593,14 +593,14 @@ namespace {
                 }
                 break;
             }
-            catch ( const DeadLockException& dle ) {
+            catch ( const WriteConflictException& dle ) {
                 if ( multi ) {
-                    log(LogComponent::kWrites) << "got deadlock during multi update, aborting";
+                    log(LogComponent::kWrites) << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
-                else {
-                    log(LogComponent::kWrites) << "got deadlock doing update on " << ns
-                                               << ", attempt: " << attempt++ << " retrying";
+                else if ( attempt++ > 1 ) {
+                    log(LogComponent::kWrites) << "Had WriteConflict doing update on " << ns
+                                               << ", attempt: " << attempt << " retrying";
                 }
             }
         }
@@ -675,9 +675,11 @@ namespace {
 
                 break;
             }
-            catch ( const DeadLockException& dle ) {
-                log(LogComponent::kWrites) << "got deadlock doing delete on " << ns
-                                           << ", attempt: " << attempt++ << " retrying";
+            catch ( const WriteConflictException& dle ) {
+                if ( attempt++ > 1 ) {
+                    log(LogComponent::kWrites) << "Had WriteConflict doing delete on " << ns
+                                               << ", attempt: " << attempt << " retrying";
+                }
             }
         }
     }

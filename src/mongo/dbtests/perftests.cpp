@@ -51,6 +51,7 @@
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/allocator.h"
@@ -363,10 +364,10 @@ namespace PerfTests {
             static int z;
             srand( ++z ^ (unsigned) time(0));
 #endif
+            Client::initThreadIfNotAlready("perftestthr");
             OperationContextImpl txn;
             DBDirectClient c(&txn);
 
-            Client::initThreadIfNotAlready("perftestthr");
             const unsigned int Batch = batchSize();
             while( 1 ) {
                 unsigned int i = 0;

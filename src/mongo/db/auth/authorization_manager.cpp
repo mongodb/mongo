@@ -514,6 +514,10 @@ namespace mongo {
             return status;
         }
         status = parser.initializeUserPrivilegesFromUserDocument(privDoc, user);
+        if (!status.isOK()) {
+            return status;
+        }
+
         return Status::OK();
     }
 

@@ -37,6 +37,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
@@ -57,7 +58,7 @@ namespace mongo {
         if ( sizeof( int* ) == 4 ) {
             return 512 * 1024 * 1024;
         }
-        else if (storageGlobalParams.smallfiles) {
+        else if (mmapv1GlobalOptions.smallfiles) {
             return 0x7ff00000 >> 2;
         }
         else {
@@ -77,7 +78,7 @@ namespace mongo {
             size = (64*1024*1024) << fileNo;
         else
             size = 0x7ff00000;
-        if (storageGlobalParams.smallfiles) {
+        if (mmapv1GlobalOptions.smallfiles) {
             size = size >> 2;
         }
         return size;
@@ -96,10 +97,10 @@ namespace mongo {
         unsigned long long sz = mmf.length();
         verify( sz <= 0x7fffffff );
         verify( sz % 4096 == 0 );
-        if (sz < 64*1024*1024 && !storageGlobalParams.smallfiles) {
+        if (sz < 64*1024*1024 && !mmapv1GlobalOptions.smallfiles) {
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) {
                 log() << "info openExisting file size " << sz
-                      << " but storageGlobalParams.smallfiles=false: "
+                      << " but mmapv1GlobalOptions.smallfiles=false: "
                       << filename << endl;
             }
             else {
@@ -128,11 +129,11 @@ namespace mongo {
         if ( size > maxSize() )
             size = maxSize();
 
-        verify(size >= 64*1024*1024 || storageGlobalParams.smallfiles);
+        verify(size >= 64*1024*1024 || mmapv1GlobalOptions.smallfiles);
         verify( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
-            if (storageGlobalParams.prealloc) {
+            if (mmapv1GlobalOptions.prealloc) {
                 FileAllocator::get()->requestAllocation( filename, size );
             }
             return;

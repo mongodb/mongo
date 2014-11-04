@@ -26,15 +26,19 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage_options.h"
 
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/server_parameters.h"
 
 namespace mongo {
 
     StorageGlobalParams storageGlobalParams;
 
+    /**
+     * The directory where the mongod instance stores its data.
+     */
 #ifdef _WIN32
     const char* StorageGlobalParams::kDefaultDbPath = "\\data\\db\\";
     const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
@@ -43,70 +47,14 @@ namespace mongo {
     const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
 
-    class JournalCommitIntervalSetting : public ServerParameter {
-    public:
-        JournalCommitIntervalSetting() :
-            ServerParameter(ServerParameterSet::getGlobal(), "journalCommitInterval",
-                    false, // allowedToChangeAtStartup
-                    true // allowedToChangeAtRuntime
-                    ) {}
-
-        virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-            b << name << storageGlobalParams.journalCommitInterval;
-        }
-
-        virtual Status set(const BSONElement& newValueElement) {
-            long long newValue;
-            if (!newValueElement.isNumber()) {
-                StringBuilder sb;
-                sb << "Expected number type for journalCommitInterval via setParameter command: "
-                   << newValueElement;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            if (newValueElement.type() == NumberDouble &&
-                (newValueElement.numberDouble() - newValueElement.numberLong()) > 0) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be a whole number: "
-                   << newValueElement;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            newValue = newValueElement.numberLong();
-            if (newValue <= 1 || newValue >= 500) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
-                   << newValue;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            storageGlobalParams.journalCommitInterval = static_cast<unsigned>(newValue);
-            return Status::OK();
-        }
-
-        virtual Status setFromString(const std::string& str) {
-            unsigned newValue;
-            Status status = parseNumberFromString(str, &newValue);
-            if (!status.isOK()) {
-                return status;
-            }
-            if (newValue <= 1 || newValue >= 500) {
-                StringBuilder sb;
-                sb << "journalCommitInterval must be between 1 and 500, but attempted to set to: "
-                   << newValue;
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            storageGlobalParams.journalCommitInterval = newValue;
-            return Status::OK();
-        }
-    } journalCommitIntervalSetting;
-
+    /**
+     * Specify whether all queries must use indexes.
+     * If 1, MongoDB will not execute queries that require a table scan and will return an error.
+     * NOT recommended for production use.
+     */
     ExportedServerParameter<bool> NoTableScanSetting(ServerParameterSet::getGlobal(),
                                                      "notablescan",
                                                      &storageGlobalParams.noTableScan,
-                                                     true,
-                                                     true);
-
-    ExportedServerParameter<double> SyncdelaySetting(ServerParameterSet::getGlobal(),
-                                                     "syncdelay",
-                                                     &storageGlobalParams.syncdelay,
                                                      true,
                                                      true);
 

@@ -29,6 +29,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <iostream>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/constraints.h"
@@ -76,20 +77,15 @@ namespace optionenvironment {
     class OptionDescription {
     public:
         OptionDescription(const std::string& dottedName,
-                const std::string& singleName,
-                const OptionType type,
-                const std::string& description)
-            : _dottedName(dottedName),
-            _singleName(singleName),
-            _type(type),
-            _description(description),
-            _isVisible(true),
-            _default(Value()),
-            _implicit(Value()),
-            _isComposing(false),
-            _sources(SourceAll),
-            _positionalStart(-1),
-            _positionalEnd(-1) { }
+                          const std::string& singleName,
+                          const OptionType type,
+                          const std::string& description);
+
+        OptionDescription(const std::string& dottedName,
+                          const std::string& singleName,
+                          const OptionType type,
+                          const std::string& description,
+                          const std::vector<std::string>& deprecatedDottedNames);
 
         /*
          * The following functions are part of the chaining interface for option registration.  See
@@ -232,6 +228,9 @@ namespace optionenvironment {
         // when thinking about ownership.
         std::vector<boost::shared_ptr<Constraint> > _constraints; // Constraints that must be met
                                                                   // for this option to be valid
+
+        // Deprecated dotted names - aliases for '_dottedName'.
+        std::vector<std::string> _deprecatedDottedNames;
     };
 
 } // namespace optionenvironment

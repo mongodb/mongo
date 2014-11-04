@@ -105,7 +105,7 @@ namespace mongo {
         int res;
         {
             Timer t;
-            res = s->invoke(f, &args, 0, storageGlobalParams.quota ? 10 * 60 * 1000 : 0);
+            res = s->invoke(f, &args, 0, 0);
             int m = t.millis();
             if (m > serverGlobalParams.slowMS) {
                 log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;

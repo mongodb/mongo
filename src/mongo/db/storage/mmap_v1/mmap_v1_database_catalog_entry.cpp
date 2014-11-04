@@ -118,7 +118,7 @@ namespace mongo {
           _extentManager( name, path, directoryPerDB ),
           _namespaceIndex( _path, name.toString() ) {
 
-        invariant(txn->lockState()->isWriteLocked(name));
+        invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
         try {
             WriteUnitOfWork wunit(txn);

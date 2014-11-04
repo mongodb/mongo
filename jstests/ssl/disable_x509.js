@@ -13,10 +13,10 @@ if (cmdOut.ok) {
     conn = MongoRunner.runMongod({ restart: conn,
                                    setParameter: "authenticationMechanisms=MONGODB-X509" });
     external = conn.getDB("$external")
-    
+
     // Add user using localhost exception
     external.createUser({user: CLIENT_USER, roles:[
-            {'role':'userAdminAnyDatabase', 'db':'admin'}, 
+            {'role':'userAdminAnyDatabase', 'db':'admin'},
             {'role':'readWriteAnyDatabase', 'db':'admin'}]})
 
     // Localhost exception should not be in place anymore
@@ -27,9 +27,9 @@ if (cmdOut.ok) {
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({ restart: conn,
-                                   setParameter: "authenticationMechanisms=MONGODB-CR" });
+                                   setParameter: "authenticationMechanisms=SCRAM-SHA-1" });
     external = conn.getDB("$external")
-    
+
     assert( !external.auth({user: CLIENT_USER, mechanism: 'MONGODB-X509'}),
             "authentication with disabled auth mechanism succeeded" )
 }

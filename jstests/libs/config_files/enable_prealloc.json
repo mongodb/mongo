@@ -1,5 +1,7 @@
 {
     "storage" : {
-        "preallocDataFiles" : true
+        "mmapv1" : {
+            "preallocDataFiles" : true
+        }
     }
 }

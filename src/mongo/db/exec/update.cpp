@@ -33,7 +33,7 @@
 #include "mongo/db/exec/update.h"
 
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/concurrency/deadlock.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update_lifecycle.h"
@@ -752,13 +752,13 @@ namespace mongo {
                     transformAndUpdate(reFetched.isEmpty() ? oldObj : reFetched , loc);
                     break;
                 }
-                catch ( const DeadLockException& de ) {
+                catch ( const WriteConflictException& de ) {
                     if ( !_params.request->isMulti() ) {
                         // for single cases, we just restart.
                         throw;
                     }
 
-                    log() << "got deadlock in the middle of a multi-update, redoing the doc";
+                    log() << "Had WriteConflict in the middle of a multi-update, redoing the doc";
                     OperationContext* txn = _params.request->getOpCtx();
                     txn->recoveryUnit()->commitAndRestart();
                     if ( !_collection->findDoc( txn, loc, &reFetched ) ) {

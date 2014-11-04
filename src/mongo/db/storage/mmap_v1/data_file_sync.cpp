@@ -35,6 +35,8 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 
@@ -53,25 +55,25 @@ namespace mongo {
     void DataFileSync::run() {
         Client::initThread( name().c_str() );
 
-        if (storageGlobalParams.syncdelay == 0) {
+        if (mmapv1GlobalOptions.syncdelay == 0) {
             log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
         }
-        else if (storageGlobalParams.syncdelay == 1) {
+        else if (mmapv1GlobalOptions.syncdelay == 1) {
             log() << "--syncdelay 1" << endl;
         }
-        else if (storageGlobalParams.syncdelay != 60) {
-            LOG(1) << "--syncdelay " << storageGlobalParams.syncdelay << endl;
+        else if (mmapv1GlobalOptions.syncdelay != 60) {
+            LOG(1) << "--syncdelay " << mmapv1GlobalOptions.syncdelay << endl;
         }
         int time_flushing = 0;
         while ( ! inShutdown() ) {
             _diaglog.flush();
-            if (storageGlobalParams.syncdelay == 0) {
+            if (mmapv1GlobalOptions.syncdelay == 0) {
                 // in case at some point we add an option to change at runtime
                 sleepsecs(5);
                 continue;
             }
 
-            sleepmillis((long long) std::max(0.0, (storageGlobalParams.syncdelay * 1000) - time_flushing));
+            sleepmillis((long long) std::max(0.0, (mmapv1GlobalOptions.syncdelay * 1000) - time_flushing));
 
             if ( inShutdown() ) {
                 // occasional issue trying to flush during shutdown when sleep interrupted

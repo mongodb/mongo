@@ -184,11 +184,12 @@ namespace {
             }
         }
 
-        if (!Listener::getTimeTracker()) {
-            // this ensures we are actually running a server
-            // this may return true later, so may want to retry
+        // Ensure that the server is up and ready to accept incoming network requests.
+        const Listener* listener = Listener::getTimeTracker();
+        if (!listener) {
             return false;
         }
+        listener->waitUntilListening();
 
         try {
             DBClientConnection conn;

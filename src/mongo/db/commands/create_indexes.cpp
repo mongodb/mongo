@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -134,9 +135,11 @@ namespace mongo {
 
             // now we know we have to create index(es)
             // Note: createIndexes command does not currently respect shard versioning.
-            Lock::DBLock lk(txn->lockState(), ns.db(), MODE_X);
-            Client::Context ctx(txn, ns.ns(), false /* doVersion */ );
-            Database* db = ctx.db();
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
+            Database* db = dbHolder().get(txn, ns.db());
+            if (!db) {
+                db = dbHolder().openDb(txn, ns.db());
+            }
 
             Collection* collection = db->getCollection( txn, ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
@@ -150,7 +153,7 @@ namespace mongo {
                 wunit.commit();
             }
 
-            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal(txn) );
+            result.append("numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal(txn));
 
             MultiIndexBlock indexer(txn, collection);
             indexer.allowBackgroundBuilding();
@@ -181,7 +184,39 @@ namespace mongo {
             }
 
             uassertStatusOK(indexer.init(specs));
-            uassertStatusOK(indexer.insertAllDocumentsInCollection());
+
+            // If we're a background index, replace exclusive db lock with an intent lock, so that
+            // other readers and writers can proceed during this phase.  
+            if (indexer.getBuildInBackground()) {
+                dbLock.relockWithMode(MODE_IX);
+            }
+            try {
+                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                uassertStatusOK(indexer.insertAllDocumentsInCollection());
+            }
+            catch (const DBException& e) {
+                // Must have exclusive DB lock before we clean up the index build via the
+                // destructor of 'indexer'.
+                if (indexer.getBuildInBackground()) {
+                    try {
+                        // This function cannot throw today, but we will preemptively prepare for
+                        // that day, to avoid data corruption due to lack of index cleanup.
+                        dbLock.relockWithMode(MODE_X);
+                    }
+                    catch (...) {
+                        std::terminate();
+                    }
+                }
+                throw;
+            }
+            // Need to return db lock back to exclusive, to complete the index build.
+            if (indexer.getBuildInBackground()) {
+                dbLock.relockWithMode(MODE_X);
+                Database* db = dbHolder().get(txn, ns.db());
+                uassert(28551, "database dropped during index build", db);
+                uassert(28552, "collection dropped during index build",
+                        db->getCollection(txn, ns.ns()));
+            }
 
             {
                 WriteUnitOfWork wunit(txn);

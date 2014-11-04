@@ -70,9 +70,9 @@ namespace mongo {
             ASSERT_EQUALS(nKeys, _helper.btree.fullValidate(&txn, NULL, true, false, 0));
         }
 
-        void insert(const BSONObj &key, const DiskLoc dl) {
+        Status insert(const BSONObj &key, const DiskLoc dl, bool dupsAllowed = true) {
             OperationContextNoop txn;
-            _helper.btree.insert(&txn, key, dl, true);
+            return _helper.btree.insert(&txn, key, dl, dupsAllowed);
         }
 
         bool unindex(const BSONObj &key) {
@@ -2027,6 +2027,53 @@ namespace mongo {
         }
     };
 
+    template<class OnDiskFormat>
+    class DuplicateKeys : public BtreeLogicTestBase<OnDiskFormat> {
+    public:
+        void run() {
+            OperationContextNoop txn;
+            this->_helper.btree.initAsEmpty(&txn);
+
+            BSONObj key1 = simpleKey('z');
+            ASSERT_OK(this->insert(key1, this->_helper.dummyDiskLoc, true));
+            this->checkValidNumKeys(1);
+            this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+
+            // Attempt to insert a dup key/value.
+            ASSERT_EQUALS(ErrorCodes::DuplicateKeyValue, 
+                          this->insert(key1, this->_helper.dummyDiskLoc, true));
+            this->checkValidNumKeys(1);
+            this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+
+            // Attempt to insert a dup key/value with dupsAllowed=false.
+            ASSERT_EQUALS(ErrorCodes::DuplicateKeyValue, 
+                          this->insert(key1, this->_helper.dummyDiskLoc, false));
+            this->checkValidNumKeys(1);
+            this->locate(key1, 0, true, this->_helper.headManager.getHead(&txn), 1);
+
+            // Add another record to produce another diskloc.
+            StatusWith<DiskLoc> s = this->_helper.recordStore.insertRecord(&txn, "a", 1, false);
+            
+            ASSERT_TRUE(s.isOK());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
+
+            DiskLoc dummyDiskLoc2 = s.getValue();
+
+            // Attempt to insert a dup key but this time with a different value.
+            ASSERT_EQUALS(ErrorCodes::DuplicateKey, this->insert(key1, dummyDiskLoc2, false));
+            this->checkValidNumKeys(1);
+
+            // Insert a dup key with dupsAllowed=true, should succeed.
+            ASSERT_OK(this->insert(key1, dummyDiskLoc2, true));
+            this->checkValidNumKeys(2);
+
+            // Clean up.
+            this->_helper.recordStore.deleteRecord(&txn, dummyDiskLoc2);
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
+        }
+    };
+
+
     /* This test requires the entire server to be linked-in and it is better implemented using
        the JS framework. Disabling here and will put in jsCore.
 
@@ -2254,6 +2301,8 @@ namespace mongo {
 
             add< LocateEmptyForward<OnDiskFormat> >();
             add< LocateEmptyReverse<OnDiskFormat> >();
+
+            add< DuplicateKeys<OnDiskFormat> >();
         }
     };
 

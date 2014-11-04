@@ -25,10 +25,13 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
+#include <algorithm>
 #include <cerrno>
 #include <fstream>
 #include <stdio.h>
@@ -38,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/log.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
@@ -233,9 +237,14 @@ namespace optionenvironment {
         }
 
         // Convert a YAML::Node to a Value.  See comments at the beginning of this section.
+        // 'canonicalKey' holds the dotted name that should be used in the result Environment.
+        // This ensures that both canonical and deprecated dotted names in the configuration
+        // are mapped to the canonical name.
         Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                                const std::vector<OptionDescription>& options_vector,
-                               const Key& key, Value* value) {
+                               const Key& key,
+                               Key* canonicalKey,
+                               Value* value) {
 
             bool isRegistered = false;
 
@@ -255,9 +264,20 @@ namespace optionenvironment {
             // Get expected type
             for (std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
                 iterator != options_vector.end(); iterator++) {
-                if (key == iterator->_dottedName && (iterator->_sources & SourceYAMLConfig)) {
+                if (!(iterator->_sources & SourceYAMLConfig)) {
+                    continue;
+                }
+
+                bool isDeprecated = std::count(iterator->_deprecatedDottedNames.begin(),
+                                               iterator->_deprecatedDottedNames.end(), key) > 0;
+                if (key == iterator->_dottedName || isDeprecated) {
                     isRegistered = true;
                     type = iterator->_type;
+                    *canonicalKey = iterator->_dottedName;
+                    if (isDeprecated) {
+                        warning() << "Option: " << key << " is deprecated. Please use "
+                                  << iterator->_dottedName << " instead.";
+                    }
                 }
             }
 
@@ -454,24 +474,26 @@ namespace optionenvironment {
                     }
                 }
                 else {
+                    Key canonicalKey;
                     Value optionValue;
                     Status ret = YAMLNodeToValue(YAMLNode, options_vector, dottedName,
-                                                 &optionValue);
+                                                 &canonicalKey, &optionValue);
                     if (!ret.isOK()) {
                         return ret;
                     }
 
                     Value dummyVal;
-                    if (environment->get(dottedName, &dummyVal).isOK()) {
+                    if (environment->get(canonicalKey, &dummyVal).isOK()) {
                         StringBuilder sb;
-                        sb << "Error parsing YAML config: duplcate key: " << dottedName;
+                        sb << "Error parsing YAML config: duplicate key: " << dottedName
+                           << "(canonical key: " << canonicalKey << ")";
                         return Status(ErrorCodes::BadValue, sb.str());
                     }
 
                     // Only add the value if it is not empty.  YAMLNodeToValue will set the
                     // optionValue to an empty Value if we should not set it in the Environment.
                     if (!optionValue.isEmpty()) {
-                        ret = environment->set(dottedName, optionValue);
+                        ret = environment->set(canonicalKey, optionValue);
                         if (!ret.isOK()) {
                             return ret;
                         }

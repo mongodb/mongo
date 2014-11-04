@@ -273,6 +273,16 @@ namespace mongo {
         return StatusWith<BSONObj>( fixed );
     }
 
+    void IndexCatalog::registerIndexBuild(IndexDescriptor* descriptor, unsigned int opNum) {
+        _inProgressIndexes[descriptor] = opNum;
+    }
+
+    void IndexCatalog::unregisterIndexBuild(IndexDescriptor* descriptor) {
+        InProgressIndexesMap::iterator it = _inProgressIndexes.find(descriptor);
+        invariant(it != _inProgressIndexes.end());
+        _inProgressIndexes.erase(it);
+    }
+
 namespace {
     class IndexCleanupOnRollback : public RecoveryUnit::Change {
     public:
@@ -1143,10 +1153,38 @@ namespace {
         return b.obj();
     }
 
-    std::vector<BSONObj> IndexCatalog::killMatchingIndexBuilds(
-            const IndexCatalog::IndexKillCriteria& criteria) {
-        // This is just a no-op stub. When SERVER-14860 is resolved, this will either be filled out
-        // or removed entirely.
-        return std::vector<BSONObj>();
+    std::vector<BSONObj>
+    IndexCatalog::killMatchingIndexBuilds(const IndexCatalog::IndexKillCriteria& criteria) {
+        std::vector<BSONObj> indexes;
+        for (InProgressIndexesMap::iterator it = _inProgressIndexes.begin();
+             it != _inProgressIndexes.end();
+             it++) {
+            // check criteria
+            IndexDescriptor* desc = it->first;
+            unsigned int opNum = it->second;
+            if (!criteria.ns.empty() && (desc->parentNS() != criteria.ns)) {
+                continue;
+            }
+            if (!criteria.name.empty() && (desc->indexName() != criteria.name)) {
+                continue;
+            }
+            if (!criteria.key.isEmpty() && (desc->keyPattern() != criteria.key)) {
+                continue;
+            }
+            indexes.push_back(desc->keyPattern().getOwned());
+            log() << "halting index build: " << desc->keyPattern();
+            // Note that we can only be here if the background index build in question is
+            // yielding. The bg index code is set up specially to check for interrupt
+            // immediately after it recovers from yield, such that no further work is done
+            // on the index build. Thus this thread does not have to synchronize with the
+            // bg index operation; we can just assume that it is safe to proceed.
+            getGlobalEnvironment()->killOperation(opNum);
+        }
+
+        if (indexes.size() > 0) {
+            log() << "halted " << indexes.size() << " index build(s)" << endl;
+        }
+
+        return indexes;
     }
 }

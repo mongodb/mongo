@@ -171,7 +171,6 @@ namespace ReplTests {
         }
         void applyAllOperations() {
             Lock::GlobalWrite lk(_txn.lockState());
-            WriteUnitOfWork wunit(&_txn);
             vector< BSONObj > ops;
             {
                 Client::Context ctx(&_txn,  cllNS() );
@@ -191,24 +190,26 @@ namespace ReplTests {
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
                 ReplSource a(&_txn, b.obj());
+                WriteUnitOfWork wunit(&_txn);
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
                     a.applyOperation( &_txn, ctx.db(), *i );
                 }
+                wunit.commit();
             }
-            wunit.commit();
         }
         void printAll( const char *ns ) {
             Lock::GlobalWrite lk(_txn.lockState());
-            WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
             Database* db = ctx.db();
             Collection* coll = db->getCollection( &_txn, ns );
             if ( !coll ) {
+                WriteUnitOfWork wunit(&_txn);
                 coll = db->createCollection( &_txn, ns );
+                wunit.commit();
             }
 
             RecordIterator* it = coll->getIterator(&_txn);
@@ -218,7 +219,6 @@ namespace ReplTests {
                 ::mongo::log() << coll->docFor(&_txn, currLoc).toString() << endl;
             }
             delete it;
-            wunit.commit();
         }
         // These deletes don't get logged.
         void deleteAll( const char *ns ) const {
