@@ -411,7 +411,8 @@ namespace {
                     "it is invalid: "<< myIndex.getStatus();
         }
         else {
-            boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+            boost::scoped_ptr<OperationContext> txn(
+                                      _externalState->createOperationContext("WriteReplSetConfig"));
             Status status = _externalState->storeLocalConfigDocument(txn.get(), newConfig.toBSON());
 
             lk.lock();

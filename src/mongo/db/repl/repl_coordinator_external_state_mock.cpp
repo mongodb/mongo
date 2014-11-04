@@ -159,7 +159,8 @@ namespace repl {
         return _canAcquireLock;
     }
 
-    OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext() {
+    OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext(
+            const std::string& threadName) {
         return new OperationContextReplMock;
     }
 

@@ -156,7 +156,6 @@ namespace {
             OperationContext* txn,
             const BSONObj& config) {
         try {
-            Client::initThreadIfNotAlready("WriteReplSetConfig");
             Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
@@ -219,7 +218,9 @@ namespace {
         BackgroundSync::get()->clearSyncTarget();
     }
 
-    OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
+    OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext(
+            const std::string& threadName) {
+        Client::initThreadIfNotAlready(threadName.c_str());
         return new OperationContextImpl;
     }
 

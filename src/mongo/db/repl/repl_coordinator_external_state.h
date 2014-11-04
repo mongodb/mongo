@@ -155,7 +155,7 @@ namespace repl {
          * Returns an OperationContext, owned by the caller, that may be used in methods of
          * the same instance that require an OperationContext.
          */
-        virtual OperationContext* createOperationContext() = 0;
+        virtual OperationContext* createOperationContext(const std::string& threadName) = 0;
 
         /**
          * Drops all temporary collections on all databases except "local".
