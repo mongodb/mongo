@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
@@ -48,9 +47,11 @@ namespace mongo {
 
 namespace repl {
 
+    void Sync::setHostname(const string& hostname) {
+        hn = hostname;
+    }
+
     BSONObj Sync::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
-        BackgroundSync* bgsync = BackgroundSync::get();
-        HostAndPort syncTarget = bgsync->getSyncTarget();
         OplogReader missingObjReader; // why are we using OplogReader to run a non-oplog query?
         const char *ns = o.getStringField("ns");
 
@@ -68,7 +69,7 @@ namespace repl {
                 sleepsecs(retryCount * retryCount);
             }
             try {
-                bool ok = missingObjReader.connect(syncTarget);
+                bool ok = missingObjReader.connect(HostAndPort(hn));
                 if (!ok) {
                     warning() << "network problem detected while connecting to the "
                               << "sync source, attempt " << retryCount << " of "
@@ -105,8 +106,7 @@ namespace repl {
         }
         // retry count exceeded
         msgasserted(15916, 
-                    str::stream() << "Can no longer connect to initial sync source: "
-                                  << syncTarget.toString());
+                    str::stream() << "Can no longer connect to initial sync source: " << hn);
     }
 
     bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
