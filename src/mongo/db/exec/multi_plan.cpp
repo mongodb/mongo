@@ -212,11 +212,6 @@ namespace mongo {
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
         for (size_t ix = 0; ix < numWorks; ++ix) {
-            Status yieldStatus = tryYield(yieldPolicy);
-            if (!yieldStatus.isOK()) {
-                return yieldStatus;
-            }
-
             bool moreToDo = workAllPlans(numResults, yieldPolicy);
             if (!moreToDo) { break; }
         }
@@ -355,6 +350,11 @@ namespace mongo {
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             CandidatePlan& candidate = _candidates[ix];
             if (candidate.failed) { continue; }
+
+            // Might need to yield between calls to work due to the timer elapsing.
+            if (!(tryYield(yieldPolicy)).isOK()) {
+                return false;
+            }
 
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = candidate.root->work(&id);
