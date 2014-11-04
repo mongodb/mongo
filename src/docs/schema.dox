@@ -381,8 +381,4 @@ Here is another example program, @ex_ref{ex_call_center.c}.
 @snippet ex_call_center.c call-center decl
 @snippet ex_call_center.c call-center work
 
-@todo new section: schema_advanced Advanced Schemas
-@todo non-relational data such as multiple index keys per row
-@todo application-supplied extractors and collators need to be
-registered before recovery can run.
  */

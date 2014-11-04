@@ -1753,7 +1753,6 @@ struct __wt_connection {
 
 	/*!
 	 * Add a custom extractor for index keys or column groups.
-	 * @notyet{custom extractors}
 	 *
 	 * The application must first implement the WT_EXTRACTOR interface and
 	 * then register the implementation with WiredTiger:
