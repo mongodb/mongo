@@ -215,6 +215,9 @@ add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" 
 add_option( "ld", "linker to use" , 1 , True )
 add_option( "c++11", "enable c++11 support (experimental)", "?", True,
             type="choice", choices=["on", "off", "auto"], const="on", default="auto" )
+add_option( "disable-minimum-compiler-version-enforcement",
+            "allow use of unsupported older compilers (NEVER for production builds)",
+            0, False )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , False )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , False )
@@ -1113,6 +1116,99 @@ def doConfigure(myenv):
 
     myenv = conf.Finish()
 
+    if using_msvc():
+        compiler_minimum_string = "Microsoft Visual Studio 2013 Update 2"
+        compiler_test_body = textwrap.dedent(
+        """
+        #if !defined(_MSC_VER)
+        #error
+        #endif
+
+        #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180030501)
+        #error %s or newer is required to build MongoDB
+        #endif
+
+        int main(int argc, char* argv[]) {
+            return 0;
+        }
+        """ % compiler_minimum_string)
+    elif using_gcc():
+        # TODO: Really, we want GCC 4.8.2 here, but we are admitting 4.8.1
+        # until our Solaris toolchain solution reaches 4.8.2. When our Solaris
+        # toolchain reaches 4.8.2, upgrade this string, and the check below.
+        compiler_minimum_string = "GCC 4.8.1"
+        compiler_test_body = textwrap.dedent(
+        """
+        #if !defined(__GNUC__) || defined(__clang__)
+        #error
+        #endif
+
+        #if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8) || (__GNUC__ == 4 && __GNUC_MINOR__ == 8 && __GNUC_PATCHLEVEL__ < 1)
+        #error %s or newer is required to build MongoDB
+        #endif
+
+        int main(int argc, char* argv[]) {
+            return 0;
+        }
+        """ % compiler_minimum_string)
+    elif using_clang:
+        compiler_minimum_string = "clang 3.4 (or Apple XCode 5.1.1)"
+        compiler_test_body = textwrap.dedent(
+        """
+        #if !defined(__clang__)
+        #error
+        #endif
+
+        #if defined(__apple_build_version__)
+        #if __apple_build_version__ < 5030040
+        #error %s or newer is required to build MongoDB
+        #endif
+        #elif (__clang_major__ < 3) || (__clang_major__ == 3 && __clang_minor__ < 4)
+        #error %s or newer is required to build MongoDB
+        #endif
+
+        int main(int argc, char* argv[]) {
+            return 0;
+        }
+        """ % (compiler_minimum_string, compiler_minimum_string))
+    else:
+        print("Error: can't check compiler minimum; don't know this compiler...")
+        Exit(1)
+
+    def CheckForMinimumCompiler(context, language):
+        extension_for = {
+            "C" : ".c",
+            "C++" : ".cpp",
+        }
+        context.Message("Checking if %s compiler is %s or newer..." %
+                        (language, compiler_minimum_string))
+        result = context.TryCompile(compiler_test_body, extension_for[language])
+        context.Result(result)
+        return result;
+
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckForMinimumCompiler' : CheckForMinimumCompiler,
+    })
+
+    c_compiler_validated = True
+    if check_c:
+        c_compiler_validated = conf.CheckForMinimumCompiler('C')
+    cxx_compiler_validated = conf.CheckForMinimumCompiler('C++')
+
+    myenv = conf.Finish();
+
+    suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
+    if releaseBuild and suppress_invalid:
+        print("--disable-minimum-compiler-version-enforcement is forbidden with --release")
+        Exit(1)
+
+    if not (c_compiler_validated and cxx_compiler_validated):
+        if not suppress_invalid:
+            print("ERROR: Refusing to build with compiler that does not meet requirements")
+            Exit(1)
+        print("WARNING: Ignoring failed compiler version check per explicit user request.")
+        print("WARNING: The build may fail, binaries may crash, or may run but corrupt data...")
+
     global use_clang
     use_clang = using_clang()
 
@@ -1628,63 +1724,15 @@ def doConfigure(myenv):
             print("Using the leak sanitizer requires a valid symbolizer")
             Exit(1)
 
-    # When using msvc,
-    # check for min version of VS2013 for fixes in std::list::splice
-    # check for VS 2013 Update 2+ so we can use new compiler flags
     if using_msvc():
-        haveVS2013OrLater = False
-        def CheckVS2013(context):
-            test_body = """
-            #if _MSC_VER < 1800
-            #error Old Version
-            #endif
-            int main(int argc, char* argv[]) {
-            return 0;
-            }
-            """
-            context.Message('Checking for VS 2013 or Later... ')
-            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret)
-            return ret
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckVS2013' : CheckVS2013,
-        })
-        haveVS2013 = conf.CheckVS2013()
-        conf.Finish()
+        # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
+        #
+        myenv.Append( CCFLAGS=["/Gw", "/Gy"] )
+        myenv.Append( LINKFLAGS=["/OPT:REF"])
 
-        if not haveVS2013:
-            print("Visual Studio 2013 RTM or later is required to compile MongoDB.")
-            Exit(1)
-
-        haveVS2013Update2OrLater = False
-        def CheckVS2013Update2(context):
-            test_body = """
-            #if _MSC_VER < 1800 || (_MSC_VER == 1800 && _MSC_FULL_VER < 180030501)
-            #error Old Version
-            #endif
-            int main(int argc, char* argv[]) {
-            return 0;
-            }
-            """
-            context.Message('Checking for VS 2013 Update 2 or Later... ')
-            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret)
-            return ret
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckVS2013Update2' : CheckVS2013Update2,
-        })
-        haveVS2013Update2OrLater = conf.CheckVS2013Update2()
-        conf.Finish()
-
-        if haveVS2013Update2OrLater and optBuild:
-            # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
-            #
-            myenv.Append( CCFLAGS=["/Gw", "/Gy"] )
-            myenv.Append( LINKFLAGS=["/OPT:REF"])
-
-            # http://blogs.msdn.com/b/vcblog/archive/2014/03/25/linker-enhancements-in-visual-studio-2013-update-2-ctp2.aspx
-            #
-            myenv.Append( CCFLAGS=["/Zc:inline"])
+        # http://blogs.msdn.com/b/vcblog/archive/2014/03/25/linker-enhancements-in-visual-studio-2013-update-2-ctp2.aspx
+        #
+        myenv.Append( CCFLAGS=["/Zc:inline"])
 
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
