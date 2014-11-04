@@ -1121,15 +1121,6 @@ test = env.Install(
 if len(env.subst('$PROGSUFFIX')):
     env.Alias( "dbtest", "#/${PROGPREFIX}dbtest${PROGSUFFIX}" )
 
-env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
-                                 LIBDEPS = [
-                                     "serveronly",
-                                     "coreserver",
-                                     "coredb",
-                                     "testframework",
-                                     "signal_handlers_synchronous",
-                                 ] ) )
-
 env.Install('$BUILD_ROOT/', env.Program('file_allocator_bench',
             'util/file_allocator_bench.cpp',
             LIBDEPS=[
@@ -1290,7 +1281,6 @@ for t in rewrittenTools:
 installBinary(env, "mongoperf")
 env.Alias("tools", '#/' + add_exe("mongoperf"))
 
-env.Alias("tools", "#/" + add_exe("perftest"))
 env.Alias("tools", "#/" + add_exe("mongobridge"))
 
 if mongosniff_built:

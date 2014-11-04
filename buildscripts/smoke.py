@@ -8,9 +8,9 @@
 #   so the smoke.py process and all its children must be run with the
 #   mongo repo as current working directory.  That's kinda icky.
 
-# 1 The tests that are implemented as standalone executables ("test",
-#   "perftest"), don't take arguments for the dbpath, but
-#   unconditionally use "/tmp/unittest".
+# 1 The tests that are implemented as standalone executables ("test"),
+#   don't take arguments for the dbpath, but unconditionally use
+#   "/tmp/unittest".
 
 # 2 mongod output gets intermingled with mongo output, and it's often
 #   hard to find error messages in the slop.  Maybe have smoke.py do
@@ -523,9 +523,9 @@ def runTest(test, result):
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
-        if os.path.basename(path) in ["dbtest", "dbtest.exe", "perftest", "perftest.exe"]:
+        if os.path.basename(path) in ["dbtest", "dbtest.exe"]:
             argv = [path]
-            # default data directory for test and perftest is /tmp/unittest
+            # default data directory for dbtest is /tmp/unittest
             if smoke_db_prefix:
                 dir_name = smoke_db_prefix + '/unittests'
                 argv.extend(["--dbpath", dir_name] )
@@ -949,7 +949,6 @@ def expand_suites(suites,expandUseDB=True):
     for suite in suites:
         if suite == 'all':
             return expand_suites(['dbtest',
-                                  'perf', 
                                   'jsCore', 
                                   'jsPerf', 
                                   'mmap_v1',
@@ -969,12 +968,6 @@ def expand_suites(suites,expandUseDB=True):
                 program = 'dbtest.exe'
             else:
                 program = 'dbtest'
-            (globstr, usedb) = (program, False)
-        elif suite == 'perf':
-            if os.sys.platform == "win32":
-                program = 'perftest.exe'
-            else:
-                program = 'perftest'
             (globstr, usedb) = (program, False)
         elif suite == 'mongosTest':
             if os.sys.platform == "win32":

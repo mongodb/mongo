@@ -67,7 +67,6 @@ def addSmokeSuite( name, suitefile, needMongod=False ):
     addTest(name, [suitefile], utils.run_smoke_command(*smoke_args))
 
 addSmoketest( "smoke", [ add_exe( "dbtest" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
-addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
 
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
 addSmokeSuite( "smokeCppUnittests", "$UNITTEST_LIST" )
