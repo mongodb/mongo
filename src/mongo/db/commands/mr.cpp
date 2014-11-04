@@ -386,7 +386,6 @@ namespace mongo {
             {
                 // copy indexes into temporary storage
                 Client::WriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
-                WriteUnitOfWork wuow(_txn);
                 Collection* const finalColl = finalCtx.getCollection();
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
@@ -409,7 +408,6 @@ namespace mongo {
                         indexesToInsert.push_back( b.obj() );
                     }
                 }
-                wuow.commit();
             }
 
             {
@@ -603,10 +601,8 @@ namespace mongo {
                     Lock::DBLock lock(_txn->lockState(),
                                       nsToDatabaseSubstring(_config.outputOptions.finalNamespace),
                                       MODE_X);
-                    WriteUnitOfWork wunit(_txn);
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
-                    wunit.commit();
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempNamespace );
@@ -622,7 +618,6 @@ namespace mongo {
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
-                    WriteUnitOfWork wunit(txn);
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;
 
@@ -651,7 +646,6 @@ namespace mongo {
                     else {
                         Helpers::upsert( _txn, _config.outputOptions.finalNamespace , temp );
                     }
-                    wunit.commit();
                     pm.hit();
                 }
                 pm.finished();

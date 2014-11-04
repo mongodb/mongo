@@ -462,7 +462,6 @@ namespace mongo {
             }
 
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, nsToDrop);
             Database* db = ctx.db();
 
@@ -480,6 +479,7 @@ namespace mongo {
             result.append( "ns", nsToDrop );
             result.append( "nIndexesWas", numIndexes );
 
+            WriteUnitOfWork wunit(txn);
             Status s = db->dropCollection( txn, nsToDrop );
 
             if ( !s.isOK() ) {

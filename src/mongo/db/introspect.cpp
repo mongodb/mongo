@@ -126,14 +126,17 @@ namespace {
             p = b.done();
         }
 
+        WriteUnitOfWork wunit(txn);
+
         // write: not replicated
         // get or create the profiling collection
         Collection* profileCollection = getOrCreateProfileCollection(txn, db);
-        if ( profileCollection ) {
-            profileCollection->insertDocument( txn, p, false );
-            return true;
+        if ( !profileCollection ) {
+            return false;
         }
-        return false;
+        profileCollection->insertDocument( txn, p, false );
+        wunit.commit();
+        return true;
     }
 
     void profile(OperationContext* txn, const Client& c, int op, CurOp& currentOp) {
@@ -157,9 +160,7 @@ namespace {
                 }
                 Database* db = dbHolder().get(txn, dbname);
                 if (db != NULL) {
-                    // We want the profiling to happen in a different WUOW from the actual op.
                     Lock::CollectionLock clk(txn->lockState(), db->getProfilingNS(), MODE_X);
-                    WriteUnitOfWork wunit(txn);
                     Client::Context cx(txn, currentOp.getNS(), false);
                     if ( !_profile(txn, c, cx.db(), currentOp, profileBufBuilder ) && lk.get() ) {
                         if ( tryAgain ) {
@@ -170,7 +171,6 @@ namespace {
                         tryAgain = true;
                         continue;
                     }
-                    wunit.commit();
                 }
                 else {
                     mongo::log() << "note: not profiling because db went away - "

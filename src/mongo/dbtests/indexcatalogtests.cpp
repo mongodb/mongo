@@ -56,12 +56,13 @@ namespace IndexCatalogTests {
         void run() {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
-            WriteUnitOfWork wuow(&txn);
 
             int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
+            WriteUnitOfWork wuow(&txn);
             Helpers::ensureIndex(&txn, _coll, BSON("x" << 1), false, "_x_0");
             Helpers::ensureIndex(&txn, _coll, BSON("y" << 1), false, "_y_0");
+            wuow.commit();
 
             ASSERT_TRUE(_catalog->numIndexesReady(&txn) == numFinishedIndexesStart+2);
 
@@ -82,7 +83,6 @@ namespace IndexCatalogTests {
                 }
             }
 
-            wuow.commit();
             ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&txn));
             ASSERT_TRUE(foundIndex);
         }

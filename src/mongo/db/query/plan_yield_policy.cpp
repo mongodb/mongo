@@ -42,6 +42,7 @@ namespace mongo {
           _planYielding(exec) { }
 
     bool PlanYieldPolicy::shouldYield() {
+        invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
         return _elapsedTracker.intervalHasElapsed();
     }
 
