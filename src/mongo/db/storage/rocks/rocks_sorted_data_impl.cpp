@@ -116,12 +116,6 @@ namespace mongo {
                   _isCached(false),
                   _comparator(o) {
                 _resetIterator(txn);
-
-                // TODO: maybe don't seek until we know we need to?
-                if (_forward)
-                    _iterator->SeekToFirst();
-                else
-                    _iterator->SeekToLast();
                 _checkStatus();
             }
 
