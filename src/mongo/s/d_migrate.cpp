@@ -62,13 +62,13 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/chunk.h"
@@ -2274,7 +2274,7 @@ namespace mongo {
                 Lock::GlobalRead lk(txn->lockState());
 
                 // if durability is on, force a write to journal
-                if (getDur().commitNow(txn)) {
+                if (txn->recoveryUnit()->awaitCommit()) {
                     log() << "migrate commit flushed to journal for '" << ns << "' " << min << " -> " << max << migrateLog;
                 }
             }
