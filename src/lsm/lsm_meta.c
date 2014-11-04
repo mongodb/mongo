@@ -19,7 +19,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_NAMED_COLLATOR *ncoll;
-	const char *lsmconfig;
+	char *lsmconfig;
 	u_int nchunks;
 
 	chunk = NULL;			/* -Wconditional-uninitialized */

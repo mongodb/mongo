@@ -967,6 +967,9 @@ struct __wt_session {
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
+	 * @config{extractor, configure custom extractor for indices.  Value
+	 * must be an extractor name created with WT_CONNECTION::add_extractor.,
+	 * a string; default empty.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
@@ -2970,9 +2973,39 @@ struct __wt_extractor {
 	 * @errors
 	 *
 	 * @snippet ex_all.c WT_EXTRACTOR
+	 *
+	 * @param extractor the WT_EXTRACTOR implementation
+	 * @param session the current WiredTiger session
+	 * @param key the table key in raw format, see @ref cursor_raw for
+	 *	details
+	 * @param value the table value in raw format, see @ref cursor_raw for
+	 *	details
+	 * @param[out] result_cursor the method should call WT_CURSOR::set_key
+	 *	and WT_CURSOR::insert on this cursor to return a key.  The \c
+	 *	key_format of the cursor will match that passed to
+	 *	WT_SESSION::create for the index.  Multiple index keys can be
+	 *	created for each record by calling WT_CURSOR::insert multiple
+	 *	times.
 	 */
 	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
-	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result);
+	    const WT_ITEM *key, const WT_ITEM *value,
+	    WT_CURSOR *result_cursor);
+
+	/*!
+	 * If non-NULL, this callback is called to customize the extractor for
+	 * each index.  If the callback returns a non-NULL extractor, that
+	 * instance is used instead of this one for all comparisons.
+	 */
+	int (*customize)(WT_EXTRACTOR *extractor, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_EXTRACTOR *extractor, WT_SESSION *session);
 };
 
 /*!

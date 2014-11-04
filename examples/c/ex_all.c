@@ -790,16 +790,16 @@ add_collator(WT_CONNECTION *conn)
 /*! [WT_EXTRACTOR] */
 static int
 my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
-    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result)
+    const WT_ITEM *key, const WT_ITEM *value,
+    WT_CURSOR *result_cursor)
 {
 	/* Unused parameters */
 	(void)extractor;
 	(void)session;
 	(void)key;
 
-	result->data = value->data;
-	result->size = value->size;
-	return (0);
+	result_cursor->set_key(result_cursor, value);
+	return (result_cursor->insert(result_cursor));
 }
 /*! [WT_EXTRACTOR] */
 
@@ -809,7 +809,7 @@ add_extractor(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_EXTRACTOR register] */
-	static WT_EXTRACTOR my_extractor = {my_extract};
+	static WT_EXTRACTOR my_extractor = {my_extract, NULL, NULL};
 
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 	/*! [WT_EXTRACTOR register] */

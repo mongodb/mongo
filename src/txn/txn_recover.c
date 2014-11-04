@@ -411,7 +411,7 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	struct WT_RECOVERY_FILE *metafile;
-	const char *config;
+	char *config;
 	int was_backup;
 
 	WT_CLEAR(r);

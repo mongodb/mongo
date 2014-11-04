@@ -382,7 +382,7 @@ err:		if (cursor != NULL)
  */
 int
 __wt_session_create_strip(WT_SESSION *wt_session,
-    const char *v1, const char *v2, const char **value_ret)
+    const char *v1, const char *v2, char **value_ret)
 {
 	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)wt_session;
 	const char *cfg[] =

@@ -25,7 +25,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session,
     const char *fname, const char *checkpoint, WT_CKPT *ckpt)
 {
 	WT_DECL_RET;
-	const char *config;
+	char *config;
 
 	config = NULL;
 
@@ -64,7 +64,7 @@ __wt_meta_checkpoint_last_name(
     WT_SESSION_IMPL *session, const char *fname, const char **namep)
 {
 	WT_DECL_RET;
-	const char *config;
+	char *config;
 
 	config = NULL;
 
@@ -106,7 +106,8 @@ static int
 __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
 {
 	WT_DECL_RET;
-	const char *config, *cfg[3], *newcfg;
+	const char *cfg[3];
+	char *config, *newcfg;
 
 	config = newcfg = NULL;
 
@@ -253,7 +254,7 @@ __wt_meta_ckptlist_get(
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	size_t allocated, slot;
-	const char *config;
+	char *config;
 
 	*ckptbasep = NULL;
 

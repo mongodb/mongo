@@ -17,7 +17,8 @@ __rename_file(
 {
 	WT_DECL_RET;
 	int exist;
-	const char *filename, *newfile, *newvalue, *oldvalue;
+	const char *filename, *newfile;
+	char *newvalue, *oldvalue;
 
 	newvalue = oldvalue = NULL;
 
@@ -83,7 +84,8 @@ __rename_tree(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(nv);
 	WT_DECL_ITEM(os);
 	WT_DECL_RET;
-	const char *newname, *olduri, *suffix, *value;
+	const char *newname, *olduri, *suffix;
+	char *value;
 	int is_colgroup;
 
 	olduri = table->name;
@@ -176,7 +178,7 @@ static int
 __metadata_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
 	WT_DECL_RET;
-	const char *value;
+	char *value;
 
 	WT_RET(__wt_metadata_search(session, uri, &value));
 	WT_ERR(__wt_metadata_remove(session, uri));
