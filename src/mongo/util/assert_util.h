@@ -276,7 +276,7 @@ namespace mongo {
        could be slow.
     */
 #if defined(_DEBUG)
-# define MONGO_dassert(x) fassert(16199, (x))
+# define MONGO_dassert(x) invariant(x)
 #else
 # define MONGO_dassert(x)
 #endif
