@@ -230,6 +230,8 @@ add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "rocksdb" , "Enable RocksDB" , 0 , False )
+add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
+            type="choice", choices=["on", "off"], const="on", default="on")
 add_option( "replication-implementation",
             "Controls what implementation is used for the replication system", "?", False,
             type="choice", choices=["impl", "legacy"], const="impl", default="impl" )
@@ -289,6 +291,8 @@ add_option("use-sasl-client", "Support SASL authentication in the client library
 add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, True )
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
+
+add_option( "use-system-wiredtiger", "use system version of wiredtiger library", 0, True)
 
 # library choices
 boost_choices = ['1.49', '1.56']
@@ -472,7 +476,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                ARCHIVE_ADDITIONS=[],
                PYTHON=utils.find_python(),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-               tools=["default", "gch", "jsheader", "mergelib", "mongo_unittest"],
+               tools=["default", "gch", "jsheader", "mergelib", "mongo_unittest", "textfile"],
                UNITTEST_ALIAS='unittests',
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
@@ -987,6 +991,7 @@ else:
     env.Append( MONGO_CRYPTO=["tom"] )
 
 env['MONGO_REPL_IMPL'] = get_option('replication-implementation')
+wiredtiger = (get_option('wiredtiger') == 'on')
 
 try:
     umask = os.umask(022)
@@ -1014,6 +1019,7 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 # --- check system ---
 
 def doConfigure(myenv):
+    global wiredtiger
 
     # Check that the compilers work.
     #
@@ -1154,7 +1160,25 @@ def doConfigure(myenv):
         env.Append( CPPDEFINES=[("_WIN32_WINNT", "0x" + win_version_min[0])] )
         env.Append( CPPDEFINES=[("NTDDI_VERSION", "0x" + win_version_min[0] + win_version_min[1])] )
 
-    if using_gcc() or using_clang():
+    def CheckForx86(context):
+        # See http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
+        test_body = """
+        #if defined(__i386) || defined(_M_IX86)
+        /* x86 32-bit */
+        #else
+        #error not 32-bit x86
+        #endif
+        """
+        context.Message('Checking if target architecture is 32-bit x86...')
+        ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+        context.Result(ret)
+        return ret
+
+    conf = Configure(myenv, help=False, custom_tests = {
+        'CheckForx86' : CheckForx86,
+    })
+
+    if conf.CheckForx86():
 
         # If we are using GCC or clang to target 32 or x86, set the ISA minimum to 'nocona',
         # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -1167,27 +1191,15 @@ def doConfigure(myenv):
         # contemporaries, the generic scheduling should be appropriate for a wide range of
         # deployed hardware.
 
-        def CheckForx86(context):
-            # See http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
-            test_body = """
-            #if defined(__i386) || defined(_M_IX86)
-            /* x86 32-bit */
-            #else
-            #error not 32-bit x86
-            #endif
-            """
-            context.Message('Checking if target architecture is 32-bit x86...')
-            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
-            context.Result(ret)
-            return ret
+        if using_gcc() or using_clang():
+                myenv.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
 
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckForx86' : CheckForx86,
-        })
-
-        if conf.CheckForx86():
-            myenv.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
-        conf.Finish()
+        # Wiredtiger only supports 64-bit architecture, and will fail to compile on 32-bit
+        # so disable WiredTiger automatically on 32-bit since wiredtiger is on by default
+        if wiredtiger == True:
+            print "WARNING: WiredTiger is not supported on 32-bit platforms, disabling support"
+            wiredtiger = False
+    conf.Finish()
 
     # Enable PCH if we are on using gcc or clang and the 'Gch' tool is enabled. Otherwise,
     # remove any pre-compiled header since the compiler may try to use it if it exists.
@@ -1887,6 +1899,12 @@ def doConfigure(myenv):
     if use_system_version_of_library("yaml"):
         conf.FindSysLibDep("yaml", ["yaml-cpp"])
 
+    if wiredtiger and use_system_version_of_library("wiredtiger"):
+        if not conf.CheckCXXHeader( "wiredtiger.h" ):
+            print( "Cannot find wiredtiger headers" )
+            Exit(1)
+        conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
+
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
@@ -2192,6 +2210,7 @@ Export("debugBuild optBuild")
 Export("enforce_glibc")
 Export("s3push")
 Export("use_clang")
+Export("wiredtiger")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])

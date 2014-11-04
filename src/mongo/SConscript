@@ -13,6 +13,7 @@ Import("usev8")
 Import("v8suffix")
 Import("enforce_glibc")
 Import("darwin windows solaris linux nix")
+Import("wiredtiger")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
 # db/geo unfortunately. pcre is also used many places.
@@ -40,6 +41,7 @@ env.SConscript(['base/SConscript',
                 'db/storage/kv/SConscript',
                 'db/storage/mmap_v1/SConscript',
                 'db/storage/rocks/SConscript',
+                'db/storage/wiredtiger/SConscript',
                 'db/SConscript',
                 'installer/msi/SConscript',
                 'logger/SConscript',
@@ -954,6 +956,10 @@ serveronlyLibdeps = ["coreshard",
 
 if has_option("rocksdb" ):
     serveronlyLibdeps.append( 'db/storage/rocks/storage_rocks' )
+
+if wiredtiger:
+    serveronlyLibdeps.append( 'db/storage/wiredtiger/storage_wiredtiger' )
+    serveronlyLibdeps.append( '$BUILD_DIR/third_party/shim_wiredtiger')
 
 serveronlyEnv.Library("serveronly", serverOnlyFiles,
                       LIBDEPS=serveronlyLibdeps )

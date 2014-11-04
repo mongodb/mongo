@@ -1,0 +1,76 @@
+Import("env")
+Import("wiredtiger")
+
+if wiredtiger:
+    wtEnv = env.Clone()
+    wtEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
+
+    # This is the smallest possible set of files that wraps WT
+    wtEnv.Library(
+        target= 'storage_wiredtiger_core',
+        source= [
+            'wiredtiger_index.cpp',
+            'wiredtiger_kv_engine.cpp',
+            'wiredtiger_record_store.cpp',
+            'wiredtiger_recovery_unit.cpp',
+            'wiredtiger_session_cache.cpp',
+            'wiredtiger_size_storer.cpp',
+            'wiredtiger_util.cpp',
+            ],
+        LIBDEPS= [
+            '$BUILD_DIR/mongo/bson',
+            '$BUILD_DIR/mongo/db/catalog/collection_options',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
+            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/mongo/db/storage/oplog_hack',
+            '$BUILD_DIR/mongo/elapsed_tracker',
+            '$BUILD_DIR/mongo/foundation',
+            '$BUILD_DIR/mongo/processinfo',
+            '$BUILD_DIR/third_party/shim_wiredtiger',
+            '$BUILD_DIR/third_party/shim_snappy',
+            ],
+        )
+
+    wtEnv.Library(
+        target='storage_wiredtiger',
+        source=[
+            'wiredtiger_global_options.cpp',
+            'wiredtiger_init.cpp',
+            'wiredtiger_options_init.cpp',
+            'wiredtiger_server_status.cpp',
+            ],
+        LIBDEPS=['storage_wiredtiger_core',
+                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
+                 ]
+        )
+
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_record_store_test',
+        source=['wiredtiger_record_store_test.cpp',
+                ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+            ],
+        )
+
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_index_test',
+        source=['wiredtiger_index_test.cpp',
+                ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+            ],
+        )
+
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_kv_engine_test',
+        source=['wiredtiger_kv_engine_test.cpp',
+                ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+            ],
+        )
+
