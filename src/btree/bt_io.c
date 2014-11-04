@@ -153,7 +153,6 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * verify the image.  Always check the in-memory length for accuracy.
 	 */
 	dsk = buf->mem;
-	WT_ASSERT(session, dsk->u.entries != 0);
 	if (compressed) {
 		WT_ERR(__wt_scr_alloc(session, dsk->mem_size, &tmp));
 
