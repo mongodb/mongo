@@ -103,6 +103,7 @@ src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_getline.c
 src/os_posix/os_getopt.c
+src/os_posix/os_mtx_rw.c
 src/os_posix/os_strtouq.c
 src/os_win/os_dir.c
 src/os_win/os_dlopen.c
@@ -115,7 +116,6 @@ src/os_win/os_fsync.c
 src/os_win/os_ftruncate.c
 src/os_win/os_map.c
 src/os_win/os_mtx_cond.c
-src/os_win/os_mtx_rw.c
 src/os_win/os_once.c
 src/os_win/os_open.c
 src/os_win/os_path.c
