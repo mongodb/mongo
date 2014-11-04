@@ -28,11 +28,8 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/locker.h"
-
 namespace mongo {
 
-    class BSONObjBuilder;
     struct DbResponse;
     class Message;
     class OperationContext;
@@ -42,10 +39,5 @@ namespace mongo {
      * be converted to one at some point.
      */
     void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse);
-
-    /**
-     * Constructs a human-readable BSON from the specified LockerInfo structure.
-     */
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder);
 
 } // namespace mongo

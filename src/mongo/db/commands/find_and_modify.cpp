@@ -163,7 +163,7 @@ namespace mongo {
             Client::WriteContext cx(txn, ns);
             Collection* collection = cx.getCollection();
 
-            const WhereCallbackReal whereCallback(txn, StringData(ns));
+            const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
 
             if ( !collection ) {
                 if ( !upsert ) {

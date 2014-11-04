@@ -70,6 +70,7 @@ namespace mongo {
     }
 
     void CurOp::_reset() {
+        _suppressFromCurop = false;
         _isCommand = false;
         _dbprofile = 0;
         _end = 0;

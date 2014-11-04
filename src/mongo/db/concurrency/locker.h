@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_mgr_new.h"
 
+
 namespace mongo {
     
     /**
@@ -74,7 +75,8 @@ namespace mongo {
          *          acquired within the specified time bound. Otherwise, the respective failure
          *          code and neither lock will be acquired.
          */
-        virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX) = 0;
+        virtual LockResult lockGlobal(LockMode mode,
+                                             unsigned timeoutMs = UINT_MAX) = 0;
 
         /**
          * Decrements the reference count on the global lock.  If the reference count on the
@@ -155,7 +157,8 @@ namespace mongo {
          * because MODE_X covers MODE_S.
          */
         virtual LockMode getLockMode(const ResourceId& resId) const = 0;
-        virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const = 0;
+        virtual bool isLockHeldForMode(const ResourceId& resId,
+                                       LockMode mode) const = 0;
 
         // These are shortcut methods for the above calls. They however check that the entire
         // hierarchy is properly locked and because of this they are very expensive to call.
@@ -170,40 +173,20 @@ namespace mongo {
         virtual ResourceId getWaitingResource() const = 0;
 
         /**
-         * Describes a single lock acquisition for reporting/serialization purposes.
-         */
-        struct OneLock {
-            // What lock resource is held?
-            ResourceId resourceId;
-
-            // In what mode is it held?
-            LockMode mode;
-        };
-
-        /**
-         * Returns information and locking statistics for this instance of the locker. Used to
-         * support the db.currentOp view. This structure is not thread-safe and ideally should
-         * be used only for obtaining the necessary information and then discarded instead of
-         * reused.
-         */
-        struct LockerInfo {
-            // List of high-level locks held by this locker, sorted by hierarchy in the order
-            // Global, Flush (MMAP V1 only), Database, Collection.
-            std::vector<OneLock> locks;
-
-            // If isValid(), then what lock this particular locker is sleeping on
-            ResourceId waitingResource;
-        };
-
-        virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;
-
-        /**
          * LockSnapshot captures the state of all resources that are locked, what modes they're
          * locked in, and how many times they've been locked in that mode.
          */
         struct LockSnapshot {
             // The global lock is handled differently from all other locks.
             LockMode globalMode;
+
+            struct OneLock {
+                // What lock resource is held?
+                ResourceId resourceId;
+
+                // In what mode is it held?
+                LockMode mode;
+            };
 
             // The non-global non-flush locks held, sorted by granularity.  That is, locks[i] is
             // coarser or as coarse as locks[i + 1].

@@ -86,8 +86,8 @@ namespace mongo {
     public:
 
         /**
-         * Instantiates new locker. Must be given a unique identifier for disambiguation. Lockers
-         * having the same identifier will not conflict on lock acquisition.
+         * Instantiates a new lock space with the specified unique identifier used for
+         * disambiguation.
          */
         LockerImpl(LockerId id);
 
@@ -119,8 +119,6 @@ namespace mongo {
         virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const;
 
         virtual ResourceId getWaitingResource() const;
-
-        virtual void getLockerInfo(LockerInfo* lockerInfo) const;
 
         virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 
@@ -175,9 +173,6 @@ namespace mongo {
         // work completes. Value of 0 means we are not inside a write unit of work.
         int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
-
-        // For maintaining locking timing statistics
-        Timer _timer;
 
 
         //////////////////////////////////////////////////////////////////////////////////////////

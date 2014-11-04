@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/currentop_command.h"
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -46,57 +44,11 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-    // Until we are able to resolve resource ids to db/collection names, report local db specially
-    const ResourceId resourceIdLocalDb = ResourceId(RESOURCE_DATABASE, std::string("local"));
-}
 
-    /**
-     * Populates the BSON array with information about all active clients on the server. A client
-     * is active if it has an OperationContext.
-     */
-    class OperationInfoPopulator : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-
-        OperationInfoPopulator(const Matcher& matcher, BSONArrayBuilder& builder)
-            : _matcher(matcher),
-              _builder(builder) { 
-
-        }
-
-        virtual void processOpContext(OperationContext* txn) {
-            if (!txn->getCurOp()) {
-                return;
-            }
-
-            BSONObjBuilder infoBuilder;
-
-            // Client-specific data
-            txn->getClient()->reportState(infoBuilder);
-
-            // Locking data
-            Locker::LockerInfo lockerInfo;
-            txn->lockState()->getLockerInfo(&lockerInfo);
-            fillLockerInfo(lockerInfo, infoBuilder);
-
-            infoBuilder.done();
-
-            const BSONObj info = infoBuilder.obj();
-
-            if (_matcher.matches(info)) {
-                _builder.append(info);
-            }
-        }
-
-    private:
-        const Matcher& _matcher;
-        BSONArrayBuilder& _builder;
-    };
-
-
-    void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
-        DbMessage d(message);
+    void inProgCmd(OperationContext* txn, Message &m, DbResponse &dbresponse) {
+        DbMessage d(m);
         QueryMessage q(d);
+        BSONObjBuilder b;
 
         const bool isAuthorized =
                 txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
@@ -105,106 +57,61 @@ namespace {
         audit::logInProgAuthzCheck(txn->getClient(),
                                    q.query,
                                    isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-
-        BSONObjBuilder retVal;
-
         if (!isAuthorized) {
-            retVal.append("err", "unauthorized");
-            replyToQuery(0, message, dbresponse, retVal.obj());
+            b.append("err", "unauthorized");
+            replyToQuery(0, m, dbresponse, b.obj());
             return;
         }
 
-        BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
-
-        // This lock is acquired for both cases (whether we iterate through the clients list or
-        // through the OperationContexts), because we want the CurOp to not be destroyed from
-        // underneath and ~CurOp synchronizes on the clients mutex.
-        //
-        // TODO: This is a legacy from 2.6, which needs to be fixed.
-        scoped_lock bl(Client::clientsMutex);
-
-        const bool all = q.query["$all"].trueValue();
-        if (all) {
-            for (std::set<Client*>::const_iterator i = Client::clients.begin();
-                 i != Client::clients.end();
-                 i++) {
-
-                Client* client = *i;
-                invariant(client);
-
-                CurOp* curop = client->curop();
-                if ((client == txn->getClient()) && !curop) {
-                    continue;
-                }
-
-                BSONObjBuilder infoBuilder;
-                client->reportState(infoBuilder);
-                infoBuilder.done();
-
-                inprogBuilder.append(infoBuilder.obj());
-            }
-        }
-        else {
-
-            // Filter the output
+        bool all = q.query["$all"].trueValue();
+        vector<BSONObj> vals;
+        {
             BSONObj filter;
             {
                 BSONObjBuilder b;
-                BSONObjIterator i(q.query);
-                while (i.more()) {
+                BSONObjIterator i( q.query );
+                while ( i.more() ) {
                     BSONElement e = i.next();
-                    if (str::equals("$all", e.fieldName())) {
+                    if ( str::equals( "$all", e.fieldName() ) )
                         continue;
-                    }
-
-                    b.append(e);
+                    b.append( e );
                 }
                 filter = b.obj();
             }
 
             const NamespaceString nss(d.getns());
-            const WhereCallbackReal whereCallback(txn, nss.db());
-            const Matcher matcher(filter, whereCallback);
 
-            OperationInfoPopulator allOps(matcher, inprogBuilder);
-            getGlobalEnvironment()->forEachOperationContext(&allOps);
-        }
+            Client& me = *txn->getClient();
+            scoped_lock bl(Client::clientsMutex);
+            Matcher m(filter, WhereCallbackReal(txn, nss.db()));
+            for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
+                Client *c = *i;
+                verify( c );
+                CurOp* co = c->curop();
+                if ( c == &me && !co ) {
+                    continue;
+                }
+                verify( co );
+                if( all || co->displayInCurop() ) {
+                    BSONObjBuilder infoBuilder;
 
-        inprogBuilder.done();
+                    c->reportState(infoBuilder);
+                    co->reportState(&infoBuilder);
 
-        if (lockedForWriting()) {
-            retVal.append("fsyncLock", true);
-            retVal.append("info",
-                          "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
-        }
-
-        replyToQuery(0, message, dbresponse, retVal.obj());
-    }
-
-
-    void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBuilder) {
-        // "locks" section
-        BSONObjBuilder locks(infoBuilder.subobjStart("locks"));
-        for (size_t i = 0; i < lockerInfo.locks.size(); i++) {
-            const Locker::OneLock& lock = lockerInfo.locks[i];
-
-            if (resourceIdLocalDb == lock.resourceId) {
-                locks.append("local", legacyModeName(lock.mode));
-            }
-            else {
-                locks.append(
-                    resourceTypeName(lock.resourceId.getType()), legacyModeName(lock.mode));
+                    const BSONObj info = infoBuilder.obj();
+                    if ( all || m.matches( info )) {
+                        vals.push_back( info );
+                    }
+                }
             }
         }
-        locks.done();
+        b.append("inprog", vals);
+        if( lockedForWriting() ) {
+            b.append("fsyncLock", true);
+            b.append("info", "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
+        }
 
-        // "waitingForLock" section
-        infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
-
-        // "lockStats" section
-        BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
-        // TODO: When we implement lock stats tracking
-        lockStats.done();
+        replyToQuery(0, m, dbresponse, b.obj());
     }
 
 } // namespace mongo
