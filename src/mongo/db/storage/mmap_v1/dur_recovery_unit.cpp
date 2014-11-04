@@ -40,11 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
-// Remove once we are ready to enable
-#define ROLLBACK_ENABLED 1
-
 namespace mongo {
-
 
     /**
      *  A MemoryWrite provides rollback by keeping a pre-image.
@@ -66,13 +62,10 @@ namespace mongo {
     {}
 
     void DurRecoveryUnit::beginUnitOfWork() {
-#if ROLLBACK_ENABLED
         _startOfUncommittedChangesForLevel.push_back(_changes.size());
-#endif
     }
 
     void DurRecoveryUnit::commitUnitOfWork() {
-#if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
         invariant(!_mustRollback);
 
@@ -87,14 +80,12 @@ namespace mongo {
         }
 
         publishChanges();
-#endif
 
         // global journal flush opportunity
         getDur().commitIfNeeded(_txn);
     }
 
     void DurRecoveryUnit::endUnitOfWork() {
-#if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
 
         if (haveUncommitedChangesAtCurrentLevel()) {
@@ -102,7 +93,6 @@ namespace mongo {
         }
 
         _startOfUncommittedChangesForLevel.pop_back();
-#endif
     }
 
     void DurRecoveryUnit::commitAndRestart() {
@@ -160,9 +150,7 @@ namespace mongo {
     }
 
     bool DurRecoveryUnit::awaitCommit() {
-#if ROLLBACK_ENABLED
         invariant(!inAUnitOfWork());
-#endif
         return getDur().awaitCommit();
     }
 
@@ -170,7 +158,6 @@ namespace mongo {
         if (len == 0)
             return data; // Don't need to do anything for empty ranges.
 
-#if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
 
         // Windows requires us to adjust the address space *before* we write to anything.
@@ -178,21 +165,11 @@ namespace mongo {
 
         registerChange(new MemoryWrite(static_cast<char*>(data), len));
         return data;
-#else
-        invariant(_txn->lockState()->isWriteLocked());
-
-        return getDur().writingPtr(data, len);
-#endif
     }
 
     void DurRecoveryUnit::registerChange(Change* change) {
-#if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
         _changes.push_back(ChangePtr(change));
-#else
-        change->commit();
-        delete change;
-#endif
     }
 
     void MemoryWrite::commit() {
