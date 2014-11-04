@@ -2541,7 +2541,8 @@ struct __wt_config_arg;     typedef struct __wt_config_arg WT_CONFIG_ARG;
  * records.
  *
  * Applications register their implementation with WiredTiger by calling
- * WT_CONNECTION::add_collator.
+ * WT_CONNECTION::add_collator.  See @ref custom_collators for more
+ * information.
  *
  * @snippet ex_extending.c add collator nocase
  *
@@ -2962,7 +2963,8 @@ struct __wt_data_source {
  * index keys or column group values.
  *
  * Applications register implementations with WiredTiger by calling
- * WT_CONNECTION::add_extractor.
+ * WT_CONNECTION::add_extractor.  See @ref custom_extractors for more
+ * information.
  *
  * @snippet ex_all.c WT_EXTRACTOR register
  */

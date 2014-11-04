@@ -19,6 +19,9 @@ Shows some common cursor types and operations.
 Shows how to extend WiredTiger with application-specific collations,
 extractors and cursor types.
 
+@example ex_extractor.c
+Shows how to extend WiredTiger with a more complex custom extractor.
+
 @example ex_file.c
 Shows how to use file objects.
 
