@@ -76,7 +76,10 @@ namespace mongo {
         static void restoreIndexes(const std::vector<BSONObj>& indexes);
 
     private:
-        Status _build(OperationContext* txn, Database* db, bool allowBackgroundBuilding) const;
+        Status _build(OperationContext* txn, 
+                      Database* db, 
+                      bool allowBackgroundBuilding,
+                      Lock::DBLock* dbLock) const;
 
         const BSONObj _index;
         std::string _name; // name of this builder, not related to the index

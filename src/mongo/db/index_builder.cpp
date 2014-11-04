@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -76,27 +77,29 @@ namespace mongo {
 
         Database* db = dbHolder().get(&txn, ns.db().toString());
 
-        Status status = _build(&txn, db, true);
+        Status status = _build(&txn, db, true, &dlk);
         if ( !status.isOK() ) {
             error() << "IndexBuilder could not build index: " << status.toString();
+            fassert(28555, ErrorCodes::isInterruption(status.code()));
         }
 
         txn.getClient()->shutdown();
     }
 
     Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {
-        return _build(txn, db, false);
+        return _build(txn, db, false, NULL);
     }
 
     Status IndexBuilder::_build(OperationContext* txn,
                                 Database* db,
-                                bool allowBackgroundBuilding) const {
-        const string ns = _index["ns"].String();
+                                bool allowBackgroundBuilding,
+                                Lock::DBLock* dbLock) const {
+        const NamespaceString ns(_index["ns"].String());
 
-        Collection* c = db->getCollection( txn, ns );
+        Collection* c = db->getCollection( txn, ns.ns() );
         if ( !c ) {
             WriteUnitOfWork wunit(txn);
-            c = db->getOrCreateCollection( txn, ns );
+            c = db->getOrCreateCollection( txn, ns.ns() );
             verify(c);
             wunit.commit();
         }
@@ -116,14 +119,21 @@ namespace mongo {
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
                 return Status::OK();
 
-            if (allowBackgroundBuilding) {
-                descriptor = indexer.registerIndexBuild();
+            if (status.isOK()) {
+                if (allowBackgroundBuilding) {
+                    descriptor = indexer.registerIndexBuild();
+                    invariant(dbLock);
+                    dbLock->relockWithMode(MODE_IX);
+                }
+
+                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                status = indexer.insertAllDocumentsInCollection();
             }
 
-            if (status.isOK())
-                status = indexer.insertAllDocumentsInCollection();
-
             if (status.isOK()) {
+                if (allowBackgroundBuilding) {
+                    dbLock->relockWithMode(MODE_X);
+                }
                 WriteUnitOfWork wunit(txn);
                 indexer.commit();
                 wunit.commit();
@@ -132,15 +142,20 @@ namespace mongo {
         catch (const DBException& e) {
             status = e.toStatus();
         }
-        
+
+        if (allowBackgroundBuilding) {
+            dbLock->relockWithMode(MODE_X);
+            Database* db = dbHolder().get(txn, ns.db());
+            fassert(28553, db);
+            fassert(28554, db->getCollection(txn, ns.ns()));
+            indexer.unregisterIndexBuild(descriptor);
+        }
+
         if (status.code() == ErrorCodes::InterruptedAtShutdown) {
             // leave it as-if kill -9 happened. This will be handled on restart.
             indexer.abortWithoutCleanup();
         }
 
-        if (allowBackgroundBuilding) {
-            indexer.unregisterIndexBuild(descriptor);
-        }
         return status;
     }
 
