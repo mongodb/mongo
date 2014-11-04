@@ -28,24 +28,13 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
-#include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/2d_access_method.h"
-#include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/index/hash_access_method.h"
-#include "mongo/db/index/haystack_access_method.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
     class KVDatabaseCatalogEntry::AddCollectionChange : public RecoveryUnit::Change {
@@ -197,46 +186,14 @@ namespace mongo {
         return it->second->getRecordStore();
     }
 
-    IndexAccessMethod* KVDatabaseCatalogEntry::getIndex( OperationContext* txn,
-                                                         const CollectionCatalogEntry* collection,
-                                                         IndexCatalogEntry* index ) {
-        IndexDescriptor* desc = index->descriptor();
-
-        const string& type = desc->getAccessMethodName();
-
-        string ident = _engine->getCatalog()->getIndexIdent( txn,
-                                                             collection->ns().ns(),
-                                                             desc->indexName() );
-
-        SortedDataInterface* sdi =
-            _engine->getEngine()->getSortedDataInterface( txn, ident, desc );
-
-        if ("" == type)
-            return new BtreeAccessMethod( index, sdi );
-
-        if (IndexNames::HASHED == type)
-            return new HashAccessMethod( index, sdi );
-
-        if (IndexNames::GEO_2DSPHERE == type)
-            return new S2AccessMethod( index, sdi );
-
-        if (IndexNames::TEXT == type)
-            return new FTSAccessMethod( index, sdi );
-
-        if (IndexNames::GEO_HAYSTACK == type)
-            return new HaystackAccessMethod( index, sdi );
-
-        if (IndexNames::GEO_2D == type)
-            return new TwoDAccessMethod( index, sdi );
-
-        log() << "Can't find index for keyPattern " << desc->keyPattern();
-        invariant( false );
-    }
-
     Status KVDatabaseCatalogEntry::createCollection( OperationContext* txn,
                                                      const StringData& ns,
                                                      const CollectionOptions& options,
                                                      bool allocateDefaultSpace ) {
+        if (ns.empty()) {
+            return Status(ErrorCodes::BadValue, "Collection namespace cannot be empty");
+        }
+
         // we assume there is a logical lock on the collection name above
 
         {
