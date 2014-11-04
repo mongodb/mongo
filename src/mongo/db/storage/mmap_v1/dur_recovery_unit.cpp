@@ -155,10 +155,9 @@ namespace mongo {
     }
 
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
-        if (len == 0)
-            return data; // Don't need to do anything for empty ranges.
-
         invariant(inAUnitOfWork());
+
+        if (len == 0) return data; // Don't need to do anything for empty ranges.
 
         // Windows requires us to adjust the address space *before* we write to anything.
         MemoryMappedFile::makeWritable(data, len);
