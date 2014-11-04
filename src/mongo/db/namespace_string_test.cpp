@@ -50,9 +50,9 @@ namespace mongo {
         ASSERT( !NamespaceString::oplog( "a.b" ) );
 
         ASSERT( NamespaceString::oplog( "local.oplog.rs" ) );
-        ASSERT( !NamespaceString::oplog( "local.oplog.foo" ) );
+        ASSERT( NamespaceString::oplog( "local.oplog.foo" ) );
         ASSERT( NamespaceString::oplog( "local.oplog.$main" ) );
-        ASSERT( !NamespaceString::oplog( "local.oplog.$foo" ) );
+        ASSERT( NamespaceString::oplog( "local.oplog.$foo" ) );
     }
 
     TEST( NamespaceStringTest, Special ) {
