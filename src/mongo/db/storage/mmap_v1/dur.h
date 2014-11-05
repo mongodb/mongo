@@ -81,6 +81,13 @@ namespace mongo {
             */
             virtual void declareWriteIntent(void *x, unsigned len) = 0;
 
+            /**
+             * Allows you to declare many write intents at once more efficiently than repeated calls
+             * to declareWriteIntent.
+             */
+            virtual void declareWriteIntents(
+                const std::vector<std::pair<void*, unsigned> >& intents) = 0;
+
             /** declare intent to write
                 @param ofs offset within buf at which we will write
                 @param len the length at ofs we will write
@@ -190,6 +197,7 @@ namespace mongo {
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
             void* writingRangesAtOffsets(void *buf, const std::vector< std::pair< long long, unsigned > > &ranges) { return buf; }
             void declareWriteIntent(void *, unsigned);
+            void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents) {}
             void createdFile(const std::string& filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow(OperationContext* txn);
@@ -204,6 +212,7 @@ namespace mongo {
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
             void* writingRangesAtOffsets(void *buf, const std::vector< std::pair< long long, unsigned > > &ranges);
             void declareWriteIntent(void *, unsigned);
+            void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents);
             void createdFile(const std::string& filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow(OperationContext* txn);

@@ -49,7 +49,17 @@ namespace mongo {
         /** we batch up our write intents so that we do not have to synchronize too often */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
             MemoryMappedFile::makeWritable(p, len);
+            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             commitJob.note(p, len);
+        }
+
+        void DurableImpl::declareWriteIntents(
+                const std::vector<std::pair<void*, unsigned> >& intents) {
+            typedef std::vector<std::pair<void*, unsigned> > Intents;
+            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+            for (Intents::const_iterator it(intents.begin()), end(intents.end()); it != end; ++it) {
+                commitJob.note(it->first, it->second);
+            }
         }
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
@@ -118,7 +128,6 @@ namespace mongo {
         }
 
         void CommitJob::note(void* p, int len) {
-            SimpleMutex::scoped_lock lk(groupCommitMutex);
             _hasWritten = true;
 
             // from the point of view of the dur module, it would be fine (i think) to only

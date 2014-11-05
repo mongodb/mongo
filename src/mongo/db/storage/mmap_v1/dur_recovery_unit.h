@@ -61,8 +61,8 @@ namespace mongo {
         virtual void registerChange(Change* change);
 
     private:
-        void recordPreimage(char* data, size_t len);
-        void publishChanges();
+        void commitChanges();
+        void pushChangesToDurSubSystem();
         void rollbackInnermostChanges();
 
         bool inAUnitOfWork() const { return !_startOfUncommittedChangesForLevel.empty(); }
@@ -72,25 +72,47 @@ namespace mongo {
         }
 
         bool haveUncommitedChangesAtCurrentLevel() const {
-            return _changes.size() > _startOfUncommittedChangesForLevel.back();
+            return _writes.size() > _startOfUncommittedChangesForLevel.back().writeIndex
+                || _changes.size() > _startOfUncommittedChangesForLevel.back().changeIndex;
         }
 
         // The parent operation context. This pointer is not owned and it's lifetime must extend
         // past that of the DurRecoveryUnit
         OperationContext* _txn;
 
-        // Changes are ordered from oldest to newest. Overlapping and duplicate regions are allowed,
-        // since rollback undoes changes in reverse order.
-        // TODO compare performance against a data-structure that coalesces overlapping/adjacent
-        // changes.
+        // Changes are ordered from oldest to newest.
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
         Changes _changes;
 
-        // Index of the first uncommited change in _changes for each nesting level. Index 0 in this
-        // vector is always the outermost transaction and back() is always the innermost. The size()
-        // is the current nesting level.
-        std::vector<size_t> _startOfUncommittedChangesForLevel;
+        // These are memory writes inside the mmapv1 mmaped files. Writes are ordered from oldest to
+        // newest. Overlapping and duplicate regions are allowed, since rollback undoes changes in
+        // reverse order.
+        std::string _preimageBuffer;
+        struct Write {
+            Write(char* addr, int len, int offset) : addr(addr), len(len), offset(offset) {}
+
+            bool operator < (const Write& rhs) const { return addr < rhs.addr; }
+
+            char* addr;
+            int len;
+            int offset; // index into _preimageBuffer;
+        };
+        typedef std::vector<Write> Writes;
+        Writes _writes;
+
+        // Indexes of the first uncommitted Change/Write in _changes/_writes for each nesting level.
+        // Index 0 in this vector is always the outermost transaction and back() is always the
+        // innermost. The size() is the current nesting level.
+        struct Indexes {
+            Indexes(size_t changeIndex, size_t writeIndex)
+                : changeIndex(changeIndex)
+                , writeIndex(writeIndex)
+            {}
+            size_t changeIndex;
+            size_t writeIndex;
+        };
+        std::vector<Indexes> _startOfUncommittedChangesForLevel;
 
         // If true, this RU is in a "failed" state and all changes must be rolled back. Once the
         // outermost WUOW rolls back it reverts to false.
