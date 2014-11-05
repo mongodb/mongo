@@ -253,7 +253,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, session_create), config, NULL };
-	const char *tmpconfig;
+	char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
 	if ((ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree)) == 0) {

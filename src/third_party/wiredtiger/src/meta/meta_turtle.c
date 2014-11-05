@@ -12,12 +12,12 @@
  *	Return the default configuration information for the metadata file.
  */
 static int
-__metadata_config(WT_SESSION_IMPL *session, const char **metaconfp)
+__metadata_config(WT_SESSION_IMPL *session, char **metaconfp)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	const char *cfg[] = { WT_CONFIG_BASE(session, file_meta), NULL, NULL };
-	const char *metaconf;
+	char *metaconf;
 
 	*metaconfp = NULL;
 
@@ -159,7 +159,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	int exist;
-	const char *metaconf;
+	char *metaconf;
 
 	metaconf = NULL;
 
@@ -213,7 +213,7 @@ err:	__wt_free(session, metaconf);
  *	Read the turtle file.
  */
 int
-__wt_turtle_read(WT_SESSION_IMPL *session, const char *key, const char **valuep)
+__wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	FILE *fp;
 	WT_DECL_ITEM(buf);

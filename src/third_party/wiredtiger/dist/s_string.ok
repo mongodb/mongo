@@ -38,6 +38,7 @@ BUFs
 BUILTIN
 BZ
 BZIP
+Barack
 Bitfield
 Bitwise
 Bsearch
@@ -242,6 +243,7 @@ ONPAGE
 OPTYPE
 OUTBUFF
 OVFL
+Obama
 PADDR
 PAGE's
 PARAM
@@ -289,6 +291,7 @@ SPARC
 SPINLOCK
 SQL
 SSD
+SSHH
 SSq
 STAILQ
 STRTOUQ
@@ -491,6 +494,7 @@ curbtree
 curbulk
 curconfig
 curdump
+curextract
 curfile
 curindex
 curlog

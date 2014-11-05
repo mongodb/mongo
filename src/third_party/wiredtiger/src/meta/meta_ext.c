@@ -50,7 +50,7 @@ __wt_ext_metadata_remove(
  */
 int
 __wt_ext_metadata_search(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, const char *key, const char **valuep)
+    WT_SESSION *wt_session, const char *key, char **valuep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;

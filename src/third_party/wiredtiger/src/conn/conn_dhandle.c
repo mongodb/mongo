@@ -11,7 +11,32 @@
  * __conn_dhandle_open_lock --
  *	Spin on the current data handle until either (a) it is open, read
  *	locked; or (b) it is closed, write locked.  If exclusive access is
- *	requested and cannot be granted immediately, fail with EBUSY.
+ *	requested and cannot be granted immediately because the handle is
+ *	in use, fail with EBUSY.
+ *
+ *	Here is a brief summary of how different operations synchronize using
+ *	either the schema lock, handle locks or handle flags:
+ *
+ *	open -- holds the schema lock, one thread gets the handle exclusive,
+ *		reverts to a shared handle lock and drops the schema lock
+ *		once the handle is open;
+ *	bulk load -- sets bulk and exclusive;
+ *	salvage, truncate, update, verify -- hold the schema lock, set a
+ *		"special" flag;
+ *	sweep -- gets a write lock on the handle, doesn't set exclusive
+ *
+ *	The schema lock prevents a lot of potential conflicts: we should never
+ *	see handles being salvaged or verified because those operation hold the
+ *	schema lock.  However, it is possible to see a handle that is being
+ *	bulk loaded, or that the sweep server is closing.
+ *
+ *	The principle here is that application operations can cause other
+ *	application operations to fail (so attempting to open a cursor on a
+ *	file while it is being bulk-loaded will fail), but internal or
+ *	database-wide operations should not prevent application-initiated
+ *	operations.  For example, attempting to verify a file should not fail
+ *	because the sweep server happens to be in the process of closing that
+ *	file.
  */
 static int
 __conn_dhandle_open_lock(
@@ -19,8 +44,11 @@ __conn_dhandle_open_lock(
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
+	int is_open, lock_busy, want_exclusive;
 
 	btree = dhandle->handle;
+	lock_busy = 0;
+	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
 
 	/*
 	 * Check that the handle is open.  We've already incremented
@@ -33,16 +61,36 @@ __conn_dhandle_open_lock(
 	 * and WT_DHANDLE_OPEN is still not set, we need to do the open.
 	 */
 	for (;;) {
-		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) &&
-		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+		/*
+		 * If the handle is already open for a special operation,
+		 * give up.
+		 */
+		if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
 
+		/*
+		 * If the handle is open, get a read lock and recheck.
+		 *
+		 * Wait for a read lock if we want exclusive access and failed
+		 * to get it: the sweep server may be closing this handle, and
+		 * we need to wait for it to complete.  If we want exclusive
+		 * access and find the handle open once we get the read lock,
+		 * give up: some other thread has it locked for real.
+		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
+		    (!want_exclusive || lock_busy)) {
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
+			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
+
+			/*
+			 * If we're trying to get exclusive access and the file
+			 * is open, give up.
+			 */
+			if (is_open && want_exclusive)
+				return (EBUSY);
 		}
 
 		/*
@@ -57,7 +105,8 @@ __conn_dhandle_open_lock(
 			 * lock and get a read lock instead.
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-			    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
+			    !want_exclusive) {
+				lock_busy = 0;
 				WT_RET(
 				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;
@@ -66,8 +115,10 @@ __conn_dhandle_open_lock(
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			return (0);
-		} else if (ret != EBUSY || LF_ISSET(WT_DHANDLE_EXCLUSIVE))
-			return (EBUSY);
+		} else if (ret != EBUSY)
+			return (ret);
+		else
+			lock_busy = 1;
 
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
@@ -253,7 +304,7 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	const char *metaconf;
+	char *metaconf;
 
 	dhandle = session->dhandle;
 

@@ -967,6 +967,9 @@ struct __wt_session {
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
+	 * @config{extractor, configure custom extractor for indices.  Value
+	 * must be an extractor name created with WT_CONNECTION::add_extractor.,
+	 * a string; default empty.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
@@ -1750,7 +1753,6 @@ struct __wt_connection {
 
 	/*!
 	 * Add a custom extractor for index keys or column groups.
-	 * @notyet{custom extractors}
 	 *
 	 * The application must first implement the WT_EXTRACTOR interface and
 	 * then register the implementation with WiredTiger:
@@ -2538,7 +2540,8 @@ struct __wt_config_arg;     typedef struct __wt_config_arg WT_CONFIG_ARG;
  * records.
  *
  * Applications register their implementation with WiredTiger by calling
- * WT_CONNECTION::add_collator.
+ * WT_CONNECTION::add_collator.  See @ref custom_collators for more
+ * information.
  *
  * @snippet ex_extending.c add collator nocase
  *
@@ -2959,7 +2962,8 @@ struct __wt_data_source {
  * index keys or column group values.
  *
  * Applications register implementations with WiredTiger by calling
- * WT_CONNECTION::add_extractor.
+ * WT_CONNECTION::add_extractor.  See @ref custom_extractors for more
+ * information.
  *
  * @snippet ex_all.c WT_EXTRACTOR register
  */
@@ -2970,9 +2974,39 @@ struct __wt_extractor {
 	 * @errors
 	 *
 	 * @snippet ex_all.c WT_EXTRACTOR
+	 *
+	 * @param extractor the WT_EXTRACTOR implementation
+	 * @param session the current WiredTiger session
+	 * @param key the table key in raw format, see @ref cursor_raw for
+	 *	details
+	 * @param value the table value in raw format, see @ref cursor_raw for
+	 *	details
+	 * @param[out] result_cursor the method should call WT_CURSOR::set_key
+	 *	and WT_CURSOR::insert on this cursor to return a key.  The \c
+	 *	key_format of the cursor will match that passed to
+	 *	WT_SESSION::create for the index.  Multiple index keys can be
+	 *	created for each record by calling WT_CURSOR::insert multiple
+	 *	times.
 	 */
 	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
-	    const WT_ITEM *key, const WT_ITEM *value, WT_ITEM *result);
+	    const WT_ITEM *key, const WT_ITEM *value,
+	    WT_CURSOR *result_cursor);
+
+	/*!
+	 * If non-NULL, this callback is called to customize the extractor for
+	 * each index.  If the callback returns a non-NULL extractor, that
+	 * instance is used instead of this one for all comparisons.
+	 */
+	int (*customize)(WT_EXTRACTOR *extractor, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
+
+	/*!
+	 * If non-NULL, a callback performed when the database is closed.
+	 *
+	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
+	 * the handle will not be subsequently accessed by WiredTiger.
+	 */
+	int (*terminate)(WT_EXTRACTOR *extractor, WT_SESSION *session);
 };
 
 /*!
@@ -3019,43 +3053,43 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 /*! async: number of allocation state races */
 #define	WT_STAT_CONN_ASYNC_ALLOC_RACE			1000
-/*! async: number of op slots viewed for alloc */
+/*! async: number of operation slots viewed for allocation */
 #define	WT_STAT_CONN_ASYNC_ALLOC_VIEW			1001
 /*! async: current work queue length */
 #define	WT_STAT_CONN_ASYNC_CUR_QUEUE			1002
-/*! async: number of async flush calls */
+/*! async: number of flush calls */
 #define	WT_STAT_CONN_ASYNC_FLUSH			1003
-/*! async: number of times op allocation failed */
+/*! async: number of times operation allocation failed */
 #define	WT_STAT_CONN_ASYNC_FULL				1004
 /*! async: maximum work queue length */
 #define	WT_STAT_CONN_ASYNC_MAX_QUEUE			1005
 /*! async: number of times worker found no work */
 #define	WT_STAT_CONN_ASYNC_NOWORK			1006
-/*! async: op allocations */
+/*! async: total allocations */
 #define	WT_STAT_CONN_ASYNC_OP_ALLOC			1007
-/*! async: op compact calls */
+/*! async: total compact calls */
 #define	WT_STAT_CONN_ASYNC_OP_COMPACT			1008
-/*! async: op insert calls */
+/*! async: total insert calls */
 #define	WT_STAT_CONN_ASYNC_OP_INSERT			1009
-/*! async: op remove calls */
+/*! async: total remove calls */
 #define	WT_STAT_CONN_ASYNC_OP_REMOVE			1010
-/*! async: op search calls */
+/*! async: total search calls */
 #define	WT_STAT_CONN_ASYNC_OP_SEARCH			1011
-/*! async: op update calls */
+/*! async: total update calls */
 #define	WT_STAT_CONN_ASYNC_OP_UPDATE			1012
-/*! block manager: mapped bytes read */
+/*! block-manager: mapped bytes read */
 #define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		1013
-/*! block manager: bytes read */
+/*! block-manager: bytes read */
 #define	WT_STAT_CONN_BLOCK_BYTE_READ			1014
-/*! block manager: bytes written */
+/*! block-manager: bytes written */
 #define	WT_STAT_CONN_BLOCK_BYTE_WRITE			1015
-/*! block manager: mapped blocks read */
+/*! block-manager: mapped blocks read */
 #define	WT_STAT_CONN_BLOCK_MAP_READ			1016
-/*! block manager: blocks pre-loaded */
+/*! block-manager: blocks pre-loaded */
 #define	WT_STAT_CONN_BLOCK_PRELOAD			1017
-/*! block manager: blocks read */
+/*! block-manager: blocks read */
 #define	WT_STAT_CONN_BLOCK_READ				1018
-/*! block manager: blocks written */
+/*! block-manager: blocks written */
 #define	WT_STAT_CONN_BLOCK_WRITE			1019
 /*! cache: tracked dirty bytes in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1020
@@ -3107,31 +3141,31 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_READ				1043
 /*! cache: pages written from cache */
 #define	WT_STAT_CONN_CACHE_WRITE			1044
-/*! conn: pthread mutex condition wait calls */
+/*! connection: pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				1045
-/*! Btree: cursor create calls */
+/*! btree: cursor create calls */
 #define	WT_STAT_CONN_CURSOR_CREATE			1046
-/*! Btree: cursor insert calls */
+/*! btree: cursor insert calls */
 #define	WT_STAT_CONN_CURSOR_INSERT			1047
-/*! Btree: cursor next calls */
+/*! btree: cursor next calls */
 #define	WT_STAT_CONN_CURSOR_NEXT			1048
-/*! Btree: cursor prev calls */
+/*! btree: cursor prev calls */
 #define	WT_STAT_CONN_CURSOR_PREV			1049
-/*! Btree: cursor remove calls */
+/*! btree: cursor remove calls */
 #define	WT_STAT_CONN_CURSOR_REMOVE			1050
-/*! Btree: cursor reset calls */
+/*! btree: cursor reset calls */
 #define	WT_STAT_CONN_CURSOR_RESET			1051
-/*! Btree: cursor search calls */
+/*! btree: cursor search calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH			1052
-/*! Btree: cursor search near calls */
+/*! btree: cursor search near calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1053
-/*! Btree: cursor update calls */
+/*! btree: cursor update calls */
 #define	WT_STAT_CONN_CURSOR_UPDATE			1054
-/*! dhandle: session dhandles swept */
+/*! data-handle: session dhandles swept */
 #define	WT_STAT_CONN_DH_SESSION_HANDLES			1055
-/*! dhandle: session sweep attempts */
+/*! data-handle: session sweep attempts */
 #define	WT_STAT_CONN_DH_SESSION_SWEEPS			1056
-/*! conn: files currently open */
+/*! connection: files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				1057
 /*! log: log buffer size increases */
 #define	WT_STAT_CONN_LOG_BUFFER_GROW			1058
@@ -3179,13 +3213,13 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1079
 /*! LSM: rows merged in an LSM tree */
 #define	WT_STAT_CONN_LSM_ROWS_MERGED			1080
-/*! LSM: App work units currently queued */
+/*! LSM: application work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_APP			1081
-/*! LSM: Merge work units currently queued */
+/*! LSM: merge work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_MANAGER		1082
 /*! LSM: tree queue hit maximum */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1083
-/*! LSM: Switch work units currently queued */
+/*! LSM: switch work units currently queued */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_SWITCH		1084
 /*! LSM: tree maintenance operations scheduled */
 #define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1085
@@ -3193,13 +3227,13 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1086
 /*! LSM: tree maintenance operations executed */
 #define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1087
-/*! conn: memory allocations */
+/*! connection: memory allocations */
 #define	WT_STAT_CONN_MEMORY_ALLOCATION			1088
-/*! conn: memory frees */
+/*! connection: memory frees */
 #define	WT_STAT_CONN_MEMORY_FREE			1089
-/*! conn: memory re-allocations */
+/*! connection: memory re-allocations */
 #define	WT_STAT_CONN_MEMORY_GROW			1090
-/*! conn: total read I/Os */
+/*! connection: total read I/Os */
 #define	WT_STAT_CONN_READ_IO				1091
 /*! reconciliation: page reconciliation calls */
 #define	WT_STAT_CONN_REC_PAGES				1092
@@ -3209,29 +3243,29 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1094
 /*! reconciliation: split objects currently awaiting free */
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1095
-/*! conn: pthread mutex shared lock read-lock calls */
+/*! connection: pthread mutex shared lock read-lock calls */
 #define	WT_STAT_CONN_RWLOCK_READ			1096
-/*! conn: pthread mutex shared lock write-lock calls */
+/*! connection: pthread mutex shared lock write-lock calls */
 #define	WT_STAT_CONN_RWLOCK_WRITE			1097
 /*! session: open cursor count */
 #define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1098
 /*! session: open session count */
 #define	WT_STAT_CONN_SESSION_OPEN			1099
-/*! txn: transaction begins */
+/*! transaction: transaction begins */
 #define	WT_STAT_CONN_TXN_BEGIN				1100
-/*! txn: transaction checkpoints */
+/*! transaction: transaction checkpoints */
 #define	WT_STAT_CONN_TXN_CHECKPOINT			1101
-/*! txn: transaction checkpoint currently running */
+/*! transaction: transaction checkpoint currently running */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1102
-/*! txn: transactions committed */
+/*! transaction: transactions committed */
 #define	WT_STAT_CONN_TXN_COMMIT				1103
-/*! txn: transaction failures due to cache overflow */
+/*! transaction: transaction failures due to cache overflow */
 #define	WT_STAT_CONN_TXN_FAIL_CACHE			1104
-/*! txn: transaction range of IDs currently pinned */
+/*! transaction: transaction range of IDs currently pinned */
 #define	WT_STAT_CONN_TXN_PINNED_RANGE			1105
-/*! txn: transactions rolled back */
+/*! transaction: transactions rolled back */
 #define	WT_STAT_CONN_TXN_ROLLBACK			1106
-/*! conn: total write I/Os */
+/*! connection: total write I/Os */
 #define	WT_STAT_CONN_WRITE_IO				1107
 
 /*!
@@ -3240,25 +3274,25 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * @anchor statistics_dsrc
  * @{
  */
-/*! block manager: file allocation unit size */
+/*! block-manager: file allocation unit size */
 #define	WT_STAT_DSRC_ALLOCATION_SIZE			2000
-/*! block manager: blocks allocated */
+/*! block-manager: blocks allocated */
 #define	WT_STAT_DSRC_BLOCK_ALLOC			2001
-/*! block manager: checkpoint size */
+/*! block-manager: checkpoint size */
 #define	WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE		2002
-/*! block manager: allocations requiring file extension */
+/*! block-manager: allocations requiring file extension */
 #define	WT_STAT_DSRC_BLOCK_EXTENSION			2003
-/*! block manager: blocks freed */
+/*! block-manager: blocks freed */
 #define	WT_STAT_DSRC_BLOCK_FREE				2004
-/*! block manager: file magic number */
+/*! block-manager: file magic number */
 #define	WT_STAT_DSRC_BLOCK_MAGIC			2005
-/*! block manager: file major version number */
+/*! block-manager: file major version number */
 #define	WT_STAT_DSRC_BLOCK_MAJOR			2006
-/*! block manager: minor version number */
+/*! block-manager: minor version number */
 #define	WT_STAT_DSRC_BLOCK_MINOR			2007
-/*! block manager: file bytes available for reuse */
+/*! block-manager: file bytes available for reuse */
 #define	WT_STAT_DSRC_BLOCK_REUSE_BYTES			2008
-/*! block manager: file size in bytes */
+/*! block-manager: file size in bytes */
 #define	WT_STAT_DSRC_BLOCK_SIZE				2009
 /*! LSM: bloom filters in the LSM tree */
 #define	WT_STAT_DSRC_BLOOM_COUNT			2010
@@ -3410,7 +3444,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_SESSION_COMPACT			2082
 /*! session: open cursor count */
 #define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2083
-/*! txn: update conflicts */
+/*! transaction: update conflicts */
 #define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2084
 /*! @} */
 /*

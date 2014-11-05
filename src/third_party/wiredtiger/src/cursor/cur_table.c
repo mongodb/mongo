@@ -19,22 +19,125 @@ static int __curtable_update(WT_CURSOR *cursor);
 		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
 
-#define	APPLY_IDX(ctable, f) do {					\
-	WT_INDEX *idx;							\
-	WT_CURSOR **__cp;						\
-	u_int __i;							\
-	__cp = (ctable)->idx_cursors;					\
-	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
-		idx = ctable->table->indices[__i];			\
-		WT_ERR(__wt_schema_project_merge(session,		\
-		    ctable->cg_cursors,					\
-		    idx->key_plan, idx->key_format, &(*__cp)->key));	\
-		F_SET(*__cp, WT_CURSTD_KEY_EXT |			\
-		    WT_CURSTD_VALUE_EXT);				\
-		WT_ERR((*__cp)->f(*__cp));				\
-		WT_ERR((*__cp)->reset(*__cp));				\
-	}								\
-} while (0)
+/* Cursor type for custom extractor callback. */
+typedef struct {
+	WT_CURSOR iface;
+	WT_CURSOR_TABLE *ctable;
+	WT_CURSOR *idxc;
+	int (*f)(WT_CURSOR *);
+} WT_CURSOR_EXTRACTOR;
+
+/*
+ * __curextract_insert --
+ *	Handle a key produced by a custom extractor.
+ */
+static int
+__curextract_insert(WT_CURSOR *cursor) {
+	WT_CURSOR_EXTRACTOR *cextract;
+	WT_ITEM *key, ikey, pkey;
+	WT_SESSION_IMPL *session;
+
+	cextract = (WT_CURSOR_EXTRACTOR *)cursor;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_ITEM_SET(ikey, cursor->key);
+	/*
+	 * We appended a padding byte to the key to avoid rewriting the last
+	 * column.  Strip that away here.
+	 */
+	WT_ASSERT(session, ikey.size > 0);
+	--ikey.size;
+	WT_RET(__wt_cursor_get_raw_key(cextract->ctable->cg_cursors[0], &pkey));
+
+	/*
+	 * We have the index key in the format we need, and all of the primary
+	 * key columns are required: just append them.
+	 */
+	key = &cextract->idxc->key;
+	WT_RET(__wt_buf_grow(session, key, ikey.size + pkey.size));
+	memcpy((uint8_t *)key->mem, ikey.data, ikey.size);
+	memcpy((uint8_t *)key->mem + ikey.size, pkey.data, pkey.size);
+	key->size = ikey.size + pkey.size;
+
+	/*
+	 * The index key is now set and the value is empty (it starts clear and
+	 * is never set).
+	 */
+	F_SET(cextract->idxc, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+
+	/* Call the underlying cursor function to update the index. */
+	return (cextract->f(cextract->idxc));
+}
+
+/*
+ * __apply_idx --
+ *	Apply an operation to all indices of a table.
+ */
+static int
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
+	WT_CURSOR_STATIC_INIT(iface,
+	    __wt_cursor_get_key,		/* get-key */
+	    __wt_cursor_get_value,		/* get-value */
+	    __wt_cursor_set_key,		/* set-key */
+	    __wt_cursor_set_value,		/* set-value */
+	    __wt_cursor_notsup,			/* compare */
+	    __wt_cursor_notsup,			/* next */
+	    __wt_cursor_notsup,			/* prev */
+	    __wt_cursor_notsup,			/* reset */
+	    __wt_cursor_notsup,			/* search */
+	    __wt_cursor_notsup,			/* search-near */
+	    __curextract_insert,		/* insert */
+	    __wt_cursor_notsup,			/* update */
+	    __wt_cursor_notsup,			/* remove */
+	    __wt_cursor_notsup);		/* close */
+	WT_CURSOR **cp;
+	WT_CURSOR_EXTRACTOR extract_cursor;
+	WT_DECL_RET;
+	WT_INDEX *idx;
+	WT_ITEM key, value;
+	WT_SESSION_IMPL *session;
+	int (*f)(WT_CURSOR *);
+	u_int i;
+
+	cp = ctable->idx_cursors;
+	session = (WT_SESSION_IMPL *)ctable->iface.session;
+
+	for (i = 0; i < ctable->table->nindices; i++, cp++) {
+		f = *(int (**)(WT_CURSOR *))((uint8_t *)*cp + func_off);
+		idx = ctable->table->indices[i];
+		if (idx->extractor) {
+			extract_cursor.iface = iface;
+			extract_cursor.iface.session = &session->iface;
+			extract_cursor.iface.key_format = idx->exkey_format;
+			extract_cursor.ctable = ctable;
+			extract_cursor.idxc = *cp;
+			extract_cursor.f = f;
+
+			WT_RET(__wt_cursor_get_raw_key(&ctable->iface, &key));
+			WT_RET(
+			    __wt_cursor_get_raw_value(&ctable->iface, &value));
+			ret = idx->extractor->extract(idx->extractor,
+			    &session->iface, &key, &value,
+			    &extract_cursor.iface);
+
+			__wt_buf_free(session, &extract_cursor.iface.key);
+			WT_RET(ret);
+		} else {
+			WT_RET(__wt_schema_project_merge(session,
+			    ctable->cg_cursors,
+			    idx->key_plan, idx->key_format, &(*cp)->key));
+			/*
+			 * The index key is now set and the value is empty
+			 * (it starts clear and is never set).
+			 */
+			F_SET(*cp, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+			WT_RET(f(*cp));
+		}
+		WT_RET((*cp)->reset(*cp));
+	}
+
+	return (0);
+}
 
 /*
  * __wt_curtable_get_key --
@@ -388,7 +491,7 @@ __curtable_insert(WT_CURSOR *cursor)
 		WT_ERR((*cp)->insert(*cp));
 	}
 
-	APPLY_IDX(ctable, insert);
+	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert)));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -424,19 +527,18 @@ __curtable_update(WT_CURSOR *cursor)
 		 * Remove only if the key exists.
 		 */
 		if (ret == 0) {
-			APPLY_IDX(ctable, remove);
+			WT_ERR(
+			    __apply_idx(ctable, offsetof(WT_CURSOR, remove)));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
 			    cursor->value_format, &cursor->value));
-		} else if (ret == WT_NOTFOUND)
-			ret = 0;
-		else
-			WT_ERR(ret);
+		} else
+			WT_ERR_NOTFOUND_OK(ret);
 	}
 	APPLY_CG(ctable, update);
 	WT_ERR(ret);
 	if (ctable->idx_cursors != NULL)
-		APPLY_IDX(ctable, insert);
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert)));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -461,7 +563,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		WT_ERR(ret);
-		APPLY_IDX(ctable, remove);
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove)));
 	}
 
 	APPLY_CG(ctable, remove);
@@ -511,7 +613,8 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 			do {
 				APPLY_CG(stop, search);
 				WT_ERR(ret);
-				APPLY_IDX(stop, remove);
+				WT_ERR(__apply_idx(
+				    stop, offsetof(WT_CURSOR, remove)));
 			} while ((ret = wt_stop->prev(wt_stop)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 
@@ -525,7 +628,8 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 			do {
 				APPLY_CG(start, search);
 				WT_ERR(ret);
-				APPLY_IDX(start, remove);
+				WT_ERR(__apply_idx(
+				    start, offsetof(WT_CURSOR, remove)));
 				if (stop != NULL)
 					WT_ERR(wt_start->compare(
 					    wt_start, wt_stop,

@@ -59,9 +59,9 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint32_t allocsize;
 	int is_metadata;
-	const char *fileconf, *filename;
-	const char **p, *filecfg[] =
+	const char *filename, **p, *filecfg[] =
 	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
+	char *fileconf;
 
 	fileconf = NULL;
 
@@ -176,12 +176,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ITEM confbuf, fmt, namebuf;
 	WT_TABLE *table;
 	size_t tlen;
-	const char *cfg[4] =
+	const char **cfgp, *cfg[4] =
 	    { WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char **cfgp;
-	const char *cgconf, *cgname, *sourceconf, *oldconf;
-	const char *source, *tablename;
+	const char *cgname, *source, *tablename;
+	char *cgconf, *sourceconf, *oldconf;
 
 	cgconf = sourceconf = oldconf = NULL;
 	WT_CLEAR(fmt);
@@ -312,24 +311,28 @@ static int
 __create_index(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
 {
-	WT_CONFIG pkcols;
-	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_CONFIG kcols, pkcols;
+	WT_CONFIG_ITEM ckey, cval, icols, kval;
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
+	WT_PACK pack;
 	WT_TABLE *table;
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *sourceconf, *source, *idxconf, *idxname;
-	const char *tablename;
+	const char *source, *idxname, *tablename;
+	char *sourceconf, *idxconf;
 	size_t tlen;
-	u_int i;
+	int have_extractor;
+	u_int i, npublic_cols;
 
 	idxconf = sourceconf = NULL;
 	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
+	have_extractor = 0;
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -346,6 +349,10 @@ __create_index(WT_SESSION_IMPL *session,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
 
+	if (table->is_simple)
+		WT_RET_MSG(session, EINVAL,
+		    "%s requires a table with named columns", name);
+
 	if (__wt_config_getones(session, config, "source", &cval) == 0) {
 		WT_ERR(__wt_buf_fmt(session, &namebuf,
 		    "%.*s", (int)cval.len, cval.str));
@@ -360,10 +367,38 @@ __create_index(WT_SESSION_IMPL *session,
 		    ",source=\"%s\"", source));
 	}
 
+	if (__wt_config_getones(session, config, "extractor", &cval) == 0 &&
+	    cval.len != 0) {
+		have_extractor = 1;
+		/* Custom extractors must supply a key format. */
+		if ((ret = __wt_config_getones(
+		    session, config, "key_format", &kval)) != 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: custom extractors require a key_format", name);
+	}
+
 	/* Calculate the key/value formats. */
-	if (__wt_config_getones(session, config, "columns", &icols) != 0)
+	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
+	    !have_extractor)
 		WT_ERR_MSG(session, EINVAL,
-		    "No 'columns' configuration for '%s'", name);
+		    "%s: requires 'columns' configuration", name);
+
+	/*
+	 * Count the public columns using the declared columns for normal
+	 * indices or the key format for custom extractors.
+	 */
+	npublic_cols = 0;
+	if (!have_extractor) {
+		WT_ERR(__wt_config_subinit(session, &kcols, &icols));
+		while ((ret = __wt_config_next(&kcols, &ckey, &cval)) == 0)
+			++npublic_cols;
+		WT_ERR_NOTFOUND_OK(ret);
+	} else {
+		WT_ERR(__pack_initn(session, &pack, kval.str, kval.len));
+		while ((ret = __pack_next(&pack, &pv)) == 0)
+			++npublic_cols;
+		WT_ERR_NOTFOUND_OK(ret);
+	}
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -381,24 +416,32 @@ __create_index(WT_SESSION_IMPL *session,
 		 * If the primary key column is already in the secondary key,
 		 * don't add it again.
 		 */
-		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
+		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0) {
+			if (have_extractor)
+				WT_ERR_MSG(session, EINVAL,
+				    "an index with a custom extractor may not "
+				    "include primary key columns");
 			continue;
+		}
 		WT_ERR(__wt_buf_catfmt(
 		    session, &extra_cols, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
 
-	/*
-	 * Index values are normally empty: all columns are packed into the
-	 * index key.  The exception is LSM, which (currently) reserves empty
-	 * values as tombstones.  Use a single padding byte in that case.
-	 */
-	if (WT_PREFIX_MATCH(source, "lsm:"))
-		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=x,"));
-	else
-		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,"));
+	/* Index values are empty: all columns are packed into the index key. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
+
+	if (have_extractor) {
+		WT_ERR(__wt_buf_catfmt(session, &fmt, "%.*s",
+		    (int)kval.len, kval.str));
+		WT_CLEAR(icols);
+	}
+
+	/*
+	 * Construct the index key format, or append the primary key columns
+	 * for custom extractors.
+	 */
 	WT_ERR(__wt_struct_reformat(session, table,
 	    icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
 
@@ -408,6 +451,9 @@ __create_index(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, EINVAL,
 		    "column-store index may not use the record number as its "
 		    "index key");
+
+	WT_ERR(__wt_buf_catfmt(
+	    session, &fmt, ",index_key_columns=%u", npublic_cols));
 
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
@@ -450,12 +496,12 @@ __create_table(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cgkey, cgval, cval;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	size_t cgsize;
-	int ncolgroups;
-	char *cgname;
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, table_meta), config, NULL, NULL };
-	const char *tableconf, *tablename;
+	const char *tablename;
+	char *tableconf, *cgname;
+	size_t cgsize;
+	int ncolgroups;
 
 	cgname = NULL;
 	table = NULL;
@@ -504,7 +550,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (table != NULL) {
-			__wt_schema_remove_table(session, table);
+			WT_TRET(__wt_schema_remove_table(session, table));
 			table = NULL;
 		}
 	}

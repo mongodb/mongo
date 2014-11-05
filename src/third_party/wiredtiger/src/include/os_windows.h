@@ -12,7 +12,6 @@
 typedef CONDITION_VARIABLE	wt_cond_t;
 typedef CRITICAL_SECTION	wt_mutex_t;
 typedef HANDLE			wt_thread_t;
-typedef SRWLOCK			wt_rwlock_t;
 
 /* Timespec is a POSIX structure not defined in Windows */
 struct timespec {

@@ -70,7 +70,7 @@ __wt_metadata_cursor(
 	 * We use the metadata a lot, so we have a handle cached; lock it and
 	 * increment the in-use counter.
 	 */
-	WT_ERR(__wt_session_lock_btree(session, 0));
+	WT_ERR(__wt_session_lock_dhandle(session, 0));
 	__wt_session_dhandle_incr_use(session);
 
 	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
@@ -179,7 +179,7 @@ err:	WT_TRET(cursor->close(cursor));
  */
 int
 __wt_metadata_search(
-    WT_SESSION_IMPL *session, const char *key, const char **valuep)
+    WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;

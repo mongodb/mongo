@@ -59,7 +59,7 @@ namespace mongo {
         }
 
         BSONObj obj = b.obj();
-        BSONObj sub = obj["block manager"].Obj();
+        BSONObj sub = obj["block-manager"].Obj();
         BSONElement e = sub["file size in bytes"];
         invariant( e.type() );
 

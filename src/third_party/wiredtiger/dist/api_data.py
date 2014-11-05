@@ -277,7 +277,7 @@ file_meta = file_config + [
 	    the file version'''),
 ]
 
-table_only_meta = [
+table_only_config = [
 	Config('colgroups', '', r'''
 	    comma-separated list of names of column groups.  Each column
 	    group is stored separately, keyed by the primary key of the
@@ -288,11 +288,20 @@ table_only_meta = [
 	    WT_SESSION::create''', type='list'),
 ]
 
+index_only_config = [
+	Config('extractor', '', r'''
+        configure custom extractor for indices.  Value must be an extractor
+        name created with WT_CONNECTION::add_extractor'''),
+]
+
 colgroup_meta = common_meta + source_meta
 
-index_meta = format_meta + source_meta
+index_meta = format_meta + source_meta + index_only_config + [
+	Config('index_key_columns', '', r'''
+	    number of public key columns''', type='int', undoc=True),
+]
 
-table_meta = format_meta + table_only_meta
+table_meta = format_meta + table_only_config
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
@@ -569,8 +578,8 @@ methods = {
 	    type='int'),
 ]),
 
-'session.create' :
-	    Method(table_only_meta + file_config + lsm_config + source_meta + [
+'session.create' : Method(file_config + lsm_config + source_meta + 
+	    index_only_config + table_only_config + [
 	Config('exclusive', 'false', r'''
 	    fail if the object exists.  When false (the default), if the
 	    object exists, check that its settings match the specified

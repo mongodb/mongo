@@ -246,7 +246,7 @@ struct __wt_extension_api {
 	 * @snippet ex_data_source.c WT_EXTENSION metadata search
 	 */
 	int (*metadata_search)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session, const char *key, const char **valuep);
+	    WT_SESSION *session, const char *key, char **valuep);
 
 	/*!
 	 * Update a row in the metadata by either inserting a new record or

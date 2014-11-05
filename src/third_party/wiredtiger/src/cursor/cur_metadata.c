@@ -56,7 +56,7 @@ __curmetadata_metadata_search(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
-	const char *value;
+	char *value;
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 

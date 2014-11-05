@@ -54,6 +54,16 @@ struct __wt_named_data_source {
 };
 
 /*
+ * WT_NAMED_EXTRACTOR --
+ *	An extractor list entry
+ */
+struct __wt_named_extractor {
+	const char *name;		/* Name of extractor */
+	WT_EXTRACTOR *extractor;		/* User supplied object */
+	TAILQ_ENTRY(__wt_named_extractor) q;	/* Linked list of extractors */
+};
+
+/*
  * Allocate some additional slots for internal sessions.  There is a default
  * session for each connection, plus a session for each server thread.
  */
@@ -251,6 +261,9 @@ struct __wt_connection_impl {
 
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
+
+					/* Locked: extractor list */
+	TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;
 
 	void	*lang_private;		/* Language specific private storage */
 

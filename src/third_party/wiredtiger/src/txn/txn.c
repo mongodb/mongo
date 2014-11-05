@@ -274,7 +274,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	txn->txn_logsync = S2C(session)->txn_logsync;
 	WT_RET(__wt_config_gets_def(session, cfg, "sync",
-	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH), &cval));
+	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
 	if (!cval.val)
 		txn->txn_logsync = 0;
 

@@ -262,7 +262,7 @@ namespace {
         appendCustomStats( txn, &b, 1 );
         BSONObj obj = b.obj();
 
-        BSONObj blockManager = obj["wiredtiger"].Obj()["block manager"].Obj();
+        BSONObj blockManager = obj["wiredtiger"].Obj()["block-manager"].Obj();
         BSONElement fileSize = blockManager["file size in bytes"];
         invariant( fileSize.type() );
 

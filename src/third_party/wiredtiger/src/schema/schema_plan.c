@@ -196,8 +196,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	for (i = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; i++) {
 		have_it = 0;
 
-		while (__find_next_col(session, table,
-		    &k, &cg, &col, &coltype) == 0 &&
+		while ((ret = __find_next_col(session, table,
+		    &k, &cg, &col, &coltype)) == 0 &&
 		    (!have_it || cg != start_cg || col != start_col)) {
 			/*
 			 * First we move to the column.  If that is in a
@@ -247,6 +247,15 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 				    plan, "%c", WT_PROJ_REUSE));
 			current_col = col + 1;
 		}
+		/*
+		 * We may fail to find a column if it is a custom extractor.
+		 * In that case, treat it as the first value column: we only
+		 * ever use such plans to extract the primary key from the
+		 * index.
+		 */
+		if (ret == WT_NOTFOUND)
+			WT_RET(__wt_buf_catfmt(session, plan,
+			    "0%c%c", WT_PROJ_VALUE, WT_PROJ_NEXT));
 	}
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
@@ -320,9 +329,14 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	 */
 	WT_RET_NOTFOUND_OK(ret = __wt_config_next(&config, &next_k, &next_v));
 	if (ret == WT_NOTFOUND) {
-		if (format->size == 0)
+		if (extra_cols != NULL) {
+			WT_RET(__wt_config_init(session, &config, extra_cols));
+			WT_RET(__wt_config_next(&config, &next_k, &next_v));
+			extra_cols = NULL;
+		} else if (format->size == 0) {
 			WT_RET(__wt_buf_set(session, format, "", 1));
-		return (0);
+			return (0);
+		}
 	}
 	do {
 		k = next_k;

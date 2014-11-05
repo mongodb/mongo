@@ -11,6 +11,7 @@ noinst_PROGRAMS = \
 	ex_cursor \
 	ex_data_source \
 	ex_extending \
+	ex_extractor \
 	ex_file \
 	ex_hello \
 	ex_log \

@@ -83,13 +83,13 @@ __log_archive_server(void *arg)
 	WT_LSN lsn;
 	WT_SESSION_IMPL *session;
 	uint32_t lognum;
-	u_int i, logcount;
+	u_int i, locked_archive, locked_backup, logcount;
 	char **logfiles;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	logcount = 0;
+	locked_archive = locked_backup = logcount = 0;
 	logfiles = NULL;
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
@@ -111,6 +111,7 @@ __log_archive_server(void *arg)
 			continue;
 		}
 
+		locked_archive = 1;
 		lsn = log->ckpt_lsn;
 		lsn.offset = 0;
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
@@ -127,6 +128,7 @@ __log_archive_server(void *arg)
 		 * We can only archive files if a hot backup is not in progress.
 		 */
 		__wt_spin_lock(session, &conn->hot_backup_lock);
+		locked_backup = 1;
 		for (i = 0; i < logcount; i++) {
 			if (conn->hot_backup == 0) {
 				WT_ERR(__wt_log_extract_lognum(
@@ -137,6 +139,7 @@ __log_archive_server(void *arg)
 			}
 		}
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
+		locked_backup = 0;
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 		logcount = 0;
@@ -148,6 +151,7 @@ __log_archive_server(void *arg)
 		log->first_lsn = lsn;
 		log->first_lsn.offset = 0;
 		WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
+		locked_archive = 0;
 
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
@@ -156,6 +160,10 @@ __log_archive_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log archive server error");
 	}
+	if (locked_archive)
+		WT_TRET(__wt_writeunlock(session, log->log_archive_lock));
+	if (locked_backup)
+		__wt_spin_unlock(session, &conn->hot_backup_lock);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (NULL);
