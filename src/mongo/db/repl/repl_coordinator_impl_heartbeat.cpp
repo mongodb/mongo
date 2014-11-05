@@ -283,6 +283,7 @@ namespace {
         // TODO Add invariant that we've got global shared or global exclusive lock, when supported
         // by lock manager.
         boost::unique_lock<boost::mutex> lk(_mutex);
+        _topCoord->stepDownIfPending();
         const PostMemberStateUpdateAction action =
             _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
@@ -461,6 +462,22 @@ namespace {
         invariant(_rsConfigState == kConfigHBReconfiguring);
         invariant(!_rsConfig.isInitialized() ||
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+
+        if (_getCurrentMemberState_inlock().primary() && !cbData.txn) {
+            // Not having an OperationContext in the CallbackData means we definitely aren't holding
+            // the global lock.  Since we're primary and this reconfig could cause us to stepdown,
+            // reschedule this work with the global exclusive lock so the stepdown is safe.
+            // TODO(spencer): When we *do* have an OperationContext, consult it to confirm that
+            // we are indeed holding the global lock.
+            _replExecutor.scheduleWorkWithGlobalExclusiveLock(
+                    stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
+                               this,
+                               stdx::placeholders::_1,
+                               newConfig,
+                               myIndex));
+            return;
+        }
+
         if (!myIndex.isOK()) {
             switch (myIndex.getStatus().code()) {
             case ErrorCodes::NodeNotFound:

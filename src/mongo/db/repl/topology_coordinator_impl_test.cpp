@@ -1385,8 +1385,14 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
         ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+        // Doesn't actually do the stepdown until stepDownIfPending is called
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
     }
 
     TEST_F(HeartbeatResponseTestOneRetry, DecideToStartElection) {
@@ -1507,8 +1513,14 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
         ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
+        // Doesn't actually do the stepdown until stepDownIfPending is called
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ASSERT_TRUE(getTopoCoord().stepDownIfPending());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStartElection) {
@@ -1845,10 +1857,15 @@ namespace {
                                                                 election,
                                                                 election,
                                                                 lastOpTimeApplied);
-        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
         ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+        // Doesn't actually do the stepdown until stepDownIfPending is called
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ASSERT_TRUE(getTopoCoord().stepDownIfPending());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownNoMajority) {
@@ -2518,7 +2535,13 @@ namespace {
         nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0", OpTime(100, 0));
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
         ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+        // Doesn't actually do the stepdown until stepDownIfPending is called
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ASSERT_TRUE(getTopoCoord().stepDownIfPending());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRemoteDoesNotExist) {

@@ -327,6 +327,16 @@ namespace repl {
         virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied) = 0;
 
         /**
+         * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
+         * global exclusive lock so we can't actually stepdown at that moment. When that happens
+         * we record that a stepdown request is pending and schedule work to stepdown in the global
+         * lock.  This method is called after holding the global lock to perform the actual
+         * stepdown, but only if the node hasn't already stepped down another way since the work was
+         * scheduled.  Returns true if it actually steps down, and false otherwise.
+         */
+        virtual bool stepDownIfPending() = 0;
+
+        /**
          * Considers whether or not this node should stand for election, and returns true
          * if the node has transitioned to candidate role as a result of the call.
          */
