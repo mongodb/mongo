@@ -38,84 +38,85 @@
 #include "mongo/util/stringutils.h"
 #include "mongo/util/timer.h"
 
-
 namespace mongo {
+namespace {
 
-    namespace {
+    /**
+     * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new request
+     * with the given 'newMode' conflicts with an existing request with mode 'existingMode'.
+     */
+    static const int LockConflictsTable[] = {
+        // MODE_NONE
+        0,
 
-        /**
-         * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new
-         * request with the given 'newMode' conflicts with an existing request with mode
-         * 'existingMode'.
-         */
-        static const int LockConflictsTable[] = {
-            // MODE_NONE
-            0,
+        // MODE_IS
+        (1 << MODE_X),
 
-            // MODE_IS
-            (1 << MODE_X),
+        // MODE_IX
+        (1 << MODE_S) | (1 << MODE_X),
 
-            // MODE_IX
-            (1 << MODE_S) | (1 << MODE_X),
+        // MODE_S
+        (1 << MODE_IX) | (1 << MODE_X),
 
-            // MODE_S
-            (1 << MODE_IX) | (1 << MODE_X),
+        // MODE_X
+        (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
+    };
 
-            // MODE_X
-            (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
-        };
-
-        // Ensure we do not add new modes without updating the conflicts table
-        BOOST_STATIC_ASSERT(
-            (sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
+    // Ensure we do not add new modes without updating the conflicts table
+    BOOST_STATIC_ASSERT(
+        (sizeof(LockConflictsTable) / sizeof(LockConflictsTable[0])) == LockModesCount);
 
 
-        /**
-         * Maps the mode id to a string.
-         */
-        static const char* LockModeNames[] = {
-            "NONE", "IS", "IX", "S", "X"
-        };
+    /**
+     * Maps the mode id to a string.
+     */
+    static const char* LockModeNames[] = {
+        "NONE", "IS", "IX", "S", "X"
+    };
 
-        static const char* LegacyLockModeNames[] = {
-            "", "r", "w", "R", "W"
-        };
+    static const char* LegacyLockModeNames[] = {
+        "", "r", "w", "R", "W"
+    };
 
-        // Ensure we do not add new modes without updating the names array
-        BOOST_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
-        BOOST_STATIC_ASSERT(
-            (sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) == LockModesCount);
-
-
-        // Helper functions for the lock modes
-        inline bool conflicts(LockMode newMode, uint32_t existingModesMask) {
-            return (LockConflictsTable[newMode] & existingModesMask) != 0;
-        }
-
-        inline uint32_t modeMask(LockMode mode) {
-            return 1 << mode;
-        }
+    // Ensure we do not add new modes without updating the names array
+    BOOST_STATIC_ASSERT((sizeof(LockModeNames) / sizeof(LockModeNames[0])) == LockModesCount);
+    BOOST_STATIC_ASSERT(
+        (sizeof(LegacyLockModeNames) / sizeof(LegacyLockModeNames[0])) == LockModesCount);
 
 
-        /**
-         * Maps the resource id to a human-readable string.
-         */
-        static const char* ResourceTypeNames[] = {
-            "Invalid",
-            "Global",
-            "MMAPV1Flush",
-            "Database",
-            "Collection",
-            "Document",
-            "MMAPV1ExtentManager"
-        };
-
-        // Ensure we do not add new types without updating the names array
-        BOOST_STATIC_ASSERT(
-            (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
-
+    // Helper functions for the lock modes
+    bool conflicts(LockMode newMode, uint32_t existingModesMask) {
+        return (LockConflictsTable[newMode] & existingModesMask) != 0;
     }
 
+    uint32_t modeMask(LockMode mode) {
+        return 1 << mode;
+    }
+
+
+    /**
+     * Maps the resource id to a human-readable string.
+     */
+    static const char* ResourceTypeNames[] = {
+        "Invalid",
+        "Global",
+        "MMAPV1Flush",
+        "Database",
+        "Collection",
+        "Document",
+        "MMAPV1ExtentManager"
+    };
+
+    // Ensure we do not add new types without updating the names array
+    BOOST_STATIC_ASSERT(
+        (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
+
+} // namespace
+
+
+    //
+    // LockHead
+    //
 
     /**
      * There is one of these objects per each resource which has a lock on it.
@@ -202,6 +203,164 @@ namespace mongo {
         // saves cycles in the regular case and only burdens the less-frequent lock upgrade case.
         uint32_t conversionsCount;
     };
+
+
+    //
+    // LockHead
+    //
+
+    LockHead::LockHead(const ResourceId& resId)
+        : resourceId(resId),
+          grantedQueueBegin(NULL),
+          grantedQueueEnd(NULL),
+          grantedModes(0),
+          conflictQueueBegin(NULL),
+          conflictQueueEnd(NULL),
+          conflictModes(0),
+          conversionsCount(0) {
+
+        memset(grantedCounts, 0, sizeof(grantedCounts));
+        memset(conflictCounts, 0, sizeof(conflictCounts));
+    }
+
+    LockRequest* LockHead::findRequest(LockerId lockerId) const {
+        // Check the granted queue first
+        for (LockRequest* it = grantedQueueBegin; it != NULL; it = it->next) {
+            if (it->locker->getId() == lockerId) {
+                return it;
+            }
+        }
+
+        // Check the conflict queue second
+        for (LockRequest* it = conflictQueueBegin; it != NULL; it = it->next) {
+            if (it->locker->getId() == lockerId) {
+                return it;
+            }
+        }
+
+        return NULL;
+    }
+
+    void LockHead::changeGrantedModeCount(LockMode mode, ChangeModeCountAction action) {
+        if (action == Increment) {
+            invariant(grantedCounts[mode] >= 0);
+            if (++grantedCounts[mode] == 1) {
+                invariant((grantedModes & modeMask(mode)) == 0);
+                grantedModes |= modeMask(mode);
+            }
+        }
+        else {
+            invariant(action == Decrement);
+            invariant(grantedCounts[mode] >= 1);
+            if (--grantedCounts[mode] == 0) {
+                invariant((grantedModes & modeMask(mode)) == modeMask(mode));
+                grantedModes &= ~modeMask(mode);
+            }
+        }
+    }
+
+    void LockHead::changeConflictModeCount(LockMode mode, ChangeModeCountAction action) {
+        if (action == Increment) {
+            invariant(conflictCounts[mode] >= 0);
+            if (++conflictCounts[mode] == 1) {
+                invariant((conflictModes & modeMask(mode)) == 0);
+                conflictModes |= modeMask(mode);
+            }
+        }
+        else {
+            invariant(action == Decrement);
+            invariant(conflictCounts[mode] >= 1);
+            if (--conflictCounts[mode] == 0) {
+                invariant((conflictModes & modeMask(mode)) == modeMask(mode));
+                conflictModes &= ~modeMask(mode);
+            }
+        }
+    }
+
+    void LockHead::addToGrantedQueue(LockRequest* request) {
+        invariant(request->next == NULL);
+        invariant(request->prev == NULL);
+        if (grantedQueueBegin == NULL) {
+            invariant(grantedQueueEnd == NULL);
+
+            request->prev = NULL;
+            request->next = NULL;
+
+            grantedQueueBegin = request;
+            grantedQueueEnd = request;
+        }
+        else {
+            invariant(grantedQueueEnd != NULL);
+
+            request->prev = grantedQueueEnd;
+            request->next = NULL;
+
+            grantedQueueEnd->next = request;
+            grantedQueueEnd = request;
+        }
+    }
+
+    void LockHead::removeFromGrantedQueue(LockRequest* request) {
+        if (request->prev != NULL) {
+            request->prev->next = request->next;
+        }
+        else {
+            grantedQueueBegin = request->next;
+        }
+
+        if (request->next != NULL) {
+            request->next->prev = request->prev;
+        }
+        else {
+            grantedQueueEnd = request->prev;
+        }
+
+        request->prev = NULL;
+        request->next = NULL;
+    }
+
+    void LockHead::addToConflictQueue(LockRequest* request) {
+        invariant(request->next == NULL);
+        invariant(request->prev == NULL);
+
+        if (conflictQueueBegin == NULL) {
+            invariant(conflictQueueEnd == NULL);
+
+            request->prev = NULL;
+            request->next = NULL;
+
+            conflictQueueBegin = request;
+            conflictQueueEnd = request;
+        }
+        else {
+            invariant(conflictQueueEnd != NULL);
+
+            request->prev = conflictQueueEnd;
+            request->next = NULL;
+
+            conflictQueueEnd->next = request;
+            conflictQueueEnd = request;
+        }
+    }
+
+    void LockHead::removeFromConflictQueue(LockRequest* request) {
+        if (request->prev != NULL) {
+            request->prev->next = request->next;
+        }
+        else {
+            conflictQueueBegin = request->next;
+        }
+
+        if (request->next != NULL) {
+            request->next->prev = request->prev;
+        }
+        else {
+            conflictQueueEnd = request->prev;
+        }
+
+        request->prev = NULL;
+        request->next = NULL;
+    }
 
 
     //
@@ -792,164 +951,6 @@ namespace mongo {
         ss << "}";
 
         return ss.str();
-    }
-
-
-    //
-    // LockHead
-    //
-
-    LockHead::LockHead(const ResourceId& resId)
-        : resourceId(resId),
-          grantedQueueBegin(NULL),
-          grantedQueueEnd(NULL),
-          grantedModes(0),
-          conflictQueueBegin(NULL),
-          conflictQueueEnd(NULL),
-          conflictModes(0),
-          conversionsCount(0) {
-
-        memset(grantedCounts, 0, sizeof(grantedCounts));
-        memset(conflictCounts, 0, sizeof(conflictCounts));
-    }
-
-    LockRequest* LockHead::findRequest(LockerId lockerId) const {
-        // Check the granted queue first
-        for (LockRequest* it = grantedQueueBegin; it != NULL; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        // Check the conflict queue second
-        for (LockRequest* it = conflictQueueBegin; it != NULL; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        return NULL;
-    }
-
-    void LockHead::changeGrantedModeCount(LockMode mode, ChangeModeCountAction action) {
-        if (action == Increment) {
-            invariant(grantedCounts[mode] >= 0);
-            if (++grantedCounts[mode] == 1) {
-                invariant((grantedModes & modeMask(mode)) == 0);
-                grantedModes |= modeMask(mode);
-            }
-        }
-        else {
-            invariant(action == Decrement);
-            invariant(grantedCounts[mode] >= 1);
-            if (--grantedCounts[mode] == 0) {
-                invariant((grantedModes & modeMask(mode)) == modeMask(mode));
-                grantedModes &= ~modeMask(mode);
-            }
-        }
-    }
-
-    void LockHead::changeConflictModeCount(LockMode mode, ChangeModeCountAction action) {
-        if (action == Increment) {
-            invariant(conflictCounts[mode] >= 0);
-            if (++conflictCounts[mode] == 1) {
-                invariant((conflictModes & modeMask(mode)) == 0);
-                conflictModes |= modeMask(mode);
-            }
-        }
-        else {
-            invariant(action == Decrement);
-            invariant(conflictCounts[mode] >= 1);
-            if (--conflictCounts[mode] == 0) {
-                invariant((conflictModes & modeMask(mode)) == modeMask(mode));
-                conflictModes &= ~modeMask(mode);
-            }
-        }
-    }
-
-    void LockHead::addToGrantedQueue(LockRequest* request) {
-        invariant(request->next == NULL);
-        invariant(request->prev == NULL);
-        if (grantedQueueBegin == NULL) {
-            invariant(grantedQueueEnd == NULL);
-
-            request->prev = NULL;
-            request->next = NULL;
-
-            grantedQueueBegin = request;
-            grantedQueueEnd = request;
-        }
-        else {
-            invariant(grantedQueueEnd != NULL);
-
-            request->prev = grantedQueueEnd;
-            request->next = NULL;
-
-            grantedQueueEnd->next = request;
-            grantedQueueEnd = request;
-        }
-    }
-
-    void LockHead::removeFromGrantedQueue(LockRequest* request) {
-        if (request->prev != NULL) {
-            request->prev->next = request->next;
-        }
-        else {
-            grantedQueueBegin = request->next;
-        }
-
-        if (request->next != NULL) {
-            request->next->prev = request->prev;
-        }
-        else {
-            grantedQueueEnd = request->prev;
-        }
-
-        request->prev = NULL;
-        request->next = NULL;
-    }
-
-    void LockHead::addToConflictQueue(LockRequest* request) {
-        invariant(request->next == NULL);
-        invariant(request->prev == NULL);
-
-        if (conflictQueueBegin == NULL) {
-            invariant(conflictQueueEnd == NULL);
-
-            request->prev = NULL;
-            request->next = NULL;
-
-            conflictQueueBegin = request;
-            conflictQueueEnd = request;
-        }
-        else {
-            invariant(conflictQueueEnd != NULL);
-
-            request->prev = conflictQueueEnd;
-            request->next = NULL;
-
-            conflictQueueEnd->next = request;
-            conflictQueueEnd = request;
-        }
-    }
-
-    void LockHead::removeFromConflictQueue(LockRequest* request) {
-        if (request->prev != NULL) {
-            request->prev->next = request->next;
-        }
-        else {
-            conflictQueueBegin = request->next;
-        }
-
-        if (request->next != NULL) {
-            request->next->prev = request->prev;
-        }
-        else {
-            conflictQueueEnd = request->prev;
-        }
-
-        request->prev = NULL;
-        request->next = NULL;
     }
 
 
