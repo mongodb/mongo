@@ -150,23 +150,35 @@ def process_lang(lang, lines):
 		err('non matching @m_if/@m_endif')
 	return result
 
+# Collect all lines between @m_page and the comment end to
+# be processed multiple times, once for each language.
 def process_multilang(source):
-	n = source.count('@m_page')
-	if n > 1:
-		err('multiple @m_page in file not allowed')
-	if n == 0:
-		err('missing @m_page in file that uses @m_ macros')
-	else:
-		m = re.search(r'@m_page{{([^}]*)},([^,}]*),([^}]*)}',
-		    source, re.M)
-		if not m:
-			err('@m_page incorrect syntax')
-		groups = m.groups()
-		langs = groups[0].split(',')
-	lines = source.split('\n')
 	result = ''
-	for lang in langs:
-		result += process_lang(lang, lines)
+	in_mpage = False
+	mpage_content = []
+	mpage_pat = re.compile('@m_page{{([^}]*)},([^,}]*),([^}]*)}')
+	mpage_end_pat = re.compile('\*/')
+	for line in source.split('\n'):
+		m = re.search(mpage_pat, line)
+		if line.count('@m_page') > 0 and not m:
+			err('@m_page incorrect syntax')
+		if m:
+			if in_mpage:
+				err('multiple @m_page without end of comment')
+			else:
+				in_mpage = True
+				langs = m.groups()[0].split(',')
+		if in_mpage:
+			mpage_content.append(line)
+		else:
+			result += line + '\n'
+		if re.search(mpage_end_pat, line):
+			if in_mpage:
+				in_mpage = False
+				for lang in langs:
+					result += process_lang(lang,
+							       mpage_content)
+				mpage_content = []
 	return result
 
 def process(source):
