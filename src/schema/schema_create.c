@@ -550,7 +550,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (table != NULL) {
-			__wt_schema_remove_table(session, table);
+			WT_TRET(__wt_schema_remove_table(session, table));
 			table = NULL;
 		}
 	}
