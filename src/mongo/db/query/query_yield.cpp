@@ -26,16 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/yield.h"
+#include "mongo/db/query/query_yield.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
-
-    // TODO(kal): There are a lot of #ifdefs for something that's not in a platform-specific
-    // directory.  Does this belong elsewhere?
+namespace {
 
     void yieldOrSleepFor1Microsecond() {
 #ifdef _WIN32
@@ -47,8 +45,10 @@ namespace mongo {
 #endif
     }
 
+}
+
     // static
-    void Yield::yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher) {
+    void QueryYield::yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher) {
         // Things have to happen here in a specific order:
         //   1) Release lock mgr locks
         //   2) Go to sleep

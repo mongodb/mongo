@@ -28,25 +28,26 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/locker.h"
-
 namespace mongo {
 
+    class OperationContext;
     class RecordFetcher;
 
     /**
      * See the documentation for yieldAllLocks(...).
      */
-    class Yield {
-        MONGO_DISALLOW_COPYING(Yield);
+    class QueryYield {
+        QueryYield();
+
     public:
+
         /**
          * If not in a nested context, unlocks all locks, suggests to the operating system to
          * switch to another thread, and then reacquires all locks.
          *
          * If in a nested context (eg DBDirectClient), does nothing.
          */
-        static void yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher = NULL);
+        static void yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher);
     };
 
 } // namespace mongo

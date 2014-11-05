@@ -30,8 +30,8 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
-#include "mongo/db/concurrency/yield.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/query/query_yield.h"
 #include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
@@ -72,7 +72,7 @@ namespace mongo {
         _planYielding->saveState();
 
         // Release and reacquire locks.
-        Yield::yieldAllLocks(opCtx, 1, fetcher);
+        QueryYield::yieldAllLocks(opCtx, 1, fetcher);
 
         _elapsedTracker.resetLastTime();
 
