@@ -590,12 +590,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	log->write_lsn = slot->slot_end_lsn;
+
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
 	 * so that threads finishing writing to the log will wait while the
-	 * current fsync completes and advance log->write_lsn.
+	 * current fsync completes and advance log->sync_lsn.
 	 */
-	while (F_ISSET(slot, SLOT_SYNC) &&
+	while (F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR) &&
 	    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 		if (__wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
 			(void)__wt_cond_wait(
@@ -604,22 +605,29 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		}
 		/*
 		 * Record the current end of log after we grabbed the lock.
-		 * That is how far our fsync call with guarantee.
+		 * That is how far our calls can guarantee.
 		 */
 		sync_lsn = log->write_lsn;
-		if (LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
-			/*
-			 * Check if we have to sync the parent directory.  Some
-			 * combinations of sync flags may result in the log file
-			 * not stable in its parent directory.  Do that now if
-			 * it is needed.
-			 */
-			if (log->sync_dir_lsn.file < log->write_lsn.file) {
-				WT_ERR(__wt_filename(session,
-				    log->log_fh->name, &dir_path));
-				WT_ERR(__wt_directory_sync(session, dir_path));
-				log->sync_dir_lsn = log->write_lsn;
-			}
+		/*
+		 * Check if we have to sync the parent directory.  Some
+		 * combinations of sync flags may result in the log file
+		 * not yet stable in its parent directory.  Do that
+		 * now if needed.
+		 */
+		if (F_ISSET(slot, SLOT_SYNC_DIR) &&
+		    (log->sync_dir_lsn.file < sync_lsn.file)) {
+			WT_ERR(__wt_filename(session,
+			    log->log_fh->name, &dir_path));
+			WT_ERR(__wt_directory_sync(session, dir_path));
+			log->sync_dir_lsn = sync_lsn;
+			F_CLR(slot, SLOT_SYNC_DIR);
+		}
+
+		/*
+		 * Sync the log file if needed.
+		 */
+		if (F_ISSET(slot, SLOT_SYNC) &&
+		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			ret = __wt_fsync(session, log->log_fh);
 			if (ret == 0) {
@@ -1064,6 +1072,8 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		return (EAGAIN);
 	locked = 1;
 
+	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
+		F_SET(&tmp, SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, SLOT_SYNC);
 	WT_ERR(__log_acquire(session, record->size, &tmp));

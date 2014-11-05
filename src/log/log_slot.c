@@ -157,6 +157,8 @@ join_slot:
 	 * the caller.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_slot_joins);
+	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
+		F_SET(slot, SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(slot, SLOT_SYNC);
 	myslotp->slot = slot;

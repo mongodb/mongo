@@ -77,6 +77,7 @@ typedef struct {
 #define	SLOT_BUFFERED	0x02			/* Buffer writes */
 #define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
 #define	SLOT_SYNC	0x08			/* Needs sync on release */
+#define	SLOT_SYNC_DIR	0x10			/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
