@@ -1106,7 +1106,8 @@ namespace {
                              "time we were supposed to step down until");
             return;
         }
-        if (_topCoord->stepDown(stepDownUntil, force, getMyLastOptime())) {
+        bool forceNow = now >= waitUntil ? force : false;
+        if (_topCoord->stepDown(stepDownUntil, forceNow, getMyLastOptime())) {
             // Schedule work to (potentially) step back up once the stepdown period has ended.
             _replExecutor.scheduleWorkAt(stepDownUntil,
                                          stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,

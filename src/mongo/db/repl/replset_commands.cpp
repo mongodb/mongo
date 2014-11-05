@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -388,16 +389,52 @@ namespace {
             if (!status.isOK())
                 return appendCommandStatus(result, status);
 
-            bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            int secs = (int) cmdObj.firstElement().numberInt();
-            if( secs == 0 )
-                secs = 60;
+            const bool force = cmdObj["force"].trueValue();
+
+            long long stepDownForSecs = cmdObj.firstElement().numberLong();
+            if (stepDownForSecs == 0) {
+                stepDownForSecs = 60;
+            }
+            else if (stepDownForSecs < 0) {
+                status = Status(ErrorCodes::BadValue,
+                                "stepdown period must be a positive integer");
+                return appendCommandStatus(result, status);
+            }
+
+            long long secondaryCatchUpPeriodSecs;
+            status = bsonExtractIntegerField(cmdObj,
+                                             "secondaryCatchUpPeriodSecs",
+                                             &secondaryCatchUpPeriodSecs);
+            if (status.code() == ErrorCodes::NoSuchKey) {
+                // if field is absent, default values
+                if (force) {
+                    secondaryCatchUpPeriodSecs = 0;
+                }
+                else {
+                    secondaryCatchUpPeriodSecs = 10;
+                }
+            }
+            else if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            if (secondaryCatchUpPeriodSecs < 0) {
+                status = Status(ErrorCodes::BadValue,
+                                "secondaryCatchUpPeriodSecs period must be a positive or absent");
+                return appendCommandStatus(result, status);
+            }
+
+            if (stepDownForSecs < secondaryCatchUpPeriodSecs) {
+                status = Status(ErrorCodes::BadValue,
+                                "stepdown period must be longer than secondaryCatchUpPeriodSecs");
+                return appendCommandStatus(result, status);
+            }
 
             status = getGlobalReplicationCoordinator()->stepDown(
                     txn,
                     force,
-                    ReplicationCoordinator::Milliseconds(1000),
-                    ReplicationCoordinator::Milliseconds(secs * 1000));
+                    ReplicationCoordinator::Milliseconds(secondaryCatchUpPeriodSecs * 1000),
+                    ReplicationCoordinator::Milliseconds(stepDownForSecs * 1000));
             return appendCommandStatus(result, status);
         }
     } cmdReplSetStepDown;
