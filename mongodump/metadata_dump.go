@@ -16,12 +16,9 @@ import (
 // Metadata JSON is read in by mongorestore to properly recreate
 // collections with the proper options and indexes.
 type Metadata struct {
-	Options bson.M          `json:"options,omitempty"`
-	Indexes []IndexDocument `json:"indexes"`
+	Options bson.M        `json:"options,omitempty"`
+	Indexes []interface{} `json:"indexes"`
 }
-
-// IndexDocument is used to write out the index info as json
-type IndexDocument bson.M
 
 // IndexDocumentFromDB is used internally to preserve key ordering
 type IndexDocumentFromDB struct {
@@ -40,7 +37,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
 		// but {indexes:null} will cause assertions in our legacy C++ mongotools
-		Indexes: []IndexDocument{},
+		Indexes: []interface{}{},
 	}
 
 	// First, we get the options for the collection. These are pulled
@@ -86,19 +83,11 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		return err
 	}
 	for _, index := range indexes {
-		marshalableIndex := IndexDocument{}
-		for _, indexDocElem := range index {
-			if indexDocElem.Name == "key" {
-				if indexAsBsonD, ok := indexDocElem.Value.(bson.D); ok {
-					marshalableIndex["key"] = bsonutil.MarshalD(indexAsBsonD)
-				} else {
-					return fmt.Errorf("index key could not be found in: %v", indexDocElem.Value)
-				}
-			} else {
-				marshalableIndex[indexDocElem.Name] = indexDocElem.Value
-			}
+		convertedIndex, err := bsonutil.ConvertBSONValueToJSON(index)
+		if err != nil {
+			return fmt.Errorf("error converting index (%#v): %v", index, err)
 		}
-		meta.Indexes = append(meta.Indexes, marshalableIndex)
+		meta.Indexes = append(meta.Indexes, convertedIndex)
 	}
 
 	// Finally, we send the results to the writer as JSON bytes
