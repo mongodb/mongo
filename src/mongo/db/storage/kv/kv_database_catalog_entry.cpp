@@ -65,7 +65,6 @@ namespace mongo {
             if (_dropOnRollback) {
                 // Intentionally ignoring failure
                 _dce->_engine->getEngine()->dropRecordStore(_opCtx, _ident);
-                _dce->_engine->getCatalog()->dropCollection(_opCtx, _collection );
             }
 
             boost::mutex::scoped_lock lk(_dce->_collectionsLock);
