@@ -50,18 +50,7 @@ namespace mongo {
         return options->addSection(wiredTigerOptions);
     }
 
-    void WiredTigerGlobalOptions::printHelp(std::ostream* out) {
-        *out << "storage.wiredtiger.databaseConfig : " << databaseConfig << std::endl;
-        *out << "storage.wiredtiger.collectionConfig : " << collectionConfig << std::endl;
-        *out << "storage.wiredtiger.indexConfig : " << indexConfig << std::endl;
-        *out << std::flush;
-    }
-
     bool WiredTigerGlobalOptions::handlePreValidation(const moe::Environment& params) {
-        if (params.count("help")) {
-            printHelp(&std::cout);
-            return true;
-        }
         return true;
     }
 
