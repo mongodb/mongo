@@ -10,6 +10,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strconv"
 )
 
 type MongoRestore struct {
@@ -62,13 +63,41 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		var err error
 		restore.oplogLimit, err = ParseTimestampFlag(restore.InputOptions.OplogLimit)
 		if err != nil {
-			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err) //TODO help text?
+			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err)
 		}
 	}
 
-	if restore.OutputOptions.WriteConcern > 0 {
-		restore.safety = &mgo.Safe{W: restore.OutputOptions.WriteConcern} //TODO, audit extra steps
-		log.Logf(log.DebugHigh, "\tdumping with w=%v", restore.safety.W)
+	if restore.OutputOptions.WriteConcern == "" || restore.OutputOptions.WriteConcern == "majority" {
+		log.Logf(log.DebugLow, "\tdumping with w=majority")
+
+		// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
+		isRepl, err := restore.SessionProvider.IsReplicaSet()
+		if err != nil {
+			return fmt.Errorf("error determining if connected to replica set: %v", err)
+		}
+
+		if isRepl {
+			restore.safety = &mgo.Safe{WMode: "majority"}
+		} else {
+			log.Logf(log.DebugHigh, "\t\tnot connected to a replset, using equivalent w=1 for backward compatibility")
+			restore.safety = &mgo.Safe{W: 1}
+		}
+	} else {
+		intWriteConcern, err := strconv.Atoi(restore.OutputOptions.WriteConcern)
+		if err != nil {
+			return fmt.Errorf("error parsing --w value: %v", err)
+		}
+		if intWriteConcern < 0 {
+			return fmt.Errorf("cannot use a negative write concern")
+		}
+
+		log.Logf(log.DebugLow, "\tdumping with w=%v", intWriteConcern)
+		if intWriteConcern == 0 {
+			// we must set safety to nil for true fire-and-forget behavior
+			restore.safety = nil
+		} else {
+			restore.safety = &mgo.Safe{W: intWriteConcern}
+		}
 	}
 
 	if restore.tempUsersCol == "" {

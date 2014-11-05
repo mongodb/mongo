@@ -14,11 +14,11 @@ func (self *InputOptions) Name() string {
 }
 
 type OutputOptions struct {
-	Drop             bool `long:"drop" description:"Drop each collection before import"`
-	WriteConcern     int  `long:"w" description:"Minimum number of replicas per write"`
-	NoIndexRestore   bool `long:"noIndexRestore" description:"Don't restore indexes"`
-	NoOptionsRestore bool `long:"noOptionsRestore" description:"Don't restore options"`
-	KeepIndexVersion bool `long:"keepIndexVersion" description:"Don't update index version"`
+	Drop             bool   `long:"drop" description:"Drop each collection before import"`
+	WriteConcern     string `long:"w" description:"Minimum number of replicas per write (default=majority)"`
+	NoIndexRestore   bool   `long:"noIndexRestore" description:"Don't restore indexes"`
+	NoOptionsRestore bool   `long:"noOptionsRestore" description:"Don't restore options"`
+	KeepIndexVersion bool   `long:"keepIndexVersion" description:"Don't update index version"`
 
 	JobThreads       int  `long:"numParallelCollections" short:"j" description:"Number of collections to restore in parallel" default:"4"`
 	BulkWriters      int  `long:"numInsertionWorkersPerCollection" description:"Number of insert connections per collection" default:"1"`
