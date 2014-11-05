@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Updates src/third_party/wiredtiger contents
+# from github.com/wiredtiger/wiredtiger branch "develop"
+#
+
+set -o errexit
+
+REMOTEBRANCH=develop
+LOCALBRANCH=$(git symbolic-ref HEAD)
+
+# Ensure working directory is TOPLEVEL/src/third_party
+STARTPWD=$(pwd)
+TOPLEVEL=$(git rev-parse --show-toplevel)
+cd ${TOPLEVEL}/src/third_party
+
+# Begin tracing commands
+set -o xtrace
+
+# Write file according to "Content-Disposition: attachment" header. Example:
+# Content-Disposition: attachment; filename=wiredtiger-wiredtiger-2.4.0-109-ge5aec44.tar.gz
+
+rm -f wiredtiger-wiredtiger-*.tar.gz
+curl -OJL https://api.github.com/repos/wiredtiger/wiredtiger/tarball/${REMOTEBRANCH}
+
+TARBALL=$(echo wiredtiger-wiredtiger-*.tar.gz)
+test -f "$TARBALL"
+
+# Delete everything in wiredtiger dir, then selectively undelete
+
+mkdir -p wiredtiger
+(cd wiredtiger;
+ rm -rf *;
+ git checkout -- .gitignore 'SCons*';
+ git checkout -- 'build_*/wiredtiger_config.h')
+
+# Tar options:
+# - Exclude subdirs "test", "src/docs"
+# - Strip 'wiredtiger-wiredtiger-e5aec44/' prefix after exclude applied
+# - Change to dir "wiredtiger" before extracting
+
+tar -x --strip-components 1 --exclude '*/test' --exclude '*/src/docs' -C wiredtiger -f ${TARBALL}
+
+git add wiredtiger
+git commit -m "Import ${TARBALL} from wiredtiger branch ${REMOTEBRANCH}"
+git log -n 1
+
+set -o errexit
+cd $STARTPWD
+echo "Done applying $TARBALL to $LOCALBRANCH"
