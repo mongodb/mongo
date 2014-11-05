@@ -30,10 +30,12 @@ for( var i = 0; i < 4; i++ ) {
 assert.eq( foo.system.namespaces.count({name: "foo.bar"}), 1 )
 
 //make sure it has no index except _id
-assert.eq(foo.system.indexes.count(), 2);
+assert.eq(foo.bar.getIndexes().length, 1);
+assert.eq(foo.baz.getIndexes().length, 1);
 
 foo.bar.createIndex({x:1});
-assert.eq(foo.system.indexes.count(), 3);
+assert.eq(foo.bar.getIndexes().length, 2);
+assert.eq(foo.baz.getIndexes().length, 1);
 
 // get data dump
 var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
@@ -108,6 +110,7 @@ assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 1);
 assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 1);
 assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
-assert.eq(foo.system.indexes.count(), 3); // _id on foo, _id on bar, x on foo
+assert.eq(foo.bar.getIndexes().length, 2);
+assert.eq(foo.baz.getIndexes().length, 1);
 
 stopMongod( port );

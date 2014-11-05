@@ -11,7 +11,7 @@ t.runTool("restore", "--dir", "jstests/tool/data/dumprestore6", "--db", "jstests
 
 assert.soon( "c.findOne()" , "no data after sleep" );
 assert.eq( 1 , c.count() , "after restore" );
-assert.eq( 1 , db.system.indexes.findOne({name:'a_1'}).v, "index version wasn't updated")
+assert.eq( 1 , c.getIndexes().filter(function(ix) { return ix.name === 'a_1'; })[0].v, "index version wasn't updated")
 assert.eq( 1, c.count({v:0}), "dropped the 'v' field from a non-index collection")
 
 db.dropDatabase()
@@ -21,7 +21,7 @@ t.runTool("restore", "--dir", "jstests/tool/data/dumprestore6", "--db", "jstests
 
 assert.soon( "c.findOne()" , "no data after sleep2" );
 assert.eq( 1 , c.count() , "after restore2" );
-assert.eq( 0 , db.system.indexes.findOne({name:'a_1'}).v, "index version wasn't maintained")
+assert.eq( 0 , c.getIndexes().filter(function(ix) { return ix.name === 'a_1'; })[0].v, "index version wasn't maintained")
 assert.eq( 1, c.count({v:0}), "dropped the 'v' field from a non-index collection")
 
 t.stop();
