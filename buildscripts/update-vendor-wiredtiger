@@ -35,11 +35,13 @@ mkdir -p wiredtiger
  git checkout -- 'build_*/wiredtiger_config.h')
 
 # Tar options:
-# - Exclude subdirs "test", "src/docs"
+# - Exclude subdirs "api", "test", "src/docs"
 # - Strip 'wiredtiger-wiredtiger-e5aec44/' prefix after exclude applied
 # - Change to dir "wiredtiger" before extracting
 
-tar -x --strip-components 1 --exclude '*/test' --exclude '*/src/docs' -C wiredtiger -f ${TARBALL}
+tar -x --strip-components 1 \
+    --exclude '*/api' --exclude '*/test' --exclude '*/src/docs' \
+    -C wiredtiger -f ${TARBALL}
 
 git add wiredtiger
 git commit -m "Import ${TARBALL} from wiredtiger branch ${REMOTEBRANCH}"
