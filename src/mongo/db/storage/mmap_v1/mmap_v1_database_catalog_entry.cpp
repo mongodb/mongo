@@ -445,7 +445,7 @@ namespace mongo {
                 const DataFileVersion version = _extentManager.getFileFormat(opCtx);
 
                 BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
-                dataFileVersion.append( "major", version.major() );
+                dataFileVersion.append( "major", version.majorRaw() );
                 dataFileVersion.append( "minor", version.minorRaw() );
                 dataFileVersion.done();
             }

@@ -71,7 +71,7 @@ namespace mongo {
         bool mayHave28Freelist() const { return _minor & kMayHave28Freelist; }
         void setMayHave28Freelist() { _minor |= kMayHave28Freelist; }
 
-        uint32_t major() const { return _major; }
+        uint32_t majorRaw() const { return _major; }
         uint32_t minorRaw() const { return _minor; }
 
     private:
@@ -127,7 +127,7 @@ namespace mongo {
 
         enum { HeaderSize = 8192 };
 
-        bool uninitialized() const { return version.major() == 0; }
+        bool uninitialized() const { return version.majorRaw() == 0; }
 
         void init(OperationContext* txn, int fileno, int filelength, const char* filename);
 
