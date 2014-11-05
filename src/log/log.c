@@ -559,6 +559,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LSN sync_lsn;
 	size_t write_size;
+	int did_sync;
 	char *dir_path;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
@@ -596,13 +597,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * so that threads finishing writing to the log will wait while the
 	 * current fsync completes and advance log->sync_lsn.
 	 */
-	while (F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR) &&
-	    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+	did_sync = 0;
+	while (F_ISSET(slot, SLOT_SYNC | SLOT_SYNC_DIR) && did_sync == 0) {
 		if (__wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
 			(void)__wt_cond_wait(
 			    session, log->log_sync_cond, 10000);
 			continue;
 		}
+		did_sync = 1;
 		/*
 		 * Record the current end of log after we grabbed the lock.
 		 * That is how far our calls can guarantee.
@@ -616,17 +618,19 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		if (F_ISSET(slot, SLOT_SYNC_DIR) &&
 		    (log->sync_dir_lsn.file < sync_lsn.file)) {
-			WT_ERR(__wt_filename(session,
-			    log->log_fh->name, &dir_path));
-			WT_ERR(__wt_directory_sync(session, dir_path));
-			log->sync_dir_lsn = sync_lsn;
-			F_CLR(slot, SLOT_SYNC_DIR);
+			ret = __wt_filename(session,
+			    log->log_fh->name, &dir_path);
+			if (ret == 0) {
+				ret = __wt_directory_sync(session, dir_path);
+				log->sync_dir_lsn = sync_lsn;
+				F_CLR(slot, SLOT_SYNC_DIR);
+			}
 		}
 
 		/*
 		 * Sync the log file if needed.
 		 */
-		if (F_ISSET(slot, SLOT_SYNC) &&
+		if (ret == 0 && F_ISSET(slot, SLOT_SYNC) &&
 		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			ret = __wt_fsync(session, log->log_fh);
