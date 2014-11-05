@@ -161,7 +161,7 @@ __log_archive_server(void *arg)
 err:		__wt_err(session, ret, "log archive server error");
 	}
 	if (locked_archive)
-		__wt_writeunlock(session, log->log_archive_lock);
+		WT_TRET(__wt_writeunlock(session, log->log_archive_lock));
 	if (locked_backup)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 	if (logfiles != NULL)
