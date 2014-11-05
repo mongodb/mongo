@@ -11,11 +11,11 @@ var InvalidReplicaSetConfig = 93;
  */
 (function addArbiterZeroVotes() {
     var replTest = new ReplSetTest({nodes: 3});
-    var conns = replTest.startSet();
+    replTest.startSet();
     replTest.initiate();
 
     var arbiterConn = replTest.add();
-    var admin = conns[0].getDB("admin");
+    var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
     conf.members.push({
         _id: 3,
@@ -39,13 +39,13 @@ var InvalidReplicaSetConfig = 93;
  */
 (function reconfigArbiterZeroVotes() {
     var replTest = new ReplSetTest({nodes: 4});
-    var conns = replTest.startSet();
+    replTest.startSet();
     var config = replTest.getReplSetConfig();
     config.members[2].arbiterOnly = true;
     config.members[3].arbiterOnly = true;
     replTest.initiate(config);
 
-    var admin = conns[0].getDB("admin");
+    var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
 
     jsTestLog('Reconfig arbiter with zero votes:');
@@ -90,11 +90,11 @@ var InvalidReplicaSetConfig = 93;
  */
 (function maxVoteEdgeAddArbiterZeroVotes() {
     var replTest = new ReplSetTest({nodes: 7});
-    var conns = replTest.startSet();
+    replTest.startSet();
     replTest.initiate();
 
     var arbiterConn = replTest.add();
-    var admin = conns[0].getDB("admin");
+    var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
     conf.members.push({
         _id: 7,
