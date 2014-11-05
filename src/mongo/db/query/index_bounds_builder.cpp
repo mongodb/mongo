@@ -31,6 +31,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 
 #include <limits>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/expression_index.h"
@@ -64,6 +66,11 @@ namespace mongo {
             return r;
         }
 
+        // A regex with the "|" character is never considered a simple regular expression.
+        if (StringData(regex).find('|') != std::string::npos) {
+            return "";
+        }
+
         bool extended = false;
         while (*flags) {
             switch (*(flags++)) {
@@ -84,15 +91,15 @@ namespace mongo {
 
         while(*regex) {
             char c = *(regex++);
+
+            // We should have bailed out early above if '|' is in the regex.
+            invariant(c != '|');
+
             if ( c == '*' || c == '?' ) {
                 // These are the only two symbols that make the last char optional
                 r = ss;
                 r = r.substr( 0 , r.size() - 1 );
                 return r; //breaking here fails with /^a?/
-            }
-            else if (c == '|') {
-                // whole match so far is optional. Nothing we can do here.
-                return string();
             }
             else if (c == '\\') {
                 c = *(regex++);

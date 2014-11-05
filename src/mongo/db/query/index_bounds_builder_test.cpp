@@ -820,6 +820,23 @@ namespace {
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
+    // A regular expression with the "|" character is not considered simple. See SERVER-15235.
+    TEST(SimpleRegexTest, PipeCharacterDisallowed) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^(a(a|$)|b", "", &tightness);
+        ASSERT_EQUALS(prefix, "");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+    }
+
+    TEST(SimpleRegexTest, PipeCharacterDisallowed2) {
+        IndexBoundsBuilder::BoundsTightness tightness;
+        string prefix = IndexBoundsBuilder::simpleRegex(
+            "^(a(a|$)|^b", "", &tightness);
+        ASSERT_EQUALS(prefix, "");
+        ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
+    }
+
     //
     // Regex bounds
     //
@@ -837,6 +854,22 @@ namespace {
             Interval(fromjson("{'': '', '': {}}"), true, false)));
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
             Interval(fromjson("{'': /foo/, '': /foo/}"), true, true)));
+        ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
+    }
+
+    TEST(IndexBoundsBuilderTest, NonSimpleRegexWithPipe) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: /^foo.*|bar/}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQUALS(oil.intervals.size(), 2U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': '', '': {}}"), true, false)));
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[1].compare(
+            Interval(fromjson("{'': /^foo.*|bar/, '': /^foo.*|bar/}"), true, true)));
         ASSERT(tightness == IndexBoundsBuilder::INEXACT_COVERED);
     }
 
