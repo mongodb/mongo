@@ -38,7 +38,7 @@ namespace mongo {
     // Interface to MongoDB option parsing.
     WiredTigerGlobalOptions wiredTigerGlobalOptions;
 
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(WiredTigerOptions)(InitializerContext* context) {
+    MONGO_MODULE_STARTUP_OPTIONS_REGISTER(WiredTigerOptions)(InitializerContext* context) {
         return wiredTigerGlobalOptions.add(&moe::startupOptions);
     }
 
