@@ -675,11 +675,11 @@ namespace mongo {
             if (!ret.isOK()) {
                 return ret;
             }
-            ret = params->set("storage.mmapv1.journal.debugFlags", moe::Value(durOptions));
+            ret = params->remove("durOptions");
             if (!ret.isOK()) {
                 return ret;
             }
-            ret = params->remove("durOptions");
+            ret = params->set("storage.mmapv1.journal.debugFlags", moe::Value(durOptions));
             if (!ret.isOK()) {
                 return ret;
             }
