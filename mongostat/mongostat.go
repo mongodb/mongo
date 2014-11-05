@@ -100,7 +100,7 @@ func (cluster *ClusterMonitor) initializeFormatter(useJson bool) {
 func (cluster *ClusterMonitor) updateHostInfo(stat StatLine) {
 	cluster.mapLock.Lock()
 	defer cluster.mapLock.Unlock()
-	cluster.LastStatLines[stat.Host] = &stat
+	cluster.LastStatLines[stat.Key] = &stat
 }
 
 //printSnapshot formats + dumps the current state of all the stats collected

@@ -291,6 +291,7 @@ type LockStatus struct {
 }
 
 type StatLine struct {
+	Key      string
 	Error    error
 	IsMongos bool
 	Host     string
@@ -597,9 +598,10 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 }
 
 //NewStatLine constructs a StatLine object from two ServerStatus objects.
-func NewStatLine(oldStat, newStat ServerStatus, host string, all bool) *StatLine {
+func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine {
 	returnVal := &StatLine{
-		Host:      host,
+		Key:       key,
+		Host:      newStat.Host,
 		Mapped:    -1,
 		Virtual:   -1,
 		Resident:  -1,
