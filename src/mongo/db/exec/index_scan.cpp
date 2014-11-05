@@ -54,7 +54,15 @@ namespace mongo {
           _filter(filter),
           _shouldDedup(true),
           _params(params),
-          _btreeCursor(NULL) { }
+          _btreeCursor(NULL) {
+        _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
+        _keyPattern = _params.descriptor->keyPattern().getOwned();
+
+        // We can't always access the descriptor in the call to getStats() so we pull
+        // any info we need for stats reporting out here.
+        _specificStats.indexName = _params.descriptor->indexName();
+        _specificStats.isMultiKey = _params.descriptor->isMultikey();
+    }
 
     void IndexScan::initIndexScan() {
         // This function transitions from the initializing state to CHECKING_END. If
@@ -62,20 +70,12 @@ namespace mongo {
         invariant(INITIALIZING == _scanState);
 
         // Perform the possibly heavy-duty initialization of the underlying index cursor.
-        _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
-        _keyPattern = _params.descriptor->keyPattern().getOwned();
-
         if (_params.doNotDedup) {
             _shouldDedup = false;
         }
         else {
             _shouldDedup = _params.descriptor->isMultikey();
         }
-
-        // We can't always access the descriptor in the call to getStats() so we pull
-        // the status-only information we need out here.
-        _specificStats.indexName = _params.descriptor->infoObj()["name"].String();
-        _specificStats.isMultiKey = _params.descriptor->isMultikey();
 
         // Set up the index cursor.
         CursorOptions cursorOptions;
