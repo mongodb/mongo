@@ -68,7 +68,12 @@ namespace mongo {
           _commonStats(kStageType) {
         _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
         _keyPattern = _params.descriptor->keyPattern().getOwned();
+
+        // We can't always access the descriptor in the call to getStats() so we pull
+        // any info we need for stats reporting out here.
         _specificStats.keyPattern = _keyPattern;
+        _specificStats.indexName = _params.descriptor->indexName();
+        _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
     }
 
     void IndexScan::initIndexScan() {
@@ -83,11 +88,6 @@ namespace mongo {
         else {
             _shouldDedup = _params.descriptor->isMultikey(_txn);
         }
-
-        // We can't always access the descriptor in the call to getStats() so we pull
-        // the status-only information we need out here.
-        _specificStats.indexName = _params.descriptor->indexName();
-        _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
 
         // Set up the index cursor.
         CursorOptions cursorOptions;
