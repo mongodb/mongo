@@ -286,7 +286,7 @@ namespace mongo {
         if (memcmp(decodedStoredKey.c_str(), computedStoredKey, scram::hashSize) != 0) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                 mongoutils::str::stream() <<
-                    "SCRAM-SHA-1 auhentication failed, storedKey mismatch");
+                    "SCRAM-SHA-1 authentication failed, storedKey mismatch");
         }
 
         // ServerSignature := HMAC(ServerKey, AuthMessage)
