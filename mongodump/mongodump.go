@@ -125,9 +125,9 @@ func (dump *MongoDump) Dump() error {
 			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
 		}
 		log.Logf(log.DebugLow, "using auth schema version %v", dump.authVersion)
-		if dump.authVersion != 3 {
+		if dump.authVersion < 3 {
 			return fmt.Errorf("backing up users and roles is only supported for "+
-				"deployments with auth schema versions 3, found: %v", dump.authVersion)
+				"deployments with auth schema versions >= 3, found: %v", dump.authVersion)
 		}
 	}
 
