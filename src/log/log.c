@@ -559,6 +559,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LSN sync_lsn;
 	size_t write_size;
+	char *dir_path;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
@@ -607,6 +608,18 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		sync_lsn = log->write_lsn;
 		if (LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+			/*
+			 * Check if we have to sync the parent directory.  Some
+			 * combinations of sync flags may result in the log file
+			 * not stable in its parent directory.  Do that now if
+			 * it is needed.
+			 */
+			if (log->sync_dir_lsn.file < log->write_lsn.file) {
+				WT_ERR(__wt_filename(session,
+				    log->log_fh->name, &dir_path));
+				WT_ERR(__wt_directory_sync(session, dir_path));
+				log->sync_dir_lsn = log->write_lsn;
+			}
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			ret = __wt_fsync(session, log->log_fh);
 			if (ret == 0) {

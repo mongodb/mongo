@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __open_directory_sync --
+ * __wt_directory_sync --
  *	Fsync the directory in which we created the file.
  */
-static int
-__open_directory_sync(WT_SESSION_IMPL *session, char *path)
+int
+__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 {
 #ifdef __linux__
 	WT_DECL_RET;
@@ -167,12 +167,10 @@ __wt_open(WT_SESSION_IMPL *session,
 	/*
 	 * If this is a file we are syncing, some filesystems require that we
 	 * sync the directory to be confident that the file will appear.
+	 * NOTE:  Logging manages its own sync of the directory.
 	 */
-	if ((dio_type == WT_FILE_TYPE_DATA &&
-	    F_ISSET(conn, WT_CONN_CKPT_SYNC)) ||
-	    (dio_type == WT_FILE_TYPE_LOG &&
-	    FLD_ISSET(conn->txn_logsync, WT_LOG_FLUSH)))
-		WT_ERR(__open_directory_sync(session, path));
+	if (dio_type == WT_FILE_TYPE_DATA && F_ISSET(conn, WT_CONN_CKPT_SYNC))
+		WT_ERR(__wt_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));

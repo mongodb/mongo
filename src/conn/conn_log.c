@@ -209,6 +209,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	INIT_LSN(&log->ckpt_lsn);
 	INIT_LSN(&log->first_lsn);
 	INIT_LSN(&log->sync_lsn);
+	INIT_LSN(&log->sync_dir_lsn);
 	INIT_LSN(&log->trunc_lsn);
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
