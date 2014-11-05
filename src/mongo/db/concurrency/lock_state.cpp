@@ -457,7 +457,7 @@ namespace mongo {
 
             // This will occasionally dump the global lock manager in case lock acquisition is
             // taking too long.
-            if (elapsedTimeMs > 5000U) {
+            if (elapsedTimeMs > 30000U) {
                 dumpGlobalLockManagerThrottled();
             }
         }
