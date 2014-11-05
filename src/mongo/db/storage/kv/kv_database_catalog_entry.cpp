@@ -62,17 +62,18 @@ namespace mongo {
 
         virtual void commit() {}
         virtual void rollback() {
+            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
+            const CollectionMap::iterator it = _dce->_collections.find(_collection);
+            if (it != _dce->_collections.end()) {
+                // Deletes the underlying record store, which makes it safe to call dropRecordStore below.
+                delete it->second;
+                _dce->_collections.erase(it);
+            }
+
             if (_dropOnRollback) {
                 // Intentionally ignoring failure
                 _dce->_engine->getEngine()->dropRecordStore(_opCtx, _ident);
                 _dce->_engine->getCatalog()->dropCollection(_opCtx, _collection );
-            }
-
-            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
-            const CollectionMap::iterator it = _dce->_collections.find(_collection);
-            if (it != _dce->_collections.end()) {
-                delete it->second;
-                _dce->_collections.erase(it);
             }
         }
 
@@ -97,6 +98,7 @@ namespace mongo {
         {}
 
         virtual void commit() {
+            // Deletes the underlying record store, which makes it safe to call dropRecordStore below.
             delete _entry;
 
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
