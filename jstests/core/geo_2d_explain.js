@@ -25,4 +25,6 @@ var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain("executio
 print('explain = ' + tojson(explain));
 
 var stats = explain.executionStats;
-assert.eq(stats.nReturned, stats.totalDocsExamined);
+assert.eq(stats.nReturned, 50);
+assert.lte(stats.nReturned, stats.totalDocsExamined);
+assert.eq(stats.executionSuccess, true);
