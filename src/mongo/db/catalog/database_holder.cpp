@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
@@ -115,8 +116,13 @@ namespace {
 
         DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
         invariant(entry);
+        const bool exists = entry->exists();
+        if (!exists) {
+            audit::logCreateDatabase(currentClient.get(), dbname);
+        }
+
         if (justCreated) {
-            *justCreated = !entry->exists();
+            *justCreated = !exists;
         }
 
         // Only one thread can be inside this method for the same DB name, because of the

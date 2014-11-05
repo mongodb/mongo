@@ -192,10 +192,6 @@ namespace mongo {
         invariant(txn->lockState()->isWriteLocked(_dbname));
 
         const int allocFileId = _files.size();
-        if (allocFileId == 0) {
-            // TODO: Does this auditing have to be done here?
-            audit::logCreateDatabase(currentClient.get(), _dbname);
-        }
 
         int minSize = 0;
         if (allocFileId > 0) {
