@@ -1,0 +1,5 @@
+{
+    "sharding" : {
+        "autoSplit" : true
+    }
+}

@@ -764,7 +764,7 @@ tasks:
         script: |
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
-          mv legacy/* .
+          mv legacy26/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
