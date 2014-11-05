@@ -80,6 +80,27 @@ namespace mongo {
         const HeapRecord _rec;
     };
 
+    class HeapRecordStore::TruncateChange : public RecoveryUnit::Change {
+    public:
+        TruncateChange(Data* data) : _data(data), _dataSize(0) {
+            using std::swap;
+            swap(_dataSize, _data->dataSize);
+            swap(_records, _data->records);
+        }
+
+        virtual void commit() {}
+        virtual void rollback() {
+            using std::swap;
+            swap(_dataSize, _data->dataSize);
+            swap(_records, _data->records);
+        }
+
+    private:
+        Data* const _data;
+        int64_t _dataSize;
+        Records _records;
+    };
+
     //
     // RecordStore
     //
@@ -340,8 +361,9 @@ namespace mongo {
     }
 
     Status HeapRecordStore::truncate(OperationContext* txn) {
-        _data->records.clear();
-        _data->dataSize = 0;
+        // Unlike other changes, TruncateChange mutates _data on construction to perform the
+        // truncate
+        txn->recoveryUnit()->registerChange(new TruncateChange(_data));
         return Status::OK();
     }
 

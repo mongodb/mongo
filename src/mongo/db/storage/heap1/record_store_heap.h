@@ -161,6 +161,7 @@ namespace mongo {
     private:
         class InsertChange;
         class RemoveChange;
+        class TruncateChange;
 
         StatusWith<DiskLoc> extractAndCheckLocForOplog(const char* data, int len) const;
 
