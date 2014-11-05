@@ -25,10 +25,10 @@ coll.insert({word: "tomato"});
 assert.eq(1, coll.count());
 
 assert.eq(4, admindb.system.users.count(), "setup users")
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+assert.eq(2, admindb.system.users.getIndexes().length,
           "setup2: " + tojson( admindb.system.users.getIndexes() ) );
 assert.eq(1, admindb.system.roles.count(), "setup3")
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}), "setup4")
+assert.eq(2, admindb.system.roles.getIndexes().length, "setup4")
 assert.eq(1, admindb.system.version.count());
 var versionDoc = admindb.system.version.findOne();
 
@@ -58,10 +58,10 @@ t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pas
 
 assert.soon("admindb.system.users.findOne()", "no data after restore");
 assert.eq(4, admindb.system.users.count(), "didn't restore users");
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+assert.eq(2, admindb.system.users.getIndexes().length,
           "didn't restore user indexes");
 assert.eq(1, admindb.system.roles.find({role:'customRole'}).count(), "didn't restore roles");
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}),
+assert.eq(2, admindb.system.roles.getIndexes().length,
           "didn't restore role indexes");
 
 admindb.logout();
@@ -85,9 +85,9 @@ assert.soon("1 == admindb.system.users.find({user:'root'}).count()", "didn't res
 assert.eq(0, admindb.system.users.find({user:'root2'}).count(), "didn't drop users");
 assert.eq(0, admindb.system.roles.find({role:'customRole2'}).count(), "didn't drop roles");
 assert.eq(1, admindb.system.roles.find({role:'customRole'}).count(), "didn't restore roles");
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.users"}),
+assert.eq(2, admindb.system.users.getIndexes().length,
           "didn't maintain user indexes");
-assert.eq(2, admindb.system.indexes.count({ns: "admin.system.roles"}),
+assert.eq(2, admindb.system.roles.getIndexes().length,
           "didn't maintain role indexes");
 assert.eq(1, admindb.system.version.count(), "didn't restore version");
 assert.docEq(versionDoc, admindb.system.version.findOne(), "version doc wasn't restored properly");
