@@ -543,9 +543,10 @@ namespace mongo {
 
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             ProcessId pid = ProcessId::fromNative(singleArg( a ).numberInt());
-            BSONObj x = BSON( "" << wait_for_pid( pid ) );
+            int exit_code = -123456; // sentinel value
+            wait_for_pid( pid, true, &exit_code );
             registry.deletePid( pid );
-            return x;
+            return BSON( string("") << exit_code);
         }
 
         BSONObj StartMongoProgram( const BSONObj &a, void* data ) {

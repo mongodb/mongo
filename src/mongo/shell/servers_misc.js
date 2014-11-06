@@ -334,7 +334,7 @@ function startParallelShell( jsCode, port, noConnect ){
 
     x = startMongoProgramNoConnect.apply(null, args);
     return function(){
-        waitProgram( x );
+        return waitProgram( x );
     };
 }
 
