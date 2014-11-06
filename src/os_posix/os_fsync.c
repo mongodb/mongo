@@ -21,7 +21,7 @@ __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	WT_SYSCALL_RETRY(fsync(fh->fd), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: fsync", path);
+		WT_ERR_MSG(session, ret, "%s: fsync", fh->name);
 	return (ret);
 #else
 	WT_UNUSED(session);
