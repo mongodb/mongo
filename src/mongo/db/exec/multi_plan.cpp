@@ -161,10 +161,6 @@ namespace mongo {
             // Here's where we yield.
             bool alive = yieldPolicy->yield(_fetcher.get());
 
-            // We're done using the fetcher, so it should be freed. We don't want to
-            // use the same RecordFetcher twice.
-            _fetcher.reset();
-
             if (!alive) {
                 _failure = true;
                 Status failStat(ErrorCodes::OperationFailed,
@@ -174,6 +170,10 @@ namespace mongo {
                 return failStat;
             }
         }
+
+        // We're done using the fetcher, so it should be freed. We don't want to
+        // use the same RecordFetcher twice.
+        _fetcher.reset();
 
         return Status::OK();
     }

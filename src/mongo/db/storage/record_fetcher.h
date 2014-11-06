@@ -40,6 +40,11 @@ namespace mongo {
         virtual ~RecordFetcher() { }
 
         /**
+         * Performs any setup which is needed prior to yielding locks.
+         */
+        virtual void setup() = 0;
+
+        /**
          * Called after locks are yielded in order to bring data into memory.
          *
          * Should not be called more than once.

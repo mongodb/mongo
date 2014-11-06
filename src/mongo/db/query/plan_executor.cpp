@@ -275,14 +275,14 @@ namespace mongo {
                 // Here's where we yield.
                 _yieldPolicy->yield(fetcher.get());
 
-                // We're done using the fetcher, so it should be freed. We don't want to
-                // use the same RecordFetcher twice.
-                fetcher.reset();
-
                 if (_killed) {
                     return PlanExecutor::DEAD;
                 }
             }
+
+            // We're done using the fetcher, so it should be freed. We don't want to
+            // use the same RecordFetcher twice.
+            fetcher.reset();
 
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);

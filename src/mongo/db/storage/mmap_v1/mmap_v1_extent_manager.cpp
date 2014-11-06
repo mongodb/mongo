@@ -67,12 +67,16 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(MmapV1RecordFetcher);
     public:
         explicit MmapV1RecordFetcher(const Record* record)
-            : _record(record),
-              _filesLock(new LockMongoFilesShared()) { }
+            : _record(record) { }
+
+        virtual void setup() {
+            invariant(!_filesLock.get());
+            _filesLock.reset(new LockMongoFilesShared());
+        }
 
         virtual void fetch() {
             // It's only legal to touch the record while we're holding a lock on the data files.
-            invariant(_filesLock);
+            invariant(_filesLock.get());
 
             const char* recordChar = reinterpret_cast<const char*>(_record);
 

@@ -50,10 +50,11 @@ namespace {
     // static
     void QueryYield::yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher) {
         // Things have to happen here in a specific order:
-        //   1) Release lock mgr locks
-        //   2) Go to sleep
-        //   3) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
-        //   4) Reacquire lock mgr locks
+        //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
+        //   2) Release lock mgr locks
+        //   3) Go to sleep
+        //   4) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
+        //   5) Reacquire lock mgr locks
 
         Locker* locker = txn->lockState();
 
@@ -61,6 +62,10 @@ namespace {
         bool hadReadLock = locker->hasAnyReadLock();
 
         Locker::LockSnapshot snapshot;
+
+        if (fetcher) {
+            fetcher->setup();
+        }
 
         // Nothing was unlocked, just return, yielding is pointless.
         if (!locker->saveLockStateAndUnlock(&snapshot)) {
