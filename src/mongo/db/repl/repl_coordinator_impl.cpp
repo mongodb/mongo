@@ -797,6 +797,11 @@ namespace {
                 return;
             }
         }
+
+        _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                           this,
+                           stdx::placeholders::_1));
     }
 
     void ReplicationCoordinatorImpl::interruptAll() {
@@ -806,6 +811,11 @@ namespace {
             WaiterInfo* info = *it;
             info->condVar->notify_all();
         }
+
+        _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                           this,
+                           stdx::placeholders::_1));
     }
 
     bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
@@ -1039,6 +1049,7 @@ namespace {
                        this,
                        stdx::placeholders::_1,
                        finishedEvent.getValue(),
+                       txn,
                        waitUntil,
                        stepDownUntil,
                        force,
@@ -1066,6 +1077,11 @@ namespace {
         if (!cbData.status.isOK()) {
             return;
         }
+
+        _signalStepDownWaiters();
+    }
+
+    void ReplicationCoordinatorImpl::_signalStepDownWaiters() {
         std::for_each(_stepDownWaiters.begin(),
                       _stepDownWaiters.end(),
                       stdx::bind(&ReplicationExecutor::signalEvent,
@@ -1077,6 +1093,7 @@ namespace {
     void ReplicationCoordinatorImpl::_stepDownContinue(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::EventHandle finishedEvent,
+            OperationContext* txn,
             const Date_t waitUntil,
             const Date_t stepDownUntil,
             bool force,
@@ -1093,6 +1110,13 @@ namespace {
             *result = cbData.status;
             return;
         }
+
+        Status interruptedStatus = txn->checkForInterruptNoAssert();
+        if (!interruptedStatus.isOK()) {
+            *result = interruptedStatus;
+            return;
+        }
+
         if (_topCoord->getRole() != TopologyCoordinator::Role::leader) {
             *result = Status(ErrorCodes::NotMaster,
                              "Already stepped down from primary while processing step down "
@@ -1130,6 +1154,7 @@ namespace {
                              dateToISOStringLocal(now));
             return;
         }
+
         if (_stepDownWaiters.empty()) {
             StatusWith<ReplicationExecutor::EventHandle> reschedEvent =
                 _replExecutor.makeEvent();
@@ -1145,6 +1170,7 @@ namespace {
                            this,
                            stdx::placeholders::_1,
                            finishedEvent,
+                           txn,
                            waitUntil,
                            stepDownUntil,
                            force,

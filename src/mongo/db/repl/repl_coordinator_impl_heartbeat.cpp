@@ -164,12 +164,7 @@ namespace {
             }
         }
 
-        std::for_each(_stepDownWaiters.begin(),
-                      _stepDownWaiters.end(),
-                      stdx::bind(&ReplicationExecutor::signalEvent,
-                                 &_replExecutor,
-                                 stdx::placeholders::_1));
-        _stepDownWaiters.clear();
+        _signalStepDownWaiters();
 
         _scheduleHeartbeatToTarget(
                 target,

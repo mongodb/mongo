@@ -457,8 +457,10 @@ namespace repl {
         /**
          * Triggers all callbacks that are blocked waiting for new heartbeat data
          * to decide whether or not to finish a step down.
+         * Should only be called from executor callbacks.
          */
         void _signalStepDownWaiters(const ReplicationExecutor::CallbackData& cbData);
+        void _signalStepDownWaiters();
 
         /**
          * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
@@ -467,6 +469,7 @@ namespace repl {
          */
         void _stepDownContinue(const ReplicationExecutor::CallbackData& cbData,
                                const ReplicationExecutor::EventHandle finishedEvent,
+                               OperationContext* txn,
                                Date_t waitUntil,
                                Date_t stepdownUntil,
                                bool force,

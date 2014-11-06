@@ -905,7 +905,7 @@ namespace {
         awaiter.reset();
     }
 
-    class OperationContextNoopWithInterrupt : public OperationContextNoop {
+    class OperationContextNoopWithInterrupt : public OperationContextReplMock {
     public:
 
         OperationContextNoopWithInterrupt() : _opID(0), _interruptOp(false) {}
@@ -1286,6 +1286,35 @@ namespace {
 
         ASSERT_OK(runner.getResult());
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+    }
+
+    TEST_F(StepDownTest, InterruptStepDown) {
+        OperationContextNoopWithInterrupt txn;
+        OpTime optime1(100, 1);
+        OpTime optime2(100, 2);
+        // No secondary is caught up
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
+
+        // stepDown where the secondary actually has to catch up before the stepDown can succeed
+        StepDownRunner runner(getReplCoord());
+        runner.setForce(false);
+        runner.setWaitTime(Milliseconds(10000));
+        runner.setStepDownTime(Milliseconds(60000));
+
+        simulateSuccessfulElection();
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+
+        runner.start(&txn);
+
+        unsigned int opID = 100;
+        txn.setOpID(opID);
+        txn.setInterruptOp(true);
+        getReplCoord()->interrupt(opID);
+
+        ASSERT_EQUALS(ErrorCodes::Interrupted, runner.getResult());
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
