@@ -1,5 +1,6 @@
 // dumprestore_auth.js
 
+/* commented out until it is rewritten per SERVER-15980
 t = new ToolTest("dumprestore_auth", { auth : "" });
 
 c = t.startDB("foo");
@@ -95,3 +96,4 @@ assert.eq(0, c.getDB().system.namespaces.findOne(
 assert.eq(sysUsers, adminDB.system.users.count());
 
 t.stop();
+*/
