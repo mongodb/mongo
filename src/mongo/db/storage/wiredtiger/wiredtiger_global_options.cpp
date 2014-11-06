@@ -40,8 +40,8 @@ namespace mongo {
         moe::OptionSection wiredTigerOptions("WiredTiger options");
 
         // Add WiredTiger storage engine specific options.
-        wiredTigerOptions.addOptionChaining("storage.wiredtiger.databaseConfig",
-                "wiredTigerDatabaseConfig", moe::String, "WiredTiger database configuration settings");
+        wiredTigerOptions.addOptionChaining("storage.wiredtiger.engineConfig",
+                "wiredTigerEngineConfig", moe::String, "WiredTiger storage engine configuration settings");
         wiredTigerOptions.addOptionChaining("storage.wiredtiger.collectionConfig",
                 "wiredTigerCollectionConfig", moe::String, "WiredTiger collection configuration settings");
         wiredTigerOptions.addOptionChaining("storage.wiredtiger.indexConfig",
