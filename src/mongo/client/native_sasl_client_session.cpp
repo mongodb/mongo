@@ -73,7 +73,7 @@ namespace {
         else {
             return Status(ErrorCodes::BadValue,
                 mongoutils::str::stream() << "SASL mechanism " << mechanism <<
-                                             "is not supported");
+                                             " is not supported");
         }
 
         return Status::OK();
