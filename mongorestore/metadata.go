@@ -280,7 +280,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		{"_mergeAuthzCollections", 1},
 		{tempColCommandField, "admin." + tempCol},
 		{"drop", restore.OutputOptions.Drop},
-		{"writeConcern", bson.M{"w": restore.OutputOptions.WriteConcern}},
+		{"writeConcern", bson.M{"w": restore.safety}},
 		{"db", userTargetDB},
 	}
 
