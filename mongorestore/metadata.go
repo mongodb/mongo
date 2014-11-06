@@ -276,11 +276,23 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		userTargetDB = ""
 	}
 
+	// we have to manually convert mgo's safety to a writeconcern object
+	writeConcern := bson.M{}
+	if restore.safety == nil {
+		writeConcern["w"] = 0
+	} else {
+		if restore.safety.WMode == "majority" {
+			writeConcern["w"] = "majority"
+		} else {
+			writeConcern["w"] = restore.safety.W
+		}
+	}
+
 	command := bsonutil.MarshalD{
 		{"_mergeAuthzCollections", 1},
 		{tempColCommandField, "admin." + tempCol},
 		{"drop", restore.OutputOptions.Drop},
-		{"writeConcern", bson.M{"w": restore.safety}},
+		{"writeConcern", writeConcern},
 		{"db", userTargetDB},
 	}
 
