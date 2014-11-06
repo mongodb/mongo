@@ -84,20 +84,20 @@ def process_lang(lang, lines):
 		err('@m_page contains illegal lang: ' + lang)
 	condstack = [True]
 	linenum = 0
-	mif_pat = re.compile('^\s*@m_if{([^,}]*)}')
-	melse_pat = re.compile('^\s*@m_else\s*$')
-	mendif_pat = re.compile('^\s*@m_endif\s*$')
-	mpage_pat = re.compile('@m_page{{([^}]*)},([^,}]*),([^}]*)}')
+	mif_pat = re.compile(r'^\s*@m_if{([^,}]*)}')
+	melse_pat = re.compile(r'^\s*@m_else\s*$')
+	mendif_pat = re.compile(r'^\s*@m_endif\s*$')
+	mpage_pat = re.compile(r'@m_page{{([^}]*)},([^,}]*),([^}]*)}')
 	mpage_rep = r'@page \2' + lang_suffix + r' \3 ' + lang_desc
-	ref_pat = re.compile('@ref\s+(\w*)')
+	ref_pat = re.compile(r'@ref\s+(\w*)')
 	ref_rep = r'@ref \1' + lang_suffix
-	snip_pat = re.compile('@snippet ex_([^.]*)[.]c\s+(.*)')
+	snip_pat = re.compile(r'@snippet ex_([^.]*)[.]c\s+(.*)')
 	snip_rep = r'@snippet ex_\1' + lang_ext + r' \2'
-	section_pat = re.compile('(^@\w*section)\s+(\w*)')
+	section_pat = re.compile(r'(^@\w*section)\s+(\w*)')
 	section_rep = r'\1 \2' + lang_suffix
-	subpage_pat = re.compile('@subpage\s+(\w*)')
+	subpage_pat = re.compile(r'@subpage\s+(\w*)')
 	subpage_rep = r'@subpage \1' + lang_suffix
-	exref_pat = re.compile('@ex_ref{ex_([^.]*)[.]c}')
+	exref_pat = re.compile(r'@ex_ref{ex_([^.]*)[.]c}')
 	if lang == 'c':
 		exref_rep = r'@ex_ref{ex_\1' + lang_ext + '}'
 	else:
@@ -107,7 +107,7 @@ def process_lang(lang, lines):
 
 	# Any remaining @m_foo{...} aliases are
 	# diverted to @c_foo{...} or @java_foo{...}
-	mgeneric_pat = re.compile('@m_([^ }]*)')
+	mgeneric_pat = re.compile(r'@m_([^ }]*)')
 	mgeneric_rep = r'@' + lang + r'_\1'
 	for line in lines:
 		linenum += 1
@@ -156,8 +156,8 @@ def process_multilang(source):
 	result = ''
 	in_mpage = False
 	mpage_content = []
-	mpage_pat = re.compile('@m_page{{([^}]*)},([^,}]*),([^}]*)}')
-	mpage_end_pat = re.compile('\*/')
+	mpage_pat = re.compile(r'@m_page{{([^}]*)},([^,}]*),([^}]*)}')
+	mpage_end_pat = re.compile(r'\*/')
 	for line in source.split('\n'):
 		m = re.search(mpage_pat, line)
 		if line.count('@m_page') > 0 and not m:
