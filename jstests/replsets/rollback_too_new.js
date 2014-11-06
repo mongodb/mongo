@@ -1,6 +1,5 @@
 // test that a rollback of an op more than 1800 secs newer than the new master causes fatal shutdown
 
-if (false) {
 (function() {
     "use strict";
     // set up a set and grab things for later
@@ -32,29 +31,23 @@ if (false) {
     // remove node B from the set
     replTest.stop(BID);
 
-    // add a very stale oplog entry as the most recent entry on node A
-    var stale_oplog_entry = a_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
-    stale_oplog_entry["ts"] = new Timestamp(stale_oplog_entry["ts"].getTime() - 200000, 1);
+    // add an oplog entry from the distant future as the most recent entry on node A
+    var future_oplog_entry = master.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+    future_oplog_entry["ts"] = new Timestamp(future_oplog_entry["ts"].getTime() + 200000, 1);
     var options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
-    assert.writeOK(master.getDB("local").oplog.rs.insert(stale_oplog_entry, options));
+    assert.writeOK(master.getDB("local").oplog.rs.insert(future_oplog_entry, options));
 
     // take down node A, allow node B to become master and do one write to it
-    // in order to force a rollback
+    // in order to force a rollback on A
     replTest.stop(AID);
     replTest.restart(BID);
     master = replTest.getMaster();
     assert.eq(b_conn.host, master.host, "b_conn assumed to be master");
-    assert.writeOK(master.getDB("foo").bar.insert({x:3}, options));
+    assert.writeOK(master.getDB(name).foo.insert({x: 2}, options));
 
-    // stop node B, bring up node A, wait for it to become primary
-    replTest.stop(BID);
-    replTest.restart(AID);
-    master = replTest.getMaster();
-    assert.eq(a_conn.host, master.host, "a_conn assumed to be master");
-
-    // restart node B, which should attempt to rollback but then fassert.
+    // restart node A, which should attempt to rollback but then fassert.
     clearRawMongoProgramOutput();
-    replTest.restart(BID);
+    replTest.restart(AID);
     assert.soon(function() {
         try {
             return rawMongoProgramOutput().match(
@@ -62,9 +55,8 @@ if (false) {
         } catch (e) {
             return false;
         }
-    }, "B failed to fassert", 60 * 1000);
+    }, "A failed to fassert", 60 * 1000);
 
     replTest.stopSet();
 
 }());
-};
