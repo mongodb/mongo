@@ -100,13 +100,13 @@ __conn_dhandle_open_lock(
 		 * don't want to block waiting to get exclusive access.
 		 */
 		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
-			lock_busy = 0;
 			/*
 			 * If it was opened while we waited, drop the write
 			 * lock and get a read lock instead.
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !want_exclusive) {
+				lock_busy = 0;
 				WT_RET(
 				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;

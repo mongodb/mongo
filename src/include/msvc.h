@@ -18,6 +18,9 @@
 #define	__WT_ATOMIC_ADD(v, val, n, s, t)				\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	_InterlockedExchangeAdd ## s((t*)&(v), (t)(val)) + (val))
+#define	__WT_ATOMIC_FETCH_ADD(v, val, n, s, t)				\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
+	_InterlockedExchangeAdd ## s((t*)&(v), (t)(val)))
 #define	__WT_ATOMIC_CAS(v, old, new, n, s, t)				\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	_InterlockedCompareExchange ## s				\
@@ -33,6 +36,8 @@
 	_InterlockedExchangeAdd ## s((t*)&(v), -(t) val) - (val))
 
 #define	WT_ATOMIC_ADD1(v, val)		__WT_ATOMIC_ADD(v, val, 1, 8, char)
+#define	WT_ATOMIC_FETCH_ADD1(v, val)					\
+	__WT_ATOMIC_FETCH_ADD(v, val, 1, 8, char)
 #define	WT_ATOMIC_CAS1(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 1, 8, char)
 #define	WT_ATOMIC_CAS_VAL1(v, old, new)					\
 	__WT_ATOMIC_CAS_VAL(v, old, new, 1, 8, char)
@@ -40,6 +45,8 @@
 #define	WT_ATOMIC_SUB1(v, val)		__WT_ATOMIC_SUB(v, val, 1, 8, char)
 
 #define	WT_ATOMIC_ADD2(v, val)		__WT_ATOMIC_ADD(v, val, 2, 16, short)
+#define	WT_ATOMIC_FETCH_ADD2(v, val)					\
+	__WT_ATOMIC_FETCH_ADD(v, val, 2, 16, short)
 #define	WT_ATOMIC_CAS2(v, old, new)					\
 	__WT_ATOMIC_CAS(v, old, new, 2, 16, short)
 #define	WT_ATOMIC_CAS_VAL2(v, old, new)					\
@@ -48,6 +55,7 @@
 #define	WT_ATOMIC_SUB2(v, val)		__WT_ATOMIC_SUB(v, val, 2, 16, short)
 
 #define	WT_ATOMIC_ADD4(v, val)		__WT_ATOMIC_ADD(v, val, 4, , long)
+#define	WT_ATOMIC_FETCH_ADD4(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 4, , long)
 #define	WT_ATOMIC_CAS4(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 4, , long)
 #define	WT_ATOMIC_CAS_VAL4(v, old, new)					\
 	__WT_ATOMIC_CAS_VAL(v, old, new, 4, , long)
@@ -55,6 +63,8 @@
 #define	WT_ATOMIC_SUB4(v, val)		__WT_ATOMIC_SUB(v, val, 4, , long)
 
 #define	WT_ATOMIC_ADD8(v, val)		__WT_ATOMIC_ADD(v, val, 8, 64, __int64)
+#define	WT_ATOMIC_FETCH_ADD8(v, val)					\
+	__WT_ATOMIC_FETCH_ADD(v, val, 8, 64, __int64)
 #define	WT_ATOMIC_CAS8(v, old, new)					\
 	__WT_ATOMIC_CAS(v, old, new, 8, 64, __int64)
 #define	WT_ATOMIC_CAS_VAL8(v, old, new)					\

@@ -28,14 +28,11 @@
  *	Example of how to use a WiredTiger custom index extractor extension.
  */
 
-#include <assert.h>
-#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -155,19 +152,20 @@ read_index(WT_SESSION *session)
 	 * Pick 10 random years and read the data.
 	 */
 	for (i = 0; i < 10; i++) {
-		year = (random() % YEAR_SPAN) + YEAR_BASE;
+		year = (uint16_t)((random() % YEAR_SPAN) + YEAR_BASE);
 		cursor->set_key(cursor, year);
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &last_name,
 			    &first_name, &term_start, &term_end)) != 0)
-				goto err;
-			printf("Year %d: %s %s\n",year, first_name, last_name);
-		} else {
-			fprintf(stderr, "Error %d for year %d\n", ret, year);
-			goto err;
+				break;
+			printf("Year %d: %s %s\n", year, first_name, last_name);
+			continue;
 		}
+
+		fprintf(stderr, "Error %d for year %d\n", ret, year);
+		break;
 	}
-err:	cursor->close(cursor);
+	ret = cursor->close(cursor);
 	return (ret);
 }
 

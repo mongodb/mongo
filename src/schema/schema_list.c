@@ -55,8 +55,8 @@ restart:
 			 */
 			if (table->schema_gen != S2C(session)->schema_gen) {
 				if (table->refcnt == 0) {
-					__wt_schema_remove_table(
-					    session, table);
+					WT_RET(__wt_schema_remove_table(
+					    session, table));
 					goto restart;
 				}
 				continue;
@@ -155,10 +155,11 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
  * __wt_schema_destroy_table --
  *	Free a table handle.
  */
-void
+int
 __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_COLGROUP *colgroup;
+	WT_DECL_RET;
 	WT_INDEX *idx;
 	u_int i;
 
@@ -179,36 +180,38 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 		for (i = 0; i < table->nindices; i++) {
 			if ((idx = table->indices[i]) == NULL)
 				continue;
-			__wt_schema_destroy_index(session, idx);
+			WT_TRET(__wt_schema_destroy_index(session, idx));
 		}
 		__wt_free(session, table->indices);
 	}
 	__wt_free(session, table);
+	return (ret);
 }
 
 /*
  * __wt_schema_remove_table --
  *	Remove the table handle from the session, closing if necessary.
  */
-void
-__wt_schema_remove_table(
-    WT_SESSION_IMPL *session, WT_TABLE *table)
+int
+__wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_ASSERT(session, table->refcnt <= 1);
 
 	TAILQ_REMOVE(&session->tables, table, q);
-	__wt_schema_destroy_table(session, table);
+	return (__wt_schema_destroy_table(session, table));
 }
 
 /*
  * __wt_schema_close_tables --
  *	Close all of the tables in a session.
  */
-void
+int
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_TABLE *table;
 
 	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
-		__wt_schema_remove_table(session, table);
+		WT_TRET(__wt_schema_remove_table(session, table));
+	return (ret);
 }

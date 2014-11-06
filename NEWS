@@ -1,12 +1,56 @@
-WiredTiger release 2.4.1, TBD
+WiredTiger release 2.4.1, 2014-11-06
 ------------------------------------
 
-The WiredTiger 2.4.1 release is currently in active development:
+The WiredTiger 2.4.1 release contains several new features, many bug fixes
+and performance enhancements.
 
 New features and API changes:
-* Add a new WT_SESSION::transaction_pinned_range method that helps users
-  identify when a session is keeping a transaction ID pinned for a long time.
-  [#1314]
+
+* Add new custom extractor functionality to WiredTiger indexes. Allowing an
+  application to define mutated and/or multiple keys for indexes. [#1199]
+ 
+* Add a new WT_SESSION::transaction_pinned_range method that allows users
+  to identify when a session is keeping a transaction ID pinned for a long
+  time. [#1314]
+
+* Enhance statistics output so that keys are more clearly categorized. [#1313]
+
+* Rename WT_DEADLOCK error return to WT_ROLLBACK. WiredTiger uses the return
+  in cases other than traditional application deadlock. The old value is
+  retained as an alias to maintain backward compatability. [#1204]
+
+* Increase the maximum configurable cache size to 100GB.
+
+Other significant changes:
+
+* Improve support for building on Windows platforms. [#1342]
+
+* Fix a bug where WiredTiger could race closing handles. [#1336]
+
+* Enhance performance when hot pages in cache are growing rapidly. [#1317]
+
+* Fix a bug in recovery, where log files that are zero extended could
+  result in some log records being skipped. [#1334]
+
+* Updates to the Java API to improve documentation and exception handling.
+  [#1295]
+
+* Improve support for building on Oracle Solaris platform [#1329]
+
+* Fix a bug where closing a handle could leave the tree in an inconsistent
+  state on failure. [#1316]
+
+* Several bug fixes and improvements to LSM including:
+  - Improving algorithm for switching the in-memory chunk.
+  - Fixing a bug related to dropping obsolete chunks. [#1304]
+
+* Fix a bug in schema level operations (table create, drop, etc). If there
+  was an explicit transaction running when the operation was performed that
+  was subsequently rolled back the object could be left in an inconsistent
+  state.
+
+* Several enhancements to cache management when there are long running
+  transactions present.
 
 
 WiredTiger release 2.4.0, 2014-10-15

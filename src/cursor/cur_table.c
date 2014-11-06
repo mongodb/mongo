@@ -103,7 +103,7 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 
 	for (i = 0; i < ctable->table->nindices; i++, cp++) {
-		f = *(void **)((uint8_t *)*cp + func_off);
+		f = *(int (**)(WT_CURSOR *))((uint8_t *)*cp + func_off);
 		idx = ctable->table->indices[i];
 		if (idx->extractor) {
 			extract_cursor.iface = iface;

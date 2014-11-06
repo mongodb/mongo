@@ -218,7 +218,7 @@ __rename_table(WT_SESSION_IMPL *session,
 		WT_ERR(__rename_tree(session, table, newuri,
 		    table->indices[i]->name, cfg));
 
-	__wt_schema_remove_table(session, table);
+	WT_ERR(__wt_schema_remove_table(session, table));
 	table = NULL;
 
 	/* Rename the table. */

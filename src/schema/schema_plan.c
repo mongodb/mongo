@@ -330,8 +330,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_RET_NOTFOUND_OK(ret = __wt_config_next(&config, &next_k, &next_v));
 	if (ret == WT_NOTFOUND) {
 		if (extra_cols != NULL) {
-			WT_RET(
-			    __wt_config_init(session, &config, extra_cols));
+			WT_RET(__wt_config_init(session, &config, extra_cols));
 			WT_RET(__wt_config_next(&config, &next_k, &next_v));
 			extra_cols = NULL;
 		} else if (format->size == 0) {

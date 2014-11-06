@@ -2427,7 +2427,7 @@ __rec_raw_decompress(
 
 	WT_ERR(__wt_strndup(session, tmp->data, dsk->mem_size, retp));
 	WT_ASSERT(session, __wt_verify_dsk_image(
-	    session, "[raw evict split]", tmp->data, dsk->mem_size) == 0);
+	    session, "[raw evict split]", tmp->data, dsk->mem_size, 0) == 0);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -2719,11 +2719,18 @@ skip_check_complete:
 	 * If we had to skip updates in order to build this disk image, we can't
 	 * actually write it. Instead, we will re-instantiate the page using the
 	 * disk image and the list of updates we skipped.
-	 *
-	 * If the buffer is compressed (raw compression was configured), we have
-	 * to decompress it so we can instantiate it later.
 	 */
 	if (bnd->skip != NULL) {
+		/*
+		 * If the buffer is compressed (raw compression was configured),
+		 * we have to decompress it so we can instantiate it later. It's
+		 * a slow and convoluted path, but it's also a rare one and it's
+		 * not worth making it faster. Else, the disk image is ready,
+		 * copy it into place for later. It's possible the disk image
+		 * has no items; we have to flag that for verification, it's a
+		 * special case since read/writing empty pages isn't generally
+		 * allowed.
+		 */
 		if (bnd->already_compressed)
 			WT_ERR(__rec_raw_decompress(
 			    session, buf->data, buf->size, &bnd->dsk));
@@ -2731,7 +2738,7 @@ skip_check_complete:
 			WT_ERR(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
 			WT_ASSERT(session, __wt_verify_dsk_image(session,
-			    "[evict split]", buf->data, buf->size) == 0);
+			    "[evict split]", buf->data, buf->size, 1) == 0);
 		}
 		goto done;
 	}

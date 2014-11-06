@@ -22,6 +22,26 @@ struct __wt_condvar {
 };
 
 /*
+ * !!!
+ * Don't touch this structure without understanding the read/write
+ * locking functions.
+ */
+typedef union {			/* Read/write lock */
+#ifdef WORDS_BIGENDIAN
+	WiredTiger read/write locks require modification for big-endian systems.
+#else
+	uint64_t u;
+	uint32_t us;
+	struct {
+		uint16_t writers;
+		uint16_t readers;
+		uint16_t users;
+		uint16_t pad;
+	} s;
+#endif
+} wt_rwlock_t;
+
+/*
  * Read/write locks:
  *
  * WiredTiger uses read/write locks for shared/exclusive access to resources.
