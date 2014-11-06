@@ -27,7 +27,8 @@ for( var i = 0; i < 4; i++ ) {
 }
 
 // make sure the collection exists
-assert.eq( foo.system.namespaces.count({name: "foo.bar"}), 1 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 1 )
 
 //make sure it has no index except _id
 assert.eq(foo.bar.getIndexes().length, 1);
