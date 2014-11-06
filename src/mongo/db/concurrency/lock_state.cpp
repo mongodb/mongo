@@ -57,8 +57,8 @@ namespace mongo {
         // on its use.
         const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
-        // How often (in millis) to check for deadlock if a lock has not been granted for some time
-        const unsigned DeadlockTimeoutMs = 100;
+        // How often to check for deadlock if a lock has not been granted for some time
+        const Microseconds DeadlockTimeout(100*1000);
 
         /**
          * Used to sort locks by granularity when snapshotting lock state. We must report and
@@ -263,7 +263,9 @@ namespace mongo {
         _result = LOCK_INVALID;
     }
 
-    LockResult CondVarLockGrantNotification::wait(unsigned timeoutMs) {
+    LockResult CondVarLockGrantNotification::wait(int timeoutMs) {
+        if (timeoutMs <= 0) return LOCK_TIMEOUT;
+
         boost::unique_lock<boost::mutex> lock(_mutex);
         while (_result == LOCK_INVALID) {
             if (!_cond.timed_wait(lock, Milliseconds(timeoutMs))) {
@@ -310,15 +312,12 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs) {
+    LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode,
+                                                   Microseconds* timeBudgetRemaining) {
         LockRequestsMap::Iterator it = _requests.find(resourceIdGlobal);
         if (!it) {
             // Global lock should be the first lock on any operation
             invariant(_requests.empty());
-
-            // Start counting time since first global lock acquisition (that's when effectively
-            // any timing for the locker counts from).
-            _timer.reset();
         }
         else {
             // No upgrades on the GlobalLock are currently necessary. Should not be used until we
@@ -326,7 +325,7 @@ namespace mongo {
             invariant(it->mode >= mode);
         }
 
-        LockResult globalLockResult = lock(resourceIdGlobal, mode, timeoutMs);
+        LockResult globalLockResult = lock(resourceIdGlobal, mode, timeBudgetRemaining);
         if (globalLockResult != LOCK_OK) {
             invariant(globalLockResult == LOCK_TIMEOUT);
 
@@ -335,13 +334,8 @@ namespace mongo {
 
         // Special-handling for MMAP V1 concurrency control
         if (IsForMMAPV1 && !it) {
-            // Obey the requested timeout
-            const unsigned elapsedTimeMs = _timer.millis();
-            const unsigned remainingTimeMs =
-                elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
-
             LockResult flushLockResult =
-                lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), remainingTimeMs);
+                lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), timeBudgetRemaining);
 
             if (flushLockResult != LOCK_OK) {
                 invariant(flushLockResult == LOCK_TIMEOUT);
@@ -410,7 +404,7 @@ namespace mongo {
 
             while (true) {
                 LockResult result =
-                    lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX, true);
+                    lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), NULL, true);
 
                 if (result == LOCK_OK) break;
 
@@ -422,7 +416,7 @@ namespace mongo {
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lock(const ResourceId& resId,
                                              LockMode mode,
-                                             unsigned timeoutMs,
+                                             Microseconds* timeBudgetRemaining,
                                              bool checkDeadlock) {
 
         LockResult result = lockImpl(resId, mode);
@@ -434,8 +428,10 @@ namespace mongo {
         // unsuccessful result that the lock manager would return is LOCK_WAITING.
         invariant(result == LOCK_WAITING);
 
+        if (timeBudgetRemaining && *timeBudgetRemaining <= Microseconds(0)) return LOCK_TIMEOUT;
+
         // Tracks the lock acquisition time if we don't obtain the lock immediately
-        Timer timer;
+        Timer timer(timeBudgetRemaining ? Timer::START : Timer::DONT_START);
 
         // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
         // DB lock, while holding the flush lock, so it has to be released. This is only
@@ -450,9 +446,12 @@ namespace mongo {
 
         // Don't go sleeping without bound in order to be able to report long waits or wake up for
         // deadlock detection.
-        unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
-        while (true) {
-            result = _notify.wait(waitTimeMs);
+        Microseconds timeToWait = DeadlockTimeout;
+        if (timeBudgetRemaining && *timeBudgetRemaining < timeToWait)
+            timeToWait = *timeBudgetRemaining;
+
+        for (int attempt = 0; /*forever*/; attempt++) {
+            result = _notify.wait(timeToWait.total_milliseconds());
 
             if (result == LOCK_OK) break;
 
@@ -466,17 +465,21 @@ namespace mongo {
                 }
             }
 
-            const unsigned elapsedTimeMs = timer.millis();
-            waitTimeMs = (elapsedTimeMs < timeoutMs) ?
-                std::min(timeoutMs - elapsedTimeMs, DeadlockTimeoutMs) : 0;
+            if (timeBudgetRemaining) {
+                *timeBudgetRemaining -= Microseconds(timer.microsReset());
+                if (*timeBudgetRemaining < timeToWait) {
+                    timeToWait = *timeBudgetRemaining;
+                }
+            }
 
-            if (waitTimeMs == 0) {
+            if (timeToWait <= Microseconds(0)) {
                 break;
             }
 
             // This will occasionally dump the global lock manager in case lock acquisition is
             // taking too long.
-            if (elapsedTimeMs > 30000U) {
+            static const int attemptsPerLog = 30*1000*1000 / DeadlockTimeout.total_microseconds();
+            if ((attempt % attemptsPerLog) == 0) {
                 dumpGlobalLockManagerAndCallstackThrottled(this);
             }
         }
@@ -495,6 +498,8 @@ namespace mongo {
             // request with the flush lock released.
             invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         }
+
+        if (timeBudgetRemaining) *timeBudgetRemaining -= Microseconds(timer.micros());
 
         return result;
     }

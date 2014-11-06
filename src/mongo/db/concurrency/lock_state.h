@@ -55,7 +55,7 @@ namespace mongo {
          *
          * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
          */
-        LockResult wait(unsigned timeoutMs);
+        LockResult wait(int timeoutMs);
 
     private:
 
@@ -95,7 +95,7 @@ namespace mongo {
 
         virtual LockerId getId() const { return _id; }
 
-        virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
+        virtual LockResult lockGlobal(LockMode mode, Microseconds* timeBudgetRemaining = NULL);
         virtual void downgradeGlobalXtoSForMMAPV1();
         virtual bool unlockAll();
 
@@ -106,7 +106,7 @@ namespace mongo {
 
         virtual LockResult lock(const ResourceId& resId,
                                 LockMode mode, 
-                                unsigned timeoutMs = UINT_MAX,
+                                Microseconds* timeBudgetRemaining = NULL,
                                 bool checkDeadlock = false);
 
         virtual void downgrade(const ResourceId& resId, LockMode newMode);
@@ -175,9 +175,6 @@ namespace mongo {
         // work completes. Value of 0 means we are not inside a write unit of work.
         int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
-
-        // For maintaining locking timing statistics
-        Timer _timer;
 
 
         //////////////////////////////////////////////////////////////////////////////////////////

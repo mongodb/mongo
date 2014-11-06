@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <climits> // For UINT_MAX
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -67,14 +66,19 @@ namespace mongo {
          *
          * @param mode Mode in which the global lock should be acquired. Also indicates the intent
          *              of the operation.
-         * @param timeoutMs How long to wait for the global lock (and the flush lock, for the MMAP
-         *          V1 engine) to be acquired.
+         * @param timeBudgetRemaining If NULL, wait indefinitely for the lock.
+         *                            If not NULL, we will return LOCK_TIMEOUT if it takes longer
+         *                            then *timeBudgetRemaining, and *timeBudgetRemaining will be
+         *                            decremented by the time spent waiting for locks. This allows
+         *                            you to acquire several locks in sequence using the same
+         *                            timeout. If *timeBudgetRemaining is <= 0, returns immediately
+         *                            if the lock couldn't be taken without blocking.
          *
          * @return LOCK_OK, if the global lock (and the flush lock, for the MMAP V1 engine) were
          *          acquired within the specified time bound. Otherwise, the respective failure
          *          code and neither lock will be acquired.
          */
-        virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX) = 0;
+        virtual LockResult lockGlobal(LockMode mode, Microseconds* timeBudgetRemaining = NULL) = 0;
 
         /**
          * Decrements the reference count on the global lock.  If the reference count on the
@@ -118,10 +122,13 @@ namespace mongo {
          *
          * @param resId Id of the resource to be locked.
          * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
-         * @param timeoutMs How many milliseconds to wait for the lock to be granted, before
-         *              returning LOCK_TIMEOUT. This parameter defaults to UINT_MAX, which means
-         *              wait infinitely. If 0 is passed, the request will return immediately, if
-         *              the request could not be granted right away.
+         * @param timeBudgetRemaining If NULL, wait indefinitely for the lock.
+         *                            If not NULL, we will return LOCK_TIMEOUT if it takes longer
+         *                            then *timeBudgetRemaining, and *timeBudgetRemaining will be
+         *                            decremented by the time spent waiting for locks. This allows
+         *                            you to acquire several locks in sequence using the same
+         *                            timeout. If *timeBudgetRemaining is <= 0, returns immediately
+         *                            if the lock couldn't be taken without blocking.
          * @param checkDeadlock Whether to enable deadlock detection for this acquisition. This
          *              parameter is put in place until we can handle deadlocks at all places,
          *              which acquire locks.
@@ -130,7 +137,7 @@ namespace mongo {
          */
         virtual LockResult lock(const ResourceId& resId,
                                 LockMode mode,
-                                unsigned timeoutMs = UINT_MAX,
+                                Microseconds* timeBudgetRemaining = NULL,
                                 bool checkDeadlock = false) = 0;
 
         /**

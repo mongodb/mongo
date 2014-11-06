@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/client/export_macros.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-
     /**
      * Time tracking object.
      *
@@ -50,7 +50,12 @@ namespace mongo {
         static const long long microsPerSecond = 1000 * millisPerSecond;
         static const long long nanosPerSecond = 1000 * microsPerSecond;
 
-        Timer() { reset(); }
+        enum ShouldStart { START = true, DONT_START = false };
+
+        Timer(ShouldStart shouldStart = START) : _old(shouldStart ? now() : unstartedTime) {}
+
+        bool isStarted() const { return _old != unstartedTime; }
+
         int seconds() const { return (int)(micros() / 1000000); }
         int millis() const { return (int)(micros() / 1000); }
         int minutes() const { return seconds() / 60; }
@@ -60,15 +65,24 @@ namespace mongo {
          *  @return time in milliseconds.
          */
         inline int millisReset() {
+            return static_cast<int>(microsReset() / 1000);
+        }
+
+        /** Get the time interval and reset at the same time.
+         *  @return time in microseconds.
+         */
+        inline long long microsReset() {
+            dassert(isStarted());
             const long long nextNow = now();
             const long long deltaMicros =
                 ((nextNow - _old) * microsPerSecond) / _countsPerSecond;
 
             _old = nextNow;
-            return static_cast<int>(deltaMicros / 1000);
+            return deltaMicros;
         }
 
         inline long long micros() const {
+            dassert(isStarted());
             return ((now() - _old) * microsPerSecond) / _countsPerSecond;
         }
 
@@ -85,6 +99,8 @@ namespace mongo {
         static long long _countsPerSecond;
 
     private:
+        static const long long unstartedTime = -1;
+
         long long now() const;
 
         long long _old;

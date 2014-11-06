@@ -113,10 +113,11 @@ namespace mongo {
     }
 
     void Lock::ScopedLock::resetTime() {
-        _timer.reset();
+        // TODO fill in or delete
     }
 
     void Lock::ScopedLock::recordTime() {
+        // TODO fill in or delete
     }
 
     void Lock::ScopedLock::_tempRelease() {
@@ -173,10 +174,10 @@ namespace mongo {
         resetTime();
     }
 
-    Lock::GlobalWrite::GlobalWrite(Locker* lockState, unsigned timeoutms)
+    Lock::GlobalWrite::GlobalWrite(Locker* lockState, Microseconds* timeBudgetRemaining)
         : ScopedLock(lockState, 'W') {
 
-        LockResult result = _lockState->lockGlobal(MODE_X, timeoutms);
+        LockResult result = _lockState->lockGlobal(MODE_X, timeBudgetRemaining);
         if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
@@ -192,10 +193,10 @@ namespace mongo {
         recordTime();
     }
 
-    Lock::GlobalRead::GlobalRead(Locker* lockState, unsigned timeoutms)
+    Lock::GlobalRead::GlobalRead(Locker* lockState, Microseconds* timeBudgetRemaining)
         : ScopedLock(lockState, 'R') {
 
-        LockResult result = _lockState->lockGlobal(MODE_S, timeoutms);
+        LockResult result = _lockState->lockGlobal(MODE_S, timeBudgetRemaining);
         if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
@@ -317,7 +318,8 @@ namespace mongo {
         _dbwlock( NULL )
     { 
         try { 
-            _dbwlock.reset(new Lock::GlobalWrite(lockState, tryms));
+            Microseconds timeBudget(tryms * 1000);
+            _dbwlock.reset(new Lock::GlobalWrite(lockState, &timeBudget));
         }
         catch ( DBTryLockTimeoutException & ) {
             return;
@@ -335,7 +337,8 @@ namespace mongo {
         _dbrlock( NULL )
     {
         try { 
-            _dbrlock.reset(new Lock::GlobalRead(lockState, tryms));
+            Microseconds timeBudget(tryms * 1000);
+            _dbrlock.reset(new Lock::GlobalRead(lockState, &timeBudget));
         }
         catch ( DBTryLockTimeoutException & ) {
             return;

@@ -254,7 +254,8 @@ namespace {
 
         virtual bool try_lock(OperationContext* txn, const Milliseconds& timeout) {
             try {
-                _rlock.reset(new Lock::GlobalRead(txn->lockState(), timeout.total_milliseconds()));
+                Microseconds timeoutLocal(timeout.total_microseconds());
+                _rlock.reset(new Lock::GlobalRead(txn->lockState(), &timeoutLocal));
             }
             catch (const DBTryLockTimeoutException&) {
                 return false;
