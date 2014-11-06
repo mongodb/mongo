@@ -32,6 +32,7 @@
 
 #include <algorithm>
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -283,6 +284,81 @@ namespace mongo {
             ASSERT_EQUALS( DiskLoc(), it->curr() );
 
             delete it;
+        }
+    }
+
+    // Insert several records, and iterate to the end. Ensure that the record iterator
+    // is EOF. Add an additional record, saving and restoring the iterator state, and check
+    // that the iterator remains EOF.
+    TEST( RecordStoreTestHarness, RecordIteratorEOF ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
+
+        const int nToInsert = 10;
+        DiskLoc locs[nToInsert];
+        for ( int i = 0; i < nToInsert; i++ ) {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                StringBuilder sb;
+                sb << "record " << i;
+                string data = sb.str();
+
+                WriteUnitOfWork uow( opCtx.get() );
+                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                                                            data.c_str(),
+                                                            data.size() + 1,
+                                                            false );
+                ASSERT_OK( res.getStatus() );
+                locs[i] = res.getValue();
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+
+            // Get a forward iterator starting at the beginning of the record store.
+            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get() ) );
+
+            // Iterate, checking EOF along the way.
+            for ( int i = 0; i < nToInsert; i++ ) {
+                ASSERT( !it->isEOF() );
+                DiskLoc nextLoc = it->getNext();
+                ASSERT( !nextLoc.isNull() );
+            }
+            ASSERT( it->isEOF() );
+            ASSERT( it->getNext().isNull() );
+
+            // Add a record and ensure we're still EOF.
+            it->saveState();
+
+            StringBuilder sb;
+            sb << "record " << nToInsert + 1;
+            string data = sb.str();
+
+            WriteUnitOfWork uow( opCtx.get() );
+            StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                                                        data.c_str(),
+                                                        data.size() + 1,
+                                                        false );
+            ASSERT_OK( res.getStatus() );
+            uow.commit();
+
+            ASSERT( it->restoreState( opCtx.get() ) );
+
+            // Iterator should still be EOF.
+            ASSERT( it->isEOF() );
+            ASSERT( it->getNext().isNull() );
         }
     }
 

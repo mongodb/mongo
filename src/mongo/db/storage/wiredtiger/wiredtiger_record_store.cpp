@@ -942,6 +942,11 @@ namespace {
         // case
         _txn = txn;
 
+        // If we've hit EOF, then this iterator is done and need not be restored.
+        if ( _eof ) {
+            return true;
+        }
+
         bool needRestore = false;
 
         if ( _forParallelCollectionScan ) {
