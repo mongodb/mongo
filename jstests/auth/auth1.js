@@ -99,9 +99,4 @@ function runTest(m) {
 }
 
 var m = setupTest();
-if (m.getDB("admin").runCommand("buildInfo").bits < 64) {
-    print("Skipping test on 32-bit platforms");
-}
-else {
-    runTest(m);
-}
+runTest(m);
