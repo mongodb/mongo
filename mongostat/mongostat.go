@@ -82,13 +82,16 @@ type ClusterMonitor struct {
 	//Mutex to protect access to LastStatLines and LastPollTimes
 	mapLock sync.Mutex
 
+	//Whether or not json is being used for the output
+	UseJson bool
+
 	//Used to format the StatLines for printing
 	formatter LineFormatter
 }
 
 //initialize the formatter that will be used
-func (cluster *ClusterMonitor) initializeFormatter(useJson bool) {
-	if useJson {
+func (cluster *ClusterMonitor) initializeFormatter() {
+	if cluster.UseJson {
 		cluster.formatter = &JSONLineFormatter{}
 	} else {
 		cluster.formatter = &GridLineFormatter{}
@@ -120,6 +123,20 @@ func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool)
 	for _, stat := range cluster.LastStatLines {
 		stat.LastPrinted = stat.Time
 	}
+
+	//If this is the beginning of execution and any of the stat lines are
+	//using wired tiger as the storage engine, print an appropriate
+	//warning message
+	if includeHeaders && !cluster.UseJson {
+		for _, stat := range cluster.LastStatLines {
+			if stat.StorageEngine == "wiredtiger" {
+				fmt.Printf("Warning: not all columns will apply to mongods" +
+					" running wiredtiger storage engine\n")
+				break
+			}
+		}
+	}
+
 	fmt.Print(out)
 }
 
@@ -280,7 +297,7 @@ func (mstat *MongoStat) AddNewNode(fullhost string) {
 func (mstat *MongoStat) Run() error {
 
 	// initialize the correct formatter for the data
-	mstat.Cluster.initializeFormatter(mstat.StatOptions.Json)
+	mstat.Cluster.initializeFormatter()
 
 	if mstat.Discovered != nil {
 		go func() {

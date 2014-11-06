@@ -74,6 +74,7 @@ func main() {
 			ReportChan:    make(chan mongostat.StatLine),
 			LastStatLines: map[string]*mongostat.StatLine{},
 			NoHeaders:     statOpts.NoHeaders,
+			UseJson:       statOpts.Json,
 		},
 	}
 
