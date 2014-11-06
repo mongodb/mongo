@@ -227,7 +227,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	if (log->log_dir_fh == NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
-		    "log_open: open fh to directory %s", (const char *)conn->log_path));
+		    "log_open: open fh to directory %s",
+		    (const char *)conn->log_path));
 		WT_RET(__wt_open(session, conn->log_path,
 		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
@@ -636,8 +637,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		    (log->sync_dir_lsn.file < sync_lsn.file)) {
 			WT_ASSERT(session, log->log_dir_fh != NULL);
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-			    "log_release: sync directory %s", log->log_dir_fh->name));
-			WT_ERR(__wt_directory_sync_fh(session, log->log_dir_fh));
+			    "log_release: sync directory %s",
+			    log->log_dir_fh->name));
+			WT_ERR(__wt_directory_sync_fh(
+			    session, log->log_dir_fh));
 			log->sync_dir_lsn = sync_lsn;
 			F_CLR(slot, SLOT_SYNC_DIR);
 		}
