@@ -1,5 +1,6 @@
 // test that a rollback of an op more than 1800 secs newer than the new master causes fatal shutdown
 
+if (false) {
 (function() {
     "use strict";
     // set up a set and grab things for later
@@ -66,3 +67,4 @@
     replTest.stopSet();
 
 }());
+};
