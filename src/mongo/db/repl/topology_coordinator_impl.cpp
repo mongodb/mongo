@@ -302,7 +302,10 @@ namespace {
         if (closestIndex == -1) {
             // Did not find any members to sync from
             std::string msg("could not find member to sync from");
-            log() << msg << rsLog;
+            // Only log when we had a valid sync source before
+            if (!_syncSource.empty()) {
+                log() << msg << rsLog;
+            }
             setMyHeartbeatMessage(now, msg);
 
             _syncSource = HostAndPort();
