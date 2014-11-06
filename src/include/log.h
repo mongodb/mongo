@@ -16,6 +16,11 @@
 	(l)->offset = 0;						\
 } while (0)
 
+#define	ZERO_LSN(l)	do {						\
+	(l)->file = 0;							\
+	(l)->offset = 0;						\
+} while (0)
+
 #define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
 
 /*
