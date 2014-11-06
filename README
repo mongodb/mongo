@@ -1,6 +1,6 @@
-WiredTiger 2.4.1: (October 16, 2014)
+WiredTiger 2.4.2: (November  6, 2014)
 
-This is version 2.4.1 of WiredTiger.
+This is version 2.4.2 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
@@ -9,7 +9,7 @@ WiredTiger release packages and documentation can be found at:
 Information on configuring, building and installing WiredTiger can be
 found at:
 
-	http://source.wiredtiger.com/2.4.1/install.html
+	http://source.wiredtiger.com/2.4.2/install.html
 
 WiredTiger licensing information can be found at:
 
