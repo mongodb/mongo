@@ -84,6 +84,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             // we'll skip backupPlan processing now
             _alreadyProduced = true;
+            _commonStats.advanced++;
         }
         else if (PlanStage::IS_EOF == childStatus) {
             updateCache();
@@ -92,17 +93,17 @@ namespace mongo {
              && !_alreadyProduced
              && !_usingBackupChild
              && NULL != _backupChildPlan.get()) {
+            // Switch the active child to the backup. Subsequent calls to work() will exercise
+            // the backup plan.
             _usingBackupChild = true;
-            childStatus = _backupChildPlan->work(out);
+            _commonStats.needTime++;
+            return PlanStage::NEED_TIME;
         }
         else if (PlanStage::NEED_FETCH == childStatus) {
             _commonStats.needFetch++;
         }
         else if (PlanStage::NEED_TIME == childStatus) {
             _commonStats.needTime++;
-        }
-        else if (PlanStage::ADVANCED == childStatus) {
-            _commonStats.advanced++;
         }
 
         return childStatus;
