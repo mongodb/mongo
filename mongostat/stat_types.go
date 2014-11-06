@@ -697,7 +697,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 			returnVal.NodeType = "REC"
 		} else if util.IsTruthy(newStat.Repl.ArbiterOnly) {
 			returnVal.NodeType = "ARB"
-		} else if util.SliceContains(newStat.Repl.Me, newStat.Repl.Passives) {
+		} else if util.SliceContains(newStat.Repl.Passives, newStat.Repl.Me) {
 			returnVal.NodeType = "PSV"
 		} else if isReplSet {
 			returnVal.NodeType = "UNK"
