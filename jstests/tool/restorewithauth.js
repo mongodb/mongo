@@ -61,15 +61,19 @@ admin.auth( "admin" , "admin" );
 var foo = conn.getDB( "foo" )
 
 // make sure no collection with the same name exists
-assert.eq(foo.system.namespaces.count( {name: "foo.bar"}), 0);
-assert.eq(foo.system.namespaces.count( {name: "foo.baz"}), 0);
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 0 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "baz"}}).collections.length, 0 )
 
 // now try to restore dump
 x = runMongoProgram( "mongorestore", "-h", "127.0.0.1:" + port,  "--dir" , dumpdir, "-vvvvv" );
 
 // make sure that the collection isn't restored
-assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 0);
-assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 0);
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 0 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "baz"}}).collections.length, 0 )
 
 // now try to restore dump with correct credentials
 x = runMongoProgram( "mongorestore",
@@ -82,8 +86,10 @@ x = runMongoProgram( "mongorestore",
                      "-vvvvv");
 
 // make sure that the collection was restored
-assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 1);
-assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 1);
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 1 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "baz"}}).collections.length, 1 )
 
 // make sure the collection has 4 documents
 assert.eq(foo.bar.count(), 4);
@@ -92,8 +98,10 @@ assert.eq(foo.baz.count(), 4);
 foo.dropDatabase();
 
 // make sure that the collection is empty
-assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 0);
-assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 0);
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 0 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "baz"}}).collections.length, 0 )
 
 foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
@@ -107,8 +115,10 @@ x = runMongoProgram("mongorestore",
                     "-vvvvv");
 
 // make sure that the collection was restored
-assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 1);
-assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 1);
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "bar"}}).collections.length, 1 )
+assert.eq( foo.runCommand({"listCollections": 1,
+			   "filter": {"name": "baz"}}).collections.length, 1 )
 assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
 assert.eq(foo.bar.getIndexes().length, 2);
