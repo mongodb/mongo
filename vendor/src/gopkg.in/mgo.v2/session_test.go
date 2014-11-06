@@ -3192,6 +3192,48 @@ func (s *S) TestFsync(c *C) {
 	c.Assert(err, IsNil)
 }
 
+func (s *S) TestRepairCursor(c *C) {
+	if !s.versionAtLeast(2, 7) {
+		c.Skip("RepairCursor only works on 2.7+")
+	}
+
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+	session.SetBatch(2)
+
+	coll := session.DB("mydb").C("mycoll3")
+	err = coll.DropCollection()
+
+	ns := []int{0, 10, 20, 30, 40, 50}
+	for _, n := range ns {
+		coll.Insert(M{"n": n})
+	}
+
+	repairIter := coll.Repair()
+
+	c.Assert(repairIter.Err(), IsNil)
+
+	result := struct{ N int }{}
+	resultCounts := map[int]int{}
+	for repairIter.Next(&result) {
+		resultCounts[result.N]++
+	}
+
+	c.Assert(repairIter.Next(&result), Equals, false)
+	c.Assert(repairIter.Err(), IsNil)
+	c.Assert(repairIter.Close(), IsNil)
+
+	// Verify that the results of the repair cursor are valid.
+	// The repair cursor can return multiple copies
+	// of the same document, so to check correctness we only
+	// need to verify that at least 1 of each document was returned.
+
+	for _, key := range ns {
+		c.Assert(resultCounts[key] > 0, Equals, true)
+	}
+}
+
 func (s *S) TestPipeIter(c *C) {
 	if !s.versionAtLeast(2, 1) {
 		c.Skip("Pipe only works on 2.1+")

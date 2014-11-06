@@ -1,4 +1,4 @@
-gopkg.in/mgo.v2                         231ce7e0549b5ce60d35ed805bff505cab7098e4
+gopkg.in/mgo.v2                         8c1ecfe7d8a0b5bc49a809f4c15955e514f77a80
 github.com/jacobsa/oglematchers         4fc24f97b5b74022c2a3f4ca7eed57ca29083d3e
 github.com/smartystreets/goconvey       75bc4a2dad71e5c5b51c5009b33eba766ec57051
 github.com/jessevdk/go-flags            8ec9564882e7923e632f012761c81c46dcf5bec1

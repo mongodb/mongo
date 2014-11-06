@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -71,6 +72,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("--db is required when --excludeCollection is specified")
 	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
+	case dump.OutputOptions.Repair && dump.InputOptions.Query != "":
+		return fmt.Errorf("cannot run a query with --repair enabled")
 	case dump.OutputOptions.JobThreads < 1:
 		return fmt.Errorf("number of processing threads must be >= 1")
 	}
@@ -334,9 +337,26 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	}
 	defer out.Close()
 
-	log.Logf(log.Always, "writing %v to %v", intent.Key(), outFilepath)
-	if err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
-		return err
+	if !dump.OutputOptions.Repair {
+		log.Logf(log.Always, "writing %v to %v", intent.Key(), outFilepath)
+		if err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
+			return err
+		}
+	} else {
+		// handle repairs as a special case, since we cannot count them
+		log.Logf(log.Always, "writing repair of %v to %v", intent.Key(), outFilepath)
+		repairIter := session.DB(intent.DB).C(intent.C).Repair()
+		repairCounter := 0
+		if err := dump.dumpIterToWriter(repairIter, out, &repairCounter); err != nil {
+			if strings.Index(err.Error(), "no such cmd: repairCursor") > 0 {
+				// return a more helpful error message for early server versions
+				return fmt.Errorf(
+					"error: --repair flag cannot be used on mongodb versions before 2.7.8.")
+			}
+			return fmt.Errorf("repair error: %v", err)
+		}
+		log.Logf(log.Always,
+			"\trepair cursor found %v documents in %v", repairCounter, intent.Key())
 	}
 
 	// don't dump metatdata for SystemIndexes collection
@@ -366,6 +386,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 	query *mgo.Query, intent *intents.Intent, writer io.Writer) (err error) {
 
 	dumpCounter := 0
+
 	total, err := query.Count()
 	if err != nil {
 		return fmt.Errorf("error reading from db: %v", err)
@@ -386,6 +407,14 @@ func (dump *MongoDump) dumpQueryToWriter(
 	// this allows disk i/o to not block reads from the db,
 	// which gives a slight speedup on benchmarks
 	iter := query.Iter()
+	return dump.dumpIterToWriter(iter, writer, &dumpCounter)
+}
+
+// dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
+// a counter, and dumps the iterator's contents to the writer.
+func (dump *MongoDump) dumpIterToWriter(
+	iter *mgo.Iter, writer io.Writer, counterPtr *int) error {
+
 	buffChan := make(chan []byte)
 	go func() {
 		for {
@@ -426,9 +455,9 @@ func (dump *MongoDump) dumpQueryToWriter(
 		if err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
-		dumpCounter++
+		*counterPtr++
 	}
-	err = w.Flush()
+	err := w.Flush()
 	if err != nil {
 		return fmt.Errorf("error flushing file writer: %v", err)
 	}
@@ -436,7 +465,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 }
 
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied
-// to the given the db. Only works with schema version == 3
+// to the given the db. Only works with schema version >= 3
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {

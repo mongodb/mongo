@@ -285,11 +285,11 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	}
 
 	session, err := restore.SessionProvider.GetSession()
-	session.SetSocketTimeout(0)
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	defer session.Close()
+	session.SetSocketTimeout(0)
 
 	log.Logf(log.DebugLow, "merging %v from temp collection", collectionType)
 	res := bson.M{}

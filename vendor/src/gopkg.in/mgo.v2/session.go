@@ -1816,6 +1816,75 @@ func (c *Collection) Find(query interface{}) *Query {
 	return q
 }
 
+type repairCmd struct {
+	RepairCursor string           `bson:"repairCursor"`
+	Cursor       *repairCmdCursor ",omitempty"
+}
+
+type repairCmdCursor struct {
+	BatchSize int `bson:"batchSize,omitempty"`
+}
+
+// Repair returns an iterator that goes over all recovered documents in the
+// collection, in a best-effort manner. This is most useful when there are
+// damaged data files. Multiple copies of the same document may be returned
+// by the iterator.
+//
+// Repair is supported in MongoDB 2.7.8 and later.
+func (c *Collection) Repair() *Iter {
+	// Clone session and set it to strong mode so that the server
+	// used for the query may be safely obtained afterwards, if
+	// necessary for iteration when a cursor is received.
+	session := c.Database.Session
+	session.m.Lock()
+	batchSize := int(session.queryConfig.op.limit)
+	session.m.Unlock()
+	cloned := session.Clone()
+	cloned.SetMode(Strong, false)
+	defer cloned.Close()
+	c = c.With(cloned)
+
+	iter := &Iter{
+		session: session,
+		timeout: -1,
+	}
+	iter.gotReply.L = &iter.m
+
+	var result struct {
+		Cursor struct {
+			FirstBatch []bson.Raw "firstBatch"
+			Id         int64
+		}
+	}
+
+	cmd := repairCmd{
+		RepairCursor: c.Name,
+		Cursor:       &repairCmdCursor{batchSize},
+	}
+	iter.err = c.Database.Run(cmd, &result)
+	if iter.err != nil {
+		return iter
+	}
+	docs := result.Cursor.FirstBatch
+	for i := range docs {
+		iter.docData.Push(docs[i].Data)
+	}
+	if result.Cursor.Id != 0 {
+		socket, err := cloned.acquireSocket(true)
+		if err != nil {
+			// Cloned session is in strong mode, and the query
+			// above succeeded. Should have a reserved socket.
+			panic("internal error: " + err.Error())
+		}
+		iter.server = socket.Server()
+		socket.Release()
+		iter.op.cursorId = result.Cursor.Id
+		iter.op.collection = c.FullName
+		iter.op.replyFunc = iter.replyFunc()
+	}
+	return iter
+}
+
 // FindId is a convenience helper equivalent to:
 //
 //     query := collection.Find(bson.M{"_id": id})
