@@ -462,44 +462,14 @@ namespace {
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
-                                                        const DocWriter* doc,
-                                                        bool enforceQuota ) {
+                                                             const DocWriter* doc,
+                                                             bool enforceQuota ) {
         const int len = doc->documentSize();
-
-        if ( _isCapped && len > _cappedMaxSize ) {
-            return StatusWith<DiskLoc>( ErrorCodes::BadValue,
-                                       "object to insert exceeds cappedMaxSize" );
-        }
 
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
-        WT_CURSOR *c = curwrap.get();
-
-        DiskLoc loc;
-        if (_useOplogHack) {
-            StatusWith<DiskLoc> status = extractAndCheckLocForOplog(buf.get(), len);
-            if (!status.isOK())
-                return status;
-            loc = status.getValue();
-        }
-        else {
-            loc = _nextId();
-        }
-
-        c->set_key(c, _makeKey(loc));
-        WiredTigerItem value(buf.get(), len);
-        c->set_value(c, value.Get());
-        int ret = c->insert(c);
-        invariantWTOK(ret);
-
-        _changeNumRecords( txn, true );
-        _increaseDataSize( txn, len );
-
-        cappedDeleteAsNeeded( txn );
-
-        return StatusWith<DiskLoc>( loc );
+        return insertRecord( txn, buf.get(), len, enforceQuota );
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::updateRecord( OperationContext* txn,
