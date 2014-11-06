@@ -114,10 +114,6 @@ namespace {
 } // namespace
 
 
-    //
-    // LockHead
-    //
-
     /**
      * There is one of these objects per each resource which has a lock on it.
      *
@@ -716,11 +712,18 @@ namespace {
     }
 
     void LockManager::_dumpBucket(const LockBucket* bucket) const {
-        StringBuilder sb;
+        for (LockHeadMap::const_iterator it = bucket->data.begin();
+             it != bucket->data.end();
+             it++) {
 
-        LockHeadMap::const_iterator it = bucket->data.begin();
-        while (it != bucket->data.end()) {
             const LockHead* lock = it->second;
+
+            if (lock->grantedQueueBegin == NULL) {
+                // If there are no granted requests, this lock is empty
+                continue;
+            }
+
+            StringBuilder sb;
             sb << "Lock @ " << lock << ": " << lock->resourceId.toString() << '\n';
 
             sb << "GRANTED:\n";
@@ -749,12 +752,8 @@ namespace {
                     << '\n';
             }
 
-            sb << '\n';
-
-            it++;
+            log() << sb.str();
         }
-
-        log() << sb.str();
     }
 
 

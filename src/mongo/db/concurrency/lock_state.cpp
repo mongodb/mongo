@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -114,7 +114,7 @@ namespace mongo {
         const uint64_t LockMgrDumpThrottleMicros = 30 * Timer::microsPerSecond;
         AtomicUInt64 lastDumpTimestampMicros(0);
 
-        void dumpGlobalLockManagerThrottled() {
+        void dumpGlobalLockManagerAndCallstackThrottled(const Locker* locker) {
             const uint64_t lastDumpMicros = lastDumpTimestampMicros.load();
 
             // Don't print too frequently
@@ -123,7 +123,26 @@ namespace mongo {
             // Only one thread should dump the lock manager in order to not pollute the log
             if (lastDumpTimestampMicros.compareAndSwap(lastDumpMicros,
                                                        curTimeMicros64()) == lastDumpMicros) {
+
+                log() << "LockerId " << locker->getId()
+                      << " has been waiting to acquire lock for more than 30 seconds. MongoDB will"
+                      << " print the lock manager state and the stack of the thread that has been"
+                      << " waiting, for diagnostic purposes. This message does not necessary imply"
+                      << " that the server is experiencing an outage, but might be an indication"
+                      << " of an overloaded server.";
+
+                // Dump the lock manager state and the stack trace so we can investigate
                 globalLockManager.dump();
+
+                log() << '\n';
+                printStackTrace();
+
+                // If a deadlock was discovered, the server will never recover from it, so shutdown
+                DeadlockDetector wfg(globalLockManager, locker);
+                if (wfg.check().hasCycle()) {
+                    severe() << "Deadlock found during lock acquisition: " << wfg.toString();
+                    fassertFailed(28557);
+                }
             }
         }
     }
@@ -458,7 +477,7 @@ namespace mongo {
             // This will occasionally dump the global lock manager in case lock acquisition is
             // taking too long.
             if (elapsedTimeMs > 30000U) {
-                dumpGlobalLockManagerThrottled();
+                dumpGlobalLockManagerAndCallstackThrottled(this);
             }
         }
 
