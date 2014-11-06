@@ -147,7 +147,7 @@ namespace mongo {
 
             string todb = cmdObj.getStringField("todb");
             if ( fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty() ) {
-                errmsg = "parms missing - {copydb: 1, fromhost: <connection string>, "
+                errmsg = "params missing - {copydb: 1, fromhost: <connection string>, "
                          "fromdb: <db>, todb: <db>}";
                 return false;
             }
