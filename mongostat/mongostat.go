@@ -87,6 +87,9 @@ type ClusterMonitor struct {
 
 	//Used to format the StatLines for printing
 	formatter LineFormatter
+
+	//Whether or not the last group included any wiredtiger nodes
+	lastHadWT bool
 }
 
 //initialize the formatter that will be used
@@ -124,14 +127,15 @@ func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool)
 		stat.LastPrinted = stat.Time
 	}
 
-	//If the headers and being printed and any of the stat lines are
-	//using wired tiger as the storage engine, print an appropriate
-	//warning message
-	if includeHeaders && !cluster.UseJson {
+	//If appropriate, print a warning message about how the columns relate
+	//to the wired tiger storage engine
+	if includeHeaders && !cluster.UseJson && !cluster.lastHadWT {
+		cluster.lastHadWT = false
 		for _, stat := range cluster.LastStatLines {
 			if stat.StorageEngine == "wiredtiger" {
 				fmt.Printf("Warning: not all columns will apply to mongods" +
-					" running wiredtiger storage engine\n")
+					" running WiredTiger storage engine\n")
+				cluster.lastHadWT = true
 				break
 			}
 		}
