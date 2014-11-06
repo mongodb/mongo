@@ -505,6 +505,7 @@ static int
 __curtable_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_TABLE *ctable;
+	WT_DECL_ITEM(value_copy);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -519,28 +520,32 @@ __curtable_update(WT_CURSOR *cursor)
 	 * old index keys, so we make a temporary copy of the new value.
 	 */
 	if (ctable->table->nindices > 0) {
+		WT_ERR(__wt_scr_alloc(
+		    session, ctable->cg_cursors[0]->value.size, &value_copy));
 		WT_ERR(__wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
-		    cursor->value_format, &cursor->value));
+		    cursor->value_format, value_copy));
 		APPLY_CG(ctable, search);
-		/*
-		 * Remove only if the key exists.
-		 */
+
+		/* Remove only if the key exists. */
 		if (ret == 0) {
 			WT_ERR(
 			    __apply_idx(ctable, offsetof(WT_CURSOR, remove)));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
-			    cursor->value_format, &cursor->value));
+			    cursor->value_format, value_copy));
 		} else
 			WT_ERR_NOTFOUND_OK(ret);
 	}
+
 	APPLY_CG(ctable, update);
 	WT_ERR(ret);
-	if (ctable->idx_cursors != NULL)
+
+	if (ctable->table->nindices > 0)
 		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert)));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
+	__wt_scr_free(&value_copy);
 	return (ret);
 }
 

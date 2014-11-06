@@ -378,6 +378,7 @@ __create_index(WT_SESSION_IMPL *session,
 	}
 
 	/* Calculate the key/value formats. */
+	WT_CLEAR(icols);
 	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
 	    !have_extractor)
 		WT_ERR_MSG(session, EINVAL,
