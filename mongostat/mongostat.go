@@ -124,7 +124,7 @@ func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool)
 		stat.LastPrinted = stat.Time
 	}
 
-	//If this is the beginning of execution and any of the stat lines are
+	//If the headers and being printed and any of the stat lines are
 	//using wired tiger as the storage engine, print an appropriate
 	//warning message
 	if includeHeaders && !cluster.UseJson {
