@@ -56,7 +56,9 @@ db.dropAllUsers();
 db.dropAllRoles();
 
 jsTestLog("Restore foo database from dump that doesn't contain user data ");
-runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
+// This test depends on W=0 to mask unique index violations.
+// This should be fixed once we implement TOOLS-341
+runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", w: "0"});
 
 db = mongod.getDB('foo');
 
@@ -88,7 +90,7 @@ assert.eq(0, db.getRoles().length, "didn't drop roles");
 assert.eq(0, db.bar.count(), "didn't drop 'bar' collection");
 
 jsTestLog("Restore foo database without restoring user data, even though it's in the dump");
-runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo'});
+runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', w: "0"});
 db = mongod.getDB('foo');
 
 assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
@@ -97,7 +99,7 @@ assert.eq(0, db.getUsers().length, "Restored users even though it shouldn't have
 assert.eq(0, db.getRoles().length, "Restored roles even though it shouldn't have");
 
 jsTestLog("Restore foo database *with* user data");
-runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: ""});
+runTool("mongorestore", mongod, {dir: dumpDir + "foo/", db: 'foo', restoreDbUsersAndRoles: "", w: "0"});
 db = mongod.getDB('foo');
 admindb = mongod.getDB('admin');
 
@@ -119,7 +121,7 @@ db.createRole({role: 'role2', roles: [], privileges:[]});
 jsTestLog("Restore foo database (and user data) with --drop so it overrides the changes made");
 // Restore with --drop to override the changes to user data
 runTool("mongorestore", mongod,
-        {dir: dumpDir + "foo/", db: 'foo', drop: "", restoreDbUsersAndRoles: ""});
+        {dir: dumpDir + "foo/", db: 'foo', drop: "", restoreDbUsersAndRoles: "", w: "0"});
 db = mongod.getDB('foo');
 admindb = mongod.getDB('admin');
 
@@ -150,7 +152,7 @@ db.getSiblingDB('bar').createUser({user: "user2", pwd: 'pwd', roles: []});
 db.getSiblingDB('admin').dropAllUsers();
 
 jsTestLog("Restore just the admin database. User data should be restored by default");
-runTool("mongorestore", mongod, {dir: dumpDir + "admin/", db: 'admin', drop: ""});
+runTool("mongorestore", mongod, {dir: dumpDir + "admin/", db: 'admin', drop: "", w: "0"});
 db = mongod.getDB('foo');
 var otherdb = db.getSiblingDB('bar');
 var admindb = db.getSiblingDB('admin');
@@ -184,7 +186,7 @@ assert.eq(0, db.getRoles().length, "didn't drop roles");
 assert.eq(0, db.bar.count(), "didn't drop 'bar' collection");
 
 jsTestLog("Restore all databases");
-runTool("mongorestore", mongod, {dir: dumpDir});
+runTool("mongorestore", mongod, {dir: dumpDir, w: "0"});
 db = mongod.getDB('foo');
 
 assert.soon(function() { return db.bar.findOne(); }, "no data after restore");
