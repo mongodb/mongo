@@ -8,6 +8,29 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_directory_sync_fh --
+ *	Flush a directory file handle.  We don't use __wt_fsync because
+ *	most file systems don't require this step and we don't want to
+ *	penalize them by calling fsync.
+ */
+int
+__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+#ifdef __linux__
+	WT_DECL_RET;
+
+	WT_SYSCALL_RETRY(fsync(fh->fd), ret);
+	if (ret != 0)
+		WT_ERR_MSG(session, ret, "%s: fsync", path);
+	return (ret);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	return (0);
+#endif
+}
+
+/*
  * __wt_directory_sync --
  *	Flush a directory to ensure a file creation is durable.
  */

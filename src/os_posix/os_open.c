@@ -8,6 +8,29 @@
 #include "wt_internal.h"
 
 /*
+ * __open_directory --
+ *	Open up a file handle to a directory.
+ */
+static int
+__open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
+{
+	WT_DECL_RET;
+	char *dir;
+
+	if ((dir = strrchr(path, '/')) == NULL)
+		path = (char *)".";
+	else
+		*dir = '\0';
+	WT_SYSCALL_RETRY(((*fd =
+		open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	if (dir != NULL)
+		*dir = '/';
+	if (ret != 0)
+		WT_RET_MSG(session, ret, "%s: open_directory", path);
+	return (ret);
+}
+
+/*
  * __wt_open --
  *	Open a file handle.
  */
@@ -44,6 +67,11 @@ __wt_open(WT_SESSION_IMPL *session,
 		return (0);
 
 	WT_RET(__wt_filename(session, name, &path));
+
+	if (dio_type == WT_FILE_TYPE_DIRECTORY) {
+		WT_ERR(__open_directory(session, path, &fd));
+		goto setupfh;
+	}
 
 	f = O_RDWR;
 #ifdef O_BINARY
@@ -97,6 +125,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		    "%s: open failed with direct I/O configured, some "
 		    "filesystem types do not support direct I/O" : "%s", path);
 
+setupfh:
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	/*
 	 * Security:

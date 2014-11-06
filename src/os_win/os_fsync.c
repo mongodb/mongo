@@ -8,6 +8,18 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_directory_sync_fh --
+ *	Flush a directory file handle.
+ */
+int
+__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh);
+{
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	return (0);
+}
+
+/*
  * __wt_directory_sync --
  *	Flush a directory to ensure a file creation is durable.
  */

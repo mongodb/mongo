@@ -103,6 +103,7 @@ typedef struct {
 	uint32_t	 fileid;	/* Current log file number */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
+	WT_FH           *log_dir_fh;	/* Log directory file handle */
 
 	/*
 	 * System LSNs

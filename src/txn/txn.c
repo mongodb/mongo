@@ -283,6 +283,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!cval.val)
 		txn->txn_logsync = 0;
 
+	WT_RET(__wt_verbose(session, WT_VERB_LOG,
+	    "txn_begin: conn logsync %d, txn logsync %d",
+	    S2C(session)->txn_logsync, txn->txn_logsync));
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)

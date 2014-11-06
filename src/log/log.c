@@ -222,6 +222,15 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	lastlog = 0;
 	firstlog = UINT32_MAX;
 
+	/*
+	 * Open up a file handle to the log directory if we haven't.
+	 */
+	if (log->log_dir_fh == NULL) {
+		WT_RET(__wt_verbose(session, WT_VERB_LOG,
+		    "log_open: open fh to directory %s", (const char *)conn->log_path));
+		WT_RET(__wt_open(session, conn->log_path,
+		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
+	}
 	WT_RET(__wt_log_get_files(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
@@ -276,6 +285,12 @@ __wt_log_close(WT_SESSION_IMPL *session)
 		    "closing log %s", log->log_fh->name));
 		WT_RET(__wt_close(session, log->log_fh));
 		log->log_fh = NULL;
+	}
+	if (log->log_dir_fh != NULL) {
+		WT_RET(__wt_verbose(session, WT_VERB_LOG,
+		    "closing log directory %s", log->log_dir_fh->name));
+		WT_RET(__wt_close(session, log->log_dir_fh));
+		log->log_dir_fh = NULL;
 	}
 	return (0);
 }
@@ -560,7 +575,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LSN sync_lsn;
 	size_t write_size;
 	int locked;
-	char *dir_path;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
@@ -620,9 +634,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		if (F_ISSET(slot, SLOT_SYNC_DIR) &&
 		    (log->sync_dir_lsn.file < sync_lsn.file)) {
-			WT_ERR(__wt_filename(
-			    session, log->log_fh->name, &dir_path));
-			WT_ERR(__wt_directory_sync(session, dir_path));
+			WT_ASSERT(session, log->log_dir_fh != NULL);
+			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+			    "log_release: sync directory %s", log->log_dir_fh->name));
+			WT_ERR(__wt_directory_sync_fh(session, log->log_dir_fh));
 			log->sync_dir_lsn = sync_lsn;
 			F_CLR(slot, SLOT_SYNC_DIR);
 		}
@@ -632,6 +647,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		if (F_ISSET(slot, SLOT_SYNC) &&
 		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+			    "log_release: sync log %s", log->log_fh->name));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
 			WT_ERR(__wt_fsync(session, log->log_fh));
 			F_CLR(slot, SLOT_SYNC);
