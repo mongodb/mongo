@@ -35,6 +35,8 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
+#include <limits>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -114,14 +116,20 @@ namespace mongo {
                 suffix = "num";
             }
 
+            // Convert unsigned 64-bit integral value of statistic to BSON-friendly long long.
+            // If there is an overflow, set statistic value to max(long long).
+            const long long maxLL = std::numeric_limits<long long>::max();
+            long long v =  value > static_cast<uint64_t>(maxLL) ?
+                maxLL : static_cast<long long>(value);
+
             if ( prefix.size() == 0 ) {
-                bob->append(desc, pvalue);
+                bob->appendNumber(desc, v);
             }
             else {
                 BSONObjBuilder*& sub = subs[prefix.toString()];
                 if ( !sub )
                     sub = new BSONObjBuilder();
-                sub->append( mongoutils::str::ltrim(suffix.toString()), pvalue );
+                sub->appendNumber(mongoutils::str::ltrim(suffix.toString()), v);
             }
         }
 
