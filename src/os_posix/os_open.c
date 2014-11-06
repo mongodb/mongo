@@ -46,6 +46,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	char *path;
 
 	conn = S2C(session);
+	direct_io = 0;
 	fh = NULL;
 	fd = -1;
 	path = NULL;
@@ -101,7 +102,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	} else
 		mode = 0;
 
-	direct_io = 0;
 #ifdef O_DIRECT
 	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
 		f |= O_DIRECT;
