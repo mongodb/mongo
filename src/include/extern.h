@@ -447,6 +447,7 @@ extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset,
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep);
 extern int __wt_filesize_name( WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock);
+extern int __wt_directory_sync(WT_SESSION_IMPL *session, char *path);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len);
@@ -469,7 +470,6 @@ extern int __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
 extern int __wt_once(void (*init_routine)(void));
-extern int __wt_directory_sync(WT_SESSION_IMPL *session, char *path);
 extern int __wt_open(WT_SESSION_IMPL *session, const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_absolute_path(const char *path);

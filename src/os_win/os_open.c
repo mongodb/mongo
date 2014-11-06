@@ -7,14 +7,6 @@
 
 #include "wt_internal.h"
 
-int
-__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-}
-
 /*
  * __wt_open --
  *	Open a file handle.

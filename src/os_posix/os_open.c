@@ -8,54 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_directory_sync --
- *	Fsync the directory in which we created the file.
- */
-int
-__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
-{
-#ifdef __linux__
-	WT_DECL_RET;
-	int fd;
-	char *dir;
-
-	/*
-	 * According to the Linux fsync man page:
-	 *	Calling fsync() does not necessarily ensure that the entry in
-	 *	the directory containing the file has also reached disk. For
-	 *	that an explicit fsync() on a file descriptor for the directory
-	 *	is also needed.
-	 *
-	 * Open the WiredTiger home directory and sync it, I don't want the rest
-	 * of the system to have to wonder if opening a file creates it.
-	 */
-	if ((dir = strrchr(path, '/')) == NULL)
-		path = (char *)".";
-	else
-		*dir = '\0';
-	WT_SYSCALL_RETRY(((fd =
-	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
-	if (dir != NULL)
-		*dir = '/';
-	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: open", path);
-
-	WT_SYSCALL_RETRY(fsync(fd), ret);
-	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: fsync", path);
-
-err:	WT_SYSCALL_RETRY(close(fd), ret);
-	if (ret != 0)
-		__wt_err(session, ret, "%s: close", path);
-	return (ret);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-#endif
-}
-
-/*
  * __wt_open --
  *	Open a file handle.
  */
@@ -163,14 +115,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
-
-	/*
-	 * If this is a file we are syncing, some filesystems require that we
-	 * sync the directory to be confident that the file will appear.
-	 * NOTE:  Logging manages its own sync of the directory.
-	 */
-	if (dio_type == WT_FILE_TYPE_DATA && F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__wt_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
