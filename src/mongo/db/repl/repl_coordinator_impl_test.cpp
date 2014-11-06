@@ -926,6 +926,13 @@ namespace {
             }
         }
 
+        virtual Status checkForInterruptNoAssert() const {
+            if (_interruptOp) {
+                return Status(ErrorCodes::Interrupted, "operation was interrupted");
+            }
+            return Status::OK();
+        }
+
         /**
          * Can only be called before any multi-threaded access to this object has begun.
          */

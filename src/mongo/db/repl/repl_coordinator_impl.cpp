@@ -951,10 +951,9 @@ namespace {
         while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
             const int elapsed = timer->millis();
 
-            try {
-                txn->checkForInterrupt();
-            } catch (const DBException& e) {
-                return StatusAndDuration(e.toStatus(), Milliseconds(elapsed));
+            Status interruptedStatus = txn->checkForInterruptNoAssert();
+            if (!interruptedStatus.isOK()) {
+                return StatusAndDuration(interruptedStatus, Milliseconds(elapsed));
             }
 
             if (!waitInfo.master) {
