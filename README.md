@@ -3,7 +3,7 @@
 This is the 2.7.x **unstable** branch. This project is a work in progress.
  
  - **bsondump** - _display BSON files in a human-readable format_
- - **mongoimport** - _Convert data from JSON or CSV and insert them into a collection_
+ - **mongoimport** - _Convert data from JSON, TSV or CSV and insert them into a collection_
  - **mongoexport** - _Write an existing collection to CSV or JSON format_
  - **mongodump/mongorestore** - _Dump MongoDB backups to disk in .BSON format, or restore them to a live database_
  - **mongostat** - _Monitor live MongoDB servers, replica sets, or sharded clusters_
@@ -26,7 +26,7 @@ cd mongo-tools
 
 #### Building Tools
 
-Use `go build` to build the tool binaries.
+Use `go build` to build the tool binaries. Requires Go version 1.3 and up.
 
 ```
 mkdir bin/
