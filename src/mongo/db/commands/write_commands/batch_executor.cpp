@@ -1177,7 +1177,7 @@ namespace mongo {
         // Updates from the write commands path can yield.
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        int attempt = 1;
+        int attempt = 0;
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
@@ -1276,16 +1276,18 @@ namespace mongo {
                 result->getStats().upsertedID = resUpsertedID;
             }
             catch ( const WriteConflictException& dle ) {
+                ++attempt;
                 if ( isMulti ) {
                     log() << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
-                else if ( attempt++ > 1 ) {
-                    log() << "Had WriteConflict doing update on " << nsString
-                          << ", attempt: " << attempt << " retrying";
-                    createCollection = false;
-                    fakeLoop = -1;
-                }
+
+                LOG(attempt > 1 ? 0 : 1) << "Had WriteConflict doing update on " << nsString
+                                         << ", attempt: " << attempt << " retrying";
+
+                createCollection = false;
+                // RESTART LOOP
+                fakeLoop = -1;
             }
             catch (const DBException& ex) {
                 Status status = ex.toStatus();

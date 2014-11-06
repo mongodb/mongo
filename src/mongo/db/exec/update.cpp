@@ -754,11 +754,15 @@ namespace mongo {
                 }
                 catch ( const WriteConflictException& de ) {
                     if ( !_params.request->isMulti() ) {
-                        // for single cases, we just restart.
+
+                        log() << "Had WriteConflict in the middle of a single update, "
+                              << "restarting the operation";
                         throw;
                     }
 
-                    log() << "Had WriteConflict in the middle of a multi-update, redoing the doc";
+                    log() << "Had WriteConflict in the middle of a multi-update, "
+                          << "retrying the current update";
+
                     OperationContext* txn = _params.request->getOpCtx();
                     txn->recoveryUnit()->commitAndRestart();
                     if ( !_collection->findDoc( txn, loc, &reFetched ) ) {
