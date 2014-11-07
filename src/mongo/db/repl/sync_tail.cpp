@@ -370,7 +370,7 @@ namespace repl {
             uint32_t hash = 0;
             MurmurHash3_x86_32( ns, len, 0, &hash);
 
-            const char* opType = it->getField( "op" ).value();
+            const char* opType = it->getField( "op" ).valuestrsafe();
 
             if (getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking() &&
                 isCrudOpType(opType)) {
