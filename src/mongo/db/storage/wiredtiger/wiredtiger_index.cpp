@@ -748,7 +748,14 @@ namespace {
         WiredTigerItem item = _toItem( key, loc, &data );
         c->set_key(c, item.Get() );
         c->set_value(c, &emptyItem);
-        return wtRCToStatus( c->insert(c) );
+        int ret = c->insert( c );
+
+        if ( ret != WT_DUPLICATE_KEY )
+            return wtRCToStatus( ret );
+        // If the record was already in the index, we just return OK.
+        // This can happen, for example, when building a background index while documents are being
+        // written and reindexed.
+        return Status::OK();
     }
 
     void WiredTigerIndexStandard::_unindex( WT_CURSOR* c,
