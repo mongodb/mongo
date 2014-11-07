@@ -413,7 +413,7 @@ __statlog_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "statistics log server error");
+err:		WT_PANIC_MSG(session, ret, "statistics log server error");
 	}
 	__wt_buf_free(session, &path);
 	__wt_buf_free(session, &tmp);

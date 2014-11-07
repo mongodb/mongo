@@ -633,7 +633,7 @@ __wt_cache_pool_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "cache pool manager server error");
+err:		WT_PANIC_MSG(session, ret, "cache pool manager server error");
 	}
 	return (NULL);
 }
