@@ -121,6 +121,11 @@ namespace repl {
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
 
         /**
+         * Logs a comment to oplog
+         */
+        virtual StatusWith<OpTime> logOpMessage(const std::string& msg) = 0;
+
+        /**
          * Returns the HostAndPort of the remote client connected to us that initiated the operation
          * represented by "txn".
          */

@@ -113,6 +113,11 @@ namespace repl {
         return _lastOpTime;
     }
 
+    StatusWith<OpTime>
+    ReplicationCoordinatorExternalStateMock::logOpMessage(const std::string& msg) {
+        return StatusWith<OpTime>(OpTime());
+    };
+
     void ReplicationCoordinatorExternalStateMock::setLastOpTime(
         const StatusWith<OpTime>& lastApplied) {
         _lastOpTime = lastApplied;

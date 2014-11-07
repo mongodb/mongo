@@ -286,7 +286,8 @@ namespace repl {
         enum PostMemberStateUpdateAction {
             kActionNone,
             kActionCloseAllConnections,  // Also indicates that we should clear sharding state.
-            kActionChooseNewSyncSource
+            kActionChooseNewSyncSource,
+            kActionOpLogMsgPrimary,
         };
 
         // Struct that holds information about clients waiting for replication.
