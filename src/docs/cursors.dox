@@ -125,4 +125,6 @@ For example:
 
 @snippet ex_all.c Open a cursor on the metadata
 
+The metadata cursor is read-only, and the metadata cannot be modified.
+
 */
