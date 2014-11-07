@@ -3,6 +3,8 @@
 Random.setRandomSeed();
 
 var coll = db.index_multi;
+coll.drop();
+db.results.drop();
 
 var bulk = coll.initializeUnorderedBulkOp();
 print("Populate the collection with random data");
@@ -51,9 +53,11 @@ for (var i = 90; i < 93; i++) {
     spec["field"+(i+1)] = 1;
     spec["field"+(i+2)] = 1;
     indexJobs.push(startParallelShell(setupDBStr +
-                                      "db.index_multi.createIndex(" + tojson(spec) + "," +
-                                                                  "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      "printjson(db.index_multi.createIndex(" + tojson(spec) + "," +
+                                      "{ background: true }));" +
+                                      "db.results.insert(Object.extend(" +
+                                      "db.runCommand({ getlasterror: 1 }), " + tojson(spec) +
+                                      ") );",
                                       null, // port
                                       true)); // noconnect
     specs.push(spec);
@@ -66,9 +70,11 @@ for (var i = 30; i < 90; i += 2) {
     spec["field"+i] = 1;
     spec["field"+(i+1)] = 1;
     indexJobs.push(startParallelShell(setupDBStr +
-                                      "db.index_multi.createIndex(" + tojson(spec) + ", " +
-                                                                  "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
+                                      "{ background: true }));" +
+                                      "db.results.insert(Object.extend(" +
+                                      "db.runCommand({ getlasterror: 1 }), " + tojson(spec) +
+                                      ") );",
                                       null, // port
                                       true)); // noconnect
     specs.push(spec);
@@ -80,9 +86,11 @@ for (var i = 0; i < 30; i++) {
     var spec = {};
     spec["field"+i] = 1;
     indexJobs.push(startParallelShell(setupDBStr +
-                                      "db.index_multi.createIndex(" + tojson(spec) + ", " +
-                                                                  "{ background: true });" +
-                                      "db.results.insert(db.runCommand({ getlasterror: 1 }));",
+                                      "printjson(db.index_multi.createIndex(" + tojson(spec) + ", " +
+                                      "{ background: true }));" +
+                                      "db.results.insert(Object.extend(" +
+                                      "db.runCommand({ getlasterror: 1 }), " + tojson(spec) +
+                                      ") );",
                                       null, // port
                                       true)); // noconnect
     specs.push(spec);
@@ -112,12 +120,10 @@ indexJobs.forEach(function(join) {
 });
 
 printjson(db.results.find().toArray());
-
-printjson(coll.getIndexes());
+//assert.eq(coll.getIndexes().length, 64, "didn't see 64 indexes");
 
 print("Make sure we end up with 64 indexes");
 for (var i in specs) {
-    print("trying to hint on "+tojson(specs[i]));
     var explain = coll.find().hint(specs[i]).explain();
     assert("queryPlanner" in explain, tojson(explain));
 }

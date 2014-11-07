@@ -886,6 +886,9 @@ namespace mongo {
         incWriteStats( updateItem, result.getStats(), result.getError(), currentOp.get() );
         finishCurrentOp( _txn, currentOp.get(), result.getError() );
 
+        // End current transaction and release snapshot.
+        _txn->recoveryUnit()->commitAndRestart();
+
         if ( result.getError() ) {
             result.getError()->setIndex( updateItem.getItemIndex() );
             *error = result.releaseError();
@@ -908,6 +911,9 @@ namespace mongo {
         // END CURRENT OP
         incWriteStats( removeItem, result.getStats(), result.getError(), currentOp.get() );
         finishCurrentOp( _txn, currentOp.get(), result.getError() );
+
+        // End current transaction and release snapshot.
+        _txn->recoveryUnit()->commitAndRestart();
 
         if ( result.getError() ) {
             result.getError()->setIndex( removeItem.getItemIndex() );

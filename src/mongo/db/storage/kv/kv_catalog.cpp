@@ -229,7 +229,7 @@ namespace {
     const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData( OperationContext* opCtx,
                                                                        const StringData& ns ) {
         BSONObj obj = _findEntry( opCtx, ns );
-        LOG(1) << " got: " << obj;
+        LOG(3) << " fetched CCE metadata: " << obj;
         BSONCollectionCatalogEntry::MetaData md;
         if ( obj["md"].isABSONObj() )
             md.parse( obj["md"].Obj() );
