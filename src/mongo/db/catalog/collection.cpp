@@ -89,7 +89,7 @@ namespace mongo {
             _recordStore->setCappedDeleteCallback( this );
     }
 
-    Collection::~Collection() {        
+    Collection::~Collection() {
         verify( ok() );
         _magic = 0;
         triggerChangeSubscribersNotification();
