@@ -92,4 +92,10 @@ namespace mongo {
     // during explodeForSort?
     extern int internalQueryMaxScansToExplode;
 
+    //
+    // Query execution.
+    //
+
+    extern int internalQueryExecMaxBlockingSortBytes;
+
 }  // namespace mongo

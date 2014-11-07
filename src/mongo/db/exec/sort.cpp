@@ -38,13 +38,12 @@
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 
 namespace mongo {
 
     using std::vector;
-
-    const size_t kMaxBytes = 32 * 1024 * 1024;
 
     // static
     const char* SortStage::kStageType = "SORT";
@@ -325,10 +324,11 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
-        if (_memUsage > kMaxBytes) {
+        const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
+        if (_memUsage > maxBytes) {
             mongoutils::str::stream ss;
             ss << "sort stage buffered data usage of " << _memUsage
-               << " bytes exceeds internal limit of " << kMaxBytes << " bytes";
+               << " bytes exceeds internal limit of " << maxBytes << " bytes";
             Status status(ErrorCodes::Overflow, ss);
             *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             return PlanStage::FAILURE;
@@ -469,7 +469,8 @@ namespace mongo {
 
     PlanStageStats* SortStage::getStats() {
         _commonStats.isEOF = isEOF();
-        _specificStats.memLimit = kMaxBytes;
+        const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
+        _specificStats.memLimit = maxBytes;
         _specificStats.memUsage = _memUsage;
         _specificStats.limit = _limit;
         _specificStats.sortPattern = _pattern.getOwned();

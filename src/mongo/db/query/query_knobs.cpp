@@ -62,4 +62,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
 
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1024 * 1024);
+
 }  // namespace mongo
