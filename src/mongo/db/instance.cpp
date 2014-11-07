@@ -659,7 +659,6 @@ namespace mongo {
         bool exhaust = false;
         QueryResult* msgdata = 0;
         OpTime last;
-        Collection* collection = 0;
         NotifyAll::When lastWaitTime = 0;
         while( 1 ) {
             bool isCursorAuthorized = false;
@@ -726,22 +725,23 @@ namespace mongo {
                 pass++;
                 if (debug)
                     sleepmillis(20);
-                else if( lastWaitTime == 0 ) {
-                    scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
-                    collection = ctx->ctx().db()->getCollection( txn, ns );
-                    /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
-                    uassert( 77383, "collection dropped between newGetMore calls", collection );
-                    lastWaitTime = collection->documentInsertedNotificationNow();
-                    /* After creating the notification and acquiring lastWaitTime we will do one more loop,
-                       a new item *may* have been inserted in the collection while we were
-                       acquiring lastWaitTime */
-                } else {
-                    /* TODO: Review this wait.
-                       Bellow we could wait even for the full 4 seconds, but there's something I don't understand
-                       with the call to setExpectedLatencyMs(), so I figure I better break the wait every so often to call
-                       that notification method */
-                    collection->waitForDocumentInsertedEvent( lastWaitTime, 200 );
-                    lastWaitTime = collection->documentInsertedNotificationNow();
+                else {        
+                    Collection* collection = 0;                
+                    {
+                        // Let's use a read lock to acquire a pointer to the collection object
+                        const NamespaceString nss(ns);
+                        scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, nss));
+                        collection = ctx->getCollection();
+                        /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
+                        uassert(77383, "collection dropped between newGetMore calls", collection);
+                        /* This will ensure our collection was not destroyed until we call waitForDocumentInsertedEvent()
+                           because we are going to be outside of the lock to call waitForDocumentInsertedEvent().
+                           We can't do that inside this block, because otherwise we will be blocking the collection too 
+                           long if no new documents are inserted on the capped collection.
+                         */ 
+                        collection->subscribeToInsertedEvent(); 
+                    }                    
+                    lastWaitTime = collection->waitForDocumentInsertedEvent(lastWaitTime, 50);
                 }
 
                 // note: the 1100 is because of the waitForDifferent above

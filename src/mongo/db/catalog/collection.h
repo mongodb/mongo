@@ -44,6 +44,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -261,8 +262,11 @@ namespace mongo {
 
         /* subscribers to event of new document inserted into capped collection should call this method 
            and wait to be awakened */
-        bool waitForDocumentInsertedEvent( NotifyAll::When when, int timeout );
-        NotifyAll::When documentInsertedNotificationNow();
+        NotifyAll::When waitForDocumentInsertedEvent( NotifyAll::When when, int timeout );
+        /* subscribeToInsertedEvent() should be called within a readlock. Collection will keep track of 
+           count of capped collection readers in this way preventing destruction of the object in case a reader
+           is actively waiting for data while outside of the readlock */
+        void subscribeToInsertedEvent();
 
         // --- end suspect things
 
@@ -295,6 +299,7 @@ namespace mongo {
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
         NotifyAll _changeSubscribers;
+        AtomicWord<uint32_t> _eventSubscriberCount;
 
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection

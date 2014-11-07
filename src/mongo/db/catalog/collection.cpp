@@ -81,28 +81,39 @@ namespace mongo {
           _infoCache( this ),
           _indexCatalog( this ),
           _cursorCache( fullNS ),
-          _changeSubscribers() {
+          _changeSubscribers(),
+          _eventSubscriberCount() {
         _magic = 1357924;
         _indexCatalog.init(txn);
         if ( isCapped() )
             _recordStore->setCappedDeleteCallback( this );
     }
 
-    Collection::~Collection() {
+    Collection::~Collection() {        
         verify( ok() );
         _magic = 0;
+        triggerChangeSubscribersNotification();
+        /* In the following code we will spin waiting for no readers waiting for data to be inserted
+           into the capped collection. A small 2ms wait time will be introduced to let the reader threads
+           catch up and get out of the waiting state after the call to triggerChangeSubscribersNotification() */
+        while(_eventSubscriberCount.load() > 0) {
+            sleepmillis(2);
+        }
     }
 
     void Collection::triggerChangeSubscribersNotification(){
         _changeSubscribers.notifyAll( _changeSubscribers.now() );
     }
 
-    bool Collection::waitForDocumentInsertedEvent(  NotifyAll::When when, int timeout ) {
-        return _changeSubscribers.timedWaitFor( when, timeout );
-    }
-
-    NotifyAll::When Collection::documentInsertedNotificationNow() {
-        return _changeSubscribers.now();
+    NotifyAll::When Collection::waitForDocumentInsertedEvent(  NotifyAll::When when, int timeout ) {
+        _changeSubscribers.timedWaitFor( when, timeout );
+        NotifyAll::When result = _changeSubscribers.now();
+        _eventSubscriberCount.subtractAndFetch(1);
+        return result;
+    }    
+    
+    void Collection::subscribeToInsertedEvent() {
+        _eventSubscriberCount.addAndFetch(1);
     }
 
     bool Collection::requiresIdIndex() const {
