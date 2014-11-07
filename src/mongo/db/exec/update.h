@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/update_driver.h"
@@ -78,7 +78,7 @@ namespace mongo {
     public:
         UpdateStage(const UpdateStageParams& params,
                     WorkingSet* ws,
-                    Database* db,
+                    Collection* collection,
                     PlanStage* child);
 
         virtual bool isEOF();
@@ -135,8 +135,7 @@ namespace mongo {
         // Not owned by us.
         WorkingSet* _ws;
 
-        // Not owned by us.
-        Database* _db;
+        // Not owned by us. May be NULL.
         Collection* _collection;
 
         // Owned by us.

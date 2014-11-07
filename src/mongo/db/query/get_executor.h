@@ -37,7 +37,6 @@
 namespace mongo {
 
     class Collection;
-    class Database;
     struct CountRequest;
 
     struct GroupRequest;
@@ -192,7 +191,7 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.
      */
     Status getExecutorUpdate(OperationContext* txn,
-                             Database* db,
+                             Collection* collection,
                              CanonicalQuery* rawCanonicalQuery,
                              const UpdateRequest* request,
                              UpdateDriver* driver,
@@ -212,7 +211,7 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.
      */
     Status getExecutorUpdate(OperationContext* txn,
-                             Database* db,
+                             Collection* collection,
                              const std::string& ns,
                              const UpdateRequest* request,
                              UpdateDriver* driver,

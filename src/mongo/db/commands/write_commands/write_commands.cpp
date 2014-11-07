@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
 
@@ -214,11 +215,16 @@ namespace mongo {
 
             // Explains of write commands are read-only, but we take write locks so
             // that timing info is more accurate.
-            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
-            Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
-            Client::Context ctx(txn, nsString);
+            AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
+            Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
 
-            Status prepInLockStatus = updateExecutor.prepareInLock(ctx.db());
+            // We check the shard version explicitly here rather than using Client::Context,
+            // as Context can do implicit database creation if the db does not exist. We want
+            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
+            // or collections.
+            ensureShardVersionOKOrThrow( nsString.ns() );
+
+            Status prepInLockStatus = updateExecutor.prepareInLock( autoDb.getDb() );
             if ( !prepInLockStatus.isOK() ) {
                 return prepInLockStatus;
             }
@@ -255,12 +261,15 @@ namespace mongo {
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
             AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
-            if (!autoDb.getDb()) return Status::OK();
-
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
-            Client::Context ctx(txn, nsString);
 
-            Status prepInLockStatus = deleteExecutor.prepareInLock(ctx.db());
+            // We check the shard version explicitly here rather than using Client::Context,
+            // as Context can do implicit database creation if the db does not exist. We want
+            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
+            // or collections.
+            ensureShardVersionOKOrThrow( nsString.ns() );
+
+            Status prepInLockStatus = deleteExecutor.prepareInLock( autoDb.getDb() );
             if ( !prepInLockStatus.isOK()) {
                 return prepInLockStatus;
             }

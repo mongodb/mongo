@@ -545,7 +545,7 @@ namespace mongo {
     //
 
     Status getExecutorUpdate(OperationContext* txn,
-                             Database* db,
+                             Collection* collection,
                              CanonicalQuery* rawCanonicalQuery,
                              const UpdateRequest* request,
                              UpdateDriver* driver,
@@ -554,8 +554,6 @@ namespace mongo {
                              PlanExecutor** execOut) {
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
         auto_ptr<WorkingSet> ws(new WorkingSet());
-        Collection* collection = db->getCollection(request->getOpCtx(),
-                                                   request->getNamespaceString().ns());
 
         PlanStage* root;
         QuerySolution* querySolution;
@@ -568,7 +566,7 @@ namespace mongo {
         invariant(root);
         UpdateStageParams updateStageParams(request, driver, opDebug);
         updateStageParams.canonicalQuery = rawCanonicalQuery;
-        root = new UpdateStage(updateStageParams, ws.get(), db, root);
+        root = new UpdateStage(updateStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
         return PlanExecutor::make(txn,
@@ -582,7 +580,7 @@ namespace mongo {
     }
 
     Status getExecutorUpdate(OperationContext* txn,
-                             Database* db,
+                             Collection* collection,
                              const std::string& ns,
                              const UpdateRequest* request,
                              UpdateDriver* driver,
@@ -590,8 +588,6 @@ namespace mongo {
                              PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut) {
         auto_ptr<WorkingSet> ws(new WorkingSet());
-        Collection* collection = db->getCollection(request->getOpCtx(),
-                                                   request->getNamespaceString().ns());
         const BSONObj& unparsedQuery = request->getQuery();
 
         UpdateStageParams updateStageParams(request, driver, opDebug);
@@ -601,7 +597,7 @@ namespace mongo {
             // UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
-            UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), db,
+            UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), collection,
                                                        new EOFStage());
             return PlanExecutor::make(txn, ws.release(), updateStage, ns, yieldPolicy, execOut);
         }
@@ -612,7 +608,8 @@ namespace mongo {
 
             PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
                                                      ws.get());
-            UpdateStage* root = new UpdateStage(updateStageParams, ws.get(), db, idHackStage);
+            UpdateStage* root = new UpdateStage(updateStageParams, ws.get(), collection,
+                                                idHackStage);
             return PlanExecutor::make(txn, ws.release(), root, collection, yieldPolicy, execOut);
         }
 
@@ -627,7 +624,8 @@ namespace mongo {
             return status;
 
         // Takes ownership of 'cq'.
-        return getExecutorUpdate(txn, db, cq, request, driver, opDebug, yieldPolicy, execOut);
+        return getExecutorUpdate(txn, collection, cq, request, driver, opDebug, yieldPolicy,
+                                 execOut);
     }
 
     //

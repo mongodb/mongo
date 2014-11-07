@@ -395,20 +395,17 @@ namespace mongo {
 
     UpdateStage::UpdateStage(const UpdateStageParams& params,
                              WorkingSet* ws,
-                             Database* db,
+                             Collection* collection,
                              PlanStage* child)
         : _params(params),
           _ws(ws),
-          _db(db),
+          _collection(collection),
           _child(child),
           _commonStats(kStageType),
           _updatedLocs(params.request->isMulti() ? new DiskLocSet() : NULL),
           _doc(params.driver->getDocument()) {
         // We are an update until we fall into the insert case.
         params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
-
-        _collection = db->getCollection(params.request->getOpCtx(),
-                                        params.request->getNamespaceString().ns());
     }
 
     void UpdateStage::transformAndUpdate(BSONObj& oldObj, DiskLoc& loc) {

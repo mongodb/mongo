@@ -110,10 +110,14 @@ namespace mongo {
             }
         }
 
-        // Note that 'collection' may by NULL in the case that the collection we are trying to
-        // delete from does not exist. NULL 'collection' is handled by getExecutorDelete(); we
-        // expect to get back a plan executor whose plan is a DeleteStage on top of an EOFStage.
-        Collection* collection = db->getCollection(_request->getOpCtx(), ns.ns());
+        // Note that 'collection' may by NULL in the case that the collection or database we are
+        // trying to delete from does not exist. NULL 'collection' is handled by
+        // getExecutorDelete(); we expect to get back a plan executor whose plan is a DeleteStage
+        // on top of an EOFStage.
+        Collection* collection = NULL;
+        if (db) {
+            collection = db->getCollection(_request->getOpCtx(), ns.ns());
+        }
 
         if (collection && collection->isCapped()) {
             return Status(ErrorCodes::IllegalOperation,

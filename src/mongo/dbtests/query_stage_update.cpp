@@ -185,7 +185,7 @@ namespace QueryStageUpdate {
                 CurOp& curOp = *c.curop();
                 OpDebug* opDebug = &curOp.debug();
                 UpdateDriver driver( (UpdateDriver::Options()) );
-                Database* db = ctx.ctx().db();
+                Collection* collection = ctx.getCollection();
 
                 // Collection should be empty.
                 ASSERT_EQUALS(0U, count(BSONObj()));
@@ -213,7 +213,7 @@ namespace QueryStageUpdate {
                 auto_ptr<EOFStage> eofStage(new EOFStage());
 
                 scoped_ptr<UpdateStage> updateStage(
-                    new UpdateStage(params, ws.get(), db, eofStage.release()));
+                    new UpdateStage(params, ws.get(), collection, eofStage.release()));
 
                 runUpdate(updateStage.get());
             }
@@ -292,7 +292,7 @@ namespace QueryStageUpdate {
                     new CollectionScan(&_txn, collScanParams, ws.get(), cq->root()));
 
                 scoped_ptr<UpdateStage> updateStage(
-                    new UpdateStage(updateParams, ws.get(), db, cs.release()));
+                    new UpdateStage(updateParams, ws.get(), coll, cs.release()));
 
                 const UpdateStats* stats =
                     static_cast<const UpdateStats*>(updateStage->getSpecificStats());

@@ -111,7 +111,17 @@ namespace mongo {
 
         validateUpdate(nsString.ns().c_str(), _request->getUpdates(), _request->getQuery());
 
-        Collection* collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+        // The batch executor is responsible for creating a database if this update is being
+        // performed against a non-existent database. However, it is possible for either the
+        // database or collection to be NULL for an explain. In this case, the explain is
+        // a no-op which returns a trivial EOF plan.
+        Collection* collection = NULL;
+        if (db) {
+            collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+        }
+        else {
+            invariant(_request->isExplain());
+        }
 
         // The update stage does not create its own collection.  As such, if the update is
         // an upsert, create the collection that the update stage inserts into beforehand.
@@ -177,14 +187,26 @@ namespace mongo {
         Status getExecStatus = Status::OK();
         if (_canonicalQuery.get()) {
             // This is the regular path for when we have a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, _canonicalQuery.release(),
-                                              _request, &_driver, _opDebug, policy, &rawExec);
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(),
+                                              collection,
+                                              _canonicalQuery.release(),
+                                              _request,
+                                              &_driver,
+                                              _opDebug,
+                                              policy,
+                                              &rawExec);
         }
         else {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work
             // to create a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, nsString.ns(), _request,
-                                              &_driver, _opDebug, policy, &rawExec);
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(),
+                                              collection,
+                                              nsString.ns(),
+                                              _request,
+                                              &_driver,
+                                              _opDebug,
+                                              policy,
+                                              &rawExec);
         }
 
         if (!getExecStatus.isOK()) {
