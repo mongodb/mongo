@@ -107,6 +107,11 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		restore.tempRolesCol = "temproles"
 	}
 
+	if restore.OutputOptions.BulkWriters < 0 {
+		return fmt.Errorf(
+			"cannot specify a negative number of insertion workers per collection")
+	}
+
 	return nil
 }
 
