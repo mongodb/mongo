@@ -1246,6 +1246,50 @@ func (s *S) TestFindIterLimit(c *C) {
 	c.Assert(stats.SocketsInUse, Equals, 0)
 }
 
+var cursorTimeout = flag.Bool("cursor-timeout", false, "Enable cursor timeout test")
+
+func (s *S) TestFindIterCursorTimeout(c *C) {
+	if !*cursorTimeout {
+		c.Skip("-cursor-timeout")
+	}
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	type Doc struct {
+		Id int "_id"
+	}
+
+	coll := session.DB("test").C("test")
+	coll.Remove(nil)
+	for i := 0; i < 100; i++ {
+		err = coll.Insert(Doc{i})
+		c.Assert(err, IsNil)
+	}
+
+	session.SetBatch(1)
+	iter := coll.Find(nil).Iter()
+	var doc Doc
+	if !iter.Next(&doc) {
+		c.Fatalf("iterator failed to return any documents")
+	}
+
+	for i := 10; i > 0; i-- {
+		c.Logf("Sleeping... %d minutes to go...", i)
+		time.Sleep(1*time.Minute + 2*time.Second)
+	}
+
+	// Drain any existing documents that were fetched.
+	if !iter.Next(&doc) {
+		c.Fatalf("iterator with timed out cursor failed to return previously cached document")
+	}
+	if iter.Next(&doc) {
+		c.Fatalf("timed out cursor returned document")
+	}
+
+	c.Assert(iter.Err(), Equals, mgo.ErrCursor)
+}
+
 func (s *S) TestTooManyItemsLimitBug(c *C) {
 	if *fast {
 		c.Skip("-fast")

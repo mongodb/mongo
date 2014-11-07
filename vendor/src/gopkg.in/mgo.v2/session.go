@@ -120,7 +120,10 @@ type Iter struct {
 	timedout       bool
 }
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound = errors.New("not found")
+	ErrCursor = errors.New("invalid cursor")
+)
 
 const defaultPrefetch = 0.25
 
@@ -3775,6 +3778,9 @@ func (iter *Iter) replyFunc() replyFunc {
 			if op != nil && op.cursorId != 0 {
 				// It's a tailable cursor.
 				iter.op.cursorId = op.cursorId
+			} else if op != nil && op.cursorId == 0 && op.flags&1 == 1 {
+				// Cursor likely timed out.
+				iter.err = ErrCursor
 			} else {
 				iter.err = ErrNotFound
 			}
