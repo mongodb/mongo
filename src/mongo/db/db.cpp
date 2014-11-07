@@ -71,8 +71,12 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repl/network_interface_impl.h"
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/startup_warnings_mongod.h"
@@ -766,6 +770,17 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     AuthorizationManager* authzManager =
             new AuthorizationManager(new AuthzManagerExternalStateMongod());
     setGlobalAuthorizationManager(authzManager);
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
+        (InitializerContext* context) {
+    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorImpl(
+            getGlobalReplSettings(),
+            new repl::ReplicationCoordinatorExternalStateImpl,
+            new repl::NetworkInterfaceImpl,
+            new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
+            static_cast<int64_t>(curTimeMillis64())));
     return Status::OK();
 }
 

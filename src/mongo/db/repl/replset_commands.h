@@ -32,7 +32,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 namespace repl {

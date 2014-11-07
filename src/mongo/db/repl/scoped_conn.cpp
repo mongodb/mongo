@@ -1,4 +1,6 @@
-/**
+// @connections.cpp
+
+/*
  *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -30,29 +32,50 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/state_box.h"
+#include "mongo/db/repl/scoped_conn.h"
 
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace repl {
 
-    void StateBox::change(MemberState s, const Member *self) {
-        rwlock lk(m, true);
-        if( sp.state != s ) {
-            log() << "replSet " << s.toString() << rsLog;
+    static const int DEFAULT_HEARTBEAT_TIMEOUT_SECS = 10;
+
+    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
+    // open during stepdowns
+    const unsigned ScopedConn::keepOpen = 1;
+    ScopedConn::M& ScopedConn::_map = *(new ScopedConn::M());
+    mutex ScopedConn::mapMutex("ScopedConn::mapMutex");
+
+    ScopedConn::ConnectionInfo::ConnectionInfo() : lock("ConnectionInfo"),
+                    cc(new DBClientConnection(/*reconnect*/ true,
+                                              /*replicaSet*/ 0,
+                                              /*timeout*/ DEFAULT_HEARTBEAT_TIMEOUT_SECS)),
+                    connected(false) {
+                    cc->_logLevel = logger::LogSeverity::Debug(2);
+                }
+
+    // we should already be locked...
+    bool ScopedConn::connect() {
+        std::string err;
+        if (!connInfo->cc->connect(HostAndPort(_hostport), err)) {
+            log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
+            return false;
         }
-        sp.state = s;
-        if( s.primary() ) {
-            sp.primary = self;
+        connInfo->connected = true;
+        connInfo->tagPort();
+
+        // if we cannot authenticate against a member, then either its key file
+        // or our key file has to change.  if our key file has to change, we'll
+        // be rebooting. if their file has to change, they'll be rebooted so the
+        // connection created above will go dead, reconnect, and reauth.
+        if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+            return authenticateInternalUser(connInfo->cc.get());
         }
-        else {
-            if( self == sp.primary )
-                sp.primary = 0;
-        }
+
+        return true;
     }
 
-}  // namespace repl
-}  // namespace mongo
+} // namespace repl
+} // namespace mongo

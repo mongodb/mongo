@@ -36,8 +36,6 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/db/repl/health.h"
-#include "mongo/db/repl/rs_config.h"
 
 namespace mongo {
 namespace repl {
@@ -100,13 +98,7 @@ namespace repl {
             mongo::mutex lock;
             scoped_ptr<DBClientConnection> cc;
             bool connected;
-            ConnectionInfo() : lock("ConnectionInfo"),
-                cc(new DBClientConnection(/*reconnect*/ true,
-                                          /*replicaSet*/ 0,
-                                          /*timeout*/ ReplSetConfig::DEFAULT_HB_TIMEOUT)),
-                connected(false) {
-                cc->_logLevel = logger::LogSeverity::Debug(2);
-            }
+            ConnectionInfo();
 
             void tagPort() {
                 MessagingPort& mp = cc->port();

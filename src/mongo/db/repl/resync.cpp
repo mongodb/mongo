@@ -30,7 +30,6 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/operation_context.h"
 
 namespace mongo {

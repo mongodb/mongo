@@ -41,7 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/connections.h"  // For ScopedConn::keepOpen
+#include "mongo/db/repl/scoped_conn.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"

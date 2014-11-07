@@ -30,7 +30,9 @@
 
 #pragma once
 
-#include "mongo/db/repl/connections.h"
+#include <list>
+
+#include "mongo/db/jsobj.h"
 #include "mongo/util/background.h"
 
 namespace mongo {

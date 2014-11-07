@@ -56,7 +56,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
@@ -95,7 +94,6 @@ namespace repl {
         localDB = NULL;
         localOplogMainCollection = NULL;
         localOplogRSCollection = NULL;
-        resetSlaveCache();
     }
 
     // so we can fail the same way

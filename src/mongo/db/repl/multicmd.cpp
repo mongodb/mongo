@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/multicmd.h"
+#include "mongo/db/repl/scoped_conn.h"
 
 #include "mongo/util/log.h"
 
