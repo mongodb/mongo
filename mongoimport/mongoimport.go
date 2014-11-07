@@ -301,6 +301,7 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	if err != nil {
 		return 0, fmt.Errorf("error connecting to mongod: %v", err)
 	}
+	mongoImport.configureSession(session)
 	defer func() {
 		session.Close()
 		if readErr != nil && readErr == io.EOF {
