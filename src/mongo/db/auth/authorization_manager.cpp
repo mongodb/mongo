@@ -843,15 +843,13 @@ namespace {
         }
 
         switch (authzVersion) {
-        case schemaVersion26Final: {
+        case schemaVersion26Final:
+        case schemaVersion28SCRAM: {
             Status status = updateCredentials(txn, _externalState.get(), writeConcern);
             if (status.isOK())
                 *isDone = true;
             return status;
         }
-        case schemaVersion28SCRAM:
-            *isDone = true;
-            return Status::OK();
         default:
             return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
                           "Do not know how to upgrade auth schema from version " << authzVersion);
