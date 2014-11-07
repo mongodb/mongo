@@ -34,6 +34,9 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage_options.h"
