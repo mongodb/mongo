@@ -73,15 +73,9 @@ namespace repl {
         bool maybeUp() const { return _health != 0; }
 
         /**
-         * Sets the member's state to "newState".  This is principally valuable when modeling
-         * step-down of the the local node.
-         */
-        void setState(MemberState newState);
-
-        /**
          * Sets values in this object from the results of a successful heartbeat command.
          */
-        void setUpValues(Date_t now, ReplSetHeartbeatResponse hbResponse);
+        void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse hbResponse);
 
         /**
          * Sets values in this object from the results of a erroring/failed heartbeat command.

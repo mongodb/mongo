@@ -857,15 +857,15 @@ namespace {
         invariant(memberIndex != _selfIndex);
 
         MemberHeartbeatData& hbData = _hbdata[memberIndex];
+        const MemberConfig member = _currentConfig.getMemberAt(memberIndex);
         if (!hbResponse.isOK()) {
             if (isUnauthorized) {
                 LOG(3) << "setAuthIssue: heartbeat response failed due to authentication"
-                    " issue for member _id:"
-                       << _currentConfig.getMemberAt(memberIndex).getId();
+                    " issue for member _id:" << member.getId();
                 hbData.setAuthIssue(now);
             } else {
                 LOG(3) << "setDownValues: heartbeat response failed for member _id:"
-                       << _currentConfig.getMemberAt(memberIndex).getId() << ", msg:  "
+                       << member.getId() << ", msg:  "
                        << hbResponse.getStatus().reason();
 
                 hbData.setDownValues(now, hbResponse.getStatus().reason());
@@ -874,9 +874,9 @@ namespace {
         else {
             ReplSetHeartbeatResponse hbr = hbResponse.getValue();
             LOG(3) << "setUpValues: heartbeat response good for member _id:"
-                   << _currentConfig.getMemberAt(memberIndex).getId() << ", msg:  "
+                   << member.getId() << ", msg:  "
                    << hbr.getHbMsg();
-            hbData.setUpValues(now, hbr);
+            hbData.setUpValues(now, member.getHostAndPort(), hbr);
         }
         HeartbeatResponseAction nextAction = _updateHeartbeatDataImpl(
                 memberIndex,
@@ -1241,6 +1241,7 @@ namespace {
                 hbResponse.setHbMsg("");
                 _hbdata[primaryIndex].setUpValues(
                         _hbdata[primaryIndex].getLastHeartbeat(),
+                        _currentConfig.getMemberAt(primaryIndex).getHostAndPort(),
                         hbResponse);
             }
             _currentPrimaryIndex = primaryIndex;
