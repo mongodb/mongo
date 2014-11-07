@@ -112,19 +112,27 @@ namespace mongo {
     // -----------------------
 
     WiredTigerSessionCache::WiredTigerSessionCache( WiredTigerKVEngine* engine )
-        : _engine( engine ), _conn( engine->getConnection() ) {
+        : _engine( engine ), _conn( engine->getConnection() ), _shuttingDown(false) {
     }
 
     WiredTigerSessionCache::WiredTigerSessionCache( WT_CONNECTION* conn )
-        : _engine( NULL ), _conn( conn ) {
+        : _engine( NULL ), _conn( conn ), _shuttingDown(false) {
     }
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
         _closeAll();
     }
 
+    void WiredTigerSessionCache::shuttingDown() {
+        boost::mutex::scoped_lock lk( _sessionLock );
+        _shuttingDown = true;
+        _closeAll();
+    }
+
     void WiredTigerSessionCache::closeAll() {
         boost::mutex::scoped_lock lk( _sessionLock );
+        if (_shuttingDown)
+            return; // leak sessions
         _closeAll();
     }
 
@@ -138,6 +146,8 @@ namespace mongo {
     WiredTigerSession* WiredTigerSessionCache::getSession() {
         {
             boost::mutex::scoped_lock lk( _sessionLock );
+            invariant(!_shuttingDown); // shouldn't get here after this is set.
+
             if ( !_sessionPool.empty() ) {
                 WiredTigerSession* s = _sessionPool.back();
                 _sessionPool.pop_back();
@@ -154,6 +164,10 @@ namespace mongo {
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
+        boost::mutex::scoped_lock lk( _sessionLock );
+        if (_shuttingDown)
+            return; // leak session to avoid race condition.
+
         invariant( session );
         invariant( session->cursorsOut() == 0 );
 
@@ -170,7 +184,6 @@ namespace mongo {
             return;
         }
 
-        boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
 

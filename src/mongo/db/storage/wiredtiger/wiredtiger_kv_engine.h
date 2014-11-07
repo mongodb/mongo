@@ -102,6 +102,8 @@ namespace mongo {
         virtual Status repairIdent( OperationContext* opCtx,
                                     const StringData& ident );
 
+        virtual void cleanShutdown(OperationContext* txn);
+
         // wiredtiger specific
 
         WT_CONNECTION* getConnection() { return _conn; }

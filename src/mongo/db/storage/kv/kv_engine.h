@@ -45,8 +45,6 @@ namespace mongo {
     class KVEngine {
     public:
 
-        virtual ~KVEngine() {}
-
         virtual RecoveryUnit* newRecoveryUnit() = 0;
 
         // ---------
@@ -112,6 +110,21 @@ namespace mongo {
             return Status::OK();
         }
 
+        /**
+         * This method will be called before there is a clean shutdown.  Storage engines should
+         * override this method if they have clean-up to do that is different from unclean shutdown.
+         * MongoDB will not call into the storage subsystem after calling this function.
+         *
+         * There is intentionally no uncleanShutdown().
+         */
+        virtual void cleanShutdown(OperationContext* txn) = 0;
+
+        /**
+         * The destructor will never be called from mongod, but may be called from tests.
+         * Engines may assume that this will only be called in the case of clean shutdown, even if
+         * cleanShutdown() hasn't been called.
+         */
+        virtual ~KVEngine() {}
     };
 
 }

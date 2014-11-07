@@ -109,6 +109,8 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual void cleanShutdown(OperationContext* txn) {}
+
         // rocks specific api
 
         rocksdb::DB* getDB() { return _db.get(); }

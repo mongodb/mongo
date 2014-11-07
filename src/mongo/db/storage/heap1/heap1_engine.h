@@ -81,6 +81,8 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual void cleanShutdown(OperationContext* txn) {};
+
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;
 

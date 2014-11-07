@@ -92,6 +92,8 @@ namespace mongo {
 
         void closeAll();
 
+        void shuttingDown();
+
     private:
 
         bool _shouldBeClosed( WiredTigerSession* session ) const;
@@ -102,6 +104,7 @@ namespace mongo {
         WT_CONNECTION* _conn; // not owned
         typedef std::vector<WiredTigerSession*> SessionPool;
         SessionPool _sessionPool; // owned
+        bool _shuttingDown;
         mutable boost::mutex _sessionLock;
     };
 

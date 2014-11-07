@@ -93,5 +93,6 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual void cleanShutdown(OperationContext* txn) {};
     };
 }

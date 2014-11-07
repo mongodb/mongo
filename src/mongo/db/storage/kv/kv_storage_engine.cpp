@@ -81,7 +81,8 @@ namespace mongo {
         _catalog.reset( NULL );
         _catalogRecordStore.reset( NULL );
 
-        _engine.reset( NULL );
+        _engine->cleanShutdown(txn);
+        // intentionally not deleting _engine
     }
 
     KVStorageEngine::~KVStorageEngine() {
