@@ -313,12 +313,6 @@ namespace mongo {
         if ( fileNo < mmapv1GlobalOptions.quotaFiles )
             return;
 
-        // exceeded!
-        if ( cc().hasWrittenSinceCheckpoint() ) {
-            warning() << "quota exceeded, but can't assert" << endl;
-            return;
-        }
-
         uasserted(12501, "quota exceeded");
     }
 

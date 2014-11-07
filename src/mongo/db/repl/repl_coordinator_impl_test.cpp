@@ -920,7 +920,7 @@ namespace {
             _opID = opID;
         }
 
-        virtual void checkForInterrupt(bool heedMutex = true) const {
+        virtual void checkForInterrupt() const {
             if (_interruptOp) {
                 uasserted(ErrorCodes::Interrupted, "operation was interrupted");
             }

@@ -376,9 +376,6 @@ namespace {
             nestedOp.reset( new CurOp( &c , currentOpP ) );
             currentOpP = nestedOp.get();
         }
-        else {
-            c.newTopLevelRequest();
-        }
 
         CurOp& currentOp = *currentOpP;
         currentOp.reset(remote,op);

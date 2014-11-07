@@ -96,7 +96,7 @@ namespace mongo {
     }
 
     void GlobalEnvironmentMongoD::setKillAllOperations() {
-        scoped_lock clientLock(Client::clientsMutex);
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
         _globalKill = true;
         for (size_t i = 0; i < _killOpListeners.size(); i++) {
             try {
@@ -113,12 +113,12 @@ namespace mongo {
     }
 
     bool GlobalEnvironmentMongoD::killOperation(unsigned int opId) {
-        scoped_lock clientLock(Client::clientsMutex);
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
         bool found = false;
 
         // XXX clean up
         {
-            for( set< Client* >::const_iterator j = Client::clients.begin();
+            for(ClientSet::const_iterator j = Client::clients.begin();
                  !found && j != Client::clients.end();
                  ++j ) {
 
@@ -154,7 +154,7 @@ namespace mongo {
     }
 
     void GlobalEnvironmentMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
-        scoped_lock clientLock(Client::clientsMutex);
+        boost::mutex::scoped_lock clientLock(Client::clientsMutex);
         _killOpListeners.push_back(listener);
     }
 

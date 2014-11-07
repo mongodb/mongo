@@ -67,10 +67,11 @@ namespace mongo {
 
     Client::Client(const string& desc, AbstractMessagingPort *p) :
         ClientBasic(p),
-        _shutdown(false),
         _desc(desc),
+        _connectionId(),
         _god(0),
-        _lastOp(0) {
+        _lastOp(0),
+        _shutdown(false) {
     }
     Client::~Client() {}
     bool Client::shutdown() { return true; }

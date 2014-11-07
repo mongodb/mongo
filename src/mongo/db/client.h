@@ -36,16 +36,18 @@
 
 #pragma once
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
-
 
 namespace mongo {
 
@@ -152,12 +154,14 @@ namespace mongo {
         Collection* _coll;
     };
 
+    typedef unordered_set<Client*> ClientSet;
+
     /** the database's concept of an outside "client" */
     class Client : public ClientBasic {
     public:
-        // always be in clientsMutex when manipulating this. killop stuff uses these.
-        static std::set<Client*>& clients;
-        static mongo::mutex& clientsMutex;
+        // A set of currently active clients along with a mutex to protect the list
+        static boost::mutex clientsMutex;
+        static ClientSet clients;
 
         ~Client();
 
@@ -207,33 +211,33 @@ namespace mongo {
         void setRemoteID(const OID& rid) { _remoteId = rid;  } // Only used for master/slave
         OID getRemoteID() const { return _remoteId; } // Only used for master/slave
         ConnectionId getConnectionId() const { return _connectionId; }
-        const std::string& getThreadId() const { return _threadId; }
-
-        // XXX(hk): this is per-thread mmapv1 recovery unit stuff, move into that
-        // impl of recovery unit
-        void writeHappened() { _hasWrittenSinceCheckpoint = true; }
-        bool hasWrittenSinceCheckpoint() const { return _hasWrittenSinceCheckpoint; }
-        void checkpointHappened() { _hasWrittenSinceCheckpoint = false; }
-
-        // XXX: this is really a method in the recovery unit iface to reset any state
-        void newTopLevelRequest() {
-            _hasWrittenSinceCheckpoint = false;
-        }
 
     private:
         Client(const std::string& desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
-        ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
-        std::string _threadId; // "" on non support systems
-        CurOp * _curOp;
-        bool _shutdown; // to track if Client::shutdown() gets called
-        std::string _desc;
+
+        // Description for the client (e.g. conn8)
+        const std::string _desc;
+
+        // OS id of the thread, which owns this client
+        const boost::thread::id _threadId;
+
+        // > 0 for things "conn", 0 otherwise
+        const ConnectionId _connectionId;
+
+        // Whether this client is running as DBDirectClient
         bool _god;
+
+        // Changes, based on what operation is running. Some of this should be in OperationContext.
+        CurOp* _curOp;
+
+        // Used by replication
         OpTime _lastOp;
         OID _remoteId; // Only used by master-slave
 
-        bool _hasWrittenSinceCheckpoint;
-        
+        // Tracks if Client::shutdown() gets called (TODO: Is this necessary?)
+        bool _shutdown;
+
     public:
 
         /* Set database we want to use, then, restores when we finish (are out of scope)

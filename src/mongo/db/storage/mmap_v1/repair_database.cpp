@@ -419,7 +419,7 @@ namespace mongo {
                         return result.getStatus();
 
                     wunit.commit();
-                    txn->checkForInterrupt(false);
+                    txn->checkForInterrupt();
                 }
                 
                 Status status = indexer.doneInserting();
@@ -439,7 +439,7 @@ namespace mongo {
             // need both in case journaling is disabled
             MongoFile::flushAll(true);
 
-            txn->checkForInterrupt(false);
+            txn->checkForInterrupt();
         }
 
         // at this point if we abort, we don't want to delete new files

@@ -121,11 +121,11 @@ namespace {
         // underneath and ~CurOp synchronizes on the clients mutex.
         //
         // TODO: This is a legacy from 2.6, which needs to be fixed.
-        scoped_lock bl(Client::clientsMutex);
+        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
 
         const bool all = q.query["$all"].trueValue();
         if (all) {
-            for (std::set<Client*>::const_iterator i = Client::clients.begin();
+            for (ClientSet::const_iterator i = Client::clients.begin();
                  i != Client::clients.end();
                  i++) {
 

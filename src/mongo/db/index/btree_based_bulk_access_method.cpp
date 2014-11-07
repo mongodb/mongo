@@ -141,8 +141,9 @@ namespace mongo {
         }
 
         while (i->more()) {
-            if (mayInterrupt)
-                _txn->checkForInterrupt(/*heedMutex*/ false);
+            if (mayInterrupt) {
+                _txn->checkForInterrupt();
+            }
 
             WriteUnitOfWork wunit(_txn);
 

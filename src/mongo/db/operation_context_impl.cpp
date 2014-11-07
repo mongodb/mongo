@@ -162,23 +162,20 @@ namespace {
 
     } // namespace
 
-    void OperationContextImpl::checkForInterrupt(bool heedMutex) const {
-        Client* c = getClient();
-
-        if (heedMutex && lockState()->isWriteLocked() && c->hasWrittenSinceCheckpoint()) {
-            return;
-        }
+    void OperationContextImpl::checkForInterrupt() const {
+        // We cannot interrupt operation, while it's inside of a write unit of work, because logOp
+        // cannot handle being iterrupted.
+        if (lockState()->inAWriteUnitOfWork()) return;
 
         uassertStatusOK(checkForInterruptNoAssert());
     }
 
     Status OperationContextImpl::checkForInterruptNoAssert() const {
-        Client* c = getClient();
-
         if (getGlobalEnvironment()->getKillAllOperations()) {
             return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
         }
 
+        Client* c = getClient();
         if (c->curop()->maxTimeHasExpired()) {
             c->curop()->kill();
             return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");

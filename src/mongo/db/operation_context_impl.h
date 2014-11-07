@@ -64,8 +64,7 @@ namespace mongo {
 
         virtual unsigned int getOpID() const;
 
-        virtual void checkForInterrupt(bool heedMutex = true) const;
-
+        virtual void checkForInterrupt() const;
         virtual Status checkForInterruptNoAssert() const;
 
         virtual bool isPrimaryFor( const StringData& ns );

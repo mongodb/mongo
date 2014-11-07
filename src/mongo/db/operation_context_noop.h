@@ -32,7 +32,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 
-
 namespace mongo {
 
     class OperationContextNoop : public OperationContext {
@@ -81,8 +80,7 @@ namespace mongo {
             return &_pm;
         }
 
-        virtual void checkForInterrupt(bool heedMutex = true) const { }
-
+        virtual void checkForInterrupt() const { }
         virtual Status checkForInterruptNoAssert() const {
             return Status::OK();
         }

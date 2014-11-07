@@ -122,7 +122,7 @@ namespace mongo {
 
     CurOp::~CurOp() {
         if ( _wrapped ) {
-            scoped_lock bl(Client::clientsMutex);
+            boost::mutex::scoped_lock clientLock(Client::clientsMutex);
             _client->_curOp = _wrapped;
         }
         _client = 0;

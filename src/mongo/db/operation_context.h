@@ -28,14 +28,11 @@
 
 #pragma once
 
-#include <stdlib.h>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
-
 
 namespace mongo {
 
@@ -84,17 +81,11 @@ namespace mongo {
         // --- operation level info? ---
 
         /**
-         * TODO: Get rid of this and just have one interrupt func?
-         * throws an exception if the operation is interrupted
-         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
+         * If the thread is not interrupted, returns Status::OK(), otherwise returns the cause
+         * for the interruption. The throw variant returns a user assertion corresponding to the
+         * interruption status.
          */
-        virtual void checkForInterrupt(bool heedMutex = true) const = 0;
-
-        /**
-         * TODO: Where do I go
-         * @return Status::OK() if not interrupted
-         *         otherwise returns reasons
-         */
+        virtual void checkForInterrupt() const = 0;
         virtual Status checkForInterruptNoAssert() const = 0;
 
         /**

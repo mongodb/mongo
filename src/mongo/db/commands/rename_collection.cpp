@@ -305,7 +305,7 @@ namespace mongo {
                 // Copy over all the data from source collection to target collection.
                 boost::scoped_ptr<RecordIterator> sourceIt(sourceColl->getIterator(txn));
                 while (!sourceIt->isEOF()) {
-                    txn->checkForInterrupt(false);
+                    txn->checkForInterrupt();
 
                     const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
 

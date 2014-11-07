@@ -131,10 +131,24 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max ,
-                          int total, string* cmdErrmsg, string toShard, string fromShard )
-            : _where( where ) , _ns( ns ) , _to( toShard ), _from( fromShard ), _next( 0 ),
-            _total( total ) , _cmdErrmsg( cmdErrmsg ) {
+        MoveTimingHelper(OperationContext* txn,
+                         const string& where,
+                         const string& ns,
+                         BSONObj min,
+                         BSONObj max ,
+                         int total,
+                         string* cmdErrmsg,
+                         string toShard,
+                         string fromShard)
+            : _txn(txn),
+              _where(where),
+              _ns(ns),
+              _to(toShard),
+              _from(fromShard),
+              _next(0),
+              _total(total),
+              _cmdErrmsg(cmdErrmsg) {
+
             _b.append( "min" , min );
             _b.append( "max" , max );
         }
@@ -165,7 +179,7 @@ namespace mongo {
             }
         }
 
-        void done( int step ) {
+        void done(int step) {
             verify( step == ++_next );
             verify( step <= _total );
 
@@ -173,7 +187,7 @@ namespace mongo {
             ss << "step " << step << " of " << _total;
             string s = ss.str();
 
-            CurOp * op = cc().curop();
+            CurOp * op = _txn->getCurOp();
             if ( op )
                 op->setMessage( s.c_str() );
             else
@@ -192,6 +206,7 @@ namespace mongo {
         }
 
     private:
+        OperationContext* const _txn;
         Timer _t;
 
         string _where;
@@ -997,7 +1012,7 @@ namespace mongo {
                 return false;
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , &errmsg,
+            MoveTimingHelper timing(txn, "from" , ns , min , max , 6 /* steps */ , &errmsg,
                 toShardName, fromShardName );
 
             log() << "received moveChunk request: " << cmdObj << migrateLog;
@@ -1734,7 +1749,7 @@ namespace mongo {
                   << " at epoch " << epoch.toString() << endl;
 
             string errmsg;
-            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , &errmsg, "", "" );
+            MoveTimingHelper timing(txn, "to", ns, min, max, 5 /* steps */, &errmsg, "", "");
 
             ScopedDbConnection conn(from);
             conn->getLastError(); // just test connection
@@ -1947,7 +1962,7 @@ namespace mongo {
                             repl::ReplicationCoordinator::StatusAndDuration replStatus =
                                     repl::getGlobalReplicationCoordinator()->awaitReplication(
                                             txn,
-                                            cc().getLastOp(),
+                                            txn->getClient()->getLastOp(),
                                             writeConcern);
                             if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
                                 warning() << "secondaryThrottle on, but doc insert timed out; "
@@ -1968,7 +1983,7 @@ namespace mongo {
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
-            ReplTime lastOpApplied = cc().getLastOp().asDate();
+            ReplTime lastOpApplied = txn->getClient()->getLastOp().asDate();
 
             {
                 // 4. do bulk of mods
@@ -2368,11 +2383,11 @@ namespace mongo {
         OperationContextImpl txn;
         if (getGlobalAuthorizationManager()->isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
-            cc().getAuthorizationSession()->grantInternalAuthorization();
+            txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
         }
 
         // Make curop active so this will show up in currOp.
-        cc().curop()->reset();
+        txn.getCurOp()->reset();
 
         migrateStatus.go(&txn);
         cc().shutdown();
