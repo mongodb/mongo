@@ -72,13 +72,5 @@ namespace repl {
     // Main entry point for replica sets
     void startReplSets(ReplSetSeedList *replSetSeedList);
 
-    /**
-     * does local authentication
-     * directly authorizes against AuthenticationInfo
-     * TODO(spencer): Remove this in favor of calling grantInternalAuthorization against the
-     * authorization session directly.
-     */
-    void replLocalAuth();
-
 } // namespace repl
 } // namespace mongo

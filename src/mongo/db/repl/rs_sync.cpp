@@ -37,6 +37,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
@@ -66,7 +67,7 @@ namespace repl {
 
     void runSyncThread() {
         Client::initThread("rsSync");
-        replLocalAuth();
+        cc().getAuthorizationSession()->grantInternalAuthorization();
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
         // Set initial indexPrefetch setting

@@ -37,6 +37,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/fsync.h"
@@ -86,7 +87,7 @@ namespace repl {
     void initializePrefetchThread() {
         if (!ClientBasic::getCurrent()) {
             Client::initThreadIfNotAlready();
-            replLocalAuth();
+            cc().getAuthorizationSession()->grantInternalAuthorization();
         }
     }
     namespace {
@@ -734,7 +735,7 @@ namespace {
         // Only do this once per thread
         if (!ClientBasic::getCurrent()) {
             Client::initThreadIfNotAlready();
-            replLocalAuth();
+            cc().getAuthorizationSession()->grantInternalAuthorization();
         }
     }
 

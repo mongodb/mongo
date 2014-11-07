@@ -118,7 +118,7 @@ namespace repl {
             if( replSetSeedList == 0 ) {
                 return;
             }
-            replLocalAuth();
+            cc().getAuthorizationSession()->grantInternalAuthorization();
             (theReplSet = ReplSet::make(&txn, *replSetSeedList))->go();
         }
         catch(std::exception& e) {
@@ -127,10 +127,6 @@ namespace repl {
                 fassertFailedNoTrace(18756);
         }
         cc().shutdown();
-    }
-
-    void replLocalAuth() {
-        cc().getAuthorizationSession()->grantInternalAuthorization();
     }
 
 } // namespace repl

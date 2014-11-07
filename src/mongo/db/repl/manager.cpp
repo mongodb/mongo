@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
@@ -81,7 +82,7 @@ namespace repl {
 
     void Manager::starting() {
         Client::initThread("rsMgr");
-        replLocalAuth();
+        cc().getAuthorizationSession()->grantInternalAuthorization();
     }
 
     void Manager::noteARemoteIsPrimary(OperationContext* txn, const Member *m) {
