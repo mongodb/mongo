@@ -413,6 +413,7 @@ bitstring
 bitwise
 bm
 bnd
+bool
 boolean
 br
 breakpoint

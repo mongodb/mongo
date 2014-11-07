@@ -78,6 +78,10 @@
  * To avoid locking shared data structures such as statistics and to permit
  * atomic state changes, we rely on the WT_ATOMIC_ADD and WT_ATOMIC_CAS
  * (compare and swap) operations.
+ *
+ * Note that we avoid __sync_bool_compare_and_swap due to problems with
+ * optimization with some versions of clang.  See
+ * http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
  */
 #define	__WT_ATOMIC_ADD(v, val, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_add_and_fetch(&(v), val))
@@ -85,7 +89,7 @@
 	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_fetch_and_add(&(v), val))
 #define	__WT_ATOMIC_CAS(v, old, new, n)					\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
-	__sync_bool_compare_and_swap(&(v), old, new))
+	__sync_val_compare_and_swap(&(v), old, new) == (old))
 #define	__WT_ATOMIC_CAS_VAL(v, old, new, n)				\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	__sync_val_compare_and_swap(&(v), old, new))
