@@ -150,12 +150,6 @@ mongo_tools_variables:
       mongodb_args: &auth_startup_args_string "--auth "
 
 functions:
-  "attach coverage reports" :
-    command: attach.task_files
-    params:
-      "${package} coverage report (HTML)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${package}/${task_id}.html
-      "${package} coverage report (TXT)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${package}/${task_id}.txt
-
   "attach tool":
     command: attach.task_files
     params:
@@ -275,47 +269,24 @@ functions:
     params:
       working_dir: src
       script: |
-        # Integration tests are tests that require a local mongod. They
-        # can be configured to run with SSL either on or off
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
         . ./${set_gopath|set_gopath.sh}
 
         # TODO bsondump needs tests
-        # TODO mongodump needs tests
         # TODO mongotop needs tests
 
-        # mongoimport
-        cd mongoimport
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
-        # mongoexport
-        cd mongoexport
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
-        # mongostat
-        cd mongostat
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
-        # mongooplog
-        cd mongooplog
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
-        # mongorestore
-        cd mongorestore
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
-        # mongofiles
-        cd mongofiles
-        ${library_path} go test ${coverage_args} ${args} ${build_tags}
-        cd ..
-
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            COVERAGE_ARGS=""
+            if [ "${run_coverage}" ]; then
+                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
+            fi;
+            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags}
+            cd ..
+        done
+        
   "run tool integration tests":
     command: shell.exec
     params:
@@ -341,31 +312,65 @@ functions:
             echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
           fi
         fi;
+        
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            COVERAGE_ARGS=""
+            if [ "${run_coverage}" ]; then
+                COVERAGE_ARGS="-coverprofile=coverage_$i.out"
+            fi;
+            ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags}
+            cd ..
+        done
 
-        # mongodump
-        cd mongodump
-        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
-        cd ..
+  "create coverage reports":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
 
-        # mongoexport
-        cd mongoexport
-        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
-        cd ..
+        . ./${set_gopath|set_gopath.sh}
 
-        # mongofiles
-        cd mongofiles
-        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
-        cd ..
+        for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
+            cd $i
+            perl -pe 's/.*src/github.com\/mongodb\/mongo-tools/' coverage_$i.out > coverage_$i_rewrite.out
+            ${library_path} go tool cover -html=coverage_$i_rewrite.out -o coverage_$i.html
+            ${library_path} go tool cover -func=coverage_$i_rewrite.out -o coverage_$i.txt
+            cd ..
+        done
 
-        # mongoimport
-        cd mongoimport
-        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
-        cd ..
+  "upload html coverage":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${coverage_pkg}/coverage_${coverage_pkg}.html
+      remote_file: mongo-tools/coverage/${coverage_pkg}/${task_id}.html
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/html
+      build_variants: ["ubuntu", "windows-64"]
 
-        # mongooplog
-        cd mongooplog
-        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
-        cd ..
+  "upload text coverage":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${coverage_pkg}/coverage_${coverage_pkg}.txt
+      remote_file: mongo-tools/coverage/${coverage_pkg}/${task_id}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      build_variants: ["ubuntu", "windows-64"]
+
+  "attach coverage reports":
+    command: attach.task_files
+    params:
+      "${coverage_pkg} coverage (html)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${coverage_pkg}/${task_id}.html
+      "${coverage_pkg} coverage (text)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${coverage_pkg}/${task_id}.txt
 
   "setup credentials" :
     command: shell.exec
@@ -389,18 +394,6 @@ functions:
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
         ./mongodb/mongod${extension} ${mongodb_args} ${mongod_extra_options|} --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &
-
-  "upload coverage report":
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/coverage.${format|txt}
-      remote_file: mongo-tools/coverage/${package}/${task_id}.${format|txt}
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|text/plain}
-      build_variants: ["ubuntu"]
 
   "upload tool":
     command: s3.put
@@ -847,6 +840,11 @@ tasks:
 
 - name: unit
   commands:
+    - command: expansions.update
+      params:
+        updates:
+          - key: "run_coverage"
+            value: "true"
     - command: git.get_project
       params:
         directory: src
@@ -854,16 +852,55 @@ tasks:
       params:
         directory: src
     - func: "run tool unit tests"
-
-- name: unit-coverage
-  commands:
-    - command: git.get_project
+    - func: "create coverage reports"
+    - command: expansions.update
       params:
-        directory: src
-    - command: git.apply_patch
+        updates:
+          - key: "coverage_pkg"
+            value: "mongoimport"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
+    - command: expansions.update
       params:
-        directory: src
-    - func: "run tool unit tests"
+        updates:
+          - key: "coverage_pkg"
+            value: "mongoexport"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongostat"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongooplog"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongodump"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "coverage_pkg"
+            value: "mongorestore"
+    - func: "upload html coverage"
+    - func: "upload text coverage"
+    - func: "attach coverage reports"
 
 - name: util
   commands:
