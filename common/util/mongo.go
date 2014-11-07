@@ -142,8 +142,10 @@ func ValidateDBName(database string) error {
 	}
 
 	// check for illegal characters
-	if strings.ContainsAny(database, InvalidDBChars) {
-		return fmt.Errorf("illegal character found in '%v'", database)
+	for _, illegalRune := range InvalidDBChars {
+		if strings.ContainsRune(database, illegalRune) {
+			return fmt.Errorf("illegal character '%c' found in '%v'", illegalRune, database)
+		}
 	}
 
 	// db name is valid
@@ -154,6 +156,11 @@ func ValidateDBName(database string) error {
 // collection. An error is returned if it is not valid.
 func ValidateCollectionName(collection string) error {
 
+	// collection names cannot be empty
+	if len(collection) == 0 {
+		return fmt.Errorf("collection name cannot be an empty string")
+	}
+
 	// collection names cannot begin with 'system.'
 	if strings.HasPrefix(collection, "system.") {
 		return fmt.Errorf("collection name '%v' is not allowed to begin with"+
@@ -161,8 +168,10 @@ func ValidateCollectionName(collection string) error {
 	}
 
 	// check for illegal characters
-	if strings.ContainsAny(collection, InvalidCollectionChars) {
-		return fmt.Errorf("illegal character found in '%v'", collection)
+	for _, illegalRune := range InvalidCollectionChars {
+		if strings.ContainsRune(collection, illegalRune) {
+			return fmt.Errorf("illegal character '%c' found in '%v'", illegalRune, collection)
+		}
 	}
 
 	// collection name is valid

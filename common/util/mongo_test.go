@@ -65,3 +65,44 @@ func TestParseHost(t *testing.T) {
 
 	})
 }
+
+func TestInvalidNames(t *testing.T) {
+
+	Convey("Checking some invalid collection names, ", t, func() {
+		Convey("test.col$ is invalid", func() {
+			So(ValidateDBName("test"), ShouldBeNil)
+			So(ValidateCollectionName("col$"), ShouldNotBeNil)
+			So(ValidateFullNamespace("test.col$"), ShouldNotBeNil)
+		})
+		Convey("db/aaa.col is invalid", func() {
+			So(ValidateDBName("db/aaa"), ShouldNotBeNil)
+			So(ValidateCollectionName("col"), ShouldBeNil)
+			So(ValidateFullNamespace("db/aaa.col"), ShouldNotBeNil)
+		})
+		Convey("db. is invalid", func() {
+			So(ValidateDBName("db"), ShouldBeNil)
+			So(ValidateCollectionName(""), ShouldNotBeNil)
+			So(ValidateFullNamespace("db."), ShouldNotBeNil)
+		})
+		Convey("db space.col is invalid", func() {
+			So(ValidateDBName("db space"), ShouldNotBeNil)
+			So(ValidateCollectionName("col"), ShouldBeNil)
+			So(ValidateFullNamespace("db space.col"), ShouldNotBeNil)
+		})
+		Convey("[null].[null] is invalid", func() {
+			So(ValidateDBName("\x00"), ShouldNotBeNil)
+			So(ValidateCollectionName("\x00"), ShouldNotBeNil)
+			So(ValidateFullNamespace("\x00.\x00"), ShouldNotBeNil)
+		})
+		Convey("[empty] is invalid", func() {
+			So(ValidateFullNamespace(""), ShouldNotBeNil)
+		})
+		Convey("db.col is valid", func() {
+			So(ValidateDBName("db"), ShouldBeNil)
+			So(ValidateCollectionName("col"), ShouldBeNil)
+			So(ValidateFullNamespace("db.col"), ShouldBeNil)
+		})
+
+	})
+
+}

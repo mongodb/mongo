@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -76,7 +77,10 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 // CreateIntentsForDB drills down into a db folder, creating intents
 // for all of the collection dump files it encounters
 func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
-	//TODO check that it's really a directory
+	if err := util.ValidateDBName(db); err != nil {
+		return fmt.Errorf("invalid database name '%v': %v", db, err)
+	}
+
 	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, fullpath)
 	entries, err := ioutil.ReadDir(fullpath)
 	if err != nil {
@@ -100,6 +104,11 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 						"not restoring system.indexes collection because database %v "+
 							"has .metadata.json files", db)
 					continue
+				}
+				if err = util.ValidateCollectionName(collection); err != nil {
+					if collection != "system.indexes" { // for < 2.6 compatability (TODO remove in 3.0)
+						return fmt.Errorf("invalid collection name '%v.%v': %v", db, collection, err)
+					}
 				}
 				intent := &intents.Intent{
 					DB:       db,
@@ -137,12 +146,27 @@ func hasMetadataFiles(files []os.FileInfo) bool {
 	return false
 }
 
+// CreateIntentForCollection builds an intent for the given db and collection name
+// along with a path to a .bson collection file. It searches the .bson's directory
+// for a matching metadata file. This method is not called by CreateIntentsForDB,
+// it is only used in the case where --db and --collection flags are set.
 func (restore *MongoRestore) CreateIntentForCollection(
 	db, collection, fullpath string) error {
+
 	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, fullpath)
 
-	// first make sure the bson file exists and is valid
+	//first validate the collection and db names
+	if err := util.ValidateDBName(db); err != nil {
+		return fmt.Errorf("invalid database name '%v': %v", db, err)
+	}
+	if err := util.ValidateCollectionName(collection); err != nil {
+		if collection != "system.indexes" { // for < 2.6 compatability (TODO remove in 3.0)
+			return fmt.Errorf("invalid collection name '%v.%v': %v", db, collection, err)
+		}
+	}
+
+	// then make sure the bson file exists and is valid
 	file, err := os.Lstat(fullpath)
 	if err != nil {
 		return err
