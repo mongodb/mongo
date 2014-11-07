@@ -51,20 +51,36 @@ namespace mongo {
     namespace {
         int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
                              int errorCode, const char *message) {
-            error() << "WiredTiger (" << errorCode << ") " << message;
-            fassert( 28558, errorCode != WT_PANIC );
+            try {
+                error() << "WiredTiger (" << errorCode << ") " << message;
+                fassert( 28558, errorCode != WT_PANIC );
+            }
+            catch (...) {
+                std::terminate();
+            }
             return 0;
         }
 
         int mdb_handle_message( WT_EVENT_HANDLER *handler, WT_SESSION *session,
                                 const char *message) {
-            log() << "WiredTiger " << message;
+            try {
+                log() << "WiredTiger " << message;
+            }
+            catch (...) {
+                std::terminate();
+            }
             return 0;
         }
 
         int mdb_handle_progress( WT_EVENT_HANDLER *handler, WT_SESSION *session,
                                  const char *operation, uint64_t progress) {
-            log() << "WiredTiger progress " << operation << " " << progress;
+            try {
+                log() << "WiredTiger progress " << operation << " " << progress;
+            }
+            catch (...) {
+                std::terminate();
+            }
+
             return 0;
         }
 

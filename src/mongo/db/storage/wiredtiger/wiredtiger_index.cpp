@@ -125,26 +125,50 @@ namespace {
                 return cmp;
             }
 
-            static int _compare(WT_COLLATOR *coll, WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b, int *cmp) {
+            static int _compare(WT_COLLATOR *coll,
+                                WT_SESSION *s,
+                                const WT_ITEM *a,
+                                const WT_ITEM *b,
+                                int *cmp) {
+
+                try { 
                     WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
                     *cmp = c->Compare(s, a, b);
                     return 0;
+                }
+                catch (...) {
+                    std::terminate();
+                }
             }
 
             static int _terminate(WT_COLLATOR *coll, WT_SESSION *s) {
+                try {
                     WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
                     delete c;
                     return 0;
+                }
+                catch (...) {
+                    std::terminate();
+                }
             }
 
         private:
             const IndexEntryComparison _indexComparator;
     };
 
-    extern "C" int index_collator_customize(WT_COLLATOR *coll, WT_SESSION *s, const char *uri, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collp) {
+    int index_collator_customize(WT_COLLATOR *coll,
+                                 WT_SESSION *s,
+                                 const char *uri,
+                                 WT_CONFIG_ITEM *metadata,
+                                 WT_COLLATOR **collp) {
+        try {
             IndexDescriptor desc(0, "unknown", fromjson(std::string(metadata->str, metadata->len)));
             *collp = new WiredTigerIndexCollator(Ordering::make(desc.keyPattern()));
             return 0;
+        }
+        catch (...) {
+            std::terminate();
+        }
     }
 
     extern "C" MONGO_COMPILER_API_EXPORT int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
