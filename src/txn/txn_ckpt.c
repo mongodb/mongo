@@ -282,6 +282,16 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_session_release_btree(session)));
 		WT_ERR(ret);
+
+		/*
+		 * Sync the current state of the file this should save some
+		 * work while holding the schema lock.
+		 */
+		if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC)) {
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __wt_checkpoint_sync(session, NULL));
+			WT_ERR(ret);
+		}
 	}
 
 err:	while (i < session->ckpt_handle_next) {
