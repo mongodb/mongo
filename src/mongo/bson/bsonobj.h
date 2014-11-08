@@ -44,6 +44,7 @@
 #include "mongo/client/export_macros.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 
@@ -107,13 +108,18 @@ namespace mongo {
             init(bsonData);
         }
 
+        explicit BSONObj(SharedBuffer ownedBuffer)
+                : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata())
+                , _ownedBuffer(ownedBuffer.moveFrom()) {
+        }
+
 #if __cplusplus >= 201103L
         /** Move construct a BSONObj */
         BSONObj(BSONObj&& other)
             : _objdata(std::move(other._objdata))
-            , _holder(std::move(other._holder)) {
+            , _ownedBuffer(std::move(other._ownedBuffer)) {
             other._objdata = BSONObj()._objdata; // To return to an empty state.
-            dassert(!other._holder);
+            dassert(!other.isOwned());
         }
 
         // The explicit move constructor above will inhibit generation of the copy ctor, so
@@ -135,7 +141,7 @@ namespace mongo {
         void swap(BSONObj& other) {
             using std::swap;
             swap(_objdata, other._objdata);
-            swap(_holder, other._holder);
+            swap(_ownedBuffer, other._ownedBuffer);
         }
 
         /**
@@ -166,7 +172,7 @@ namespace mongo {
 
            @return true if this is in owned mode
         */
-        bool isOwned() const { return _holder.get() != 0; }
+        bool isOwned() const { return _ownedBuffer.get() != 0; }
 
         /** assure the data buffer is under the control of this BSONObj and not a remote buffer
             @see isOwned()
@@ -524,48 +530,17 @@ namespace mongo {
 
         template<typename T> bool coerceVector( std::vector<T>* out ) const;
 
-        class Holder {
-        public:
-            explicit Holder(AtomicUInt32::WordType initial = AtomicUInt32::WordType())
-                : _refCount(initial) {}
-
-            // these are called automatically by boost::intrusive_ptr
-            friend void intrusive_ptr_add_ref(Holder* h) {
-                h->_refCount.fetchAndAdd(1);
-            }
-
-            friend void intrusive_ptr_release(Holder* h) {
-                if (h->_refCount.subtractAndFetch(1) == 0) {
-                    // We placement new'ed a Holder in BSONObj::takeOwnership below,
-                    // so we must destroy the object here.
-                    h->~Holder();
-                    free(h);
-                }
-            }
-
-            char* data() {
-                return reinterpret_cast<char *>(this + 1);
-            }
-
-            const char* data() const {
-                return reinterpret_cast<const char *>(this + 1);
-            }
-
-        private:
-            AtomicUInt32 _refCount;
-        };
+        typedef SharedBuffer::Holder Holder;
 
         /** Given a pointer to a region of un-owned memory containing BSON data, prefixed by
          *  sufficient space for a BSONObj::Holder object, return a BSONObj that owns the
          *  memory.
+         *
+         * This class will call free(holderPrefixedData), so it must have been allocated in a way
+         * that makes that valid.
          */
         static BSONObj takeOwnership(char* holderPrefixedData) {
-            // Initialize the refcount to 1 so we don't need to increment it in the constructor
-            // (see private BSONObj(Holder*) constructor below).
-            //
-            // TODO: Should dassert alignment of holderPrefixedData
-            // here if possible.
-            return BSONObj(new(holderPrefixedData) BSONObj::Holder(1U));
+            return BSONObj(SharedBuffer::takeOwnership(holderPrefixedData));
         }
 
         /// members for Sorter
@@ -582,14 +557,6 @@ namespace mongo {
         }
 
     private:
-        /** Construct a new BSONObj using the given Holder object */
-        explicit BSONObj(Holder* holder)
-            : _holder(holder, false) {
-            // NOTE: The 'false' is because we have already initialized the Holder with a
-            // refcount of '1' in takeOwnership above.
-            init(holder->data());
-        }
-
         void _assertInvalid() const;
 
         void init(const char *data) {
@@ -607,7 +574,7 @@ namespace mongo {
         Status _okForStorage(bool root, bool deep) const;
 
         const char* _objdata;
-        boost::intrusive_ptr< Holder > _holder;
+        SharedBuffer _ownedBuffer;
     };
 
     std::ostream& operator<<( std::ostream &s, const BSONObj &o );

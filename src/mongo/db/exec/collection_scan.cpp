@@ -147,7 +147,7 @@ namespace mongo {
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = nextLoc;
-        member->obj = _iter->dataFor(member->loc).toBson();
+        member->obj = _iter->dataFor(member->loc).releaseToBson();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
         return returnIfMatches(member, id, out);

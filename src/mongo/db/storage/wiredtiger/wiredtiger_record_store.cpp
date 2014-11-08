@@ -288,9 +288,9 @@ namespace {
         int ret = cursor->get_value(cursor.get(), &value);
         invariantWTOK(ret);
 
-        boost::shared_array<char> data( new char[value.size] );
+        SharedBuffer data = SharedBuffer::allocate(value.size);
         memcpy( data.get(), value.data, value.size );
-        return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
+        return RecordData(data.moveFrom(), value.size);
     }
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {

@@ -223,7 +223,7 @@ namespace {
         if (out)
             *out = dl;
 
-        return data.toBson().getOwned();
+        return data.releaseToBson().getOwned();
     }
 
     const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData( OperationContext* opCtx,

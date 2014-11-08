@@ -504,10 +504,7 @@ namespace mongo {
 
     RecordData RocksRecordStore::_getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
                                              OperationContext* txn, const DiskLoc& loc) {
-        rocksdb::Slice value;
-
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        boost::shared_array<char> data;
 
         std::string value_storage;
         auto status = ru->Get(cf, _makeKey(loc), &value_storage);
@@ -519,10 +516,10 @@ namespace mongo {
                 invariant(false);
             }
         }
-        data.reset(new char[value_storage.size()]);
+
+        SharedBuffer data = SharedBuffer::allocate(value_storage.size());
         memcpy(data.get(), value_storage.data(), value_storage.size());
-        value = rocksdb::Slice(data.get(), value_storage.size());
-        return RecordData(value.data(), value.size(), data);
+        return RecordData(data.moveFrom(), value_storage.size());
     }
 
     // XXX make sure these work with rollbacks (I don't think they will)
@@ -627,10 +624,9 @@ namespace mongo {
 
     RecordData RocksRecordStore::Iterator::dataFor(const DiskLoc& loc) const {
         if (!_eof && loc == _curr && _iterator->Valid() && _iterator->status().ok()) {
-            boost::shared_array<char> data;
-            data.reset(new char[_iterator->value().size()]);
+            SharedBuffer data = SharedBuffer::allocate(_iterator->value().size());
             memcpy(data.get(), _iterator->value().data(), _iterator->value().size());
-            return RecordData(data.get(), _iterator->value().size(), data);
+            return RecordData(data.moveFrom(), _iterator->value().size());
         }
         return RocksRecordStore::_getDataFor(_db, _cf.get(), _txn, loc);
     }

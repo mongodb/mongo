@@ -157,14 +157,14 @@ namespace mongo {
     }
 
     BSONObj Collection::docFor(OperationContext* txn, const DiskLoc& loc) const {
-        return  _recordStore->dataFor( txn, loc ).toBson();
+        return  _recordStore->dataFor( txn, loc ).releaseToBson();
     }
 
     bool Collection::findDoc(OperationContext* txn, const DiskLoc& loc, BSONObj* out) const {
         RecordData rd;
         if ( !_recordStore->findRecord( txn, loc, &rd ) )
             return false;
-        *out = rd.toBson();
+        *out = rd.releaseToBson();
         return true;
     }
 
@@ -299,7 +299,7 @@ namespace mongo {
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
 
-        BSONObj objOld = _recordStore->dataFor( txn, oldLocation ).toBson();
+        BSONObj objOld = _recordStore->dataFor( txn, oldLocation ).releaseToBson();
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];
