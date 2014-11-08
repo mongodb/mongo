@@ -137,12 +137,12 @@ func Setup(procname string, config SetupConfig) error {
 		textout = w
 	case "stdout":
 		if t == nil {
-			t = DefaultTemplate
+			t = ColorTemplate
 		}
 		textout = NewWriterOutput(os.Stdout)
 	case "stderr", "":
 		if t == nil {
-			t = DefaultTemplate
+			t = ColorTemplate
 		}
 		textout = NewWriterOutput(os.Stderr)
 	default:
