@@ -56,10 +56,10 @@ namespace mongo {
 
     Status WiredTigerGlobalOptions::store(const moe::Environment& params,
                                  const std::vector<std::string>& args) {
-        if (params.count("storage.wiredtiger.databaseConfig")) {
-            wiredTigerGlobalOptions.databaseConfig =
-                         params["storage.wiredtiger.databaseConfig"].as<string>();
-            std::cerr << "DB option: " << wiredTigerGlobalOptions.databaseConfig << std::endl;
+        if (params.count("storage.wiredtiger.engineConfig")) {
+            wiredTigerGlobalOptions.engineConfig =
+                         params["storage.wiredtiger.engineConfig"].as<string>();
+            std::cerr << "Engine option: " << wiredTigerGlobalOptions.engineConfig << std::endl;
         }
         if (params.count("storage.wiredtiger.collectionConfig")) {
             wiredTigerGlobalOptions.collectionConfig =

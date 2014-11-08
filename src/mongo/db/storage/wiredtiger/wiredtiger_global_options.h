@@ -45,7 +45,7 @@ namespace mongo {
         bool handlePreValidation(const moe::Environment& params);
         Status store(const moe::Environment& params, const std::vector<std::string>& args);
 
-        std::string databaseConfig;
+        std::string engineConfig;
         std::string collectionConfig;
         std::string indexConfig;
     };
