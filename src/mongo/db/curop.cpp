@@ -130,7 +130,7 @@ namespace mongo {
 
     void CurOp::setNS( const StringData& ns ) {
         // _ns copies the data in the null-terminated ptr it's given
-        _ns = ns.toString().c_str();
+        _ns = ns;
     }
 
     void CurOp::ensureStarted() {

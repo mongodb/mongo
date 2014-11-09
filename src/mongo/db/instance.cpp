@@ -530,7 +530,7 @@ namespace {
         DbMessage d(m);
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
-        op.debug().ns = ns.ns().c_str();
+        op.debug().ns = ns.ns();
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -632,7 +632,7 @@ namespace {
         NamespaceString ns(d.getns());
         uassertStatusOK( userAllowedWriteNS( ns ) );
 
-        op.debug().ns = ns.ns().c_str();
+        op.debug().ns = ns.ns();
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         verify( d.moreJSObjs() );
