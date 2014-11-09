@@ -22,7 +22,7 @@ __open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
 	else
 		*dir = '\0';
 	WT_SYSCALL_RETRY(((*fd =
-		open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
 	if (dir != NULL)
 		*dir = '/';
 	if (ret != 0)
