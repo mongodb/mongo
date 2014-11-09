@@ -345,7 +345,6 @@ qnx
 rdbms
 rdlock
 readlock
-readonly
 realclean
 realloc
 realloc'd
