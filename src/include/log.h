@@ -16,6 +16,11 @@
 	(l)->offset = 0;						\
 } while (0)
 
+#define	ZERO_LSN(l)	do {						\
+	(l)->file = 0;							\
+	(l)->offset = 0;						\
+} while (0)
+
 #define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
 
 /*
@@ -77,6 +82,7 @@ typedef struct {
 #define	SLOT_BUFFERED	0x02			/* Buffer writes */
 #define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
 #define	SLOT_SYNC	0x08			/* Needs sync on release */
+#define	SLOT_SYNC_DIR	0x10			/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
@@ -97,6 +103,7 @@ typedef struct {
 	uint32_t	 fileid;	/* Current log file number */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
+	WT_FH           *log_dir_fh;	/* Log directory file handle */
 
 	/*
 	 * System LSNs
@@ -104,6 +111,7 @@ typedef struct {
 	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
 	WT_LSN		first_lsn;	/* First LSN */
+	WT_LSN		sync_dir_lsn;	/* LSN of the last directory sync */
 	WT_LSN		sync_lsn;	/* LSN of the last sync */
 	WT_LSN		trunc_lsn;	/* End LSN for recovery truncation */
 	WT_LSN		write_lsn;	/* Last LSN written to log file */
