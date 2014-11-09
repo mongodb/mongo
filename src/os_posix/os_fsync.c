@@ -39,7 +39,7 @@ __wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 {
 #ifdef __linux__
 	WT_DECL_RET;
-	int fd;
+	int fd, tret;
 	char *dir;
 
 	/*
@@ -63,9 +63,10 @@ __wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s: fsync", path);
 
-err:	WT_SYSCALL_RETRY(close(fd), ret);
-	if (ret != 0)
-		__wt_err(session, ret, "%s: close", path);
+err:	WT_SYSCALL_RETRY(close(fd), tret);
+	if (tret != 0)
+		__wt_err(session, tret, "%s: close", path);
+	WT_TRET(tret);
 	return (ret);
 #else
 	WT_UNUSED(session);
