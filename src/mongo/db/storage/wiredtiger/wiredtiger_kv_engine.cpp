@@ -90,16 +90,10 @@ namespace mongo {
 
         {
             ProcessInfo pi;
-            BSONObjBuilder b;
-            pi.appendSystemDetails( b );
-            BSONObj obj = b.obj();
-            BSONObj extra = obj["extra"].Obj();
-            double pageSize = extra["pageSize"].number();
-            double numPages = extra["numPages"].number();
-            if ( pageSize > 0 && numPages > 0 ) {
-                double totalBytes = numPages * pageSize;
-                double cacheBytes = totalBytes / 10;
-                cacheSizeGB = static_cast<int>( cacheBytes / ( 1024 * 1024 * 1024 ) );
+            unsigned long long memSizeMB  = pi.getMemSizeMB();
+            if ( memSizeMB  > 0 ) {
+                double cacheMB = memSizeMB / 10;
+                cacheSizeGB = static_cast<int>( cacheMB / 1024 );
                 if ( cacheSizeGB < 1 )
                     cacheSizeGB = 1;
             }
