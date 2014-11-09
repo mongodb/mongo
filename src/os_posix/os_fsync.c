@@ -43,14 +43,10 @@ __wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 	char *dir;
 
 	/*
-	 * According to the Linux fsync man page:
-	 *	Calling fsync() does not necessarily ensure that the entry in
-	 *	the directory containing the file has also reached disk. For
-	 *	that an explicit fsync() on a file descriptor for the directory
-	 *	is also needed.
-	 *
-	 * Open the WiredTiger home directory and sync it, I don't want the rest
-	 * of the system to have to wonder if opening a file creates it.
+	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
+	 * entry in the directory containing the file has also reached disk (and
+	 * there are historic Linux filesystems requiring this), do an explicit
+	 * fsync on a file descriptor for the directory to be sure.
 	 */
 	if ((dir = strrchr(path, '/')) == NULL)
 		path = (char *)".";
