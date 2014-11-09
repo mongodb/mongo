@@ -227,8 +227,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	if (log->log_dir_fh == NULL) {
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
-		    "log_open: open fh to directory %s",
-		    (const char *)conn->log_path));
+		    "log_open: open fh to directory %s", conn->log_path));
 		WT_RET(__wt_open(session, conn->log_path,
 		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
