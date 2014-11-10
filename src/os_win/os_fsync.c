@@ -12,7 +12,7 @@
  *	Flush a directory file handle.
  */
 int
-__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh);
+__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
