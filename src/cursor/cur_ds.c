@@ -496,8 +496,10 @@ __wt_curds_open(
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	/* Data-source cursors have a collator reference. */
-	WT_ERR(__wt_collator_config(session, cfg,
-	    &data_source->collator, &data_source->collator_owned));
+	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	if (cval.len != 0)
+		WT_ERR(__wt_collator_config(session, &cval,
+		    &data_source->collator, &data_source->collator_owned));
 
 	WT_ERR(dsrc->open_cursor(dsrc,
 	    &session->iface, uri, (WT_CONFIG_ARG *)cfg, &data_source->source));

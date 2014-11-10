@@ -18,7 +18,6 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_CONFIG_ITEM ck, cv, lk, lv;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	WT_NAMED_COLLATOR *ncoll;
 	char *lsmconfig;
 	u_int nchunks;
 
@@ -38,17 +37,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
 			if (cv.len == 0)
 				continue;
-			TAILQ_FOREACH(ncoll, &S2C(session)->collqh, q) {
-				if (WT_STRING_MATCH(
-				    ncoll->name, cv.str, cv.len)) {
-					lsm_tree->collator = ncoll->collator;
-					break;
-				}
-			}
-			if (lsm_tree->collator == NULL)
-				WT_ERR_MSG(session, EINVAL,
-				    "unknown collator '%.*s'",
-				    (int)cv.len, cv.str);
+			WT_ERR(__wt_collator_config(session, &cv,
+			    &lsm_tree->collator, &lsm_tree->collator_owned));
 			WT_ERR(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->collator_name));
 		} else if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {

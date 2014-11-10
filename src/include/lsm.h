@@ -165,6 +165,7 @@ struct __wt_lsm_tree {
 
 	WT_COLLATOR *collator;
 	const char *collator_name;
+	int collator_owned;
 
 	int refcnt;			/* Number of users of the tree */
 #define	LSM_TREE_MAX_QUEUE	100

@@ -226,8 +226,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_collator_config(
-		    session, cfg, &btree->collator, &btree->collator_owned));
+		WT_RET(__wt_config_gets(session, cfg, "collator", &cval));
+		if (cval.len != 0)
+			WT_RET(__wt_collator_config(session, &cval,
+			    &btree->collator, &btree->collator_owned));
 
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
