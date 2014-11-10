@@ -66,8 +66,8 @@ except ImportError:
     sys.exit(-1)
 
 if sys.version_info<(2,7,0):
-	print >>sys.stderr, "You need python 2.7 or later to run this script"
-	sys.exit(-1)
+    print >>sys.stderr, "You need python 2.7 or later to run this script"
+    sys.exit(-1)
 
 # Plot a set of entries for a title.
 def munge(title, values):
