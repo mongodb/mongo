@@ -26,14 +26,7 @@ cd mongo-tools
 
 #### Building Tools
 
-Use `go build` to build the tool binaries. Requires Go version 1.3 and up.
-
-```
-mkdir bin/
-for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
-	 go build -o "bin/$i" $i/main/$i.go
-done
-```
+To build the tools, you need to have Go version 1.3 and up. Run the `build.sh` script to install all the tools to `./bin`.
 
 Alternatively, you can set GOBIN and use `go install`:
 
