@@ -35,9 +35,9 @@ ext_collate(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
  */
 static int
 ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
-    WT_CONFIG_ARG *cfg_arg, WT_COLLATOR **collatorp, int *ownp)
+    const char *uri, WT_CONFIG_ARG *cfg_arg, WT_COLLATOR **collatorp, int *ownp)
 {
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, metadata;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 	const char **cfg;
@@ -55,18 +55,23 @@ ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
 	if (cval.len == 0)
 		return (0);
 
-	return (__wt_collator_config(session, &cval, collatorp, ownp));
+	WT_CLEAR(metadata);
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets(session, cfg, "app_metadata", &metadata));
+	return (__wt_collator_config(
+	    session, uri, &cval, &metadata, collatorp, ownp));
 }
 
 /*
  * __wt_collator_config --
- *	Given a configuration, configure the collator.
+ *	Configure a custom collator.
  */
 int
-__wt_collator_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname,
+__wt_collator_config(WT_SESSION_IMPL *session, const char *uri,
+    WT_CONFIG_ITEM *cname, WT_CONFIG_ITEM *metadata,
     WT_COLLATOR **collatorp, int *ownp)
 {
-	WT_CONFIG_ITEM cval;
+	WT_COLLATOR *collator;
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
 
@@ -83,16 +88,13 @@ __wt_collator_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname,
 		WT_RET_MSG(session, EINVAL,
 		    "unknown collator '%.*s'", (int)cname->len, cname->str);
 
-	if (ncoll->collator->customize != NULL) {
-		WT_RET(__wt_config_gets(session,
-		    session->dhandle->cfg, "app_metadata", &cval));
-		WT_RET(ncoll->collator->customize(
-		    ncoll->collator, &session->iface,
-		    session->dhandle->name, &cval, collatorp));
-	}
+	collator = ncoll->collator;
+	if (collator->customize != NULL)
+		WT_RET(collator->customize(collator,
+		    &session->iface, uri, metadata, collatorp));
 
 	if (*collatorp == NULL)
-		*collatorp = ncoll->collator;
+		*collatorp = collator;
 	else
 		*ownp = 1;
 

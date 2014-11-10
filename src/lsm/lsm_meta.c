@@ -15,7 +15,7 @@ int
 __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_CONFIG cparser, lparser;
-	WT_CONFIG_ITEM ck, cv, lk, lv;
+	WT_CONFIG_ITEM ck, cv, fileconf, lk, lv, metadata;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	char *lsmconfig;
@@ -37,7 +37,17 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
 			if (cv.len == 0)
 				continue;
-			WT_ERR(__wt_collator_config(session, &cv,
+			/*
+			 * Extract the application-supplied metadata (if any)
+			 * from the file configuration.
+			 */
+			WT_ERR(__wt_config_getones(
+			    session, lsmconfig, "file_config", &fileconf));
+			WT_CLEAR(metadata);
+			WT_ERR_NOTFOUND_OK(__wt_config_subgets(
+			    session, &fileconf, "app_metadata", &metadata));
+			WT_ERR(__wt_collator_config(session, lsm_tree->name,
+			    &cv, &metadata,
 			    &lsm_tree->collator, &lsm_tree->collator_owned));
 			WT_ERR(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->collator_name));
