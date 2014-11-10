@@ -166,7 +166,7 @@ connection_stats = [
     ##########################################
     LogStat('log_buffer_grow', 'log buffer size increases'),
     LogStat('log_buffer_size', 'total log buffer size', 'no_clear,no_scale'),
-    LogStat('log_bytes_user', 'user provided log bytes written'),
+    LogStat('log_bytes_payload', 'log bytes of payload data'),
     LogStat('log_bytes_written', 'log bytes written'),
     LogStat('log_close_yields', 'yields waiting for previous log file close'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear'),
