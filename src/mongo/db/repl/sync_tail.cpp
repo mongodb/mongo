@@ -395,9 +395,8 @@ namespace repl {
                     break;
                 }
 
-                size_t idHash = hashBSONElement( id );
-                boost::hash_combine(idHash, hash);
-                hash = idHash;
+                const size_t idHash = hashBSONElement( id );
+                MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 
             (*writerVectors)[hash % writerVectors->size()].push_back(*it);
