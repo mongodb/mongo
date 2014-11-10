@@ -26,8 +26,11 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import os, csv, operator
+import os, csv, operator, sys
 from time import mktime
+
+tool_dir = os.path.split(sys.argv[0])[0]
+sys.path.append(tool_dir)
 
 try:
     from wt_nvd3_util import multiChart, parsetime
