@@ -25,8 +25,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+import os, sys
 from datetime import datetime
-from nvd3 import lineChart
+
+tool_dir = os.path.split(sys.argv[0])[0]
+# Make sure Python finds the NVD3 in our third party directory, to
+# avoid compatability issues
+sys.path.append(os.path.join(tool_dir, "third_party"))
+
+try:
+    from nvd3 import lineChart
+except ImportError:
+    print >>sys.stderr, "Could not import nvd3. It should be installed locally."
+    sys.exit(-1)
 
 # Add a multiChart type so we can overlay line graphs
 class multiChart(lineChart):

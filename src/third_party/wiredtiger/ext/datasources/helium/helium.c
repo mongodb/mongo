@@ -1242,7 +1242,8 @@ cache_clean:
 		a.size = (uint32_t)r->key_len;
 		b.data = cursor->t2.v;		/* b is the cache */
 		b.size = (uint32_t)cursor->t2.len;
-		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
+		if ((ret = wtext->collate(
+		    wtext, session, NULL, &a, &b, &cmp)) != 0)
 			return (ret);
 
 		if (f == he_next) {
@@ -2106,7 +2107,7 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
-	int locked, ret, tret;
+	int locked, own, ret, tret;
 	char *value;
 
 	*new_cursor = NULL;
@@ -2136,7 +2137,8 @@ helium_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		    "overwrite configuration: %s", wtext->strerror(ret));
 	cursor->config_overwrite = v.val != 0;
 
-	if ((ret = wtext->collator_config(wtext, session, config)) != 0)
+	if ((ret = wtext->collator_config(
+	    wtext, session, uri, config, NULL, &own)) != 0)
 		EMSG_ERR(wtext, session, ret,
 		    "collator configuration: %s", wtext->strerror(ret));
 

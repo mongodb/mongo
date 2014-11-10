@@ -185,7 +185,7 @@ static int
 __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, metadata;
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COMPRESSOR *ncomp;
 	int64_t maj_version, min_version;
@@ -226,8 +226,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_collator_config(
-		    session, cfg, &btree->collator, &btree->collator_owned));
+		WT_RET(
+		    __wt_config_gets(session, cfg, "app_metadata", &metadata));
+		WT_RET(__wt_config_gets(session, cfg, "collator", &cval));
+		if (cval.len != 0)
+			WT_RET(__wt_collator_config(
+			    session, btree->dhandle->name, &cval, &metadata,
+			    &btree->collator, &btree->collator_owned));
 
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
