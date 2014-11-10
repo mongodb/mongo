@@ -263,12 +263,12 @@ namespace mongo {
         _result = LOCK_INVALID;
     }
 
-    LockResult CondVarLockGrantNotification::wait(int timeoutMs) {
-        if (timeoutMs <= 0) return LOCK_TIMEOUT;
+    LockResult CondVarLockGrantNotification::wait(Microseconds timeout) {
+        if (timeout <= Microseconds(0)) return LOCK_TIMEOUT;
 
         boost::unique_lock<boost::mutex> lock(_mutex);
         while (_result == LOCK_INVALID) {
-            if (!_cond.timed_wait(lock, Milliseconds(timeoutMs))) {
+            if (!_cond.timed_wait(lock, timeout)) {
                 // Timeout
                 return LOCK_TIMEOUT;
             }
@@ -451,7 +451,7 @@ namespace mongo {
             timeToWait = *timeBudgetRemaining;
 
         for (int attempt = 1; /*forever*/; attempt++) {
-            result = _notify.wait(timeToWait.total_milliseconds());
+            result = _notify.wait(timeToWait);
 
             if (result == LOCK_OK) break;
 
@@ -466,7 +466,10 @@ namespace mongo {
             }
 
             if (timeBudgetRemaining) {
-                *timeBudgetRemaining -= Microseconds(timer.microsReset());
+                // Assume we always wait at least 1us. This ensures we always decrease the time
+                // budget each pass through the loop, even if we only waited 900ns.
+                *timeBudgetRemaining -= std::max(Microseconds(timer.microsReset()),
+                                                 Microseconds(1));
                 if (*timeBudgetRemaining < timeToWait) {
                     timeToWait = *timeBudgetRemaining;
                 }
