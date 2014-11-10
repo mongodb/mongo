@@ -28,9 +28,9 @@ of the WiredTiger library should comply with these copyrights.
 @hrow{Distribution Files, Copyright Holder, License}
 @row{\c src/include/bitstring.i, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/include/queue.h, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
+@row{\c src/os_posix/getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 @row{\c src/support/hash_city.c, Google\, Inc., <a href="http://www.opensource.org/licenses/MIT">The MIT License</a>}
 @row{\c src/support/hash_fnv.c, Authors, Public Domain}
-@row{\c src/utilities/util_getopt.c, University of California\, Berkeley, <a href="http://www.opensource.org/licenses/BSD-3-Clause">BSD-3-Clause License</a>}
 </table>
 
 @section license_leveldb 3rd party software optionally included in the WiredTiger library: LevelDB
