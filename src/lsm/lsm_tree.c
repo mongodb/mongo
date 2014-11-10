@@ -26,6 +26,11 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
 		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
 
+	if (lsm_tree->collator_owned &&
+	    lsm_tree->collator->terminate != NULL)
+		WT_TRET(lsm_tree->collator->terminate(
+		    lsm_tree->collator, &session->iface));
+
 	__wt_free(session, lsm_tree->name);
 	__wt_free(session, lsm_tree->config);
 	__wt_free(session, lsm_tree->key_format);

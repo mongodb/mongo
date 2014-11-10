@@ -375,8 +375,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*
 	 * Configure the appropriate collator.
 	 */
-	if ((ret = wt_api->collator_config(
-	    wt_api, session, config, &collator, &collator_owned)) != 0) {
+	if ((ret = wt_api->collator_config(wt_api, session,
+	    "dsrc:", config, &collator, &collator_owned)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "collator configuration: %s", wiredtiger_strerror(ret));
 		return (ret);
