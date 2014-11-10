@@ -83,18 +83,18 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri):
-        print "Compare: URI: " + uri
+        #print "Compare: URI: " + uri
         self.runWt(['dump', uri], outfilename='orig')
-        print "Compare: Run recovery Backup: " + self.dir
         # Open the backup connection to force it to run recovery.
         backup_conn_params = \
             'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = wiredtiger.wiredtiger_open(self.dir, backup_conn_params)
         # Allow threads to run
+        time.sleep(2.0)
         backup_conn.close()
-        print "Compare: Run wt dump on " + self.dir
+        #print "Compare: Run wt dump on " + self.dir
         self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
-        print "Compare: compare files"
+        #print "Compare: compare files"
         self.assertEqual(True, compare_files(self, 'orig', 'backup'))
 
     # Run background inserts while running checkpoints and incremental backups
@@ -109,13 +109,14 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         # Open up the backup cursor, and copy the files.  Do a full backup.
         config = ""
         cursor = self.session.open_cursor('backup:', None, None)
+        self.pr('Initial full backup: ')
         while True:
             ret = cursor.next()
             if ret != 0:
                 break
             newfile = cursor.get_key()
             sz = os.path.getsize(newfile)
-            print 'Copy from: ' + newfile + '(' + str(sz) + ') to ' + self.dir
+            self.pr('Copy from: ' + newfile + '(' + str(sz) + ') to ' + self.dir)
             shutil.copy(newfile, self.dir)
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         cursor.close()
@@ -137,21 +138,21 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
             self.update(self.uri, self.dsize, updstr[increment], self.nops)
             self.session.checkpoint(None)
             cursor = self.session.open_cursor('backup:', None, config)
-            print 'Iteration: ' + str(increment)
+            self.pr('Iteration: ' + str(increment))
             while True:
                 ret = cursor.next()
                 if ret != 0:
                     break
                 newfile = cursor.get_key()
                 sz = os.path.getsize(newfile)
-                print 'Copy from: ' + newfile + '(' + str(sz) + ') to ' + self.dir
+                self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
                 shutil.copy(newfile, self.dir)
             self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
             self.session.truncate('log:', cursor, None, None)
             cursor.close()
 
             increment += 1
-        print 'Done with backup loop'
+        self.pr('Done with backup loop')
         self.compare(self.uri)
 
 
