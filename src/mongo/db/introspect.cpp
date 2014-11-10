@@ -140,13 +140,13 @@ namespace {
     }
 
     void profile(OperationContext* txn, const Client& c, int op, CurOp& currentOp) {
-        // initialize with 1kb to start, to avoid realloc later
-        // doing this outside the dblock to improve performance
-        BufBuilder profileBufBuilder(1024);
-
         bool tryAgain = false;
         while ( 1 ) {
             try {
+                // initialize with 1kb to start, to avoid realloc later
+                // doing this outside the dblock to improve performance
+                BufBuilder profileBufBuilder(1024);
+
                 // NOTE: It's kind of weird that we lock the op's namespace, but have to for now
                 // since we're sometimes inside the lock already
                 const string dbname(nsToDatabase(currentOp.getNS()));
