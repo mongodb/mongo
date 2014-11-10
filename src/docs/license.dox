@@ -52,11 +52,12 @@ these copyrights.
 
 @section license_distribution 3rd party software included in the WiredTiger distribution
 
-The WiredTiger software distribution includes additional 3rd party
-software licensed under a variety of licenses.   <b>This software is NOT
-included in the WiredTiger library binary as built by the
-distribution</b>, it is only used to build and test the WiredTiger
-documentation and software.  If you extract portions of the WiredTiger
+The WiredTiger software distribution includes additional 3rd party software
+licensed under a variety of licenses.   <b>This software is NOT included
+in the WiredTiger library binary as built by the distribution.</b> This
+software is used for peripheral tasks, such as building the WiredTiger
+documentation, testing the WiredTiger software or graphically displaying
+WiredTiger run-time output.  If you extract portions of the WiredTiger
 software distribution for inclusion in other packages, or redistribute
 selected portions of the WiredTiger sources, please review the copyright
 notices and LICENSE files included in the WiredTiger distribution for
