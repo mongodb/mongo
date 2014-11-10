@@ -1254,19 +1254,25 @@ namespace {
         if (idx->isIdIndex()) {
             return false;
         }
+        if (nsToDatabaseSubstring(idx->parentNS()) == "local" ) {
+            // always enforce on local
+            return false;
+        }
         boost::lock_guard<boost::mutex> lock(_mutex);
         if (_getReplicationMode_inlock() != modeReplSet) {
             return false;
         }
         // see SERVER-6671
         MemberState ms = _getCurrentMemberState_inlock();
-        if (! ((ms == MemberState::RS_STARTUP2) ||
-               (ms == MemberState::RS_RECOVERING) ||
-               (ms == MemberState::RS_ROLLBACK))) {
+        switch ( ms.s ) {
+        case MemberState::RS_SECONDARY:
+        case MemberState::RS_RECOVERING:
+        case MemberState::RS_ROLLBACK:
+        case MemberState::RS_STARTUP2:
+            return true;
+        default:
             return false;
         }
-
-        return true;
     }
 
     OID ReplicationCoordinatorImpl::getElectionId() {

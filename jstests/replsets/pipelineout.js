@@ -32,4 +32,5 @@ assert.throws(function() {
 // run one and check for proper replication
 primary.in.aggregate({$out: "out"}).itcount;
 replTest.awaitReplication();
-assert.eq(primary.out.find().toArray(), secondary.out.find().toArray());
+assert.eq(primary.out.find().sort( { x : 1 } ).toArray(),
+          secondary.out.find().sort( { x : 1 } ).toArray());

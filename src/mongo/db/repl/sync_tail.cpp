@@ -29,6 +29,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
+#include "mongo/platform/bits.h"
 
 #include "mongo/db/repl/sync_tail.h"
 
@@ -40,6 +41,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/prefetch.h"
@@ -58,12 +60,14 @@
 namespace mongo {
 
 namespace repl {
-#ifdef MONGO_PLATFORM_64
+#if defined(MONGO_PLATFORM_64)
     const int replWriterThreadCount = 16;
     const int replPrefetcherThreadCount = 16;
-#else
+#elif defined(MONGO_PLATFORM_32)
     const int replWriterThreadCount = 2;
     const int replPrefetcherThreadCount = 2;
+#else
+#error need to include something that defines MONGO_PLATFORM_XX
 #endif
 
     static Counter64 opsAppliedStats;
@@ -231,52 +235,58 @@ namespace repl {
         bool isCommand(opType[0] == 'c');
 
         for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
+            try {
+                boost::scoped_ptr<Lock::ScopedLock> lk;
+                boost::scoped_ptr<Lock::CollectionLock> lk2;
 
-            boost::scoped_ptr<Lock::ScopedLock> lk;
-            boost::scoped_ptr<Lock::CollectionLock> lk2;
+                bool isIndexBuild = opType[0] == 'i' &&
+                    nsToCollectionSubstring( ns ) == "system.indexes";
 
-            bool isIndexBuild = opType[0] == 'i' &&
-                nsToCollectionSubstring( ns ) == "system.indexes";
+                if(isCommand) {
+                    // a command may need a global write lock. so we will conservatively go
+                    // ahead and grab one here. suboptimal. :-(
+                    lk.reset(new Lock::GlobalWrite(txn->lockState()));
+                } else if (isCrudOpType(opType)) {
+                    LockMode mode = createCollection ? MODE_X : MODE_IX;
+                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
+                    lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
 
-            if(isCommand) {
-                // a command may need a global write lock. so we will conservatively go
-                // ahead and grab one here. suboptimal. :-(
-                lk.reset(new Lock::GlobalWrite(txn->lockState()));
-            } else if (isCrudOpType(opType)) {
-                LockMode mode = createCollection ? MODE_X : MODE_IX;
-                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
-                lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+                    if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
+                        // need to create database, try again
+                        continue;
+                    }
 
-                if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
-                    // need to create database, try again
+                } else if (isIndexBuild) {
+                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                    lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, MODE_X));
+                } else {
+                    // DB level lock for this operation
+                    log() << "non command or crup op: " << op;
+                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                }
+
+                Client::Context ctx(txn, ns);
+                ctx.getClient()->curop()->reset();
+
+                if ( createCollection == 0 &&
+                     isCrudOpType(opType) &&
+                     ctx.db()->getCollection(txn,ns) == NULL ) {
+                    // uh, oh, we need to create collection
+                    // try again
                     continue;
                 }
 
-            } else if (isIndexBuild) {
-                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
-                lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, MODE_X));
-            } else {
-                // DB level lock for this operation
-                log() << "non command or crup op: " << op;
-                lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                // For non-initial-sync, we convert updates to upserts
+                // to suppress errors when replaying oplog entries.
+                bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
+                opsAppliedStats.increment();
+                return ok;
             }
-
-            Client::Context ctx(txn, ns);
-            ctx.getClient()->curop()->reset();
-
-            if ( createCollection == 0 &&
-                 isCrudOpType(opType) &&
-                 ctx.db()->getCollection(txn,ns) == NULL ) {
-                // uh, oh, we need to create collection
-                // try again
-                continue;
+            catch ( const WriteConflictException& wce ) {
+                log() << "WriteConflictException while doing oplog application on: " << ns
+                      << ", retrying.";
+                createCollection--;
             }
-
-            // For non-initial-sync, we convert updates to upserts
-            // to suppress errors when replaying oplog entries.
-            bool ok = !applyOperation_inlock(txn, ctx.db(), op, true, convertUpdateToUpsert);
-            opsAppliedStats.increment();
-            return ok;
         }
         invariant(!"impossible");
     }
