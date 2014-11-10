@@ -1,4 +1,4 @@
-// heap1_record_store_test.cpp
+// in_memory_engine_test.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,31 +28,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/heap1/record_store_heap.h"
-#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
-#include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/in_memory/in_memory_engine.h"
+#include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 namespace mongo {
 
-    class MyHarnessHelper : public HarnessHelper {
+    class InMemoryKVHarnessHelper : public KVHarnessHelper {
     public:
-        MyHarnessHelper() {
+        InMemoryKVHarnessHelper() : _engine( new InMemoryEngine()) {}
+
+        virtual KVEngine* restartEngine() {
+            // Intentionally not restarting since the in-memory storage engine
+            // does not persist data across restarts
+            return _engine.get();
         }
 
-        virtual RecordStore* newNonCappedRecordStore() {
-            return new HeapRecordStore( "a.b", &data);
-        }
+        virtual KVEngine* getEngine() { return _engine.get(); }
 
-        virtual RecoveryUnit* newRecoveryUnit() {
-            return new Heap1RecoveryUnit();
-        }
-
-        boost::shared_ptr<void> data;
+    private:
+        boost::scoped_ptr<InMemoryEngine> _engine;
     };
 
-    HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+    KVHarnessHelper* KVHarnessHelper::create() {
+        return new InMemoryKVHarnessHelper();
     }
-
 }

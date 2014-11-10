@@ -1,9 +1,9 @@
 Import("env")
 
 env.Library(
-    target= 'heap_record_store',
+    target= 'in_memory_record_store',
     source= [
-        'record_store_heap.cpp'
+        'in_memory_record_store.cpp'
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/bson',
@@ -13,60 +13,59 @@ env.Library(
     )
 
 env.Library(
-    target= 'storage_heap1_core',
+    target= 'storage_in_memory_core',
     source= [
-        'heap1_btree_impl.cpp',
-        'heap1_engine.cpp',
-        'heap1_recovery_unit.cpp',
+        'in_memory_btree_impl.cpp',
+        'in_memory_engine.cpp',
+        'in_memory_recovery_unit.cpp',
         ],
     LIBDEPS= [
-        'heap_record_store',
+        'in_memory_record_store',
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/foundation',
         ]
     )
 
 env.Library(
-    target= 'storage_heap1',
+    target= 'storage_in_memory',
     source= [
-        'heap1_init.cpp',
+        'in_memory_init.cpp',
         ],
     LIBDEPS= [
-        'storage_heap1_core',
+        'storage_in_memory_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
         ]
     )
 
 env.CppUnitTest(
-   target='storage_heap1_btree_test',
-   source=['heap1_btree_impl_test.cpp'
+   target='storage_in_memory_btree_test',
+   source=['in_memory_btree_impl_test.cpp'
            ],
    LIBDEPS=[
-        'storage_heap1_core',
+        'storage_in_memory_core',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
         ]
    )
 
 env.CppUnitTest(
-   target='storage_heap1_record_storetest',
-   source=['heap1_record_store_test.cpp'
+   target='storage_in_memory_record_store_test',
+   source=['in_memory_record_store_test.cpp'
            ],
    LIBDEPS=[
-        'storage_heap1_core',
+        'storage_in_memory_core',
         '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
         ]
    )
 
 env.CppUnitTest(
-    target='storage_heap1_engine_test',
-    source=['heap1_engine_test.cpp',
+    target='storage_in_memory_engine_test',
+    source=['in_memory_engine_test.cpp',
             ],
     LIBDEPS=[
-        'storage_heap1_core',
+        'storage_in_memory_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         ],
     )
-

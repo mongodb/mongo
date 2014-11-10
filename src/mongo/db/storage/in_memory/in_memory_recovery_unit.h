@@ -1,4 +1,4 @@
-// heap1_recovery_unit.h
+// in_memory_recovery_unit.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -39,10 +39,10 @@ namespace mongo {
 
     class SortedDataInterface;
 
-    class Heap1RecoveryUnit : public RecoveryUnit {
+    class InMemoryRecoveryUnit : public RecoveryUnit {
     public:
-        Heap1RecoveryUnit() : _depth(0) {}
-        virtual ~Heap1RecoveryUnit();
+        InMemoryRecoveryUnit() : _depth(0) {}
+        virtual ~InMemoryRecoveryUnit();
 
         virtual void beginUnitOfWork();
         virtual void commitUnitOfWork();

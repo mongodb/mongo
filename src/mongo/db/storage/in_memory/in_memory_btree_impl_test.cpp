@@ -1,10 +1,11 @@
+// in_memory_btree_impl_test.cpp
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
- *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,32 +28,34 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/storage/heap1/heap1_engine.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
+#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    namespace {
+    class InMemoryHarnessHelper : public HarnessHelper {
+    public:
+        InMemoryHarnessHelper()
+            : _order( Ordering::make( BSONObj() ) ) {
+        }
 
-        class HeapFactory : public StorageEngine::Factory {
-        public:
-            virtual ~HeapFactory() { }
-            virtual StorageEngine* create(const StorageGlobalParams& params) const {
-                return new KVStorageEngine(new Heap1Engine());
-            }
-        };
+        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
+            return getInMemoryBtreeImpl(_order, &_data);
+        }
 
-    } // namespace
+        virtual RecoveryUnit* newRecoveryUnit() {
+            return new InMemoryRecoveryUnit();
+        }
 
-    MONGO_INITIALIZER_WITH_PREREQUISITES(HeapEngineInit,
-                                         ("SetGlobalEnvironment"))
-                                         (InitializerContext* context) {
+    private:
+        shared_ptr<void> _data; // used by InMemoryBtreeImpl
+        Ordering _order;
+    };
 
-        getGlobalEnvironment()->registerStorageEngine("inMemoryExperiment", new HeapFactory());
-        return Status::OK();
+    HarnessHelper* newHarnessHelper() {
+        return new InMemoryHarnessHelper();
     }
 
-}  // namespace mongo
+}

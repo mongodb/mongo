@@ -1,4 +1,4 @@
-// heap1_engine_test.cpp
+// in_memory_btree_impl.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,27 +28,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/heap1/heap1_engine.h"
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include <boost/shared_ptr.hpp>
+
+#include "mongo/db/storage/sorted_data_interface.h"
+
+#pragma once
 
 namespace mongo {
 
-    class Heap1KVHarnessHelper : public KVHarnessHelper {
-    public:
-        Heap1KVHarnessHelper() : _engine( new Heap1Engine()) {}
+    class IndexCatalogEntry;
 
-        virtual KVEngine* restartEngine() {
-            // Intentionally not restarting since heap doesn't keep data across restarts
-            return _engine.get();
-        }
+    /**
+     * Caller takes ownership.
+     * All permanent data will be stored and fetch from dataInOut.
+     */
+    SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
+                                              boost::shared_ptr<void>* dataInOut);
 
-        virtual KVEngine* getEngine() { return _engine.get(); }
-
-    private:
-        boost::scoped_ptr<Heap1Engine> _engine;
-    };
-
-    KVHarnessHelper* KVHarnessHelper::create() {
-        return new Heap1KVHarnessHelper();
-    }
-}
+}  // namespace mongo

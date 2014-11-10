@@ -1,4 +1,4 @@
-// heap1_recovery_unit.cpp
+// in_memory_recovery_unit.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,20 +28,20 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
-    Heap1RecoveryUnit::~Heap1RecoveryUnit() {
+    InMemoryRecoveryUnit::~InMemoryRecoveryUnit() {
         invariant(_depth == 0);
     }
 
-    void Heap1RecoveryUnit::beginUnitOfWork() {
+    void InMemoryRecoveryUnit::beginUnitOfWork() {
         _depth++;
     }
 
-    void Heap1RecoveryUnit::commitUnitOfWork() {
+    void InMemoryRecoveryUnit::commitUnitOfWork() {
         if ( _depth > 1 )
             return;
 
@@ -51,7 +51,7 @@ namespace mongo {
         _changes.clear();
     }
 
-    void Heap1RecoveryUnit::endUnitOfWork() {
+    void InMemoryRecoveryUnit::endUnitOfWork() {
          _depth--;
          if (_depth > 0 )
              return;

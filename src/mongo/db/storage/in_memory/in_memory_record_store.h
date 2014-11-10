@@ -1,4 +1,4 @@
-// record_store_heap.h
+// in_memory_record_store.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -39,21 +39,21 @@
 
 namespace mongo {
 
-    class HeapRecordIterator;
+    class InMemoryRecordIterator;
 
     /**
-     * A RecordStore that stores all data on the heap.
+     * A RecordStore that stores all data in-memory.
      *
      * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
      */
-    class HeapRecordStore : public RecordStore {
+    class InMemoryRecordStore : public RecordStore {
     public:
-        explicit HeapRecordStore(const StringData& ns,
-                                 boost::shared_ptr<void>* dataInOut,
-                                 bool isCapped = false,
-                                 int64_t cappedMaxSize = -1,
-                                 int64_t cappedMaxDocs = -1,
-                                 CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
+        explicit InMemoryRecordStore(const StringData& ns,
+                                     boost::shared_ptr<void>* dataInOut,
+                                     bool isCapped = false,
+                                     int64_t cappedMaxSize = -1,
+                                     int64_t cappedMaxDocs = -1,
+                                     CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
 
         virtual const char* name() const;
 
@@ -71,14 +71,14 @@ namespace mongo {
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
-                                                  
+
         virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
                                                   const DiskLoc& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
-                                                  
+
         virtual Status updateWithDamages( OperationContext* txn,
                                           const DiskLoc& loc,
                                           const RecordData& oldRec,
@@ -108,13 +108,13 @@ namespace mongo {
                                  bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results, BSONObjBuilder* output ) const;
-                                 
+
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
                                         double scale ) const;
 
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
-        
+
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );
@@ -127,15 +127,17 @@ namespace mongo {
 
         virtual long long dataSize( OperationContext* txn ) const { return _data->dataSize; }
 
-        virtual long long numRecords( OperationContext* txn ) const { return _data->records.size(); }
+        virtual long long numRecords( OperationContext* txn ) const {
+            return _data->records.size();
+        }
 
         virtual DiskLoc oplogStartHack(OperationContext* txn,
                                        const DiskLoc& startingPosition) const;
 
     protected:
-        struct HeapRecord {
-            HeapRecord() :size(0) {}
-            HeapRecord(int size) :size(size), data(new char[size]) {}
+        struct InMemoryRecord {
+            InMemoryRecord() :size(0) {}
+            InMemoryRecord(int size) :size(size), data(new char[size]) {}
 
             RecordData toRecordData() const { return RecordData(data.get(), size); }
 
@@ -143,18 +145,20 @@ namespace mongo {
             boost::shared_array<char> data;
         };
 
-        virtual const HeapRecord* recordFor( const DiskLoc& loc ) const;
-        virtual HeapRecord* recordFor( const DiskLoc& loc );
+        virtual const InMemoryRecord* recordFor( const DiskLoc& loc ) const;
+        virtual InMemoryRecord* recordFor( const DiskLoc& loc );
 
     public:
         //
         // Not in RecordStore interface
         //
 
-        typedef std::map<DiskLoc, HeapRecord> Records;
+        typedef std::map<DiskLoc, InMemoryRecord> Records;
 
         bool isCapped() const { return _isCapped; }
-        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) { _cappedDeleteCallback = cb; }
+        void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
+            _cappedDeleteCallback = cb;
+        }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
@@ -175,7 +179,7 @@ namespace mongo {
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
-        // This is the "persistant" data.
+        // This is the "persistent" data.
         struct Data {
             Data(bool isOplog) :dataSize(0), nextId(1), isOplog(isOplog) {}
 
@@ -188,13 +192,13 @@ namespace mongo {
         Data* const _data;
     };
 
-    class HeapRecordIterator : public RecordIterator {
+    class InMemoryRecordIterator : public RecordIterator {
     public:
-        HeapRecordIterator(OperationContext* txn,
-                           const HeapRecordStore::Records& records,
-                           const HeapRecordStore& rs,
-                           DiskLoc start = DiskLoc(),
-                           bool tailable = false);
+        InMemoryRecordIterator(OperationContext* txn,
+                               const InMemoryRecordStore::Records& records,
+                               const InMemoryRecordStore& rs,
+                               DiskLoc start = DiskLoc(),
+                               bool tailable = false);
 
         virtual bool isEOF();
 
@@ -212,21 +216,21 @@ namespace mongo {
 
     private:
         OperationContext* _txn; // not owned
-        HeapRecordStore::Records::const_iterator _it;
+        InMemoryRecordStore::Records::const_iterator _it;
         bool _tailable;
         DiskLoc _lastLoc; // only for restarting tailable
         bool _killedByInvalidate;
 
-        const HeapRecordStore::Records& _records;
-        const HeapRecordStore& _rs;
+        const InMemoryRecordStore::Records& _records;
+        const InMemoryRecordStore& _rs;
     };
 
-    class HeapRecordReverseIterator : public RecordIterator {
+    class InMemoryRecordReverseIterator : public RecordIterator {
     public:
-        HeapRecordReverseIterator(OperationContext* txn,
-                                  const HeapRecordStore::Records& records,
-                                  const HeapRecordStore& rs,
-                                  DiskLoc start = DiskLoc());
+        InMemoryRecordReverseIterator(OperationContext* txn,
+                                      const InMemoryRecordStore::Records& records,
+                                      const InMemoryRecordStore& rs,
+                                      DiskLoc start = DiskLoc());
 
         virtual bool isEOF();
 
@@ -244,12 +248,12 @@ namespace mongo {
 
     private:
         OperationContext* _txn; // not owned
-        HeapRecordStore::Records::const_reverse_iterator _it;
+        InMemoryRecordStore::Records::const_reverse_iterator _it;
         bool _killedByInvalidate;
         DiskLoc _savedLoc; // isNull if saved at EOF
 
-        const HeapRecordStore::Records& _records;
-        const HeapRecordStore& _rs;
+        const InMemoryRecordStore::Records& _records;
+        const InMemoryRecordStore& _rs;
     };
 
 } // namespace mongo

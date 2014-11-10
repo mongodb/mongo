@@ -1,4 +1,4 @@
-// heap1_engine.cpp
+// in_memory_engine.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -28,20 +28,20 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/heap1/heap1_engine.h"
+#include "mongo/db/storage/in_memory/in_memory_engine.h"
 
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/heap1/heap1_btree_impl.h"
-#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
-#include "mongo/db/storage/heap1/record_store_heap.h"
+#include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
+#include "mongo/db/storage/in_memory/in_memory_record_store.h"
+#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 
 namespace mongo {
 
-    RecoveryUnit* Heap1Engine::newRecoveryUnit() {
-        return new Heap1RecoveryUnit();
+    RecoveryUnit* InMemoryEngine::newRecoveryUnit() {
+        return new InMemoryRecoveryUnit();
     }
 
-    Status Heap1Engine::createRecordStore(OperationContext* opCtx,
+    Status InMemoryEngine::createRecordStore(OperationContext* opCtx,
                                           const StringData& ns,
                                           const StringData& ident,
                                           const CollectionOptions& options) {
@@ -49,30 +49,30 @@ namespace mongo {
         return Status::OK();
     }
 
-    RecordStore* Heap1Engine::getRecordStore(OperationContext* opCtx,
+    RecordStore* InMemoryEngine::getRecordStore(OperationContext* opCtx,
                                              const StringData& ns,
                                              const StringData& ident,
                                              const CollectionOptions& options) {
         boost::mutex::scoped_lock lk(_mutex);
         if (options.capped) {
-            return new HeapRecordStore(ns,
-                                       &_dataMap[ident],
-                                       true,
-                                       options.cappedSize ? options.cappedSize : 4096,
-                                       options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+            return new InMemoryRecordStore(ns,
+                                           &_dataMap[ident],
+                                           true,
+                                           options.cappedSize ? options.cappedSize : 4096,
+                                           options.cappedMaxDocs ? options.cappedMaxDocs : -1);
         }
         else {
-            return new HeapRecordStore(ns, &_dataMap[ident]);
+            return new InMemoryRecordStore(ns, &_dataMap[ident]);
         }
     }
 
-    Status Heap1Engine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
+    Status InMemoryEngine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
         boost::mutex::scoped_lock lk(_mutex);
         _dataMap.erase(ident);
         return Status::OK();
     }
 
-    Status Heap1Engine::createSortedDataInterface(OperationContext* opCtx,
+    Status InMemoryEngine::createSortedDataInterface(OperationContext* opCtx,
                                                   const StringData& ident,
                                                   const IndexDescriptor* desc) {
 
@@ -80,20 +80,21 @@ namespace mongo {
         return Status::OK();
     }
 
-    SortedDataInterface* Heap1Engine::getSortedDataInterface(OperationContext* opCtx,
+    SortedDataInterface* InMemoryEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc) {
         boost::mutex::scoped_lock lk(_mutex);
-        return getHeap1BtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
+        return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
     }
 
-    Status Heap1Engine::dropSortedDataInterface(OperationContext* opCtx, const StringData& ident) {
+    Status InMemoryEngine::dropSortedDataInterface(OperationContext* opCtx,
+                                                   const StringData& ident) {
         boost::mutex::scoped_lock lk(_mutex);
         _dataMap.erase(ident);
         return Status::OK();
     }
 
-    int64_t Heap1Engine::getIdentSize( OperationContext* opCtx,
+    int64_t InMemoryEngine::getIdentSize( OperationContext* opCtx,
                                        const StringData& ident ) {
         return 1;
     }

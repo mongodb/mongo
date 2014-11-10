@@ -1,4 +1,4 @@
-// heap1_engine.h
+// in_memory_engine.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    class Heap1Engine : public KVEngine {
+    class InMemoryEngine : public KVEngine {
     public:
         virtual RecoveryUnit* newRecoveryUnit();
 

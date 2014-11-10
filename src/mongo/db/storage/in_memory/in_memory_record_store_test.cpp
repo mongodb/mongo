@@ -1,4 +1,4 @@
-// heap1_btree_impl_test.cpp
+// in_memory_record_store_test.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,34 +28,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/heap1/heap1_btree_impl.h"
-#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/storage/in_memory/in_memory_record_store.h"
+#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    class MyHarnessHelper : public HarnessHelper {
+    class InMemoryHarnessHelper : public HarnessHelper {
     public:
-        MyHarnessHelper()
-            : _order( Ordering::make( BSONObj() ) ) {
+        InMemoryHarnessHelper() {
         }
 
-        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
-            return getHeap1BtreeImpl(_order, &_data);
+        virtual RecordStore* newNonCappedRecordStore() {
+            return new InMemoryRecordStore( "a.b", &data );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new Heap1RecoveryUnit();
+            return new InMemoryRecoveryUnit();
         }
 
-    private:
-        shared_ptr<void> _data; // used by Heap1BtreeImpl
-        Ordering _order;
+        boost::shared_ptr<void> data;
     };
 
     HarnessHelper* newHarnessHelper() {
-        return new MyHarnessHelper();
+        return new InMemoryHarnessHelper();
     }
 
 }

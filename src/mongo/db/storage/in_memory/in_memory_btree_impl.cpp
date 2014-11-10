@@ -1,3 +1,5 @@
+// in_memory_btree_impl.cpp
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,13 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/heap1/heap1_btree_impl.h"
+#include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
 
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -71,7 +73,7 @@ namespace {
         sb << "dup key: " << key;
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
-    
+
     bool isDup(const IndexSet& data, const BSONObj& key, DiskLoc loc) {
         const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, DiskLoc()));
         if (it == data.end())
@@ -81,9 +83,9 @@ namespace {
         return it->loc != loc;
     }
 
-    class Heap1BtreeBuilderImpl : public SortedDataBuilderInterface {
+    class InMemoryBtreeBuilderImpl : public SortedDataBuilderInterface {
     public:
-        Heap1BtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
+        InMemoryBtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
                 : _data(data),
                   _currentKeySize( currentKeySize ),
                   _dupsAllowed(dupsAllowed),
@@ -97,7 +99,6 @@ namespace {
             if ( key.objsize() >= TempKeyMaxSize ) {
                 return Status(ErrorCodes::KeyTooLong, "key too big");
             }
-
 
             invariant(!loc.isNull());
             invariant(loc.isValid());
@@ -131,15 +132,16 @@ namespace {
         IndexSet::const_iterator _last;    // or (key, DiskLoc) ordering violations
     };
 
-    class Heap1BtreeImpl : public SortedDataInterface {
+    class InMemoryBtreeImpl : public SortedDataInterface {
     public:
-        Heap1BtreeImpl(IndexSet* data)
+        InMemoryBtreeImpl(IndexSet* data)
             : _data(data) {
             _currentKeySize = 0;
         }
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-            return new Heap1BtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                           bool dupsAllowed) {
+            return new InMemoryBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
         }
 
         virtual Status insert(OperationContext* txn,
@@ -153,7 +155,7 @@ namespace {
 
             if ( key.objsize() >= TempKeyMaxSize ) {
                 string msg = mongoutils::str::stream()
-                    << "Heap1Btree::insert: key too large to index, failing "
+                    << "InMemoryBtree::insert: key too large to index, failing "
                     << ' ' << key.objsize() << ' ' << key;
                 return Status(ErrorCodes::KeyTooLong, msg);
             }
@@ -488,13 +490,13 @@ namespace {
 
     // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
     // factories. We don't actually modify it.
-    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
-                                           boost::shared_ptr<void>* dataInOut) {
+    SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
+                                              boost::shared_ptr<void>* dataInOut) {
         invariant(dataInOut);
         if (!*dataInOut) {
             *dataInOut = boost::make_shared<IndexSet>(IndexEntryComparison(ordering));
         }
-        return new Heap1BtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
+        return new InMemoryBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
     }
 
 }  // namespace mongo

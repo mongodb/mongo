@@ -1,9 +1,12 @@
+// in_memory_init.cpp
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,21 +29,32 @@
  *    it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
-
-#include "mongo/db/storage/sorted_data_interface.h"
-
-#pragma once
+#include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/in_memory/in_memory_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
-    class IndexCatalogEntry;
+    namespace {
 
-    /**
-     * Caller takes ownership.
-     * All permanent data will be stored and fetch from dataInOut.
-     */
-    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
-                                           boost::shared_ptr<void>* dataInOut);
+        class InMemoryFactory : public StorageEngine::Factory {
+        public:
+            virtual ~InMemoryFactory() { }
+            virtual StorageEngine* create(const StorageGlobalParams& params) const {
+                return new KVStorageEngine(new InMemoryEngine());
+            }
+        };
+
+    } // namespace
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(InMemoryEngineInit,
+                                         ("SetGlobalEnvironment"))
+                                         (InitializerContext* context) {
+
+        getGlobalEnvironment()->registerStorageEngine("inMemoryExperiment", new InMemoryFactory());
+        return Status::OK();
+    }
 
 }  // namespace mongo
