@@ -103,11 +103,6 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 							"has .metadata.json files", db)
 					continue
 				}
-				if err = util.ValidateCollectionName(collection); err != nil {
-					if collection != "system.indexes" { // for < 2.6 compatability (TODO remove in 3.0)
-						return fmt.Errorf("invalid collection name '%v.%v': %v", db, collection, err)
-					}
-				}
 				intent := &intents.Intent{
 					DB:       db,
 					C:        collection,
