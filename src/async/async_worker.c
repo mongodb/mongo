@@ -340,11 +340,11 @@ __wt_async_worker(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "async worker error");
+err:		WT_PANIC_MSG(session, ret, "async worker error");
 	}
 	/*
-	 * Worker thread cleanup, close our cached cursors and
-	 * free all the WT_ASYNC_CURSOR structures.
+	 * Worker thread cleanup, close our cached cursors and free all the
+	 * WT_ASYNC_CURSOR structures.
 	 */
 	ac = STAILQ_FIRST(&worker.cursorqh);
 	while (ac != NULL) {

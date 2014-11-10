@@ -158,7 +158,7 @@ __log_archive_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "log archive server error");
+err:		WT_PANIC_MSG(session, ret, "log archive server error");
 	}
 	if (locked_archive)
 		WT_TRET(__wt_writeunlock(session, log->log_archive_lock));

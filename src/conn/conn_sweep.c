@@ -117,7 +117,7 @@ __sweep_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "handle sweep server error");
+err:		WT_PANIC_MSG(session, ret, "handle sweep server error");
 	}
 	return (NULL);
 }

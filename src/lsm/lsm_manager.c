@@ -499,7 +499,7 @@ __lsm_worker_manager(void *arg)
 	WT_ERR(__lsm_manager_worker_shutdown(session));
 
 	if (ret != 0) {
-err:		__wt_err(session, ret, "LSM worker manager thread error");
+err:		WT_PANIC_MSG(session, ret, "LSM worker manager thread error");
 	}
 	F_CLR(S2C(session), WT_CONN_SERVER_LSM);
 	return (NULL);
