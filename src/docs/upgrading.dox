@@ -1,13 +1,13 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_241 Upgrading to Version 2.4.2
+@section version_242 Upgrading to Version 2.4.2
 
 <dl>
-<dt>WT_STAT_CONN_LOG_BYTES_USER	renamed WT_STAT_CONN_LOG_BYTES_USER</dt>
+<dt>WT_STAT_CONN_LOG_BYTES_USER	renamed WT_STAT_CONN_LOG_BYTES_PAYLOAD</dt>
 <dd>
 The statistic for the number of bytes written to the log minus the overhead of
 log record headers and padding was renamed to make the intent clearer.  Any
-applications that used the old name will need to be updated.
+applications using the old name will need to be updated.
 </dd>
 </dl>
 
