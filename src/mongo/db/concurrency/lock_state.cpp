@@ -450,7 +450,7 @@ namespace mongo {
         if (timeBudgetRemaining && *timeBudgetRemaining < timeToWait)
             timeToWait = *timeBudgetRemaining;
 
-        for (int attempt = 0; /*forever*/; attempt++) {
+        for (int attempt = 1; /*forever*/; attempt++) {
             result = _notify.wait(timeToWait.total_milliseconds());
 
             if (result == LOCK_OK) break;
