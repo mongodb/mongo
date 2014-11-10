@@ -56,8 +56,7 @@ retry:
 			return (0);
 		if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
 			return (0);
-		if (F_ISSET(conn, WT_CONN_PANIC))
-			return (__wt_panic(session));
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		WT_ORDERED_READ(last_consume, async->alloc_tail);
 	}
 	if (async->flush_state == WT_ASYNC_FLUSHING)
@@ -308,8 +307,7 @@ __wt_async_worker(void *arg)
 			 * keep running, unless there is a panic.
 			 */
 			(void)__async_worker_op(session, op, &worker);
-			if (F_ISSET(conn, WT_CONN_PANIC))
-				WT_ERR(__wt_panic(session));
+			WT_ERR(WT_SESSION_CHECK_PANIC(session));
 		} else if (async->flush_state == WT_ASYNC_FLUSHING) {
 			/*
 			 * Worker flushing going on.  Last worker to the party
@@ -342,11 +340,11 @@ __wt_async_worker(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "async worker error");
+err:		WT_PANIC_MSG(session, ret, "async worker error");
 	}
 	/*
-	 * Worker thread cleanup, close our cached cursors and
-	 * free all the WT_ASYNC_CURSOR structures.
+	 * Worker thread cleanup, close our cached cursors and free all the
+	 * WT_ASYNC_CURSOR structures.
 	 */
 	ac = STAILQ_FIRST(&worker.cursorqh);
 	while (ac != NULL) {

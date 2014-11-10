@@ -70,6 +70,15 @@ struct __wt_named_extractor {
 #define	WT_NUM_INTERNAL_SESSIONS	10
 
 /*
+ * WT_CONN_CHECK_PANIC --
+ *	Check if we've panicked and return the appropriate error.
+ */
+#define	WT_CONN_CHECK_PANIC(conn)					\
+	(F_ISSET(conn, WT_CONN_PANIC) ? WT_PANIC : 0)
+#define	WT_SESSION_CHECK_PANIC(session)					\
+	WT_CONN_CHECK_PANIC(S2C(session))
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */

@@ -45,6 +45,7 @@ __wt_block_manager_create(
 {
 	WT_DECL_RET;
 	WT_FH *fh;
+	char *path;
 
 	/* Create the underlying file and open a handle. */
 	WT_RET(__wt_open(session, filename, 1, 1, WT_FILE_TYPE_DATA, &fh));
@@ -54,6 +55,16 @@ __wt_block_manager_create(
 
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
+
+	/*
+	 * If checkpoint syncing is enabled, some filesystems require that we
+	 * sync the directory to be confident that the file will appear.
+	 */
+	if (ret == 0 && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) &&
+	    (ret = __wt_filename(session, filename, &path)) == 0) {
+		ret = __wt_directory_sync(session, path);
+		__wt_free(session, path);
+	}
 
 	/* Undo any create on error. */
 	if (ret != 0)

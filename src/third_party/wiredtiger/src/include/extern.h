@@ -158,7 +158,7 @@ extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst);
 extern int __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk, size_t size);
+extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *addr, const WT_PAGE_HEADER *dsk, size_t size, int empty_page_ok);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf);
 extern int __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno, WT_ITEM *value, WT_UPDATE *upd, int is_remove);
@@ -447,6 +447,8 @@ extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset,
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep);
 extern int __wt_filesize_name( WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock);
+extern int __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_directory_sync(WT_SESSION_IMPL *session, char *path);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len);

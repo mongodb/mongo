@@ -8,6 +8,74 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_directory_sync_fh --
+ *	Flush a directory file handle.  We don't use __wt_fsync because
+ *	most file systems don't require this step and we don't want to
+ *	penalize them by calling fsync.
+ */
+int
+__wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+#ifdef __linux__
+	WT_DECL_RET;
+
+	WT_SYSCALL_RETRY(fsync(fh->fd), ret);
+	if (ret != 0)
+		WT_RET_MSG(session, ret, "%s: fsync", fh->name);
+	return (ret);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	return (0);
+#endif
+}
+
+/*
+ * __wt_directory_sync --
+ *	Flush a directory to ensure a file creation is durable.
+ */
+int
+__wt_directory_sync(WT_SESSION_IMPL *session, char *path)
+{
+#ifdef __linux__
+	WT_DECL_RET;
+	int fd, tret;
+	char *dir;
+
+	/*
+	 * POSIX 1003.1 does not require that fsync of a file handle ensures the
+	 * entry in the directory containing the file has also reached disk (and
+	 * there are historic Linux filesystems requiring this), do an explicit
+	 * fsync on a file descriptor for the directory to be sure.
+	 */
+	if ((dir = strrchr(path, '/')) == NULL)
+		path = (char *)".";
+	else
+		*dir = '\0';
+	WT_SYSCALL_RETRY(((fd =
+	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
+	if (dir != NULL)
+		*dir = '/';
+	if (ret != 0)
+		WT_RET_MSG(session, ret, "%s: open", path);
+
+	WT_SYSCALL_RETRY(fsync(fd), ret);
+	if (ret != 0)
+		WT_ERR_MSG(session, ret, "%s: fsync", path);
+
+err:	WT_SYSCALL_RETRY(close(fd), tret);
+	if (tret != 0)
+		__wt_err(session, tret, "%s: close", path);
+	WT_TRET(tret);
+	return (ret);
+#else
+	WT_UNUSED(session);
+	WT_UNUSED(path);
+	return (0);
+#endif
+}
+
+/*
  * __wt_fsync --
  *	Flush a file handle.
  */

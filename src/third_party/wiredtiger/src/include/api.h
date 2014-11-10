@@ -15,14 +15,14 @@
 
 #define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
-	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
+	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	WT_ERR(__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n))
 
 #define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
 	const char *cfg[] =						\
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
-	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
+	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	WT_ERR(((config) != NULL) ?					\
 	    __wt_config_check((s),					\
 	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\

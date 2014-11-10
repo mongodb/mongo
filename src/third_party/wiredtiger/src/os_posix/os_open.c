@@ -8,51 +8,26 @@
 #include "wt_internal.h"
 
 /*
- * __open_directory_sync --
- *	Fsync the directory in which we created the file.
+ * __open_directory --
+ *	Open up a file handle to a directory.
  */
 static int
-__open_directory_sync(WT_SESSION_IMPL *session, char *path)
+__open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
 {
-#ifdef __linux__
 	WT_DECL_RET;
-	int fd;
 	char *dir;
 
-	/*
-	 * According to the Linux fsync man page:
-	 *	Calling fsync() does not necessarily ensure that the entry in
-	 *	the directory containing the file has also reached disk. For
-	 *	that an explicit fsync() on a file descriptor for the directory
-	 *	is also needed.
-	 *
-	 * Open the WiredTiger home directory and sync it, I don't want the rest
-	 * of the system to have to wonder if opening a file creates it.
-	 */
 	if ((dir = strrchr(path, '/')) == NULL)
 		path = (char *)".";
 	else
 		*dir = '\0';
-	WT_SYSCALL_RETRY(((fd =
+	WT_SYSCALL_RETRY(((*fd =
 	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
 	if (dir != NULL)
 		*dir = '/';
 	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: open", path);
-
-	WT_SYSCALL_RETRY(fsync(fd), ret);
-	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: fsync", path);
-
-err:	WT_SYSCALL_RETRY(close(fd), ret);
-	if (ret != 0)
-		__wt_err(session, ret, "%s: close", path);
+		WT_RET_MSG(session, ret, "%s: open_directory", path);
 	return (ret);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-#endif
 }
 
 /*
@@ -71,6 +46,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	char *path;
 
 	conn = S2C(session);
+	direct_io = 0;
 	fh = NULL;
 	fd = -1;
 	path = NULL;
@@ -92,6 +68,11 @@ __wt_open(WT_SESSION_IMPL *session,
 		return (0);
 
 	WT_RET(__wt_filename(session, name, &path));
+
+	if (dio_type == WT_FILE_TYPE_DIRECTORY) {
+		WT_ERR(__open_directory(session, path, &fd));
+		goto setupfh;
+	}
 
 	f = O_RDWR;
 #ifdef O_BINARY
@@ -121,7 +102,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	} else
 		mode = 0;
 
-	direct_io = 0;
 #ifdef O_DIRECT
 	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
 		f |= O_DIRECT;
@@ -145,6 +125,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		    "%s: open failed with direct I/O configured, some "
 		    "filesystem types do not support direct I/O" : "%s", path);
 
+setupfh:
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	/*
 	 * Security:
@@ -163,9 +144,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
 #endif
-
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__open_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));

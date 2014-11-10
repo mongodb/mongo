@@ -18,6 +18,7 @@ flags = {
 	'file_types' : [
 		'FILE_TYPE_CHECKPOINT',
 		'FILE_TYPE_DATA',
+		'FILE_TYPE_DIRECTORY',
 		'FILE_TYPE_LOG',
 	],
 	'log_scan' : [

@@ -99,7 +99,7 @@ __ckpt_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "checkpoint server error");
+err:		WT_PANIC_MSG(session, ret, "checkpoint server error");
 	}
 	return (NULL);
 }

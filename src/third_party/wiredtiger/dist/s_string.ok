@@ -413,6 +413,7 @@ bitstring
 bitwise
 bm
 bnd
+bool
 boolean
 br
 breakpoint
@@ -601,6 +602,7 @@ fileop
 fileops
 filesize
 filesystem
+filesystems
 fillms
 firstfit
 fixup

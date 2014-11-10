@@ -195,13 +195,8 @@ __evict_server(void *arg)
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "waking"));
 	}
 
-	WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "exiting"));
-
-err:	
-	if (ret != 0) {
-		WT_PANIC_MSG(session, ret, "eviction server error");
-		return (NULL);
-	}
+	WT_ERR(__wt_verbose(
+	    session, WT_VERB_EVICTSERVER, "cache eviction server exiting"));
 
 	if (cache->pages_inmem != cache->pages_evict)
 		__wt_errx(session,
@@ -219,6 +214,9 @@ err:
 		    " bytes dirty and %" PRIu64 " pages dirty",
 		    cache->bytes_dirty, cache->pages_dirty);
 
+	if (0) {
+err:		WT_PANIC_MSG(session, ret, "cache eviction server error");
+	}
 	return (NULL);
 }
 
@@ -364,13 +362,12 @@ __evict_worker(void *arg)
 		else
 			WT_ERR(__evict_lru_pages(session, 1));
 	}
+	WT_ERR(__wt_verbose(
+	    session, WT_VERB_EVICTSERVER, "cache eviction worker exiting"));
 
 	if (0) {
-err:		__wt_err(session, ret, "cache eviction helper error");
+err:		WT_PANIC_MSG(session, ret, "cache eviction worker error");
 	}
-
-	WT_TRET(__wt_verbose(session, WT_VERB_EVICTSERVER, "helper exiting"));
-
 	return (NULL);
 }
 

@@ -253,11 +253,8 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int i;
-
-	i = 0;
 
 	/* Should not be called with any handle reference. */
 	WT_ASSERT(session, session->dhandle == NULL);
@@ -270,25 +267,31 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 	    ret = __checkpoint_apply(session, cfg, __wt_checkpoint_list, NULL));
 	WT_ERR(ret);
 
-	/*
-	 * Walk the list, flushing the leaf pages from each file, then releasing
-	 * the file.  Note that we increment inside the loop to simplify error
-	 * handling.
-	 */
-	while (i < session->ckpt_handle_next) {
-		dhandle = session->ckpt_handle[i++];
-		WT_WITH_DHANDLE(session, dhandle,
+	/* Walk the list, flushing the leaf pages from each file. */
+	for (i = 0; i < session->ckpt_handle_next; ++i) {
+		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
-		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_session_release_btree(session)));
 		WT_ERR(ret);
 	}
 
-err:	while (i < session->ckpt_handle_next) {
-		dhandle = session->ckpt_handle[i++];
-		WT_WITH_DHANDLE(session, dhandle,
+	/*
+	 * The underlying flush routine scheduled an asynchronous flush after
+	 * writing the leaf pages, but in order to minimize I/O while holding
+	 * the schema lock, do a flush and wait for the completion. Do it after
+	 * flushing the pages to give the asynchronous flush as much time as
+	 * possible before we wait.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		for (i = 0; i < session->ckpt_handle_next; ++i) {
+			WT_WITH_DHANDLE(session, session->ckpt_handle[i],
+			    ret = __wt_checkpoint_sync(session, NULL));
+			WT_ERR(ret);
+		}
+
+err:	for (i = 0; i < session->ckpt_handle_next; ++i)
+		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    WT_TRET(__wt_session_release_btree(session)));
-	}
+
 	__wt_free(session, session->ckpt_handle);
 	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
 	return (ret);
