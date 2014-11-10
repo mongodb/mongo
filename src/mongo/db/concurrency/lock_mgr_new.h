@@ -82,7 +82,8 @@ namespace mongo {
      * There is one of those entries per each request for a lock. They hang on a linked list off
      * the LockHead and also are in a map for each Locker. This structure is not thread-safe.
      *
-     * The lifetime of a LockRequest is managed by the Locker class.
+     * LockRequest are owned by the Locker class and it controls their lifetime. They should not
+     * be deleted while on the LockManager though (see the contract for the lock/unlock methods).
      */
     struct LockRequest {
 
