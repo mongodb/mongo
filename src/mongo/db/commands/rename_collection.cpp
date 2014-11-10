@@ -38,12 +38,13 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -125,6 +126,18 @@ namespace mongo {
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
+            }
+
+            if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() != 
+                 repl::ReplicationCoordinator::modeNone)) {
+                if (NamespaceString(source).isOplog()) {
+                    errmsg = "can't rename live oplog while replicating";
+                    return false;
+                }
+                if (NamespaceString(target).isOplog()) {
+                    errmsg = "can't rename to live oplog while replicating";
+                    return false;
+                }
             }
 
             if (NamespaceString::oplog(source) != NamespaceString::oplog(target)) {

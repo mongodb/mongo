@@ -185,6 +185,13 @@ namespace mongo {
                 errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
                 return false;
             }
+
+            if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() != 
+                 repl::ReplicationCoordinator::modeNone) &&
+                (dbname == "local")) {
+                errmsg = "Cannot drop 'local' database while replication is active";
+                return false;
+            }
             BSONElement e = cmdObj.firstElement();
             int p = (int) e.number();
             if ( p != 1 ) {
@@ -458,6 +465,13 @@ namespace mongo {
 
             if ( nsToDrop.find( '$' ) != string::npos ) {
                 errmsg = "can't drop collection with reserved $ character in name";
+                return false;
+            }
+
+            if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() != 
+                 repl::ReplicationCoordinator::modeNone) && 
+                NamespaceString(nsToDrop).isOplog()) {
+                errmsg = "can't drop live oplog while replicating";
                 return false;
             }
 
