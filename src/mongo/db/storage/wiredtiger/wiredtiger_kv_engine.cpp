@@ -93,7 +93,7 @@ namespace mongo {
             ProcessInfo pi;
             unsigned long long memSizeMB  = pi.getMemSizeMB();
             if ( memSizeMB  > 0 ) {
-                double cacheMB = memSizeMB / 50;
+                double cacheMB = memSizeMB / 2;
                 cacheSizeGB = static_cast<int>( cacheMB / 1024 );
                 if ( cacheSizeGB < 1 )
                     cacheSizeGB = 1;
