@@ -429,9 +429,14 @@ namespace {
                 request->mode = mode;
                 request->convertMode = MODE_NONE;
 
-                // Put it on the conflict queue. This is the place where various policies could be
-                // applied for where in the wait queue does a request go.
-                lock->conflictList.push_back(request);
+                // Put it on the conflict queue. Conflicts are granted front to back.
+                if (request->enqueueAtFront) {
+                    lock->conflictList.push_front(request);
+                }
+                else {
+                    lock->conflictList.push_back(request);
+                }
+
                 lock->changeConflictModeCount(mode, LockHead::Increment);
 
                 return LOCK_WAITING;
@@ -721,6 +726,7 @@ namespace {
                     << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
+                    << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                     << '\n';
             }
 
@@ -735,6 +741,7 @@ namespace {
                     << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
+                    << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                     << '\n';
             }
 
@@ -947,13 +954,15 @@ namespace {
         this->locker = locker;
         this->notify = notify;
 
+        enqueueAtFront = false;
+        recursiveCount = 0;
+
         lock = NULL;
         prev = NULL;
         next = NULL;
         status = STATUS_NEW;
         mode = MODE_NONE;
         convertMode = MODE_NONE;
-        recursiveCount = 0;
     }
 
 

@@ -698,6 +698,14 @@ namespace mongo {
             request = it.objAddr();
         }
 
+        // Give priority to the full modes for global and flush lock so we don't stall global
+        // operations such as shutdown or flush.
+        if (resId == resourceIdGlobal || (IsForMMAPV1 && resId == resourceIdMMAPV1Flush)) {
+            if (mode == MODE_S || mode == MODE_X) {
+                request->enqueueAtFront = true;
+            }
+        }
+
         _notify.clear();
 
         return globalLockManager.lock(resId, request, mode);

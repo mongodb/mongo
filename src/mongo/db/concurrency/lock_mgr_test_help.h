@@ -65,4 +65,12 @@ namespace mongo {
         LockResult lastResult;
     };
 
+
+    struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
+    public:
+        LockRequestCombo(Locker* locker) {
+            initNew(locker, this);
+        }
+    };
+
 } // namespace mongo

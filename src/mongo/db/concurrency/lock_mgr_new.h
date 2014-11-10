@@ -99,6 +99,7 @@ namespace mongo {
          */
         void initNew(Locker* locker, LockGrantNotification* notify);
 
+
         //
         // These fields are maintained by the Locker class
         //
@@ -114,7 +115,21 @@ namespace mongo {
 
 
         //
-        // These fields are owned and maintained by the LockManager class
+        // These fields are maintained by both the LockManager and Locker class
+        //
+
+        // If the request cannot be granted right away, whether to put it at the front or at the
+        // end of the queue. By default, requests are put at the back. If a request is requested
+        // to be put at the front, this effectively bypasses fairness. Default is FALSE.
+        bool enqueueAtFront;
+
+        // How many times has LockManager::lock been called for this request. Locks are released
+        // when their recursive count drops to zero.
+        unsigned recursiveCount;
+
+
+        //
+        // These fields are owned and maintained by the LockManager class exclusively
         //
 
         // Pointer to the lock to which this request belongs, or null if this request has not yet
@@ -139,10 +154,6 @@ namespace mongo {
         // This value is different from MODE_NONE only if a conversion is requested for a lock and
         // that conversion cannot be immediately granted.
         LockMode convertMode;
-
-        // How many times has LockManager::lock been called for this request. Locks are released
-        // when their recursive count drops to zero.
-        unsigned recursiveCount;
     };
 
 

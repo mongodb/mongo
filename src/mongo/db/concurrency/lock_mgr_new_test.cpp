@@ -29,7 +29,6 @@
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/unittest/unittest.h"
 
-
 namespace mongo {
 
     TEST(ResourceId, Semantics) {
@@ -343,7 +342,7 @@ namespace mongo {
 
         ASSERT(notify.numNotifies == 0);
 
-        // Free them one by one and make sure they get granted
+        // Free them one by one and make sure they get granted in the correct order
         for (int i = 0; i < 6; i++) {
             lockMgr.unlock(&request[i]);
 
@@ -591,7 +590,6 @@ namespace mongo {
 
     static void checkConflict(LockMode existingMode, LockMode newMode, bool hasConflict) {
         LockManager lockMgr;
-
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl lockerExisting(1);
@@ -638,6 +636,44 @@ namespace mongo {
         checkConflict(MODE_X, MODE_IX, true);
         checkConflict(MODE_X, MODE_S, true);
         checkConflict(MODE_X, MODE_X, true);
+    }
+
+    TEST(LockManager, EnqueueAtFront) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        MMAPV1LockerImpl lockerX(1);
+        LockRequestCombo requestX(&lockerX);
+
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &requestX, MODE_X));
+
+        // The subsequent request will block
+        MMAPV1LockerImpl lockerLow(2);
+        LockRequestCombo requestLow(&lockerLow);
+
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestLow, MODE_X));
+
+        // This is a "queue jumping request", which will go before locker 2 above
+        MMAPV1LockerImpl lockerHi(2);
+        LockRequestCombo requestHi(&lockerHi);
+        requestHi.enqueueAtFront = true;
+
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestHi, MODE_X));
+
+        // Once the X request is gone, lockerHi should be granted, because it's queue jumping
+        ASSERT(lockMgr.unlock(&requestX));
+
+        ASSERT(requestHi.lastResId == resId);
+        ASSERT(requestHi.lastResult == LOCK_OK);
+
+        // Finally lockerLow should be granted
+        ASSERT(lockMgr.unlock(&requestHi));
+
+        ASSERT(requestLow.lastResId == resId);
+        ASSERT(requestLow.lastResult == LOCK_OK);
+
+        // This avoids the lock manager asserting on leaked locks
+        ASSERT(lockMgr.unlock(&requestLow));
     }
 
 } // namespace mongo
