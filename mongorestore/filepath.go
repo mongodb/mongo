@@ -52,9 +52,10 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
-			//TODO name validation
-			err = restore.CreateIntentsForDB(entry.Name(),
-				filepath.Join(fullpath, entry.Name()))
+			if err = util.ValidateDBName(entry.Name()); err != nil {
+				return fmt.Errorf("invalid database name '%v': %v", entry.Name(), err)
+			}
+			err = restore.CreateIntentsForDB(entry.Name(), filepath.Join(fullpath, entry.Name()))
 			if err != nil {
 				return err
 			}
@@ -77,9 +78,6 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 // CreateIntentsForDB drills down into a db folder, creating intents
 // for all of the collection dump files it encounters
 func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
-	if err := util.ValidateDBName(db); err != nil {
-		return fmt.Errorf("invalid database name '%v': %v", db, err)
-	}
 
 	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, fullpath)
 	entries, err := ioutil.ReadDir(fullpath)
@@ -156,17 +154,7 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, fullpath)
 
-	//first validate the collection and db names
-	if err := util.ValidateDBName(db); err != nil {
-		return fmt.Errorf("invalid database name '%v': %v", db, err)
-	}
-	if err := util.ValidateCollectionName(collection); err != nil {
-		if collection != "system.indexes" { // for < 2.6 compatability (TODO remove in 3.0)
-			return fmt.Errorf("invalid collection name '%v.%v': %v", db, collection, err)
-		}
-	}
-
-	// then make sure the bson file exists and is valid
+	// first make sure the bson file exists and is valid
 	file, err := os.Lstat(fullpath)
 	if err != nil {
 		return err

@@ -155,16 +155,23 @@ func ValidateDBName(database string) error {
 // ValidateCollectionName validates that a string is a valid name for a mongodb
 // collection. An error is returned if it is not valid.
 func ValidateCollectionName(collection string) error {
-
-	// collection names cannot be empty
-	if len(collection) == 0 {
-		return fmt.Errorf("collection name cannot be an empty string")
-	}
-
 	// collection names cannot begin with 'system.'
 	if strings.HasPrefix(collection, "system.") {
 		return fmt.Errorf("collection name '%v' is not allowed to begin with"+
 			" 'system.'", collection)
+	}
+
+	return ValidateCollectionGrammar(collection)
+}
+
+// ValidateCollectionGrammar validates the collection for character and length
+// errors without erroring on system collections. For validation of functionality
+// that manipulates system collections.
+func ValidateCollectionGrammar(collection string) error {
+
+	// collection names cannot be empty
+	if len(collection) == 0 {
+		return fmt.Errorf("collection name cannot be an empty string")
 	}
 
 	// check for illegal characters

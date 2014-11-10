@@ -7,6 +7,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -54,6 +55,17 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 	if restore.ToolOptions.DB == "" && restore.ToolOptions.Collection != "" {
 		return fmt.Errorf("cannot dump a collection without a specified database")
+	}
+
+	if restore.ToolOptions.DB != "" {
+		if err := util.ValidateDBName(restore.ToolOptions.DB); err != nil {
+			return fmt.Errorf("invalid db name: %v", err)
+		}
+	}
+	if restore.ToolOptions.Collection != "" {
+		if err := util.ValidateCollectionGrammar(restore.ToolOptions.Collection); err != nil {
+			return fmt.Errorf("invalid collection name: %v", err)
+		}
 	}
 
 	if restore.InputOptions.OplogLimit != "" {
