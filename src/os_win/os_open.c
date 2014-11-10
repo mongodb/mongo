@@ -28,6 +28,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	path = NULL;
 	filehandle = INVALID_HANDLE_VALUE;
 	filehandle_secondary = INVALID_HANDLE_VALUE;
+	direct_io = 0;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
@@ -44,6 +45,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_spin_unlock(session, &conn->fh_lock);
 	if (matched)
 		return (0);
+
+	/* For directories, create empty file handles with invalid handles */
+	if (dio_type == WT_FILE_TYPE_DIRECTORY) {
+		goto setupfh;
+	}
 
 	WT_RET(__wt_filename(session, name, &path));
 
@@ -66,8 +72,6 @@ __wt_open(WT_SESSION_IMPL *session,
 			dwCreationDisposition = CREATE_ALWAYS;
 	} else
 		dwCreationDisposition = OPEN_EXISTING;
-
-	direct_io = 0;
 
 	if (dio_type && FLD_ISSET(conn->direct_io, dio_type)) {
 		f |= FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH;
@@ -125,6 +129,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, __wt_errno(),
 		    "open failed for secondary handle: %s", path);
 
+setupfh:
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->filehandle = filehandle;
@@ -133,7 +138,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	fh->direct_io = direct_io;
 
 	/* Set the file's size. */
-	WT_ERR(__wt_filesize(session, fh, &fh->size));
+	if (dio_type != WT_FILE_TYPE_DIRECTORY)
+		WT_ERR(__wt_filesize(session, fh, &fh->size));
 
 	/* Configure file extension. */
 	if (dio_type == WT_FILE_TYPE_DATA ||
@@ -202,13 +208,18 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	__wt_spin_unlock(session, &conn->fh_lock);
 
-	/* Discard the memory. */
-	if (!CloseHandle(fh->filehandle) != 0) {
+	/* Discard the memory.
+	 * Note: For directories, we do not open valid directory handles on
+	 * windows since it is not possible to sync a directory
+	 */
+	if (fh->filehandle != INVALID_HANDLE_VALUE &&
+	    !CloseHandle(fh->filehandle) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "CloseHandle: %s", fh->name);
 	}
 
-	if (!CloseHandle(fh->filehandle_secondary) != 0) {
+	if (fh->filehandle_secondary != INVALID_HANDLE_VALUE &&
+	    !CloseHandle(fh->filehandle_secondary) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "CloseHandle: secondary: %s", fh->name);
 	}
