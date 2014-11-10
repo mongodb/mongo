@@ -78,6 +78,7 @@
 typedef struct {
 	JavaVM *javavm;		/* Used in async threads to craft a jnienv */
 	JNIEnv *jnienv;		/* jni env that created the Session/Cursor */
+	WT_SESSION_IMPL *session; /* session used for alloc/free */
 	jobject jobj;		/* the java Session/Cursor/AsyncOp object */
 	jobject jcallback;	/* callback object for async ops */
 	jfieldID cptr_fid;	/* cached Cursor.swigCPtr field id in session */
@@ -168,14 +169,14 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 %}
 
 %define NULL_CHECK(val, name)
-	if (!val) { 
-     		SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, 
-		#name " is null"); 
+	if (!val) {
+		SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException,
+		#name " is null");
 		return $null;
 	}
 %enddef
 
-%define WT_CLASS(type, class, name, closeHandler)
+%define WT_CLASS(type, class, name)
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
@@ -190,12 +191,6 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 %typemap(in, numinputs=0) type *name {
 	$1 = *(type **)&jarg1;
 	NULL_CHECK($1, $1_name)
-}
-
-%typemap(in, numinputs=0) class ## _CLOSED *name {
-	$1 = *(type **)&jarg1;
-	NULL_CHECK($1, $1_name)
-	closeHandler;
 }
 
 %typemap(in) class ## _NULLABLE * {
@@ -214,6 +209,22 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
   */"
 %enddef
 
+%define WT_CLASS_WITH_CLOSE_HANDLER(type, class, name, closeHandler, priv)
+WT_CLASS(type, class, name)
+
+%typemap(in, numinputs=0) class ## _CLOSED *name (JAVA_CALLBACK *jcb) {
+	$1 = *(type **)&jarg1;
+	NULL_CHECK($1, $1_name)
+	jcb = (JAVA_CALLBACK *)(priv);
+}
+
+%typemap(freearg, numinputs=0) class ## _CLOSED *name {
+	closeHandler(jcb2);
+	priv = NULL;
+}
+
+%enddef
+
 %pragma(java) moduleimports=%{
 /**
  * @defgroup wt_java WiredTiger Java API
@@ -226,10 +237,13 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
  */
 %}
 
-WT_CLASS(struct __wt_connection, WT_CONNECTION, connection, connCloseHandler($1))
-WT_CLASS(struct __wt_session, WT_SESSION, session, sessionCloseHandler($1))
-WT_CLASS(struct __wt_cursor, WT_CURSOR, cursor, cursorCloseHandler($1))
-WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op, )
+WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_connection, WT_CONNECTION, connection,
+    closeHandler, ((WT_CONNECTION_IMPL *)$1)->lang_private)
+WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_session, WT_SESSION, session,
+    closeHandler, ((WT_SESSION_IMPL *)$1)->lang_private)
+WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_cursor, WT_CURSOR, cursor,
+    cursorCloseHandler, ((WT_CURSOR *)$1)->lang_private)
+WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
 %javamethodmodifiers SIGNATURE_CLASS::METHOD "
@@ -312,58 +326,27 @@ javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
 	}
 	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
+	__wt_free(jcb->session, jcb);
 	return (0);
 }
 
-/* Connection specific close handler. */
+/* Connection and Session close handler. */
 static int
-connCloseHandler(WT_CONNECTION *conn_arg)
+closeHandler(JAVA_CALLBACK *jcb)
 {
-	int ret;
-	JAVA_CALLBACK *jcb;
-	WT_CONNECTION_IMPL *conn;
-
-	conn = (WT_CONNECTION_IMPL *)conn_arg;
-	jcb = (JAVA_CALLBACK *)conn->lang_private;
-	conn->lang_private = NULL;
-	ret = javaClose(jcb->jnienv, jcb, NULL);
-	__wt_free(conn->default_session, jcb);
-
-	return (ret);
-}
-
-/* Session specific close handler. */
-static int
-sessionCloseHandler(WT_SESSION *session_arg)
-{
-	int ret;
-	JAVA_CALLBACK *jcb;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)session_arg;
-	jcb = (JAVA_CALLBACK *)session->lang_private;
-	session->lang_private = NULL;
-	ret = javaClose(jcb->jnienv, jcb, NULL);
-	__wt_free(session, jcb);
-
-	return (ret);
+	return (javaClose(jcb->jnienv, jcb, NULL));
 }
 
 /* Cursor specific close handler. */
 static int
-cursorCloseHandler(WT_CURSOR *cursor)
+cursorCloseHandler(JAVA_CALLBACK *jcb)
 {
 	int ret;
-	JAVA_CALLBACK *jcb;
 	JAVA_CALLBACK *sess_jcb;
 
-	jcb = (JAVA_CALLBACK *)cursor->lang_private;
-	sess_jcb = (JAVA_CALLBACK *)
-	    ((WT_SESSION_IMPL *)cursor->session)->lang_private;
-	cursor->lang_private = NULL;
+	sess_jcb = (JAVA_CALLBACK *)jcb->session->lang_private;
 	ret = javaClose(jcb->jnienv, jcb,
 	    sess_jcb ? &sess_jcb->cptr_fid : NULL);
-	__wt_free((WT_SESSION_IMPL *)cursor->session, jcb);
 
 	return (ret);
 }
@@ -378,9 +361,10 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	WT_UNUSED(handler);
 
 	if (cursor != NULL)
-		ret = cursorCloseHandler(cursor);
+		ret = cursorCloseHandler((JAVA_CALLBACK *)cursor->lang_private);
 	else
-		ret = sessionCloseHandler(session);
+		ret = closeHandler((JAVA_CALLBACK *)
+		    ((WT_SESSION_IMPL *)session)->lang_private);
 	return (ret);
 }
 
@@ -396,6 +380,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	jclass cls;
 	jfieldID fid;
 	jmethodID mid;
+	jobject jcallback;
 	JNIEnv *jenv;
 	WT_ASYNC_OP_IMPL *op;
 	WT_SESSION_IMPL *session;
@@ -407,6 +392,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	jcb = (JAVA_CALLBACK *)asyncop->c.lang_private;
 	conn_jcb = (JAVA_CALLBACK *)S2C(session)->lang_private;
 	asyncop->c.lang_private = NULL;
+	jcallback = jcb->jcallback;
 
 	/*
 	 * We rely on the fact that the async machinery uses a pool of
@@ -455,7 +441,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 			goto err;
 		conn_jcb->vunp_fid = fid;
 
-		cls = (*jenv)->GetObjectClass(jenv, jcb->jcallback);
+		cls = (*jenv)->GetObjectClass(jenv, jcallback);
 		if (cls == NULL)
 			goto err;
 		mid = (*jenv)->GetMethodID(jenv, cls, "notify",
@@ -473,7 +459,7 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	(*jenv)->SetObjectField(jenv, jcb->jobj, conn_jcb->vunp_fid, NULL);
 
 	/* Call the registered callback. */
-	ret = (*jenv)->CallIntMethod(jenv, jcb->jcallback, conn_jcb->notify_mid,
+	ret = (*jenv)->CallIntMethod(jenv, jcallback, conn_jcb->notify_mid,
 	    jcb->jobj, opret, flags);
 
 	if ((*jenv)->ExceptionOccurred(jenv)) {
@@ -487,9 +473,7 @@ err:		__wt_err(session, ret, "Java async callback error");
 	/* Invalidate the AsyncOp, further use throws NullPointerException. */
 	ret = javaClose(jenv, jcb, &conn_jcb->asynccptr_fid);
 
-	(*jenv)->DeleteGlobalRef(jenv, jcb->jcallback);
-
-	__wt_free(session, jcb);
+	(*jenv)->DeleteGlobalRef(jenv, jcallback);
 
 	if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
 		return (0);
@@ -1770,6 +1754,7 @@ err:	if (ret != 0)
 			goto err;
 
 		jcb->jnienv = jenv;
+		jcb->session = connimpl->default_session;
 		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
 		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
 		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
@@ -1822,6 +1807,7 @@ err:		if (ret != 0)
 			goto err;
 
 		jcb->jnienv = jenv;
+		jcb->session = (WT_SESSION_IMPL *)cursor->session;
 		cursor->lang_private = jcb;
 
 err:		if (ret != 0)

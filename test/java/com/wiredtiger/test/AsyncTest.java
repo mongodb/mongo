@@ -313,7 +313,7 @@ public class AsyncTest {
                 catch (WiredTigerException wte) {
                     if (retry == MAX_RETRIES)
                         throw wte;
-                    sleepMillis(retry);
+                    sleepMillis(1 << retry);
                 }
             }
 
@@ -451,6 +451,46 @@ public class AsyncTest {
         assertEquals(0, callback.nerror);
         assertEquals(1000000, callback.nsearch);
         assertEquals(1000000, callback.ninsert);
+    }
+
+    @Test
+    public void asyncManyConnections01()
+    throws WiredTigerException {
+        Object syncobj = new Object();
+        HashMap<String, String> current = new HashMap<String, String>();
+
+        for (int i = 0; i < 100; i++) {
+            CallbackSS callback = new CallbackSS(current, syncobj);
+            asyncTester("asyncMany01", "S", "S", 100, 10, 3, 10, 1,
+                        callback, callback, current);
+
+            assertEquals(0, callback.nerror);
+            assertEquals(100, callback.nsearch);
+            assertEquals(100, callback.ninsert);
+            conn.close("");
+            connvalid = false;
+        }
+    }
+
+    @Test
+    public void asyncManyConnections02()
+    throws WiredTigerException {
+        Object syncobj = new Object();
+        HashMap<Long, Integer> current = new HashMap<Long, Integer>();
+
+        for (int i = 0; i < 10; i++) {
+            // These are each long tests, so give some additional feedback
+            System.err.print(",");
+            CallbackRI callback = new CallbackRI(current, syncobj);
+            asyncTester("asyncMany02", "q", "i", 1000000, 4000,
+                        3, 1000000, 0, callback, callback, current);
+
+            assertEquals(0, callback.nerror);
+            assertEquals(1000000, callback.nsearch);
+            assertEquals(1000000, callback.ninsert);
+            conn.close("");
+            connvalid = false;
+        }
     }
 
     @After
