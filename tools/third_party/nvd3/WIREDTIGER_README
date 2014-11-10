@@ -1,4 +1,4 @@
-This is a pre-build python-nvd3 library. It was build from the
+This is a pre-build python-nvd3 library. It was built from the
 Git repository:
 https://github.com/areski/python-nvd3
 
@@ -13,8 +13,8 @@ To reproduce run:
 
 $ cd wiredtiger/tools/third_party
 $ git clone https://github.com/areski/python-nvd3
-$ git checkout deb12255
 $ cd python-nvd3
+$ git checkout deb12255
 $ python27 setup.py build
 $ cp build/lib/nvd3/* nvd3/
 
