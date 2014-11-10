@@ -457,9 +457,7 @@ int
 __wt_panic(WT_SESSION_IMPL *session)
 {
 	F_SET(S2C(session), WT_CONN_PANIC);
-	__wt_errx(session, "%s",
-	    "the WiredTiger library cannot continue; the process must exit "
-	    "and restart");
+	__wt_err(session, WT_PANIC, "the process must exit and restart");
 
 #if !defined(HAVE_DIAGNOSTIC)
 	/*
