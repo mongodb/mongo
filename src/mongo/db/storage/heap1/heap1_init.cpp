@@ -51,7 +51,7 @@ namespace mongo {
                                          ("SetGlobalEnvironment"))
                                          (InitializerContext* context) {
 
-        getGlobalEnvironment()->registerStorageEngine("heap1", new HeapFactory());
+        getGlobalEnvironment()->registerStorageEngine("inMemoryExperiment", new HeapFactory());
         return Status::OK();
     }
 
