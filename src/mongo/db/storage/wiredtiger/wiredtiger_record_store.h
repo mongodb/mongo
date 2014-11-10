@@ -31,7 +31,10 @@
 
 #pragma once
 
+#include <set>
 #include <string>
+
+#include <boost/thread/mutex.hpp>
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/record_store.h"
@@ -157,6 +160,12 @@ namespace mongo {
         virtual DiskLoc oplogStartHack(OperationContext* txn,
                                        const DiskLoc& startingPosition) const;
 
+        virtual Status oplogDiskLocRegister( OperationContext* txn,
+                                             const OpTime& opTime );
+
+        bool isOplog() const { return _isOplog; }
+        bool usingOplogHack() const { return _useOplogHack; }
+
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
             _cappedDeleteCallback = cb;
         }
@@ -167,6 +176,9 @@ namespace mongo {
         uint64_t instanceId() const { return _instanceId; }
 
         void setSizeStorer( WiredTigerSizeStorer* ss ) { _sizeStorer = ss; }
+
+        void dealtWithCappedLoc( const DiskLoc& loc );
+        bool isCappedHidden( const DiskLoc& loc ) const;
 
     private:
 
@@ -214,6 +226,8 @@ namespace mongo {
         static uint64_t _makeKey(const DiskLoc &loc);
         static DiskLoc _fromKey(uint64_t k);
 
+        void _addUncommitedDiskLoc_inlock( OperationContext* txn, const DiskLoc& loc );
+
         DiskLoc _nextId();
         void _setId(DiskLoc loc);
         bool cappedAndNeedDelete(OperationContext* txn) const;
@@ -234,7 +248,10 @@ namespace mongo {
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
         const bool _useOplogHack;
-        DiskLoc _highestLocForOplogHack;
+
+        typedef std::vector<DiskLoc> SortedDiskLocs;
+        SortedDiskLocs _uncommittedDiskLocs;
+        mutable boost::mutex _uncommittedDiskLocsMutex;
 
         AtomicUInt64 _nextIdNum;
         AtomicInt64 _dataSize;

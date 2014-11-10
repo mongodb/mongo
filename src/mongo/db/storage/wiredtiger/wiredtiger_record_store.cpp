@@ -89,6 +89,26 @@ namespace {
 
         return false;
     }
+
+    class CappedInsertChange : public RecoveryUnit::Change {
+    public:
+        CappedInsertChange( WiredTigerRecordStore* rs, const DiskLoc& loc )
+            : _rs( rs ), _loc( loc ) {
+        }
+
+        virtual void commit() {
+            _rs->dealtWithCappedLoc( _loc );
+        }
+
+        virtual void rollback() {
+            _rs->dealtWithCappedLoc( _loc );
+        }
+
+    private:
+        WiredTigerRecordStore* _rs;
+        DiskLoc _loc;
+    };
+
 } // namespace
 
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(const StringData& ns,
@@ -180,16 +200,8 @@ namespace {
             _nextIdNum.store( 1 );
             if ( sizeStorer )
                 _sizeStorer->onCreate( this, 0, 0 );
-
-            if (_useOplogHack) {
-                _highestLocForOplogHack = minDiskLoc;
-            }
         }
         else {
-            if (_useOplogHack) {
-                _highestLocForOplogHack = iterator->curr();
-            }
-
             uint64_t max = _makeKey( iterator->curr() );
             _nextIdNum.store( 1 + max );
 
@@ -412,15 +424,7 @@ namespace {
 
     StatusWith<DiskLoc> WiredTigerRecordStore::extractAndCheckLocForOplog(const char* data,
                                                                           int len) {
-        StatusWith<DiskLoc> status = oploghack::extractKey(data, len);
-        if (!status.isOK())
-            return status;
-
-        if (status.getValue() <= _highestLocForOplogHack)
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts not higher than highest");
-
-        _highestLocForOplogHack = status.getValue();
-        return status;
+        return oploghack::extractKey(data, len);
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
@@ -432,26 +436,34 @@ namespace {
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
-        WT_CURSOR *c = curwrap.get();
-        invariant( c );
-
         DiskLoc loc;
-        if (_useOplogHack) {
+        if ( _useOplogHack ) {
             StatusWith<DiskLoc> status = extractAndCheckLocForOplog(data, len);
             if (!status.isOK())
                 return status;
             loc = status.getValue();
         }
+        else if ( _isCapped ) {
+            boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+            loc = _nextId();
+            _addUncommitedDiskLoc_inlock( txn, loc );
+        }
         else {
             loc = _nextId();
         }
+
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WT_CURSOR *c = curwrap.get();
+        invariant( c );
 
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
         int ret = c->insert(c);
-        invariantWTOK(ret);
+        if ( ret ) {
+            return StatusWith<DiskLoc>( wtRCToStatus( ret,
+                                                      "WiredTigerRecordStore::insertRecord" ) );
+        }
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -459,6 +471,23 @@ namespace {
         cappedDeleteAsNeeded(txn);
 
         return StatusWith<DiskLoc>( loc );
+    }
+
+    void WiredTigerRecordStore::dealtWithCappedLoc( const DiskLoc& loc ) {
+        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        SortedDiskLocs::iterator it = std::find(_uncommittedDiskLocs.begin(),
+                                                _uncommittedDiskLocs.end(),
+                                                loc);
+        invariant(it != _uncommittedDiskLocs.end());
+        _uncommittedDiskLocs.erase(it);
+    }
+
+    bool WiredTigerRecordStore::isCappedHidden( const DiskLoc& loc ) const {
+        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        if (_uncommittedDiskLocs.empty()) {
+            return false;
+        }
+        return _uncommittedDiskLocs.front() <= loc;
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
@@ -569,8 +598,6 @@ namespace {
 
         // WiredTigerRecoveryUnit* ru = _getRecoveryUnit( txn );
 
-        _highestLocForOplogHack = DiskLoc();
-
         return Status::OK();
     }
 
@@ -672,6 +699,26 @@ namespace {
             return Status( ErrorCodes::InvalidOptions, "Invalid Option" );
 
         return Status::OK();
+    }
+
+    Status WiredTigerRecordStore::oplogDiskLocRegister( OperationContext* txn,
+                                                        const OpTime& opTime ) {
+        StatusWith<DiskLoc> loc = oploghack::keyForOptime( opTime );
+        if ( !loc.isOK() )
+            return loc.getStatus();
+
+        boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+        _addUncommitedDiskLoc_inlock( txn, loc.getValue() );
+        return Status::OK();
+    }
+
+    void WiredTigerRecordStore::_addUncommitedDiskLoc_inlock( OperationContext* txn,
+                                                              const DiskLoc& loc ) {
+        // todo: make this a dassert at some point
+        invariant( _uncommittedDiskLocs.empty() ||
+                   _uncommittedDiskLocs.back() < loc );
+        _uncommittedDiskLocs.push_back( loc );
+        txn->recoveryUnit()->registerChange( new CappedInsertChange( this, loc ) );
     }
 
     DiskLoc WiredTigerRecordStore::oplogStartHack(OperationContext* txn,
@@ -880,6 +927,12 @@ namespace {
         DiskLoc toReturn = curr();
         RS_ITERATOR_TRACE( "getNext toReturn: " << toReturn );
         _getNext();
+        if ( !_eof && _rs.isCapped() ) {
+            DiskLoc loc = _curr();
+            if ( _rs.isCappedHidden( loc ) ) {
+                _eof = true;
+            }
+        }
         RS_ITERATOR_TRACE( " ----" );
         _lastLoc = toReturn;
         return toReturn;
@@ -976,8 +1029,5 @@ namespace {
             }
         }
         wuow.commit();
-
-        iter.reset(getIterator(txn, DiskLoc(), CollectionScanParams::BACKWARD));
-        _highestLocForOplogHack = iter->isEOF() ? DiskLoc() : iter->curr();
     }
 }

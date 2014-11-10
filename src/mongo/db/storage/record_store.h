@@ -301,6 +301,17 @@ namespace mongo {
             return DiskLoc().setInvalid();
         }
 
+        /**
+         * When we write to an oplog, we call this so that if the storage engine
+         * supports doc locking, it can manage the visibility of oplog entries to ensure
+         * they are ordered.
+         */
+        virtual Status oplogDiskLocRegister( OperationContext* txn,
+                                             const OpTime& opTime ) {
+            return Status::OK();
+        }
+
+
     protected:
         std::string _ns;
     };

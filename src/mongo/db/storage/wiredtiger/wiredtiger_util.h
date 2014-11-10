@@ -50,7 +50,7 @@ namespace mongo {
     /**
      * converts wiredtiger return codes to mongodb statuses.
      */
-    inline Status wtRCToStatus(int retCode) {
+    inline Status wtRCToStatus(int retCode, const char* prefix = NULL ) {
         if (MONGO_likely(retCode == 0))
             return Status::OK();
 
@@ -62,10 +62,13 @@ namespace mongo {
 
         fassert( 28559, retCode != WT_PANIC );
 
-        // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
-        return Status(ErrorCodes::UnknownError,
-                      str::stream() << retCode << ": " << wiredtiger_strerror(retCode));
+        str::stream s;
+        if ( prefix )
+            s << prefix << " ";
+        s << retCode << ": " << wiredtiger_strerror(retCode);
 
+        // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
+        return Status(ErrorCodes::UnknownError, s);
     }
 
     inline void invariantWTOK(int retCode) {

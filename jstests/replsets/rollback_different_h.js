@@ -42,8 +42,11 @@ master = replTest.getMaster();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+oplog_entry["ts"].t++;
 oplog_entry["h"] = NumberLong(1);
-b_conn.getDB("local").oplog.rs.insert(oplog_entry);
+res = b_conn.getDB("local").oplog.rs.insert(oplog_entry);
+assert( res.nInserted > 0, tojson( res ) );
+
 // another insert to set minvalid ahead
 assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
 
