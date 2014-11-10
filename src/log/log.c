@@ -1133,15 +1133,15 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
-	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
-	 * a header at the beginning for us to fill in.
+	 * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a
+	 * header at the beginning for us to fill in.
 	 *
 	 * If using direct_io, the caller should pass us an aligned record.
 	 * But we need to make sure it is big enough and zero-filled so
 	 * that we can write the full amount.  Do this whether or not
 	 * direct_io is in use because it makes the reading code cleaner.
 	 */
-	WT_STAT_FAST_CONN_INCRV(session, log_bytes_user, record->size);
+	WT_STAT_FAST_CONN_INCRV(session, log_bytes_payload, record->size);
 	rdup_len = __wt_rduppo2((uint32_t)record->size, log->allocsize);
 	WT_ERR(__wt_buf_grow(session, record, rdup_len));
 	WT_ASSERT(session, record->data == record->mem);

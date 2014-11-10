@@ -3171,8 +3171,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_BUFFER_GROW			1058
 /*! log: total log buffer size */
 #define	WT_STAT_CONN_LOG_BUFFER_SIZE			1059
-/*! log: user provided log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_USER			1060
+/*! log: log bytes of payload data */
+#define	WT_STAT_CONN_LOG_BYTES_PAYLOAD			1060
 /*! log: log bytes written */
 #define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1061
 /*! log: yields waiting for previous log file close */

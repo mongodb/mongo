@@ -187,7 +187,7 @@ struct __wt_connection_stats {
 	WT_STATS file_open;
 	WT_STATS log_buffer_grow;
 	WT_STATS log_buffer_size;
-	WT_STATS log_bytes_user;
+	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;
 	WT_STATS log_close_yields;
 	WT_STATS log_max_filesize;
