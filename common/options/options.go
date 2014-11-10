@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	VersionStr = "2.7.8"
+	VersionStr = "2.8.0-rc0"
 )
 
 // Struct encompassing all of the options that are reused across tools: "help",
