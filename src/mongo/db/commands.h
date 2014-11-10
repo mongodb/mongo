@@ -175,6 +175,12 @@ namespace mutablebson {
          */
         virtual void redactForLogging(mutablebson::Document* cmdObj);
 
+        /**
+         * Returns a copy of "cmdObj" in a form suitable for writing to logs.
+         * Uses redactForLogging() to transform "cmdObj".
+         */
+        BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj);
+
         /* Return true if a replica set secondary should go into "recovering"
            (unreadable) state while running this command.
          */

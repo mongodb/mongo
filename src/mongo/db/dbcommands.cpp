@@ -84,6 +84,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     CmdShutdown cmdShutdown;
 
     void CmdShutdown::help( stringstream& help ) const {
@@ -1419,8 +1421,6 @@ namespace mongo {
                       bool fromRepl, int queryOptions) {
         string dbname = nsToDatabase( ns );
 
-        LOG(2) << "run command " << ns << ' ' << _cmdobj << endl;
-
         const char *p = strchr(ns, '.');
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
@@ -1460,12 +1460,17 @@ namespace mongo {
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
 
         if ( c ) {
+            LOG(2) << "run command " << ns << ' ' << c->getRedactedCopyForLogging(_cmdobj);
             Command::execCommand(txn, c, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
         }
         else {
-            Command::appendCommandStatus(anObjBuilder,
-                                         false,
-                                         str::stream() << "no such cmd: " << e.fieldName());
+            // In the absence of a Command object, no redaction is possible. Therefore
+            // to avoid displaying potentially sensitive information in the logs,
+            // we restrict the log message to the name of the unrecognized command.
+            // However, the complete command object will still be echoed to the client.
+            string msg = str::stream() << "no such command: " << e.fieldName();
+            LOG(2) << msg;
+            Command::appendCommandStatus(anObjBuilder, false, msg);
             anObjBuilder.append("code", ErrorCodes::CommandNotFound);
             anObjBuilder.append("bad cmd" , _cmdobj );
             Command::unknownCommands.increment();
