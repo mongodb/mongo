@@ -382,6 +382,11 @@ namespace {
         if (!cappedAndNeedDelete(txn))
             return;
 
+        // ensure only one thread at a time can do deletes, otherwise they'll conflict.
+        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::try_to_lock);
+        if ( !lock )
+            return;
+
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         int ret = c->next(c);
