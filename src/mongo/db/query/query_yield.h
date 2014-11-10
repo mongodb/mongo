@@ -47,7 +47,7 @@ namespace mongo {
          *
          * If in a nested context (eg DBDirectClient), does nothing.
          */
-        static void yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher);
+        static void yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher);
     };
 
 } // namespace mongo

@@ -72,7 +72,7 @@ namespace mongo {
         _planYielding->saveState();
 
         // Release and reacquire locks.
-        QueryYield::yieldAllLocks(opCtx, 1, fetcher);
+        QueryYield::yieldAllLocks(opCtx, fetcher);
 
         _elapsedTracker.resetLastTime();
 
