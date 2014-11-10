@@ -60,6 +60,8 @@ namespace mongo {
             throw WriteConflictException();
         }
 
+        fassert( 28559, retCode != WT_PANIC );
+
         // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
         return Status(ErrorCodes::UnknownError,
                       str::stream() << retCode << ": " << wiredtiger_strerror(retCode));

@@ -52,6 +52,7 @@ namespace mongo {
         int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
                              int errorCode, const char *message) {
             error() << "WiredTiger (" << errorCode << ") " << message;
+            fassert( 28558, errorCode != WT_PANIC );
             return 0;
         }
 
