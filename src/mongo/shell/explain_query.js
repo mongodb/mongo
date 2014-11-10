@@ -169,15 +169,17 @@ var DBExplainQuery = (function() {
         }
 
         /**
-         * Mark this query as a count rather than a regular query. This causes .finish() to
-         * create an explain of a count command rather than an explain of a find command.
+         * Returns the explain resulting from running this query as a count operation.
+         *
+         * If 'applySkipLimit' is true, then the skip and limit values set on this query values are
+         * passed to the server; otherwise they are ignored.
          */
         this.count = function(applySkipLimit) {
             this._isCount = true;
             if (applySkipLimit) {
                 this._applySkipLimit = true;
             }
-            return this;
+            return this.finish();
         }
 
         /**

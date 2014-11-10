@@ -224,19 +224,19 @@ assert("queryPlanner" in explain.stages[0].$cursor);
 //
 
 // Basic count.
-explain = t.explain().count().finish();
+explain = t.explain().count();
 assert.commandWorked(explain);
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT"));
 
 // Tests for applySkipLimit argument to .count. When we don't apply the skip, we
 // count one result. When we do apply the skip we count zero.
-explain = t.explain("executionStats").find({a: 3}).skip(1).count(false).finish();
+explain = t.explain("executionStats").find({a: 3}).skip(1).count(false);
 stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(1, stage.nCounted);
-explain = t.explain("executionStats").find({a: 3}).skip(1).count(true).finish();
+explain = t.explain("executionStats").find({a: 3}).skip(1).count(true);
 stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;
@@ -244,13 +244,7 @@ if ("SINGLE_SHARD" === stage.stage) {
 assert.eq(0, stage.nCounted);
 
 // Count with hint.
-explain = t.explain().count({a: 3}).hint({a: 1}).finish();
-assert.commandWorked(explain);
-assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT"));
-assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT_SCAN"));
-
-// Count with hint using .find().count() syntax.
-explain = t.explain().find({a: 3}).count().hint({a: 1}).finish();
+explain = t.explain().find({a: 3}).hint({a: 1}).count();
 assert.commandWorked(explain);
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT"));
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT_SCAN"));
