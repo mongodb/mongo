@@ -251,15 +251,16 @@ namespace mongo {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be >= 4 bytes" );
         }
-        int lenWHdr = docSize + Record::HeaderSize;
+        const int lenWHdr = docSize + Record::HeaderSize;
         if ( lenWHdr > MaxAllowedAllocation ) {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be <= 16.5MB" );
         }
-        if (doc->addPadding() && shouldPadInserts())
-            lenWHdr = quantizeAllocationSpace( lenWHdr );
+        const int lenToAlloc = (doc->addPadding() && shouldPadInserts())
+                                 ? quantizeAllocationSpace(lenWHdr)
+                                 : lenWHdr;
 
-        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenToAlloc, enforceQuota );
         if ( !loc.isOK() )
             return loc;
 
@@ -299,12 +300,12 @@ namespace mongo {
                                                           int len,
                                                           bool enforceQuota ) {
 
-        int lenWHdr = len + Record::HeaderSize;
-        if (shouldPadInserts())
-            lenWHdr = quantizeAllocationSpace( lenWHdr );
-        fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
+        const int lenWHdr = len + Record::HeaderSize;
+        const int lenToAlloc = shouldPadInserts() ? quantizeAllocationSpace(lenWHdr)
+                                                  : lenWHdr;
+        fassert( 17208, lenToAlloc >= lenWHdr );
 
-        StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
+        StatusWith<DiskLoc> loc = allocRecord( txn, lenToAlloc, enforceQuota );
         if ( !loc.isOK() )
             return loc;
 
