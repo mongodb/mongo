@@ -67,10 +67,6 @@ namespace mongo {
 
         DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
         DiskLoc() { Null(); }
-        DiskLoc(const DiskLoc& l) {
-            _a=l._a;
-            ofs=l.ofs;
-        }
 
         bool questionable() const {
             return ofs < -1 ||
@@ -125,12 +121,6 @@ namespace mongo {
         }
         bool operator!=(const DiskLoc& b) const {
             return !(*this==b);
-        }
-        const DiskLoc& operator=(const DiskLoc& b) {
-            _a=b._a;
-            ofs = b.ofs;
-            //verify(ofs!=0);
-            return *this;
         }
         int compare(const DiskLoc& b) const {
             int x = _a - b._a;

@@ -273,7 +273,7 @@ namespace mongo {
         // Type Conversion
         //
 
-        operator const DiskLoc() const { 
+        operator DiskLoc() const {
             // endian
             if( isNull() ) return DiskLoc();
             unsigned a = *((unsigned *) (_a-1));
