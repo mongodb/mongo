@@ -149,6 +149,18 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, fullpath)
 
+	// avoid actual file handling if we are using stdin
+	// TODO encapsulate this is a cleaner way
+	if restore.useStdin {
+		intent := &intents.Intent{
+			DB:       db,
+			C:        collection,
+			BSONPath: "-",
+		}
+		restore.manager.Put(intent)
+		return nil
+	}
+
 	// first make sure the bson file exists and is valid
 	file, err := os.Lstat(fullpath)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -157,20 +158,27 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	// then do bson
 	if intent.BSONPath != "" {
 		log.Logf(log.Always, "restoring %v from file %v", intent.Key(), intent.BSONPath)
+		var rawBSONSource io.ReadCloser
+		var size int64
 
-		fileInfo, err := os.Lstat(intent.BSONPath)
-		if err != nil {
-			return fmt.Errorf("error reading bson file: %v", err)
+		if restore.useStdin {
+			rawBSONSource = os.Stdin
+			log.Log(log.Always, "restoring from stdin")
+		} else {
+			fileInfo, err := os.Lstat(intent.BSONPath)
+			if err != nil {
+				return fmt.Errorf("error reading bson file: %v", err)
+			}
+			size = fileInfo.Size()
+			log.Logf(log.Info, "\tfile %v is %v bytes", intent.BSONPath, size)
+
+			rawBSONSource, err = os.Open(intent.BSONPath)
+			if err != nil {
+				return fmt.Errorf("error reading bson file: %v", err)
+			}
 		}
-		size := fileInfo.Size()
-		log.Logf(log.Info, "\tfile %v is %v bytes", intent.BSONPath, size)
 
-		rawFile, err := os.Open(intent.BSONPath)
-		if err != nil {
-			return fmt.Errorf("error reading bson file: %v", err)
-		}
-
-		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawBSONSource))
 		defer bsonSource.Close()
 
 		err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, size)
@@ -190,6 +198,8 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	} else {
 		log.Log(log.Always, "no indexes to restore")
 	}
+
+	log.Logf(log.Always, "finished restoring %v", intent.Key())
 	return nil
 }
 
@@ -210,15 +220,19 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	// progress bar handlers
 	bytesRead := 0
 
-	bar := &progress.ProgressBar{
-		Name:       fmt.Sprintf("%v.%v", dbName, colName),
-		Max:        int(fileSize),
-		CounterPtr: &bytesRead,
-		Writer:     log.Writer(0),
-		BarLength:  ProgressBarLength,
+	// only print progress bar if we know the bounds
+	// TODO have useful progress meters when max=0
+	if fileSize > 0 {
+		bar := &progress.ProgressBar{
+			Name:       fmt.Sprintf("%v.%v", dbName, colName),
+			Max:        int(fileSize),
+			CounterPtr: &bytesRead,
+			Writer:     log.Writer(0),
+			BarLength:  ProgressBarLength,
+		}
+		restore.progressManager.Attach(bar)
+		defer restore.progressManager.Detach(bar)
 	}
-	restore.progressManager.Attach(bar)
-	defer restore.progressManager.Detach(bar)
 
 	MaxInsertThreads := restore.OutputOptions.BulkWriters
 	if restore.OutputOptions.PreserveDocOrder {

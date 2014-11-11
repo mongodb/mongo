@@ -30,8 +30,10 @@ type MongoRestore struct {
 	manager         *intents.Manager
 	safety          *mgo.Safe
 	progressManager *progress.Manager
-	objCheck        bool
-	oplogLimit      bson.MongoTimestamp
+
+	objCheck   bool
+	oplogLimit bson.MongoTimestamp
+	useStdin   bool
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {
@@ -122,6 +124,14 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	if restore.OutputOptions.BulkWriters < 0 {
 		return fmt.Errorf(
 			"cannot specify a negative number of insertion workers per collection")
+	}
+
+	// a single dash signals reading from stdin
+	if restore.TargetDirectory == "-" {
+		restore.useStdin = true
+		if restore.ToolOptions.Collection == "" {
+			return fmt.Errorf("cannot restore from stdin without a specified collection")
+		}
 	}
 
 	return nil
