@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __lsm_tree_cleanup_old(WT_SESSION_IMPL *, const char *);
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
 static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
@@ -210,6 +211,27 @@ __wt_lsm_tree_set_chunk_size(
 }
 
 /*
+ * __lsm_tree_cleanup_old --
+ *	Cleanup any old LSM chunks that might conflict with one we are
+ *	about to create. Sometimes failed LSM metadata operations can
+ *	leave old files and bloom filters behind.
+ */
+static int
+__lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_DECL_RET;
+	const char *cfg[] =
+	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
+	int exists;
+
+	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
+	if (exists)
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_drop(session, uri, cfg));
+	return (ret);
+}
+
+/*
  * __wt_lsm_tree_setup_chunk --
  *	Initialize a chunk of an LSM tree.
  */
@@ -217,10 +239,7 @@ int
 __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
-	int exists;
-
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 	WT_RET(__wt_epoch(session, &chunk->create_ts));
 
 	WT_RET(__wt_lsm_tree_chunk_name(
@@ -235,13 +254,32 @@ __wt_lsm_tree_setup_chunk(
 	 * things with handle locks and metadata tracking.  It can never have
 	 * been the result of an interrupted merge, anyway.
 	 */
-	if (chunk->id > 1) {
-		WT_RET(__wt_exist(
-		    session, chunk->uri + strlen("file:"), &exists));
-		if (exists)
-			WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
-	}
+	if (chunk->id > 1)
+		WT_RET(__lsm_tree_cleanup_old(session, chunk->uri));
+
 	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
+}
+
+/*
+ * __wt_lsm_tree_setup_bloom --
+ *	Initialize a bloom filter for an LSM tree.
+ */
+int
+__wt_lsm_tree_setup_bloom(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
+{
+	WT_DECL_RET;
+
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	/*
+	 * The Bloom URI can be populated when the chunk is created, but
+	 * it isn't set yet on open or merge.
+	 */
+	if (chunk->bloom_uri == NULL)
+		WT_RET(__wt_lsm_tree_bloom_name(
+		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
+	WT_RET(__lsm_tree_cleanup_old(session, chunk->bloom_uri));
+	return (ret);
 }
 
 /*
