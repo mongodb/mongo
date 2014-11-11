@@ -352,27 +352,9 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_CURSOR *src;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
 	uint64_t insert_count;
-	int exist;
 
-	/*
-	 * Normally, the Bloom URI is populated when the chunk struct is
-	 * allocated.  After an open, however, it may not have been.
-	 * Deal with that here.
-	 */
-	if (chunk->bloom_uri == NULL)
-		WT_RET(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
-
-	/*
-	 * Drop the bloom filter first - there may be some content hanging over
-	 * from an aborted merge or checkpoint.
-	 */
-	wt_session = &session->iface;
-	WT_RET(__wt_exist(session, chunk->bloom_uri + strlen("file:"), &exist));
-	if (exist)
-		WT_RET(wt_session->drop(wt_session, chunk->bloom_uri, "force"));
+	WT_RET(__wt_lsm_tree_setup_bloom(session, lsm_tree, chunk));
 
 	bloom = NULL;
 	/*

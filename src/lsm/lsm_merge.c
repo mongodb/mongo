@@ -272,7 +272,6 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	nchunks = (end_chunk + 1) - start_chunk;
 
 	WT_ASSERT(session, nchunks > 0);
-
 	start_id = lsm_tree->chunk[start_chunk]->id;
 
 	/* Find the merge generation. */
@@ -326,8 +325,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	    ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 	WT_ERR(ret);
 	if (create_bloom) {
-		WT_ERR(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
+		WT_ERR(__wt_lsm_tree_setup_bloom(session, lsm_tree, chunk));
 
 		WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
 		    lsm_tree->bloom_config,
