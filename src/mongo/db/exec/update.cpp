@@ -754,9 +754,7 @@ namespace mongo {
                 }
                 catch ( const WriteConflictException& de ) {
                     if ( !_params.request->isMulti() ) {
-
-                        log() << "Had WriteConflict in the middle of a single update, "
-                              << "restarting the operation";
+                        // We don't handle this here as we handle at the top level
                         throw;
                     }
 
