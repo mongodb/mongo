@@ -26,7 +26,7 @@ cd mongo-tools
 
 #### Building Tools
 
-To build the tools, you need to have Go version 1.3 and up. Run the `build.sh` script to install all the tools to `./bin`.
+To build the tools, you need to have Go version 1.3 and up. Running the `build.sh` script will install all the tools to `./bin`.
 
 Alternatively, you can set GOBIN and use `go install`:
 
@@ -35,8 +35,17 @@ export GOBIN=bin
 go install mongodump/main/mongodump.go
 ```
 
+An additional flag, `-tags`, can be passed to the `go install` command in order to install the tools with support for SSL and/or SASL. For example:
 
-#### SSL
+```
+go install -tags ssl mongoimport/main/mongoimport.go # install mongoimport with SSL support enabled
+go install -tags sasl mongoimport/main/mongoimport.go # install mongoimport with SASL support enabled
+go install -tags "ssl sasl" mongoimport/main/mongoimport.go # install mongoimport with both SASL and SSL
+```
 
-These tools also support linking with OpenSSL to provide SSL support. To build binaries with SSL features, add the `-tags ssl` argument to go build commands.
+Alternatively, you can run `build.sh` with the appropriate arguments. For example:
 
+```
+build.sh ssl # install all the tools with SSL support enabled
+build.sh sasl ssl # install all the tools with both SASL and SSL support enabled
+```
