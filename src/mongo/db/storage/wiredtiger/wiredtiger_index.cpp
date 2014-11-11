@@ -628,8 +628,15 @@ namespace {
         c->set_value( c, valueItem.Get() );
         int ret = c->insert( c );
 
-        if ( ret != WT_DUPLICATE_KEY )
+        if ( ret == WT_ROLLBACK && !dupsAllowed ) {
+            // if there is a conflict on a unique key, it means there is a dup key
+            // even if someone else is deleting at the same time, its ok to fail this
+            // insert as a dup key as it a race
+            return dupKeyError(key);
+        }
+        else if ( ret != WT_DUPLICATE_KEY ) {
             return wtRCToStatus( ret );
+        }
 
         // we're in weird mode where there might be multiple values
         // we put them all in the "list"
