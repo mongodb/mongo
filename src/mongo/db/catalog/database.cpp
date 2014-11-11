@@ -595,7 +595,7 @@ namespace mongo {
                            "collection already exists" );
 
         CollectionOptions collectionOptions;
-        Status status = collectionOptions.parse( options );
+        Status status = collectionOptions.parse(options, storageGlobalParams.engine);
         if ( !status.isOK() )
             return status;
 

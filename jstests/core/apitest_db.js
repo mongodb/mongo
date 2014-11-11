@@ -38,9 +38,23 @@ var found = false;
 db.getCollectionNames().forEach( function(x) { if (x == "test") found = true; });
 assert(found, "found test.test in system.namespaces");
 
-// Test round trip of storageEngine in collection options.
+// storageEngine in collection options must:
+// - be a document
+// - contains a single field of document type with the name of the current storage engine.
 db.getCollection('test').drop();
-assert.commandWorked(db.createCollection('test', {storageEngine: {storageEngine1: {x: 1}}}));
+var storageEngineName = db.serverStatus().storageEngine.name;
+assert.commandFailed(db.createCollection('test', {storageEngine: {}}));
+assert.commandFailed(db.createCollection('test', {storageEngine: {unknownStorageEngine: {}}}));
+var invalidStorageEngineOptions = {}
+invalidStorageEngineOptions[storageEngineName] = 12345;
+assert.commandFailed(db.createCollection('test', {storageEngine: invalidStorageEngineOptions}));
+
+// Test round trip of storageEngine in collection options.
+// Assume that empty document for storageEngine-specific options is acceptable.
+var validStorageEngineOptions = {}
+validStorageEngineOptions[storageEngineName] = {};
+db.getCollection('test').drop();
+assert.commandWorked(db.createCollection('test', {storageEngine: validStorageEngineOptions}));
 var result = assert.commandWorked(db.runCommand('listCollections'));
 found  = false;
 for (var i = 0; i < result.collections.length; ++i) {
@@ -49,7 +63,7 @@ for (var i = 0; i < result.collections.length; ++i) {
         continue;
     }
     found = true;
-    assert.docEq({storageEngine1: {x: 1}}, collection.options.storageEngine,
+    assert.docEq(validStorageEngineOptions, collection.options.storageEngine,
                  'storage engine options not found in listCommands result');
 }
 assert(found, "'test' collection not created");

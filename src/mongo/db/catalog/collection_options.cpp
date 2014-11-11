@@ -63,6 +63,10 @@ namespace mongo {
     }
 
     Status CollectionOptions::parse( const BSONObj& options ) {
+        return parse(options, "");
+    }
+
+    Status CollectionOptions::parse(const BSONObj& options, const std::string& storageEngineName) {
         reset();
 
         // During parsing, ignore some validation errors in order to accept options objects that
@@ -123,7 +127,8 @@ namespace mongo {
             }
             else if (fieldName == "storageEngine") {
                 // Storage engine-specific collection options.
-                // Every field under "storageEngine" is an object.
+                // Exactly one document field under "storageEngine".
+                // Every field under "storageEngine" has to be a document.
                 // Format:
                 // {
                 //     ...
@@ -131,23 +136,42 @@ namespace mongo {
                 //         storageEngine1: {
                 //             ...
                 //         },
-                //         storageEngine2: {
-                //             ...
-                //         },
                 //     },
                 //     ...
                 // }
                 if (e.type() != mongo::Object) {
-                    return Status(ErrorCodes::BadValue, "storageEngine has to be an object");
+                    return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
                 }
                 BSONObjIterator j(e.Obj());
-                while (j.more()) {
+                if (!j.more()) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Empty 'storageEngine' options are invalid. "
+                                  "Please remove, or include valid options.");
+                }
+                else {
                     BSONElement storageEngineElement = j.next();
                     if (storageEngineElement.type() != mongo::Object) {
                         return Status(ErrorCodes::BadValue, str::stream()
-                             << "storageEngine." << storageEngineElement.fieldNameStringData()
-                             << " has to be an object");
+                            << "'storageEngine." << storageEngineElement.fieldNameStringData()
+                            << "' has to be an embedded document.");
                     }
+                    // If 'storageEngineName' is provided, ensure that current field name
+                    // matches 'storageEngineName'.
+                    if (!storageEngineName.empty() &&
+                        storageEngineElement.fieldNameStringData() != storageEngineName) {
+                        return Status(ErrorCodes::BadValue, str::stream()
+                            << "'storageEngine." << storageEngineElement.fieldNameStringData()
+                            << "' options do not match, and cannot be used, "
+                            << "for the currently enabled storage engine of '" + storageEngineName + "'");
+                    }
+                }
+                if (j.more()) {
+                    BSONElement storageEngineElement = j.next();
+                    return Status(ErrorCodes::BadValue, str::stream()
+                        << "The 'storageEngine' options must only include the current storage "
+                        << "engine ('" << e.Obj().firstElementFieldName()
+                        << "'), not the additional options for '"
+                        << storageEngineElement.fieldNameStringData() << "'.");
                 }
                 storageEngine = e.Obj().getOwned();
             }
