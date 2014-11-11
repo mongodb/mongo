@@ -28,6 +28,8 @@
 
 #include "mongo/s/dbclient_shard_resolver.h"
 
+#include <set>
+
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/s/config.h"
 #include "mongo/s/shard.h"
@@ -78,10 +80,18 @@ namespace mongo {
         // If we need to, then get the particular node we're targeting in the replica set
         //
 
-        // Does not reload the monitor if it doesn't currently exist
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get( rawHost.getSetName(),
-                                                                   false );
-        if ( !replMonitor ) {
+        // Don't create the monitor unless we need to - fast path
+        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), false);
+
+        if (!replMonitor) {
+            // Slow path
+            std::set<HostAndPort> seedServers(rawHost.getServers().begin(),
+                                              rawHost.getServers().end());
+            ReplicaSetMonitor::createIfNeeded(rawHost.getSetName(), seedServers);
+            replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), true);
+        }
+
+        if (!replMonitor) {
             return Status( ErrorCodes::ReplicaSetNotFound,
                            string("unknown replica set ") + rawHost.getSetName() );
         }

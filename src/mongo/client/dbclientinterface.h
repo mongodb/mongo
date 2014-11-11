@@ -265,7 +265,7 @@ namespace mongo {
 
         std::string getSetName() const { return _setName; }
 
-        std::vector<HostAndPort> getServers() const { return _servers; }
+        const std::vector<HostAndPort>& getServers() const { return _servers; }
 
         ConnectionType type() const { return _type; }
 

@@ -22,9 +22,9 @@ var chunkToMove = configDB2.chunks.find().sort({ min: 1 }).next();
 var toShard = configDB2.shards.findOne({ _id: { $ne: chunkToMove.shard }})._id;
 testDB2.adminCommand({ moveChunk: 'test.user', to: toShard, find: { x: 50 }});
 
-for (var x = 0; x < 200; x++) {
-    testDB2.user.insert({ x: x });
-}
+// Insert a document into each chunk
+assert.writeOK(testDB2.user.insert({ x: 30 }));
+assert.writeOK(testDB2.user.insert({ x: 130 }));
 
 // The testDB1 mongos does not know the chunk has been moved, and will retry
 var cursor = testDB1.user.find({ x: 30 }).readPref('primary');
