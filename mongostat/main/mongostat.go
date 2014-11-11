@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
@@ -58,9 +59,26 @@ func main() {
 		return
 	}
 
+	var formatter mongostat.LineFormatter
+	formatter = &mongostat.GridLineFormatter{!statOpts.NoHeaders, 10}
+	if statOpts.Json {
+		formatter = &mongostat.JSONLineFormatter{}
+	}
+
 	var discoverChan chan string
+	var cluster mongostat.ClusterMonitor
 	if statOpts.Discover {
 		discoverChan = make(chan string, 128)
+		cluster = &mongostat.AsyncClusterMonitor{
+			ReportChan:    make(chan mongostat.StatLine),
+			LastStatLines: map[string]*mongostat.StatLine{},
+			Formatter:     formatter,
+		}
+	} else {
+		cluster = &mongostat.SyncClusterMonitor{
+			ReportChan: make(chan mongostat.StatLine),
+			Formatter:  formatter,
+		}
 	}
 
 	opts.Direct = true
@@ -70,12 +88,7 @@ func main() {
 		Nodes:         map[string]*mongostat.NodeMonitor{},
 		Discovered:    discoverChan,
 		SleepInterval: time.Duration(sleepInterval) * time.Second,
-		Cluster: &mongostat.ClusterMonitor{
-			ReportChan:    make(chan mongostat.StatLine),
-			LastStatLines: map[string]*mongostat.StatLine{},
-			NoHeaders:     statOpts.NoHeaders,
-			UseJson:       statOpts.Json,
-		},
+		Cluster:       cluster,
 	}
 
 	seedHost := opts.Host
@@ -88,7 +101,7 @@ func main() {
 	// kick it off
 	err = stat.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v", err)
+		log.Logf(log.Always, "Error: %v", err)
 		util.ExitFail()
 		return
 	}

@@ -376,31 +376,17 @@ func formatOpcount(opcount, opcountRepl int64, both bool) string {
 // A LineFormatter formats StatLines for printing
 type LineFormatter interface {
 	// FormatLines returns the string representation of the StatLines that
-	// are passed in. It also takes in whether or not to include the header
-	// line in the output (meaningless for some formatters) and whether or
-	// not cluster discovery is in use.
-	FormatLines(lines []StatLine, includeHeader bool, discover bool) string
+	// are passed in. It also takes a bool if cluster discovery is active.
+	FormatLines(lines []StatLine, index int, discover bool) string
 }
 
 // Implementation of LineFormatter - converts the StatLines to json
 type JSONLineFormatter struct{}
 
 // Satisfy the LineFormatter interface. Formats the StatLines as json.
-func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
-	discover bool) string {
+func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover bool) string {
 
-	repl := false
-	all := false
-	// if any of the nodes being monitored are part of a replset,
-	// enable the printing of replset-specific columns
-	for _, line := range lines {
-		if line.ReplSetName != "" || line.NodeType == "RTR" {
-			repl = true
-		}
-		if line.NonMapped >= 0 {
-			all = true
-		}
-	}
+	repl, all := checkLineAttributes(lines)
 
 	// middle ground b/t the StatLines and the json string to be returned
 	jsonFormat := map[string]interface{}{}
@@ -430,12 +416,12 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		lineJson["conn"] = fmt.Sprintf("%v", line.NumConnections)
 		lineJson["time"] = fmt.Sprintf("%v", line.Time.Format("15:04:05"))
 		lineJson["host"] = line.Host
+		lineJson["vsize"] = formatMegs(int64(line.Virtual))
+		lineJson["res"] = formatMegs(int64(line.Resident))
 
 		// add mmapv1-specific fields
 		if line.StorageEngine == "mmapv1" {
 			lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
-			lineJson["vsize"] = formatMegs(int64(line.Virtual))
-			lineJson["res"] = formatMegs(int64(line.Resident))
 			lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
 			lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
 				line.QueuedWriters)
@@ -486,11 +472,30 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 
 // Implementation of LineFormatter - uses a common/text.GridWriter to format
 // the StatLines as a grid.
-type GridLineFormatter struct{}
+type GridLineFormatter struct {
+	//If true, enables printing of headers to output
+	IncludeHeader bool
+
+	//Number of line outputs to skip between adding in headers
+	HeaderInterval int
+}
+
+func checkLineAttributes(lines []StatLine) (hasRepl, hasAll bool) {
+	// if any of the nodes being monitored are part of a replset,
+	// enable the printing of replset-specific columns
+	for _, line := range lines {
+		if line.ReplSetName != "" || line.NodeType == "RTR" {
+			hasRepl = true
+		}
+		if line.NonMapped >= 0 {
+			hasAll = true
+		}
+	}
+	return
+}
 
 // Satisfy the LineFormatter interface. Formats the StatLines as a grid.
-func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
-	discover bool) string {
+func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover bool) string {
 	buf := &bytes.Buffer{}
 	out := &text.GridWriter{ColumnPadding: 1}
 
@@ -498,18 +503,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 		out.WriteCell(" ")
 	}
 
-	repl := false
-	all := false
-	// if any of the nodes being monitored are part of a replset,
-	// enable the printing of replset-specific columns
-	for _, line := range lines {
-		if line.ReplSetName != "" || line.NodeType == "RTR" {
-			repl = true
-		}
-		if line.NonMapped >= 0 {
-			all = true
-		}
-	}
+	repl, all := checkLineAttributes(lines)
 
 	// Sort the stat lines by hostname, so that we see the output
 	// in the same order for each snapshot
@@ -585,10 +579,10 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 			out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
 			out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
 		} else {
-			// 8 empties for wiredtiger
+			// 6 empties for wiredtiger
 			out.WriteCell("n/a")
-			out.WriteCell("n/a")
-			out.WriteCell("n/a")
+			out.WriteCell(formatMegs(int64(line.Virtual)))
+			out.WriteCell(formatMegs(int64(line.Resident)))
 			out.WriteCell("n/a")
 			out.WriteCell("n/a")
 			out.WriteCell("n/a")
@@ -611,7 +605,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, includeHeader bool,
 	out.Flush(buf)
 	returnVal := buf.String()
 
-	if !includeHeader {
+	if !glf.IncludeHeader || index%glf.HeaderInterval != 0 {
 		//Strip out the first line of the formatted output,
 		//which contains the headers. They've been left in up until this point
 		//in order to force the formatting of the columns to be wide enough.
