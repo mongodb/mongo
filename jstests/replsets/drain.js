@@ -54,6 +54,6 @@
     // Check for at least two entries. There was one prior to freezing op application on the
     // secondary and we cannot guarantee all writes reached the secondary's op queue prior to
     // shutting down the original primary.
-    assert.gt(primary.getDB("foo").foo.count(), 2);
+    assert.gte(primary.getDB("foo").foo.count(), 2);
 
 })();
