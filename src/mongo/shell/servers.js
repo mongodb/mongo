@@ -802,6 +802,9 @@ function appendSetParameterArgs(argArray) {
             if (jsTest.options().storageEngine) {
                 argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
             }
+            if (jsTest.options().wiredTigerEngineConfig) {
+                argArray.push.apply(argArray, ['--wiredTigerEngineConfig', jsTest.options().wiredTigerEngineConfig]);
+            }
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");

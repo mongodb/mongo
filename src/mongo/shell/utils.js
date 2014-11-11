@@ -146,6 +146,7 @@ jsTestOptions = function(){
                             { setParameters : TestData.setParameters,
                               setParametersMongos : TestData.setParametersMongos,
                               storageEngine: TestData.storageEngine,
+                              wiredTigerEngineConfig: TestData.wiredTigerEngineConfig,
                               noJournal : TestData.noJournal,
                               noJournalPrealloc : TestData.noJournalPrealloc,
                               auth : TestData.auth,
