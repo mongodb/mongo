@@ -997,7 +997,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
-	__wt_random_init(session_ret->rnd);
+	if (WT_SESSION_FIRST_USE(session_ret))
+		__wt_random_init(session_ret->rnd);
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);
@@ -1014,7 +1015,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 * session close because access to it isn't serialized.  Allocate the
 	 * first time we open this session.
 	 */
-	if (session_ret->hazard == NULL)
+	if (WT_SESSION_FIRST_USE(session_ret))
 		WT_ERR(__wt_calloc_def(
 		    session, conn->hazard_max, &session_ret->hazard));
 
