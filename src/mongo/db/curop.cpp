@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -205,7 +206,8 @@ namespace mongo {
         if( killPending() )
             builder->append("killPending", true);
 
-        builder->append( "numYields" , _numYields );
+        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
+            builder->append( "numYields" , _numYields );
     }
 
     BSONObj CurOp::description() {

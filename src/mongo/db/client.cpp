@@ -494,7 +494,8 @@ namespace mongo {
                 s << " code:" << exceptionInfo.code;
         }
 
-        s << " numYields:" << curop.numYields();
+        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
+            s << " numYields:" << curop.numYields();
         
         s << " ";
         
@@ -578,7 +579,8 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
-        b.appendNumber( "numYield" , curop.numYields() );
+        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
+            b.appendNumber( "numYield" , curop.numYields() );
 
         if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );
