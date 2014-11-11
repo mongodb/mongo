@@ -377,14 +377,14 @@ namespace {
         invariant( descriptor );
         invariant( entry == _entries.find( descriptor ) );
 
-        status = entry->accessMethod()->initializeAsEmpty(txn);
-        if (!status.isOK())
-            return status;
-
         txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(txn,
                                                                        _collection,
                                                                        &_entries,
                                                                        entry->descriptor()));
+
+        status = entry->accessMethod()->initializeAsEmpty(txn);
+        if (!status.isOK())
+            return status;
         indexBuildBlock.success();
 
         // sanity check

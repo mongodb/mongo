@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context_impl.h"
@@ -597,6 +598,70 @@ namespace {
     };
 
     template<bool rollback>
+    class SetIndexHead {
+    public:
+        void run() {
+            string ns = "unittests.rollback_set_index_head";
+            OperationContextImpl txn;
+            NamespaceString nss( ns );
+            dropDatabase( &txn, nss );
+            createCollection( &txn, nss );
+
+            Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
+            Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
+
+            Client::Context ctx( &txn, ns );
+            Collection* coll = ctx.db()->getCollection( &txn, ns );
+            IndexCatalog* catalog = coll->getIndexCatalog();
+
+            string idxName = "a";
+            BSONObj spec = BSON( "ns" << ns << "key" << BSON( "a" << 1 ) << "name" << idxName );
+
+            {
+                WriteUnitOfWork uow( &txn );
+                ASSERT_OK( catalog->createIndexOnEmptyCollection( &txn, spec ) );
+                uow.commit();
+            }
+
+            IndexDescriptor* indexDesc = catalog->findIndexByName(&txn, idxName);
+            invariant(indexDesc);
+            const IndexCatalogEntry* ice = catalog->getEntry(indexDesc);
+            invariant(ice);
+            HeadManager* headManager = ice->headManager();
+
+            const DiskLoc oldHead = headManager->getHead(&txn);
+            ASSERT_EQ(oldHead, ice->head(&txn));
+
+            const DiskLoc dummyHead(123, 456);
+            ASSERT_NE(oldHead, dummyHead);
+
+            // END SETUP / START TEST
+
+            {
+                WriteUnitOfWork uow( &txn );
+
+                headManager->setHead(&txn, dummyHead);
+
+                ASSERT_EQ(ice->head(&txn), dummyHead);
+                ASSERT_EQ(headManager->getHead(&txn), dummyHead);
+
+                if ( !rollback ) {
+                    uow.commit();
+                }
+            }
+
+            if ( rollback ) {
+                ASSERT_EQ(ice->head(&txn), oldHead);
+                ASSERT_EQ(headManager->getHead(&txn), oldHead);
+            }
+            else {
+                ASSERT_EQ(ice->head(&txn), dummyHead);
+                ASSERT_EQ(headManager->getHead(&txn), dummyHead);
+            }
+        }
+    };
+
+    template<bool rollback>
     class CreateCollectionAndIndexes {
     public:
         void run() {
@@ -674,6 +739,7 @@ namespace {
             addAll< CreateIndex >();
             addAll< DropIndex >();
             addAll< CreateDropIndex >();
+            addAll< SetIndexHead >();
             addAll< CreateCollectionAndIndexes >();
         }
     };

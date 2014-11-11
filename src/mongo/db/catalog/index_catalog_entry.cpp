@@ -119,10 +119,24 @@ namespace mongo {
         _isReady = newIsReady;
     }
 
+    class IndexCatalogEntry::SetHeadChange : public RecoveryUnit::Change {
+    public:
+        SetHeadChange(IndexCatalogEntry* ice, DiskLoc oldHead) :_ice(ice), _oldHead(oldHead) {
+        }
+
+        virtual void commit() {}
+        virtual void rollback() { _ice->_head = _oldHead; }
+
+        IndexCatalogEntry* _ice;
+        const DiskLoc _oldHead;
+    };
+
     void IndexCatalogEntry::setHead( OperationContext* txn, DiskLoc newHead ) {
         _collection->setIndexHead( txn,
                                    _descriptor->indexName(),
                                    newHead );
+
+        txn->recoveryUnit()->registerChange(new SetHeadChange(this, _head));
         _head = newHead;
     }
 

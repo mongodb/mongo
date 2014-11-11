@@ -102,6 +102,8 @@ namespace mongo {
         private:
             friend class BtreeLogic;
 
+            class SetRightLeafLocChange;
+
             Builder(BtreeLogic* logic, OperationContext* txn, bool dupsAllowed);
 
             /**

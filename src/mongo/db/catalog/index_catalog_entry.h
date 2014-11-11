@@ -92,6 +92,7 @@ namespace mongo {
     private:
 
         class SetMultikeyChange;
+        class SetHeadChange;
 
         bool _catalogIsReady( OperationContext* txn ) const;
         DiskLoc _catalogHead( OperationContext* txn ) const;
