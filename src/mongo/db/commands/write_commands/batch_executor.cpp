@@ -1050,8 +1050,10 @@ namespace mongo {
         }
 
         // Errors release the write lock, as a matter of policy.
-        if (result->getError())
+        if (result->getError()) {
+            state->txn->recoveryUnit()->commitAndRestart();
             state->unlock();
+        }
     }
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
@@ -1294,6 +1296,7 @@ namespace mongo {
                 createCollection = false;
                 // RESTART LOOP
                 fakeLoop = -1;
+                txn->recoveryUnit()->commitAndRestart();
             }
             catch (const DBException& ex) {
                 Status status = ex.toStatus();
