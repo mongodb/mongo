@@ -353,14 +353,14 @@ namespace {
         _increaseDataSize(txn, -old_length);
     }
 
-    bool WiredTigerRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
+    bool WiredTigerRecordStore::cappedAndNeedDelete() const {
         if (!_isCapped)
             return false;
 
         if (_dataSize.load() > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (_numRecords.load() > _cappedMaxDocs))
             return true;
 
         return false;
@@ -370,16 +370,15 @@ namespace {
         int oplogCounter = 0;
     }
 
-    void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-
-        bool useTruncate = false;
+    void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
+                                                     const DiskLoc& justInserted ) {
 
         if ( _isOplog ) {
             if ( oplogCounter++ % 100 > 0 )
                 return;
         }
 
-        if (!cappedAndNeedDelete(txn))
+        if (!cappedAndNeedDelete())
             return;
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
@@ -387,44 +386,68 @@ namespace {
         if ( !lock )
             return;
 
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
-        WT_CURSOR *c = curwrap.get();
-        int ret = c->next(c);
-        DiskLoc oldest;
-        while ( ret == 0 && cappedAndNeedDelete(txn) ) {
-            invariant(_numRecords.load() > 0);
+        WiredTigerRecoveryUnit* realRecoveryUnit = NULL;
+        if ( _isOplog ) {
+            // we do this is a sub transaction in case it aborts
+            realRecoveryUnit = dynamic_cast<WiredTigerRecoveryUnit*>( txn->releaseRecoveryUnit() );
+            invariant( realRecoveryUnit );
+            WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
+            txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
+        }
 
-            uint64_t key;
-            ret = c->get_key(c, &key);
-            invariantWTOK(ret);
-            oldest = _fromKey(key);
+        try {
+            WiredTigerCursor curwrap( _uri, _instanceId, txn);
+            WT_CURSOR *c = curwrap.get();
+            int ret = c->next(c);
+            DiskLoc oldest;
+            while ( ret == 0 && cappedAndNeedDelete() ) {
+                WriteUnitOfWork wuow( txn );
 
-            if ( _cappedDeleteCallback ) {
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
-            }
+                invariant(_numRecords.load() > 0);
 
-            if ( useTruncate ) {
-                _changeNumRecords( txn, false );
-                WT_ITEM temp;
-                invariantWTOK( c->get_value( c, &temp ) );
-                _increaseDataSize( txn, temp.size );
-            }
-            else {
+                uint64_t key;
+                ret = c->get_key(c, &key);
+                invariantWTOK(ret);
+                oldest = _fromKey(key);
+
+                if ( oldest >= justInserted )
+                    break;
+
+                if ( _cappedDeleteCallback ) {
+                    uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+                }
+
                 deleteRecord( txn, oldest );
+
+                ret = c->next(c);
+
+                wuow.commit();
             }
 
-            ret = c->next(c);
+            if (ret != WT_NOTFOUND) invariantWTOK(ret);
+
+        }
+        catch ( const WriteConflictException& wce ) {
+            if ( _isOplog ) {
+                delete txn->releaseRecoveryUnit();
+                txn->setRecoveryUnit( realRecoveryUnit );
+                log() << "got conflict purging oplog, ignoring";
+                return;
+            }
+            throw;
+        }
+        catch ( ... ) {
+            if ( _isOplog ) {
+                delete txn->releaseRecoveryUnit();
+                txn->setRecoveryUnit( realRecoveryUnit );
+            }
+            throw;
         }
 
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
-
-        if ( useTruncate && !oldest.isNull() ) {
-            c->reset( c );
-            c->set_key( c, _makeKey( oldest ) );
-            invariantWTOK( curwrap.getWTSession()->truncate( curwrap.getWTSession(),
-                                                             NULL, NULL, c, "" ) );
+        if ( _isOplog ) {
+            delete txn->releaseRecoveryUnit();
+            txn->setRecoveryUnit( realRecoveryUnit );
         }
-
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::extractAndCheckLocForOplog(const char* data,
@@ -473,7 +496,7 @@ namespace {
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded(txn, loc);
 
         return StatusWith<DiskLoc>( loc );
     }
@@ -533,7 +556,7 @@ namespace {
 
         _increaseDataSize(txn, len - old_length);
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded(txn, loc);
 
         return StatusWith<DiskLoc>( loc );
     }

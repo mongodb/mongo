@@ -230,8 +230,8 @@ namespace mongo {
 
         DiskLoc _nextId();
         void _setId(DiskLoc loc);
-        bool cappedAndNeedDelete(OperationContext* txn) const;
-        void cappedDeleteAsNeeded(OperationContext* txn);
+        bool cappedAndNeedDelete() const;
+        void cappedDeleteAsNeeded(OperationContext* txn, const DiskLoc& justInserted );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
