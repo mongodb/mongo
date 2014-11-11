@@ -154,6 +154,7 @@ struct __wt_lsm_manager {
 	WT_LSM_WORKER_ARGS lsm_worker_cookies[WT_LSM_MAX_WORKERS];
 };
 
+#define	WT_LSM_AGGRESSIVE_THRESHOLD	5
 /*
  * WT_LSM_TREE --
  *	An LSM tree.
