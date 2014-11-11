@@ -196,6 +196,7 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 			--end_chunk;
 		}
 	}
+	nchunks = (end_chunk + 1) - start_chunk;
 
 	/* Be paranoid, check that we setup the merge properly. */
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
