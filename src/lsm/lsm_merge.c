@@ -62,7 +62,9 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	u_int end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 
 	chunk_size = 0;
+	nchunks = 0;
 	record_count = 0;
+	chunk = youngest = NULL;
 
 	/* Clear the return parameters */
 	*start = 0;
@@ -203,6 +205,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 		    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
 	}
 
+	WT_ASSERT(session,
+	    nchunks == 0 || (chunk != NULL && youngest != NULL));
 	/*
 	 * Don't do merges that are too small or across too many
 	 * generations.
