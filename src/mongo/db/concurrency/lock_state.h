@@ -53,9 +53,9 @@ namespace mongo {
         /**
          * Uninterruptible blocking method, which waits for the notification to fire.
          *
-         * @param timeout How long to wait before returning LOCK_TIMEOUT.
+         * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
          */
-        LockResult wait(Microseconds timeout);
+        LockResult wait(int timeoutMs);
 
     private:
 
