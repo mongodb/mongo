@@ -81,8 +81,7 @@ namespace mongo {
 
         MMAPV1LockerImpl locker2(2);
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
-        Microseconds timeBudget(0);
-        ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, &timeBudget));
+        ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
 
         ASSERT(locker2.isLockHeldForMode(resId, MODE_NONE));
 
@@ -104,8 +103,7 @@ namespace mongo {
         ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
 
         // Try upgrading locker 1, which should block and timeout
-        Microseconds timeBudget(1);
-        ASSERT(LOCK_TIMEOUT == locker1.lock(resId, MODE_X, &timeBudget));
+        ASSERT(LOCK_TIMEOUT == locker1.lock(resId, MODE_X, 1));
 
         locker1.unlockAll();
         locker2.unlockAll();

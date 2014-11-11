@@ -151,7 +151,7 @@ namespace mongo {
         }
 
         const ResourceId collRes = ResourceId(RESOURCE_COLLECTION, _ns);
-        LockResult res = txn->lockState()->lock(collRes, MODE_X, NULL, true);
+        LockResult res = txn->lockState()->lock(collRes, MODE_X, UINT_MAX, true);
         if (res == LOCK_DEADLOCK) throw WriteConflictException();
         invariant(res == LOCK_OK);
 

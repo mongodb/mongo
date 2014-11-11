@@ -32,6 +32,7 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <climits> // For UINT_MAX
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_mgr_defs.h"
@@ -116,6 +117,7 @@ namespace mongo {
 
             ParallelBatchWriterSupport _pbws_lk;
 
+            Timer _timer;
             char _type;      // 'r','w','R','W'
         };
 
@@ -131,8 +133,8 @@ namespace mongo {
             void _tempRelease();
             void _relock();
         public:
-            // timeBudgetRemaining is only for writelocktry -- deprecated -- do not use
-            GlobalWrite(Locker* lockState, Microseconds* timeBudgetRemaining = NULL);
+            // timeoutms is only for writelocktry -- deprecated -- do not use
+            GlobalWrite(Locker* lockState, unsigned timeoutms = UINT_MAX);
             virtual ~GlobalWrite();
         };
 
@@ -145,8 +147,8 @@ namespace mongo {
          */
         class GlobalRead : public ScopedLock {
         public:
-            // timeBudgetRemaining is only for readlocktry -- deprecated -- do not use
-            GlobalRead(Locker* lockState, Microseconds* timeBudgetRemaining = NULL);
+            // timeoutms is only for readlocktry -- deprecated -- do not use
+            GlobalRead(Locker* lockState, unsigned timeoutms = UINT_MAX);
             virtual ~GlobalRead();
         };
 

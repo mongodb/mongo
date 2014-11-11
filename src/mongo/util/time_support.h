@@ -41,7 +41,6 @@
 
 namespace mongo {
 
-    typedef boost::posix_time::microseconds Microseconds;
     typedef boost::posix_time::milliseconds Milliseconds;
     typedef boost::posix_time::seconds Seconds;
 
