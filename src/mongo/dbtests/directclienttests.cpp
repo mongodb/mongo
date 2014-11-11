@@ -129,7 +129,7 @@ namespace DirectClientTests {
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
             ASSERT( result.hasField( "$err" ));
-            ASSERT_EQUALS(result["code"].Int(), 16332);
+            ASSERT_EQUALS(result["code"].Int(), 16256);
         }
     };
 
