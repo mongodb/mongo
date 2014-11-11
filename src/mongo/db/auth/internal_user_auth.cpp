@@ -35,6 +35,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -95,7 +96,9 @@ namespace mongo {
 
     bool authenticateInternalUser(DBClientWithCommands* conn) {
         if (!isInternalAuthSet()) {
-            log() << "ERROR: No authentication parameters set for internal user" << endl;
+            if (!serverGlobalParams.quiet) {
+                log() << "ERROR: No authentication parameters set for internal user";
+            }
             return false;
         }
 
@@ -103,9 +106,11 @@ namespace mongo {
             conn->auth(getInternalUserAuthParamsWithFallback());
             return true;
         } catch(const UserException& ex) {
-                log() << "can't authenticate to " << conn->toString() <<
-                         " as internal user, error: "<< ex.what() << endl;
-                return false;
+            if (!serverGlobalParams.quiet) {
+                log() << "can't authenticate to " << conn->toString()
+                      << " as internal user, error: "<< ex.what();
+            }
+            return false;
         }
     }
 } // namespace mongo

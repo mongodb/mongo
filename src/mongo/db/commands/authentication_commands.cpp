@@ -53,6 +53,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
@@ -147,9 +148,11 @@ namespace mongo {
                               BSONObjBuilder& result,
                               bool fromRepl) {
 
-        mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
-        redactForLogging(&cmdToLog);
-        log() << " authenticate db: " << dbname << " " << cmdToLog << endl;
+        if (!serverGlobalParams.quiet) {
+            mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
+            redactForLogging(&cmdToLog);
+            log() << " authenticate db: " << dbname << " " << cmdToLog;
+        }
 
         UserName user(cmdObj.getStringField("user"), dbname);
         if (Command::testCommandsEnabled &&
@@ -171,8 +174,10 @@ namespace mongo {
                                  user,
                                  status.code());
         if (!status.isOK()) {
-            log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": " <<
-                status;
+            if (!serverGlobalParams.quiet) {
+                log() << "Failed to authenticate " << user << " with mechanism " << mechanism
+                      << ": " << status;
+            }
             if (status.code() == ErrorCodes::AuthenticationFailed) {
                 // Statuses with code AuthenticationFailed may contain messages we do not wish to
                 // reveal to the user, so we return a status with the message "auth failed".
