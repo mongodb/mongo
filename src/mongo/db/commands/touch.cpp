@@ -79,8 +79,8 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || dbname.empty() ) {
+            const std::string coll = cmdObj.firstElement().valuestrsafe();
+            if (coll.empty()) {
                 errmsg = "no collection name specified";
                 return false;
             }

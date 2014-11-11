@@ -250,7 +250,7 @@ namespace mongo {
         Config::Config( const string& _dbname , const BSONObj& cmdObj )
         {
             dbname = _dbname;
-            ns = dbname + "." + cmdObj.firstElement().valuestr();
+            ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
             verbose = cmdObj["verbose"].trueValue();
             jsMode = cmdObj["jsMode"].trueValue();

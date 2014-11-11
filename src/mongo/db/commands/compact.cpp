@@ -76,7 +76,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string coll = cmdObj.firstElement().valuestr();
+            std::string coll = cmdObj.firstElement().valuestrsafe();
             std::string ns = db->name() + "." + coll;
 
             IndexCatalog::IndexKillCriteria criteria;
@@ -85,8 +85,8 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string coll = cmdObj.firstElement().valuestr();
-            if( coll.empty() || db.empty() ) {
+            const std::string coll = cmdObj.firstElement().valuestrsafe();
+            if (coll.empty()) {
                 errmsg = "no collection name specified";
                 return false;
             }

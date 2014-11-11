@@ -74,7 +74,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestr();
+            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestrsafe();
             Collection* collection = db->getCollection(opCtx, toDeleteNs);
             IndexCatalog::IndexKillCriteria criteria;
 
@@ -121,8 +121,13 @@ namespace mongo {
                         BSONObj& jsobj,
                         string& errmsg,
                         BSONObjBuilder& anObjBuilder) {
-            BSONElement e = jsobj.firstElement();
-            const string toDeleteNs = dbname + '.' + e.valuestr();
+            const std::string coll = jsobj.firstElement().valuestrsafe();
+            if (coll.empty()) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+
+            const std::string toDeleteNs = dbname + '.' + coll;
             if (!serverGlobalParams.quiet) {
                 LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }

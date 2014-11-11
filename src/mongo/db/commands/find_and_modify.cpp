@@ -73,7 +73,13 @@ namespace mongo {
         bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             verify( cmdObj["sort"].eoo() );
 
-            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const std::string coll = cmdObj.firstElement().valuestrsafe();
+            if (coll.empty()) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+
+            const std::string ns = dbname + '.' + coll;
 
             BSONObj query = cmdObj.getObjectField("query");
             BSONObj fields = cmdObj.getObjectField("fields");
@@ -368,7 +374,13 @@ namespace mongo {
                 return runNoDirectClient(txn, dbname, cmdObj, x, errmsg, result, y);
             }
 
-            const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            const std::string coll = cmdObj.firstElement().valuestrsafe();
+            if (coll.empty()) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+
+            const std::string ns = dbname + '.' + coll;
 
             BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
             Query q (origQuery);

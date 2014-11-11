@@ -451,7 +451,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string nsToDrop = db->name() + '.' + cmdObj.firstElement().valuestr();
+            std::string nsToDrop = db->name() + '.' + cmdObj.firstElement().valuestrsafe();
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = nsToDrop;
@@ -459,7 +459,13 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
+            const std::string collToDrop = cmdObj.firstElement().valuestrsafe();
+            if (collToDrop.empty()) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+
+            const std::string nsToDrop = dbname + '.' + collToDrop;
             if (!serverGlobalParams.quiet) {
                 LOG(0) << "CMD: drop " << nsToDrop << endl;
             }
@@ -562,7 +568,7 @@ namespace mongo {
                 return appendCommandStatus( result, status );
             }
 
-            const string ns = dbname + '.' + firstElt.valuestr();
+            const std::string ns = dbname + '.' + firstElt.valuestrsafe();
 
             // Build options object from remaining cmdObj elements.
             BSONObjBuilder optionsBuilder;
@@ -984,7 +990,13 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            const string ns = dbname + "." + jsobj.firstElement().valuestr();
+            const std::string collName = jsobj.firstElement().valuestrsafe();
+            if (collName.empty()) {
+                errmsg = "no collection name specified";
+                return false;
+            }
+
+            const std::string ns = dbname + "." + collName;
 
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             WriteUnitOfWork wunit(txn);
