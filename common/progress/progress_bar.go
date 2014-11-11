@@ -13,7 +13,7 @@ const (
 	BarFilling = "#"
 	BarEmpty   = "."
 	BarLeft    = "["
-	BarRight   = "]\t"
+	BarRight   = "]"
 )
 
 // ProgressBar is a tool for concurrently monitoring the progress
@@ -75,9 +75,9 @@ func (pb *ProgressBar) Stop() {
 func (pb *ProgressBar) renderToWriter() {
 	currentCount := *pb.CounterPtr
 	percent := float64(currentCount) / float64(pb.Max)
-	fmt.Fprintf(pb.Writer, "%v\t%v%d/%d (%2.1f%%)",
-		pb.Name,
+	fmt.Fprintf(pb.Writer, "%v %v\t%d/%d (%2.1f%%)",
 		drawBar(pb.BarLength, percent),
+		pb.Name,
 		currentCount,
 		pb.Max,
 		percent*100,
