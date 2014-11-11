@@ -84,14 +84,8 @@ __conn_dhandle_open_lock(
 			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
-
-			/*
-			 * If we're trying to get exclusive access and the file
-			 * is open, give up.
-			 */
-			if (is_open && want_exclusive)
-				return (EBUSY);
-		}
+		} else
+			is_open = 0;
 
 		/*
 		 * It isn't open or we want it exclusive: try to get an
@@ -115,7 +109,7 @@ __conn_dhandle_open_lock(
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			return (0);
-		} else if (ret != EBUSY)
+		} else if (ret != EBUSY || (is_open && want_exclusive))
 			return (ret);
 		else
 			lock_busy = 1;
