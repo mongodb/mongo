@@ -35,6 +35,7 @@
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage_options.h"
 
@@ -52,6 +53,7 @@ namespace mongo {
                 kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
                 // Intentionally leaked.
                 new WiredTigerServerStatusSection(kv);
+                new WiredTigerEngineRuntimeConfigSetting(kv);
                 return new KVStorageEngine( kv );
             }
         };

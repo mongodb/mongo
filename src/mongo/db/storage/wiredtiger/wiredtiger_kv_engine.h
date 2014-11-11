@@ -104,6 +104,9 @@ namespace mongo {
         virtual void cleanShutdown(OperationContext* txn);
 
         // wiredtiger specific
+        // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
+        // held by this class
+        int reconfigure(const char* str);
 
         WT_CONNECTION* getConnection() { return _conn; }
         void dropAllQueued();

@@ -417,4 +417,8 @@ namespace mongo {
 
         return all;
     }
+
+    int WiredTigerKVEngine::reconfigure(const char* str) {
+        return _conn->reconfigure(_conn, str);
+    }
 }

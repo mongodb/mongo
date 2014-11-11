@@ -39,6 +39,7 @@ if wiredtiger:
             'wiredtiger_global_options.cpp',
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
+            'wiredtiger_parameters.cpp',
             'wiredtiger_server_status.cpp',
             ],
         LIBDEPS=['storage_wiredtiger_core',
