@@ -148,7 +148,7 @@ wts_ops(void)
 		track("ops", 0ULL, &total);
 		if (!running)
 			break;
-		(void)usleep(100000);		/* 1/10th of a second */
+		(void)usleep(250000);		/* 1/4th of a second */
 		if (tenths != 0)
 			--tenths;
 	}
