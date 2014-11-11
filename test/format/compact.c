@@ -56,11 +56,11 @@ compact(void *arg)
 	 */
 	for (period = MMRAND(1, 15);; period = 23) {
 		/* Sleep for short periods so we don't make the run wait. */
-		while (period > 0 && !g.threads_finished) {
+		while (period > 0 && !g.workers_finished) {
 			--period;
 			sleep(1);
 		}
-		if (g.threads_finished)
+		if (g.workers_finished)
 			break;
 
 		if ((ret = session->compact(

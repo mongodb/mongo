@@ -183,7 +183,7 @@ main(int argc, char *argv[])
 		wts_verify("post-bulk verify");	/* Verify */
 
 						/* Loop reading & operations */
-		for (reps = 0; reps < 3; ++reps) {
+		for (reps = 0; reps < FORMAT_OPERATION_REPS; ++reps) {
 			wts_read_scan();	/* Read scan */
 
 			if (g.c_ops != 0)	/* Random operations */

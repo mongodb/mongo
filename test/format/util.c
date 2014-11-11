@@ -199,10 +199,20 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 		    msg, sizeof(msg), "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt);
 	else
 		len = snprintf(msg, sizeof(msg),
-		    "%4d: %s: " "search %" PRIu64
-		    ", insert %" PRIu64 ", update %" PRIu64 ", remove %" PRIu64,
+		    "%4d: %s: "
+		    "search %" PRIu64 "%s, "
+		    "insert %" PRIu64 "%s, "
+		    "update %" PRIu64 "%s, "
+		    "remove %" PRIu64 "%s",
 		    g.run_cnt, tag,
-		    tinfo->search, tinfo->insert, tinfo->update, tinfo->remove);
+		    tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
+		    tinfo->search > M(9) ? "M" : "",
+		    tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
+		    tinfo->insert > M(9) ? "M" : "",
+		    tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
+		    tinfo->update > M(9) ? "M" : "",
+		    tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
+		    tinfo->remove > M(9) ? "M" : "");
 
 	if (lastlen > len) {
 		memset(msg + len, ' ', (size_t)(lastlen - len));
