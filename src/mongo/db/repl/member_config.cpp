@@ -117,23 +117,17 @@ namespace {
         // Parse votes field.
         //
         BSONElement votesElement = mcfg[kVotesFieldName];
-        int votes;
         if (votesElement.eoo()) {
-            votes = kVotesFieldDefault;
+            _votes = kVotesFieldDefault;
         }
         else if (votesElement.isNumber()) {
-            votes = votesElement.numberInt();
+            _votes = votesElement.numberInt();
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << kVotesFieldName <<
                           " field value has non-numeric type " <<
                           typeName(votesElement.type()));
         }
-        if (votes != 0 && votes != 1) {
-            return Status(ErrorCodes::BadValue, str::stream() << kVotesFieldName <<
-                          " field value is " << votesElement.numberInt() << " but must be 0 or 1");
-        }
-        _isVoter = bool(votes);
 
         //
         // Parse priority field.
@@ -224,7 +218,7 @@ namespace {
         
         // Add a voter tag if this non-arbiter member votes; use _id for uniquity.
         const std::string id = str::stream() << _id;
-        if (_isVoter && !_arbiterOnly) {
+        if (isVoter() && !_arbiterOnly) {
             _tags.push_back(tagConfig->makeTag(kInternalVoterTagName, id));
         }
 
@@ -251,11 +245,15 @@ namespace {
             return Status(ErrorCodes::BadValue, str::stream() << kPriorityFieldName <<
                           " field value of " << _priority << " is out of range");
         }
+        if (_votes != 0 && _votes != 1) {
+            return Status(ErrorCodes::BadValue, str::stream() << kVotesFieldName <<
+                          " field value is " << _votes << " but must be 0 or 1");
+        }
         if (_arbiterOnly) {
             if (!_tags.empty()) {
                 return Status(ErrorCodes::BadValue, "Cannot set tags on arbiters.");
             }
-            if (!_isVoter) {
+            if (!isVoter()) {
                 return Status(ErrorCodes::BadValue, "Arbiter must vote (cannot have 0 votes)");
             }
         }

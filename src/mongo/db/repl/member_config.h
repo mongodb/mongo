@@ -110,7 +110,7 @@ namespace repl {
         /**
          * Returns true if this member may vote in elections.
          */
-        bool isVoter() const { return _isVoter; }
+        bool isVoter() const { return _votes != 0; }
 
         /**
          * Returns the number of votes that this member gets.
@@ -168,7 +168,7 @@ namespace repl {
         int _id;
         HostAndPort _host;
         double _priority;      // 0 means can never be primary
-        bool _isVoter;       // Can this member vote? default true.
+        int _votes;            // Can this member vote? Only 0 and 1 are valid.  Default 1.
         bool _arbiterOnly;
         Seconds _slaveDelay;
         bool _hidden;          // if set, don't advertise to drivers in isMaster.
