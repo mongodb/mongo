@@ -166,6 +166,9 @@ namespace mongo {
                         if (execStats.hasField("totalDocsExamined")) {
                             docsExamined += execStats["totalDocsExamined"].numberLong();
                         }
+                        if (execStats.hasField("executionTimeMillis")) {
+                            millis += execStats["executionTimeMillis"].numberLong();
+                        }
                     }
                     else {
                         // Here we assume that the shard gave us back explain 1.0 style output.
@@ -178,9 +181,25 @@ namespace mongo {
                         if (temp.hasField("nscannedObjects")) {
                             docsExamined += temp["nscannedObjects"].numberLong();
                         }
+                        if (temp.hasField("millis")) {
+                            millis += temp["millis"].numberLong();
+                        }
+                        if (String == temp["cursor"].type()) {
+                            if (cursorType.empty()) {
+                                cursorType = temp["cursor"].String();
+                            }
+                            else if (cursorType != temp["cursor"].String()) {
+                                cursorType = "multiple";
+                            }
+                        }
+                        if (Object == temp["indexBounds"].type()) {
+                            indexBounds = temp["indexBounds"].Obj();
+                        }
+                        if (Object == temp["oldPlan"].type()) {
+                            oldPlan = temp["oldPlan"].Obj();
+                        }
                     }
 
-                    millis += temp["executionStats"]["executionTimeMillis"].numberLong();
                     numExplains++;
                 }
                 y.done();
@@ -188,11 +207,13 @@ namespace mongo {
             x.done();
         }
 
-        b.append( "cursor" , cursorType );
+        if ( !cursorType.empty() ) {
+            b.append( "cursor" , cursorType );
+        }
 
-        b.appendNumber( "nReturned" , nReturned );
-        b.appendNumber( "totalKeysExamined" , keysExamined );
-        b.appendNumber( "totalDocsExamined" , docsExamined );
+        b.appendNumber( "n" , nReturned );
+        b.appendNumber( "nscanned" , keysExamined );
+        b.appendNumber( "nscannedObjects" , docsExamined );
 
         b.appendNumber( "millisShardTotal" , millis );
         b.append( "millisShardAvg" , 
