@@ -45,7 +45,7 @@ type IngestOptions struct {
 	// Use this option if the _id fields in the existing documents don’t match
 	// the field in the document, but another field or field combination can
 	// uniquely identify documents as a basis for performing upsert operations.
-	UpsertFields string `long:"upsertFields" description:" comma-separated fields for the query part of the upsert. You should make sure this is indexed"`
+	UpsertFields string `long:"upsertFields" description:"comma-separated fields for the query part of the upsert. You should make sure this is indexed"`
 
 	// Forces mongoimport to halt the import operation at the first error
 	// rather than continuing the operation despite errors.
@@ -71,7 +71,7 @@ type IngestOptions struct {
 
 	// Specifies the write concern for each write operation that mongorestore writes to the target database.
 	// By default, mongoimport waits for a majority of members from the replica set to respond before returning.
-	WriteConcern string `long:"w" default:"majority" description:"minimum number of replicas per write"`
+	WriteConcern string `long:"w" default:"majority" description:"write concern options e.g. --w majority, --w '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 }
 
 func (self *IngestOptions) Name() string {

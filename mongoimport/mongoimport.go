@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -259,10 +258,10 @@ func (mongoImport *MongoImport) getSourceReader() (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Logf(log.Info, "filesize: %v", fileStat.Size())
+		log.Logf(log.Info, "filesize: %v bytes", fileStat.Size())
 		return file, err
 	}
-	log.Logf(log.Info, "filesize: 0")
+	log.Logf(log.Info, "filesize: 0 bytes")
 	return os.Stdin, nil
 }
 
@@ -292,16 +291,11 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 // work by taking data from the inputReader source and writing it to the
 // appropriate namespace
 func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImported uint64, retErr error) {
-	connURL := mongoImport.ToolOptions.Host
-	if connURL == "" {
-		connURL = util.DefaultHost
-	}
-	var readErr error
 	session, err := mongoImport.SessionProvider.GetSession()
 	if err != nil {
 		return 0, fmt.Errorf("error connecting to mongod: %v", err)
 	}
-	mongoImport.configureSession(session)
+	var readErr error
 	defer func() {
 		session.Close()
 		if readErr != nil && readErr == io.EOF {
@@ -312,6 +306,10 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 		}
 	}()
 
+	connURL := mongoImport.ToolOptions.Host
+	if connURL == "" {
+		connURL = util.DefaultHost
+	}
 	if mongoImport.ToolOptions.Port != "" {
 		connURL = connURL + ":" + mongoImport.ToolOptions.Port
 	}
@@ -320,6 +318,17 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	log.Logf(log.Info, "ns: %v.%v",
 		mongoImport.ToolOptions.Namespace.DB,
 		mongoImport.ToolOptions.Namespace.Collection)
+
+	// check if the server is a replica set
+	mongoImport.isReplicaSet, err = mongoImport.SessionProvider.IsReplicaSet()
+	if err != nil {
+		return 0, fmt.Errorf("error checking if server is part of a replicaset: %v", err)
+	}
+	log.Logf(log.Info, "is replica set: %v", mongoImport.isReplicaSet)
+
+	if err = mongoImport.configureSession(session); err != nil {
+		return 0, fmt.Errorf("error configuring session: %v", err)
+	}
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
@@ -371,13 +380,6 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 // IngestDocuments takes a slice of documents and either inserts/upserts them -
 // based on whether an upsert is requested - into the given collection
 func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error) {
-	// check if the server is a replica set
-	mongoImport.isReplicaSet, err = mongoImport.SessionProvider.IsReplicaSet()
-	if err != nil {
-		return fmt.Errorf("error checking if server is part of a replicaset: %v", err)
-	}
-	log.Logf(log.Info, "is replica set: %v", mongoImport.isReplicaSet)
-
 	numDecodingWorkers := *mongoImport.IngestOptions.NumInsertionWorkers
 
 	// initialize the tomb where all goroutines go to die
@@ -403,32 +405,21 @@ func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error
 // settings. It does the following configurations:
 //
 // 1. Sets the session to not timeout
-// 2. Sets 'w' for the write concern
+// 2. Sets the write concern on the session
 //
-func (mongoImport *MongoImport) configureSession(session *mgo.Session) {
+// returns an error if it's unable to set the write concern
+func (mongoImport *MongoImport) configureSession(session *mgo.Session) error {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
-
-	sessionSafety := &mgo.Safe{}
-	intWriteConcern, err := strconv.Atoi(mongoImport.IngestOptions.WriteConcern)
+	sessionSafety, err := util.BuildWriteConcern(
+		mongoImport.IngestOptions.WriteConcern,
+		mongoImport.isReplicaSet,
+	)
 	if err != nil {
-		log.Logf(log.Info, "using wmode write concern: %v", mongoImport.IngestOptions.WriteConcern)
-		sessionSafety.WMode = mongoImport.IngestOptions.WriteConcern
-	} else {
-		log.Logf(log.Info, "using w write concern: %v", mongoImport.IngestOptions.WriteConcern)
-		sessionSafety.W = intWriteConcern
-	}
-
-	// handle fire-and-forget write concern
-	if sessionSafety.WMode == "" && sessionSafety.W == 0 {
-		sessionSafety = nil
-	} else if !mongoImport.isReplicaSet {
-		// for standalone mongod, only a write concern of 0/1 is needed
-		log.Logf(log.Info, "standalone server: setting write concern to 1")
-		sessionSafety.W = 1
-		sessionSafety.WMode = ""
+		return fmt.Errorf("write concern error: %v", err)
 	}
 	session.SetSafe(sessionSafety)
+	return nil
 }
 
 // ingestDocuments is a helper to IngestDocuments - it reads document off the
@@ -439,7 +430,9 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 		return fmt.Errorf("error connecting to mongod: %v", err)
 	}
 	defer session.Close()
-	mongoImport.configureSession(session)
+	if err = mongoImport.configureSession(session); err != nil {
+		return fmt.Errorf("error configuring session: %v", err)
+	}
 	collection := session.DB(mongoImport.ToolOptions.DB).C(mongoImport.ToolOptions.Collection)
 	ignoreBlanks := mongoImport.IngestOptions.IgnoreBlanks && mongoImport.InputOptions.Type != JSON
 	documentBytes := make([]byte, 0)
