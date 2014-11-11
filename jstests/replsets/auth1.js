@@ -46,7 +46,7 @@ var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
 print("restart 0 with keyFile");
 m = rs.restart(0, {"keyFile" : path+"key1"});
 print("restart 1 with keyFile");
-var s = rs.start(1, {"keyFile" : path+"key1"});
+var slave = rs.start(1, {"keyFile" : path+"key1"});
 print("restart 2 with keyFile");
 var s2 = rs.start(2, {"keyFile" : path+"key1"});
 
@@ -56,25 +56,24 @@ print("Initializing replSet with config: " + tojson(rs.getReplSetConfig()));
 result = m.getDB("admin").runCommand({replSetInitiate : rs.getReplSetConfig()});
 assert.eq(result.ok, 1, "couldn't initiate: "+tojson(result));
 
-var master = rs.getMaster().getDB("test");
+var master = rs.getMaster();
 wait(function() {
         var status = master.adminCommand({replSetGetStatus:1});
         return status.members && status.members[1].state == 2 && status.members[2].state == 2;
     });
 
-master.foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
+master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
 
 print("try some legal and illegal reads");
-var r = master.foo.findOne();
+var r = master.getDB("test").foo.findOne();
 assert.eq(r.x, 1);
 
-s.setSlaveOk();
-slave = s.getDB("test");
+slave.setSlaveOk();
 
 function doQueryOn(p) {
     var err = {};
     try {
-        r = p.foo.findOne();
+        r = p.getDB("test").foo.findOne();
     }
     catch(e) {
         if (typeof(JSON) != "undefined") {
@@ -96,16 +95,16 @@ printjson(master.adminCommand({replSetGetStatus : 1}));
 doQueryOn(master);
 
 
-result = slave.auth("bar", "baz");
+result = slave.getDB("test").auth("bar", "baz");
 assert.eq(result, 1);
 
-r = slave.foo.findOne();
+r = slave.getDB("test").foo.findOne();
 assert.eq(r.x, 1);
 
 
 print("add some data");
-master.auth("bar", "baz");
-var bulk = master.foo.initializeUnorderedBulkOp();
+master.getDB("test").auth("bar", "baz");
+var bulk = master.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
     bulk.insert({ x: i, foo: "bar" });
 }
@@ -114,27 +113,11 @@ assert.writeOK(bulk.execute({ w: 3, wtimeout: 60000 }));
 print("fail over");
 rs.stop(0);
 
-wait(function() {
-        function getMaster(s) {
-            var result = s.getDB("admin").runCommand({isMaster: 1});
-            printjson(result);
-            if (result.ismaster) {
-                master = s.getDB("test");
-                return true;
-            }
-            return false;
-        }
-
-        if (getMaster(s) || getMaster(s2)) {
-            return true;
-        }
-        return false;
-    });
-
+master = rs.getMaster();
 
 print("add some more data 1");
-master.auth("bar", "baz");
-bulk = master.foo.initializeUnorderedBulkOp();
+master.getDB("test").auth("bar", "baz");
+bulk = master.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
     bulk.insert({ x: i, foo: "bar" });
 }
@@ -142,10 +125,10 @@ assert.writeOK(bulk.execute({ w: 2 }));
 
 print("resync");
 rs.restart(0, {"keyFile" : path+"key1"});
-
+master = rs.getMaster();
 
 print("add some more data 2");
-bulk = master.foo.initializeUnorderedBulkOp();
+bulk = master.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
     bulk.insert({ x: i, foo: "bar" });
 }
@@ -156,8 +139,8 @@ var conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null,
 conn.start();
 
 
-master.getSisterDB("admin").auth("foo", "bar");
-var config = master.getSisterDB("local").system.replset.findOne();
+master.getDB("admin").auth("foo", "bar");
+var config = master.getDB("local").system.replset.findOne();
 config.members.push({_id : 3, host : rs.host+":"+port[3]});
 config.version++;
 try {
@@ -166,8 +149,8 @@ try {
 catch (e) {
     print("error: "+e);
 }
-reconnect(master);
-master.getSisterDB("admin").auth("foo", "bar");
+master = rs.getMaster();
+master.getDB("admin").auth("foo", "bar");
 
 
 print("shouldn't ever sync");
