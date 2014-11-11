@@ -53,5 +53,8 @@ function test(t) {
 // test on non-oplog
 test(db.jstests_query_oplogreplay);
 
+// Temporarily disabling: can no longer drop oplog if replicating.  SERVER-8511.
+/*
 // test on real oplog
 test(db.getSiblingDB('local').oplog.jstests_query_oplogreplay);
+*/
