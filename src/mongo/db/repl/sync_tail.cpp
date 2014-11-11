@@ -340,8 +340,10 @@ namespace repl {
     // Doles out all the work to the writer pool threads and waits for them to complete
     OpTime SyncTail::multiApply( std::deque<BSONObj>& ops) {
 
-        // Use a ThreadPool to prefetch all the operations in a batch.
-        prefetchOps(ops);
+        if (getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+            // Use a ThreadPool to prefetch all the operations in a batch.
+            prefetchOps(ops);
+        }
         
         std::vector< std::vector<BSONObj> > writerVectors(replWriterThreadCount);
         fillWriterVectors(ops, &writerVectors);
