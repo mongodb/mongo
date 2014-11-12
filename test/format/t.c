@@ -186,7 +186,8 @@ main(int argc, char *argv[])
 		for (reps = 0; reps < FORMAT_OPERATION_REPS; ++reps) {
 			wts_read_scan();	/* Read scan */
 
-			if (g.c_ops != 0)	/* Random operations */
+						/* Operations */
+			if (g.c_timer != 0 || g.c_ops != 0)
 				wts_ops();
 
 			/*
@@ -203,8 +204,9 @@ main(int argc, char *argv[])
 			wts_verify("post-ops verify");
 
 			/*
-			 * If no operations scheduled, quit after a single
-			 * read pass.
+			 * If no operation count, quit after a single read pass.
+			 * (A timer configuration ran out the timer on the first
+			 * set of operations.)
 			 */
 			if (g.c_ops == 0)
 				break;
