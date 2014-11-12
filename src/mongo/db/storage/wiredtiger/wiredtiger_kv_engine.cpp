@@ -153,7 +153,7 @@ namespace mongo {
 
     void WiredTigerKVEngine::cleanShutdown(OperationContext* txn) {
         log() << "WiredTigerKVEngine shutting down";
-        syncSizeInfo();
+        syncSizeInfo(true);
         if (_conn) {
             // this must be the last thing we do before _conn->close();
             _sessionCache->shuttingDown();
@@ -172,7 +172,7 @@ namespace mongo {
         _sizeStorer->store( _uri( ident ),
                             originalRecordStore->numRecords( opCtx ),
                             originalRecordStore->dataSize( opCtx ) );
-        syncSizeInfo();
+        syncSizeInfo(true);
         return Status::OK();
     }
 
@@ -192,7 +192,7 @@ namespace mongo {
 
     int WiredTigerKVEngine::flushAllFiles( bool sync ) {
         LOG(1) << "WiredTigerKVEngine::flushAllFiles";
-        syncSizeInfo();
+        syncSizeInfo(true);
 
         WiredTigerSession session( _conn, -1 );
         WT_SESSION* s = session.getSession();
@@ -201,14 +201,14 @@ namespace mongo {
         return 1;
     }
 
-    void WiredTigerKVEngine::syncSizeInfo() const {
+    void WiredTigerKVEngine::syncSizeInfo( bool sync ) const {
         if ( !_sizeStorer )
             return;
 
         try {
             WiredTigerSession session( _conn, -1 );
             WT_SESSION* s = session.getSession();
-            invariantWTOK( s->begin_transaction( s, "sync=true" ) );
+            invariantWTOK( s->begin_transaction( s, sync ? "sync=true" : NULL ) );
             _sizeStorer->storeInto( &session, _sizeStorerUri );
             invariantWTOK( s->commit_transaction( s, NULL ) );
         }
@@ -326,7 +326,7 @@ namespace mongo {
     bool WiredTigerKVEngine::haveDropsQueued() const {
         if ( _sizeStorerSyncTracker.intervalHasElapsed() ) {
             _sizeStorerSyncTracker.resetLastTime();
-            syncSizeInfo();
+            syncSizeInfo(false);
         }
         boost::mutex::scoped_lock lk( _identToDropMutex );
         return !_identToDrop.empty();

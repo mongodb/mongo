@@ -112,7 +112,7 @@ namespace mongo {
 
         int currentEpoch() const { return _epoch; }
 
-        void syncSizeInfo() const;
+        void syncSizeInfo(bool sync) const;
 
     private:
 
