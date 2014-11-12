@@ -27,26 +27,25 @@ function makepoints(needle) {
 }
 
 function runTest(index) {
-    t.ensureIndex(index)
-    // If both tests take longer than this, then we will error.  This is intentional
-    // since the tests shouldn't take that long.
-    mintime = 100000.0;
-    resultcount = 0;
-    iterations = 10;
-    for (var x = 0; x < iterations; ++x) {
-        res = t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0,0], Math.PI/180.0]}}})
-        if (res.explain("executionStats").executionStats.executionTimeMillis < mintime) {
-            mintime = res.explain("executionStats").executionStats.executionTimeMillis;
-            resultcount = res.itcount()
-        }
-    }
-    t.dropIndex(index)
-    return {time: mintime, results: resultcount}
+    t.ensureIndex(index);
+    var resultcount = 0;
+    var cursor = t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0,0], Math.PI/180.0]}}});
+
+    var stats = cursor.explain("executionStats").executionStats;
+    t.dropIndex(index);
+    return stats;
 }
 
 makepoints(needle)
 // Indexing non-geo first should be quicker.
 fast = runTest({nongeo: 1, geo: "2dsphere"})
 slow = runTest({geo: "2dsphere", nongeo: 1})
-assert.eq(fast.results, slow.results)
-assert(fast.time < slow.time)
+// The nReturned should be the same
+assert.eq(fast.nReturned, 1);
+assert.eq(slow.nReturned, 1);
+// Only one document is examined, since we use index.
+assert.eq(fast.totalDocsExamined, 1);
+assert.eq(slow.totalDocsExamined, 1);
+// The ordering actually matters for lookup speed.
+// totalKeysExamined is a direct measure of its speed.
+assert.lt(fast.totalKeysExamined, slow.totalKeysExamined);
