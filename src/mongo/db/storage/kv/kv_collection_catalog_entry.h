@@ -79,6 +79,8 @@ namespace mongo {
         RecordStore* getRecordStore() { return _recordStore.get(); }
         const RecordStore* getRecordStore() const { return _recordStore.get(); }
 
+        void closeRecordStore() { _recordStore.reset(); }
+
     protected:
         virtual MetaData _getMetaData( OperationContext* txn ) const;
 

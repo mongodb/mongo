@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -72,6 +73,8 @@ namespace mongo {
     }
 
     void KVStorageEngine::cleanShutdown(OperationContext* txn) {
+        BSONObjBuilder closeResult;
+        dbHolder().closeAll(txn, closeResult, true);
 
         for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
             delete it->second;
