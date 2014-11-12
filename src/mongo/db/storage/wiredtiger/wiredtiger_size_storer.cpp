@@ -128,12 +128,12 @@ namespace mongo {
                 WT_ITEM value;
                 invariantWTOK( c->get_key(c, &key ) );
                 invariantWTOK( c->get_value(c, &value ) );
-                string uri( reinterpret_cast<const char*>( key.data ), key.size );
+                std::string uriKey( reinterpret_cast<const char*>( key.data ), key.size );
                 BSONObj data( reinterpret_cast<const char*>( value.data ) );
 
-                LOG(2) << "WiredTigerSizeStorer::loadFrom " << uri << " -> " << data;
+                LOG(2) << "WiredTigerSizeStorer::loadFrom " << uriKey << " -> " << data;
 
-                Entry& e = m[uri];
+                Entry& e = m[uriKey];
                 e.numRecords = data["numRecords"].safeNumberLong();
                 e.dataSize = data["dataSize"].safeNumberLong();
                 e.dirty = false;
@@ -152,7 +152,7 @@ namespace mongo {
         {
             boost::mutex::scoped_lock lk( _entriesMutex );
             for ( Map::iterator it = _entries.begin(); it != _entries.end(); ++it ) {
-                string uri = it->first;
+                std::string uriKey = it->first;
                 Entry& entry = it->second;
                 if ( entry.rs ) {
                     if ( entry.dataSize != entry.rs->dataSize( NULL ) ) {
@@ -167,7 +167,7 @@ namespace mongo {
 
                 if ( !entry.dirty )
                     continue;
-                myMap[uri] = entry;
+                myMap[uriKey] = entry;
             }
         }
 
@@ -181,7 +181,7 @@ namespace mongo {
         invariantWTOK( ret );
 
         for ( Map::iterator it = myMap.begin(); it != myMap.end(); ++it ) {
-            string uri = it->first;
+            string uriKey = it->first;
             Entry& entry = it->second;
 
             BSONObj data;
@@ -192,9 +192,9 @@ namespace mongo {
                 data = b.obj();
             }
 
-            LOG(2) << "WiredTigerSizeStorer::storeInto " << uri << " -> " << data;
+            LOG(2) << "WiredTigerSizeStorer::storeInto " << uriKey << " -> " << data;
 
-            WiredTigerItem key( uri.c_str(), uri.size() );
+            WiredTigerItem key( uriKey.c_str(), uriKey.size() );
             WiredTigerItem value( data.objdata(), data.objsize() );
             c->set_key( c, key.Get() );
             c->set_value( c, value.Get() );

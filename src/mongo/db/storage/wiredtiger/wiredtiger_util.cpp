@@ -72,14 +72,14 @@ namespace mongo {
     }
 
 
-    Status WiredTigerUtil::exportTableToBSON(WT_SESSION* s,
+    Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                              const std::string& uri, const std::string& config,
                                              BSONObjBuilder* bob) {
-        invariant(s);
+        invariant(session);
         invariant(bob);
         WT_CURSOR* c = NULL;
         const char *cursorConfig = config.empty() ? NULL : config.c_str();
-        int ret = s->open_cursor(s, uri.c_str(), NULL, cursorConfig, &c);
+        int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &c);
         if (ret != 0) {
             return Status(ErrorCodes::CursorNotFound, str::stream()
                 << "unable to open cursor at URI " << uri
