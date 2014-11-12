@@ -20,11 +20,6 @@ type BSONDump struct {
 	Out             io.Writer
 }
 
-func (bd *BSONDump) ValidateSettings() error {
-	//TODO
-	return nil
-}
-
 func (bd *BSONDump) init() (*db.BSONSource, error) {
 	file, err := os.Open(bd.FileName)
 	if err != nil {
@@ -87,6 +82,14 @@ func (bd *BSONDump) Debug() error {
 			break
 		}
 		result.Data = reusableBuf[0:docSize]
+
+		if bd.BSONDumpOptions.ObjCheck && !bd.BSONDumpOptions.NoObjCheck {
+			validated := bson.M{}
+			err := bson.Unmarshal(result.Data, &validated)
+			if err != nil {
+				return fmt.Errorf("Failed to validate bson during objcheck: %v", err)
+			}
+		}
 		err = DebugBSON(result, 0, bd.Out)
 		if err != nil {
 			return err
@@ -119,7 +122,7 @@ func DebugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 		// So size == 1 [size of type byte] +  1 [null byte for cstring key] + len(bson key) + len(bson value)
 		// see http://bsonspec.org/spec.html for more details
 		fmt.Fprintf(out, "%v\t\t\ttype: %4v size: %v\n", indent, rawElem.Value.Kind,
-			2 + len(rawElem.Name) + len(rawElem.Value.Data) )
+			2+len(rawElem.Name)+len(rawElem.Value.Data))
 
 		//For nested objects or arrays, recurse.
 		if rawElem.Value.Kind == 0x03 || rawElem.Value.Kind == 0x04 {

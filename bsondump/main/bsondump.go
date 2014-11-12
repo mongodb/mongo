@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/bsondump"
 	"github.com/mongodb/mongo-tools/bsondump/options"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"os"
 )

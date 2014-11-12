@@ -1,9 +1,9 @@
 package options
 
 type BSONDumpOptions struct {
-	Filter string `long:"filter" description:"filter documents according to matcher expression"`
-	Type   string `long:"type" default:"json" description:"type of output: json, debug"`
-	//ObjCheck TODO ?
+	Type       string `long:"type" default:"json" description:"type of output: json, debug"`
+	ObjCheck   bool   `long:"objcheck" description:"validate bson during processing"`
+	NoObjCheck bool   `long:"noobjcheck" description:"don't validate bson during processing"`
 }
 
 func (self *BSONDumpOptions) Name() string {
