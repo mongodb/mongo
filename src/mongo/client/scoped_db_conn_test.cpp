@@ -88,7 +88,7 @@ namespace mongo {
         quickExit(rc);
     }
 
-    void exitCleanly(ExitCode rc, OperationContext* txn) {
+    void exitCleanly(ExitCode rc) {
         dbexit(rc, "");
     }
 

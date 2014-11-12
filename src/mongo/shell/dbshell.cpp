@@ -181,7 +181,7 @@ namespace mongo {
     void Client::initThread(const char *desc, mongo::AbstractMessagingPort *mp) {}
     void logProcessDetailsForLogRotate() {}
 
-    void exitCleanly( ExitCode code, OperationContext* txn ) {
+    void exitCleanly(ExitCode code) {
         {
             mongo::mutex::scoped_lock lk(mongo::shell_utils::mongoProgramOutputMutex);
             mongo::dbexitCalled = true;

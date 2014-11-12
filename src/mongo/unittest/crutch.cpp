@@ -60,7 +60,7 @@ namespace mongo {
         invariant(!"unittests shouldn't call dbexit");
     }
 
-    void exitCleanly( ExitCode code, OperationContext* txn ) {
+    void exitCleanly(ExitCode code) {
         invariant(!"unittests shouldn't call exitCleanly");
     }
 

@@ -479,7 +479,7 @@ int main(int argc, char* argv[], char** envp) {
 
 #undef exit
 
-void mongo::exitCleanly( ExitCode code, OperationContext* txn ) {
+void mongo::exitCleanly(ExitCode code) {
     // TODO: do we need to add anything?
     mongo::dbexit( code );
 }

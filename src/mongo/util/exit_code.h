@@ -61,9 +61,8 @@ namespace mongo {
     /**
      * Exit the current executable doing whatever cleanup is necessary.
      * Defined differently in different executables.
-     *
-     * If txn is NULL, an OperationContext will be constructed if necessary for clean shutdown.
+     * No database locks must be held by the thread when this function is called.
      */
-    void exitCleanly( ExitCode code, OperationContext* txn = NULL );
+    void exitCleanly(ExitCode code);
 
 }  // namespace mongo

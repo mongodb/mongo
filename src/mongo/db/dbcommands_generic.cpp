@@ -304,7 +304,7 @@ namespace mongo {
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    bool CmdShutdown::shutdownHelper(OperationContext* txn) {
+    void CmdShutdown::shutdownHelper() {
         MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
             const std::string crashHow = crashBlock.getData()["how"].str();
             if (crashHow == "fault") {
@@ -319,7 +319,7 @@ namespace mongo {
 
         log() << "terminating, shutdown command received" << endl;
 
-        exitCleanly( EXIT_CLEAN, txn ); // this never returns
+        exitCleanly(EXIT_CLEAN); // this never returns
         invariant(false);
     }
 
