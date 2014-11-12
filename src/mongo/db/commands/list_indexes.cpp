@@ -56,7 +56,7 @@ namespace mongo {
      */
     class CmdListIndexes : public Command {
     public:
-        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual bool isWriteCommandForConfigServer() const { return false; }

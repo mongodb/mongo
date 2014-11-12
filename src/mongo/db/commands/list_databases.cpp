@@ -44,7 +44,7 @@ namespace mongo {
     class CmdListDatabases : public Command {
     public:
         virtual bool slaveOk() const {
-            return true;
+            return false;
         }
         virtual bool slaveOverrideOk() const {
             return true;

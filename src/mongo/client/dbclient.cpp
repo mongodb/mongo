@@ -865,7 +865,10 @@ namespace mongo {
 
     list<string> DBClientWithCommands::getDatabaseNames() {
         BSONObj info;
-        uassert( 10005 ,  "listdatabases failed" , runCommand( "admin" , BSON( "listDatabases" << 1 ) , info ) );
+        uassert(10005, "listdatabases failed", runCommand("admin",
+                                                          BSON("listDatabases" << 1),
+                                                          info,
+                                                          QueryOption_SlaveOk));
         uassert( 10006 ,  "listDatabases.databases not array" , info["databases"].type() == Array );
 
         list<string> names;
@@ -898,7 +901,10 @@ namespace mongo {
 
         {
             BSONObj res;
-            if ( runCommand( db, BSON( "listCollections" << 1 << "filter" << filter ), res ) ) {
+            if (runCommand(db,
+                           BSON("listCollections" << 1 << "filter" << filter),
+                           res,
+                           QueryOption_SlaveOk)) {
                 BSONObj collections = res["collections"].Obj();
                 BSONObjIterator it( collections );
                 while ( it.more() ) {

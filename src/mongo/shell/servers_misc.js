@@ -211,11 +211,18 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     var o = this.getOptions( master , options , restart, norepl );
 
     if (restart) {
-        return startMongoProgram.apply(null, o);
+        var conn = startMongoProgram.apply(null, o);
+        if (!master) {
+            conn.setSlaveOk();
+        }
+        return conn;
     } else {
         var conn = startMongod.apply(null, o);
         if (jsTestOptions().keyFile || jsTestOptions().auth || jsTestOptions().useX509) {
             jsTest.authenticate(conn);
+        }
+        if (!master) {
+            conn.setSlaveOk();
         }
         return conn;
     }
