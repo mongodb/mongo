@@ -77,7 +77,9 @@ wts_ops(void)
 	 */
 	if (g.c_timer == 0) {
 		tenths = 0;
-		thread_ops = 100 + g.c_ops / g.c_threads;
+		if (g.c_ops < g.c_threads)
+			g.c_ops = g.c_threads;
+		thread_ops = g.c_ops / g.c_threads;
 	} else {
 		tenths = (g.c_timer * 10 * 60) / FORMAT_OPERATION_REPS;
 		thread_ops = 0;
