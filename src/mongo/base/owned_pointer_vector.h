@@ -94,8 +94,14 @@ namespace mongo {
          */
         void erase(const_iterator it) {
             delete *it;
-            // vector::erase(const_iterator) is new in c++11, so converting to non-const iterator.
-            _vector.erase(_vector.begin() + (it - begin()));
+            _vector.erase(toNonConstIter(it));
+        }
+
+        void erase(const_iterator begin, const_iterator end) {
+            for (const_iterator it = begin; it != end; ++it) {
+                delete *it;
+            }
+            _vector.erase(toNonConstIter(begin), toNonConstIter(end));
         }
 
         //
@@ -136,6 +142,12 @@ namespace mongo {
         }
 
     private:
+        typename std::vector<T*>::iterator toNonConstIter(const_iterator it) {
+            // This is needed for a few cases where c++03 vectors require non-const iterators that
+            // were relaxed in c++11 to allow const_iterators. It can go away when we require c++11.
+            return _vector.begin() + (it - begin());
+        }
+
         std::vector<T*> _vector;
     };
 

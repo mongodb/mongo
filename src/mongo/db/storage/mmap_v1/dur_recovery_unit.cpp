@@ -99,7 +99,7 @@ namespace mongo {
         if (getDur().isDurable())
             pushChangesToDurSubSystem();
 
-        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit();
         }
 
@@ -202,7 +202,7 @@ namespace mongo {
 
     void DurRecoveryUnit::registerChange(Change* change) {
         invariant(inAUnitOfWork());
-        _changes.push_back(ChangePtr(change));
+        _changes.push_back(change);
     }
 
 }  // namespace mongo

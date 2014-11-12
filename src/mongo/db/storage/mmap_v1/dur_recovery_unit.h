@@ -26,9 +26,9 @@
  *    it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/compiler.h"
 
@@ -81,8 +81,7 @@ namespace mongo {
         OperationContext* _txn;
 
         // Changes are ordered from oldest to newest.
-        typedef boost::shared_ptr<Change> ChangePtr;
-        typedef std::vector<ChangePtr> Changes;
+        typedef OwnedPointerVector<Change> Changes;
         Changes _changes;
 
         // These are memory writes inside the mmapv1 mmaped files. Writes are ordered from oldest to

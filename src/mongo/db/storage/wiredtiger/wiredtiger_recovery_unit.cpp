@@ -105,7 +105,7 @@ namespace mongo {
             _txnClose( true );
         }
 
-        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit();
         }
         _changes.clear();
@@ -116,7 +116,7 @@ namespace mongo {
             _txnClose( false );
         }
 
-        for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
                 it != end; ++it) {
             (*it)->rollback();
         }
@@ -162,7 +162,7 @@ namespace mongo {
 
     void WiredTigerRecoveryUnit::registerChange(Change* change) {
         invariant(_depth > 0);
-        _changes.push_back(ChangePtr(change));
+        _changes.push_back(change);
     }
 
     WiredTigerRecoveryUnit* WiredTigerRecoveryUnit::get(OperationContext *txn) {
