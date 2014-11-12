@@ -261,12 +261,14 @@ DB.prototype.cloneCollection = function(from, collection, query) {
   * @return Object returned has member ok set to true if operation succeeds, false otherwise.
   * See also: db.clone()
 */
-DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password) { 
+DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password, mechanism) {
     assert( isString(fromdb) && fromdb.length );
     assert( isString(todb) && todb.length );
     fromhost = fromhost || "";
 
-    var mechanism = this._getDefaultAuthenticationMechanism();
+    if (!mechanism) {
+        mechanism = this._getDefaultAuthenticationMechanism();
+    }
     assert(mechanism == "SCRAM-SHA-1" || mechanism == "MONGODB-CR");
 
     // Check for no auth or copying from localhost
