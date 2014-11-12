@@ -741,6 +741,9 @@ namespace repl {
         // (X)  Reads and writes must be performed in a callback in _replExecutor
         // (MX) Must hold _mutex and be in a callback in _replExecutor to write; must either hold
         //      _mutex or be in a callback in _replExecutor to read.
+        // (GX) Readable under a global intent lock or from the executor context.  Must either hold
+        //      global lock in exclusive mode (MODE_X) or both hold global lock in shared
+        //      mode (MODE_S) and be in executor context to write.
         // (I)  Independently synchronized, see member variable comment.
 
         // Protects member data of this ReplicationCoordinator.
@@ -843,6 +846,10 @@ namespace repl {
 
         // Whether we slept last time we attempted an election but possibly tied with other nodes.
         bool _sleptLastElection;                                                          // (X)
+
+        // Flag that indicates whether writes to databases other than "local" are allowed.  Used
+        // to answer the canAcceptWritesForDatabase() question.
+        bool _canAcceptNonLocalWrites;                                                    // (GX)
     };
 
 } // namespace repl

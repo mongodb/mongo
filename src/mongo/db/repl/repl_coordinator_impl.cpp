@@ -147,7 +147,8 @@ namespace {
         _isWaitingForDrainToComplete(false),
         _rsConfigState(kConfigPreStart),
         _thisMembersConfigIndex(-1),
-        _sleptLastElection(false) {
+        _sleptLastElection(false),
+        _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)) {
 
         if (!isReplEnabled()) {
             return;
@@ -507,9 +508,10 @@ namespace {
         // 1.) Check to see if we're waiting for this signal.  If not, return early.
         // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
         //     since that might take a while (NB there's a deadlock cycle otherwise, too).
-        // 3.) Re-check to see if we've somehow left drain mode.  If we are, clear
-        //     _isWaitingForDrainToComplete and drop the mutex.  At this point, no writes
-        //     can occur from other threads, due to the global exclusive lock.
+        // 3.) Re-check to see if we've somehow left drain mode.  If we have not, clear
+        //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
+        //     drop the mutex.  At this point, no writes can occur from other threads, due to the
+        //     global exclusive lock.
         // 4.) Drop all temp collections.
         // 5.) Drop the global exclusive lock.
         //
@@ -532,6 +534,7 @@ namespace {
             return;
         }
         _isWaitingForDrainToComplete = false;
+        _canAcceptNonLocalWrites = true;
         lk.unlock();
         _externalState->dropAllTempCollections(txn.get());
         log() << "transition to primary complete; database writes are now permitted";
@@ -1189,32 +1192,20 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(const StringData& dbName) {
-        // we must check _settings since getReplicationMode() isn't aware of modeReplSet
-        // until a valid replica set config has been loaded
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        if (_settings.usingReplSets()) {
-            if (_getReplicationMode_inlock() == modeReplSet &&
-                    _getCurrentMemberState_inlock().primary() &&
-                    !_isWaitingForDrainToComplete) {
-                return true;
-            }
-            return dbName == "local";
-        }
-
-        if (!_settings.slave)
-            return true;
-
-        // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
-        if (replAllDead) {
-            return dbName == "local";
-        }
-
-        if (_settings.master) {
-            // if running with --master --slave, allow.
+        // _canAcceptNonLocalWrites is always true for standalone nodes, always false for nodes
+        // started with --slave, and adjusted based on primary+drain state in replica sets.
+        //
+        // That is, stand-alone nodes, non-slave nodes and drained replica set primaries can always
+        // accept writes.  Similarly, writes are always permitted to the "local" database.  Finally,
+        // in the event that a node is started with --slave and --master, we allow writes unless the
+        // master/slave system has set the replAllDead flag.
+        if (_canAcceptNonLocalWrites) {
             return true;
         }
-
-        return dbName == "local";
+        if (dbName == "local") {
+            return true;
+        }
+        return !replAllDead && _settings.master;
     }
 
     Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
@@ -1892,6 +1883,7 @@ namespace {
                 info->condVar->notify_all();
             }
             _isWaitingForDrainToComplete = false;
+            _canAcceptNonLocalWrites = false;
             result = kActionCloseAllConnections;
         }
         else {

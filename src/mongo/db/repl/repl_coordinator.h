@@ -210,6 +210,9 @@ namespace repl {
          * If a node was started with the replSet argument, but has not yet received a config, it
          * will not be able to receive writes to a database other than local (it will not be treated
          * as standalone node).
+         *
+         * NOTE: This function can only be meaningfully called while the caller holds the global
+         * lock in some mode other than MODE_NONE.
          */
         virtual bool canAcceptWritesForDatabase(const StringData& dbName) = 0;
 
