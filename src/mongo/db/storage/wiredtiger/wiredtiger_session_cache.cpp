@@ -164,7 +164,6 @@ namespace mongo {
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
-        boost::mutex::scoped_lock lk( _sessionLock );
         if (_shuttingDown)
             return; // leak session to avoid race condition.
 
@@ -184,6 +183,7 @@ namespace mongo {
             return;
         }
 
+        boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
 
