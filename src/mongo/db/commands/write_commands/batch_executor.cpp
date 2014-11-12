@@ -1274,14 +1274,12 @@ namespace mongo {
                 result->getStats().upsertedID = resUpsertedID;
             }
             catch ( const WriteConflictException& dle ) {
-                ++attempt;
                 if ( isMulti ) {
                     log() << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
 
-                LOG(attempt > 1 ? 0 : 1) << "Had WriteConflict doing update on " << nsString
-                                         << ", attempt: " << attempt << " retrying";
+                WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
 
                 createCollection = false;
                 // RESTART LOOP
@@ -1350,10 +1348,7 @@ namespace mongo {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
-                if ( attempt++ > 1 ) {
-                    log() << "Had WriteConflict doing delete on " << nss
-                          << ", attempt: " << attempt << " retrying";
-                }
+                WriteConflictException::logAndBackoff( attempt++, "delete", nss.ns() );
             }
             catch ( const DBException& ex ) {
                 Status status = ex.toStatus();

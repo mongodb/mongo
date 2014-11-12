@@ -3,6 +3,14 @@
 Import("env")
 
 env.Library(
+    target='write_conflict_exception',
+    source=[
+        'write_conflict_exception.cpp'
+        ],
+    LIBDEPS=[]
+)
+
+env.Library(
     target='lock_mgr',
     source=[
         'd_concurrency.cpp',

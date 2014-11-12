@@ -1,4 +1,4 @@
-// write_conflict_exception.h
+// write_conflict_exception.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,32 +28,36 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrites
 
-#include <exception>
-
-#include "mongo/util/assert_util.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-    /**
-     * This is thrown if during a write, two or more operations conflict with each other.
-     * For example if two operations get the same version of a document, and then both try to
-     * modify that document, this exception will get thrown by one of them.
-     */
-    class WriteConflictException : public DBException {
-    public:
-        WriteConflictException() : DBException( "WriteConflict", ErrorCodes::WriteConflict ){}
+    void WriteConflictException::logAndBackoff(int attempt,
+                                               const StringData& operation,
+                                               const StringData& ns) {
 
-        /**
-         * Will log a message if sensible and will do an exponential backoff to make sure
-         * we don't hammer the same doc over and over.
-         * @param attempt - what attempt is this, 1 based
-         * @param operation - e.g. "update"
-         */
-        static void logAndBackoff(int attempt,
-                                  const StringData& operation,
-                                  const StringData& ns);
-    };
+        bool logByDefault = attempt > 3;
+        LOG(logByDefault ? 0 : 1) << "Caught WriteConflictException doing " << operation
+                                  << " on " << ns
+                                  << ", attempt: " << attempt << " retrying";
+
+        // All numbers below chosen by guess and check against a few random benchmarks.
+        if (attempt < 2) {
+            // do nothing
+        }
+        else if (attempt < 5) {
+            sleepmillis(1);
+        }
+        else if (attempt < 100) {
+            sleepmillis(2);
+        }
+        else {
+            sleepmillis(10);
+        }
+
+    }
 
 }

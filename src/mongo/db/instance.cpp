@@ -596,10 +596,7 @@ namespace {
                     log(LogComponent::kWrites) << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
-                else if ( attempt++ > 1 ) {
-                    log(LogComponent::kWrites) << "Had WriteConflict doing update on " << ns
-                                               << ", attempt: " << attempt << " retrying";
-                }
+                WriteConflictException::logAndBackoff( attempt++, "update", ns.toString() );
             }
         }
 
@@ -674,10 +671,7 @@ namespace {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
-                if ( attempt++ > 1 ) {
-                    log(LogComponent::kWrites) << "Had WriteConflict doing delete on " << ns
-                                               << ", attempt: " << attempt << " retrying";
-                }
+                WriteConflictException::logAndBackoff( attempt++, "delete", ns.toString() );
             }
         }
     }
