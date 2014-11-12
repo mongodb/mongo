@@ -117,6 +117,10 @@ struct __wt_stats {
 		   session, &(session)->dhandle->stats, fld, value);	\
 } while (0)
 
+/* Connection handle statistics value. */
+#define	WT_CONN_STAT(session, fld)					\
+	WT_STAT(&S2C(session)->stats, fld)
+
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
