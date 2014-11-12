@@ -327,7 +327,10 @@ namespace mongo {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
             /* todo use getDatabaseNames() method here */
-            bool ok = oplogReader.conn()->runCommand( "admin", BSON( "listDatabases" << 1 ), info );
+            bool ok = oplogReader.conn()->runCommand("admin",
+                                                     BSON("listDatabases" << 1),
+                                                     info,
+                                                     QueryOption_SlaveOk);
             massert( 10385 ,  "Unable to get database list", ok );
         }
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
