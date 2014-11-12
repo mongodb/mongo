@@ -258,6 +258,12 @@ namespace mongo {
         }
     }
 
+    MONGO_CLIENT_API inline void massertNoTraceStatusOK(const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            msgassertedNoTrace((status.location() != 0 ? status.location() : status.code()),
+                        status.reason());
+        }
+    }
 
     /* same as massert except no msgid */
 #define MONGO_verify(_Expression) do {                                  \

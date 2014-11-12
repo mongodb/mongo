@@ -503,7 +503,7 @@ namespace mongo {
 
         Status status = _dbEntry->createCollection(txn, ns,
                                                 options, allocateDefaultSpace);
-        massertStatusOK(status);
+        massertNoTraceStatusOK(status);
 
         Collection* collection = getCollection(txn, ns);
         invariant(collection);
