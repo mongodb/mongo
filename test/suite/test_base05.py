@@ -123,13 +123,15 @@ class test_base05(wttest.WiredTigerTestCase):
 
     # 'Hello' in several languages that use the non-latin part of unicode
     non_english_strings = [
+        # This notation creates 'string' objects that have embedded unicode.
         '\u20320\u22909',
         '\u1571\u1604\u1587\u1617\u1604\u1575\u1605\u32\u1593\u1604\u1610\u1603\u1605',
         '\u1513\u1500\u1493\u1501',
         '\u20170\u26085\u12399',
         '\u50504\u45397\u54616\u49464\u50836',
         '\u1047\u1076\u1088\u1072\u1074\u1089\u1090\u1074\u1091\u1081\u1090\u1077',
-        "\u4306\u4304\u4315\u4304\u4320\u4335\u4317\u4305\u4304"
+        "\u4306\u4304\u4315\u4304\u4320\u4335\u4317\u4305\u4304",
+        u'Hello',  # This notation creates a 'unicode' type object.
         ]
 
     def mixed_string(self, n):
@@ -191,6 +193,50 @@ class test_base05(wttest.WiredTigerTestCase):
         self.assertEqual(total, self.nentries)
         self.assertEqual(0, len(numbers))
         cursor.close()
+
+    def do_test_table_base(self, convert):
+        """
+        Base functionality that uses regular strings with 
+        non-ASCII (UTF) chars and optionally converts them to
+        Unicode (considered a type separate from string in Python).
+        """
+        create_args = 'key_format=S,value_format=S,' + self.config_string()
+        self.session_create("table:" + self.table_name1, create_args)
+        self.pr('creating cursor')
+        cursor = self.session.open_cursor('table:' + self.table_name1)
+        strlist = self.non_english_strings
+        for i in range(0, len(strlist)):
+            if convert:
+                key = val = unicode(strlist[i])
+            else:
+                key = val = strlist[i]
+            cursor.set_key(key)
+            cursor.set_value(val)
+            cursor.insert()
+
+        for i in range(0, len(strlist)):
+            if convert:
+                key = val = unicode(strlist[i])
+            else:
+                key = val = strlist[i]
+            cursor.set_key(key)
+            self.assertEqual(0, cursor.search())
+            self.assertEqual(key, cursor.get_key())
+            self.assertEqual(val, cursor.get_value())
+
+    def test_table_string(self):
+        """
+        Create entries using regular strings that may have non-ASCII (UTF)
+        chars, and read back in a cursor: key=string, value=string
+        """
+        self.do_test_table_base(False)
+
+    def test_table_unicode(self):
+        """
+        Create entries using unicode strings,
+	and read back in a cursor: key=string, value=string
+        """
+        self.do_test_table_base(True)
 
 if __name__ == '__main__':
     wttest.run()

@@ -109,10 +109,11 @@ def pack(fmt, *values):
 				result += '\0' * size
 			# Note: no value, don't increment i
 		elif f in 'Ssu':
-			if f == 'S' and '\0' in values[i]:
-				l = values[i].find('\0')
+			val = values[i]
+			if f == 'S' and '\0' in val:
+				l = val.find('\0')
 			else:
-				l = len(values[i])
+				l = len(val)
 			if havesize:
 				if l > size:
 					l = size
@@ -120,7 +121,10 @@ def pack(fmt, *values):
 				havesize = size = 1
 			elif f == 'u' and offset != len(fmt) - 1:
 				result += pack_int(l)
-			result += values[i][:l]
+			if type(val) is unicode and f in 'Ss':
+				result += str(val[:l])
+			else:
+				result += val[:l]
 			if f == 'S' and not havesize:
 				result += '\0'
 			elif size > l:
