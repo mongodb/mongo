@@ -3257,13 +3257,13 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_CHECKPOINT			1101
 /*! transaction: transaction checkpoint currently running */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1102
-/*! transaction: transaction checkpoint maximum time */
+/*! transaction: transaction checkpoint max time (msecs) */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1103
-/*! transaction: transaction checkpoint minimum time */
+/*! transaction: transaction checkpoint min time (msecs) */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1104
-/*! transaction: transaction checkpoint most recent time */
+/*! transaction: transaction checkpoint most recent time (msecs) */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1105
-/*! transaction: transaction checkpoint total time */
+/*! transaction: transaction checkpoint total time (msecs) */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1106
 /*! transaction: transactions committed */
 #define	WT_STAT_CONN_TXN_COMMIT				1107

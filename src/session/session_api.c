@@ -817,27 +817,25 @@ __session_ckpt_stats(WT_SESSION_IMPL *session,
     struct timespec *start, struct timespec *stop)
 {
 	WT_CONNECTION_IMPL *conn;
-	uint64_t usec;
+	uint64_t msec;
 
 	conn = S2C(session);
 	/*
 	 * Get time diff in microseconds.
 	 */
-	usec = (WT_TIMEDIFF(*stop, *start) / 1000);
-	if (conn->ckpt_min_time == 0 || usec < conn->ckpt_min_time)
-		conn->ckpt_min_time = usec;
-	if (usec > conn->ckpt_max_time)
-		conn->ckpt_max_time = usec;
+	msec = (WT_TIMEDIFF(*stop, *start) / WT_MILLION);
+	if (conn->ckpt_min_time == 0 || msec < conn->ckpt_min_time)
+		conn->ckpt_min_time = msec;
+	if (msec > conn->ckpt_max_time)
+		conn->ckpt_max_time = msec;
 	WT_STAT_FAST_CONN_SET(session,
 	    txn_checkpoint_time_max, conn->ckpt_max_time);
 	WT_STAT_FAST_CONN_SET(session,
 	    txn_checkpoint_time_min, conn->ckpt_min_time);
 	WT_STAT_FAST_CONN_SET(session,
-	    txn_checkpoint_time_recent, usec);
+	    txn_checkpoint_time_recent, msec);
 	WT_STAT_FAST_CONN_INCRV(session,
-	    txn_checkpoint_time_total, usec);
-
-	return;
+	    txn_checkpoint_time_total, msec);
 }
 
 /*
@@ -900,13 +898,13 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * here to ensure we don't get into trouble.
 	 */
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
-	WT_ERR(__wt_epoch(session, &start));
+	WT_TRET(__wt_epoch(session, &start));
 	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 
 	ret = __wt_txn_checkpoint(session, cfg);
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
-	WT_ERR(__wt_epoch(session, &stop));
+	WT_TRET(__wt_epoch(session, &stop));
 	__session_ckpt_stats(session, &start, &stop);
 
 	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
