@@ -36,6 +36,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <limits>
+#include <string>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -44,6 +45,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -81,6 +84,7 @@
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -245,12 +249,19 @@ namespace mongo {
         OperationContextImpl txn;
 
         Lock::GlobalWrite lk(txn.lockState());
-        //  No WriteUnitOfWork, as DirectClient creates its own units of work
-        DBDirectClient c(&txn);
-
-        static const char* name = "local.startup_log";
-        c.createCollection( name, 10 * 1024 * 1024, true );
-        c.insert( name, o);
+        AutoGetOrCreateDb autoDb(&txn, "local", mongo::MODE_X);
+        Database* db = autoDb.getDb();
+        const std::string ns = "local.startup_log";
+        Collection* collection = db->getCollection(&txn, ns);
+        WriteUnitOfWork wunit(&txn);
+        if (!collection) {
+            BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
+            uassertStatusOK(userCreateNS(&txn, db, ns, options, true));
+            collection = db->getCollection(&txn, ns);
+        }
+        invariant(collection);
+        uassertStatusOK(collection->insertDocument(&txn, o, false).getStatus());
+        wunit.commit();
     }
 
     static void checkForIdIndexes(OperationContext* txn, Database* db) {

@@ -143,7 +143,13 @@ namespace mongo {
         ss << extraOpenOptions;
         string config = ss.str();
         log() << "wiredtiger_open config: " << config;
-        invariantWTOK(wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn));
+        int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
+        // Invalid argument (EINVAL) is usually caused by invalid configuration string.
+        // We still fassert() but without a stack trace.
+        if (ret == EINVAL) {
+            fassertFailedNoTrace(28561);
+        }
+        invariantWTOK(ret);
         _sessionCache.reset( new WiredTigerSessionCache( this ) );
 
         _sizeStorerUri = "table:sizeStorer";

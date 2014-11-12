@@ -67,6 +67,10 @@ namespace mongo {
             s << prefix << " ";
         s << retCode << ": " << wiredtiger_strerror(retCode);
 
+        if (retCode == EINVAL) {
+            return Status(ErrorCodes::BadValue, s);
+        }
+
         // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
         return Status(ErrorCodes::UnknownError, s);
     }

@@ -99,6 +99,11 @@ namespace mongo {
                                                     catalogInfo,
                                                     catalogInfo,
                                                     CollectionOptions() );
+        // BadValue is usually caused by invalid configuration string.
+        // We still fassert() but without a stack trace.
+        if (status.code() == ErrorCodes::BadValue) {
+            fassertFailedNoTrace(28562);
+        }
         fassert( 28520, status );
 
         _catalogRecordStore.reset( _engine->getRecordStore( &opCtx,
