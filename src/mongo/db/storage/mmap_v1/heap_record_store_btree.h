@@ -195,7 +195,10 @@ namespace mongo {
 
         virtual void commitAndRestart() {}
 
-        virtual void registerChange(Change* change) {}
+        virtual void registerChange(Change* change) { 
+            change->commit();
+            delete change; 
+        }
 
         virtual void* writingPtr(void* data, size_t len);
 
