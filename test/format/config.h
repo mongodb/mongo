@@ -248,6 +248,10 @@ static CONFIG c[] = {
 	  "the number of threads",
 	  C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
 
+	{ "timer",
+	  "time to run in minutes",
+	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_timer, NULL },
+
 	{ "value_max",
 	  "maximum size of values",
 	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },
