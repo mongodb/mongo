@@ -38,6 +38,7 @@
 #include <memory>
 #include <signal.h>
 #include <streambuf>
+#include <typeinfo>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -128,7 +129,53 @@ namespace {
     // exceptions
     void myTerminate() {
         boost::mutex::scoped_lock lk(streamMutex);
-        printStackTrace(mallocFreeOStream << "terminate() called.\n");
+
+#if __cplusplus >= 201103L || defined(_MSC_VER) // Available in MSVC++2010 and newer.
+        // In c++11 we can recover the current exception to print it.
+        if (std::exception_ptr eptr = std::current_exception()) {
+            mallocFreeOStream << "terminate() called. An exception is active;"
+                              << " attempting to gather more information";
+            writeMallocFreeStreamToLog();
+
+            const std::type_info* typeInfo = nullptr;
+            try {
+                try {
+                    std::rethrow_exception(eptr);
+                }
+                catch (const DBException& ex) {
+                    typeInfo = &typeid(ex);
+                    mallocFreeOStream << "DBException::toString(): " << ex.toString() << '\n';
+                }
+                catch (const std::exception& ex) {
+                    typeInfo = &typeid(ex);
+                    mallocFreeOStream << "std::exception::what(): " << ex.what() << '\n';
+                }
+                catch (...) {
+                    mallocFreeOStream << "A non-standard exception type was thrown\n";
+                }
+
+                if (typeInfo) {
+                    const std::string name = demangleName(*typeInfo);
+                    mallocFreeOStream << "Actual exception type: " << name << '\n';
+                }
+            }
+            catch (...) {
+                mallocFreeOStream << "Exception while trying to print current exception.\n";
+                if (typeInfo) {
+                    // It is possible that we failed during demangling. At least try to print the
+                    // mangled name.
+                    mallocFreeOStream << "Actual exception type: " << typeInfo->name() << '\n';
+                }
+            }
+        }
+        else {
+            mallocFreeOStream << "terminate() called. No exception is active";
+        }
+#else
+        mallocFreeOStream << "terminate() called.\n";
+#endif
+
+        printStackTrace(mallocFreeOStream);
         writeMallocFreeStreamToLog();
 
 #if defined(_WIN32)
