@@ -48,22 +48,28 @@ namespace mongo {
 
     using std::list;
 
+    ConfigServerFixture::ConfigServerFixture()
+        : _client(&_txn),
+          _connectHook(NULL) {
+
+    }
+
     void ConfigServerFixture::setUp() {
         DBException::traceExceptions = true;
 
         // Make all connections redirect to the direct client
-        _connectHook = new CustomConnectHook();
+        _connectHook = new CustomConnectHook(&_txn);
         ConnectionString::setConnectionHook(_connectHook);
         // Disable the lock pinger
         setLockPingerEnabled(false);
 
         // Create the default config database before querying, necessary for direct connections
         clearServer();
-        client().insert("config.test", BSON( "hello" << "world" ));
-        client().dropCollection("config.test");
+        _client.insert("config.test", BSON( "hello" << "world" ));
+        _client.dropCollection("config.test");
 
         // Create an index over the chunks, to allow correct diffing
-        ASSERT_OK(dbtests::createIndex(&_client._txn,
+        ASSERT_OK(dbtests::createIndex(&_txn,
                                        ChunkType::ConfigNS,
                                        BSON( ChunkType::ns() << 1 <<
                                              ChunkType::DEPRECATED_lastmod() << 1 )));
@@ -71,48 +77,48 @@ namespace mongo {
     }
 
     void ConfigServerFixture::clearServer() {
-        client().dropDatabase("config");
+        _client.dropDatabase("config");
     }
 
     void ConfigServerFixture::clearVersion() {
-        client().dropCollection(VersionType::ConfigNS);
+        _client.dropCollection(VersionType::ConfigNS);
     }
 
     void ConfigServerFixture::clearShards() {
-        client().dropCollection(ShardType::ConfigNS);
+        _client.dropCollection(ShardType::ConfigNS);
     }
 
     void ConfigServerFixture::clearDatabases() {
-        client().dropCollection(DatabaseType::ConfigNS);
+        _client.dropCollection(DatabaseType::ConfigNS);
     }
 
     void ConfigServerFixture::clearCollections() {
-        client().dropCollection(CollectionType::ConfigNS);
+        _client.dropCollection(CollectionType::ConfigNS);
     }
 
     void ConfigServerFixture::clearChunks() {
-        client().dropCollection(ChunkType::ConfigNS);
+        _client.dropCollection(ChunkType::ConfigNS);
     }
 
     void ConfigServerFixture::clearPings() {
-        client().dropCollection(MongosType::ConfigNS);
+        _client.dropCollection(MongosType::ConfigNS);
     }
 
     void ConfigServerFixture::clearChangelog() {
-        client().dropCollection(ChangelogType::ConfigNS);
+        _client.dropCollection(ChangelogType::ConfigNS);
     }
 
     void ConfigServerFixture::dumpServer() {
 
         log() << "Dumping virtual config server to log..." << endl;
 
-        list<string> collectionNames(client().getCollectionNames("config"));
+        list<string> collectionNames(_client.getCollectionNames("config"));
 
         for (list<string>::iterator it = collectionNames.begin(); it != collectionNames.end(); ++it)
         {
             const string& collection = *it;
 
-            scoped_ptr<DBClientCursor> cursor(client().query(collection, BSONObj()).release());
+            scoped_ptr<DBClientCursor> cursor(_client.query(collection, BSONObj()).release());
             ASSERT(cursor.get() != NULL);
 
             log() << "Dumping collection " << collection << endl;

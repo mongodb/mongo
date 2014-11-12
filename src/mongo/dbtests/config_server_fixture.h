@@ -37,11 +37,9 @@
 
 namespace mongo {
 
-    class OperationContext;
-
     class CustomDirectClient: public DBDirectClient {
     public:
-        CustomDirectClient() : DBDirectClient(&_txn) {
+        CustomDirectClient(OperationContext* txn) : DBDirectClient(txn) {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
@@ -71,19 +69,22 @@ namespace mongo {
 
             return true;
         }
-
-        OperationContextImpl _txn;
     };
 
-    class CustomConnectHook: public ConnectionString::ConnectionHook {
+    class CustomConnectHook : public ConnectionString::ConnectionHook {
     public:
+        CustomConnectHook(OperationContext* txn) : _txn(txn) { }
+
         virtual DBClientBase* connect(const ConnectionString& connStr,
                                       std::string& errmsg,
                                       double socketTimeout)
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient();
+            return new CustomDirectClient(_txn);
         }
+
+    private:
+        OperationContext* const _txn;
     };
 
     /**
@@ -95,12 +96,7 @@ namespace mongo {
     class ConfigServerFixture: public mongo::unittest::Test {
     public:
 
-        /**
-         * Returns a client connection to the virtual config server.
-         */
-        DBClientBase& client() {
-            return _client;
-        }
+        ConfigServerFixture();
 
         /**
          * Returns a connection std::string to the virtual config server.
@@ -133,10 +129,10 @@ namespace mongo {
 
         virtual void tearDown();
 
-    private:
 
-        CustomConnectHook* _connectHook;
+        OperationContextImpl _txn;
         CustomDirectClient _client;
+        CustomConnectHook* _connectHook;
     };
 
 }

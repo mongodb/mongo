@@ -1,5 +1,3 @@
-// sharding.cpp : some unit tests for sharding internals
-
 /**
  *    Copyright (C) 2009 10gen Inc.
  *
@@ -86,11 +84,8 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
-        OperationContextImpl _txn;
-        CustomDirectClient _client;
-        Shard _shard;
-
-        ChunkManagerTest() {
+        ChunkManagerTest() : _client(&_txn) {
+            shardConnectionPool.clear();
 
             DBException::traceExceptions = true;
 
@@ -139,8 +134,14 @@ namespace ShardingTests {
                                        double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new CustomDirectClient();
+            return new CustomDirectClient(&_txn);
         }
+
+
+    protected:
+        OperationContextImpl _txn;
+        CustomDirectClient _client;
+        Shard _shard;
     };
 
     //

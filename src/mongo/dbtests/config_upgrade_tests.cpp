@@ -47,13 +47,18 @@ namespace mongo {
     class ConfigUpgradeFixture: public ConfigServerFixture {
     public:
 
+        ConfigUpgradeFixture() : ConfigServerFixture() {
+
+        }
+
         void stopBalancer() {
             // Note: The balancer key is needed in the update portion, for some reason related to 
             // DBDirectClient
-            client().update(SettingsType::ConfigNS, 
-                            BSON(SettingsType::key("balancer")),
-                            BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
-                            true, false);
+            DBDirectClient client(&_txn);
+            client.update(SettingsType::ConfigNS,
+                          BSON(SettingsType::key("balancer")),
+                          BSON(SettingsType::key("balancer") << SettingsType::balancerStopped(true)),
+                          true, false);
         }
 
         /**
@@ -63,22 +68,25 @@ namespace mongo {
 
             if (version == 0) return;
 
+            DBDirectClient client(&_txn);
+
             if (version == 1) {
                 ShardType shard;
                 shard.setName("test");
                 shard.setHost("$dummy:10000");
-                client().insert(ShardType::ConfigNS, shard.toBSON());
+                client.insert(ShardType::ConfigNS, shard.toBSON());
                 return;
             }
 
-            client().insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
+            client.insert(VersionType::ConfigNS, BSON("_id" << 1 << "version" << version));
         }
 
         /**
          * Stores a newer { version, minVersion, currentVersion, clusterId } config server entry
          */
         void storeConfigVersion(const VersionType& versionInfo) {
-            client().insert(VersionType::ConfigNS, versionInfo.toBSON());
+            DBDirectClient client(&_txn);
+            client.insert(VersionType::ConfigNS, versionInfo.toBSON());
         }
 
         /**
@@ -109,13 +117,14 @@ namespace mongo {
          * Stores sample shard and ping information at the current version.
          */
         void storeShardsAndPings(int numShards, int numPings) {
+            DBDirectClient client(&_txn);
 
             for (int i = 0; i < numShards; i++) {
                 ShardType shard;
                 shard.setName(OID::gen().toString());
                 shard.setHost((string) (str::stream() << "$dummyShard:" << (i + 1) << "0000"));
 
-                client().insert(ShardType::ConfigNS, shard.toBSON());
+                client.insert(ShardType::ConfigNS, shard.toBSON());
             }
 
             for (int i = 0; i < numPings; i++) {
@@ -130,7 +139,7 @@ namespace mongo {
                     ping.setPing(ping.getPing() - 10 * 60 * 1000);
                 }
 
-                client().insert(MongosType::ConfigNS, ping.toBSON());
+                client.insert(MongosType::ConfigNS, ping.toBSON());
             }
         }
     };

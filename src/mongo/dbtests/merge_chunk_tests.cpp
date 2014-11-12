@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/s/chunk.h" // for genID
 #include "mongo/s/chunk_version.h"
@@ -45,6 +44,10 @@ namespace mongo {
      */
     class MergeChunkFixture: public ConfigServerFixture {
     public:
+
+        MergeChunkFixture() : ConfigServerFixture() {
+
+        }
 
         /**
          * Stores ranges for a particular collection and shard starting from some version
@@ -65,9 +68,11 @@ namespace mongo {
             string errMsg;
             ASSERT( coll.isValid( &errMsg ) );
 
-            client().update( CollectionType::ConfigNS,
-                             BSON( CollectionType::ns( coll.getNS() ) ),
-                             coll.toBSON(), true, false );
+            DBDirectClient client(&_txn);
+
+            client.update( CollectionType::ConfigNS,
+                           BSON( CollectionType::ns( coll.getNS() ) ),
+                           coll.toBSON(), true, false );
 
             ChunkVersion nextVersion = startVersion;
             for ( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
@@ -83,7 +88,7 @@ namespace mongo {
                 chunk.setMax( it->maxKey );
                 nextVersion.incMajor();
 
-                client().insert( ChunkType::ConfigNS, chunk.toBSON() );
+                client.insert( ChunkType::ConfigNS, chunk.toBSON() );
             }
         }
 
@@ -97,13 +102,15 @@ namespace mongo {
             BSONObj rangeMin;
             BSONObj rangeMax;
 
+            DBDirectClient client(&_txn);
+
             // Ensure written
             for( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
 
                 Query query( BSON( ChunkType::min( it->minKey ) <<
                                    ChunkType::max( it->maxKey ) <<
                                    ChunkType::shard( shardName() ) ) );
-                ASSERT( client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
+                ASSERT(client.findOne(ChunkType::ConfigNS, query).isEmpty());
 
                 if ( rangeMin.isEmpty() || rangeMin.woCompare( it->minKey ) > 0 ) {
                     rangeMin = it->minKey;
@@ -117,14 +124,12 @@ namespace mongo {
             Query query( BSON( ChunkType::min( rangeMin ) <<
                                ChunkType::max( rangeMax ) <<
                                ChunkType::shard( shardName() ) ) );
-            ASSERT( !client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
+            ASSERT(!client.findOne(ChunkType::ConfigNS, query).isEmpty());
         }
 
         string shardName() { return "shard0000"; }
 
     protected:
-
-        OperationContextImpl _txn;
 
         virtual void setUp() {
             ConfigServerFixture::setUp();
