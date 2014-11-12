@@ -228,43 +228,41 @@ namespace mongo {
     AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                        const std::string& ns)
             : _txn(txn),
-              _nss(ns),
-              _db(_txn, _nss.db(), MODE_IS),
+              _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
               _collLock(_txn->lockState(), ns, MODE_IS),
               _coll(NULL) {
 
-        _init();
+        _init(ns, nsToCollectionSubstring(ns));
     }
 
     AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                        const NamespaceString& nss)
             : _txn(txn),
-              _nss(nss),
-              _db(_txn, _nss.db(), MODE_IS),
-              _collLock(_txn->lockState(), _nss.toString(), MODE_IS),
+              _db(_txn, nss.db(), MODE_IS),
+              _collLock(_txn->lockState(), nss.toString(), MODE_IS),
               _coll(NULL) {
 
-        _init();
+        _init(nss.toString(), nss.coll());
     }
 
-    void AutoGetCollectionForRead::_init() {
-        massert(28535, "need a non-empty collection name", !_nss.coll().empty());
+    void AutoGetCollectionForRead::_init(const std::string& ns, const StringData& coll) {
+        massert(28535, "need a non-empty collection name", !coll.empty());
 
         // TODO: Client::Context legacy, needs to be removed
         _txn->getCurOp()->ensureStarted();
-        _txn->getCurOp()->setNS(_nss.toString());
+        _txn->getCurOp()->setNS(ns);
 
         // We have both the DB and collection locked, which the prerequisite to do a stable shard
         // version check.
-        ensureShardVersionOKOrThrow(_nss);
+        ensureShardVersionOKOrThrow(ns);
 
         // At this point, we are locked in shared mode for the database by the DB lock in the
         // constructor, so it is safe to load the DB pointer.
         if (_db.getDb()) {
             // TODO: Client::Context legacy, needs to be removed
-            _txn->getCurOp()->enter(_nss.toString().c_str(), _db.getDb()->getProfilingLevel());
+            _txn->getCurOp()->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
 
-            _coll = _db.getDb()->getCollection(_txn, _nss);
+            _coll = _db.getDb()->getCollection(_txn, ns);
         }
     }
 

@@ -77,6 +77,7 @@ namespace mongo {
         Database* getDb() const {
             return _db;
         }
+
     private:
         const Lock::DBLock _dbLock;
         Database* const _db;
@@ -140,11 +141,11 @@ namespace mongo {
         }
 
     private:
-        void _init();
+        void _init(const std::string& ns,
+                   const StringData& coll);
 
         const Timer _timer;
         OperationContext* const _txn;
-        const NamespaceString _nss;
         const AutoGetDb _db;
         const Lock::CollectionLock _collLock;
 

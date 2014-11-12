@@ -1064,16 +1064,6 @@ namespace mongo {
         WriteOpResult result;
         insertOne(state, &result);
 
-        if (state->hasLock()) {
-            // Normally, unlocking records lock time stats on the active CurOp.  However,
-            // insertOne() may not release the lock. In that case, record time by hand.
-            state->getLock().recordTime();
-            // If we deschedule here, there could be substantial unaccounted locked time.
-            // Any time from here will be attributed to the next insert in the batch, or
-            // not attributed to any operation if this is the last op in the batch.
-            state->getLock().resetTime();
-        }
-
         incWriteStats(currInsertItem,
                       result.getStats(),
                       result.getError(),

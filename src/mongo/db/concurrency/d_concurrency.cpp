@@ -112,13 +112,6 @@ namespace mongo {
         _relock();
     }
 
-    void Lock::ScopedLock::resetTime() {
-        _timer.reset();
-    }
-
-    void Lock::ScopedLock::recordTime() {
-    }
-
     void Lock::ScopedLock::_tempRelease() {
         // TempRelease is only used for global locks
         invariant(false);
@@ -164,13 +157,11 @@ namespace mongo {
         invariant(_lockState->isW());
 
         invariant(_lockState->unlockAll());
-        recordTime();
     }
     void Lock::GlobalWrite::_relock() { 
         invariant(!_lockState->isLocked());
 
         _lockState->lockGlobal(MODE_X);
-        resetTime();
     }
 
     Lock::GlobalWrite::GlobalWrite(Locker* lockState, unsigned timeoutms)
@@ -180,8 +171,6 @@ namespace mongo {
         if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
-
-        resetTime();
     }
 
     Lock::GlobalWrite::~GlobalWrite() {
@@ -189,7 +178,6 @@ namespace mongo {
         invariant(_lockState->isW() || _lockState->isR());
 
         _lockState->unlockAll();
-        recordTime();
     }
 
     Lock::GlobalRead::GlobalRead(Locker* lockState, unsigned timeoutms)
@@ -199,13 +187,10 @@ namespace mongo {
         if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
-
-        resetTime();
     }
 
     Lock::GlobalRead::~GlobalRead() {
         _lockState->unlockAll();
-        recordTime();
     }
 
     Lock::DBLock::DBLock(Locker* lockState, const StringData& db, const LockMode mode)
@@ -230,8 +215,6 @@ namespace mongo {
         else {
             _lockState->lock(_id, isRead ? MODE_S : MODE_X);
         }
-
-        resetTime();
     }
 
     void Lock::DBLock::relockWithMode(const LockMode newMode) {
@@ -258,10 +241,7 @@ namespace mongo {
     void Lock::DBLock::unlockDB() {
         _lockState->unlock(_id);
 
-        // The last release reports time the lock was held
-        if (_lockState->unlockAll()) {
-            recordTime();
-        }
+        _lockState->unlockAll();
     }
 
     Lock::CollectionLock::CollectionLock(Locker* lockState,

@@ -268,9 +268,6 @@ namespace mongo {
         virtual Lock::ScopedLock* getCurrentScopedLock() const = 0;
         virtual void leaveScopedLock(Lock::ScopedLock* lock) = 0;
 
-        virtual void recordLockTime() = 0;
-        virtual void resetLockTime() = 0;
-
         // Used for the replication parallel log op application threads
         virtual void setIsBatchWriter(bool newValue) = 0;
         virtual bool isBatchWriter() const = 0;

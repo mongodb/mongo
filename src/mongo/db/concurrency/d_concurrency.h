@@ -78,12 +78,6 @@ namespace mongo {
         public:
             virtual ~ScopedLock();
 
-            // Start recording a new period, starting now()
-            void resetTime();
-
-            // Accrue elapsed lock time since last we called reset
-            void recordTime();
-
         protected:
             explicit ScopedLock(Locker* lockState, char type );
 
@@ -117,7 +111,6 @@ namespace mongo {
 
             ParallelBatchWriterSupport _pbws_lk;
 
-            Timer _timer;
             char _type;      // 'r','w','R','W'
         };
 

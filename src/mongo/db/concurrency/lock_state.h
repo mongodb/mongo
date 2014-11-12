@@ -215,9 +215,6 @@ namespace mongo {
         virtual Lock::ScopedLock* getCurrentScopedLock() const;
         virtual void leaveScopedLock(Lock::ScopedLock* lock);
 
-        virtual void recordLockTime() { _scopedLk->recordTime(); }
-        virtual void resetLockTime() { _scopedLk->resetTime(); }
-
         virtual void setIsBatchWriter(bool newValue) { _batchWriter = newValue; }
         virtual bool isBatchWriter() const { return _batchWriter; }
         virtual void setLockPendingParallelWriter(bool newValue) { 
