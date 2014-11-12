@@ -180,6 +180,8 @@ struct __wt_connection_impl {
 	int		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
+	uint64_t	 ckpt_max_time;	/* Checkpoint maximum time (msecs) */
+	uint64_t	 ckpt_min_time;	/* Checkpoint minimum time (msecs) */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t		 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled; /* Checkpoint signalled */

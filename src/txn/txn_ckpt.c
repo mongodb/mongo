@@ -7,6 +7,9 @@
 
 #include "wt_internal.h"
 
+static void __checkpoint_stats(WT_SESSION_IMPL *,
+    struct timespec *, struct timespec *);
+
 /*
  * __wt_checkpoint_name_ok --
  *	Complain if the checkpoint name isn't acceptable.
@@ -298,12 +301,41 @@ err:	for (i = 0; i < session->ckpt_handle_next; ++i)
 }
 
 /*
+ * __checkpoint_stats --
+ *	Update checkpoint timer stats.
+ */
+static void
+__checkpoint_stats(WT_SESSION_IMPL *session,
+    struct timespec *start, struct timespec *stop)
+{
+	WT_CONNECTION_IMPL *conn;
+	uint64_t msec;
+
+	conn = S2C(session);
+	/*
+	 * Get time diff in microseconds.
+	 */
+	msec = (WT_TIMEDIFF(*stop, *start) / WT_MILLION);
+	if (conn->ckpt_min_time == 0 || msec < conn->ckpt_min_time)
+		conn->ckpt_min_time = msec;
+	if (msec > conn->ckpt_max_time)
+		conn->ckpt_max_time = msec;
+	WT_STAT_FAST_CONN_SET(session,
+	    txn_checkpoint_time_max, conn->ckpt_max_time);
+	WT_STAT_FAST_CONN_SET(session,
+	    txn_checkpoint_time_min, conn->ckpt_min_time);
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_time_recent, msec);
+	WT_STAT_FAST_CONN_INCRV(session, txn_checkpoint_time_total, msec);
+}
+
+/*
  * __wt_txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
 int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	struct timespec start, stop;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -360,6 +392,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * side effects on cursors, which applications can hold open across
 	 * calls to checkpoint.
 	 */
+	if (full)
+		WT_ERR(__wt_epoch(session, &start));
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
@@ -404,6 +438,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
+	if (full) {
+		WT_ERR(__wt_epoch(session, &stop));
+		__checkpoint_stats(session, &start, &stop);
+	}
 
 err:	/*
 	 * XXX
