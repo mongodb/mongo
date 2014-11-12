@@ -458,6 +458,14 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
+	stats->txn_checkpoint_time_max.desc =
+	    "transaction: transaction checkpoint max time (msecs)";
+	stats->txn_checkpoint_time_min.desc =
+	    "transaction: transaction checkpoint min time (msecs)";
+	stats->txn_checkpoint_time_recent.desc =
+	    "transaction: transaction checkpoint most recent time (msecs)";
+	stats->txn_checkpoint_time_total.desc =
+	    "transaction: transaction checkpoint total time (msecs)";
 	stats->txn_checkpoint.desc = "transaction: transaction checkpoints";
 	stats->txn_fail_cache.desc =
 	    "transaction: transaction failures due to cache overflow";

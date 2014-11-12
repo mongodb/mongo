@@ -781,6 +781,7 @@ minprefix
 mkdir
 mmap
 mnt
+msecs
 msg
 msgv
 msvc

@@ -870,6 +870,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	ret = __wt_txn_checkpoint(session, cfg);
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
 	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
