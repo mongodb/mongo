@@ -234,7 +234,7 @@ class test_base05(wttest.WiredTigerTestCase):
     def test_table_unicode(self):
         """
         Create entries using unicode strings,
-	and read back in a cursor: key=string, value=string
+        and read back in a cursor: key=string, value=string
         """
         self.do_test_table_base(True)
 
