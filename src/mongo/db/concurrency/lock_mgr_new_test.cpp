@@ -676,4 +676,171 @@ namespace mongo {
         ASSERT(lockMgr.unlock(&requestLow));
     }
 
+    TEST(LockManager, CompatibleFirstImmediateGrant) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+        MMAPV1LockerImpl locker1(1);
+        LockRequestCombo request1(&locker1);
+
+        MMAPV1LockerImpl locker2(2);
+        LockRequestCombo request2(&locker2);
+        request2.compatibleFirst = true;
+
+        MMAPV1LockerImpl locker3(3);
+        LockRequestCombo request3(&locker3);
+
+        // Lock all in IS mode
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_IS));
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request3, MODE_IS));
+
+        // Now an exclusive mode comes, which would block
+        MMAPV1LockerImpl lockerX(4);
+        LockRequestCombo requestX(&lockerX);
+
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
+
+        // If an S comes, it should be granted, because of request2
+        {
+            MMAPV1LockerImpl lockerS(5);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // If request1 goes away, the policy should still be compatible-first, because of request2
+        ASSERT(lockMgr.unlock(&request1));
+
+        // If S comes again, it should be granted, because of request2 still there
+        {
+            MMAPV1LockerImpl lockerS(6);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // With request2 gone the policy should go back to FIFO, even though request3 is active
+        ASSERT(lockMgr.unlock(&request2));
+
+        {
+            MMAPV1LockerImpl lockerS(7);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // Unlock request3 to keep the lock mgr not assert for leaked locks
+        ASSERT(lockMgr.unlock(&request3));
+        ASSERT(lockMgr.unlock(&requestX));
+    }
+
+    TEST(LockManager, CompatibleFirstDelayedGrant) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+        MMAPV1LockerImpl lockerXInitial(1);
+        LockRequestCombo requestXInitial(&lockerXInitial);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &requestXInitial, MODE_X));
+
+        MMAPV1LockerImpl locker1(2);
+        LockRequestCombo request1(&locker1);
+
+        MMAPV1LockerImpl locker2(3);
+        LockRequestCombo request2(&locker2);
+        request2.compatibleFirst = true;
+
+        MMAPV1LockerImpl locker3(4);
+        LockRequestCombo request3(&locker3);
+
+        // Lock all in IS mode (should block behind the global lock)
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request1, MODE_IS));
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_IS));
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, MODE_IS));
+
+        // Now an exclusive mode comes, which would block behind the IS modes
+        MMAPV1LockerImpl lockerX(5);
+        LockRequestCombo requestX(&lockerX);
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
+
+        // Free the first X lock so all IS modes are granted
+        ASSERT(lockMgr.unlock(&requestXInitial));
+        ASSERT(request1.lastResult == LOCK_OK);
+        ASSERT(request2.lastResult == LOCK_OK);
+        ASSERT(request3.lastResult == LOCK_OK);
+
+        // If an S comes, it should be granted, because of request2
+        {
+            MMAPV1LockerImpl lockerS(6);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // If request1 goes away, the policy should still be compatible-first, because of request2
+        ASSERT(lockMgr.unlock(&request1));
+
+        // If S comes again, it should be granted, because of request2 still there
+        {
+            MMAPV1LockerImpl lockerS(7);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // With request2 gone the policy should go back to FIFO, even though request3 is active
+        ASSERT(lockMgr.unlock(&request2));
+
+        {
+            MMAPV1LockerImpl lockerS(8);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // Unlock request3 to keep the lock mgr not assert for leaked locks
+        ASSERT(lockMgr.unlock(&request3));
+        ASSERT(lockMgr.unlock(&requestX));
+    }
+
+    TEST(LockManager, CompatibleFirstCancelWaiting) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_GLOBAL, 0);
+
+        MMAPV1LockerImpl lockerSInitial(1);
+        LockRequestCombo requestSInitial(&lockerSInitial);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &requestSInitial, MODE_S));
+
+        MMAPV1LockerImpl lockerX(2);
+        LockRequestCombo requestX(&lockerX);
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
+
+        MMAPV1LockerImpl lockerPending(3);
+        LockRequestCombo requestPending(&lockerPending);
+        requestPending.compatibleFirst = true;
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestPending, MODE_S));
+
+        // S1 is not granted yet, so the policy should still be FIFO
+        {
+            MMAPV1LockerImpl lockerS(4);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // Unlock S1, the policy should still be FIFO
+        ASSERT(lockMgr.unlock(&requestPending));
+
+        {
+            MMAPV1LockerImpl lockerS(5);
+            LockRequestCombo requestS(&lockerS);
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
+            ASSERT(lockMgr.unlock(&requestS));
+        }
+
+        // Unlock remaining locks to keep the leak detection logic happy
+        ASSERT(lockMgr.unlock(&requestSInitial));
+        ASSERT(lockMgr.unlock(&requestX));
+    }
+
 } // namespace mongo

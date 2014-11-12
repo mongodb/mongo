@@ -1,21 +1,38 @@
-// test the lock/unlock snapshotting feature a bit
+// Tests the db.fsyncLock/fsyncUnlock features
 
-x=db.runCommand({fsync:1,lock:1}); // not on admin db
-assert(!x.ok,"D");
+// Start with a clean DB
+var fsyncLockDB = db.getSisterDB('fsyncLockTestDB');
+fsyncLockDB.dropDatabase();
 
-x=db.fsyncLock(); // uses admin automatically
+// Test it doesn't work unless invoked against the admin DB
+var resFail = fsyncLockDB.runCommand({fsync:1, lock:1});
+assert(!resFail.ok, "fsyncLock command succeeded against DB other than admin.");
 
-assert(x.ok,"C");
+// Uses admin automatically and locks the server for writes
+var fsyncLockRes = db.fsyncLock();
+assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");
+assert(db.currentOp().fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
-y = db.currentOp();
-assert(y.fsyncLock,"B");
+// Make sure writes are blocked. Spawn a write operation in a separate shell and make sure it
+// is blocked. There is really now way to do that currently, so just check that the write didn't
+// go through.
+var writeOpHandle = startParallelShell("db.getSisterDB('fsyncLockTestDB').coll.insert({x:1});");
+sleep(1000);
 
-z = db.fsyncUnlock();
-assert( db.currentOp().fsyncLock == null, "A2" );
+// Make sure reads can still run even though there is a pending write and also that the write
+// didn't get through
+assert.eq(0, fsyncLockDB.coll.count({}));
 
-// make sure the db is unlocked
-db.jstests_fsync.insert({x:1});
+// Unlock and make sure the insert succeeded
+var fsyncUnlockRes = db.fsyncUnlock();
+assert(fsyncUnlockRes.ok, "fsyncUnlock command failed");
+assert(db.currentOp().fsyncLock == null, "fsyncUnlock is not null in db.currentOp");
 
-assert( db.currentOp().fsyncLock == null, "A" );
+// Make sure the db is unlocked and the initial write made it through.
+writeOpHandle();
+fsyncLockDB.coll.insert({x:2});
 
-assert( !db.eval('db.fsyncLock()').ok, "eval('db.fsyncLock()') should fail." )
+assert.eq(2, fsyncLockDB.coll.count({}));
+
+// Ensure eval is not allowed to invoke fsyncLock
+assert(!db.eval('db.fsyncLock()').ok, "eval('db.fsyncLock()') should fail.");

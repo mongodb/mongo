@@ -277,6 +277,11 @@ namespace {
         // check the granted queue for requests in STATUS_CONVERTING if this count is zero. This
         // saves cycles in the regular case and only burdens the less-frequent lock upgrade case.
         uint32_t conversionsCount;
+
+        // Counts the number of requests on the granted queue, which have requested that the policy
+        // be switched to compatible-first. As long as this value is > 0, the policy will stay
+        // compatible-first.
+        uint32_t compatibleFirstCount;
     };
 
 
@@ -296,6 +301,7 @@ namespace {
         conflictModes = 0;
 
         conversionsCount = 0;
+        compatibleFirstCount = 0;
     }
 
     LockRequest* LockHead::findRequest(LockerId lockerId) const {
@@ -424,7 +430,9 @@ namespace {
 
             // New lock request. Queue after all granted modes and after any already requested
             // conflicting modes.
-            if (conflicts(mode, lock->grantedModes) || conflicts(mode, lock->conflictModes)) {
+            if (conflicts(mode, lock->grantedModes) ||
+                    (!lock->compatibleFirstCount && conflicts(mode, lock->conflictModes))) {
+
                 request->status = LockRequest::STATUS_WAITING;
                 request->mode = mode;
                 request->convertMode = MODE_NONE;
@@ -448,6 +456,10 @@ namespace {
 
                 lock->grantedList.push_back(request);
                 lock->changeGrantedModeCount(mode, LockHead::Increment);
+
+                if (request->compatibleFirst) {
+                    lock->compatibleFirstCount++;
+                }
 
                 return LOCK_OK;
             }
@@ -550,6 +562,10 @@ namespace {
             lock->grantedList.remove(request);
             lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
 
+            if (request->compatibleFirst) {
+                lock->compatibleFirstCount--;
+            }
+
             _onLockModeChanged(lock, lock->grantedCounts[request->mode] == 0);
         }
         else {
@@ -598,6 +614,7 @@ namespace {
                     invariant(lock->conflictList._front == NULL);
                     invariant(lock->conflictList._back == NULL);
                     invariant(lock->conversionsCount == 0);
+                    invariant(lock->compatibleFirstCount == 0);
 
                     bucket->data.erase(it++);
                     delete lock;
@@ -676,6 +693,10 @@ namespace {
             lock->changeGrantedModeCount(iter->mode, LockHead::Increment);
             lock->changeConflictModeCount(iter->mode, LockHead::Decrement);
 
+            if (iter->compatibleFirst) {
+                lock->compatibleFirstCount++;
+            }
+
             iter->notify->notify(lock->resourceId, LOCK_OK);
         }
 
@@ -727,6 +748,7 @@ namespace {
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
+                    << "CompatibleFirst = " << iter->compatibleFirst << "; "
                     << '\n';
             }
 
@@ -742,6 +764,7 @@ namespace {
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
+                    << "CompatibleFirst = " << iter->compatibleFirst << "; "
                     << '\n';
             }
 
@@ -955,6 +978,7 @@ namespace {
         this->notify = notify;
 
         enqueueAtFront = false;
+        compatibleFirst = false;
         recursiveCount = 0;
 
         lock = NULL;

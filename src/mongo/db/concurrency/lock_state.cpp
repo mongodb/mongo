@@ -703,6 +703,7 @@ namespace mongo {
         if (resId == resourceIdGlobal || (IsForMMAPV1 && resId == resourceIdMMAPV1Flush)) {
             if (mode == MODE_S || mode == MODE_X) {
                 request->enqueueAtFront = true;
+                request->compatibleFirst = true;
             }
         }
 

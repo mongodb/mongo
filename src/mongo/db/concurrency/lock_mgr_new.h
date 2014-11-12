@@ -123,6 +123,12 @@ namespace mongo {
         // to be put at the front, this effectively bypasses fairness. Default is FALSE.
         bool enqueueAtFront;
 
+        // When this request is granted and as long as it is on the granted queue, the particular
+        // resource's policy will be changed to "compatibleFirst". This means that even if there
+        // are pending requests on the conflict queue, if a compatible request comes in it will be
+        // granted immediately. This effectively turns off fairness.
+        bool compatibleFirst;
+
         // How many times has LockManager::lock been called for this request. Locks are released
         // when their recursive count drops to zero.
         unsigned recursiveCount;
