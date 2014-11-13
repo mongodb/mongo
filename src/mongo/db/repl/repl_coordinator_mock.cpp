@@ -163,7 +163,7 @@ namespace repl {
         return false;
     }
 
-    void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
+    void ReplicationCoordinatorMock::signalDrainComplete() {}
 
     void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 

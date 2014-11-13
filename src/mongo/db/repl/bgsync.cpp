@@ -127,13 +127,13 @@ namespace {
         _condvar.notify_all();
     }
 
-    void BackgroundSync::notify(OperationContext* txn) {
+    void BackgroundSync::notify() {
         boost::lock_guard<boost::mutex> lock(_mutex);
 
         // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
         if (_buffer.empty()) {
             _appliedBuffer = true;
-            _replCoord->signalDrainComplete(txn);
+            _replCoord->signalDrainComplete();
             _condvar.notify_all();
         }
     }

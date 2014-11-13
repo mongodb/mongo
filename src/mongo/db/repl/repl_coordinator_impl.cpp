@@ -498,7 +498,7 @@ namespace {
         return _isWaitingForDrainToComplete;
     }
 
-    void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
+    void ReplicationCoordinatorImpl::signalDrainComplete() {
         // This logic is a little complicated in order to avoid acquiring the global exclusive lock
         // unnecessarily.  This is important because the applier may call signalDrainComplete()
         // whenever it wants, not only when the ReplicationCoordinator is expecting it.
@@ -525,6 +525,7 @@ namespace {
             return;
         }
         lk.unlock();
+        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext("rsDrain"));
         Lock::GlobalWrite globalWriteLock(txn->lockState());
         lk.lock();
         if (!_isWaitingForDrainToComplete) {
@@ -532,7 +533,7 @@ namespace {
         }
         _isWaitingForDrainToComplete = false;
         lk.unlock();
-        _externalState->dropAllTempCollections(txn);
+        _externalState->dropAllTempCollections(txn.get());
         log() << "transition to primary complete; database writes are now permitted";
     }
 

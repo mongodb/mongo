@@ -153,7 +153,7 @@ namespace repl {
 
         virtual bool isWaitingForApplierToDrain();
 
-        virtual void signalDrainComplete(OperationContext* txn);
+        virtual void signalDrainComplete();
 
         virtual void signalUpstreamUpdater();
 

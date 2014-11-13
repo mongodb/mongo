@@ -34,7 +34,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
-#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -129,7 +128,6 @@ namespace {
     }
 
     TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
-        OperationContextReplMock txn;
         startCapturingLogMessages();
         assertStartSuccess(
             BSON("_id" << "mySet" <<
@@ -148,7 +146,7 @@ namespace {
         getReplCoord()->fillIsMasterForReplSet(&imResponse);
         ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
         ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
-        getReplCoord()->signalDrainComplete(&txn);
+        getReplCoord()->signalDrainComplete();
         getReplCoord()->fillIsMasterForReplSet(&imResponse);
         ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
         ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
