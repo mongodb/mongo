@@ -1,0 +1,71 @@
+(function() {
+
+    // Tests using mongorestore to restore data to a different collection
+    // then it was dumped from.
+    
+    jsTest.log('Testing restoration to a different collection');
+
+    var toolTest = new ToolTest('different_collection');
+    toolTest.startDB('foo');
+
+    // where we'll put the dump
+    var dumpTarget = 'different_collection_dump';
+
+    // the db we will dump from 
+    var sourceDB = toolTest.db.getSiblingDB('source');
+    // the collection we will dump from
+    var sourceCollName = 'sourceColl';
+
+    // insert a bunch of data 
+    for (var i = 0; i < 500; i++) {
+        sourceDB[sourceCollName].insert({ _id:i });
+    }
+    // sanity check the insertion worked
+    assert.eq(500, sourceDB[sourceCollName].count());
+
+    // dump the data
+    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    assert.eq(0, ret);
+
+    // restore just the collection into a different collection 
+    // in the same database
+    var destCollName = 'destColl';
+    ret = toolTest.runTool('restore', '--db', 'source', '--collection',
+            destCollName, dumpTarget+'/source/sourceColl.bson');
+    assert.eq(0, ret)
+
+    // make sure the data was restored correctly
+    assert.eq(500, sourceDB[destCollName].count());
+    for (var i = 0; i < 500; i++) {
+        assert.eq(1, sourceDB[destCollName].count({ _id: i }));
+    }
+
+    // restore just the collection into a similarly-named collection
+    // in a different database
+    var destDB = toolTest.db.getSiblingDB('dest');
+    ret = toolTest.runTool('restore', '--db', 'dest', '--collection',
+            sourceCollName, dumpTarget+'/source/sourceColl.bson');
+    assert.eq(0, ret)
+    
+    // make sure the data was restored correctly
+    assert.eq(500, destDB[sourceCollName].count());
+    for (var i = 0; i < 500; i++) {
+        assert.eq(1, destDB[sourceCollName].count({ _id: i }));
+    }
+
+    // restore just the collection into a different collection
+    // in a different database
+    ret = toolTest.runTool('restore', '--db', 'dest', '--collection',
+            destCollName, dumpTarget+'/source/sourceColl.bson');
+    assert.eq(0, ret)
+
+    // make sure the data was restored correctly
+    assert.eq(500, destDB[destCollName].count());
+    for (var i = 0; i < 500; i++) {
+        assert.eq(1, destDB[destCollName].count({ _id: i }));
+    }
+
+    // success
+    toolTest.stop();
+
+})();
