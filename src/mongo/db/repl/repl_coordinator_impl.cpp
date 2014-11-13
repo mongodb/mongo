@@ -539,7 +539,7 @@ namespace {
         _canAcceptNonLocalWrites = true;
         lk.unlock();
         _externalState->dropAllTempCollections(txn.get());
-        log() << "transition to primary complete; database writes are now permitted";
+        log() << "transition to primary complete; database writes are now permitted" << rsLog;
     }
 
     void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
@@ -1520,8 +1520,8 @@ namespace {
 
             _topCoord->adjustMaintenanceCountBy(-1);
 
-            log() << "leaving maintenance mode (" << curMaintenanceCalls-1 << " other maintenance "
-                    "mode tasks ongoing)" << rsLog;
+            log() << "leaving maintenance mode (" << curMaintenanceCalls-1
+                  << " other maintenance mode tasks ongoing)" << rsLog;
         } else {
             warning() << "Attempted to leave maintenance mode but it is not currently active";
             *result = Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
@@ -1659,7 +1659,7 @@ namespace {
                                                               const ReplSetReconfigArgs& args,
                                                               BSONObjBuilder* resultObj) {
 
-        log() << "replSetReconfig admin command received from client" << rsLog;
+        log() << "replSetReconfig admin command received from client";
 
         boost::unique_lock<boost::mutex> lk(_mutex);
 
@@ -1713,8 +1713,7 @@ namespace {
         }
         Status status = newConfig.initialize(newConfigObj);
         if (!status.isOK()) {
-            error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
-                rsLog;
+            error() << "replSetReconfig got " << status << " while parsing " << newConfigObj;
             return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
@@ -1733,20 +1732,20 @@ namespace {
                 args.force);
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
-                newConfigObj << rsLog;
+                newConfigObj;
             return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                           myIndex.getStatus().reason());
         }
 
         log() << "replSetReconfig config object with " << newConfig.getNumMembers() <<
-            " members parses ok" << rsLog;
+            " members parses ok";
 
         if (!args.force) {
             status = checkQuorumForReconfig(&_replExecutor,
                                             newConfig,
                                             myIndex.getValue());
             if (!status.isOK()) {
-                error() << "replSetReconfig failed; " << status << rsLog;
+                error() << "replSetReconfig failed; " << status;
                 return status;
             }
         }
@@ -1796,7 +1795,7 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                               const BSONObj& configObj,
                                                               BSONObjBuilder* resultObj) {
-        log() << "replSetInitiate admin command received from client" << rsLog;
+        log() << "replSetInitiate admin command received from client";
 
         boost::unique_lock<boost::mutex> lk(_mutex);
         if (!_settings.usingReplSets()) {
@@ -1825,7 +1824,7 @@ namespace {
         ReplicaSetConfig newConfig;
         Status status = newConfig.initialize(configObj);
         if (!status.isOK()) {
-            error() << "replSet initiate got " << status << " while parsing " << configObj << rsLog;
+            error() << "replSet initiate got " << status << " while parsing " << configObj;
             return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
@@ -1840,12 +1839,12 @@ namespace {
         StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
         if (!myIndex.isOK()) {
             error() << "replSet initiate got " << myIndex.getStatus() << " while validating " <<
-                configObj << rsLog;
+                configObj;
             return Status(ErrorCodes::InvalidReplicaSetConfig, myIndex.getStatus().reason());
         }
 
         log() << "replSet replSetInitiate config object with " << newConfig.getNumMembers() <<
-            " members parses ok" << rsLog;
+            " members parses ok";
 
         status = checkQuorumForInitiate(
                 &_replExecutor,
@@ -1935,7 +1934,7 @@ namespace {
             result = kActionChooseNewSyncSource;
         }
         _currentState = newState;
-        log() << "transition to " << newState.toString();
+        log() << "transition to " << newState.toString() << rsLog;
         return result;
     }
 
@@ -2048,6 +2047,7 @@ namespace {
                  _replExecutor.now(),
                  myOptime);
          _rsConfig = newConfig;
+         log() << "new replica set config in use: " << _rsConfig.toBSON() << rsLog;
          _thisMembersConfigIndex = myIndex;
 
          if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {

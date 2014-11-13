@@ -47,7 +47,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -183,8 +182,7 @@ namespace {
             syncer.oplogApplication(ctx, stopOpTime);
         }
         catch (const DBException&) {
-            log() << "replSet initial sync failed during oplog application phase, and will retry"
-                  << rsLog;
+            log() << "replSet initial sync failed during oplog application phase, and will retry";
 
             getGlobalReplicationCoordinator()->setMyLastOptime(ctx, OpTime());
             BackgroundSync::get()->setLastAppliedHash(0);
@@ -293,7 +291,7 @@ namespace {
         }
 
         if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
-            log() << "fastsync: skipping database clone" << rsLog;
+            log() << "fastsync: skipping database clone";
 
             // prime oplog
             try {
@@ -377,7 +375,7 @@ namespace {
         {
             AutoGetDb autodb(&txn, "local", MODE_X);
             OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
-            log() << "replSet set minValid=" << lastOpTimeWritten << rsLog;
+            log() << "replSet set minValid=" << lastOpTimeWritten;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.

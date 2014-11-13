@@ -47,7 +47,6 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/scoped_conn.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -71,7 +70,7 @@ namespace repl {
                                            std::vector<Privilege>* out) {}
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
+            log() << "replSet replSetTest command received: " << cmdObj.toString();
 
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
@@ -238,7 +237,7 @@ namespace {
             if (configObj.isEmpty()) {
                 result.append("info2", "no configuration explicitly specified -- making one");
                 log() << "replSet info initiate : no configuration specified.  "
-                    "Using a default configuration for the set" << rsLog;
+                    "Using a default configuration for the set";
 
                 ReplicationCoordinatorExternalStateImpl externalState;
                 std::string name;
@@ -265,7 +264,7 @@ namespace {
                 b.appendArray("members", members.obj());
                 configObj = b.obj();
                 log() << "replSet created this configuration for initiation : " <<
-                        configObj.toString() << rsLog;
+                        configObj.toString();
             }
 
             if (configObj.getField("version").eoo()) {
@@ -695,8 +694,8 @@ namespace {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
-            DEV log() << "replSet received elect msg " << cmdObj.toString() << rsLog;
-            else LOG(2) << "replSet received elect msg " << cmdObj.toString() << rsLog;
+            DEV log() << "replSet received elect msg " << cmdObj.toString();
+            else LOG(2) << "replSet received elect msg " << cmdObj.toString();
 
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())

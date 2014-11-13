@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replset_commands.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 
@@ -52,7 +51,7 @@ namespace repl {
     void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
         if (replSetForceInitialSyncFailure > 0) {
             log() << "replSet test code invoked, forced InitialSync failure: "
-                  << replSetForceInitialSyncFailure << rsLog;
+                  << replSetForceInitialSyncFailure;
             replSetForceInitialSyncFailure--;
             throw DBException("forced error",0);
         }

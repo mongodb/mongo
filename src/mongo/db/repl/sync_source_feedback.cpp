@@ -43,7 +43,6 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
@@ -160,7 +159,7 @@ namespace repl {
         if (hasConnection()) {
             return true;
         }
-        log() << "replset setting syncSourceFeedback to " << host.toString() << rsLog;
+        log() << "replset setting syncSourceFeedback to " << host.toString();
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         try {

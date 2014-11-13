@@ -47,7 +47,6 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -162,13 +161,11 @@ namespace repl {
 
                 // Connected to at least one member, but in all cases we were too stale to use them
                 // as a sync source.
-                log() << "replSet error RS102 too stale to catch up" << rsLog;
-                log() << "replSet our last optime : " << lastOpTimeFetched.toStringLong() << rsLog;
-                log() << "replSet oldest available is " << oldestOpTimeSeen.toStringLong() <<
-                    rsLog;
+                log() << "replSet error RS102 too stale to catch up";
+                log() << "replSet our last optime : " << lastOpTimeFetched.toStringLong();
+                log() << "replSet oldest available is " << oldestOpTimeSeen.toStringLong();
                 log() << "replSet "
-                    "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" 
-                      << rsLog;
+                    "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
                 setMinValid(txn, oldestOpTimeSeen);
                 bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
                 if (!worked) {
@@ -181,7 +178,7 @@ namespace repl {
 
             if (!connect(candidate)) {
                 LOG(2) << "replSet can't connect to " << candidate.toString() << 
-                    " to read operations" << rsLog;
+                    " to read operations";
                 resetConnection();
                 replCoord->blacklistSyncSource(candidate, Date_t(curTimeMillis64() + 10*1000));
                 continue;

@@ -50,7 +50,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -91,8 +90,7 @@ namespace repl {
             // trying to sync with other replicas.
             // TODO(spencer): Use a condition variable to await loading a config
             if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
-                log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds "
-                      << rsLog;
+                log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds ";
                 sleepsecs(5);
                 continue;
             }

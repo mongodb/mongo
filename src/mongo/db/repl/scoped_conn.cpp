@@ -34,7 +34,6 @@
 
 #include "mongo/db/repl/scoped_conn.h"
 
-#include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -60,7 +59,7 @@ namespace repl {
     bool ScopedConn::connect() {
         std::string err;
         if (!connInfo->cc->connect(HostAndPort(_hostport), err)) {
-            log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
+            log() << "couldn't connect to " << _hostport << ": " << err;
             return false;
         }
         connInfo->connected = true;

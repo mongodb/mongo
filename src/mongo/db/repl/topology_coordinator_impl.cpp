@@ -404,8 +404,7 @@ namespace {
         if (hbdata.getOpTime().getSecs()+10 < lastOpApplied.getSecs()) {
             warning() << "attempting to sync from " << target
                       << ", but its latest opTime is " << hbdata.getOpTime().getSecs()
-                      << " and ours is " << lastOpApplied.getSecs() << " so this may not work"
-                      << rsLog;
+                      << " and ours is " << lastOpApplied.getSecs() << " so this may not work";
             response->append("warning",
                              str::stream() << "requested member \"" << target.toString() <<
                                      "\" is more than 10 seconds behind us");

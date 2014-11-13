@@ -51,7 +51,6 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rslog.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/exit.h"
@@ -230,7 +229,7 @@ namespace repl {
             // this is often a no-op
             // but can't be 100% sure
             if( *op.getStringField("op") != 'n' ) {
-                error() << "replSet skipping bad op in oplog: " << op.toString() << rsLog;
+                error() << "replSet skipping bad op in oplog: " << op.toString();
             }
             return true;
         }
@@ -438,7 +437,7 @@ namespace repl {
                 }
                 else if (currentOpTime > endOpTime) {
                     severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
-                            << " without seeing it. Rollback?" << rsLog;
+                            << " without seeing it. Rollback?";
                     fassertFailedNoTrace(18693);
                 }
 
@@ -686,7 +685,7 @@ namespace {
                 }
                 else {
                     warning() << "replSet slavedelay causing a long sleep of " << sleeptime
-                              << " seconds" << rsLog;
+                              << " seconds";
                     // sleep(hours) would prevent reconfigs from taking effect & such!
                     long long waitUntil = b + sleeptime;
                     while(time(0) < waitUntil) {
