@@ -85,8 +85,8 @@ namespace {
         newReplUp();
     }
 
-    void ReplicationCoordinatorExternalStateImpl::startMasterSlave() {
-        repl::startMasterSlave();
+    void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext* txn) {
+        repl::startMasterSlave(txn);
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {

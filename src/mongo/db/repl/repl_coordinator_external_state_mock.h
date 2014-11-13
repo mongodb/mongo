@@ -49,7 +49,7 @@ namespace repl {
         ReplicationCoordinatorExternalStateMock();
         virtual ~ReplicationCoordinatorExternalStateMock();
         virtual void startThreads();
-        virtual void startMasterSlave();
+        virtual void startMasterSlave(OperationContext*);
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();

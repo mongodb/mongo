@@ -1268,8 +1268,7 @@ namespace repl {
         }
     }
 
-    void startMasterSlave() {
-        OperationContextImpl txn;
+    void startMasterSlave(OperationContext* txn) {
 
         oldRepl();
 
@@ -1278,12 +1277,12 @@ namespace repl {
             return;
 
         {
-            Lock::GlobalWrite lk(txn.lockState());
+            Lock::GlobalWrite lk(txn->lockState());
             replLocalAuth();
         }
 
         {
-            ReplSource temp(&txn); // Ensures local.me is populated
+            ReplSource temp(txn); // Ensures local.me is populated
         }
 
         if ( replSettings.slave ) {
@@ -1294,7 +1293,7 @@ namespace repl {
 
         if ( replSettings.master ) {
             LOG(1) << "master=true" << endl;
-            createOplog(&txn);
+            createOplog(txn);
             boost::thread t(replMasterThread);
         }
 

@@ -69,7 +69,7 @@ namespace repl {
         /**
          * Starts the Master/Slave threads and sets up logOp
          */
-        virtual void startMasterSlave() = 0;
+        virtual void startMasterSlave(OperationContext* txn) = 0;
 
         /**
          * Performs any necessary external state specific shutdown tasks, such as cleaning up

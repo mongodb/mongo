@@ -288,7 +288,7 @@ namespace {
         if (!_settings.usingReplSets()) {
             // Must be Master/Slave
             invariant(_settings.master || _settings.slave);
-            _externalState->startMasterSlave();
+            _externalState->startMasterSlave(txn);
             return;
         }
 

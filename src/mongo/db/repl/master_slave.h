@@ -50,7 +50,7 @@ namespace mongo {
 namespace repl {
 
     // Main entry point for master/slave at startup time.
-    void startMasterSlave();
+    void startMasterSlave(OperationContext* txn);
 
     // externed for use with resync.cpp
     extern volatile int relinquishSyncingSome;

@@ -54,7 +54,7 @@ namespace repl {
     ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
     void ReplicationCoordinatorExternalStateMock::startThreads() {}
-    void ReplicationCoordinatorExternalStateMock::startMasterSlave() {}
+    void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
     void ReplicationCoordinatorExternalStateMock::shutdown() {}
     void ReplicationCoordinatorExternalStateMock::forwardSlaveHandshake() {}
     void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}

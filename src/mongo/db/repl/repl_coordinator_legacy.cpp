@@ -95,7 +95,7 @@ namespace repl {
                                                                    _settings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
         } else {
-            startMasterSlave();
+            startMasterSlave(txn);
         }
     }
 
