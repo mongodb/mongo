@@ -4,11 +4,6 @@
  *
  * See the file LICENSE for redistribution information.
  */
-/*
- * REFERENCES:
- *      http://www.eecs.harvard.edu/~kirsch/pubs/bbbf/esa06.pdf
- *      http://code.google.com/p/cityhash-c/
- */
 
 struct __wt_bloom {
 	const char *uri;
