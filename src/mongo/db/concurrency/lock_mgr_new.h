@@ -74,7 +74,7 @@ namespace mongo {
          * @resId ResourceId for which a lock operation was previously called.
          * @result Outcome of the lock operation.
          */
-        virtual void notify(const ResourceId& resId, LockResult result) = 0;
+        virtual void notify(ResourceId resId, LockResult result) = 0;
     };
 
 
@@ -267,7 +267,7 @@ namespace mongo {
          * Retrieves the bucket in which the particular resource must reside. There is no need to
          * hold a lock when calling this function.
          */
-        LockBucket* _getBucket(const ResourceId& resId) const;
+        LockBucket* _getBucket(ResourceId resId) const;
 
         /**
          * Prints the contents of a bucket to the log.
@@ -287,8 +287,7 @@ namespace mongo {
          */
         void _onLockModeChanged(LockHead* lock, bool checkConflictQueue);
 
-
-        unsigned _numLockBuckets;
+        static const unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
     };
 
@@ -351,7 +350,7 @@ namespace mongo {
         typedef std::vector<LockerId> ConflictingOwnersList;
 
         struct Edges {
-            Edges(const ResourceId& resId) : resId(resId) { }
+            explicit Edges(ResourceId resId) : resId(resId) { }
 
             // Resource id indicating the lock node
             ResourceId resId;

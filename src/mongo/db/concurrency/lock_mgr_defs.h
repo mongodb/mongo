@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/static_assert.hpp>
+#include <boost/cstdint.hpp>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -144,41 +145,37 @@ namespace mongo {
         ResourceTypesCount
     };
 
-    // We only use 3 bits for the resource type in the ResourceId hash
-    BOOST_STATIC_ASSERT(ResourceTypesCount <= 8);
-
     /**
      * Returns a human-readable name for the specified resource type.
      */
     const char* resourceTypeName(ResourceType resourceType);
 
-
     /**
      * Uniquely identifies a lockable resource.
      */
     class ResourceId {
+        // We only use 3 bits for the resource type in the ResourceId hash
+        enum {resourceTypeBits = 3};
+        BOOST_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
+
     public:
         ResourceId() : _fullHash(0) { }
         ResourceId(ResourceType type, const StringData& ns);
         ResourceId(ResourceType type, const std::string& ns);
         ResourceId(ResourceType type, uint64_t hashId);
 
-        bool isValid() const { return _type != RESOURCE_INVALID; }
+        bool isValid() const { return getType() != RESOURCE_INVALID; }
 
         operator uint64_t() const {
             return _fullHash;
         }
 
-        bool operator== (const ResourceId& other) const {
-            return _fullHash == other._fullHash;
-        }
-
         ResourceType getType() const {
-            return static_cast<ResourceType>(_type);
+            return static_cast<ResourceType>(_fullHash >> (64 - resourceTypeBits));
         }
 
         uint64_t getHashId() const {
-            return _hashId;
+            return _fullHash & (UINT64_MAX >> resourceTypeBits);
         }
 
         std::string toString() const;
@@ -186,27 +183,24 @@ namespace mongo {
     private:
 
         /**
-         * 64-bit hash of the resource
+         * The top 'resourceTypeBits' bits of '_fullHash' represent the resource type,
+         * while the remaining bits contain the bottom bits of the hashId. This avoids false
+         * conflicts between resources of different types, which is necessary to prevent deadlocks.
          */
-        union {
-            struct {
-                uint64_t     _type   : 3;
-                uint64_t     _hashId : 61;
-            };
+        uint64_t _fullHash;
 
-            uint64_t _fullHash;
-        };
+        static uint64_t fullHash(ResourceType type, uint64_t hashId);
 
 #ifdef _DEBUG
-        // Keep the complete namespace name for debugging purposes (TODO: this will be removed once
-        // we are confident in the robustness of the lock manager).
+        // Keep the complete namespace name for debugging purposes (TODO: this will be
+        // removed once we are confident in the robustness of the lock manager).
         std::string _nsCopy;
 #endif
     };
 
 #ifndef _DEBUG
-    // Treat the resource ids as 64-bit integers in release mode in order to ensure we do not
-    // spend too much time doing comparisons for hashing.
+    // Treat the resource ids as 64-bit integers in release mode in order to ensure we do
+    // not spend too much time doing comparisons for hashing.
     BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
 

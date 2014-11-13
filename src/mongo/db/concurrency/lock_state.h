@@ -59,7 +59,7 @@ namespace mongo {
 
     private:
 
-        virtual void notify(const ResourceId& resId, LockResult result);
+        virtual void notify(ResourceId resId, LockResult result);
 
         // These two go together to implement the conditional variable pattern.
         boost::mutex _mutex;
@@ -104,17 +104,17 @@ namespace mongo {
 
         virtual bool inAWriteUnitOfWork() const { return _wuowNestingLevel > 0; }
 
-        virtual LockResult lock(const ResourceId& resId,
+        virtual LockResult lock(ResourceId resId,
                                 LockMode mode, 
                                 unsigned timeoutMs = UINT_MAX,
                                 bool checkDeadlock = false);
 
-        virtual void downgrade(const ResourceId& resId, LockMode newMode);
+        virtual void downgrade(ResourceId resId, LockMode newMode);
 
-        virtual bool unlock(const ResourceId& resId);
+        virtual bool unlock(ResourceId resId);
 
-        virtual LockMode getLockMode(const ResourceId& resId) const;
-        virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+        virtual LockMode getLockMode(ResourceId resId) const;
+        virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const;
         virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const;
         virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const;
 
@@ -133,7 +133,7 @@ namespace mongo {
          * NOTE: Must only be used to implement the actual lock call and for unit tests, because
          * it skips any internal consistency checks.
          */
-        LockResult lockImpl(const ResourceId& resId, LockMode mode);
+        LockResult lockImpl(ResourceId resId, LockMode mode);
 
     private:
 

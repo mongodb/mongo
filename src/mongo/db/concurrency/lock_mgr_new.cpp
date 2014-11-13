@@ -230,7 +230,6 @@ namespace {
         // Id of the resource which this lock protects
         ResourceId resourceId;
 
-
         //
         // Granted queue
         //
@@ -363,9 +362,10 @@ namespace {
     // LockManager
     //
 
+    //  Have more buckets than CPUs to reduce contention on lock and caches
+    const unsigned LockManager::_numLockBuckets(128);
+
     LockManager::LockManager() {
-        //  Have more buckets than CPUs to reduce contention on lock and caches
-        _numLockBuckets = 128;
         _lockBuckets = new LockBucket[_numLockBuckets];
     }
 
@@ -705,7 +705,7 @@ namespace {
         invariant((lock->conflictModes == 0) ^ (lock->conflictList._front != NULL));
     }
 
-    LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) const {
+    LockManager::LockBucket* LockManager::_getBucket(ResourceId resId) const {
         return &_lockBuckets[resId % _numLockBuckets];
     }
 
@@ -930,33 +930,32 @@ namespace {
 
     static const StringData::Hasher stringDataHashFunction = StringData::Hasher();
 
-    ResourceId::ResourceId(ResourceType type, const StringData& ns) {
-        _type = type;
-        _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
+    uint64_t ResourceId::fullHash(ResourceType type, uint64_t hashId) {
+        return (static_cast<uint64_t>(type) << (64 - resourceTypeBits))
+                + (hashId & (UINT64_MAX >> resourceTypeBits));
+    }
 
+    ResourceId::ResourceId(ResourceType type, const StringData& ns)
+        : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
 #ifdef _DEBUG
         _nsCopy = ns.toString();
 #endif
     }
 
-    ResourceId::ResourceId(ResourceType type, const string& ns) {
-        _type = type;
-        _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
-
+    ResourceId::ResourceId(ResourceType type, const string& ns)
+        : _fullHash(fullHash(type, stringDataHashFunction(ns))) {
 #ifdef _DEBUG
         _nsCopy = ns;
 #endif
     }
 
-    ResourceId::ResourceId(ResourceType type, uint64_t hashId) {
-        _type = type;
-        _hashId = hashId;
-    }
+    ResourceId::ResourceId(ResourceType type, uint64_t hashId)
+        : _fullHash(fullHash(type, hashId)) { }
 
     string ResourceId::toString() const {
         StringBuilder ss;
-        ss << "{" << _fullHash << ": " << resourceTypeName(static_cast<ResourceType>(_type))
-           << ", " << _hashId;
+        ss << "{" << _fullHash << ": " << resourceTypeName(getType())
+           << ", " << getHashId();
 
 #ifdef _DEBUG
         ss << ", " << _nsCopy;

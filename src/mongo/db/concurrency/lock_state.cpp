@@ -83,9 +83,9 @@ namespace mongo {
          * delay releases for exclusive locks (locks that are for write operations) in order to
          * ensure that the data they protect is committed successfully.
          */
-        bool shouldDelayUnlock(const ResourceId& resId, LockMode mode) {
-            // Global and flush lock are not used to protect transactional resources and as such, they
-            // need to be acquired and released when requested.
+        bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
+            // Global and flush lock are not used to protect transactional resources and as
+            // such, they need to be acquired and released when requested.
             if (resId == resourceIdGlobal) {
                 return false;
             }
@@ -275,7 +275,7 @@ namespace mongo {
         return _result;
     }
 
-    void CondVarLockGrantNotification::notify(const ResourceId& resId, LockResult result) {
+    void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         invariant(_result == LOCK_INVALID);
         _result = result;
@@ -420,7 +420,7 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    LockResult LockerImpl<IsForMMAPV1>::lock(const ResourceId& resId,
+    LockResult LockerImpl<IsForMMAPV1>::lock(ResourceId resId,
                                              LockMode mode,
                                              unsigned timeoutMs,
                                              bool checkDeadlock) {
@@ -500,19 +500,19 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::downgrade(const ResourceId& resId, LockMode newMode) {
+    void LockerImpl<IsForMMAPV1>::downgrade(ResourceId resId, LockMode newMode) {
         LockRequestsMap::Iterator it = _requests.find(resId);
         globalLockManager.downgrade(it.objAddr(), newMode);
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::unlock(const ResourceId& resId) {
+    bool LockerImpl<IsForMMAPV1>::unlock(ResourceId resId) {
         LockRequestsMap::Iterator it = _requests.find(resId);
         return _unlockImpl(it);
     }
 
     template<bool IsForMMAPV1>
-    LockMode LockerImpl<IsForMMAPV1>::getLockMode(const ResourceId& resId) const {
+    LockMode LockerImpl<IsForMMAPV1>::getLockMode(ResourceId resId) const {
         scoped_spinlock scopedLock(_lock);
 
         const LockRequestsMap::ConstIterator it = _requests.find(resId);
@@ -522,7 +522,7 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
+    bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(ResourceId resId, LockMode mode) const {
         return isModeCovered(mode, getLockMode(resId));
     }
 
@@ -647,7 +647,7 @@ namespace mongo {
 
         // Next, the non-global locks.
         for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
-            const ResourceId& resId = it.key();
+            const ResourceId resId = it.key();
 
             // We don't support saving and restoring document-level locks.
             invariant(RESOURCE_DATABASE == resId.getType() ||
@@ -683,7 +683,7 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    LockResult LockerImpl<IsForMMAPV1>::lockImpl(const ResourceId& resId, LockMode mode) {
+    LockResult LockerImpl<IsForMMAPV1>::lockImpl(ResourceId resId, LockMode mode) {
         LockRequest* request;
         bool isNew = true;
 

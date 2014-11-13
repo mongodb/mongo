@@ -128,7 +128,7 @@ namespace mongo {
          *
          * @return All LockResults except for LOCK_WAITING, because it blocks.
          */
-        virtual LockResult lock(const ResourceId& resId,
+        virtual LockResult lock(ResourceId resId,
                                 LockMode mode,
                                 unsigned timeoutMs = UINT_MAX,
                                 bool checkDeadlock = false) = 0;
@@ -136,7 +136,7 @@ namespace mongo {
         /**
          * Downgrades the specified resource's lock mode without changing the reference count.
          */
-        virtual void downgrade(const ResourceId& resId, LockMode newMode) = 0;
+        virtual void downgrade(ResourceId resId, LockMode newMode) = 0;
 
         /**
          * Releases a lock previously acquired through a lock call. It is an error to try to
@@ -145,7 +145,7 @@ namespace mongo {
          * @return true if the lock was actually released; false if only the reference count was 
          *              decremented, but the lock is still held.
          */
-        virtual bool unlock(const ResourceId& resId) = 0;
+        virtual bool unlock(ResourceId resId) = 0;
 
         /**
          * Retrieves the mode in which a lock is held or checks whether the lock held for a
@@ -154,8 +154,8 @@ namespace mongo {
          * For example isLockHeldForMode will return true for MODE_S, if MODE_X is already held,
          * because MODE_X covers MODE_S.
          */
-        virtual LockMode getLockMode(const ResourceId& resId) const = 0;
-        virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const = 0;
+        virtual LockMode getLockMode(ResourceId resId) const = 0;
+        virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const = 0;
 
         // These are shortcut methods for the above calls. They however check that the entire
         // hierarchy is properly locked and because of this they are very expensive to call.

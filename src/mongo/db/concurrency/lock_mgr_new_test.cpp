@@ -59,6 +59,21 @@ namespace mongo {
         ASSERT_EQUALS(resIdString, resIdStringData);
     }
 
+    TEST(ResourceId, Masking) {
+        const ResourceType maxRes = static_cast<ResourceType>(ResourceTypesCount - 1);
+        const uint64_t maxHash = (1ULL<<61) - 1; //  Only 61 bits usable for hash
+        ResourceType resources[3] = {maxRes, RESOURCE_GLOBAL, RESOURCE_DOCUMENT};
+        uint64_t hashes[3] = {maxHash, maxHash / 3, maxHash / 3 * 2};
+
+        //  The test below verifies that types/hashes are stored/retrieved unchanged
+        for (int h = 0; h < 3; h++) {
+            for (int r = 0; r < 3; r++) {
+                ResourceId id(resources[r], hashes[h]);
+                ASSERT_EQUALS(id.getHashId(), hashes[h]);
+                ASSERT_EQUALS(id.getType(), resources[r]);
+            }
+        }
+    }
 
     //
     // LockManager
