@@ -544,8 +544,8 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		//
 		// Without write commands, we can't say for sure how many documents
 		// were inserted when we use bulk inserts so we assume the entire batch
-		// succeeded - even if an error is returned. The result is that we may
-		// report that more documents - than were actually inserted - were
+		// insert failed if an error is returned. The result is that we may
+		// report that less documents - than were actually inserted - were
 		// inserted into the database. This will change as soon as BulkResults
 		// are supported by the driver
 		if err == nil {

@@ -22,10 +22,10 @@ t.runTool("dump" , "--out" , t.ext, "--username", "backup", "--password", "passw
 c.drop();
 assert.eq(0 , c.count() , "after drop");
 
-t.runTool("restore" , "--dir" , t.ext, "--w", "0"); // Should fail
+t.runTool("restore" , "--dir" , t.ext, "--writeConcern", "0"); // Should fail
 assert.eq(0 , c.count() , "after restore without auth");
 
-t.runTool("restore" , "--dir" , t.ext, "--username", "restore", "--password", "password", "--w", "0");
+t.runTool("restore" , "--dir" , t.ext, "--username", "restore", "--password", "password", "--writeConcern", "0");
 assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 2");
 assert.eq(22 , c.findOne().a , "after restore 2");

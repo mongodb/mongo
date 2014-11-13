@@ -15,6 +15,9 @@ func TestBuildWriteConcern(t *testing.T) {
 			writeConcern, err = BuildWriteConcern(`{w:"majority"}`, true)
 			So(err, ShouldBeNil)
 			So(writeConcern.WMode, ShouldEqual, "majority")
+			writeConcern, err = BuildWriteConcern(`majority`, true)
+			So(err, ShouldBeNil)
+			So(writeConcern.WMode, ShouldEqual, "majority")
 			writeConcern, err = BuildWriteConcern(`tagset`, true)
 			So(err, ShouldBeNil)
 			So(writeConcern.WMode, ShouldEqual, "tagset")
@@ -145,6 +148,10 @@ func TestConstructWCObject(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(writeConcern, ShouldBeNil)
 			writeConcernString = `{w: 0}`
+			writeConcern, err = constructWCObject(writeConcernString)
+			So(err, ShouldBeNil)
+			So(writeConcern, ShouldBeNil)
+			writeConcernString = `0`
 			writeConcern, err = constructWCObject(writeConcernString)
 			So(err, ShouldBeNil)
 			So(writeConcern, ShouldBeNil)

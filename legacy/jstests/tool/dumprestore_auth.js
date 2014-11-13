@@ -62,11 +62,11 @@ c.drop();
 assert.eq(0 , c.count() , "after drop");
 
 // Restore should fail without user & pass
-t.runTool("restore" , "--dir" , t.ext, "--w" ,"0");
+t.runTool("restore" , "--dir" , t.ext, "--writeConcern" ,"0");
 assert.eq(0 , c.count() , "after restore without auth");
 
 // Restore should pass with authorized user
-t.runTool("restore" , "--dir" , t.ext, "--username", "restore", "--password", "password", "--w", "0");
+t.runTool("restore" , "--dir" , t.ext, "--username", "restore", "--password", "password", "--writeConcern", "0");
 assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 2");
 assert.eq(22 , c.findOne().a , "after restore 2");
@@ -83,12 +83,12 @@ assert.eq(0 , c.count() , "after drop");
 
 // Restore with wrong user
 t.runTool("restore" , "--username", "restoreChester", "--password", "password",
-          "--db", dbName, "--collection", "foo", t.ext+dbName+"/foo.bson", "--w", "0");
+          "--db", dbName, "--collection", "foo", t.ext+dbName+"/foo.bson", "--writeConcern", "0");
 assert.eq(0 , c.count() , "after restore with wrong user");
 
 // Restore with proper user
 t.runTool("restore" , "--username", "restoreFoo", "--password", "password",
-          "--db", dbName, "--collection", "foo", t.ext+dbName+"/foo.bson", "--w", "0");
+          "--db", dbName, "--collection", "foo", t.ext+dbName+"/foo.bson", "--writeConcern", "0");
 assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 3");
 assert.eq(22 , c.findOne().a , "after restore 3");

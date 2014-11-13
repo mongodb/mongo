@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2"
+	"strconv"
 )
 
 // write concern fields
@@ -36,7 +37,7 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 		// allows a default to the old behavior wherein the entire argument
 		// passed in is assigned to the 'w' field - thus allowing users pass
 		// a write concern that looks like: "majority", 0, "4", etc.
-		wValue, err := ToInt(writeConcern)
+		wValue, err := strconv.Atoi(writeConcern)
 		if err != nil {
 			sessionSafety.WMode = writeConcern
 		} else {

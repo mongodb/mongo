@@ -15,7 +15,7 @@ func (self *InputOptions) Name() string {
 
 type OutputOptions struct {
 	Drop             bool   `long:"drop" description:"Drop each collection before import"`
-	WriteConcern     string `long:"w" default:"majority" description:"Write concern options e.g. --w majority, --w '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
+	WriteConcern     string `long:"writeConcern" default:"majority" description:"Write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
 	NoIndexRestore   bool   `long:"noIndexRestore" description:"Don't restore indexes"`
 	NoOptionsRestore bool   `long:"noOptionsRestore" description:"Don't restore options"`
 	KeepIndexVersion bool   `long:"keepIndexVersion" description:"Don't update index version"`
