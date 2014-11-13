@@ -189,7 +189,6 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::setOplogReadTill( const DiskLoc& loc ) {
-        invariant( _session == NULL || _oplogReadTill == loc );
         _oplogReadTill = loc;
     }
 
