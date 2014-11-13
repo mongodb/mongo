@@ -2,6 +2,9 @@
 #    Tools Driver Config for MCI      #
 #######################################
 
+# run the same task in the previous revision if the current task fails
+stepback: true
+
 mongo_tools_variables:
 
 ## Common download URLs (merge in as hashes)
