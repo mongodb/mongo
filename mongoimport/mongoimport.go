@@ -528,14 +528,6 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		numInserted, err = mongoImport.handleUpsert(documents, collection)
 		return err
 	} else {
-		// note that this count may not be entirely accurate if some
-		// ingester workers insert when another errors out.
-		// without write commands, we can't say for sure how many documents were
-		// inserted when we use bulk inserts so we assume the entire batch
-		// succeeded - even if an error is returned. The result is that we may
-		// report that more documents - than were actually inserted - were
-		// inserted into the database. This will change as soon as BulkResults
-		// are supported by the driver
 		bulk := collection.Bulk()
 		for _, document := range documents {
 			bulk.Insert(document)
@@ -546,7 +538,19 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		// mgo.Bulk doesn't currently implement write commands so mgo.BulkResult
 		// isn't informative
 		_, err = bulk.Run()
-		numInserted = len(documents)
+
+		// TOOLS-349: Note that this count may not be entirely accurate if some
+		// ingester workers insert when another errors out.
+		//
+		// Without write commands, we can't say for sure how many documents
+		// were inserted when we use bulk inserts so we assume the entire batch
+		// succeeded - even if an error is returned. The result is that we may
+		// report that more documents - than were actually inserted - were
+		// inserted into the database. This will change as soon as BulkResults
+		// are supported by the driver
+		if err == nil {
+			numInserted = len(documents)
+		}
 	}
 	return filterIngestError(stopOnError, err)
 }
