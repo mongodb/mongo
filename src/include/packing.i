@@ -670,8 +670,10 @@ __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep)
 	size_t curr_size = *sizep;
 	size_t field_size, prev_field_size = 1;
 
-	while ((field_size = __wt_vsize_uint(curr_size)) != prev_field_size)
+	while ((field_size = __wt_vsize_uint(curr_size)) != prev_field_size) {
 		curr_size += field_size - prev_field_size;
+		prev_field_size = field_size;
+	}
 
 	/* Make sure the field size we calculated matches the adjusted size. */
 	WT_ASSERT(session, field_size == __wt_vsize_uint(curr_size));
