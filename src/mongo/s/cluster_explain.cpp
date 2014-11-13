@@ -130,11 +130,22 @@ namespace mongo {
         // Check that the result from each shard has a true value for "ok" and has
         // the expected "queryPlanner" field.
         for (size_t i = 0; i < shardResults.size(); i++) {
-            if (!shardResults[i].result["ok"].trueValue() ||
-                Object != shardResults[i].result["queryPlanner"].type()) {
-                return Status(ErrorCodes::OperationFailed,
-                              str::stream() << "Shard " << shardResults[i].target.toString()
-                                            << " failed: " << shardResults[i].result);
+            if (!shardResults[i].result["ok"].trueValue()) {
+                // Try to pass up the error code from the shard.
+                ErrorCodes::Error error = ErrorCodes::OperationFailed;
+                if (shardResults[i].result["code"].isNumber()) {
+                    error = ErrorCodes::fromInt(shardResults[i].result["code"].numberInt());
+                }
+
+                return Status(error, str::stream()
+                    << "Explain command on shard " << shardResults[i].target.toString()
+                    << " failed, caused by: " << shardResults[i].result);
+            }
+
+            if (Object != shardResults[i].result["queryPlanner"].type()) {
+                return Status(ErrorCodes::OperationFailed, str::stream()
+                    << "Explain command on shard " << shardResults[i].target.toString()
+                    << " failed, caused by: " << shardResults[i].result);
             }
 
             if (shardResults[i].result.hasField("executionStats")) {

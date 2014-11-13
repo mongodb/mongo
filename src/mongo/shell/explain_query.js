@@ -5,6 +5,10 @@
 
 var DBExplainQuery = (function() {
 
+    // We expect to get back a "command not found" error in a sharded configuration if any
+    // of the shards have not been upgraded and don't implement the explain command.
+    var CMD_NOT_FOUND_CODE = 59;
+
     //
     // Private methods.
     //
@@ -50,6 +54,28 @@ var DBExplainQuery = (function() {
             dbQuery[name].apply(dbQuery, arguments);
             return explainQuery;
         }
+    }
+
+    /**
+     * Where possible, the explain query will be sent to the server as an explain command.
+     * However, if one of the nodes we are talking to (either a standalone or a shard in
+     * a sharded cluster) is of a version that doesn't have the explain command, we will
+     * use this function to fall back on the $explain query option.
+     */
+    function explainWithLegacyQueryOption(explainQuery) {
+        // The wire protocol version indicates that the server does not have the explain
+        // command. Add $explain to the query and send it to the server.
+        var clone = explainQuery._query.clone();
+        clone._addSpecial("$explain", true);
+        var result = clone.next();
+
+        // Remove some fields from the explain if verbosity is
+        // just "queryPlanner".
+        if ("queryPlanner" === explainQuery._verbosity) {
+            removeVerboseFields(result);
+        }
+
+        return Explainable.throwOrReturn(result);
     }
 
     function constructor(query, verbosity) {
@@ -135,22 +161,16 @@ var DBExplainQuery = (function() {
                 explainCmd["verbosity"] = this._verbosity;
 
                 var explainResult = this._query._db.runCommand(explainCmd);
+                if (!explainResult.ok && explainResult.code === CMD_NOT_FOUND_CODE) {
+                    // One of the shards doesn't have the explain command available. Retry using
+                    // the legacy $explain format, which should be supported by all shards.
+                    return explainWithLegacyQueryOption(this);
+                }
+
                 return Explainable.throwOrReturn(explainResult);
             }
             else {
-                // The wire protocol version indicates that the server does not have the explain
-                // command. Add $explain to the query and send it to the server.
-                var clone = this._query.clone();
-                clone._addSpecial("$explain", true);
-                var result = clone.next();
-
-                // Remove some fields from the explain if verbosity is
-                // just "queryPlanner".
-                if ("queryPlanner" === this._verbosity) {
-                    removeVerboseFields(result);
-                }
-
-                return Explainable.throwOrReturn(result);
+                return explainWithLegacyQueryOption(this);
             }
         }
 
