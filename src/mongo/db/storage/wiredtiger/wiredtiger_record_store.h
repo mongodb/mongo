@@ -214,6 +214,7 @@ namespace mongo {
             bool _forParallelCollectionScan;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
+            DiskLoc _readUntilForOplog;
 
             DiskLoc _lastLoc; // the last thing returned from getNext()
         };
@@ -236,6 +237,7 @@ namespace mongo {
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
         StatusWith<DiskLoc> extractAndCheckLocForOplog(const char* data, int len);
+        void _oplogSetStartHack( WiredTigerRecoveryUnit* wru ) const;
 
         const std::string _uri;
         const uint64_t _instanceId; // not persisted
@@ -252,6 +254,8 @@ namespace mongo {
 
         typedef std::vector<DiskLoc> SortedDiskLocs;
         SortedDiskLocs _uncommittedDiskLocs;
+        DiskLoc _oplog_visibleTo;
+        DiskLoc _oplog_highestSeen;
         mutable boost::mutex _uncommittedDiskLocsMutex;
 
         AtomicUInt64 _nextIdNum;

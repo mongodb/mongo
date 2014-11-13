@@ -355,59 +355,90 @@ namespace mongo {
     TEST(WiredTigerRecordStoreTest, OplogHack) {
         WiredTigerHarnessHelper harnessHelper;
         scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("local.oplog.foo"));
-        scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
 
-        // always illegal
-        ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,-1)).getStatus(),
+            // always illegal
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,-1)).getStatus(),
                   ErrorCodes::BadValue);
 
-        {
-            BSONObj obj = BSON("not_ts" << OpTime(2,1));
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
-                                       false ).getStatus(),
-                      ErrorCodes::BadValue);
+            {
+                BSONObj obj = BSON("not_ts" << OpTime(2,1));
+                ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
+                                           false ).getStatus(),
+                          ErrorCodes::BadValue);
 
-            obj = BSON( "ts" << "not an OpTime" );
-            ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
-                                       false ).getStatus(),
-                      ErrorCodes::BadValue);
+                obj = BSON( "ts" << "not an OpTime" );
+                ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
+                                           false ).getStatus(),
+                          ErrorCodes::BadValue);
+            }
+
+            // currently dasserts
+            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << OpTime(-2,1))).getStatus(),
+            // ErrorCodes::BadValue);
+
+            // success cases
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
+                      DiskLoc(1,1));
+
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
+                      DiskLoc(1,2));
+
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
+                      DiskLoc(2,2));
         }
 
-        // currently dasserts
-        // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << OpTime(-2,1))).getStatus(),
-                  // ErrorCodes::BadValue);
-
-        // success cases
-        ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
-                  DiskLoc(1,1));
-
-        ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
-                  DiskLoc(1,2));
-
-        ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
-                  DiskLoc(2,2));
-
-        // find start
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(0,1)), DiskLoc()); // nothing <=
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,1)), DiskLoc(1,2)); // between
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,2)), DiskLoc(2,2)); // ==
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2)); // > highest
-
-        rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(2,2),  false); // no-op
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2));
-
-        rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  false); // deletes 2,2
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,2));
-
-        rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  true); // deletes 1,2
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,1));
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            // find start
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(0,1)), DiskLoc()); // nothing <=
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,1)), DiskLoc(1,2)); // between
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,2)), DiskLoc(2,2)); // ==
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2)); // > highest
+        }
 
         {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(2,2),  false); // no-op
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  false); // deletes 2,2
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,2));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  true); // deletes 1,2
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,1));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
             WriteUnitOfWork wuow(opCtx.get());
             ASSERT_OK(rs->truncate(opCtx.get())); // deletes 1,1 and leaves collection empty
             wuow.commit();
         }
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc());
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc());
+        }
     }
 
     TEST(WiredTigerRecordStoreTest, OplogHackOnNonOplog) {

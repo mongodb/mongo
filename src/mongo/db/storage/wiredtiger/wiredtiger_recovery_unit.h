@@ -37,6 +37,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/timer.h"
@@ -83,6 +84,9 @@ namespace mongo {
         bool everStartedWrite() const { return _everStartedWrite; }
         int depth() const { return _depth; }
 
+        void setOplogReadTill( const DiskLoc& loc );
+        DiskLoc getOplogReadTill() const { return _oplogReadTill; }
+
         static WiredTigerRecoveryUnit* get(OperationContext *txn);
 
     private:
@@ -102,6 +106,7 @@ namespace mongo {
         Timer _timer;
         bool _currentlySquirreled;
         bool _syncing;
+        DiskLoc _oplogReadTill;
 
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
