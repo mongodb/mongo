@@ -287,8 +287,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	CONFIG_OPT *popt;
 	char *newstr, **strp;
-	size_t i, nopt;
-	uint64_t newlen;
+	size_t i, newlen, nopt;
 	void *valueloc;
 
 	popt = NULL;

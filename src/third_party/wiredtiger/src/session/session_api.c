@@ -870,6 +870,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	ret = __wt_txn_checkpoint(session, cfg);
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
 	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
@@ -997,7 +998,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
-	__wt_random_init(session_ret->rnd);
+	if (WT_SESSION_FIRST_USE(session_ret))
+		__wt_random_init(session_ret->rnd);
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);
@@ -1014,7 +1016,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 * session close because access to it isn't serialized.  Allocate the
 	 * first time we open this session.
 	 */
-	if (session_ret->hazard == NULL)
+	if (WT_SESSION_FIRST_USE(session_ret))
 		WT_ERR(__wt_calloc_def(
 		    session, conn->hazard_max, &session_ret->hazard));
 

@@ -33,10 +33,10 @@ from subprocess import call
 
 # Make sure Python can find files in the tools directory
 tool_dir = os.path.split(sys.argv[0])[0]
-sys.path.append(tool_dir)
-# Make sure Python finds the NVD3 in our third party directory, to
-# avoid compatability issues
-sys.path.append(os.path.join(tool_dir, "third_party"))
+
+# Make sure Python finds the NVD3 in our third party directory.
+# To avoid compatability issues, prepend it to the system path.
+sys.path = [ os.path.join(tool_dir, "3rdparty") ] + sys.path
 
 try:
     from stat_data import no_scale_per_second_list, no_clear_list
