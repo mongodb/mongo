@@ -18,12 +18,16 @@ var testOnlyCommands = ['_testDistLockWithSyncCluster',
 var assertCmdNotFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
     assert.eq(0, res.ok);
-    assert(res.errmsg == 'no such cmd: ' + cmdName);
+    assert.eq(59, res.code, 'expected CommandNotFound(59) error code for test command ' + cmdName);
 }
 
 var assertCmdFound = function(db, cmdName) {
     var res = db.runCommand(cmdName);
-    assert(res.ok || res.errmsg != 'no such cmd' + cmdName);
+    if (!res.ok) {
+        assert.neq(59, res.code,
+                   'test command ' + cmdName + ' should either have succeeded or ' +
+                   'failed with an error code other than CommandNotFound(59)');
+    }
 }
 
 jsTest.setOption('enableTestCommands', false);
