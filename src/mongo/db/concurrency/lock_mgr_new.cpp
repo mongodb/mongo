@@ -382,22 +382,9 @@ namespace {
         delete[] _lockBuckets;
     }
 
-    LockResult LockManager::lock(const ResourceId& resId, LockRequest* request, LockMode mode) {
-        // Fast path for acquiring the same lock multiple times in modes, which are already covered
-        // by the current mode. It is safe to do this without locking, because 1) all calls for the
-        // same lock request must be done on the same thread and 2) if there are lock requests
-        // hanging off a given LockHead, then this lock will never disappear.
-        if ((LockConflictsTable[request->mode] | LockConflictsTable[mode]) == 
-                LockConflictsTable[request->mode]) {
-            request->recursiveCount++;
-            return LOCK_OK;
-        }
-
-        // TODO: For the time being we do not need conversions between unrelated lock modes (i.e.,
-        // modes which both add and remove to the conflicts set), so these are not implemented yet
-        // (e.g., S -> IX).
-        invariant((LockConflictsTable[request->mode] | LockConflictsTable[mode]) == 
-                LockConflictsTable[mode]);
+    LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mode) {
+        // Sanity check that requests are not being reused without proper cleanup
+        invariant(request->status == LockRequest::STATUS_NEW);
 
         LockBucket* bucket = _getBucket(resId);
         SimpleMutex::scoped_lock scopedLock(bucket->mutex);
@@ -406,111 +393,123 @@ namespace {
 
         LockHeadMap::iterator it = bucket->data.find(resId);
         if (it == bucket->data.end()) {
-            // Lock is free (not on the map)
-            invariant(request->status == LockRequest::STATUS_NEW);
-
             lock = new LockHead();
             lock->initNew(resId);
 
             bucket->data.insert(LockHeadPair(resId, lock));
         }
         else {
-            // Lock is not free
             lock = it->second;
         }
 
-        // Sanity check if requests are being reused
-        invariant(request->lock == NULL || request->lock == lock);
-
         request->lock = lock;
-        request->recursiveCount++;
+        request->recursiveCount = 1;
 
-        if (request->status == LockRequest::STATUS_NEW) {
-            invariant(request->recursiveCount == 1);
+        // New lock request. Queue after all granted modes and after any already requested
+        // conflicting modes.
+        if (conflicts(mode, lock->grantedModes) ||
+                (!lock->compatibleFirstCount && conflicts(mode, lock->conflictModes))) {
 
-            // New lock request. Queue after all granted modes and after any already requested
-            // conflicting modes.
-            if (conflicts(mode, lock->grantedModes) ||
-                    (!lock->compatibleFirstCount && conflicts(mode, lock->conflictModes))) {
+            request->status = LockRequest::STATUS_WAITING;
+            request->mode = mode;
 
-                request->status = LockRequest::STATUS_WAITING;
-                request->mode = mode;
-                request->convertMode = MODE_NONE;
-
-                // Put it on the conflict queue. Conflicts are granted front to back.
-                if (request->enqueueAtFront) {
-                    lock->conflictList.push_front(request);
-                }
-                else {
-                    lock->conflictList.push_back(request);
-                }
-
-                lock->changeConflictModeCount(mode, LockHead::Increment);
-
-                return LOCK_WAITING;
+            // Put it on the conflict queue. Conflicts are granted front to back.
+            if (request->enqueueAtFront) {
+                lock->conflictList.push_front(request);
             }
-            else {  // No conflict, new request
-                request->status = LockRequest::STATUS_GRANTED;
-                request->mode = mode;
-                request->convertMode = MODE_NONE;
-
-                lock->grantedList.push_back(request);
-                lock->changeGrantedModeCount(mode, LockHead::Increment);
-
-                if (request->compatibleFirst) {
-                    lock->compatibleFirstCount++;
-                }
-
-                return LOCK_OK;
+            else {
+                lock->conflictList.push_back(request);
             }
+
+            lock->changeConflictModeCount(mode, LockHead::Increment);
+
+            return LOCK_WAITING;
         }
         else {
-            // If we are here, we already hold the lock in some mode. In order to keep it simple,
-            // we do not allow requesting a conversion while a lock is already waiting or pending
-            // conversion, hence the assertion below.
-            invariant(request->status == LockRequest::STATUS_GRANTED);
-            invariant(request->recursiveCount > 1);
-            invariant(request->mode != mode);
+            // No conflict, new request
+            request->status = LockRequest::STATUS_GRANTED;
+            request->mode = mode;
 
-            // Construct granted mask without our current mode, so that it is not counted as
-            // conflicting
-            uint32_t grantedModesWithoutCurrentRequest = 0;
+            lock->grantedList.push_back(request);
+            lock->changeGrantedModeCount(mode, LockHead::Increment);
 
-            // We start the counting at 1 below, because LockModesCount also includes MODE_NONE
-            // at position 0, which can never be acquired/granted.
-            for (uint32_t i = 1; i < LockModesCount; i++) {
-                const uint32_t currentRequestHolds =
-                                    (request->mode == static_cast<LockMode>(i) ? 1 : 0);
-
-                if (lock->grantedCounts[i] > currentRequestHolds) {
-                    grantedModesWithoutCurrentRequest |= modeMask(static_cast<LockMode>(i));
-                }
+            if (request->compatibleFirst) {
+                lock->compatibleFirstCount++;
             }
 
-            // This check favours conversion requests over pending requests. For example:
-            //
-            // T1 requests lock L in IS
-            // T2 requests lock L in X
-            // T1 then upgrades L from IS -> S
-            //
-            // Because the check does not look into the conflict modes bitmap, it will grant L to
-            // T1 in S mode, instead of block, which would otherwise cause deadlock.
-            if (conflicts(mode, grantedModesWithoutCurrentRequest)) {
-                request->status = LockRequest::STATUS_CONVERTING;
-                request->convertMode = mode;
+            return LOCK_OK;
+        }
+    }
 
-                lock->conversionsCount++;
-                lock->changeGrantedModeCount(request->convertMode, LockHead::Increment);
+    LockResult LockManager::convert(ResourceId resId, LockRequest* request, LockMode newMode) {
+        // If we are here, we already hold the lock in some mode. In order to keep it simple, we do
+        // not allow requesting a conversion while a lock is already waiting or pending conversion.
+        invariant(request->status == LockRequest::STATUS_GRANTED);
+        invariant(request->recursiveCount > 0);
 
-                return LOCK_WAITING;
+        request->recursiveCount++;
+
+        // Fast path for acquiring the same lock multiple times in modes, which are already covered
+        // by the current mode. It is safe to do this without locking, because 1) all calls for the
+        // same lock request must be done on the same thread and 2) if there are lock requests
+        // hanging off a given LockHead, then this lock will never disappear.
+        if ((LockConflictsTable[request->mode] | LockConflictsTable[newMode]) ==
+                                                        LockConflictsTable[request->mode]) {
+            return LOCK_OK;
+        }
+
+        // TODO: For the time being we do not need conversions between unrelated lock modes (i.e.,
+        // modes which both add and remove to the conflicts set), so these are not implemented yet
+        // (e.g., S -> IX).
+        invariant((LockConflictsTable[request->mode] | LockConflictsTable[newMode]) ==
+                                                        LockConflictsTable[newMode]);
+
+        LockBucket* bucket = _getBucket(resId);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+
+        LockHeadMap::iterator it = bucket->data.find(resId);
+        invariant(it != bucket->data.end());
+
+        LockHead* const lock = it->second;
+
+        // Construct granted mask without our current mode, so that it is not counted as
+        // conflicting
+        uint32_t grantedModesWithoutCurrentRequest = 0;
+
+        // We start the counting at 1 below, because LockModesCount also includes MODE_NONE
+        // at position 0, which can never be acquired/granted.
+        for (uint32_t i = 1; i < LockModesCount; i++) {
+            const uint32_t currentRequestHolds =
+                (request->mode == static_cast<LockMode>(i) ? 1 : 0);
+
+            if (lock->grantedCounts[i] > currentRequestHolds) {
+                grantedModesWithoutCurrentRequest |= modeMask(static_cast<LockMode>(i));
             }
-            else {  // No conflict, existing request
-                lock->changeGrantedModeCount(mode, LockHead::Increment);
-                lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
-                request->mode = mode;
+        }
 
-                return LOCK_OK;
-            }
+        // This check favours conversion requests over pending requests. For example:
+        //
+        // T1 requests lock L in IS
+        // T2 requests lock L in X
+        // T1 then upgrades L from IS -> S
+        //
+        // Because the check does not look into the conflict modes bitmap, it will grant L to
+        // T1 in S mode, instead of block, which would otherwise cause deadlock.
+        if (conflicts(newMode, grantedModesWithoutCurrentRequest)) {
+            request->status = LockRequest::STATUS_CONVERTING;
+            request->convertMode = newMode;
+
+            lock->conversionsCount++;
+            lock->changeGrantedModeCount(request->convertMode, LockHead::Increment);
+
+            return LOCK_WAITING;
+        }
+        else {  // No conflict, existing request
+            lock->changeGrantedModeCount(newMode, LockHead::Increment);
+            lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
+            request->mode = newMode;
+
+            return LOCK_OK;
         }
     }
 

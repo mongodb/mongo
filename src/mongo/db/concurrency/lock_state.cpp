@@ -685,6 +685,7 @@ namespace mongo {
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lockImpl(const ResourceId& resId, LockMode mode) {
         LockRequest* request;
+        bool isNew = true;
 
         LockRequestsMap::Iterator it = _requests.find(resId);
         if (!it) {
@@ -696,6 +697,7 @@ namespace mongo {
         }
         else {
             request = it.objAddr();
+            isNew = false;
         }
 
         // Give priority to the full modes for global and flush lock so we don't stall global
@@ -709,7 +711,8 @@ namespace mongo {
 
         _notify.clear();
 
-        return globalLockManager.lock(resId, request, mode);
+        return isNew ? globalLockManager.lock(resId, request, mode) :
+                       globalLockManager.convert(resId, request, mode);
     }
 
     template<bool IsForMMAPV1>

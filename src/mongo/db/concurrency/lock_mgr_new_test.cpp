@@ -154,21 +154,18 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker(1);
-        TrackingLockGrantNotification notify;
-
-        LockRequest request;
-        request.initNew(&locker, &notify);
+        LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_S);
         ASSERT(request.recursiveCount == 1);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Acquire again, in the same mode
-        ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
+        ASSERT(LOCK_OK == lockMgr.convert(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_S);
         ASSERT(request.recursiveCount == 2);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Release first acquire
         lockMgr.unlock(&request);
@@ -185,28 +182,25 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker(1);
-        TrackingLockGrantNotification notify;
-
-        LockRequest request;
-        request.initNew(&locker, &notify);
+        LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_IS));
         ASSERT(request.mode == MODE_IS);
         ASSERT(request.recursiveCount == 1);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Acquire again, in *compatible*, but stricter mode
-        ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
+        ASSERT(LOCK_OK == lockMgr.convert(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_S);
         ASSERT(request.recursiveCount == 2);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
-        // Release first acquire
+        // Release the first acquire
         lockMgr.unlock(&request);
         ASSERT(request.mode == MODE_S);
         ASSERT(request.recursiveCount == 1);
 
-        // Release second acquire
+        // Release the second acquire
         lockMgr.unlock(&request);
         ASSERT(request.recursiveCount == 0);
     }
@@ -216,21 +210,18 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker(1);
-        TrackingLockGrantNotification notify;
-
-        LockRequest request;
-        request.initNew(&locker, &notify);
+        LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_S);
         ASSERT(request.recursiveCount == 1);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Acquire again, in *non-compatible*, but stricter mode
-        ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_X));
+        ASSERT(LOCK_OK == lockMgr.convert(resId, &request, MODE_X));
         ASSERT(request.mode == MODE_X);
         ASSERT(request.recursiveCount == 2);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Release first acquire
         lockMgr.unlock(&request);
@@ -247,21 +238,18 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker(1);
-        TrackingLockGrantNotification notify;
-
-        LockRequest request;
-        request.initNew(&locker, &notify);
+        LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_X));
         ASSERT(request.mode == MODE_X);
         ASSERT(request.recursiveCount == 1);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Acquire again, in *non-compatible*, but less strict mode
-        ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
+        ASSERT(LOCK_OK == lockMgr.convert(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_X);
         ASSERT(request.recursiveCount == 2);
-        ASSERT(notify.numNotifies == 0);
+        ASSERT(request.numNotifies == 0);
 
         // Release first acquire
         lockMgr.unlock(&request);
@@ -278,44 +266,38 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker1(1);
-        TrackingLockGrantNotification notify1;
-
         MMAPV1LockerImpl locker2(2);
-        TrackingLockGrantNotification notify2;        
 
-        LockRequest request1;
-        request1.initNew(&locker1, &notify1);
-
-        LockRequest request2;
-        request2.initNew(&locker2, &notify2);
+        LockRequestCombo request1(&locker1);
+        LockRequestCombo request2(&locker2);
 
         // First request granted right away
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_S));
         ASSERT(request1.recursiveCount == 1);
-        ASSERT(notify1.numNotifies == 0);
+        ASSERT(request1.numNotifies == 0);
 
         // Second request must block
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_X));
         ASSERT(request2.mode == MODE_X);
         ASSERT(request2.recursiveCount == 1);
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request2.numNotifies == 0);
 
         // Release first request
         lockMgr.unlock(&request1);
         ASSERT(request1.recursiveCount == 0);
-        ASSERT(notify1.numNotifies == 0);
+        ASSERT(request1.numNotifies == 0);
 
         ASSERT(request2.mode == MODE_X);
         ASSERT(request2.recursiveCount == 1);
-        ASSERT(notify2.numNotifies == 1);
-        ASSERT(notify2.lastResult == LOCK_OK);
+        ASSERT(request2.numNotifies == 1);
+        ASSERT(request2.lastResult == LOCK_OK);
 
         // Release second acquire
         lockMgr.unlock(&request2);
         ASSERT(request2.recursiveCount == 0);
 
-        ASSERT(notify1.numNotifies == 0);
-        ASSERT(notify2.numNotifies == 1);
+        ASSERT(request1.numNotifies == 0);
+        ASSERT(request2.numNotifies == 1);
     }
 
     TEST(LockManager, MultipleConflict) {
@@ -423,36 +405,30 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker1(1);
-        TrackingLockGrantNotification notify1;
-
         MMAPV1LockerImpl locker2(2);
-        TrackingLockGrantNotification notify2;
 
-        LockRequest request1;
-        request1.initNew(&locker1, &notify1);
-
-        LockRequest request2;
-        request2.initNew(&locker2, &notify2);
+        LockRequestCombo request1(&locker1);
+        LockRequestCombo request2(&locker2);
 
         // First request granted right away
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_S));
-        ASSERT(notify1.numNotifies == 0);
+        ASSERT(request1.numNotifies == 0);
 
         // Second request is granted right away
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_S));
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request2.numNotifies == 0);
 
         // Convert second request to conflicting
-        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_X));
+        ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request2, MODE_X));
         ASSERT(request2.mode == MODE_S);
         ASSERT(request2.convertMode == MODE_X);
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request2.numNotifies == 0);
 
         // Cancel the conflicting upgrade
         lockMgr.unlock(&request2);
         ASSERT(request2.mode == MODE_S);
         ASSERT(request2.convertMode == MODE_NONE);
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request2.numNotifies == 0);
 
         // Free the remaining locks so the LockManager destructor does not complain
         lockMgr.unlock(&request1);
@@ -464,33 +440,27 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker1(1);
-        TrackingLockGrantNotification notify1;
-
         MMAPV1LockerImpl locker2(2);
-        TrackingLockGrantNotification notify2;
 
-        LockRequest request1;
-        request1.initNew(&locker1, &notify1);
+        LockRequestCombo request1(&locker1);
+        LockRequestCombo request2(&locker2);
 
-        LockRequest request2;
-        request2.initNew(&locker2, &notify2);
-
-        // First request granted right away
+        // The S requests are granted right away
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_S));
-        ASSERT(notify1.numNotifies == 0);
+        ASSERT(request1.numNotifies == 0);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_S));
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request2.numNotifies == 0);
 
         // Convert first request to conflicting
-        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request1, MODE_X));
-        ASSERT(notify1.numNotifies == 0);
+        ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request1, MODE_X));
+        ASSERT(request1.numNotifies == 0);
 
         // Free the second lock and make sure the first is granted
         lockMgr.unlock(&request2);
         ASSERT(request1.mode == MODE_X);
-        ASSERT(notify1.numNotifies == 1);
-        ASSERT(notify2.numNotifies == 0);
+        ASSERT(request1.numNotifies == 1);
+        ASSERT(request2.numNotifies == 0);
 
         // Frees the first reference, mode remains X
         lockMgr.unlock(&request1);
@@ -514,7 +484,7 @@ namespace mongo {
         }
 
         // Upgrade the one in the middle (not the first one)
-        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request[1], MODE_X));
+        ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request[1], MODE_X));
 
         ASSERT(notify.numNotifies == 0);
 
@@ -532,25 +502,20 @@ namespace mongo {
         lockMgr.unlock(&request[1]);
     }
 
-    TEST(LockManager, Upgrade) {
+    TEST(LockManager, ConvertUpgrade) {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker1(1);
-        TrackingLockGrantNotification notify1;
-        LockRequest request1;
-        request1.initNew(&locker1, &notify1);
-        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
+        LockRequestCombo request1(&locker1);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_S));
 
         MMAPV1LockerImpl locker2(2);
-        TrackingLockGrantNotification notify2;
-        LockRequest request2;
-        request2.initNew(&locker2, &notify2);
+        LockRequestCombo request2(&locker2);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_S));
-        ASSERT(request2.recursiveCount == 1);
 
-        // Upgrade the IS lock to X
-        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request1, MODE_IX));
+        // Upgrade the S lock to X
+        ASSERT(LOCK_WAITING == lockMgr.convert(resId, &request1, MODE_X));
 
         ASSERT(!lockMgr.unlock(&request1));
         ASSERT(lockMgr.unlock(&request1));
@@ -563,31 +528,27 @@ namespace mongo {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         MMAPV1LockerImpl locker1(1);
-        TrackingLockGrantNotification notify1;
-        LockRequest request1;
-        request1.initNew(&locker1, &notify1);
+        LockRequestCombo request1(&locker1);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
 
         MMAPV1LockerImpl locker2(2);
-        TrackingLockGrantNotification notify2;
-        LockRequest request2;
-        request2.initNew(&locker2, &notify2);
+        LockRequestCombo request2(&locker2);
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
-        ASSERT(request2.recursiveCount == 1);
 
+        // Downgrade the X request to S
         lockMgr.downgrade(&request1, MODE_S);
-        ASSERT(notify2.numNotifies == 1);
+
+        ASSERT(request2.numNotifies == 1);
+        ASSERT(request2.lastResult == LOCK_OK);
         ASSERT(request2.recursiveCount == 1);
 
-        lockMgr.unlock(&request1);
-        ASSERT(request1.recursiveCount == 0);
-
-        lockMgr.unlock(&request2);
-        ASSERT(request2.recursiveCount == 0);
+        ASSERT(lockMgr.unlock(&request1));
+        ASSERT(lockMgr.unlock(&request2));
     }
 
 
 
+    // Lock conflict matrix tests
     static void checkConflict(LockMode existingMode, LockMode newMode, bool hasConflict) {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));

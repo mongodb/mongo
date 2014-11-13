@@ -34,10 +34,6 @@
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/unittest/unittest.h"
 
-
-// Most of the tests here will be removed once we move everything over to using LockManager
-//
-
 namespace mongo {
 
     TEST(DConcurrency, GlobalRead) {
