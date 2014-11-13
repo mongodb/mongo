@@ -120,24 +120,21 @@ __conn_dhandle_open_lock(
 }
 
 /*
- * __conn_dhandle_get --
- *	Find an open btree file handle, otherwise create a new one, lock it
- * exclusively, and return it linked into the connection's list.
+ * __wt_conn_dhandle_find --
+ *	Find a previously opened data handle.
  */
-static int
-__conn_dhandle_get(WT_SESSION_IMPL *session,
+int
+__wt_conn_dhandle_find(WT_SESSION_IMPL *session,
     const char *name, const char *ckpt, uint32_t flags)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
 	uint64_t hash;
 
 	conn = S2C(session);
 
-	/* We must be holding the schema lock at a higher level. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	/* We must be holding the handle list lock at a higher level. */
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) &&
 	    !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	/* Increment the reference count if we already have the btree open. */
@@ -148,12 +145,41 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
-			WT_RET(__conn_dhandle_open_lock(
-			    session, dhandle, flags));
-			(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
 			session->dhandle = dhandle;
 			return (0);
 		}
+
+	return (WT_NOTFOUND);
+}
+
+/*
+ * __conn_btree_get --
+ *	Allocate a new data handle, lock it exclusively, and return it linked
+ *	into the connection's list.
+ */
+static int
+__conn_btree_get(WT_SESSION_IMPL *session,
+    const char *name, const char *ckpt, uint32_t flags)
+{
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	/*
+	 * If we find the handle or something goes wrong, we're done.
+	 * Only keep going if the handle is not found.
+	 */
+	ret = __wt_conn_dhandle_find(session, name, ckpt, flags);
+	if (ret == 0) {
+		dhandle = session->dhandle;
+		WT_RET(__conn_dhandle_open_lock(session, dhandle, flags));
+		(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
+		return (0);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/*
 	 * Allocate the data source handle and underlying btree handle, then
@@ -165,7 +191,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
 	dhandle->session_ref = 1;
 
-	dhandle->name_hash = hash;
+	dhandle->name_hash = __wt_hash_city64(name, strlen(name));
 	WT_ERR(__wt_strdup(session, name, &dhandle->name));
 	if (ckpt != NULL)
 		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
@@ -194,6 +220,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * list because the insert races, it will return without finding enough
 	 * candidates for eviction, and will then retry).
 	 */
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	SLIST_INSERT_HEAD(&conn->dhlh, dhandle, l);
 
 	session->dhandle = dhandle;
@@ -429,8 +456,11 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_DHANDLE_HAVE_REF))
 		WT_RET(
 		    __conn_dhandle_open_lock(session, session->dhandle, flags));
-	else
-		WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
+	else {
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __conn_btree_get(session, name, ckpt, flags));
+		WT_RET(ret);
+	}
 	dhandle = session->dhandle;
 
 	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
@@ -450,8 +480,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 
 /*
  * __wt_conn_btree_apply --
- *	Apply a function to all open btree handles apart from the metadata
- * file.
+ *	Apply a function to all open btree handles apart from the metadata.
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -464,7 +493,10 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	/* XXX wrong: should just require the dhandle lock, but that means changing the checkpoint logic to reuse the handle list rather than holding the handle lock while doing I/O. */
+	WT_ASSERT(session,
+	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
+	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
@@ -515,7 +547,10 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 	saved_dhandle = session->dhandle;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	/* XXX wrong: should just require the dhandle lock, but that means changing the checkpoint logic to reuse the handle list rather than holding the handle lock while doing I/O. */
+	WT_ASSERT(session,
+	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
+	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (strcmp(dhandle->name, uri) == 0 &&
@@ -567,7 +602,7 @@ __wt_conn_dhandle_close_all(
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	WT_ASSERT(session, session->dhandle == NULL);
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
@@ -611,23 +646,39 @@ err:	session->dhandle = NULL;
 	return (ret);
 }
 
+static int
+__conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+
+	conn = S2C(session);
+	dhandle = session->dhandle;
+
+	/*
+	 * Check if the handle was reacquired by a session while we waited;
+	 * this should only happen when called from the periodic sweep code, of
+	 * course.
+	 */
+	if (!final && dhandle->session_ref != 0)
+		return (EBUSY);
+
+	SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
+	return (0);
+
+}
+
 /*
  * __wt_conn_dhandle_discard_single --
  *	Close/discard a single data handle.
  */
 int
-__wt_conn_dhandle_discard_single(
-    WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, int final)
+__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *save_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
-	conn = S2C(session);
-
-	save_dhandle = session->dhandle;
-	session->dhandle = dhandle;
+	dhandle = session->dhandle;
 
 	/*
 	 * We're called from the periodic sweep function and the final close;
@@ -640,38 +691,11 @@ __wt_conn_dhandle_discard_single(
 		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
 	}
 
-	/* 
-	 * Get the schema lock (required to remove entries from the data handle
-	 * list), get the dhandle lock to block the eviction server from
-	 * walking the list.
-	 */
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_lock(session, &conn->schema_lock);
-
 	/*
-	 * If the eviction server is running, don't block waiting for it while
-	 * holding the schema lock.  The sweep server will try again.
+	 * Try to remove the handle, protected by the data handle lock.
 	 */
-	if (final)
-		__wt_spin_lock(session, &conn->dhandle_lock);
-	else if ((ret =
-	    __wt_spin_trylock(session, &conn->dhandle_lock, &id)) != 0)
-		goto unlock;
-
-	/*
-	 * Check if the handle was reacquired by a session while we waited;
-	 * this should only happen when called from the periodic sweep code, of
-	 * course.
-	 */
-	if (!final && dhandle->session_ref != 0)
-		ret = EBUSY;
-	else
-		SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
-
-	__wt_spin_unlock(session, &conn->dhandle_lock);
-
-unlock:	__wt_spin_unlock(session, &conn->schema_lock);
-	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __conn_dhandle_remove(session, final));
 
 	/*
 	 * After successfully removing the handle, clean it up.
@@ -688,8 +712,7 @@ unlock:	__wt_spin_unlock(session, &conn->schema_lock);
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 
-err:	session->dhandle = save_dhandle;
-	WT_ASSERT(session, !final || ret == 0);
+err:	WT_ASSERT(session, !final || ret == 0);
 	return (ret);
 }
 
@@ -718,7 +741,8 @@ restart:
 		if (WT_IS_METADATA(dhandle))
 			continue;
 
-		WT_TRET(__wt_conn_dhandle_discard_single(session, dhandle, 1));
+		WT_WITH_DHANDLE(session, dhandle,
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
 		goto restart;
 	}
 
@@ -733,7 +757,8 @@ restart:
 
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)
-		WT_TRET(__wt_conn_dhandle_discard_single(session, dhandle, 1));
+		WT_WITH_DHANDLE(session, dhandle,
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
 
 	return (ret);
 }

@@ -1481,7 +1481,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		    "LSM does not support opening by checkpoint");
 
 	/* Get the LSM tree. */
-	WT_WITH_SCHEMA_LOCK(session,
+	WT_WITH_DHANDLE_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 

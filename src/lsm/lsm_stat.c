@@ -156,7 +156,7 @@ __wt_curstat_lsm_init(
 {
 	WT_DECL_RET;
 
-	WT_WITH_SCHEMA_LOCK(session, ret = __lsm_stat_init(session, uri, cst));
+	WT_WITH_DHANDLE_LOCK(session, ret = __lsm_stat_init(session, uri, cst));
 
 	return (ret);
 }

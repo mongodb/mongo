@@ -433,7 +433,8 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	}
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_create(session, uri, config));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_create(session, uri, config)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -479,7 +480,8 @@ __session_rename(WT_SESSION *wt_session,
 	WT_ERR(__wt_str_name_check(session, newuri));
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_rename(session, uri, newuri, cfg));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_rename(session, uri, newuri, cfg)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -525,7 +527,8 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_ERR(__wt_str_name_check(session, uri));
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_drop(session, uri, cfg));
+	    WT_WITH_DHANDLE_LOCK(session,
+		ret = __wt_schema_drop(session, uri, cfg)));
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);
@@ -545,8 +548,9 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_salvage,
-		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_worker(session, uri, __wt_salvage,
+		    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -587,7 +591,8 @@ __session_truncate(WT_SESSION *wt_session,
 		WT_ERR(__wt_str_name_check(session, uri));
 
 		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_truncate(session, uri, cfg));
+		    WT_WITH_DHANDLE_LOCK(session,
+		        ret = __wt_schema_truncate(session, uri, cfg)));
 		goto done;
 	}
 
@@ -667,8 +672,9 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
-		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_worker(session, uri, __wt_upgrade,
+	    	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -687,8 +693,9 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_verify,
-		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_worker(session, uri, __wt_verify,
+		    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }

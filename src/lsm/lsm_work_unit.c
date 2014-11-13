@@ -138,8 +138,9 @@ __wt_lsm_work_switch(
 	*entryp = NULL;
 
 	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-		WT_WITH_SCHEMA_LOCK(session, ret =
-		    __wt_lsm_tree_switch(session, entry->lsm_tree));
+		WT_WITH_SCHEMA_LOCK(session,
+		    WT_WITH_DHANDLE_LOCK(session,
+		        ret = __wt_lsm_tree_switch(session, entry->lsm_tree)));
 		/* Failing to complete the switch is fine */
 		if (ret == EBUSY) {
 			if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH))
@@ -461,7 +462,8 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 * metadata (which would be too late to prevent our drop).
 	 */
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_drop(session, uri, drop_cfg));
+	    WT_WITH_DHANDLE_LOCK(session,
+	        ret = __wt_schema_drop(session, uri, drop_cfg)));
 
 	if (ret == 0)
 		ret = __wt_remove(session, uri + strlen("file:"));

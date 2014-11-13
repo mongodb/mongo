@@ -227,7 +227,8 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
 		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_drop(session, uri, cfg));
+		    WT_WITH_DHANDLE_LOCK(session, 
+		         ret = __wt_schema_drop(session, uri, cfg)));
 	return (ret);
 }
 
@@ -239,7 +240,7 @@ int
 __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	WT_RET(__wt_epoch(session, &chunk->create_ts));
 
 	WT_RET(__wt_lsm_tree_chunk_name(
@@ -270,7 +271,6 @@ __wt_lsm_tree_setup_bloom(
 {
 	WT_DECL_RET;
 
-	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 	/*
 	 * The Bloom URI can be populated when the chunk is created, but
 	 * it isn't set yet on open or merge.
@@ -468,7 +468,7 @@ __lsm_tree_open(
 	conn = S2C(session);
 	lsm_tree = NULL;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	/* Start the LSM manager thread if it isn't running. */
 	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
