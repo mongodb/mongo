@@ -28,7 +28,9 @@ __drop_file(
 		return (EINVAL);
 
 	/* Close all btree handles associated with this file. */
-	WT_RET(__wt_conn_dhandle_close_all(session, uri, force));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_conn_dhandle_close_all(session, uri, force));
+	WT_RET(ret);
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -177,7 +179,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __drop_table(session, uri, force, cfg);
+		WT_WITH_TABLE_LOCK(session,
+		    ret = __drop_table(session, uri, force, cfg));
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->drop == NULL ?
 		    __wt_object_unsupported(session, uri) :

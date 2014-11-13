@@ -13,22 +13,18 @@
  */
 static int
 __schema_add_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
+    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	/*
-	 * Make sure the metadata is open before we grab the handle
-	 * list lock.
-	 */
+	/* Make sure the metadata is open before getting other locks. */
 	WT_RET(__wt_metadata_open(session));
-	WT_WITH_DHANDLE_LOCK(session,
-	    ret = __wt_schema_open_table(session, name, namelen, &table));
-	WT_RET(ret);
 
-	/* Copy the schema generation into the new table. */
-	table->schema_gen = S2C(session)->schema_gen;
+	WT_WITH_TABLE_LOCK(session,
+	    ret = __wt_schema_open_table(
+	    session, name, namelen, ok_incomplete, &table));
+	WT_RET(ret);
 
 	TAILQ_INSERT_HEAD(&session->tables, table, q);
 	*tablep = table;
@@ -92,14 +88,10 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 	ret = __schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND)
-		ret = __schema_add_table(session, name, namelen, &table);
+		ret = __schema_add_table(
+		    session, name, namelen, ok_incomplete, &table);
 
 	if (ret == 0) {
-		if (!ok_incomplete && !table->cg_complete)
-			WT_RET_MSG(session, EINVAL, "'%s' cannot be used "
-			    "until all column groups are created",
-			    table->name);
-
 		++table->refcnt;
 		*tablep = table;
 	}

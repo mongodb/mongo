@@ -8,11 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __lsm_stat_init --
- *	Initialize a LSM statistics structure.
+ * __wt_curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
  */
-static int
-__lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
+int
+__wt_curstat_lsm_init(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
@@ -30,7 +31,9 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;
-	WT_RET(__wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
 	/* Propagate all, fast and/or clear to the cursors we open. */
@@ -142,21 +145,6 @@ err:	if (locked)
 		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
 	__wt_scr_free(&uribuf);
-
-	return (ret);
-}
-
-/*
- * __wt_curstat_lsm_init --
- *	Initialize the statistics for a LSM tree.
- */
-int
-__wt_curstat_lsm_init(
-    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
-{
-	WT_DECL_RET;
-
-	WT_WITH_DHANDLE_LOCK(session, ret = __lsm_stat_init(session, uri, cst));
 
 	return (ret);
 }

@@ -493,7 +493,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	/* XXX wrong: should just require the dhandle lock, but that means changing the checkpoint logic to reuse the handle list rather than holding the handle lock while doing I/O. */
+	/*
+	 * XXX wrong: should just require the dhandle lock, but that means
+	 * changing the checkpoint logic to reuse the handle list rather than
+	 * holding the handle lock while doing I/O.
+	 */
 	WT_ASSERT(session,
 	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -547,7 +551,11 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 	saved_dhandle = session->dhandle;
 
-	/* XXX wrong: should just require the dhandle lock, but that means changing the checkpoint logic to reuse the handle list rather than holding the handle lock while doing I/O. */
+	/*
+	 * XXX wrong: should just require the dhandle lock, but that means
+	 * changing the checkpoint logic to reuse the handle list rather than
+	 * holding the handle lock while doing I/O.
+	 */
 	WT_ASSERT(session,
 	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -646,6 +654,10 @@ err:	session->dhandle = NULL;
 	return (ret);
 }
 
+/*
+ * __conn_dhandle_remove --
+ *	Remove a handle from the shared list.
+ */
 static int
 __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 {
@@ -654,6 +666,9 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 
 	conn = S2C(session);
 	dhandle = session->dhandle;
+
+	WT_ASSERT(session,
+	    final || F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	/*
 	 * Check if the handle was reacquired by a session while we waited;

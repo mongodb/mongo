@@ -43,6 +43,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	char *cgconfig;
 	u_int i;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+
 	if (table->cg_complete)
 		return (0);
 
@@ -360,7 +362,7 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
  */
 int
 __wt_schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
+    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
@@ -374,6 +376,8 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	cursor = NULL;
 	table = NULL;
 	tablename = NULL;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
@@ -434,6 +438,15 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
+
+	if (!ok_incomplete && !table->cg_complete)
+		WT_ERR_MSG(session, EINVAL, "'%s' cannot be used "
+		    "until all column groups are created",
+		    table->name);
+
+	/* Copy the schema generation into the new table. */
+	table->schema_gen = S2C(session)->schema_gen;
+
 	*tablep = table;
 
 	if (0) {

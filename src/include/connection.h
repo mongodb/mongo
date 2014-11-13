@@ -97,6 +97,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK reconfig_lock;	/* Single thread reconfigure */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
+	WT_SPINLOCK table_lock;		/* Table creation spinlock */
 
 	/*
 	 * We distribute the btree page locks across a set of spin locks; it

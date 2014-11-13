@@ -330,8 +330,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_ERR(__wt_clsm_init_merge(src, start_chunk, start_id, nchunks));
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_DHANDLE_LOCK(session,
-	        ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk)));
+	    ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 	WT_ERR(ret);
 	if (create_bloom) {
 		WT_ERR(__wt_lsm_tree_setup_bloom(session, lsm_tree, chunk));
@@ -500,14 +499,12 @@ err:	if (locked)
 	if (ret != 0 && created_chunk) {
 		/* Drop the newly-created files on error. */
 		WT_WITH_SCHEMA_LOCK(session,
-		    WT_WITH_DHANDLE_LOCK(session,
-		        tret = __wt_schema_drop(session, chunk->uri, drop_cfg)));
+		    tret = __wt_schema_drop(session, chunk->uri, drop_cfg));
 		WT_TRET(tret);
 		if (create_bloom) {
 			WT_WITH_SCHEMA_LOCK(session,
-			    WT_WITH_DHANDLE_LOCK(session,
-				tret = __wt_schema_drop(
-			        session, chunk->bloom_uri, drop_cfg)));
+			    tret = __wt_schema_drop(
+			    session, chunk->bloom_uri, drop_cfg));
 			WT_TRET(tret);
 		}
 		__wt_free(session, chunk->bloom_uri);

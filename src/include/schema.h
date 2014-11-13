@@ -84,8 +84,8 @@ struct __wt_table {
 		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
 		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
 		op;							\
-		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 	}								\
 } while (0)
 
@@ -95,8 +95,8 @@ struct __wt_table {
  */
 #define	WT_WITHOUT_SCHEMA_LOCK(session, op) do {			\
 	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {		\
-		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		op;							\
 		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
 		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
@@ -104,3 +104,20 @@ struct __wt_table {
 		op;							\
 	}								\
 } while (0)
+
+/*
+ * WT_WITH_TABLE_LOCK --
+ *	Acquire the schema lock, perform an operation, drop the lock.
+ */
+#define	WT_WITH_TABLE_LOCK(session, op) do {				\
+	if (F_ISSET(session, WT_SESSION_TABLE_LOCKED)) {		\
+		op;							\
+	} else {							\
+		__wt_spin_lock(session, &S2C(session)->table_lock);	\
+		F_SET(session, WT_SESSION_TABLE_LOCKED);		\
+		op;							\
+		F_CLR(session, WT_SESSION_TABLE_LOCKED);		\
+		__wt_spin_unlock(session, &S2C(session)->table_lock);	\
+	}								\
+} while (0)
+

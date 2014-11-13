@@ -519,15 +519,15 @@ __create_table(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));
-	WT_RET(__wt_config_subinit(session, &conf, &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));
+	WT_ERR(__wt_config_subinit(session, &conf, &cval));
 	for (ncolgroups = 0;
 	    (ret = __wt_config_next(&conf, &cgkey, &cgval)) == 0;
 	    ncolgroups++)
 		;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &tableconf));
 	if ((ret = __wt_metadata_insert(session, name, tableconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -619,15 +619,22 @@ __wt_schema_create(
 	WT_RET(__wt_meta_track_on(session));
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __create_colgroup(session, uri, exclusive, config);
+		WT_WITH_TABLE_LOCK(session,
+		    ret = __create_colgroup(session, uri, exclusive, config));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __create_file(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_create(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __create_index(session, uri, exclusive, config);
+		WT_WITH_TABLE_LOCK(session,
+		    ret = __create_index(session, uri, exclusive, config));
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __create_table(session, uri, exclusive, config);
+		/*
+		 * Table creation involves multiple steps.
+		 * Use a spinlock to make it appear atomic.
+		 */
+		WT_WITH_TABLE_LOCK(session,
+		    ret = __create_table(session, uri, exclusive, config));
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->create == NULL ?
 		    __wt_object_unsupported(session, uri) :
