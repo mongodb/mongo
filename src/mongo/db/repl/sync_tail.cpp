@@ -302,7 +302,10 @@ namespace repl {
                 // for multiple prefetches if they are for the same database.
                 OperationContextImpl txn;
                 AutoGetCollectionForRead ctx(&txn, ns);
-                prefetchPagesForReplicatedOp(&txn, ctx.getDb(), op);
+                Database* db = ctx.getDb();
+                if (db) {
+                    prefetchPagesForReplicatedOp(&txn, db, op);
+                }
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;

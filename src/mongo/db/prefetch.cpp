@@ -153,6 +153,7 @@ namespace {
     void prefetchPagesForReplicatedOp(OperationContext* txn,
                                       Database* db,
                                       const BSONObj& op) {
+        invariant(db);
         const BackgroundSync::IndexPrefetchConfig prefetchConfig =
             BackgroundSync::get()->getIndexPrefetchConfig();
         const char *opField;
