@@ -534,7 +534,7 @@ def runTest(test, result):
 
             if storage_engine:
                 argv.extend(["--storageEngine", storage_engine])
-            if storage_engine:
+            if wiredtiger_engineconfig:
                 argv.extend(["--wiredTigerEngineConfig", wiredtiger_engineconfig])
 
         # more blech
