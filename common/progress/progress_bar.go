@@ -21,14 +21,14 @@ const (
 type ProgressBar struct {
 	// Name is an identifier printed along with the bar
 	Name string
-	// Max is the maximum value the counter addressed at CounterPtr
-	// is expected to reach (ie, the total)
-	Max int
 	// BarLength is the number of characters used to print the bar
 	BarLength int
+	// Max is the maximum value the counter addressed at CounterPtr
+	// is expected to reach (ie, the total)
+	Max int64
 	// CounterPtr is a pointer to an integer the increases as progress
 	// is made. The value pointed to is read periodically to draw the bar.
-	CounterPtr *int
+	CounterPtr *int64
 	// Writer is where the ProgressBar is written out to
 	Writer io.Writer
 	// WaitTime is the time to wait between writing the bar

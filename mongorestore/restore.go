@@ -218,14 +218,14 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	collection := session.DB(dbName).C(colName)
 
 	// progress bar handlers
-	bytesRead := 0
+	var bytesRead int64
 
 	// only print progress bar if we know the bounds
 	// TODO have useful progress meters when max=0
 	if fileSize > 0 {
 		bar := &progress.ProgressBar{
 			Name:       fmt.Sprintf("%v.%v", dbName, colName),
-			Max:        int(fileSize),
+			Max:        int64(fileSize),
 			CounterPtr: &bytesRead,
 			Writer:     log.Writer(0),
 			BarLength:  ProgressBarLength,
@@ -245,7 +245,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	defer close(killChan)
 
 	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
+	bytesReadChan := make(chan int64, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
 	go func() {
 		for {
 			select {
@@ -293,7 +293,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 						resultChan <- err
 						return
 					}
-					bytesReadChan <- len(rawDoc.Data)
+					bytesReadChan <- int64(len(rawDoc.Data))
 				case <-killChan:
 					return
 				}

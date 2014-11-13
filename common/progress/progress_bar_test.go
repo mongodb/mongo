@@ -9,7 +9,7 @@ import (
 )
 
 func TestBasicProgressBar(t *testing.T) {
-	var localCounter int
+	var localCounter int64
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {
@@ -54,7 +54,7 @@ func TestBasicProgressBar(t *testing.T) {
 }
 
 func TestBarConcurrency(t *testing.T) {
-	var localCounter int
+	var localCounter int64
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {

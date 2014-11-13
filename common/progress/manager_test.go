@@ -17,7 +17,7 @@ func TestManagerAttachAndDetach(t *testing.T) {
 		So(manager, ShouldNotBeNil)
 
 		Convey("adding 3 bars", func() {
-			localCounter := 5
+			localCounter := int64(5)
 			pbar1 := &ProgressBar{
 				Name:       "\nTEST1",
 				Max:        10,
@@ -115,7 +115,7 @@ func TestManagerStartAndStop(t *testing.T) {
 	Convey("With a progress.Manager with a WaitTime of 10 ms and one bar", t, func() {
 		manager = NewProgressBarManager(time.Millisecond * 10)
 		So(manager, ShouldNotBeNil)
-		localCounter := 5
+		localCounter := int64(5)
 		pbar := &ProgressBar{
 			Name:       "\nTEST",
 			Max:        10,

@@ -346,7 +346,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		// handle repairs as a special case, since we cannot count them
 		log.Logf(log.Always, "writing repair of %v to %v", intent.Key(), outFilepath)
 		repairIter := session.DB(intent.DB).C(intent.C).Repair()
-		repairCounter := 0
+		var repairCounter int64
 		if err := dump.dumpIterToWriter(repairIter, out, &repairCounter); err != nil {
 			if strings.Index(err.Error(), "no such cmd: repairCursor") > 0 {
 				// return a more helpful error message for early server versions
@@ -385,7 +385,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 func (dump *MongoDump) dumpQueryToWriter(
 	query *mgo.Query, intent *intents.Intent, writer io.Writer) (err error) {
 
-	dumpCounter := 0
+	var dumpCounter int64
 
 	total, err := query.Count()
 	if err != nil {
@@ -395,7 +395,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 
 	bar := &progress.ProgressBar{
 		Name:       intent.Key(),
-		Max:        total,
+		Max:        int64(total),
 		CounterPtr: &dumpCounter,
 		Writer:     log.Writer(0),
 		BarLength:  ProgressBarLength,
@@ -413,7 +413,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
 // a counter, and dumps the iterator's contents to the writer.
 func (dump *MongoDump) dumpIterToWriter(
-	iter *mgo.Iter, writer io.Writer, counterPtr *int) error {
+	iter *mgo.Iter, writer io.Writer, counterPtr *int64) error {
 
 	buffChan := make(chan []byte)
 	go func() {
