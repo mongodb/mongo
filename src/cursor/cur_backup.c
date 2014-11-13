@@ -9,7 +9,7 @@
 
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
-static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
+static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, int);
 static int __backup_file_remove(WT_SESSION_IMPL *);
 static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
@@ -221,9 +221,6 @@ __backup_start(
 	conn->hot_backup = 1;
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
-	/* Create the hot backup file. */
-	WT_ERR(__backup_file_create(session, cb));
-
 	/* Add log files if logging is enabled. */
 
 	/*
@@ -236,13 +233,20 @@ __backup_start(
 	 */
 	target_list = 0;
 	WT_ERR(__backup_uri(session, cb, cfg, &target_list, &log_only));
+
+	/* Create the hot backup file. */
+	WT_ERR(__backup_file_create(session, cb, log_only));
+
 	if (!target_list) {
 		WT_ERR(__backup_log_append(session, cb, 1));
 		WT_ERR(__backup_all(session, cb));
 	}
 
 	/* Add the hot backup and standard WiredTiger files to the list. */
-	if (!log_only) {
+	if (log_only)
+		WT_ERR(__backup_list_append(
+		    session, cb, WT_INCREMENTAL_BACKUP));
+	else {
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_METADATA_BACKUP));
 		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
@@ -308,7 +312,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/* Remove any backup metadata file. */
+	/* Remove any backup specific file. */
 	ret = __backup_file_remove(session);
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
@@ -444,13 +448,17 @@ err:	__wt_scr_free(&tmp);
  *	Create the meta-data backup file.
  */
 static int
-__backup_file_create(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
+__backup_file_create(
+    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int incremental)
 {
 	WT_DECL_RET;
 	char *path;
 
 	/* Open the hot backup file. */
-	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
+	if (incremental)
+		WT_RET(__wt_filename(session, WT_INCREMENTAL_BACKUP, &path));
+	else
+		WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
 	WT_ERR_TEST((cb->bfp = fopen(path, "w")) == NULL, __wt_errno());
 
 err:	__wt_free(session, path);
@@ -464,7 +472,17 @@ err:	__wt_free(session, path);
 static int
 __backup_file_remove(WT_SESSION_IMPL *session)
 {
-	return (__wt_remove(session, WT_METADATA_BACKUP));
+	WT_DECL_RET;
+	int exist;
+
+	WT_ERR(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist));
+	if (exist)
+		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
+	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
+	if (exist)
+		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
+err:
+	return (ret);
 }
 
 /*

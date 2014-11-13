@@ -158,7 +158,7 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	int exist;
+	int exist, exist_incr;
 	char *metaconf;
 
 	metaconf = NULL;
@@ -180,11 +180,18 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * creation doesn't fully complete, we won't have a turtle file and we
 	 * will repeat the process until we succeed.
 	 *
-	 * If there's already a turtle file, we're done.
+	 * If there's already a turtle file, we're done.  If this is an
+	 * incremental backup we need to set the flag.
 	 */
+	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
 	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist)
+	if (exist) {
+		if (exist_incr) {
+			F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+			WT_RET(__wt_remove(session, WT_INCREMENTAL_BACKUP));
+		}
 		return (0);
+	}
 
 	/* Create the metadata file. */
 	WT_RET(__metadata_init(session));
@@ -200,6 +207,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
 	/* Remove the backup file if it exists, we'll never read it again. */
+	if (exist_incr)
+		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
 	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
 	if (exist)
 		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));

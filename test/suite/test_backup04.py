@@ -46,7 +46,12 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # running an incremental backup with a targeted cursor and then calling
     # truncate to archive the logs.
     #
-    # We run recovery and verify the backup after reach incremental loop.
+    # At the same time, we take a full backup during each loop.
+    # We run recovery and verify the full backup with the incremental
+    # backup after each loop.  We compare two backups instead of the original
+    # because running 'wt' causes all of our original handles to be closed
+    # and that is not what we want here.
+    #
     pfx = 'test_backup'
     scenarios = [
         ('table', dict(uri='table:test',dsize=100,nops=2000,nthreads=1,time=30)),
@@ -82,44 +87,64 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         cursor.close()
 
     # Compare the original and backed-up files using the wt dump command.
-    def compare(self, uri):
-        #print "Compare: URI: " + uri
-        self.runWt(['dump', uri], outfilename='orig')
-        # Open the backup connection to force it to run recovery.
-        backup_conn_params = \
-            'log=(enabled,file_max=%s)' % self.logmax
-        backup_conn = wiredtiger.wiredtiger_open(self.dir, backup_conn_params)
-        # Allow threads to run
-        time.sleep(2.0)
-        backup_conn.close()
-        #print "Compare: Run wt dump on " + self.dir
-        self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
-        #print "Compare: compare files"
-        self.assertEqual(True, compare_files(self, 'orig', 'backup'))
+    def compare(self, uri, dir_full, dir_incr):
+        #print "Compare: full URI: " + uri_full + " with incremental URI: " + uri_incr
+        full_name='backup_full'
+        incr_name='backup_incr'
+        if os.path.exists(full_name):
+            os.remove(full_name)
+        if os.path.exists(incr_name):
+            os.remove(incr_name)
+        self.runWt(['-h', dir_full, 'dump', uri], outfilename=full_name)
+        self.runWt(['-h', dir_incr, 'dump', uri], outfilename=incr_name)
+        self.assertEqual(True,
+            compare_files(self, full_name, incr_name))
 
-    # Run background inserts while running checkpoints and incremental backups
-    # repeatedly.
-    def test_incremental_backup(self):
-        # Create the backup directory.
-        os.mkdir(self.dir)
-        self.session.create(self.uri, "key_format=S,value_format=S")
-
-        self.populate(self.uri, self.dsize, self.nops)
-
+    def take_full_backup(self, dir):
         # Open up the backup cursor, and copy the files.  Do a full backup.
-        config = ""
         cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Initial full backup: ')
+        self.pr('Full backup to ' + dir + ': ')
+        os.mkdir(dir)
         while True:
             ret = cursor.next()
             if ret != 0:
                 break
             newfile = cursor.get_key()
             sz = os.path.getsize(newfile)
-            self.pr('Copy from: ' + newfile + '(' + str(sz) + ') to ' + self.dir)
-            shutil.copy(newfile, self.dir)
+            self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + dir)
+            shutil.copy(newfile, dir)
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         cursor.close()
+
+    # Take an incremental backup and then truncate/archive the logs.
+    def take_incr_backup(self, dir):
+            config = 'target=("log:")'
+            cursor = self.session.open_cursor('backup:', None, config)
+            while True:
+                ret = cursor.next()
+                if ret != 0:
+                    break
+                newfile = cursor.get_key()
+                sz = os.path.getsize(newfile)
+                self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + dir)
+                shutil.copy(newfile, dir)
+            self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+            self.session.truncate('log:', cursor, None, None)
+            cursor.close()
+
+    # Run background inserts while running checkpoints and incremental backups
+    # repeatedly.
+    def test_incremental_backup(self):
+        import sys
+        # Create the backup directory.
+        self.session.create(self.uri, "key_format=S,value_format=S")
+
+        self.populate(self.uri, self.dsize, self.nops)
+
+        # We need to start the directory for the incremental backup with
+        # a full backup.  The full backup function creates the directory.
+        dir = self.dir
+        self.take_full_backup(dir)
         self.session.checkpoint(None)
 
         #
@@ -132,28 +157,23 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         count = 5
         increment = 0
         updstr="bcdefghi"
-        config = 'target=("log:")'
         while increment < count:
+            full_dir = self.dir + str(increment)
             # Add more work to move the logs forward.
             self.update(self.uri, self.dsize, updstr[increment], self.nops)
             self.session.checkpoint(None)
-            cursor = self.session.open_cursor('backup:', None, config)
-            self.pr('Iteration: ' + str(increment))
-            while True:
-                ret = cursor.next()
-                if ret != 0:
-                    break
-                newfile = cursor.get_key()
-                sz = os.path.getsize(newfile)
-                self.pr('Copy from: ' + newfile + ' (' + str(sz) + ') to ' + self.dir)
-                shutil.copy(newfile, self.dir)
-            self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-            self.session.truncate('log:', cursor, None, None)
-            cursor.close()
 
+            # Take both the incremental backup and a new full backup.
+            # Then we can compare that both have the same content.
+            # Since the incremental backup also performs an archive, we
+            # take the full backup after the archival.
+            self.pr('Iteration: ' + str(increment))
+            self.take_incr_backup(self.dir)
+            self.take_full_backup(full_dir)
+
+            self.compare(self.uri, full_dir, self.dir)
             increment += 1
         self.pr('Done with backup loop')
-        self.compare(self.uri)
 
 
 if __name__ == '__main__':
