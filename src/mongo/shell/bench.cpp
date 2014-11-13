@@ -726,15 +726,14 @@ namespace mongo {
     }  // namespace
 
     void BenchRunWorker::run() {
-        BenchRunWorkerStateGuard _workerStateGuard( _brState );
-
-        boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
-
         try {
+            BenchRunWorkerStateGuard _workerStateGuard( _brState );
+            boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
             if ( !_config->username.empty() ) {
                 string errmsg;
                 if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                    uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
+                    uasserted(15932,
+                              "Authenticating to connection for benchThread failed: " + errmsg);
                 }
             }
             generateLoadOnConnection( conn.get() );
