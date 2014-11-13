@@ -1894,9 +1894,6 @@ namespace {
             _isWaitingForDrainToComplete = false;
             result = kActionCloseAllConnections;
         }
-        else if (newState.primary()) {
-            result = kActionOpLogMsgPrimary;
-        }
         else {
             result = kActionChooseNewSyncSource;
         }
@@ -1917,16 +1914,6 @@ namespace {
         case kActionCloseAllConnections:
             _externalState->closeConnections();
             _externalState->clearShardingState();
-            break;
-        case kActionOpLogMsgPrimary: {
-            const MemberConfig me = _rsConfig.getMemberAt(_thisMembersConfigIndex);
-            _externalState->logOpMessage(
-                    str::stream() << "Primary is now host:"
-                                  << me.getHostAndPort().toString()
-                                  << " configVersion:" << _rsConfig.getConfigVersion()
-                                  << " _id:" << me.getId()
-                    );
-            }
             break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
