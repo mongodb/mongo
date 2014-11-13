@@ -164,13 +164,14 @@ namespace mongo {
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
-        if (_shuttingDown)
-            return; // leak session to avoid race condition.
-
         invariant( session );
         invariant( session->cursorsOut() == 0 );
 
-        {
+        boost::mutex::scoped_lock lk( _sessionLock );
+        if (_shuttingDown)
+            return; // leak session to avoid race condition.
+
+        DEV {
             WT_SESSION* ss = session->getSession();
             uint64_t range;
             invariantWTOK( ss->transaction_pinned_range( ss, &range ) );
@@ -183,7 +184,6 @@ namespace mongo {
             return;
         }
 
-        boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
 
