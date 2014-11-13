@@ -192,6 +192,14 @@ __wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
 		x -= POS_1BYTE_MAX + 1;
 		*p++ = POS_2BYTE_MARKER | GET_BITS(x, 13, 8);
 		*p++ = GET_BITS(x, 8, 0);
+	} else if (x == POS_2BYTE_MAX + 1) {
+		/*
+		 * This is a special case where we could store the value with
+		 * just a single byte, but we append a zero byte so that the
+		 * encoding doesn't get shorter for this one value.
+		 */
+		*p++ = POS_MULTI_MARKER | 0x1;
+		*p++ = 0;
 	} else {
 		x -= POS_2BYTE_MAX + 1;
 		*p = POS_MULTI_MARKER;
@@ -344,7 +352,7 @@ __wt_vsize_uint(uint64_t x)
 {
 	if (x <= POS_1BYTE_MAX)
 		return (1);
-	else if (x <= POS_2BYTE_MAX) {
+	else if (x <= POS_2BYTE_MAX + 1) {
 		return (2);
 	} else {
 		x -= POS_2BYTE_MAX + 1;
