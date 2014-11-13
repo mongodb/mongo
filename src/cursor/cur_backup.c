@@ -221,6 +221,9 @@ __backup_start(
 	conn->hot_backup = 1;
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
+	/* Create the hot backup file. */
+	WT_ERR(__backup_file_create(session, cb, 0));
+
 	/* Add log files if logging is enabled. */
 
 	/*
@@ -234,19 +237,25 @@ __backup_start(
 	target_list = 0;
 	WT_ERR(__backup_uri(session, cb, cfg, &target_list, &log_only));
 
-	/* Create the hot backup file. */
-	WT_ERR(__backup_file_create(session, cb, log_only));
-
 	if (!target_list) {
 		WT_ERR(__backup_log_append(session, cb, 1));
 		WT_ERR(__backup_all(session, cb));
 	}
 
 	/* Add the hot backup and standard WiredTiger files to the list. */
-	if (log_only)
+	if (log_only) {
+		/*
+		 * Close any hot backup file.
+		 * We're about to open the incremental backup file.
+		 */
+		if (cb->bfp != NULL) {
+			WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
+			cb->bfp = NULL;
+		}
+		WT_ERR(__backup_file_create(session, cb, log_only));
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
-	else {
+	} else {
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_METADATA_BACKUP));
 		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
