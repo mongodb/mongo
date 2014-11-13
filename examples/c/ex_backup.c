@@ -102,7 +102,8 @@ add_work(WT_SESSION *session, int iter)
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
 	}
-	cursor->close(cursor);
+	ret = cursor->close(cursor);
+	return (ret);
 }
 
 static int
