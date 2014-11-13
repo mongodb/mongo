@@ -736,6 +736,7 @@ var authCommandsLib = {
         {
             testname: "currentOpCtx",
             command: {currentOpCtx: 1},
+            skipSharded: true,
             testcases: [
                 {
                     runOnDb: firstDbName,
