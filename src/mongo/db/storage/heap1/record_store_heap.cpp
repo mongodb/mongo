@@ -166,10 +166,10 @@ namespace mongo {
         return true;
     }
 
-    void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
-        HeapRecord* rec = recordFor(loc);
-        txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *rec));
-        _data->dataSize -= rec->size;
+    void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc, const RecordData *rec) {
+        HeapRecord* hrec = recordFor(loc);
+        txn->recoveryUnit()->registerChange(new RemoveChange(_data, loc, *hrec));
+        _data->dataSize -= hrec->size;
         invariant(_data->records.erase(loc) == 1);
     }
 

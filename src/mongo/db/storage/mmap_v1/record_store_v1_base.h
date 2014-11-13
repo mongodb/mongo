@@ -136,8 +136,7 @@ namespace mongo {
 
         virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* rd ) const;
 
-        void deleteRecord( OperationContext* txn,
-                           const DiskLoc& dl );
+        void deleteRecord( OperationContext* txn, const DiskLoc& dl, const RecordData* rec = NULL );
 
         virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
                                                  const DiskLoc& loc ) const;
