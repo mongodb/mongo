@@ -26,15 +26,20 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <vector>
 
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/unittest/unittest.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
+    const int NUM_PERF_ITERS = 1000*1000; // numeber of iterations to use for lock perf
+}
     
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -206,6 +211,62 @@ namespace mongo {
         ASSERT(locker.getLockMode(resIdCollection) == MODE_X);
 
         locker.unlockAll();
+    }
+
+    TEST(Locker, PerformanceBoostSharedMutex) {
+        for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
+            boost::mutex mtx;
+
+            // Do some warm-up loops
+            for (int i = 0; i < 1000; i++) {
+                mtx.lock();
+                mtx.unlock();
+            }
+
+            // Measure the number of loops
+            //
+            Timer t;
+
+            for (int i = 0; i < NUM_PERF_ITERS; i++) {
+                mtx.lock();
+                mtx.unlock();
+            }
+
+            log() << numLockers
+                << " locks took: "
+                << static_cast<double>(t.micros()) * 1000.0 / static_cast<double>(NUM_PERF_ITERS)
+                << " ns";
+        }
+    }
+
+    TEST(Locker, PerformanceLocker) {
+        for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
+            std::vector<boost::shared_ptr<LockerForTests> > lockers(numLockers);
+            for (int i = 0; i < numLockers; i++) {
+                lockers[i].reset(new LockerForTests(LockerId(100 + i)));
+            }
+
+            LockerImpl<false> locker(1);
+
+            // Do some warm-up loops
+            for (int i = 0; i < 1000; i++) {
+                locker.lockGlobal(MODE_IS);
+                locker.unlockAll();
+            }
+
+            // Measure the number of loops
+            Timer t;
+
+            for (int i = 0; i < NUM_PERF_ITERS; i++) {
+                locker.lockGlobal(MODE_IS);
+                locker.unlockAll();
+            }
+
+            log() << numLockers
+                  << " locks took: "
+                  << static_cast<double>(t.micros()) * 1000.0 / static_cast<double>(NUM_PERF_ITERS)
+                  << " ns";
+        }
     }
 
 } // namespace mongo
