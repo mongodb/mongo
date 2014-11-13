@@ -228,13 +228,14 @@ namespace mongo {
         string s2 = "eliot was here again";
 
         DiskLoc loc;
+        RecordData record(s1.c_str(), s1.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                           s1.c_str(), s1.size() + 1,
-                                                           false );
+                                                            record.data(), record.size(),
+                                                            false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -252,8 +253,9 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(), loc,
-                                                           s2.c_str(), s2.size() + 1,
-                                                           false, NULL );
+                                                            record,
+                                                            s2.c_str(), s2.size() + 1,
+                                                            false, NULL );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
