@@ -57,7 +57,6 @@ static int
 compare_backups(WT_SESSION *session, int i)
 {
 	int ret;
-	WT_CONNECTION *wt_conn;
 	char buf[1024];
 
 	(void)snprintf(buf, sizeof(buf),
@@ -135,7 +134,6 @@ take_full_backup(WT_SESSION *session, int i)
 		ret = cursor->get_key(cursor, &filename);
 		(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
 		    home, filename, hdir, filename);
-		if (i == 0)
 		ret = system(buf);
 	}
 	if (ret != WT_NOTFOUND)
@@ -178,7 +176,6 @@ int
 main(void)
 {
 	WT_CONNECTION *wt_conn;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int i, ret;
 	char cmd_buf[256];
