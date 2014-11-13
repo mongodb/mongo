@@ -40,7 +40,8 @@ mkdir -p wiredtiger
 # - Change to dir "wiredtiger" before extracting
 
 tar -x --strip-components 1 \
-    --exclude '*/api' --exclude '*/test' --exclude '*/tools/third_party' --exclude '*/src/docs' \
+    --exclude '*/api' --exclude '*/dist/package' --exclude '*/examples' \
+    --exclude '*/src/docs' --exclude '*/test' --exclude '*/tools/3rdparty' \
     -C wiredtiger -f ${TARBALL}
 
 git add wiredtiger
