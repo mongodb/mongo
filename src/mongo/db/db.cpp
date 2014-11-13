@@ -553,11 +553,15 @@ namespace mongo {
         mongo::signalForkSuccess();
 #endif
 
-            authindex::configureSystemIndexes(&txn);
+            Status status = authindex::verifySystemIndexes(&txn);
+            if (!status.isOK()) {
+                log() << status.reason();
+                exitCleanly(EXIT_NEED_UPGRADE);
+            }
 
             // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
             int foundSchemaVersion;
-            Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
+            status = getGlobalAuthorizationManager()->getAuthorizationVersion(
                     &txn, &foundSchemaVersion);
             if (!status.isOK()) {
                 log() << "Auth schema version is incompatible: "

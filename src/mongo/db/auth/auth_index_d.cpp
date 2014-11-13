@@ -74,38 +74,33 @@ namespace {
 
 }  // namespace
 
-    void configureSystemIndexes(OperationContext* txn) {
-        int authzVersion;
-        Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
-                                                                txn, &authzVersion);
-        if (!status.isOK()) {
-            return;
+    Status verifySystemIndexes(OperationContext* txn) {
+        const NamespaceString systemUsers = AuthorizationManager::usersCollectionNamespace;
+
+        // Make sure the old unique index from v2.4 on system.users doesn't exist.
+        AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
+        if (!autoDb.getDb()) {
+            return Status::OK();
         }
 
-        if (authzVersion >= AuthorizationManager::schemaVersion26Final) {
-            const NamespaceString systemUsers("admin", "system.users");
-
-            // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
-            if (!autoDb.getDb()) {
-                return;
-            }
-
-            Collection* collection = autoDb.getDb()->getCollection(txn,
-                                                                   NamespaceString(systemUsers));
-            if (!collection) {
-                return;
-            }
-
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
-            IndexDescriptor* oldIndex = NULL;
-
-            WriteUnitOfWork wunit(txn);
-            while ((oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
-                indexCatalog->dropIndex(txn, oldIndex);
-            }
-            wunit.commit();
+        Collection* collection = autoDb.getDb()->getCollection(txn,
+                                                               NamespaceString(systemUsers));
+        if (!collection) {
+            return Status::OK();
         }
+
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        IndexDescriptor* oldIndex = NULL;
+
+        if (indexCatalog &&
+            (oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
+            return Status(ErrorCodes::AuthSchemaIncompatible,
+                          "Old 2.4 style user index identified. "
+                          "The authentication schema needs to be updated by "
+                          "running authSchemaUpgrade on a 2.6 server.");
+        }
+
+        return Status::OK();
     }
 
     void createSystemIndexes(OperationContext* txn, Collection* collection) {
