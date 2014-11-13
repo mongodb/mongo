@@ -390,7 +390,7 @@ namespace {
 
         // If we just cloned & there were no ops applied, we still want the primary to know where
         // we're up to
-        bgsync->notify();
+        bgsync->notify(&txn);
 
         log() << "initial sync done";
         return Status::OK();

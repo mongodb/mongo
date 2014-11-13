@@ -23,8 +23,8 @@ load("jstests/replsets/rslib.js");
     "use strict";
     // helper function for verifying contents at the end of the test
     var checkFinalResults = function(db) {
-        assert.eq(5, db.bar.count(), "incorrect number of documents found");
         var x = db.bar.find().sort({q: 1}).toArray();
+        assert.eq(5, x.length, "incorrect number of documents found. Docs found: " + tojson(x));
         assert.eq(1, x[0].q);
         assert.eq(2, x[1].q);
         assert.eq(3, x[2].q);

@@ -81,7 +81,7 @@ namespace repl {
 
 
         void shutdown();
-        void notify();
+        void notify(OperationContext* txn);
 
         virtual ~BackgroundSync() {}
 
