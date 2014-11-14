@@ -240,7 +240,7 @@ extern int __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session);
 extern int __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize);
 extern int __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *name, const char *ckpt, uint32_t flags);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force);
-extern int __wt_conn_btree_get(WT_SESSION_IMPL *session, const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags);
+extern int __wt_conn_btree_get(WT_SESSION_IMPL *session, const char *name, const char *ckpt, const char *cfg[], uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, int apply_checkpoints, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern void __wt_conn_btree_close(WT_SESSION_IMPL *session);

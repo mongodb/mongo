@@ -153,12 +153,12 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 }
 
 /*
- * __conn_btree_get --
+ * __conn_dhandle_get --
  *	Allocate a new data handle, lock it exclusively, and return it linked
  *	into the connection's list.
  */
 static int
-__conn_btree_get(WT_SESSION_IMPL *session,
+__conn_dhandle_get(WT_SESSION_IMPL *session,
     const char *name, const char *ckpt, uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -169,8 +169,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 
 	/*
-	 * If we find the handle or something goes wrong, we're done.
-	 * Only keep going if the handle is not found.
+	 * We have the handle lock, check whether we can find the handle we
+	 * are looking for.  If we do, and we can lock it in the state we
+	 * want, this session will take ownership and we are done.
 	 */
 	ret = __wt_conn_dhandle_find(session, name, ckpt, flags);
 	if (ret == 0) {
@@ -182,9 +183,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_RET_NOTFOUND_OK(ret);
 
 	/*
-	 * Allocate the data source handle and underlying btree handle, then
-	 * initialize the data source handle.  Exclusively lock the data
-	 * source handle before inserting it in the list.
+	 * If no handle was found, allocate the data handle and a btree handle,
+	 * then initialize the data handle.  Exclusively lock the data handle
+	 * before inserting it in the list.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 
@@ -209,16 +210,6 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	/*
 	 * Prepend the handle to the connection list, assuming we're likely to
 	 * need new files again soon, until they are cached by all sessions.
-	 *
-	 * !!!
-	 * We hold only the schema lock here, not the dhandle lock.  Eviction
-	 * walks this list only holding the dhandle lock.  This works because
-	 * we're inserting at the beginning of the list, and we're only
-	 * publishing this one entry per lock acquisition.  Eviction either
-	 * sees our newly added entry or the former head of the list, and it
-	 * doesn't matter which (if eviction only sees a single element in the
-	 * list because the insert races, it will return without finding enough
-	 * candidates for eviction, and will then retry).
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	SLIST_INSERT_HEAD(&conn->dhlh, dhandle, l);
@@ -369,7 +360,7 @@ err:	__wt_free(session, metaconf);
  */
 static int
 __conn_btree_open(
-	WT_SESSION_IMPL *session, const char *op_cfg[], uint32_t flags)
+	WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -407,7 +398,7 @@ __conn_btree_open(
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
-		WT_ERR(__wt_btree_open(session, op_cfg));
+		WT_ERR(__wt_btree_open(session, cfg));
 		F_SET(dhandle, WT_DHANDLE_OPEN);
 		/*
 		 * Checkpoint handles are read only, so eviction calculations
@@ -448,7 +439,7 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
  */
 int
 __wt_conn_btree_get(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *op_cfg[], uint32_t flags)
+    const char *name, const char *ckpt, const char *cfg[], uint32_t flags)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -458,7 +449,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 		    __conn_dhandle_open_lock(session, session->dhandle, flags));
 	else {
 		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __conn_btree_get(session, name, ckpt, flags));
+		    ret = __conn_dhandle_get(session, name, ckpt, flags));
 		WT_RET(ret);
 	}
 	dhandle = session->dhandle;
@@ -466,7 +457,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
 	    (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
-		if ((ret = __conn_btree_open(session, op_cfg, flags)) != 0) {
+		if ((ret = __conn_btree_open(session, cfg, flags)) != 0) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		}

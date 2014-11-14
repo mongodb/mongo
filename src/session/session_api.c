@@ -433,8 +433,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	}
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_DHANDLE_LOCK(session,
-		ret = __wt_schema_create(session, uri, config)));
+	    ret = __wt_schema_create(session, uri, config));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }

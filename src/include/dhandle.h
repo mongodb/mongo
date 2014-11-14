@@ -6,27 +6,6 @@
  */
 
 /*
- * WT_WITH_DHANDLE_LOCK --
- *	Acquire the data handle list lock, perform an operation, drop the lock.
- */
-#define	WT_WITH_DHANDLE_LOCK(session, op) do {				\
-	if (F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED))		\
-		op;							\
-	else {								\
-		int __no_lock_set =					\
-		    F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK);	\
-		__wt_spin_lock(session, &S2C(session)->dhandle_lock);	\
-		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED |		\
-		    WT_SESSION_NO_SCHEMA_LOCK);				\
-		op;							\
-		__wt_spin_unlock(session, &S2C(session)->dhandle_lock);	\
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);		\
-		if (!__no_lock_set)					\
-			F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);	\
-	}								\
-} while (0)
-
-/*
  * XXX
  * The server threads use their own WT_SESSION_IMPL handles because they may
  * want to block (for example, the eviction server calls reconciliation, and
