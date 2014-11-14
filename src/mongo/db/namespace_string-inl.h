@@ -99,6 +99,9 @@ namespace mongo {
         if (coll.empty())
             return false;
 
+        if (coll[0] == '.')
+            return false;
+
         for (StringData::const_iterator iter = coll.begin(), end = coll.end();
                 iter != end; ++iter) {
             switch (*iter) {

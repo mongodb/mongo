@@ -90,6 +90,7 @@ namespace mongo {
         ASSERT( NamespaceString::validCollectionComponent( "a.b" ) );
         ASSERT( NamespaceString::validCollectionComponent( "a.b" ) );
         ASSERT( !NamespaceString::validCollectionComponent( "a." ) );
+        ASSERT( !NamespaceString::validCollectionComponent( "a..foo" ) );
         ASSERT( NamespaceString::validCollectionComponent( "a.b." ) ); // TODO: should this change?
     }
 
@@ -98,6 +99,7 @@ namespace mongo {
         ASSERT( NamespaceString::validCollectionName( "a.b" ) );
         ASSERT( NamespaceString::validCollectionName( "a." ) ); // TODO: should this change?
         ASSERT( NamespaceString::validCollectionName( "a.b." ) ); // TODO: should this change?
+        ASSERT( !NamespaceString::validCollectionName( ".a" ) );
         ASSERT( !NamespaceString::validCollectionName( "$a" ) );
         ASSERT( !NamespaceString::validCollectionName( "a$b" ) );
         ASSERT( !NamespaceString::validCollectionName( "" ) );
