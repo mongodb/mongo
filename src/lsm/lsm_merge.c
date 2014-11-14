@@ -216,7 +216,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	 * generations.
 	 */
 	if (nchunks < merge_min ||
-	    chunk->generation > youngest->generation + max_gap) {
+	    lsm_tree->chunk[end_chunk]->generation >
+	    youngest->generation + max_gap) {
 		for (i = 0; i < nchunks; i++) {
 			chunk = lsm_tree->chunk[start_chunk + i];
 			WT_ASSERT(session,
