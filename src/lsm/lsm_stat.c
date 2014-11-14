@@ -152,9 +152,6 @@ err:	if (locked)
 /*
  * __wt_curstat_lsm_init --
  *	Initialize the statistics for a LSM tree.
- *
- *	Grab the schema lock because we will be locking the LSM tree and we may
- *	need to open some files.
  */
 int
 __wt_curstat_lsm_init(
@@ -162,6 +159,10 @@ __wt_curstat_lsm_init(
 {
 	WT_DECL_RET;
 
+	/*
+	 * Grab the schema lock because we will be locking the LSM tree and we
+	 * may need to open some files.
+	 */
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __curstat_lsm_init(session, uri, cst));
 
