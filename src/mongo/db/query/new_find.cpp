@@ -568,20 +568,25 @@ namespace mongo {
         }
 
         // Parse the qm into a CanonicalQuery.
-        CanonicalQuery* cq;
-        Status canonStatus = CanonicalQuery::canonicalize(q, &cq, WhereCallbackReal(txn, nss.db()));
-        if (!canonStatus.isOK()) {
-            uasserted(17287, str::stream() << "Can't canonicalize query: " << canonStatus.toString());
+        std::auto_ptr<CanonicalQuery> cq;
+        {
+            CanonicalQuery* cqRaw;
+            Status canonStatus = CanonicalQuery::canonicalize(q,
+                                                              &cqRaw,
+                                                              WhereCallbackReal(txn, nss.db()));
+            if (!canonStatus.isOK()) {
+                uasserted(17287, str::stream() << "Can't canonicalize query: "
+                                               << canonStatus.toString());
+            }
+            cq.reset(cqRaw);
         }
+        invariant(cq.get());
 
         QLOG() << "Running query:\n" << cq->toString();
         LOG(2) << "Running query: " << cq->toStringShort();
 
         // Parse, canonicalize, plan, transcribe, and get a plan executor.
         PlanExecutor* rawExec = NULL;
-
-        // We use this a lot below.
-        const LiteParsedQuery& pq = cq->getParsed();
 
         AutoGetCollectionForRead ctx(txn, nss);
 
@@ -602,26 +607,27 @@ namespace mongo {
         // Otherwise we go through the selection of which executor is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
-        if (NULL != collection && pq.getOptions().oplogReplay) {
-            // Takes ownership of 'cq'.
-            status = getOplogStartHack(txn, collection, cq, &rawExec);
+        if (NULL != collection && cq->getParsed().getOptions().oplogReplay) {
+            status = getOplogStartHack(txn, collection, cq.release(), &rawExec);
         }
         else {
             size_t options = QueryPlannerParams::DEFAULT;
             if (shardingState.needCollectionMetadata(nss.ns())) {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
-            // Takes ownership of 'cq'.
-            status = getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, options);
+            status = getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec,
+                                 options);
         }
+        invariant(cq.get() == NULL); // cq has been released above.
 
         if (!status.isOK()) {
-            // NOTE: Do not access cq as getExecutor has deleted it.
             uasserted(17007, "Unable to execute query: " + status.reason());
         }
 
         verify(NULL != rawExec);
         auto_ptr<PlanExecutor> exec(rawExec);
+
+        const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
 
         // If it's actually an explain, do the explain and return rather than falling through
         // to the normal query execution loop.
@@ -817,8 +823,8 @@ namespace mongo {
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
             ClientCursor* cc = new ClientCursor(collection, exec.get(),
-                                                cq->getParsed().getOptions().toInt(),
-                                                cq->getParsed().getFilter());
+                                                pq.getOptions().toInt(),
+                                                pq.getFilter());
             ccId = cc->cursorid();
 
             if (fromDBDirectClient) {
