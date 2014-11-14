@@ -66,6 +66,8 @@ __drop_colgroup(
 	WT_DECL_RET;
 	WT_TABLE *table;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
 	    session, uri, &table, &colgroup)) == 0) {
@@ -179,8 +181,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		WT_WITH_TABLE_LOCK(session,
-		    ret = __drop_table(session, uri, force, cfg));
+		ret = __drop_table(session, uri, force, cfg);
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->drop == NULL ?
 		    __wt_object_unsupported(session, uri) :

@@ -433,7 +433,8 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	}
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_create(session, uri, config));
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_create(session, uri, config)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -479,7 +480,8 @@ __session_rename(WT_SESSION *wt_session,
 	WT_ERR(__wt_str_name_check(session, newuri));
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_rename(session, uri, newuri, cfg));
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_rename(session, uri, newuri, cfg)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -525,7 +527,8 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_ERR(__wt_str_name_check(session, uri));
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_drop(session, uri, cfg));
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_drop(session, uri, cfg)));
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);

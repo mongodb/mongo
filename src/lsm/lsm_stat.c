@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_curstat_lsm_init --
+ * __curstat_lsm_init --
  *	Initialize the statistics for a LSM tree.
  */
-int
-__wt_curstat_lsm_init(
+static int
+__curstat_lsm_init(
     WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
@@ -148,3 +148,23 @@ err:	if (locked)
 
 	return (ret);
 }
+
+/*
+ * __wt_curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
+ *
+ *	Grab the schema lock because we will be locking the LSM tree and we may
+ *	need to open some files.
+ */
+int
+__wt_curstat_lsm_init(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __curstat_lsm_init(session, uri, cst));
+
+	return (ret);
+}
+

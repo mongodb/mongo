@@ -619,22 +619,15 @@ __wt_schema_create(
 	WT_RET(__wt_meta_track_on(session));
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		WT_WITH_TABLE_LOCK(session,
-		    ret = __create_colgroup(session, uri, exclusive, config));
+		ret = __create_colgroup(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __create_file(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_create(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		WT_WITH_TABLE_LOCK(session,
-		    ret = __create_index(session, uri, exclusive, config));
+		ret = __create_index(session, uri, exclusive, config);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		/*
-		 * Table creation involves multiple steps.
-		 * Use a spinlock to make it appear atomic.
-		 */
-		WT_WITH_TABLE_LOCK(session,
-		    ret = __create_table(session, uri, exclusive, config));
+		ret = __create_table(session, uri, exclusive, config);
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->create == NULL ?
 		    __wt_object_unsupported(session, uri) :

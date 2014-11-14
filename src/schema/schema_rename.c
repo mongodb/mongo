@@ -261,8 +261,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_rename(session, uri, newuri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		WT_WITH_TABLE_LOCK(session,
-		    ret = __rename_table(session, uri, newuri, cfg));
+		ret = __rename_table(session, uri, newuri, cfg);
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->rename == NULL ?
 		    __wt_object_unsupported(session, uri) :
