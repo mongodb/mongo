@@ -609,16 +609,13 @@ namespace mongo {
 
     bool RocksRecordStore::Iterator::restoreState(OperationContext* txn) {
         _txn = txn;
+        if (_eof) {
+          return true;
+        }
+
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         _iterator.reset(ru->NewIterator(_cf.get()));
-        bool previousEOF = _eof;
-        DiskLoc previousCurr = _curr;
         _locate(_curr);
-        // if _curr != previousCurr that means that _curr has been deleted, so we don't need to
-        // advance it, because we're already on the next document by Seek-ing
-        if (previousEOF && _curr == previousCurr) {
-            getNext();
-        }
         return true;
     }
 
