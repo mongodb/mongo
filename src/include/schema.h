@@ -127,7 +127,7 @@ struct __wt_table {
 
 /*
  * WT_WITH_TABLE_LOCK --
- *	Acquire the schema lock, perform an operation, drop the lock.
+ *	Acquire the table lock, perform an operation, drop the lock.
  */
 #define	WT_WITH_TABLE_LOCK(session, op) do {				\
 	WT_ASSERT(session,						\
