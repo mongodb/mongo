@@ -36,8 +36,11 @@
 #include <vector>
 
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 #include <wiredtiger.h>
+
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -95,17 +98,24 @@ namespace mongo {
         void shuttingDown();
 
     private:
+        typedef std::vector<WiredTigerSession*> SessionPool;
+
 
         bool _shouldBeClosed( WiredTigerSession* session ) const;
 
-        void _closeAll(); // does not lock
 
         WiredTigerKVEngine* _engine; // not owned, might be NULL
         WT_CONNECTION* _conn; // not owned
-        typedef std::vector<WiredTigerSession*> SessionPool;
-        SessionPool _sessionPool; // owned
-        bool _shuttingDown;
+
+        // Session pool and protection around the get/return/cleanup methods
         mutable boost::mutex _sessionLock;
+        SessionPool _sessionPool;
+
+        // Regular operations take it in shared mode. Shutdown sets the _shuttingDown flag and
+        // then takes it in exclusive mode. This ensures that all threads, which would return
+        // sessions to the cache would leak them.
+        boost::shared_mutex _shutdownLock;
+        AtomicUInt32 _shuttingDown; // Used as boolean - 0 = false, 1 = true
     };
 
 }

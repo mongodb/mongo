@@ -112,78 +112,97 @@ namespace mongo {
     // -----------------------
 
     WiredTigerSessionCache::WiredTigerSessionCache( WiredTigerKVEngine* engine )
-        : _engine( engine ), _conn( engine->getConnection() ), _shuttingDown(false) {
+        : _engine( engine ), _conn( engine->getConnection() ), _shuttingDown(0) {
     }
 
     WiredTigerSessionCache::WiredTigerSessionCache( WT_CONNECTION* conn )
-        : _engine( NULL ), _conn( conn ), _shuttingDown(false) {
+        : _engine( NULL ), _conn( conn ), _shuttingDown(0) {
     }
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
-        _closeAll();
+        shuttingDown();
     }
 
     void WiredTigerSessionCache::shuttingDown() {
-        boost::mutex::scoped_lock lk( _sessionLock );
-        _shuttingDown = true;
-        _closeAll();
+        if (_shuttingDown.load()) return;
+        _shuttingDown.store(1);
+
+        {
+            // This ensures that any calls, which are currently inside of getSession/releaseSession
+            // will be able to complete before we start cleaning up the pool. Any others, which are
+            // about to enter will return immediately because of _shuttingDown == true.
+            boost::lock_guard<boost::shared_mutex> lk(_shutdownLock);
+        }
+
+        closeAll();
+        invariant(_sessionPool.empty());
     }
 
     void WiredTigerSessionCache::closeAll() {
-        boost::mutex::scoped_lock lk( _sessionLock );
-        if (_shuttingDown)
-            return; // leak sessions
-        _closeAll();
-    }
-
-    void WiredTigerSessionCache::_closeAll() {
-        for ( size_t i = 0; i < _sessionPool.size(); i++ ) {
-            delete _sessionPool[i];
+        SessionPool swapPool;
+        {
+            boost::mutex::scoped_lock lk(_sessionLock);
+            _sessionPool.swap(swapPool);
         }
-        _sessionPool.clear();
+
+        // New sessions will be created if need be outside of the lock
+        for (size_t i = 0; i < swapPool.size(); i++) {
+            delete swapPool[i];
+        }
+
+        swapPool.clear();
     }
 
     WiredTigerSession* WiredTigerSessionCache::getSession() {
+        boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
+
+        // We should never be able to get here after _shuttingDown is set, because no new
+        // operations should be allowed to start.
+        invariant(!_shuttingDown.loadRelaxed());
+
         {
             boost::mutex::scoped_lock lk( _sessionLock );
-            invariant(!_shuttingDown); // shouldn't get here after this is set.
 
-            if ( !_sessionPool.empty() ) {
-                WiredTigerSession* s = _sessionPool.back();
+            if (!_sessionPool.empty()) {
+                WiredTigerSession* cachedSession = _sessionPool.back();
                 _sessionPool.pop_back();
-                {
-                    WT_SESSION* ss = s->getSession();
-                    uint64_t range;
-                    invariantWTOK( ss->transaction_pinned_range( ss, &range ) );
-                    invariant( range == 0 );
-                }
-                return s;
+
+                return cachedSession;
             }
         }
+
         return new WiredTigerSession( _conn, _engine ? _engine->currentEpoch() : -1 );
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
         invariant( session );
-        invariant( session->cursorsOut() == 0 );
+        invariant(session->cursorsOut() == 0);
 
-        boost::mutex::scoped_lock lk( _sessionLock );
-        if (_shuttingDown)
-            return; // leak session to avoid race condition.
-
-        DEV {
-            WT_SESSION* ss = session->getSession();
-            uint64_t range;
-            invariantWTOK( ss->transaction_pinned_range( ss, &range ) );
-            invariant( range == 0 );
+        boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
+        if (_shuttingDown.loadRelaxed()) {
+            // Leak the session in order to avoid race condition with clean shutdown, where the
+            // storage engine is ripped from underneath transactions, which are not "active"
+            // (i.e., do not have any locks), but are just about to delete the recovery unit.
+            // See SERVER-16031 for more information.
+            return;
         }
 
-        if ( _engine && _engine->haveDropsQueued() && session->epoch() < _engine->currentEpoch() ) {
+        // This checks that we are only caching idle sessions and not something which might hold
+        // locks or otherwise prevent truncation.
+        {
+            WT_SESSION* ss = session->getSession();
+            uint64_t range;
+            invariantWTOK(ss->transaction_pinned_range(ss, &range));
+            invariant(range == 0);
+        }
+
+        if (_engine && _engine->haveDropsQueued() && session->epoch() < _engine->currentEpoch()) {
             delete session;
             _engine->dropAllQueued();
             return;
         }
 
+        boost::mutex::scoped_lock lk(_sessionLock);
         _sessionPool.push_back( session );
     }
 
