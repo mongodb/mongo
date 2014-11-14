@@ -6,7 +6,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"os"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
 )
