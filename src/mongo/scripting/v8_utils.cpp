@@ -101,6 +101,7 @@ namespace mongo {
         JSThreadConfig(V8Scope* scope, const v8::Arguments& args, bool newScope = false) :
             _started(),
             _done(),
+            _errored(),
             _newScope(newScope) {
             jsassert(args.Length() > 0, "need at least one argument");
             jsassert(args[0]->IsFunction(), "first argument must be a function");
@@ -126,6 +127,16 @@ namespace mongo {
             jsassert(_started && !_done, "Thread not running");
             _thread->join();
             _done = true;
+        }
+
+        /**
+         * Returns true if the JSThread terminated as a result of an error
+         * during its execution, and false otherwise. This operation does
+         * not block, nor does it require join() to have been called.
+         */
+        bool hasFailed() const {
+            jsassert(_started, "Thread not started");
+            return _errored;
         }
 
         BSONObj returnData() {
@@ -168,8 +179,7 @@ namespace mongo {
                         string e = _config._scope->v8ExceptionToSTLString(&try_catch);
                         log() << "js thread raised js exception: " << e << endl;
                         ret = v8::Undefined();
-                        // TODO propagate exceptions (or at least the fact that an exception was
-                        // thrown) to the calling js on either join() or returnData().
+                        _config._errored = true;
                     }
                     // ret is translated to BSON to switch isolate
                     BSONObjBuilder b;
@@ -179,14 +189,17 @@ namespace mongo {
                 catch (const DBException& e) {
                     // Keeping behavior the same as for js exceptions.
                     log() << "js thread threw c++ exception: " << e.toString();
+                    _config._errored = true;
                     _config._returnData = BSON("ret" << BSONUndefined);
                 }
                 catch (const std::exception& e) {
                     log() << "js thread threw c++ exception: " << e.what();
+                    _config._errored = true;
                     _config._returnData = BSON("ret" << BSONUndefined);
                 }
                 catch (...) {
                     log() << "js thread threw c++ non-exception";
+                    _config._errored = true;
                     _config._returnData = BSON("ret" << BSONUndefined);
                 }
             }
@@ -197,6 +210,7 @@ namespace mongo {
 
         bool _started;
         bool _done;
+        bool _errored;
         bool _newScope;
         BSONObj _args;
         scoped_ptr<boost::thread> _thread;
@@ -241,6 +255,12 @@ namespace mongo {
         return v8::Undefined();
     }
 
+    // Indicates to the caller that the thread terminated as a result of an error.
+    v8::Handle<v8::Value> ThreadHasFailed(V8Scope* scope, const v8::Arguments& args) {
+        bool hasFailed = thisConfig(scope, args)->hasFailed();
+        return v8::Boolean::New(hasFailed);
+    }
+
     v8::Handle<v8::Value> ThreadReturnData(V8Scope* scope, const v8::Arguments& args) {
         BSONObj data = thisConfig(scope, args)->returnData();
         return scope->mongoToV8Element(data.firstElement(), true);
@@ -256,6 +276,7 @@ namespace mongo {
         scope->injectV8Function("init", ThreadInit, o);
         scope->injectV8Function("start", ThreadStart, o);
         scope->injectV8Function("join", ThreadJoin, o);
+        scope->injectV8Function("hasFailed", ThreadHasFailed, o);
         scope->injectV8Function("returnData", ThreadReturnData, o);
         return handle_scope.Close(v8::Handle<v8::Value>());
     }
