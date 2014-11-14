@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("error parsing command line options: %v\n\n", err)
 		fmt.Printf("try 'mongorestore --help' for more information\n")
-		os.Exit(2)
+		os.Exit(-1)
 	}
 
 	// print help or version info, if specified
@@ -43,7 +43,7 @@ func main() {
 	targetDir, err := getTargetDirFromArgs(extraArgs, os.Args, inputOpts.Directory)
 	if err != nil {
 		fmt.Printf("error parsing command line options: %v\n", err)
-		os.Exit(2)
+		os.Exit(-1)
 	}
 	targetDir = util.ToUniversalPath(targetDir)
 
@@ -60,8 +60,7 @@ func main() {
 	err = restore.Restore()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		util.ExitFail()
-		return
+		os.Exit(-1)
 	}
 }
 

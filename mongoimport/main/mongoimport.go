@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	"os"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongoimport"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
@@ -26,7 +26,7 @@ func main() {
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(-1)
 	}
 
 	log.SetVerbosity(opts.Verbosity)
@@ -57,7 +57,7 @@ func main() {
 	if err = mongoImport.ValidateSettings(args); err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(-1)
 	}
 
 	numDocs, err := mongoImport.ImportDocuments()
@@ -72,6 +72,6 @@ func main() {
 		log.Logf(log.Always, message)
 	}
 	if err != nil {
-		os.Exit(1)
+		os.Exit(-1)
 	}
 }
