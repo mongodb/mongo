@@ -50,7 +50,8 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 /*
  * __lsm_merge_span --
  *	Figure out the best span of chunks to merge. Return an error if
- *	there is no need to do any merges.
+ *	there is no need to do any merges.  Called with the LSM tree
+ *	locked.
  */
 static int
 __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
@@ -200,11 +201,13 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 
 	/* Be paranoid, check that we setup the merge properly. */
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
+#ifdef	HAVE_DIAGNOSTIC
 	for (i = 0; i < nchunks; i++) {
 		chunk = lsm_tree->chunk[start_chunk + i];
 		WT_ASSERT(session,
 		    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
 	}
+#endif
 
 	WT_ASSERT(session,
 	    nchunks == 0 || (chunk != NULL && youngest != NULL));
@@ -213,7 +216,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	 * generations.
 	 */
 	if (nchunks < merge_min ||
-	    chunk->generation > youngest->generation + max_gap) {
+	    lsm_tree->chunk[end_chunk]->generation >
+	    youngest->generation + max_gap) {
 		for (i = 0; i < nchunks; i++) {
 			chunk = lsm_tree->chunk[start_chunk + i];
 			WT_ASSERT(session,

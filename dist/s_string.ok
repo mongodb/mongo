@@ -220,6 +220,7 @@ Marsaglia's
 Mellor
 Metadata
 Mewhort
+Mitzenmacher
 MoveFile
 Multi
 Multithreaded
@@ -783,6 +784,7 @@ minprefix
 mkdir
 mmap
 mnt
+msecs
 msg
 msgv
 msvc

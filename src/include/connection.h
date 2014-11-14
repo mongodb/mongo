@@ -181,8 +181,8 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
-	wt_off_t		 ckpt_logsize;	/* Checkpoint log size period */
-	uint32_t	 ckpt_signalled; /* Checkpoint signalled */
+	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
+	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
 	int compact_in_memory_pass;	/* Compaction serialization */

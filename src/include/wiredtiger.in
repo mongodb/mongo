@@ -3257,16 +3257,24 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_CHECKPOINT			1101
 /*! transaction: transaction checkpoint currently running */
 #define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1102
+/*! transaction: transaction checkpoint max time (msecs) */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1103
+/*! transaction: transaction checkpoint min time (msecs) */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1104
+/*! transaction: transaction checkpoint most recent time (msecs) */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1105
+/*! transaction: transaction checkpoint total time (msecs) */
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1106
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1103
+#define	WT_STAT_CONN_TXN_COMMIT				1107
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1104
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1108
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1105
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1109
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1106
+#define	WT_STAT_CONN_TXN_ROLLBACK			1110
 /*! connection: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1107
+#define	WT_STAT_CONN_WRITE_IO				1111
 
 /*!
  * @}

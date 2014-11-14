@@ -667,19 +667,16 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 static inline void
 __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep)
 {
-	size_t prev_size = 1;
-	size_t orig_size = *sizep;
-	size_t field_size0 = __wt_vsize_uint(orig_size);
-	size_t field_size1 =
-	    __wt_vsize_uint(orig_size + field_size0 - prev_size);
-	*sizep += field_size1 - prev_size;
+	size_t curr_size = *sizep;
+	size_t field_size, prev_field_size = 1;
 
-	/*
-	 * Make sure the field size we calculated matches the adjusted size.
-	 * This relies on the fact that we are only adjusting by a small number
-	 * of bytes, so we won't cross multiple boundaries in the packing
-	 * routine.  If that were not true, we would need to iterate here until
-	 * the field size stops growing.
-	 */
-	WT_ASSERT(session, field_size1 == __wt_vsize_uint(*sizep));
+	while ((field_size = __wt_vsize_uint(curr_size)) != prev_field_size) {
+		curr_size += field_size - prev_field_size;
+		prev_field_size = field_size;
+	}
+
+	/* Make sure the field size we calculated matches the adjusted size. */
+	WT_ASSERT(session, field_size == __wt_vsize_uint(curr_size));
+
+	*sizep = curr_size;
 }
