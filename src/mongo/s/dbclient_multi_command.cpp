@@ -34,15 +34,11 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/s/write_ops/batch_downconvert.h"
-#include "mongo/s/write_ops/dbclient_safe_writer.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
-
-    // Can force the write mode used for the shards to not uses commands, even if avail.
-    MONGO_EXPORT_SERVER_PARAMETER( _forceLegacyShardWriteMode, bool, false );
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
                                                           const StringData& dbName,
@@ -64,8 +60,7 @@ namespace mongo {
     namespace {
 
         //
-        // Stuff we need for batch downconversion
-        // TODO: Remove post-2.6
+        // For sanity checks of batch write operations
         //
 
         BatchedCommandRequest::BatchType getBatchWriteType( const BSONObj& cmdObj ) {
@@ -81,38 +76,8 @@ namespace mongo {
         }
 
         bool hasBatchWriteFeature( DBClientBase* conn ) {
-            return !_forceLegacyShardWriteMode
-                   && conn->getMinWireVersion() <= BATCH_COMMANDS
+            return conn->getMinWireVersion() <= BATCH_COMMANDS
                    && conn->getMaxWireVersion() >= BATCH_COMMANDS;
-        }
-
-        /**
-         * Parses and re-BSON's a batch write command in order to send it as a set of safe writes.
-         */
-        void legacySafeWrite( DBClientBase* conn,
-                              const StringData& dbName,
-                              const BSONObj& cmdRequest,
-                              BSONObj* cmdResponse ) {
-
-            // Translate from BSON
-            BatchedCommandRequest request( getBatchWriteType( cmdRequest ) );
-
-            // This should *always* parse correctly
-            bool parsed = request.parseBSON( cmdRequest, NULL );
-            (void) parsed; // for non-debug compile
-            dassert( parsed && request.isValid( NULL ) );
-
-            // Collection name is sent without db to the dispatcher
-            request.setNS( dbName.toString() + "." + request.getNS() );
-
-            DBClientSafeWriter safeWriter;
-            BatchSafeWriter batchSafeWriter( &safeWriter );
-            BatchedCommandResponse response;
-            batchSafeWriter.safeWriteBatch( conn, request, &response );
-
-            // Back to BSON
-            dassert( response.isValid( NULL ) );
-            *cmdResponse = response.toBSON();
         }
     }
 
@@ -166,15 +131,14 @@ namespace mongo {
                 int timeoutSecs = _timeoutMillis / 1000;
                 command->conn = shardConnectionPool.get( command->endpoint, timeoutSecs );
 
-                if ( hasBatchWriteFeature( command->conn )
-                     || !isBatchWriteCommand( command->cmdObj ) ) {
-                    // Do normal command dispatch
-                    sayAsCmd( command->conn, command->dbName, command->cmdObj );
-                }
-                else {
-                    // Sending a batch as safe writes necessarily blocks, so we can't do anything
-                    // here.  Instead we do the safe writes in recvAny(), which can block.
-                }
+                // Sanity check if we're sending a batch write that we're talking to a new-enough
+                // server.
+                massert(28563, str::stream() << "cannot send batch write operation to server "
+                                             << command->conn->toString(),
+                       !isBatchWriteCommand(command->cmdObj) ||
+                       hasBatchWriteFeature(command->conn));
+
+                sayAsCmd( command->conn, command->dbName, command->cmdObj );
             }
             catch ( const DBException& ex ) {
                 command->status = ex.toStatus();
@@ -217,16 +181,7 @@ namespace mongo {
             Message toRecv;
             BSONObj result;
 
-            if ( hasBatchWriteFeature( command->conn )
-                 || !isBatchWriteCommand( command->cmdObj ) ) {
-                // Recv data from command sent earlier
-                recvAsCmd( command->conn, &toRecv, &result );
-            }
-            else {
-                // We can safely block in recvAny, so dispatch writes as safe writes for hosts
-                // that don't understand batch write commands.
-                legacySafeWrite( command->conn, command->dbName, command->cmdObj, &result );
-            }
+            recvAsCmd( command->conn, &toRecv, &result );
 
             shardConnectionPool.release( command->endpoint.toString(), command->conn );
             command->conn = NULL;

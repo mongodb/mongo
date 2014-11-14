@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    Status BatchSafeWriter::extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors ) {
+    Status extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors ) {
 
         // DRAGONS
         // Parsing GLE responses is incredibly finicky.
@@ -154,208 +154,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    void BatchSafeWriter::extractGLEStats(const BSONObj& gleResponse,
-                                          const BatchItemRef& batchItem,
-                                          GLEStats* stats) {
-
-        stats->n = gleResponse["n"].numberInt();
-
-        if ( !gleResponse["upserted"].eoo() ) {
-            stats->upsertedId = gleResponse["upserted"].wrap( "upserted" );
-        }
-        else if (batchItem.getOpType() == BatchedCommandRequest::BatchType_Update
-                 && !gleResponse["updatedExisting"].eoo()
-                 && !gleResponse["updatedExisting"].trueValue() && stats->n == 1) {
-
-            // v2.4 doesn't include the upserted field when the upserted id isn't an OID.
-            // Note that updatedExisting only appears in GLE after update.
-
-            // Rip out the upserted _id from the request item
-            // This is only safe b/c v2.4 doesn't allow modifiers on _id
-            BSONObj upsertedId;
-            if (!batchItem.getUpdate()->getUpdateExpr()["_id"].eoo()) {
-                upsertedId = batchItem.getUpdate()->getUpdateExpr()["_id"].wrap("upserted");
-            }
-            else if (!batchItem.getUpdate()->getQuery()["_id"].eoo()) {
-                upsertedId = batchItem.getUpdate()->getQuery()["_id"].wrap("upserted");
-            }
-
-            dassert(!upsertedId.isEmpty());
-
-            stats->upsertedId = upsertedId;
-        }
-
-        if ( gleResponse["lastOp"].type() == Timestamp ) {
-            stats->lastOp = gleResponse["lastOp"]._opTime();
-        }
-    }
-
-    static BSONObj fixWCForConfig( const BSONObj& writeConcern ) {
-        BSONObjBuilder fixedB;
-        BSONObjIterator it( writeConcern );
-        while ( it.more() ) {
-            BSONElement el = it.next();
-            if ( StringData( el.fieldName() ).compare( "w" ) != 0 ) {
-                fixedB.append( el );
-            }
-        }
-        return fixedB.obj();
-    }
-
-    void BatchSafeWriter::safeWriteBatch( DBClientBase* conn,
-                                          const BatchedCommandRequest& request,
-                                          BatchedCommandResponse* response ) {
-
-        const NamespaceString nss( request.getNS() );
-
-        // N starts at zero, and we add to it for each item
-        response->setN( 0 );
-
-        // GLE path always sets nModified to -1 (sentinel) to indicate we should omit it later.
-        response->setNModified(-1);
-
-        for ( size_t i = 0; i < request.sizeWriteOps(); ++i ) {
-
-            // Break on first error if we're ordered
-            if ( request.getOrdered() && response->isErrDetailsSet() )
-                break;
-
-            BatchItemRef itemRef( &request, static_cast<int>( i ) );
-
-            BSONObj gleResult;
-            GLEErrors errors;
-            Status status = _safeWriter->safeWrite( conn,
-                                                    itemRef,
-                                                    WriteConcernOptions::Acknowledged,
-                                                    &gleResult );
-
-            if ( status.isOK() ) {
-                status = extractGLEErrors( gleResult, &errors );
-            }
-
-            if ( !status.isOK() ) {
-                response->clear();
-                response->setOk( false );
-                response->setErrCode( ErrorCodes::RemoteResultsUnavailable );
-                
-                StringBuilder builder;
-                builder << "could not get write error from safe write";
-                builder << causedBy( status.toString() );
-                response->setErrMessage( builder.str() );
-                return;
-            }
-
-            if ( errors.wcError.get() ) {
-                response->setWriteConcernError( errors.wcError.release() );
-            }
-
-            //
-            // STATS HANDLING
-            //
-
-            GLEStats stats;
-            extractGLEStats( gleResult, itemRef, &stats );
-
-            // Special case for making legacy "n" field result for insert match the write
-            // command result.
-            if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert
-                 && !errors.writeError.get() ) {
-                // n is always 0 for legacy inserts.
-                dassert( stats.n == 0 );
-                stats.n = 1;
-            }
-
-            response->setN( response->getN() + stats.n );
-
-            if ( !stats.upsertedId.isEmpty() ) {
-                BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
-                upsertedId->setIndex( i );
-                upsertedId->setUpsertedID( stats.upsertedId );
-                response->addToUpsertDetails( upsertedId );
-            }
-
-            response->setLastOp( stats.lastOp );
-
-            // Save write error
-            if ( errors.writeError.get() ) {
-                errors.writeError->setIndex( i );
-                response->addToErrDetails( errors.writeError.release() );
-            }
-        }
-
-        //
-        // WRITE CONCERN ERROR HANDLING
-        //
-
-        // The last write is weird, since we enforce write concern and check the error through
-        // the same GLE if possible.  If the last GLE was an error, the write concern may not
-        // have been enforced in that same GLE, so we need to send another after resetting the
-        // error.
-
-        BSONObj writeConcern;
-        if ( request.isWriteConcernSet() ) {
-            writeConcern = request.getWriteConcern();
-            // Pre-2.4.2 mongods react badly to 'w' being set on config servers
-            if ( nss.db() == "config" )
-                writeConcern = fixWCForConfig( writeConcern );
-        }
-
-        bool needToEnforceWC = WriteConcernOptions::Acknowledged.woCompare(writeConcern) != 0 &&
-                WriteConcernOptions::Unacknowledged.woCompare(writeConcern) != 0;
-
-        if ( needToEnforceWC &&
-                ( !response->isErrDetailsSet() ||
-                        ( !request.getOrdered() &&
-                                // Not all errored. Note: implicit response->isErrDetailsSet().
-                                response->sizeErrDetails() < request.sizeWriteOps() ))) {
-
-            // Might have gotten a write concern validity error earlier, these are
-            // enforced even if the wc isn't applied, so we ignore.
-            response->unsetWriteConcernError();
-
-            const string dbName( nss.db().toString() );
-
-            Status status( Status::OK() );
-
-            if ( response->isErrDetailsSet() ) {
-                const WriteErrorDetail* lastError = response->getErrDetails().back();
-
-                // If last write op was an error.
-                if ( lastError->getIndex() == static_cast<int>( request.sizeWriteOps() - 1 )) {
-                    // Reset previous errors so we can apply the write concern no matter what
-                    // as long as it is valid.
-                    status = _safeWriter->clearErrors( conn, dbName );
-                }
-            }
-
-            BSONObj gleResult;
-            if ( status.isOK() ) {
-                status = _safeWriter->enforceWriteConcern( conn,
-                                                           dbName,
-                                                           writeConcern,
-                                                           &gleResult );
-            }
-
-            GLEErrors errors;
-            if ( status.isOK() ) {
-                status = extractGLEErrors( gleResult, &errors );
-            }
-            
-            if ( !status.isOK() ) {
-                auto_ptr<WCErrorDetail> wcError( new WCErrorDetail );
-                wcError->setErrCode( status.code() );
-                wcError->setErrMessage( status.reason() );
-                response->setWriteConcernError( wcError.release() ); 
-            }
-            else if ( errors.wcError.get() ) {
-                response->setWriteConcernError( errors.wcError.release() );
-            }
-        }
-
-        response->setOk( true );
-        dassert( response->isValid( NULL ) );
-    }
-
     /**
      * Suppress the "err" and "code" field if they are coming from a previous write error and
      * are not related to write concern.  Also removes any write stats information (e.g. "n")
@@ -365,7 +163,7 @@ namespace mongo {
      *
      * Returns the stripped GLE response.
      */
-    BSONObj BatchSafeWriter::stripNonWCInfo( const BSONObj& gleResponse ) {
+    BSONObj stripNonWCInfo( const BSONObj& gleResponse ) {
 
         BSONObjIterator it( gleResponse );
         BSONObjBuilder builder;
@@ -487,12 +285,12 @@ namespace mongo {
                 continue;
             }
 
-            BSONObj gleResponse = BatchSafeWriter::stripNonWCInfo( gleResponseSerial.toBSON() );
+            BSONObj gleResponse = stripNonWCInfo( gleResponseSerial.toBSON() );
 
             // Use the downconversion tools to determine if this GLE response is ok, a
             // write concern error, or an unknown error we should immediately abort for.
-            BatchSafeWriter::GLEErrors errors;
-            Status extractStatus = BatchSafeWriter::extractGLEErrors( gleResponse, &errors );
+            GLEErrors errors;
+            Status extractStatus = extractGLEErrors( gleResponse, &errors );
             if ( !extractStatus.isOK() ) {
                 failedStatuses.push_back( extractStatus );
                 continue;
