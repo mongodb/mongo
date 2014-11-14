@@ -201,21 +201,20 @@ namespace mongo {
             virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         private:
-            bool _forward() const;
             void _getNext();
             void _locate( const DiskLoc &loc, bool exact );
-            void _checkStatus();
             DiskLoc _curr() const; // const version of public curr method
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
             RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
-            CollectionScanParams::Direction _dir;
+            const bool _forward;
             bool _forParallelCollectionScan;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
-            DiskLoc _readUntilForOplog;
+            const DiskLoc _readUntilForOplog;
 
+            DiskLoc _loc; // Cached key of _cursor. Update any time _cursor is moved.
             DiskLoc _lastLoc; // the last thing returned from getNext()
         };
 

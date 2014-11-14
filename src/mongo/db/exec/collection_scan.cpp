@@ -112,12 +112,21 @@ namespace mongo {
         if (isEOF())
             return PlanStage::IS_EOF;
 
+        const DiskLoc curr = _iter->curr();
+        if (curr.isNull()) {
+            // We just hit EOF
+            if (_params.tailable)
+                _iter.reset(); // pick up where we left off on the next call to work()
+            return PlanStage::IS_EOF;
+        }
+
+        _lastSeenLoc = curr;
+
         // See if the record we're about to access is in memory. If not, pass a fetch request up.
-        // Note that curr() returns the same thing as getNext() will, except without advancing the
-        // iterator or touching the DiskLoc. This means that we can use curr() to check whether we
-        // need to fetch on the DiskLoc prior to touching it with getNext().
-        DiskLoc curr = _iter->curr();
-        if (!curr.isNull()) {
+        // Note that curr() does not touch the record (on MMAPv1 which is the only place we use
+        // NEED_FETCH) so we are able to yield before touching the record, as long as we do so
+        // before calling getNext().
+        {
             std::auto_ptr<RecordFetcher> fetcher(
                 _params.collection->documentNeedsFetch(_txn, curr));
             if (NULL != fetcher.get()) {
@@ -131,24 +140,14 @@ namespace mongo {
             }
         }
 
-        // What we'll return to the user.
-        DiskLoc nextLoc;
-
-        // See if _iter gives us anything new.
-        nextLoc = _iter->getNext();
-        if (nextLoc.isNull()) {
-            if (_params.tailable)
-                _iter.reset(); // pick up where we left off on the next call to work()
-            return PlanStage::IS_EOF;
-        }
-
-        _lastSeenLoc = nextLoc;
-
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
-        member->loc = nextLoc;
+        member->loc = curr;
         member->obj = _iter->dataFor(member->loc).releaseToBson();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+
+        // Advance the iterator.
+        invariant(_iter->getNext() == curr);
 
         return returnIfMatches(member, id, out);
     }

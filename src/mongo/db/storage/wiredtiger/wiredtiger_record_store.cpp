@@ -893,11 +893,12 @@ namespace {
             bool forParallelCollectionScan)
         : _rs( rs ),
           _txn( txn ),
-          _dir( dir ),
+          _forward( dir == CollectionScanParams::FORWARD ),
           _forParallelCollectionScan( forParallelCollectionScan ),
-          _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ) {
+          _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ),
+          _eof(false),
+          _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
         RS_ITERATOR_TRACE("start");
-        _readUntilForOplog = WiredTigerRecoveryUnit::get(txn)->getOplogReadTill();
         _locate(start, true);
     }
 
@@ -910,12 +911,15 @@ namespace {
         invariant( c );
         int ret;
         if (loc.isNull()) {
-            ret = _forward() ? c->next(c) : c->prev(c);
-            if (ret != WT_NOTFOUND) invariantWTOK(ret);
+            ret = _forward ? c->next(c) : c->prev(c);
             _eof = (ret == WT_NOTFOUND);
+            if (!_eof) invariantWTOK(ret);
+            _loc = _curr();
+
             RS_ITERATOR_TRACE("_locate   null loc eof: " << _eof);
             return;
         }
+
         c->set_key(c, _makeKey(loc));
         if (exact) {
             ret = c->search(c);
@@ -928,10 +932,11 @@ namespace {
             ret = c->search_near(c, &cmp);
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
+                _loc = DiskLoc();
                 return;
             }
             invariantWTOK(ret);
-            if (_forward()) {
+            if (_forward) {
                 // return >= loc
                 if (cmp < 0)
                     ret = c->next(c);
@@ -944,6 +949,7 @@ namespace {
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
+        _loc = _curr();
         RS_ITERATOR_TRACE("_locate   not null loc eof: " << _eof);
     }
 
@@ -959,7 +965,7 @@ namespace {
             return DiskLoc();
 
         WT_CURSOR *c = _cursor->get();
-        invariant( c );
+        dassert( c );
         uint64_t key;
         int ret = c->get_key(c, &key);
         invariantWTOK(ret);
@@ -967,50 +973,54 @@ namespace {
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::curr() {
-        return _curr();
+        return _loc;
     }
 
     void WiredTigerRecordStore::Iterator::_getNext() {
+        // Once you go EOF you never go back.
+        if (_eof) return;
+
         RS_ITERATOR_TRACE("_getNext");
         WT_CURSOR *c = _cursor->get();
-        int ret = _forward() ? c->next(c) : c->prev(c);
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
+        int ret = _forward ? c->next(c) : c->prev(c);
         _eof = (ret == WT_NOTFOUND);
         RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof );
         if ( !_eof ) {
             RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _curr() );
+            invariantWTOK(ret);
+            _loc = _curr();
+            RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _loc );
+            if ( _rs._isCapped ) {
+                DiskLoc loc = _curr();
+                if ( _readUntilForOplog.isNull() ) {
+                    // this is the normal capped case
+                    if ( _rs.isCappedHidden( loc ) ) {
+                        _eof = true;
+                    }
+                }
+                else {
+                    // this is for oplogs
+                    if ( loc > _readUntilForOplog ) {
+                        _eof = true;
+                    }
+                    else if ( loc == _readUntilForOplog && _rs.isCappedHidden( loc ) ) {
+                        // we allow if its been commited already
+                        _eof = true;
+                    }
+                }
+            }
+        }
+
+        if (_eof) {
+            _loc = DiskLoc();
         }
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
         RS_ITERATOR_TRACE( "getNext" );
-        /* Take care not to restart a scan if we have hit the end */
-        if (isEOF())
-            return DiskLoc();
-
-        /* MongoDB expects "natural" ordering - which is the order that items are inserted. */
-        DiskLoc toReturn = curr();
+        const DiskLoc toReturn = _loc;
         RS_ITERATOR_TRACE( "getNext toReturn: " << toReturn );
         _getNext();
-        if ( !_eof && _rs.isCapped() ) {
-            DiskLoc loc = _curr();
-            if ( _readUntilForOplog.isNull() ) {
-                // this is the normal capped case
-                if ( _rs.isCappedHidden( loc ) ) {
-                    _eof = true;
-                }
-            }
-            else {
-                // this is for oplogs
-                if ( loc > _readUntilForOplog ) {
-                    _eof = true;
-                }
-                else if ( loc == _readUntilForOplog && _rs.isCappedHidden( loc ) ) {
-                    // we allow if its been commited already
-                    _eof = true;
-                }
-            }
-        }
         RS_ITERATOR_TRACE( " ----" );
         _lastLoc = toReturn;
         return toReturn;
@@ -1067,7 +1077,7 @@ namespace {
             if ( _eof ) {
                 _lastLoc = DiskLoc();
             }
-            else if ( _curr() != saved ) {
+            else if ( _loc != saved ) {
                 // old doc deleted, we're ok
             }
             else {
@@ -1085,14 +1095,13 @@ namespace {
         // Retrieve the data if the iterator is already positioned at loc, otherwise
         // open a new cursor and find the data to avoid upsetting the iterators
         // cursor position.
-        if (loc == _curr())
-            return (_rs._getData(*_cursor));
-        else
-            return (_rs.dataFor( _txn, loc ));
-    }
-
-    bool WiredTigerRecordStore::Iterator::_forward() const {
-        return _dir == CollectionScanParams::FORWARD;
+        if (loc == _loc) {
+            dassert(loc == _curr());
+            return _rs._getData(*_cursor);
+        }
+        else {
+            return _rs.dataFor( _txn, loc );
+        }
     }
 
     void WiredTigerRecordStore::temp_cappedTruncateAfter( OperationContext* txn,

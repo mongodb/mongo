@@ -122,7 +122,12 @@ namespace mongo {
         WiredTigerCursor(const std::string& uri, uint64_t uriID, WiredTigerRecoveryUnit* ru);
         ~WiredTigerCursor();
 
-        WT_CURSOR* get() const;
+
+        WT_CURSOR* get() const {
+            dassert(_session == _ru->getSession());
+            return _cursor;
+        }
+
         WT_CURSOR* operator->() const { return get(); }
 
         WiredTigerSession* getSession() { return _session; }

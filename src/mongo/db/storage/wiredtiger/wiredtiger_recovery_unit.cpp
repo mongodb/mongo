@@ -257,11 +257,6 @@ namespace mongo {
         _cursor = NULL;
     }
 
-    WT_CURSOR* WiredTigerCursor::get() const {
-        invariant( _session == _ru->getSession() );
-        return _cursor;
-    }
-
     void WiredTigerCursor::reset() {
         invariantWTOK( _cursor->reset( _cursor ) );
     }
