@@ -67,6 +67,7 @@ namespace mongo {
         /**
          * Register a storage engine.  Called from a MONGO_INIT that depends on initializiation of
          * the global environment.
+         * Ownership of 'factory' is transferred to global environment upon registration.
          */
         virtual void registerStorageEngine(const std::string& name,
                                            const StorageEngine::Factory* factory) = 0;
