@@ -80,6 +80,7 @@ namespace mongo {
 
         WiredTigerSession* getSession();
         WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
+        bool inActiveTxn() const { return _active; }
 
         bool everStartedWrite() const { return _everStartedWrite; }
         int depth() const { return _depth; }

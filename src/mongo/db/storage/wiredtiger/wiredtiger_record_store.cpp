@@ -472,6 +472,12 @@ namespace {
             if (!status.isOK())
                 return status;
             loc = status.getValue();
+            if ( loc > _oplog_highestSeen ) {
+                boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
+                if ( loc > _oplog_highestSeen ) {
+                    _oplog_highestSeen = loc;
+                }
+            }
         }
         else if ( _isCapped ) {
             boost::mutex::scoped_lock lk( _uncommittedDiskLocsMutex );
@@ -611,7 +617,8 @@ namespace {
                                                         const CollectionScanParams::Direction& dir ) const {
         if ( _isOplog && dir == CollectionScanParams::FORWARD ) {
             WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
-            if ( wru->getOplogReadTill().isNull() ) {
+            if ( !wru->inActiveTxn() || wru->getOplogReadTill().isNull() ) {
+                // if we don't have a session, we have no snapshot, so we can update our view
                 _oplogSetStartHack( wru );
             }
         }
