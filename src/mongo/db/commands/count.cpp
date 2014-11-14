@@ -38,6 +38,7 @@
 #include "mongo/db/exec/count.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/log.h"
 
@@ -82,6 +83,10 @@ namespace mongo {
             AutoGetCollectionForRead ctx(txn, request.ns);
             Collection* collection = ctx.getCollection();
 
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into count.
+            RangePreserver preserver(collection);
+
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn,
                                                     collection,
@@ -113,6 +118,10 @@ namespace mongo {
 
             AutoGetCollectionForRead ctx(txn, request.ns);
             Collection* collection = ctx.getCollection();
+
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into count.
+            RangePreserver preserver(collection);
 
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn,

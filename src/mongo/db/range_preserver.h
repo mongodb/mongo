@@ -49,16 +49,19 @@ namespace mongo {
          * deleted until this object goes out of scope.
          */
         RangePreserver(const Collection* collection) {
-            invariant( collection );
-            // Not a memory leak.  Cached in a static structure by CC's ctor.
-            ClientCursor* cc = new ClientCursor(collection);
+            // Empty collections don't have any data we need to preserve
+            if (collection) {
+                // Not a memory leak.  Cached in a static structure by CC's ctor.
+                ClientCursor* cc = new ClientCursor(collection);
 
-            // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-            _pin.reset(new ClientCursorPin(collection, cc->cursorid()));
+                // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
+                _pin.reset(new ClientCursorPin(collection, cc->cursorid()));
+            }
         }
 
         ~RangePreserver() {
-            _pin->deleteUnderlying();
+            if (_pin)
+                _pin->deleteUnderlying();
         }
 
     private:

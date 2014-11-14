@@ -33,6 +33,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -45,7 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/range_preserver.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 
@@ -180,6 +181,10 @@ namespace mongo {
                 errmsg = "Can't parse filter / create query";
                 return false;
             }
+
+            // Prevent chunks from being cleaned up during yields - this allows us to only check the
+            // version on initial entry into geoNear.
+            RangePreserver preserver(collection);
 
             PlanExecutor* rawExec;
             if (!getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, 0).isOK()) {
