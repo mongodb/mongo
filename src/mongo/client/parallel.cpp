@@ -645,13 +645,15 @@ namespace mongo {
         else if( primary ) todo.insert( *primary );
 
         // Close all cursors on extra shards first, as these will be invalid
-        for( map< Shard, PCMData >::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end; ++i ){
+        for (map<Shard, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
+            ++i) {
+            if (todo.find(i->first) == todo.end()) {
 
-            LOG( pc ) << "closing cursor on shard " << i->first
-                << " as the connection is no longer required by " << vinfo << endl;
+                LOG( pc ) << "closing cursor on shard " << i->first
+                          << " as the connection is no longer required by " << vinfo << endl;
 
-            // Force total cleanup of these connections
-            if( todo.find( i->first ) == todo.end() ) i->second.cleanup();
+                i->second.cleanup(true);
+            }
         }
 
         verify( todo.size() );
@@ -703,7 +705,7 @@ namespace mongo {
                     }
                     else {
                         // Force total cleanup of connection if no longer compatible
-                        mdata.cleanup();
+                        mdata.cleanup( true );
                     }
                 }
                 else {
@@ -836,7 +838,7 @@ namespace mongo {
                 e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -846,7 +848,7 @@ namespace mongo {
                 e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial && e.getCode() == 15925 /* From above! */ ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -967,14 +969,14 @@ namespace mongo {
                 staleNSExceptions[ staleNS ] = e;
 
                 // Fully clear this cursor, as it needs to be re-established
-                mdata.cleanup();
+                mdata.cleanup( true );
                 continue;
             }
             catch( SocketException& e ){
                 warning() << "socket exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
                 mdata.errored = true;
                 if( returnPartial ){
-                    mdata.cleanup();
+                    mdata.cleanup( true );
                     continue;
                 }
                 throw;
@@ -990,7 +992,7 @@ namespace mongo {
 
                     mdata.errored = true;
                     if (returnPartial) {
-                        mdata.cleanup();
+                        mdata.cleanup( true );
                         continue;
                     }
                     throw;
