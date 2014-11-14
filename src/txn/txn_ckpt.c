@@ -359,8 +359,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(
-	    session, cfg, __checkpoint_write_leaves));
+	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	/*
 	 * The underlying flush routine scheduled an asynchronous flush
@@ -370,8 +369,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * asynchronous flush as much time as possible before we wait.
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(
-		    session, cfg, __wt_checkpoint_sync));
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Acquire the schema lock. */
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
