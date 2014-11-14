@@ -214,8 +214,10 @@ namespace {
      * three times: step 4, 6, and 8.  4 may involve refetching, 6 should not.  By the end of 6,
      * this member should have consistent data.  8 is "cosmetic," it is only to get this member
      * closer to the latest op time before it can transition out of startup state
+     *
+     * returns true on success
      */
-    void _initialSync() {
+    bool _initialSync() {
         BackgroundSync* bgsync(BackgroundSync::get());
         InitialSync init(bgsync);
         SyncTail tail(bgsync, multiSyncApply);
@@ -233,7 +235,7 @@ namespace {
         if (r.getHost().empty()) {
             log() << "no valid sync sources found in current replset to do an initial sync";
             sleepsecs(3);
-            return;
+            return false;
         }
 
         init.setHostname(r.getHost().toString());
@@ -242,7 +244,7 @@ namespace {
         if ( lastOp.isEmpty() ) {
             log() << "initial sync couldn't read remote oplog";
             sleepsecs(15);
-            return;
+            return false;
         }
 
         if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
@@ -251,7 +253,7 @@ namespace {
             // prime oplog
             _tryToApplyOpWithRetry(&txn, &init, lastOp);
             _logOpObjRS(&txn, lastOp);
-            return;
+            return true;
         }
 
         // Add field to minvalid document to tell us to restart initial sync if we crash
@@ -266,7 +268,7 @@ namespace {
 
         Cloner cloner;
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
-            return;
+            return false;
         }
 
         log() << "initial sync data copy, starting syncup";
@@ -277,7 +279,7 @@ namespace {
 
         log() << "oplog sync 1 of 3" << endl;
         if (!_initialSyncApplyOplog(&txn, init, &r)) {
-            return;
+            return false;
         }
 
         // Now we sync to the latest op on the sync target _again_, as we may have recloned ops
@@ -285,18 +287,18 @@ namespace {
         // nothing should need to be recloned.
         log() << "oplog sync 2 of 3" << endl;
         if (!_initialSyncApplyOplog(&txn, init, &r)) {
-            return;
+            return false;
         }
         // data should now be consistent
 
         log() << "initial sync building indexes";
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
-            return;
+            return false;
         }
 
         log() << "oplog sync 3 of 3" << endl;
         if (!_initialSyncApplyOplog(&txn, tail, &r)) {
-            return;
+            return false;
         }
         
         // ---------
@@ -304,7 +306,7 @@ namespace {
         Status status = getGlobalAuthorizationManager()->initialize(&txn);
         if (!status.isOK()) {
             warning() << "Failed to reinitialize auth data after initial sync. " << status;
-            return;
+            return false;
         }
 
         log() << "initial sync finishing up";
@@ -330,6 +332,7 @@ namespace {
         bgsync->notify();
 
         log() << "initial sync done";
+        return true;
     }
 } // namespace
 
@@ -344,18 +347,24 @@ namespace {
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {
             try {
-                _initialSync();
-                break;
+                // leave loop when successful
+                if (_initialSync()) {
+                    break;
+                }
             }
-            catch(DBException& e) {
-                failedAttempts++;
-                mongoutils::str::stream msg;
-                error() << "initial sync exception: " << e.toString() << " " << 
-                    (maxFailedAttempts - failedAttempts) << " attempts remaining";
-                sleepsecs(5);
+            catch(const DBException& e) {
+                error() << e ;
             }
+            error() << "initial sync attempt failed, "
+                    << (maxFailedAttempts - ++failedAttempts) << " attempts remaining";
+            sleepsecs(5);
         }
-        fassert( 16233, failedAttempts < maxFailedAttempts);
+
+        // No need to print a stack
+        if (failedAttempts >= maxFailedAttempts) {
+            severe() << "The maximum number of retries have been exhausted for initial sync.";
+            fassertFailedNoTrace(16233);
+        }
     }
 
 } // namespace repl
