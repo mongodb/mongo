@@ -136,7 +136,7 @@ namespace {
     void BackgroundOperation::assertNoBgOpInProgForNs(const StringData& ns) {
         uassert(ErrorCodes::BackgroundOperationInProgressForNamespace, mongoutils::str::stream() <<
                 "cannot perform operation: a background operation is currently running for "
-                "collection" << ns,
+                "collection " << ns,
                 !inProgForNs(ns));
     }
 
