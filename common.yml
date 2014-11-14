@@ -170,7 +170,7 @@ functions:
         if [ '${library_path}' != '' ]; then
             export ${library_path}
         fi
-        . ./${set_gopath|set_gopath.sh}
+        . ./set_gopath.sh
         go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
@@ -206,7 +206,7 @@ functions:
           if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
           fi;
-          . ./${set_gopath|set_gopath.sh}
+          . ./set_gopath.sh
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
         fi;
@@ -236,7 +236,7 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./${set_gopath|set_gopath.sh}
+        . ./set_gopath.sh
         if [ '${library_path}' != '' ]; then
             export ${library_path}
         fi
@@ -265,7 +265,7 @@ functions:
       working_dir: src
       script: |
         chmod 700 go.sh
-        chmod 700 ${set_gopath|set_gopath.sh}
+        chmod 700 set_gopath.sh
 
   "run tool unit tests":
     command: shell.exec
@@ -275,7 +275,7 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./${set_gopath|set_gopath.sh}
+        . ./set_gopath.sh
 
         # TODO bsondump needs tests
         # TODO mongotop needs tests
@@ -289,7 +289,7 @@ functions:
             ${library_path} go test $COVERAGE_ARGS ${args} ${build_tags}
             cd ..
         done
-        
+
   "run tool integration tests":
     command: shell.exec
     params:
@@ -300,7 +300,7 @@ functions:
             set -o igncr
             export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         fi;
-        . ./${set_gopath|set_gopath.sh}
+        . ./set_gopath.sh
         if [ "${library_path}" != "" ]; then
             export ${library_path}
         fi;
@@ -315,7 +315,7 @@ functions:
             echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
           fi
         fi;
-        
+
         for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
             cd $i
             COVERAGE_ARGS=""
@@ -335,7 +335,7 @@ functions:
             set -o igncr
         fi;
 
-        . ./${set_gopath|set_gopath.sh}
+        . ./set_gopath.sh
 
         for i in mongoimport mongoexport mongostat mongooplog mongorestore mongodump mongofiles; do
             cd $i
@@ -1034,7 +1034,6 @@ buildvariants:
     <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    set_gopath: set_gopath_windows.sh
     integration_test_args: "integration"
   tasks: *windows_32_tasks
 
@@ -1047,7 +1046,6 @@ buildvariants:
     <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    set_gopath: set_gopath_windows.sh
     integration_test_args: "integration"
   tasks: *windows_64_tasks
 
@@ -1064,7 +1062,6 @@ buildvariants:
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    set_gopath: set_gopath_windows.sh
     integration_test_args: "integration,ssl"
   tasks: *windows_64_ssl_tasks
 
@@ -1079,6 +1076,5 @@ buildvariants:
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    set_gopath: set_gopath_windows.sh
     integration_test_args: "integration"
   tasks: *windows_64_enterprise_tasks
