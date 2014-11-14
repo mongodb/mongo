@@ -484,14 +484,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	/*
-	 * XXX wrong: should just require the dhandle lock, but that means
-	 * changing the checkpoint logic to reuse the handle list rather than
-	 * holding the handle lock while doing I/O.
-	 */
-	WT_ASSERT(session,
-	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
@@ -542,14 +535,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	conn = S2C(session);
 	saved_dhandle = session->dhandle;
 
-	/*
-	 * XXX wrong: should just require the dhandle lock, but that means
-	 * changing the checkpoint logic to reuse the handle list rather than
-	 * holding the handle lock while doing I/O.
-	 */
-	WT_ASSERT(session,
-	    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED) ||
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (strcmp(dhandle->name, uri) == 0 &&
@@ -557,11 +543,12 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 		    (dhandle->checkpoint != NULL && checkpoint != NULL &&
 		    strcmp(dhandle->checkpoint, checkpoint) == 0))) {
 			/*
-			 * We're holding the schema lock which locks out handle
-			 * open (which might change the state of the underlying
-			 * object).  However, closing a handle doesn't require
-			 * the schema lock, lock out closing the handle and then
-			 * confirm the handle is still open.
+			 * We're holding the handle list lock which locks out
+			 * handle open (which might change the state of the
+			 * underlying object).  However, closing a handle
+			 * doesn't require the handle list lock, lock out
+			 * closing the handle and then confirm the handle is
+			 * still open.
 			 */
 			__wt_spin_lock(session, &dhandle->close_lock);
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {

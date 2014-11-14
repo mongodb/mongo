@@ -350,7 +350,9 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Build a list of the file objects that need to be copied. */
-	WT_ERR(__wt_meta_btree_apply(session, __backup_list_all_append, NULL));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_meta_btree_apply(
+	    session, __backup_list_all_append, NULL));
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
