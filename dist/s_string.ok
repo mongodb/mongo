@@ -154,6 +154,7 @@ IFF
 IKEY
 IMPL
 IMPL's
+INCR
 INDX
 INIT
 INITIALIZER
@@ -658,6 +659,7 @@ hval
 hw
 iS
 iSh
+ibackup
 icount
 idx
 ifdef's

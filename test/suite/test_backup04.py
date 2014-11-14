@@ -89,13 +89,19 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri, dir_full, dir_incr):
         #print "Compare: full URI: " + uri_full + " with incremental URI: " + uri_incr
-        full_name='backup_full'
+        if dir_full == None:
+            full_name='original'
+        else:
+            full_name='backup_full'
         incr_name='backup_incr'
         if os.path.exists(full_name):
             os.remove(full_name)
         if os.path.exists(incr_name):
             os.remove(incr_name)
-        self.runWt(['-h', dir_full, 'dump', uri], outfilename=full_name)
+        if dir_full == None:
+            self.runWt(['dump', uri], outfilename=full_name)
+        else:
+            self.runWt(['-h', dir_full, 'dump', uri], outfilename=full_name)
         self.runWt(['-h', dir_incr, 'dump', uri], outfilename=incr_name)
         self.assertEqual(True,
             compare_files(self, full_name, incr_name))
@@ -163,17 +169,15 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
             self.update(self.uri, self.dsize, updstr[increment], self.nops)
             self.session.checkpoint(None)
 
-            # Take both the incremental backup and a new full backup.
-            # Then we can compare that both have the same content.
-            # Since the incremental backup also performs an archive, we
-            # take the full backup after the archival.
             self.pr('Iteration: ' + str(increment))
             self.take_incr_backup(self.dir)
-            self.take_full_backup(full_dir)
-
-            self.compare(self.uri, full_dir, self.dir)
             increment += 1
-        self.pr('Done with backup loop')
+
+        # After running, take a full backup.  Compare the incremental
+        # backup to the original database and the full backup database.
+        self.take_full_backup(full_dir)
+        self.compare(self.uri, full_dir, self.dir)
+        self.compare(self.uri, None, self.dir)
 
 
 if __name__ == '__main__':

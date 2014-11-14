@@ -589,7 +589,7 @@ __session_truncate(WT_SESSION *wt_session,
 		WT_ERR(__wt_str_name_check(session, uri));
 
 		if (WT_PREFIX_MATCH(uri, "log:"))
-			ret = __wt_log_truncate(session, start, cfg);
+			ret = __wt_log_truncate_files(session, start, cfg);
 		else
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_truncate(session, uri, cfg));

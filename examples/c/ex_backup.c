@@ -51,6 +51,7 @@ static const char * const uri = "table:logtest";
 
 #define	CONN_CONFIG \
     "create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K)"
+#define	MAX_ITERATIONS	5
 #define	MAX_KEYS	10000
 
 static int
@@ -59,15 +60,34 @@ compare_backups(WT_SESSION *session, int i)
 	int ret;
 	char buf[1024];
 
-	(void)snprintf(buf, sizeof(buf),
-	    "../../wt -h %s.%d dump logtest > %s.%d",
-	    home_full, i, full_out, i);
-	ret = system(buf);
-	(void)snprintf(buf, sizeof(buf), "../../wt -h %s dump logtest > %s.%d",
-	    home_incr, incr_out, i);
+	/*
+	 * We run 'wt dump' on both the full backup directory and the
+	 * incremental backup directory for this iteration.  Since running
+	 * 'wt' runs recovery and makes both directories "live", we need
+	 * a new directory for each iteration.
+	 *
+	 * If i == 0, we're comparing against the main, original directory
+	 * with the final incremental directory.
+	 */
+	if (i == 0)
+		(void)snprintf(buf, sizeof(buf),
+		    "../../wt -h %s dump logtest > %s.%d",
+		    home, full_out, i);
+	else
+		(void)snprintf(buf, sizeof(buf),
+		    "../../wt -h %s.%d dump logtest > %s.%d",
+		    home_full, i, full_out, i);
 	ret = system(buf);
 	/*
-	 * XXX Need to compare files here.
+	 * Now run dump on the incremental directory.
+	 */
+	(void)snprintf(buf, sizeof(buf),
+	    "../../wt -h %s.%d dump logtest > %s.%d",
+	    home_incr, i, incr_out, i);
+	ret = system(buf);
+
+	/*
+	 * Compare the files.
 	 */
 	(void)snprintf(buf, sizeof(buf), "cmp %s.%d %s.%d",
 	    full_out, i, incr_out, i);
@@ -76,11 +96,59 @@ compare_backups(WT_SESSION *session, int i)
 		fprintf(stdout,
 		    "Iteration %d: Tables %s.%d and %s.%d identical\n",
 		    i, full_out, i, incr_out, i);
-	else
+	else {
 		fprintf(stdout,
 		    "Iteration %d: Tables %s.%d and %s.%d differ\n",
 		    i, full_out, i, incr_out, i);
+		exit(1);
+	}
+
+	/*
+	 * If they compare successfully, clean up.
+	 */
+	if (i != 0) {
+		(void)snprintf(buf, sizeof(buf),
+		    "rm -rf %s.%d %s.%d %s.%d %s.%d",
+		    home_full, i, home_incr, i, full_out, i, incr_out, i);
+		ret = system(buf);
+	}
 	return (ret);
+}
+
+/*
+ * Set up all the directories needed for the test.  We have a full backup
+ * directory for each iteration and an incremental backup for each iteration.
+ * That way we can compare the full and incremental each time through.
+ */
+static int
+setup_directories()
+{
+	int i, ret;
+	char buf[1024];
+
+	for (i = 0; i < MAX_ITERATIONS; i++) {
+		/*
+		 * For incremental backups we need 0-N.  The 0 incremental
+		 * directory will compare with the original at the end.
+		 */
+		snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d",
+		    home_incr, i, home_incr, i);
+		if ((ret = system(buf)) != 0) {
+			fprintf(stderr, "%s: failed ret %d\n", buf, ret);
+			return (ret);
+		}
+		if (i == 0)
+			continue;
+		/*
+		 * For full backups we need 1-N.
+		 */
+		snprintf(buf, sizeof(buf), "rm -rf %s.%d && mkdir %s.%d",
+		    home_full, i, home_full, i);
+		if ((ret = system(buf)) != 0) {
+			fprintf(stderr, "%s: failed ret %d\n", buf, ret);
+			return (ret);
+		}
+	}
 }
 
 static int
@@ -109,32 +177,40 @@ static int
 take_full_backup(WT_SESSION *session, int i)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	int j, ret;
 	char buf[1024], h[256];
 	const char *filename, *hdir;
 
 	/*
 	 * First time through we take a full backup into the incremental
-	 * directory.
+	 * directories.  Otherwise only into the appropriate full directory.
 	 */
 	if (i != 0) {
 		snprintf(h, sizeof(h), "%s.%d", home_full, i);
 		hdir = h;
-		snprintf(buf, sizeof(buf), "rm -rf %s && mkdir %s",
-		    hdir, hdir);
-		if ((ret = system(buf)) != 0) {
-			fprintf(stderr, "%s: failed ret %d\n", buf, ret);
-			return (ret);
-		}
 	} else
 		hdir = home_incr;
 	ret = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &filename);
-		(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
-		    home, filename, hdir, filename);
-		ret = system(buf);
+		if (i == 0)
+			/*
+			 * Take a full backup into each incremental directory.
+			 */
+			for (j = 0; j < MAX_ITERATIONS; j++) {
+				snprintf(h, sizeof(h), "%s.%d", home_incr, j);
+				(void)snprintf(buf, sizeof(buf),
+				    "cp %s/%s %s/%s",
+				    home, filename, h, filename);
+				ret = system(buf);
+			}
+		else {
+			snprintf(h, sizeof(h), "%s.%d", home_full, i);
+			(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
+			    home, filename, hdir, filename);
+			ret = system(buf);
+		}
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
@@ -144,11 +220,11 @@ take_full_backup(WT_SESSION *session, int i)
 }
 
 static int
-take_incr_backup(WT_SESSION *session)
+take_incr_backup(WT_SESSION *session, int i)
 {
 	WT_CURSOR *cursor;
-	int ret;
-	char buf[1024];
+	int j, ret;
+	char buf[1024], h[256];
 	const char *filename;
 
 	ret = session->open_cursor(session, "backup:",
@@ -156,9 +232,20 @@ take_incr_backup(WT_SESSION *session)
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &filename);
+		/*
+		 * Copy into the 0 incremental directory and then each of the
+		 * incremental directories for this iteration and later.
+		 */
+		snprintf(h, sizeof(h), "%s.0", home_incr);
 		(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
-		    home, filename, home_incr, filename);
+		    home, filename, h, filename);
 		ret = system(buf);
+		for (j = i; j < MAX_ITERATIONS; j++) {
+			snprintf(h, sizeof(h), "%s.%d", home_incr, j);
+			(void)snprintf(buf, sizeof(buf), "cp %s/%s %s/%s",
+			    home, filename, h, filename);
+			ret = system(buf);
+		}
 	}
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
@@ -193,6 +280,7 @@ main(void)
 		return (ret);
 	}
 
+	ret = setup_directories();
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
 	ret = add_work(session, 0);
@@ -201,20 +289,20 @@ main(void)
 
 	ret = session->checkpoint(session, NULL);
 
-	for (i = 1; i < 5; i++) {
+	for (i = 1; i < MAX_ITERATIONS; i++) {
 		ret = add_work(session, i);
 		ret = session->checkpoint(session, NULL);
 		ret = take_full_backup(session, i);
-		ret = take_incr_backup(session);
+		ret = take_incr_backup(session, i);
 
 		ret = compare_backups(session, i);
 	}
 
 	/*
-	 * Close and reopen the connection so that the log ends up with
-	 * a variety of records such as file sync and checkpoint.  We
-	 * have archiving turned off.
+	 * Close the connection.  We're done and want to run the final
+	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
+	ret = compare_backups(session, 0);
 	return (ret);
 }

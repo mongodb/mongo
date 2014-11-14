@@ -146,12 +146,12 @@ err:		__wt_err(session, ret, "log archive server error");
 }
 
 /*
- * __wt_log_truncate --
- *	Truncate a log via archive once. Requires that the server is not
+ * __wt_log_truncate_files --
+ *	Truncate log files via archive once. Requires that the server is not
  *	currently running.
  */
 int
-__wt_log_truncate(
+__wt_log_truncate_files(
     WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;

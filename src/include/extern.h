@@ -248,7 +248,7 @@ extern int __wt_conn_dhandle_discard_single( WT_SESSION_IMPL *session, WT_DATA_H
 extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_log_truncate( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
+extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
