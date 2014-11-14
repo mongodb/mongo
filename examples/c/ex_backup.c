@@ -149,6 +149,7 @@ setup_directories()
 			return (ret);
 		}
 	}
+	return (0);
 }
 
 static int
