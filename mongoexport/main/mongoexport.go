@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongoexport", "<options>")
+	opts := commonopts.New("mongoexport", "<options>", commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
 	outputOpts := &options.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)

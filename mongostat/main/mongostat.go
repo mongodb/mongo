@@ -14,7 +14,10 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongostat", "<options>")
+	opts := commonopts.New(
+		"mongostat",
+		"[options] <polling interval in seconds>",
+		commonopts.EnabledOptions{Connection: true, Auth: true, Namespace: false})
 
 	// add mongotop-specific options
 	statOpts := &options.StatOptions{}

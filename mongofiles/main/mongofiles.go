@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"os"
@@ -27,7 +27,7 @@ const (
 func main() {
 
 	// initialize command-line opts
-	opts := commonOpts.New("mongofiles", Usage)
+	opts := commonopts.New("mongofiles", Usage, commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
 	storageOpts := &options.StorageOptions{}
 	opts.AddOptions(storageOpts)

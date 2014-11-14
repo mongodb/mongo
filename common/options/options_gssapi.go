@@ -3,7 +3,7 @@
 package options
 
 func init() {
-	OptionRegistrationFunctions = append(OptionRegistrationFunctions, registerGSSAPIOptions)
+	ConnectionOptFunctions = append(ConnectionOptFunctions, registerGSSAPIOptions)
 }
 
 func registerGSSAPIOptions(self *ToolOptions) error {

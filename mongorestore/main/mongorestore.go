@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongorestore", "<options>")
+	opts := commonopts.New("mongorestore", "<options>", commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 	inputOpts := &options.InputOptions{}
 	opts.AddOptions(inputOpts)
 	outputOpts := &options.OutputOptions{}

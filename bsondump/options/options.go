@@ -1,7 +1,7 @@
 package options
 
 type BSONDumpOptions struct {
-	Type       string `long:"type" default:"json" description:"type of output: json, debug"`
+	Type       string `long:"type" default:"json" description:"type of output: debug, json"`
 	ObjCheck   bool   `long:"objcheck" description:"validate bson during processing"`
 	NoObjCheck bool   `long:"noobjcheck" description:"don't validate bson during processing"`
 }

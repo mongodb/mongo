@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongodump", "<options>")
+	opts := commonopts.New("mongodump", "<options>", commonopts.EnabledOptions{true, true, true})
 
 	inputOpts := &options.InputOptions{}
 	opts.AddOptions(inputOpts)

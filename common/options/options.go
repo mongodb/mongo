@@ -31,16 +31,12 @@ type ToolOptions struct {
 	*Connection
 	*SSL
 	*Auth
-	*Namespace
 	*Kerberos
+	*Namespace
 
 	//Force direct connection to the server and disable the
 	//drivers automatic repl set discovery logic.
 	Direct bool
-
-	// Extra tool-specific options that can be specified by calling
-	// AddOptions
-	Extra []ExtraOptions
 
 	// for caching the parser
 	parser *flags.Parser
@@ -103,15 +99,17 @@ type Kerberos struct {
 
 type OptionRegistrationFunction func(self *ToolOptions) error
 
-var OptionRegistrationFunctions []OptionRegistrationFunction
+var ConnectionOptFunctions []OptionRegistrationFunction
 
-func init() {
-	OptionRegistrationFunctions = append(OptionRegistrationFunctions, registerCommonOptions, registerExtraOptions)
+type EnabledOptions struct {
+	Auth       bool
+	Connection bool
+	Namespace  bool
 }
 
 // Ask for a new instance of tool options
-func New(appName, usageStr string) *ToolOptions {
-	return &ToolOptions{
+func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
+	opts := &ToolOptions{
 		AppName:    appName,
 		VersionStr: VersionStr,
 		UsageStr:   usageStr,
@@ -123,7 +121,42 @@ func New(appName, usageStr string) *ToolOptions {
 		Auth:       &Auth{},
 		Namespace:  &Namespace{},
 		Kerberos:   &Kerberos{},
+		parser:     flags.NewNamedParser(appName, flags.None),
 	}
+
+	opts.parser.Usage = usageStr
+
+	if _, err := opts.parser.AddGroup("general options", "", opts.General); err != nil {
+		panic(fmt.Errorf("couldn't register general options: %v", err))
+	}
+	if _, err := opts.parser.AddGroup("verbosity options", "", opts.Verbosity); err != nil {
+		panic(fmt.Errorf("couldn't register verbosity options: %v", err))
+	}
+
+	if enabled.Connection {
+		if _, err := opts.parser.AddGroup("connection options", "", opts.Connection); err != nil {
+			panic(fmt.Errorf("couldn't register connection options: %v", err))
+		}
+
+		//Register options that were enabled at compile time with build tags (ssl, sasl)
+		for _, optionRegistrationFunction := range ConnectionOptFunctions {
+			if err := optionRegistrationFunction(opts); err != nil {
+				panic(fmt.Errorf("couldn't register command-line options: %v", err))
+			}
+		}
+	}
+
+	if enabled.Auth {
+		if _, err := opts.parser.AddGroup("authentication options", "", opts.Auth); err != nil {
+			panic(fmt.Errorf("couldn't register auth options"))
+		}
+	}
+	if enabled.Namespace {
+		if _, err := opts.parser.AddGroup("namespace options", "", opts.Namespace); err != nil {
+			panic(fmt.Errorf("couldn't register namespace options"))
+		}
+	}
+	return opts
 }
 
 // Print the usage message for the tool to stdout.  Returns whether or not the
@@ -162,104 +195,24 @@ func (self *ToolOptions) GetAuthenticationDatabase() string {
 	return ""
 }
 
-// Add extra command line options into the tool options
-func (self *ToolOptions) AddOptions(opts ExtraOptions) {
-	self.Extra = append(self.Extra, opts)
+// AddOptions registers an additional options group to this instance
+func (self *ToolOptions) AddOptions(opts ExtraOptions) error {
+	_, err := self.parser.AddGroup(opts.Name()+" options", "", opts)
+	if err != nil {
+		return fmt.Errorf("error setting command line options for"+
+			" %v: %v", opts.Name(), err)
+	}
+	return nil
 }
 
 // Parse the command line args.  Returns any extra args not accounted for by
 // parsing, as well as an error if the parsing returns an error.
 func (self *ToolOptions) Parse() ([]string, error) {
-
-	// init a parser for the flags
-	self.parser = flags.NewNamedParser(self.AppName, flags.None)
-	self.parser.Usage = self.UsageStr
-
-	for _, optionRegistrationFunction := range OptionRegistrationFunctions {
-		if err := optionRegistrationFunction(self); err != nil {
-			return nil, err
-		}
-	}
-
-	// parse
 	return self.parser.Parse()
 }
 
-func registerExtraOptions(self *ToolOptions) error {
-
-	// register all of the extra options
-	for _, eo := range self.Extra {
-		_, err := self.parser.AddGroup(eo.Name()+" options", "", eo)
-		if err != nil {
-			return fmt.Errorf("error setting command line options for"+
-				" %v: %v", eo.Name(), err)
-		}
-	}
-	return nil
-
-}
-
-func registerCommonOptions(self *ToolOptions) error {
-
-	// register self to receive the flags
-	if _, err := self.parser.AddGroup("general options", "", self.General); err != nil {
-		return err
-	}
-	if _, err := self.parser.AddGroup("verbosity options", "", self.Verbosity); err != nil {
-		return err
-	}
-	if _, err := self.parser.AddGroup("connection options", "", self.Connection); err != nil {
-		return err
-	}
-	if _, err := self.parser.AddGroup("authentication options", "", self.Auth); err != nil {
-		return err
-	}
-	if _, err := self.parser.AddGroup("namespace options", "", self.Namespace); err != nil {
-		return err
-	}
-	return nil
-}
-
-////////////
-
-// Run the post-parse logic
-func (self *ToolOptions) PostParse() error {
-	// build the filter string and options based on the db and collection
-	// specified, if any
-
-	/*
-		if self.DB != "" {
-			self.FilterNS = self.DB + "."
-			if self.Collection != "" {
-				self.FilterBoth = true
-				self.FilterNS += self.Collection
-			}
-		} else if self.Collection != "" {
-			self.FilterOnlyColl = true
-			self.FilterNS = "." + self.Collection
-		}
-
-		// post-parse the extra params
-		if self.ExtraOptions != nil {
-			if err := self.ExtraOptions.PostParse(); err != nil {
-				return err
-			}
-		}
-	*/
-
-	return nil
-}
-
-// Run the validation logic
+//Validate() runs validation checks that are global to all tools.
 func (self *ToolOptions) Validate() error {
-	/*
-		if self.ExtraOptions != nil {
-			if err := self.ExtraOptions.Validate(); err != nil {
-				return err
-			}
-		}
-	*/
-
 	switch {
 	case self.DBPath != "" && self.Host != "":
 		return fmt.Errorf("--dbpath is not allowed when --host is specified")

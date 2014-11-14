@@ -3,7 +3,7 @@
 package options
 
 func init() {
-	OptionRegistrationFunctions = append(OptionRegistrationFunctions, registerSSLOptions)
+	ConnectionOptFunctions = append(ConnectionOptFunctions, registerSSLOptions)
 }
 
 func registerSSLOptions(self *ToolOptions) error {

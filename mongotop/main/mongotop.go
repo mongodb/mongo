@@ -20,7 +20,9 @@ const (
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.New("mongotop", "<options> <sleeptime>")
+	opts := commonopts.New("mongotop",
+		"<options> <sleeptime>",
+		commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add mongotop-specific options
 	outputOpts := &options.Output{}
