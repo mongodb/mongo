@@ -606,8 +606,10 @@ namespace {
             _lastVote.whoHostAndPort = hopeful->getHostAndPort();
             vote = _selfConfig().getNumVotes();
             invariant(hopeful->getId() == args.whoid);
-            log() << "replSetElect voting yea for " << hopeful->getHostAndPort().toString()
-                  << " (" << args.whoid << ')';
+            if (vote > 0) {
+                log() << "replSetElect voting yea for " << hopeful->getHostAndPort().toString()
+                      << " (" << args.whoid << ')';
+            }
         }
 
         response->append("vote", vote);
