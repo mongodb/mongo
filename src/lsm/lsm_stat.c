@@ -167,4 +167,3 @@ __wt_curstat_lsm_init(
 
 	return (ret);
 }
-
