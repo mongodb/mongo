@@ -229,13 +229,18 @@ namespace {
 
         ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
-        // We must prime the sync source selector so that it considers all candidates regardless
-        // of oplog position, by passing in "now" as the last op fetched time.
-        r.connectToSyncSource(&txn, now, replCoord);
-        if (r.getHost().empty()) {
-            log() << "no valid sync sources found in current replset to do an initial sync";
-            sleepsecs(3);
-            return false;
+        while (r.getHost().empty()) {
+            // We must prime the sync source selector so that it considers all candidates regardless
+            // of oplog position, by passing in "now" as the last op fetched time.
+            r.connectToSyncSource(&txn, now, replCoord);
+            if (r.getHost().empty()) {
+                log() << "no valid sync sources found in current replset to do an initial sync";
+                sleepsecs(3);
+            }
+
+            if (inShutdown()) {
+                return false;
+            }
         }
 
         init.setHostname(r.getHost().toString());
@@ -355,6 +360,11 @@ namespace {
             catch(const DBException& e) {
                 error() << e ;
             }
+
+            if (inShutdown()) {
+                return;
+            }
+
             error() << "initial sync attempt failed, "
                     << (maxFailedAttempts - ++failedAttempts) << " attempts remaining";
             sleepsecs(5);
