@@ -29,8 +29,8 @@
 #pragma once
 
 #include <boost/static_assert.hpp>
-#include <boost/cstdint.hpp>
 #include <string>
+#include <limits>
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/cstdint.h"
@@ -175,7 +175,7 @@ namespace mongo {
         }
 
         uint64_t getHashId() const {
-            return _fullHash & (UINT64_MAX >> resourceTypeBits);
+            return _fullHash & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits);
         }
 
         std::string toString() const;

@@ -932,7 +932,7 @@ namespace {
 
     uint64_t ResourceId::fullHash(ResourceType type, uint64_t hashId) {
         return (static_cast<uint64_t>(type) << (64 - resourceTypeBits))
-                + (hashId & (UINT64_MAX >> resourceTypeBits));
+                + (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
     }
 
     ResourceId::ResourceId(ResourceType type, const StringData& ns)
