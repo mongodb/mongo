@@ -251,9 +251,11 @@ take_incr_backup(WT_SESSION *session, int i)
 	if (ret != WT_NOTFOUND)
 		fprintf(stderr,
 		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+	ret = 0;
 	/*
 	 * With an incremental cursor, we want to truncate on the backup
-	 * cursor to archive the logs.
+	 * cursor to archive the logs.  Only do this if the copy process
+	 * was entirely successful.
 	 */
 	ret = session->truncate(session, "log:", cursor, NULL, NULL);
 	ret = cursor->close(cursor);
@@ -293,7 +295,17 @@ main(void)
 	for (i = 1; i < MAX_ITERATIONS; i++) {
 		ret = add_work(session, i);
 		ret = session->checkpoint(session, NULL);
+		/*
+		 * The full backup here is only needed for testing and
+		 * comparison purposes.  A normal incremental backup
+		 * procedure would not include this.
+		 */
 		ret = take_full_backup(session, i);
+		/*
+		 * Taking the incremental backup also calls truncate
+		 * to archive the log files, if the copies were successful.
+		 * See that function for details on that call.
+		 */
 		ret = take_incr_backup(session, i);
 
 		ret = compare_backups(session, i);
