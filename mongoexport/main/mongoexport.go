@@ -22,6 +22,7 @@ func main() {
 	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
+		opts.PrintHelp(true)
 		os.Exit(1)
 	}
 	if len(args) != 0 {
@@ -51,6 +52,7 @@ func main() {
 	err = exporter.ValidateSettings()
 	if err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
+		opts.PrintHelp(true)
 		os.Exit(1)
 	}
 
