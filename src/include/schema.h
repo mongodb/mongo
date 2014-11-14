@@ -121,7 +121,7 @@ struct __wt_table {
 		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		op;							\
 		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
-	 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
 	}								\
 } while (0)
 

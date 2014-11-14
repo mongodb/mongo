@@ -567,15 +567,27 @@ __evict_tree_walk_clear(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
+	int locked;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	while (btree->evict_ref != NULL) {
+	/*
+	 * Drop the handle lock if we are holding it: the eviction server needs
+	 * it to find the handle and clear the walk point.
+	  */
+	locked = F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+	if (locked)
+		__wt_spin_unlock(session, &S2C(session)->dhandle_lock);
+
+	while (btree->evict_ref != NULL && ret == 0) {
 		F_SET(cache, WT_EVICT_CLEAR_WALKS);
-		WT_RET(__wt_cond_wait(
-		    session, cache->evict_waiter_cond, 100000));
+		ret = __wt_cond_wait(
+		    session, cache->evict_waiter_cond, 100000);
 	}
+
+	if (locked)
+		__wt_spin_lock(session, &S2C(session)->dhandle_lock);
 
 	return (ret);
 }
