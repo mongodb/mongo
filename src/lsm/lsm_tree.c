@@ -227,7 +227,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
 		WT_WITH_SCHEMA_LOCK(session,
-		     ret = __wt_schema_drop(session, uri, cfg));
+		    ret = __wt_schema_drop(session, uri, cfg));
 	return (ret);
 }
 
