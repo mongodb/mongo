@@ -150,19 +150,20 @@ namespace ReplTests {
             return count;
         }
         int opCount() {
-            Lock::GlobalWrite lk(_txn.lockState());
-            Client::Context ctx(&_txn,  cllNS() );
+            OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
+            Client::Context ctx(&txn,  cllNS() );
 
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &_txn, cllNS() );
+            Collection* coll = db->getCollection( &txn, cllNS() );
             if ( !coll ) {
-                WriteUnitOfWork wunit(&_txn);
-                coll = db->createCollection( &_txn, cllNS() );
+                WriteUnitOfWork wunit(&txn);
+                coll = db->createCollection( &txn, cllNS() );
                 wunit.commit();
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator(&_txn);
+            RecordIterator* it = coll->getIterator(&txn);
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
