@@ -871,6 +871,7 @@ suiteGlobalConfig = {"js": ("core/*.js", True),
                      "gle": ("gle/*.js", True),
                      "rocksDB": ("rocksDB/*.js", True),
                      "restore": ("restore/*.js", False),
+                     "stat": ("stat/*.js", False),
                      "slow1": ("slow1/*.js", True),
                      "slow2": ("slow2/*.js", True),
                      }
