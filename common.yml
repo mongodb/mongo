@@ -41,7 +41,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy
+      - name: legacy28
       - name: legacy26
       - name: unit
     osx_108_ssl_task_list: &osx_108_ssl_tasks
@@ -51,7 +51,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy
+      - name: legacy28
       - name: legacy26
       - name: unit
     solaris_task_list: &solaris_tasks
@@ -59,7 +59,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy
+      - name: legacy28
       - name: legacy26
       - name: unit
     ubuntu1204_task_list: &ubuntu1204_tasks
@@ -69,7 +69,7 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: json
-      - name: legacy
+      - name: legacy28
       - name: legacy26
       - name: lint
       - name: log
@@ -82,7 +82,7 @@ mongo_tools_variables:
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
       - name: dist
       - name: integration
-      - name: legacy
+      - name: legacy28
       - name: integration-auth
     ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
       - name: bsonutil
@@ -92,7 +92,7 @@ mongo_tools_variables:
       - name: integration-auth
       - name: json
       - name: kerberos
-      - name: legacy
+      - name: legacy28
       - name: lint
       - name: log
       - name: pool
@@ -107,7 +107,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy
+      - name: legacy28
         distros:
         - windows-64-vs2013-test
       - name: legacy26
@@ -119,7 +119,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy
+      - name: legacy28
         distros:
         - windows-64-vs2013-test
       - name: legacy26
@@ -129,7 +129,7 @@ mongo_tools_variables:
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
       - name: integration
-      - name: legacy
+      - name: legacy28
       - name: integration-auth
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
@@ -137,7 +137,7 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: kerberos
-      - name: legacy
+      - name: legacy28
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -674,7 +674,7 @@ tasks:
     - func: "setup integration test"
     - func: "run tool integration tests"
 
-- name: legacy
+- name: legacy28
   depends_on:
   - name: dist
   commands:
@@ -714,7 +714,7 @@ tasks:
         script: |
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
-          mv legacy/* .
+          mv test/legacy28/* .
           chmod +x mongo*
           python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 tool
 
@@ -760,7 +760,7 @@ tasks:
         script: |
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
-          mv legacy26/* .
+          mv test/legacy26/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
