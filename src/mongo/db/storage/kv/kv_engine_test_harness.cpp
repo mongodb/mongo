@@ -79,6 +79,13 @@ namespace mongo {
             ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
         }
 
+        {
+            MyOperationContext opCtx( engine );
+            std::vector<std::string> all = engine->getAllIdents( &opCtx );
+            ASSERT_EQUALS( 1, all.size() );
+            ASSERT_EQUALS( ns, all[0] );
+        }
+
     }
 
     TEST( KVEngineTestHarness, Restart1 ) {

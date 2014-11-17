@@ -66,12 +66,6 @@ namespace mongo {
         }
     }
 
-    Status InMemoryEngine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
-        boost::mutex::scoped_lock lk(_mutex);
-        _dataMap.erase(ident);
-        return Status::OK();
-    }
-
     Status InMemoryEngine::createSortedDataInterface(OperationContext* opCtx,
                                                   const StringData& ident,
                                                   const IndexDescriptor* desc) {
@@ -87,8 +81,8 @@ namespace mongo {
         return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
     }
 
-    Status InMemoryEngine::dropSortedDataInterface(OperationContext* opCtx,
-                                                   const StringData& ident) {
+    Status InMemoryEngine::dropIdent(OperationContext* opCtx,
+                                     const StringData& ident) {
         boost::mutex::scoped_lock lk(_mutex);
         _dataMap.erase(ident);
         return Status::OK();
@@ -99,4 +93,14 @@ namespace mongo {
         return 1;
     }
 
+    std::vector<std::string> InMemoryEngine::getAllIdents( OperationContext* opCtx ) const {
+        std::vector<std::string> all;
+        {
+            boost::mutex::scoped_lock lk(_mutex);
+            for ( DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it ) {
+                all.push_back( it->first );
+            }
+        }
+        return all;
+    }
 }

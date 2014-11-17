@@ -86,7 +86,9 @@ namespace mongo {
                                const StringData& ns );
 
         std::vector<std::string> getAllIdentsForDB( const StringData& db ) const;
+        std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
+        bool isUserDataIdent( const StringData& ident ) const;
     private:
         class AddIdentChange;
         class RemoveIdentChange;

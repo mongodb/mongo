@@ -287,12 +287,6 @@ namespace mongo {
         }
     }
 
-    Status WiredTigerKVEngine::dropRecordStore( OperationContext* opCtx,
-                                                const StringData& ident ) {
-        _drop( ident );
-        return Status::OK();
-    }
-
     string WiredTigerKVEngine::_uri( const StringData& ident ) const {
         return string("table:") + ident.toString();
     }
@@ -311,8 +305,8 @@ namespace mongo {
         return new WiredTigerIndexStandard( _uri( ident ) );
     }
 
-    Status WiredTigerKVEngine::dropSortedDataInterface( OperationContext* opCtx,
-                                                        const StringData& ident ) {
+    Status WiredTigerKVEngine::dropIdent( OperationContext* opCtx,
+                                          const StringData& ident ) {
         _drop( ident );
         return Status::OK();
     }
@@ -396,4 +390,31 @@ namespace mongo {
         return true;
     }
 
+    std::vector<std::string> WiredTigerKVEngine::getAllIdents( OperationContext* opCtx ) const {
+        std::vector<std::string> all;
+        WiredTigerCursor cursor( "metadata:", WiredTigerSession::kMetadataCursorId, opCtx );
+        WT_CURSOR* c = cursor.get();
+        if ( !c )
+            return all;
+
+        while ( c->next(c) == 0 ) {
+            const char* raw;
+            c->get_key(c, &raw );
+            StringData key(raw);
+            size_t idx = key.find( ':' );
+            if ( idx == string::npos )
+                continue;
+            StringData type = key.substr( 0, idx );
+            if ( type != "table" )
+                continue;
+
+            StringData ident = key.substr(idx+1);
+            if ( ident == "sizeStorer" )
+                continue;
+
+            all.push_back( ident.toString() );
+        }
+
+        return all;
+    }
 }

@@ -358,15 +358,43 @@ namespace {
     std::vector<std::string> KVCatalog::getAllIdentsForDB( const StringData& db ) const {
         std::vector<std::string> v;
 
-        boost::mutex::scoped_lock lk( _identsLock );
-        for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
-            NamespaceString ns( it->first );
-            if ( ns.db() != db )
-                continue;
-            v.push_back( it->second.ident );
+        {
+            boost::mutex::scoped_lock lk( _identsLock );
+            for ( NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it ) {
+                NamespaceString ns( it->first );
+                if ( ns.db() != db )
+                    continue;
+                v.push_back( it->second.ident );
+            }
         }
 
         return v;
+    }
+
+    std::vector<std::string> KVCatalog::getAllIdents( OperationContext* opCtx ) const {
+        std::vector<std::string> v;
+
+        scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
+        while ( !it->isEOF()  ) {
+            DiskLoc loc = it->getNext();
+            RecordData data = it->dataFor( loc );
+            BSONObj obj( data.data() );
+
+            v.push_back( obj["ident"].String() );
+            BSONObj idxIdent = obj["idxIdent"].Obj();
+
+            BSONObjIterator sub( idxIdent );
+            while ( sub.more() ) {
+                BSONElement e = sub.next();
+                v.push_back( e.String() );
+            }
+        }
+
+        return v;
+    }
+
+    bool KVCatalog::isUserDataIdent( const StringData& ident ) const {
+        return ident.startsWith( "index-" ) || ident.startsWith( "collection-" );
     }
 
 }

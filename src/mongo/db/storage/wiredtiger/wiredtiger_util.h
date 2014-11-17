@@ -133,11 +133,11 @@ namespace mongo {
             invariantWTOK(_parser->close(_parser));
         }
 
-	int next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {
+        int next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {
             return _parser->next(_parser, key, value);
         }
 
-	int get(const char* key, WT_CONFIG_ITEM* value) {
+        int get(const char* key, WT_CONFIG_ITEM* value) {
             return _parser->get(_parser, key, value);
         }
 

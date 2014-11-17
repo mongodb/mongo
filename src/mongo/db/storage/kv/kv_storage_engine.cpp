@@ -93,43 +93,79 @@ namespace mongo {
             return;
 
         OperationContextNoop opCtx( _engine->newRecoveryUnit() );
-        WriteUnitOfWork uow( &opCtx );
+        {
+            WriteUnitOfWork uow( &opCtx );
 
-        Status status = _engine->createRecordStore( &opCtx,
-                                                    catalogInfo,
-                                                    catalogInfo,
-                                                    CollectionOptions() );
-        // BadValue is usually caused by invalid configuration string.
-        // We still fassert() but without a stack trace.
-        if (status.code() == ErrorCodes::BadValue) {
-            fassertFailedNoTrace(28562);
-        }
-        fassert( 28520, status );
-
-        _catalogRecordStore.reset( _engine->getRecordStore( &opCtx,
-                                                            catalogInfo,
-                                                            catalogInfo,
-                                                            CollectionOptions() ) );
-        _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
-        _catalog->init( &opCtx );
-
-        std::vector<std::string> collections;
-        _catalog->getAllCollections( &collections );
-
-        for ( size_t i = 0; i < collections.size(); i++ ) {
-            std::string coll = collections[i];
-            NamespaceString nss( coll );
-            string dbName = nss.db().toString();
-
-            // No rollback since this is only for committed dbs.
-            KVDatabaseCatalogEntry*& db = _dbs[dbName];
-            if ( !db ) {
-                db = new KVDatabaseCatalogEntry( dbName, this );
+            Status status = _engine->createRecordStore( &opCtx,
+                                                        catalogInfo,
+                                                        catalogInfo,
+                                                        CollectionOptions() );
+            // BadValue is usually caused by invalid configuration string.
+            // We still fassert() but without a stack trace.
+            if (status.code() == ErrorCodes::BadValue) {
+                fassertFailedNoTrace(28562);
             }
-            db->initCollection( &opCtx, coll );
+            fassert( 28520, status );
+
+            _catalogRecordStore.reset( _engine->getRecordStore( &opCtx,
+                                                                catalogInfo,
+                                                                catalogInfo,
+                                                                CollectionOptions() ) );
+            _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
+            _catalog->init( &opCtx );
+
+            std::vector<std::string> collections;
+            _catalog->getAllCollections( &collections );
+
+            for ( size_t i = 0; i < collections.size(); i++ ) {
+                std::string coll = collections[i];
+                NamespaceString nss( coll );
+                string dbName = nss.db().toString();
+
+                // No rollback since this is only for committed dbs.
+                KVDatabaseCatalogEntry*& db = _dbs[dbName];
+                if ( !db ) {
+                    db = new KVDatabaseCatalogEntry( dbName, this );
+                }
+                db->initCollection( &opCtx, coll );
+            }
+
+            uow.commit();
         }
 
-        uow.commit();
+        opCtx.recoveryUnit()->commitAndRestart();
+
+        // now clean up orphaned idents
+
+        {
+            // get all idents
+            std::set<std::string> allIdents;
+            {
+                std::vector<std::string> v = _engine->getAllIdents( &opCtx );
+                allIdents.insert( v.begin(), v.end() );
+                allIdents.erase( catalogInfo );
+            }
+
+            // remove ones still in use
+            {
+                vector<string> idents = _catalog->getAllIdents( &opCtx );
+                for ( size_t i = 0; i < idents.size(); i++ ) {
+                    allIdents.erase( idents[i] );
+                }
+            }
+
+            for ( std::set<std::string>::const_iterator it = allIdents.begin();
+                  it != allIdents.end();
+                  ++it ) {
+                const std::string& toRemove = *it;
+                if ( !_catalog->isUserDataIdent( toRemove ) )
+                    continue;
+                log() << "dropping unused ident: " << toRemove;
+                WriteUnitOfWork wuow( &opCtx );
+                _engine->dropIdent( &opCtx, toRemove );
+                wuow.commit();
+            }
+        }
 
         _initialized = true;
     }

@@ -52,9 +52,6 @@ namespace mongo {
                                              const StringData& ident,
                                              const CollectionOptions& options );
 
-        virtual Status dropRecordStore( OperationContext* opCtx,
-                                        const StringData& ident );
-
         virtual Status createSortedDataInterface( OperationContext* opCtx,
                                                   const StringData& ident,
                                                   const IndexDescriptor* desc );
@@ -63,8 +60,8 @@ namespace mongo {
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc );
 
-        virtual Status dropSortedDataInterface( OperationContext* opCtx,
-                                                const StringData& ident );
+        virtual Status dropIdent( OperationContext* opCtx,
+                                  const StringData& ident );
 
         virtual bool supportsDocLocking() const { return false; }
 
@@ -83,6 +80,7 @@ namespace mongo {
 
         virtual void cleanShutdown(OperationContext* txn) {};
 
+        std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;
 

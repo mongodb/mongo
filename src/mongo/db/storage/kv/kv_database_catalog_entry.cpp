@@ -53,7 +53,7 @@ namespace mongo {
         virtual void rollback() {
             if (_dropOnRollback) {
                 // Intentionally ignoring failure
-                _dce->_engine->getEngine()->dropRecordStore(_opCtx, _ident);
+                _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
             }
 
             boost::mutex::scoped_lock lk(_dce->_collectionsLock);
@@ -90,7 +90,7 @@ namespace mongo {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
             // collection, we should never see it again anyway.
             if (_dropOnCommit)
-                _dce->_engine->getEngine()->dropRecordStore( _opCtx, _ident );
+                _dce->_engine->getEngine()->dropIdent( _opCtx, _ident );
         }
 
         virtual void rollback() {

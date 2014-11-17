@@ -47,7 +47,7 @@ namespace mongo {
         virtual void commit() {}
         virtual void rollback() {
             // Intentionally ignoring failure.
-            _cce->_engine->dropSortedDataInterface(_opCtx, _ident);
+            _cce->_engine->dropIdent(_opCtx, _ident);
         }
 
         OperationContext* const _opCtx;
@@ -68,7 +68,7 @@ namespace mongo {
         virtual void commit() {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
             // index, we should never see it again anyway.
-            _cce->_engine->dropSortedDataInterface(_opCtx, _ident);
+            _cce->_engine->dropIdent(_opCtx, _ident);
         }
 
         OperationContext* const _opCtx;

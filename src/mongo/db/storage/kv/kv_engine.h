@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -75,22 +78,19 @@ namespace mongo {
                                           const StringData& ns,
                                           const StringData& ident,
                                           const CollectionOptions& options ) = 0;
-        virtual Status dropRecordStore( OperationContext* opCtx,
-                                        const StringData& ident ) = 0;
-
 
         virtual Status createSortedDataInterface( OperationContext* opCtx,
                                                   const StringData& ident,
                                                   const IndexDescriptor* desc ) = 0;
-
-        virtual Status dropSortedDataInterface( OperationContext* opCtx,
-                                                const StringData& ident ) = 0;
 
         virtual int64_t getIdentSize( OperationContext* opCtx,
                                       const StringData& ident ) = 0;
 
         virtual Status repairIdent( OperationContext* opCtx,
                                     const StringData& ident ) = 0;
+
+        virtual Status dropIdent( OperationContext* opCtx,
+                                  const StringData& ident ) = 0;
 
         // optional
         virtual int flushAllFiles( bool sync ) { return 0; }
@@ -109,6 +109,8 @@ namespace mongo {
                                    const RecordStore* originalRecordStore ) const {
             return Status::OK();
         }
+
+        virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const = 0;
 
         /**
          * This method will be called before there is a clean shutdown.  Storage engines should
