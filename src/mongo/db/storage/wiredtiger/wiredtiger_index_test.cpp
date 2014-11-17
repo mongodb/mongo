@@ -71,8 +71,8 @@ namespace mongo {
             invariantWTOK( WiredTigerIndex::Create( &txn, uri, "", &desc ) );
 
             if ( unique )
-                return new WiredTigerIndexUnique( uri );
-            return new WiredTigerIndexStandard( uri );
+                return new WiredTigerIndexUnique( uri, &desc );
+            return new WiredTigerIndexStandard( uri, &desc );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {

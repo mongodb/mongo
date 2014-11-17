@@ -185,6 +185,17 @@ namespace {
         sb << "dup key: " << key;
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
+
+    Status checkKeySize(const BSONObj& key) {
+        if ( key.objsize() >= TempKeyMaxSize ) {
+            string msg = mongoutils::str::stream()
+                << "WiredTigerIndex::insert: key too large to index, failing "
+                << ' ' << key.objsize() << ' ' << key;
+            return Status(ErrorCodes::KeyTooLong, msg);
+        }
+        return Status::OK();
+    }
+
 } // namespace
 
     int WiredTigerIndex::Create(OperationContext* txn,
@@ -204,8 +215,9 @@ namespace {
         return s->create(s, uri.c_str(), config.c_str());
     }
 
-    WiredTigerIndex::WiredTigerIndex(const std::string &uri )
-        : _uri( uri ),
+    WiredTigerIndex::WiredTigerIndex(const std::string& uri, const IndexDescriptor* desc)
+        : _ordering(Ordering::make(desc->keyPattern())),
+          _uri( uri ),
           _instanceId( WiredTigerSession::genCursorId() ) {
     }
 
@@ -215,14 +227,11 @@ namespace {
               bool dupsAllowed) {
         invariant(!loc.isNull());
         invariant(loc.isValid());
-        invariant(!hasFieldNames(key));
+        dassert(!hasFieldNames(key));
 
-        if ( key.objsize() >= TempKeyMaxSize ) {
-            string msg = mongoutils::str::stream()
-                << "WiredTigerIndex::insert: key too large to index, failing "
-                << ' ' << key.objsize() << ' ' << key;
-            return Status(ErrorCodes::KeyTooLong, msg);
-        }
+        Status s = checkKeySize(key);
+        if (!s.isOK())
+            return s;
 
         WiredTigerCursor curwrap(_uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
@@ -236,7 +245,7 @@ namespace {
                                   bool dupsAllowed ) {
         invariant(!loc.isNull());
         invariant(loc.isValid());
-        invariant(!hasFieldNames(key));
+        dassert(!hasFieldNames(key));
 
         WiredTigerCursor curwrap(_uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
@@ -339,35 +348,175 @@ namespace {
         return Status::OK();
     }
 
-    class WiredTigerBuilderImpl : public SortedDataBuilderInterface {
+    /**
+     * Base class for WiredTigerIndex bulk builders.
+     *
+     * Manages the bulk cursor used by bulk builders.
+     */
+    class WiredTigerIndex::BulkBuilder : public SortedDataBuilderInterface {
     public:
-        WiredTigerBuilderImpl(WiredTigerIndex* idx,
-                              OperationContext *txn,
-                              bool dupsAllowed)
-            : _idx(idx), _txn(txn), _dupsAllowed(dupsAllowed), _count(0) {
+        BulkBuilder(WiredTigerIndex* idx, OperationContext* txn)
+            : _ordering(idx->_ordering)
+            , _txn(txn)
+            , _session(WiredTigerRecoveryUnit::get(_txn)->getSessionCache()->getSession())
+            , _cursor(openBulkCursor(idx))
+        {}
+
+        ~BulkBuilder() {
+            _cursor->close(_cursor);
+            WiredTigerRecoveryUnit::get(_txn)->getSessionCache()->releaseSession(_session);
         }
 
-        ~WiredTigerBuilderImpl() {
+    protected:
+        WT_CURSOR* openBulkCursor(WiredTigerIndex* idx) {
+            // Open cursors can cause bulk open_cursor to fail with EBUSY.
+            // TODO any other cases that could cause EBUSY?
+            WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_txn)->getSession();
+            outerSession->closeAllCursors();
+
+            // Not using cursor cache since we need to set "bulk".
+            WT_CURSOR* cursor;
+            // We use our own session to ensure we aren't in a transaction.
+            WT_SESSION* session = _session->getSession();
+            int err = session->open_cursor(session, idx->uri().c_str(), NULL, "bulk", &cursor);
+            if (!err)
+                return cursor;
+
+            warning() << "failed to create WiredTiger bulk cursor: " << wiredtiger_strerror(err);
+            warning() << "falling back to non-bulk cursor for index " << idx->uri();
+
+            invariantWTOK(session->open_cursor(session, idx->uri().c_str(), NULL, NULL, &cursor));
+            return cursor;
+        }
+
+        const Ordering _ordering;
+        OperationContext* const _txn;
+        WiredTigerSession* const _session;
+        WT_CURSOR* const _cursor;
+    };
+
+    /**
+     * Bulk builds a non-unique index.
+     */
+    class WiredTigerIndex::StandardBulkBuilder : public BulkBuilder {
+    public:
+        StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* txn)
+            : BulkBuilder(idx, txn) {
         }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
-            Status s = _idx->insert(_txn, key, loc, _dupsAllowed);
-            if (s.isOK())
-                _count++;
-            return s;
+            {
+                const Status s = checkKeySize(key);
+                if (!s.isOK())
+                    return s;
+            }
+
+            // Build a buffer with the key and loc concatenated.
+            const size_t keyLen = key.objsize() + sizeof(DiskLoc);
+            invariant(keyLen <= kBufferSize);
+            memcpy(_buffer, key.objdata(), key.objsize());
+            memcpy(_buffer + key.objsize(), &loc, sizeof(DiskLoc));
+            WiredTigerItem item(_buffer, keyLen);
+
+            // Can't use WiredTigerCursor since we aren't using the cache.
+            _cursor->set_key(_cursor, item.Get() );
+            _cursor->set_value(_cursor, &emptyItem);
+            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(_cursor->reset(_cursor));
+
+            return Status::OK();
         }
 
         void commit(bool mayInterrupt) {
+            // TODO do we still need this?
             // this is bizarre, but required as part of the contract
             WriteUnitOfWork uow( _txn );
             uow.commit();
         }
 
     private:
-        WiredTigerIndex* _idx;
-        OperationContext* _txn;
-        bool _dupsAllowed;
-        unsigned long long _count;
+        // Will need to support dynamic sizing if we remove TempKeyMaxSize.
+        static const size_t kBufferSize = TempKeyMaxSize + sizeof(DiskLoc);
+        char _buffer[kBufferSize];
+    };
+
+    /**
+     * Bulk builds a unique index.
+     *
+     * In order to support unique indexes in dupsAllowed mode this class only does an actual insert
+     * after it sees a key after the one we are trying to insert. This allows us to gather up all
+     * duplicate locs and insert them all together. This is necessary since bulk cursors can only
+     * append data.
+     */
+    class WiredTigerIndex::UniqueBulkBuilder : public BulkBuilder {
+    public:
+        UniqueBulkBuilder(WiredTigerIndex* idx, OperationContext* txn, bool dupsAllowed)
+            : BulkBuilder(idx, txn), _dupsAllowed(dupsAllowed) {
+        }
+
+        Status addKey(const BSONObj& newKey, const DiskLoc& loc) {
+            {
+                const Status s = checkKeySize(newKey);
+                if (!s.isOK())
+                    return s;
+            }
+
+            const int cmp = newKey.woCompare(_key, _ordering);
+            if (cmp != 0) {
+                if (!_key.isEmpty()) { // _key.isEmpty() is only true on the first call to addKey().
+                    invariant(cmp > 0); // newKey must be > the last key
+                    // We are done with dups of the last key so we can insert it now.
+                    doInsert();
+                }
+                invariant(_locs.empty());
+            }
+            else {
+                // Dup found!
+                if (!_dupsAllowed) {
+                    return dupKeyError(newKey);
+                }
+
+                // If we get here, we are in the weird mode where dups are allowed on a unique
+                // index, so add ourselves to the list of duplicate locs. This also replaces the
+                // _key which is correct since any dups seen later are likely to be newer.
+            }
+
+            _key = newKey.getOwned();
+            _locs.push_back(loc);
+
+            return Status::OK();
+        }
+
+        void commit(bool mayInterrupt) {
+            WriteUnitOfWork uow( _txn );
+            if (!_locs.empty()) {
+                // This handles inserting the last unique key.
+                doInsert();
+            }
+            uow.commit();
+        }
+
+    private:
+        void doInsert() {
+
+            invariant(!_locs.empty());
+
+            WiredTigerItem keyItem(_key.objdata(), _key.objsize());
+            _cursor->set_key(_cursor, keyItem.Get());
+
+            invariant(_locs.size() > 0);
+            WiredTigerItem valueItem(&_locs.front(), _locs.size() * sizeof(DiskLoc));
+            _cursor->set_value(_cursor, valueItem.Get());
+
+            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(_cursor->reset(_cursor));
+
+            _locs.clear();
+        }
+
+        const bool _dupsAllowed;
+        BSONObj _key;
+        std::vector<DiskLoc> _locs;
     };
 
     SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder( OperationContext* txn,
@@ -376,7 +525,13 @@ namespace {
             // if we don't allow dups, we better be unique
             invariant( unique() );
         }
-        return new WiredTigerBuilderImpl(this, txn, dupsAllowed);
+
+        if (unique()) {
+            return new UniqueBulkBuilder(this, txn, dupsAllowed);
+        }
+        else {
+            return new StandardBulkBuilder(this, txn);
+        }
     }
 
 
@@ -637,8 +792,9 @@ namespace {
 
     // ------------------------------
 
-    WiredTigerIndexUnique::WiredTigerIndexUnique( const std::string& uri )
-        : WiredTigerIndex( uri ) {
+    WiredTigerIndexUnique::WiredTigerIndexUnique( const std::string& uri,
+                                                  const IndexDescriptor* desc )
+        : WiredTigerIndex( uri, desc ) {
     }
 
     Status WiredTigerIndexUnique::_insert( WT_CURSOR* c,
@@ -765,8 +921,9 @@ namespace {
 
     // ------------------------------
 
-    WiredTigerIndexStandard::WiredTigerIndexStandard( const std::string& uri )
-        : WiredTigerIndex( uri ) {
+    WiredTigerIndexStandard::WiredTigerIndexStandard( const std::string& uri,
+                                                      const IndexDescriptor* desc )
+        : WiredTigerIndex( uri, desc ) {
     }
 
     Status WiredTigerIndexStandard::_insert( WT_CURSOR* c,

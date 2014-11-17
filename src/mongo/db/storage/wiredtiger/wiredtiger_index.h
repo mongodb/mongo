@@ -53,7 +53,7 @@ namespace mongo {
          * @param unique - If this is a unique index.
          *                 Note: even if unique, it may be allowed ot be non-unique at times.
          */
-        WiredTigerIndex(const std::string &uri );
+        WiredTigerIndex(const std::string& uri, const IndexDescriptor* desc);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -102,6 +102,10 @@ namespace mongo {
                                const BSONObj& key,
                                const DiskLoc& loc,
                                bool dupsAllowed ) = 0;
+
+        class BulkBuilder;
+        class StandardBulkBuilder;
+        class UniqueBulkBuilder;
 
         class IndexCursor : public SortedDataInterface::Cursor {
         public:
@@ -161,6 +165,7 @@ namespace mongo {
             DiskLoc _savedLoc;
         };
 
+        const Ordering _ordering;
         std::string _uri;
         uint64_t _instanceId;
     };
@@ -168,7 +173,7 @@ namespace mongo {
 
     class WiredTigerIndexUnique : public WiredTigerIndex {
     public:
-        WiredTigerIndexUnique( const std::string& uri );
+        WiredTigerIndexUnique( const std::string& uri, const IndexDescriptor* desc );
 
         virtual bool unique() const { return true; }
 
@@ -185,7 +190,7 @@ namespace mongo {
 
     class WiredTigerIndexStandard : public WiredTigerIndex {
     public:
-        WiredTigerIndexStandard( const std::string& uri );
+        WiredTigerIndexStandard( const std::string& uri, const IndexDescriptor* desc );
 
         virtual bool unique() const { return false; }
 
