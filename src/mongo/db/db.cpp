@@ -537,32 +537,11 @@ namespace mongo {
             web.detach();
         }
 
-        startClientCursorMonitor();
-
-        PeriodicTask::startRunningPeriodicTasks();
-
         {
             OperationContextImpl txn;
 
-            const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
-            if (missingRepl) {
-                log() << startupWarningsLog;
-                log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                      << " documents are present in local.system.replset" << startupWarningsLog;
-                log() << "**          Restart with --replSet unless you are doing maintenance and "
-                      << " no other clients are connected." << startupWarningsLog;
-                log() << "**          The TTL collection monitor will not start because of this." 
-                      << startupWarningsLog;
-                log() << "**         ";
-                log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
-                log() << startupWarningsLog;
-            }
-            else {
-                startTTLBackgroundJob();
-            }
-
 #ifndef _WIN32
-        mongo::signalForkSuccess();
+            mongo::signalForkSuccess();
 #endif
 
             Status status = authindex::verifySystemIndexes(&txn);
@@ -598,7 +577,29 @@ namespace mongo {
             restartInProgressIndexesFromLastShutdown(&txn);
 
             repl::getGlobalReplicationCoordinator()->startReplication(&txn);
+
+            const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
+            if (missingRepl) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: mongod started without --replSet yet " << missingRepl
+                      << " documents are present in local.system.replset" << startupWarningsLog;
+                log() << "**          Restart with --replSet unless you are doing maintenance and "
+                      << " no other clients are connected." << startupWarningsLog;
+                log() << "**          The TTL collection monitor will not start because of this." 
+                      << startupWarningsLog;
+                log() << "**         ";
+                log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
+                log() << startupWarningsLog;
+            }
+            else {
+                startTTLBackgroundJob();
+            }
+
         }
+
+        startClientCursorMonitor();
+
+        PeriodicTask::startRunningPeriodicTasks();
 
         logStartup();
 
