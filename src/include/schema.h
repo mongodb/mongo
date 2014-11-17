@@ -133,7 +133,7 @@ struct __wt_table {
 		__wt_spin_lock(session, &__conn->schema_lock);	\
 		F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
 	}							\
-	if (__schema_locked) {					\
+	if (__handle_locked) {					\
 		__wt_spin_lock(session, &__conn->dhandle_lock);	\
 		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
 	}							\
