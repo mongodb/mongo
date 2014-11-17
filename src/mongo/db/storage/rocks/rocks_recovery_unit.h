@@ -114,6 +114,8 @@ namespace mongo {
     private:
         void _destroyInternal();
 
+        void _abort();
+
         rocksdb::DB* _db; // not owned
         bool _defaultCommit;
 
@@ -127,6 +129,8 @@ namespace mongo {
         std::vector<Change*> _changes;
 
         bool _destroyed;
+
+        int _depth;
     };
 
 }

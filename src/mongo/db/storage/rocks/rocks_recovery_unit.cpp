@@ -50,7 +50,8 @@ namespace mongo {
           _defaultCommit(defaultCommit),
           _writeBatch(),
           _snapshot(NULL),
-          _destroyed(false) {}
+          _destroyed(false),
+          _depth(0) {}
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if (!_destroyed) {
@@ -58,10 +59,17 @@ namespace mongo {
         }
     }
 
-    void RocksRecoveryUnit::beginUnitOfWork() {}
+    void RocksRecoveryUnit::beginUnitOfWork() {
+        _depth++;
+    }
 
     void RocksRecoveryUnit::commitUnitOfWork() {
+        if (_depth > 1) {
+            return; // only outermost gets committed.
+        }
+
         invariant(!_destroyed);
+
         if ( !_writeBatch ) {
             // nothing to be committed
             return;
@@ -97,7 +105,12 @@ namespace mongo {
         }
     }
 
-    void RocksRecoveryUnit::endUnitOfWork() {}
+    void RocksRecoveryUnit::endUnitOfWork() {
+        _depth--;
+        if (_depth == 0) {
+            _abort();
+        }
+    }
 
     bool RocksRecoveryUnit::awaitCommit() {
         // TODO
@@ -144,6 +157,13 @@ namespace mongo {
 
         releaseSnapshot();
         _destroyed = true;
+    }
+
+    void RocksRecoveryUnit::_abort() {
+        // TODO rollback?
+        _writeBatch.reset();
+        _changes.clear();
+        _deltaCounters.clear();
     }
 
     // XXX lazily initialized for now
