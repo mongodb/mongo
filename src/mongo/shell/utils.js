@@ -147,6 +147,8 @@ jsTestOptions = function(){
                               setParametersMongos : TestData.setParametersMongos,
                               storageEngine: TestData.storageEngine,
                               wiredTigerEngineConfig: TestData.wiredTigerEngineConfig,
+                              wiredTigerCollectionConfig: TestData.wiredTigerCollectionConfig,
+                              wiredTigerIndexConfig: TestData.wiredTigerIndexConfig,
                               noJournal : TestData.noJournal,
                               noJournalPrealloc : TestData.noJournalPrealloc,
                               auth : TestData.auth,
