@@ -163,11 +163,11 @@ __wt_log_extract_lognum(
 }
 
 /*
- * __log_preallocate --
+ * __log_prealloc --
  *	Pre-allocate a log file.
  */
 static int
-__log_preallocate(WT_SESSION_IMPL *session, WT_FH *fh)
+__log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -245,7 +245,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * Pre-allocate on the first real write into the log file.
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
-		WT_RET(__log_preallocate(session, log->log_fh));
+		WT_RET(__log_prealloc(session, log->log_fh));
 
 	log->alloc_lsn.offset += (wt_off_t)recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
@@ -407,7 +407,7 @@ __log_reset_file(WT_SESSION_IMPL *session, uint32_t lognum)
 	WT_ERR(__log_openfile(session, 0, &log_fh, WT_LOG_ARCHNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
-	WT_ERR(__log_preallocate(session, log_fh));
+	WT_ERR(__log_prealloc(session, log_fh));
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_close(session, tmp_fh));
@@ -521,10 +521,8 @@ __wt_log_recycle(WT_SESSION_IMPL *session, uint32_t lognum)
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
-	WT_LOG *log;
 
 	conn = S2C(session);
-	log = conn->log;
 	WT_RET(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
 	WT_ERR(__log_filename(session, lognum, WT_LOG_ARCHNAME, from_path));

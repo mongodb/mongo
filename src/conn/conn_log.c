@@ -148,11 +148,21 @@ __log_archive_server(void *arg)
 		}
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 		locked_backup = 0;
+
+		/*
+		 * Indicate what is our new earliest LSN.  It is the start
+		 * of the log file containing the last checkpoint.
+		 */
+		log->first_lsn = lsn;
+		log->first_lsn.offset = 0;
+		WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
+		locked_archive = 0;
+
 		/*
 		 * If we're recycling the log files, walk the files again and
 		 * prepare them to be reused.  We've moved them aside while
-		 * holding the backup lock and now we can process them without
-		 * the backup lock.
+		 * holding the archive and backup locks and now we can process
+		 * them without the locks.
 		 */
 		if (conn->log_recycle)
 			for (i = 0; i < logcount; i++) {
@@ -165,15 +175,6 @@ __log_archive_server(void *arg)
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 		logcount = 0;
-
-		/*
-		 * Indicate what is our new earliest LSN.  It is the start
-		 * of the log file containing the last checkpoint.
-		 */
-		log->first_lsn = lsn;
-		log->first_lsn.offset = 0;
-		WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
-		locked_archive = 0;
 
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
