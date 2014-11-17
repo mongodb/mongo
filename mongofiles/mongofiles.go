@@ -51,13 +51,13 @@ type GFSFile struct {
 	ContentType string        `bson:"contentType,omitempty"`
 }
 
-func ValidateCommand(args []string) (string, error) {
+func (mf *MongoFiles) ValidateCommand(args []string) error {
 	// make sure a command is specified and that we don't have
 	// too many arguments
 	if len(args) == 0 {
-		return "", fmt.Errorf("you must specify a command")
+		return fmt.Errorf("no command specified")
 	} else if len(args) > 2 {
-		return "", fmt.Errorf("too many positional arguments")
+		return fmt.Errorf("too many positional arguments")
 	}
 
 	var fileName string
@@ -72,14 +72,21 @@ func ValidateCommand(args []string) (string, error) {
 		// also make sure the supporting argument isn't literally an empty string
 		// for example, mongofiles get ""
 		if len(args) == 1 || args[1] == "" {
-			return "", fmt.Errorf("'%v' requires a non-empty supporting argument", args[0])
+			return fmt.Errorf("'%v' argument missing", args[0])
 		}
 		fileName = args[1]
 	default:
-		return "", fmt.Errorf("'%v' is not a valid command", args[0])
+		return fmt.Errorf("'%v' is not a valid command", args[0])
 	}
 
-	return fileName, nil
+	if mf.StorageOptions.GridFSPrefix == "" {
+		return fmt.Errorf("--prefix can not be blank")
+	}
+
+	// set the mongofiles command and file name
+	mf.Command = args[0]
+	mf.FileName = fileName
+	return nil
 }
 
 // query GridFS for files and display the results
@@ -203,9 +210,9 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
 	// it's ok to validate only <db>.<prefix>.chunks (the longer one)
-	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.ToolOptions.Namespace.DB, 
+	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.ToolOptions.Namespace.DB,
 		self.StorageOptions.GridFSPrefix))
-	
+
 	if err != nil {
 		return "", err
 	}

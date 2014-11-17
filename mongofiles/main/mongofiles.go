@@ -25,7 +25,6 @@ const (
 )
 
 func main() {
-
 	// initialize command-line opts
 	opts := commonopts.New("mongofiles", Usage, commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
@@ -48,28 +47,22 @@ func main() {
 	if opts.PrintVersion() {
 		return
 	}
-
 	log.SetVerbosity(opts.Verbosity)
 
-	fileName, err := mongofiles.ValidateCommand(args)
-	if err != nil {
+	// create a session provider to connect to the db
+	mf := mongofiles.MongoFiles{
+		ToolOptions:     opts,
+		StorageOptions:  storageOpts,
+		SessionProvider: db.NewSessionProvider(*opts),
+	}
+
+	if err := mf.ValidateCommand(args); err != nil {
 		log.Logf(log.Always, "error: %v", err)
 		opts.PrintHelp(true)
 		os.Exit(1)
 	}
 
-	// create a session provider to connect to the db
-	sessionProvider := db.NewSessionProvider(*opts)
-
-	mongofiles := mongofiles.MongoFiles{
-		ToolOptions:     opts,
-		StorageOptions:  storageOpts,
-		SessionProvider: sessionProvider,
-		Command:         args[0],
-		FileName:        fileName,
-	}
-
-	output, err := mongofiles.Run(true)
+	output, err := mf.Run(true)
 	if err != nil {
 		log.Logf(log.Always, "%v", err)
 		os.Exit(1)
