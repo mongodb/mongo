@@ -215,9 +215,11 @@ namespace {
      * this member should have consistent data.  8 is "cosmetic," it is only to get this member
      * closer to the latest op time before it can transition out of startup state
      *
-     * returns true on success
+     * Returns a Status with ErrorCode::ShutdownInProgress if the node enters shutdown,
+     * ErrorCode::InitialSyncOplogSourceMissing if the node fails to find an sync source, Status::OK
+     * if everything worked, and ErrorCode::InitialSyncFailure for all other error cases.
      */
-    bool _initialSync() {
+    Status _initialSync() {
         BackgroundSync* bgsync(BackgroundSync::get());
         InitialSync init(bgsync);
         SyncTail tail(bgsync, multiSyncApply);
@@ -234,12 +236,14 @@ namespace {
             // of oplog position, by passing in "now" as the last op fetched time.
             r.connectToSyncSource(&txn, now, replCoord);
             if (r.getHost().empty()) {
-                log() << "no valid sync sources found in current replset to do an initial sync";
-                sleepsecs(3);
+                std::string msg =
+                        "no valid sync sources found in current replset to do an initial sync";
+                log() << msg;
+                return Status(ErrorCodes::InitialSyncOplogSourceMissing, msg);
             }
 
             if (inShutdown()) {
-                return false;
+                return Status(ErrorCodes::ShutdownInProgress, "shutting down");
             }
         }
 
@@ -247,9 +251,10 @@ namespace {
 
         BSONObj lastOp = r.getLastOp(rsoplog);
         if ( lastOp.isEmpty() ) {
-            log() << "initial sync couldn't read remote oplog";
+            std::string msg = "initial sync couldn't read remote oplog";
+            log() << msg;
             sleepsecs(15);
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure, msg);
         }
 
         if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
@@ -258,7 +263,7 @@ namespace {
             // prime oplog
             _tryToApplyOpWithRetry(&txn, &init, lastOp);
             _logOpObjRS(&txn, lastOp);
-            return true;
+            return Status::OK();
         }
 
         // Add field to minvalid document to tell us to restart initial sync if we crash
@@ -273,7 +278,7 @@ namespace {
 
         Cloner cloner;
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure, "initial sync failed data cloning");
         }
 
         log() << "initial sync data copy, starting syncup";
@@ -282,28 +287,36 @@ namespace {
         _tryToApplyOpWithRetry(&txn, &init, lastOp);
         _logOpObjRS(&txn, lastOp);
 
-        log() << "oplog sync 1 of 3" << endl;
+        std::string msg = "oplog sync 1 of 3";
+        log() << msg;
         if (!_initialSyncApplyOplog(&txn, init, &r)) {
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
         }
 
         // Now we sync to the latest op on the sync target _again_, as we may have recloned ops
         // that were "from the future" compared with minValid. During this second application,
         // nothing should need to be recloned.
-        log() << "oplog sync 2 of 3" << endl;
+        msg = "oplog sync 2 of 3";
+        log() << msg;
         if (!_initialSyncApplyOplog(&txn, init, &r)) {
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
         }
         // data should now be consistent
 
-        log() << "initial sync building indexes";
+        msg = "initial sync building indexes";
+        log() << msg;
         if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
         }
 
-        log() << "oplog sync 3 of 3" << endl;
+        msg = "oplog sync 3 of 3";
+        log() << msg;
         if (!_initialSyncApplyOplog(&txn, tail, &r)) {
-            return false;
+            return Status(ErrorCodes::InitialSyncFailure,
+                          str::stream() << "initial sync failed: " << msg);
         }
         
         // ---------
@@ -311,7 +324,7 @@ namespace {
         Status status = getGlobalAuthorizationManager()->initialize(&txn);
         if (!status.isOK()) {
             warning() << "Failed to reinitialize auth data after initial sync. " << status;
-            return false;
+            return status;
         }
 
         log() << "initial sync finishing up";
@@ -337,7 +350,7 @@ namespace {
         bgsync->notify();
 
         log() << "initial sync done";
-        return true;
+        return Status::OK();
     }
 } // namespace
 
@@ -353,8 +366,12 @@ namespace {
         while ( failedAttempts < maxFailedAttempts ) {
             try {
                 // leave loop when successful
-                if (_initialSync()) {
+                Status status = _initialSync();
+                if (status.isOK()) {
                     break;
+                }
+                if (status == ErrorCodes::InitialSyncOplogSourceMissing) {
+                    return;
                 }
             }
             catch(const DBException& e) {
