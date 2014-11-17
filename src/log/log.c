@@ -176,7 +176,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	conn = S2C(session);
 	log = conn->log;
 	ret = 0;
-	if (!fh->fallocate_available ||
+	if (fh->fallocate_available == WT_FALLOCATE_NOT_AVAILABLE ||
 	    (ret = __wt_fallocate(session, fh,
 	    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
 		ret = __wt_ftruncate(session, fh,
