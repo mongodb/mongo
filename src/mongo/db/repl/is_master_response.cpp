@@ -33,6 +33,7 @@
 #include "mongo/db/repl/is_master_response.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
@@ -56,6 +57,7 @@ namespace {
     const std::string kSlaveDelayFieldName = "slaveDelay";
     const std::string kTagsFieldName = "tags";
     const std::string kMeFieldName = "me";
+    const std::string kElectionIdFieldName = "electionId";
 
     // field name constants that don't directly correspond to member variables
     const std::string kInfoFieldName = "info";
@@ -89,6 +91,7 @@ namespace {
             _slaveDelaySet(false),
             _tagsSet(false),
             _meSet(false),
+            _electionId(OID()),
             _configSet(true),
             _shutdownInProgress(false)
             {}
@@ -159,6 +162,8 @@ namespace {
         }
         invariant(_meSet);
         builder->append(kMeFieldName, _me.toString());
+        if (_electionId.isSet())
+            builder->append(kElectionIdFieldName, _electionId);
     }
 
     BSONObj IsMasterResponse::toBSON() const {
@@ -344,6 +349,15 @@ namespace {
             _tagsSet = true;
         }
 
+        if (doc.hasField(kElectionIdFieldName)) {
+            BSONElement electionIdElem;
+            status = bsonExtractTypedField(doc, kElectionIdFieldName, jstOID, &electionIdElem);
+            if (!status.isOK()) {
+                return status;
+            }
+            _electionId = electionIdElem.OID();
+        }
+
         std::string meString;
         status = bsonExtractStringField(doc, kMeFieldName, &meString);
         if (!status.isOK()) {
@@ -428,6 +442,10 @@ namespace {
     void IsMasterResponse::setMe(const HostAndPort& me) {
         _meSet = true;
         _me = me;
+    }
+
+    void IsMasterResponse::setElectionId(const OID& electionId) {
+        _electionId = electionId;
     }
 
     void IsMasterResponse::markAsNoConfig() { _configSet = false; }

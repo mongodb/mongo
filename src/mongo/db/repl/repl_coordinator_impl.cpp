@@ -1267,7 +1267,7 @@ namespace {
 
     OID ReplicationCoordinatorImpl::getElectionId() {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        return _electionID;
+        return _electionId;
     }
 
     OID ReplicationCoordinatorImpl::getMyRID() const {

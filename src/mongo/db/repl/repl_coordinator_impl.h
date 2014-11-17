@@ -797,7 +797,7 @@ namespace repl {
         bool _inShutdown;                                                                 // (M)
 
         // Election ID of the last election that resulted in this node becoming primary.
-        OID _electionID;                                                                  // (M)
+        OID _electionId;                                                                  // (M)
 
         // Vector containing known information about each member (such as replication
         // progress and member ID) in our replica set or each member replicating from

@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/oid.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -106,6 +107,8 @@ namespace repl {
 
         const HostAndPort& getMe() const { return _me; }
 
+        const OID& getElectionId() const { return _electionId; }
+
         /**
          * If false, calls to toBSON/addToBSON will ignore all other fields and add a specific
          * message to indicate that we have no replica set config.
@@ -150,6 +153,8 @@ namespace repl {
         void addTag(const std::string& tagKey, const std::string& tagValue);
 
         void setMe(const HostAndPort& me);
+
+        void setElectionId(const OID& electionId);
 
         /**
          * Marks _configSet as false, which will cause future calls to toBSON/addToBSON to ignore
@@ -197,6 +202,7 @@ namespace repl {
         bool _tagsSet;
         HostAndPort _me;
         bool _meSet;
+        OID _electionId;
 
         // If _configSet is false this means we don't have a valid repl set config, so toBSON
         // will return a set of hardcoded values that indicate this.

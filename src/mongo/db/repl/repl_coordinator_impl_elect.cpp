@@ -257,8 +257,8 @@ namespace {
         _freshnessChecker.reset(NULL);
         _electCmdRunner.reset(NULL);
         boost::unique_lock<boost::mutex> lk(_mutex);
-        _electionID = OID::gen();
-        _topCoord->processWinElection(_electionID,
+        _electionId = OID::gen();
+        _topCoord->processWinElection(_electionId,
                                       OpTime(Milliseconds(_replExecutor.now()).total_seconds(), 0));
         const PostMemberStateUpdateAction action =
             _updateCurrentMemberStateFromTopologyCoordinator_inlock();

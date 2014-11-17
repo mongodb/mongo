@@ -1468,6 +1468,9 @@ namespace {
             }
         }
         response->setMe(selfConfig.getHostAndPort());
+        if (_iAmPrimary()) {
+            response->setElectionId(_electionId);
+        }
     }
 
     void TopologyCoordinatorImpl::prepareFreezeResponse(
