@@ -217,6 +217,10 @@ namespace repl {
     */
     bool SyncTail::syncApply(
                         OperationContext* txn, const BSONObj &op, bool convertUpdateToUpsert) {
+        if (inShutdown()) {
+            return true;
+        }
+
         const char *ns = op.getStringField("ns");
         verify(ns);
 
@@ -607,7 +611,6 @@ namespace {
             // if we should crash and restart before updating the oplog
             OpTime minValid = lastOp["ts"]._opTime();
             setMinValid(&txn, minValid);
-
             multiApply(ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
@@ -772,9 +775,15 @@ namespace {
                 if (!st->syncApply(&txn, *it, convertUpdatesToUpserts)) {
                     fassertFailedNoTrace(16359);
                 }
-            } catch (const DBException& e) {
+            }
+            catch (const DBException& e) {
                 error() << "writer worker caught exception: " << causedBy(e)
-                        << " on: " << it->toString() << endl;
+                        << " on: " << it->toString();
+
+                if (inShutdown()) {
+                    return;
+                }
+
                 fassertFailedNoTrace(16360);
             }
         }
@@ -812,7 +821,13 @@ namespace {
                 }
             }
             catch (const DBException& e) {
-                error() << "exception: " << causedBy(e) << " on: " << it->toString() << endl;
+                error() << "writer worker caught exception: " << causedBy(e)
+                        << " on: " << it->toString();
+
+                if (inShutdown()) {
+                    return;
+                }
+
                 fassertFailedNoTrace(16361);
             }
         }

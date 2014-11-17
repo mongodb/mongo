@@ -62,7 +62,7 @@ namespace {
 
         for( list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++ ) {
             const string db = *i;
-            if( db == "local" ) 
+            if ( db == "local" )
                 continue;
             
             if ( dataPass )
@@ -121,7 +121,7 @@ namespace {
             HostAndPort host = r->getHost();
             log() << "connection lost to " << host.toString() << 
                 "; is your tcp keepalive interval set appropriately?";
-            if( !r->connect(host) ) {
+            if ( !r->connect(host) ) {
                 error() << "initial sync couldn't connect to " << host.toString();
                 throw;
             }
@@ -261,9 +261,17 @@ namespace {
             log() << "fastsync: skipping database clone" << rsLog;
 
             // prime oplog
-            _tryToApplyOpWithRetry(&txn, &init, lastOp);
-            _logOpObjRS(&txn, lastOp);
-            return Status::OK();
+            try {
+                _tryToApplyOpWithRetry(&txn, &init, lastOp);
+                _logOpObjRS(&txn, lastOp);
+                return Status::OK();
+            } catch (DBException& e) {
+                // Return if in shutdown
+                if (inShutdown()) {
+                    return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
+                }
+                throw;
+            }
         }
 
         // Add field to minvalid document to tell us to restart initial sync if we crash
@@ -376,6 +384,10 @@ namespace {
             }
             catch(const DBException& e) {
                 error() << e ;
+                // Return if in shutdown
+                if (inShutdown()) {
+                    return;
+                }
             }
 
             if (inShutdown()) {
