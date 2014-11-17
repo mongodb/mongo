@@ -1049,7 +1049,15 @@ DBCollection.prototype.clean = function() {
     return this._dbCommand( { clean: this.getName() } );
 }
 
-
+DBCollection.prototype.hashAllDocs = function() {
+    var cmd = { dbhash : 1,
+                collections : [ this._shortName ] };
+    var res = this._dbCommand( cmd );
+    var hash = res.collections[this._shortName];
+    assert( hash );
+    assert( typeof(hash) == "string" );
+    return hash;
+}
 
 /**
  * <p>Drop a specified index.</p>

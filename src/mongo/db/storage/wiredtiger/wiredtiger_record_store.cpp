@@ -628,7 +628,11 @@ namespace {
 
 
     RecordIterator* WiredTigerRecordStore::getIteratorForRepair( OperationContext* txn ) const {
-        return getIterator( txn );
+        return new Iterator(*this,
+                            txn,
+                            DiskLoc(),
+                            CollectionScanParams::FORWARD,
+                            true);
     }
 
     std::vector<RecordIterator*> WiredTigerRecordStore::getManyIterators(
