@@ -110,19 +110,33 @@ struct __wt_table {
 } while (0)
 
 /*
- * WT_WITHOUT_SCHEMA_LOCK --
- *	Drop the schema lock, perform an operation, re-acquire the lock.
+ * WT_WITHOUT_LOCKS --
+ *	Drop the schema lock and/or the handle list lock, perform an operation,
+ *	re-acquire the lock(s).
  */
-#define	WT_WITHOUT_SCHEMA_LOCK(session, op) do {			\
-	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {		\
-		op;							\
-	} else {							\
-		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
-		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
-		op;							\
-		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
-		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
-	}								\
+#define	WT_WITHOUT_LOCKS(session, op) do {			\
+	WT_CONNECTION_IMPL *__conn = S2C(session);		\
+	int __handle_locked =					\
+		F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);\
+	int __schema_locked =					\
+		F_ISSET(session, WT_SESSION_SCHEMA_LOCKED);	\
+	if (__handle_locked) {					\
+		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
+		__wt_spin_unlock(session, &__conn->dhandle_lock);\
+	}							\
+	if (__schema_locked) {					\
+		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);	\
+		__wt_spin_unlock(session, &__conn->schema_lock);\
+	}							\
+	op;							\
+	if (__schema_locked) {					\
+		__wt_spin_lock(session, &__conn->schema_lock);	\
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
+	}							\
+	if (__schema_locked) {					\
+		__wt_spin_lock(session, &__conn->dhandle_lock);	\
+		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
+	}							\
 } while (0)
 
 /*

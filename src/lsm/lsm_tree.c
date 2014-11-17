@@ -88,16 +88,17 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
 		 * created when we cleared the active flag.
-		 * !! Drop the schema lock whilst completing this step so that
-		 * we don't block any operations that require the schema
-		 * lock to complete. This is safe because any operation that
-		 * is closing the tree should first have gotten exclusive
-		 * access to the LSM tree via __wt_lsm_tree_get, so other
-		 * schema level operations will return EBUSY, even though
+		 *
+		 * !!! Drop the schema and handle list locks whilst completing
+		 * this step so that we don't block any operations that require
+		 * the schema lock to complete. This is safe because any
+		 * operation that is closing the tree should first have gotten
+		 * exclusive access to the LSM tree via __wt_lsm_tree_get, so
+		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
 		if (i % 1000 == 0) {
-			WT_WITHOUT_SCHEMA_LOCK(session, ret =
+			WT_WITHOUT_LOCKS(session, ret =
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
 			WT_RET(ret);
 		}
