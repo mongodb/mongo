@@ -61,7 +61,12 @@ struct __wt_fh {
 
 	int	direct_io;			/* O_DIRECT configured */
 
-	int	fallocate_available;		/* fallocate/posix_fallocate */
+#define	WT_FALLOCATE_NOT_AVAILABLE	0
+#define	WT_FALLOCATE_AVAILABLE		1
+#define	WT_FALLOCATE_POSIX		2
+#define	WT_FALLOCATE_STD		3
+#define	WT_FALLOCATE_SYS		4
+	int	fallocate_available;		/* file extend configuration */
 	int	fallocate_requires_locking;
 };
 
