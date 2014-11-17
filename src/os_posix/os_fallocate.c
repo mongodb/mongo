@@ -50,14 +50,13 @@ __wt_std_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 
 	WT_SYSCALL_RETRY(
 	    fallocate(fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
-	if (ret == 0)
-		return (0);
+	return (ret);
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
-#endif
 	return (ENOTSUP);
+#endif
 }
 
 /*
@@ -78,14 +77,13 @@ __wt_sys_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 	 */
 	WT_SYSCALL_RETRY(syscall(
 	    SYS_fallocate, fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
-	if (ret == 0)
-		return (0);
+	return (ret);
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
-#endif
 	return (ENOTSUP);
+#endif
 }
 
 /*
@@ -99,14 +97,13 @@ __wt_posix_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 	WT_DECL_RET;
 
 	WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
-	if (ret == 0)
-		return (0);
+	return (ret);
 #else
 	WT_UNUSED(fh);
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
-#endif
 	return (ENOTSUP);
+#endif
 }
 
 /*
