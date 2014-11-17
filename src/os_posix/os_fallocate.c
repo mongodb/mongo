@@ -77,26 +77,23 @@ __wt_fallocate(
 	    session, WT_VERB_FILEOPS, "%s: posix_fallocate", fh->name));
 
 #if defined(__linux__)
-    /**
-     * We try the direct syscall for fallocate if the libc wrapper was not found.
-     * The syscall actually exists in the kernel for RHEL 5.5, but not in
-     * the version of libc, so this allows it to work everywhere the kernel
-     * supports it.
-     */
-    WT_SYSCALL_RETRY(syscall(SYS_fallocate, fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
-    if (ret == 0) {
-        fh->fallocate_requires_locking = 0;
-    }
-    else if (ret == ENOSYS) {
-        WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
-    }
-    else if (ret != ENOTSUP) {
-        // see above handling for ENOTSUP
-        WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
-    }
-#else
-    WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
+	/*
+	 * We try the direct system call for fallocate even if the C library
+	 * wrapper was not found.  The system call actually exists in the kernel
+	 * for some Linux versions, but not in the version of the C library.
+	 * This allows it to work everywhere the kernel supports it.
+	 */
+	WT_SYSCALL_RETRY(syscall(SYS_fallocate,
+	    fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
+	if (ret == 0)
+		fh->fallocate_requires_locking = 0;
+	else if (ret != ENOTSUP && ret != ENOSYS)
+		/* See comment above about ENOTSUP. */
+		WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
+	else if (ret == ENOSYS)
+	/* Fall through to posix_fallocate if ENOSYS */
 #endif
+	WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
 
 	if (ret == 0)
 		return (0);
