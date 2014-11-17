@@ -118,6 +118,7 @@ FOREACH
 FREAD
 FREELIST
 FTRUNCATE
+FULLFSYNC
 Fasttrack
 Filesystems
 FindFirstFile
@@ -143,6 +144,7 @@ GetModuleHandleEx
 GetProcAddress
 Givargis
 Google
+HFS
 HHHH
 HHHHLL
 HHHLL
@@ -328,6 +330,7 @@ Timespec
 Timestamp
 TryCV
 TxnID
+UDF
 UID
 UIDs
 UINT
