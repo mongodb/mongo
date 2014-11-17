@@ -7,8 +7,10 @@
 
 #include "wt_internal.h"
 
-#if defined(HAVE_FALLOCATE)
+#if defined(HAVE_FALLOCATE) || defined(__linux__)
 #include <linux/falloc.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #endif
 
 /*
@@ -73,7 +75,29 @@ __wt_fallocate(
 #elif defined(HAVE_POSIX_FALLOCATE)
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: posix_fallocate", fh->name));
-	WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
+
+#if defined(__linux__)
+    /**
+     * We try the direct syscall for fallocate if the libc wrapper was not found.
+     * The syscall actually exists in the kernel for RHEL 5.5, but not in
+     * the version of libc, so this allows it to work everywhere the kernel
+     * supports it.
+     */
+    WT_SYSCALL_RETRY(syscall(SYS_fallocate, fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
+    if (ret == 0) {
+        fh->fallocate_requires_locking = 0;
+    }
+    else if (ret == ENOSYS) {
+        WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
+    }
+    else if (ret != ENOTSUP) {
+        // see above handling for ENOTSUP
+        WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
+    }
+#else
+    WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
+#endif
+
 	if (ret == 0)
 		return (0);
 
