@@ -5,7 +5,9 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
+#define	WT_LOG_ARCHNAME		"WiredTigerLogArchive"	/* Log archived name */
+#define	WT_LOG_FILENAME		"WiredTigerLog"		/* Log file name */
+#define	WT_LOG_RECYCLENAME	"WiredTigerLogRecycle"	/* Log recycled name */
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128

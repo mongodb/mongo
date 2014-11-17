@@ -370,6 +370,8 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerInit
 WiredTigerLog
+WiredTigerLogArchive
+WiredTigerLogRecycle
 WiredTigerStat
 WiredTigerTxn
 WithSeeds

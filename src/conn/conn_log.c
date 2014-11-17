@@ -66,6 +66,9 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
+	WT_RET(__wt_config_gets(session, cfg, "log.recycle", &cval));
+	conn->log_recycle = cval.val != 0;
+
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
 }
@@ -133,13 +136,32 @@ __log_archive_server(void *arg)
 			if (conn->hot_backup == 0) {
 				WT_ERR(__wt_log_extract_lognum(
 				    session, logfiles[i], &lognum));
-				if (lognum < lsn.file)
-					WT_ERR(
-					    __wt_log_remove(session, lognum));
+				if (lognum < lsn.file) {
+					if (conn->log_recycle)
+						WT_ERR(__wt_log_recycle_rename(
+						    session, lognum));
+					else
+						WT_ERR(__wt_log_remove(
+						    session, lognum));
+				}
 			}
 		}
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 		locked_backup = 0;
+		/*
+		 * If we're recycling the log files, walk the files again and
+		 * prepare them to be reused.  We've moved them aside while
+		 * holding the backup lock and now we can process them without
+		 * the backup lock.
+		 */
+		if (conn->log_recycle)
+			for (i = 0; i < logcount; i++) {
+				WT_ERR(__wt_log_extract_lognum(
+				    session, logfiles[i], &lognum));
+				if (lognum < lsn.file)
+					WT_ERR(__wt_log_recycle(
+					    session, lognum));
+			}
 		__wt_log_files_free(session, logfiles, logcount);
 		logfiles = NULL;
 		logcount = 0;
