@@ -166,7 +166,7 @@ namespace mongo {
             _creds.scram.salt.empty()) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                                     "It is not possible to authenticate as the __system user "
-                                    "on servers started without --keyFile parameter");
+                                    "on servers started without a --keyFile parameter");
         }
 
         // Generate SCRAM credentials on the fly for mixed MONGODB-CR/SCRAM mode.
