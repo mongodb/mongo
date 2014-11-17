@@ -517,12 +517,10 @@ err:	__wt_scr_free(&from_path);
 int
 __wt_log_recycle(WT_SESSION_IMPL *session, uint32_t lognum)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
 
-	conn = S2C(session);
 	WT_RET(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
 	WT_ERR(__log_filename(session, lognum, WT_LOG_ARCHNAME, from_path));
