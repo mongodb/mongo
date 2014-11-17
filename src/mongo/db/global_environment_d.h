@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include <set>
 #include <vector>
 
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 
 
@@ -73,7 +73,7 @@ namespace mongo {
     private:
         bool _globalKill;
 
-        typedef std::set<OperationContext*> OperationContextSet;
+        typedef unordered_set<OperationContext*> OperationContextSet;
 
         mongo::mutex _registeredOpContextsMutex;
         OperationContextSet _registeredOpContexts;
