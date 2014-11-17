@@ -430,6 +430,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
+	WT_ERR(ret);
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC)) {
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __wt_checkpoint_sync(session, NULL));
+		WT_ERR(ret);
+	}
 	if (full) {
 		WT_ERR(__wt_epoch(session, &stop));
 		__checkpoint_stats(session, &start, &stop);
