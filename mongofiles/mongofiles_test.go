@@ -162,51 +162,42 @@ func TestValidArguments(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a MongoFiles instance", t, func() {
-
+		args := []string{"search", "file"}
+		mf, err := simpleMongoFilesInstance(args)
+		So(err, ShouldBeNil)
 		Convey("It should error out when no arguments fed", func() {
 			args := []string{}
-
-			_, err := ValidateCommand(args)
+			err := mf.ValidateCommand(args)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldEqual, "you must specify a command")
+			So(err.Error(), ShouldEqual, "no command specified")
 		})
 
 		Convey("It should error out when too many positional arguments provided", func() {
 			args := []string{"list", "something", "another"}
-
-			_, err := ValidateCommand(args)
+			err := mf.ValidateCommand(args)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldEqual, "too many positional arguments")
 		})
 
 		Convey("It should not error out when list command isn't given an argument", func() {
 			args := []string{"list"}
-
-			fileName, err := ValidateCommand(args)
-			So(err, ShouldBeNil)
-			So(fileName, ShouldEqual, "")
+			So(mf.ValidateCommand(args), ShouldBeNil)
+			So(mf.StorageOptions.LocalFileName, ShouldEqual, "")
 		})
 
 		Convey("It should error out when any of (get|put|delete|search) not given supporting argument", func() {
-			var args []string
-
 			for _, command := range []string{"get", "put", "delete", "search"} {
-				args = []string{command}
-
-				_, err := ValidateCommand(args)
+				args := []string{command}
+				err := mf.ValidateCommand(args)
 				So(err, ShouldNotBeNil)
-				So(err.Error(),
-					ShouldEqual,
-					fmt.Sprintf("'%v' requires a non-empty supporting argument",
-						command),
-				)
+				So(err.Error(), ShouldEqual, fmt.Sprintf("'%v' argument missing", command))
 			}
 		})
 
 		Convey("It should error out when a nonsensical command is given", func() {
 			args := []string{"commandnonexistent"}
 
-			_, err := ValidateCommand(args)
+			err := mf.ValidateCommand(args)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldEqual, fmt.Sprintf("'%v' is not a valid command", args[0]))
 		})
