@@ -546,7 +546,8 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * Pre-allocate on the first real write into the log file.
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD) {
-		if (!log->log_fh->fallocate_available ||
+		if (log->log_fh->fallocate_available !=
+		    WT_FALLOCATE_NOT_AVAILABLE ||
 		    (ret = __wt_fallocate(session, log->log_fh,
 		    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
 			ret = __wt_ftruncate(session, log->log_fh,
