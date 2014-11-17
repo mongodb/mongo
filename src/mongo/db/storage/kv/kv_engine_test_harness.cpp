@@ -82,7 +82,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             std::vector<std::string> all = engine->getAllIdents( &opCtx );
-            ASSERT_EQUALS( 1, all.size() );
+            ASSERT_EQUALS( 1U, all.size() );
             ASSERT_EQUALS( ns, all[0] );
         }
 
