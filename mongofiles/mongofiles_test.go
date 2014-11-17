@@ -159,7 +159,7 @@ func fileExists(name string) bool {
 // Test that it works whenever valid arguments are passed in and that
 // it barfs whenever invalid ones are passed
 func TestValidArguments(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 
 	Convey("With a MongoFiles instance", t, func() {
 		args := []string{"search", "file"}
