@@ -157,7 +157,7 @@ namespace mongo {
     Status WriteBatchExecutor::validateBatch( const BatchedCommandRequest& request ) {
 
         // Validate namespace
-        const NamespaceString nss = NamespaceString( request.getNS() );
+        const NamespaceString& nss = request.getNSS();
         if ( !nss.isValid() ) {
             return Status( ErrorCodes::InvalidNamespace,
                            nss.ns() + " is not a valid namespace" );
@@ -432,7 +432,7 @@ namespace mongo {
                                   const BatchedCommandRequest& request,
                                   WriteOpResult* result) {
 
-        const NamespaceString nss( request.getTargetingNS() );
+        const NamespaceString& nss = request.getTargetingNSS();
         txn->lockState()->assertWriteLocked( nss.ns() );
 
         ChunkVersion requestShardVersion =
@@ -459,13 +459,13 @@ namespace mongo {
         return true;
     }
 
-    static bool checkIsMasterForDatabase(const std::string& ns, WriteOpResult* result) {
+    static bool checkIsMasterForDatabase(const NamespaceString& ns, WriteOpResult* result) {
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                NamespaceString(ns).db())) {
+                ns.db())) {
             WriteErrorDetail* errorDetail = new WriteErrorDetail;
             result->setError(errorDetail);
             errorDetail->setErrCode(ErrorCodes::NotMaster);
-            errorDetail->setErrMessage("Not primary while writing to " + ns);
+            errorDetail->setErrMessage("Not primary while writing to " + ns.toString());
             return false;
         }
         return true;
@@ -485,7 +485,7 @@ namespace mongo {
                                       const BatchedCommandRequest& request,
                                       WriteOpResult* result) {
 
-        const NamespaceString nss( request.getTargetingNS() );
+        const NamespaceString& nss = request.getTargetingNSS();
         txn->lockState()->assertWriteLocked( nss.ns() );
 
         if ( !request.isUniqueIndexRequest() )
@@ -962,7 +962,7 @@ namespace mongo {
             intentLock = false; // can't build indexes in intent mode
 
         invariant(!_context.get());
-        const NamespaceString nss(request->getNS());
+        const NamespaceString& nss = request->getNSS();
         _collLock.reset(); // give up locks if any
         _writeLock.reset();
         _writeLock.reset(new Lock::DBLock(txn->lockState(),
@@ -977,9 +977,9 @@ namespace mongo {
             intentLock = false;
         }
         _collLock.reset(new Lock::CollectionLock(txn->lockState(),
-                                                 request->getNS(),
+                                                 nss.ns(),
                                                  intentLock ? MODE_IX : MODE_X));
-        if (!checkIsMasterForDatabase(request->getNS(), result)) {
+        if (!checkIsMasterForDatabase(nss, result)) {
             return false;
         }
         if (!checkShardVersion(txn, &shardingState, *request, result)) {
@@ -990,7 +990,7 @@ namespace mongo {
         }
 
         _context.reset();
-        _context.reset(new Client::Context(txn, request->getNS(), false));
+        _context.reset(new Client::Context(txn, nss, false));
 
         Database* database = _context->db();
         dassert(database);
@@ -1332,7 +1332,7 @@ namespace mongo {
                              const BatchItemRef& removeItem,
                              WriteOpResult* result ) {
 
-        const NamespaceString nss( removeItem.getRequest()->getNS() );
+        const NamespaceString& nss = removeItem.getRequest()->getNSS();
         DeleteRequest request(nss);
         request.setQuery( removeItem.getDelete()->getQuery() );
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );

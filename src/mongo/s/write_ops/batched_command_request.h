@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    class NamespaceString;
+
     /**
      * This class wraps the different kinds of command requests into a generically usable write
      * command request.
@@ -109,6 +111,7 @@ namespace mongo {
         bool isUniqueIndexRequest() const;
         bool isValidIndexRequest( std::string* errMsg ) const;
         std::string getTargetingNS() const;
+        const NamespaceString& getTargetingNSS() const;
         BSONObj getIndexKeyPattern() const;
 
         //
@@ -117,10 +120,10 @@ namespace mongo {
 
         bool isVerboseWC() const;
 
+        void setNSS( const NamespaceString& nss );
         void setNS( const StringData& collName );
-        void unsetNS();
-        bool isNSSet() const;
         const std::string& getNS() const;
+        const NamespaceString& getNSS() const;
 
         std::size_t sizeWriteOps() const;
 
@@ -180,7 +183,6 @@ namespace mongo {
         scoped_ptr<BatchedInsertRequest> _insertReq;
         scoped_ptr<BatchedUpdateRequest> _updateReq;
         scoped_ptr<BatchedDeleteRequest> _deleteReq;
-
     };
 
     /**

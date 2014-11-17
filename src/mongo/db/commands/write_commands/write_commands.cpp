@@ -131,7 +131,7 @@ namespace mongo {
         // Internally, everything work with the namespace string as opposed to just the
         // collection name.
         NamespaceString nss(dbName, request.getNS());
-        request.setNS(nss.ns());
+        request.setNSS(nss);
 
         WriteConcernOptions defaultWriteConcern =
             repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
@@ -172,7 +172,7 @@ namespace mongo {
         // Internally, everything work with the namespace string as opposed to just the
         // collection name.
         NamespaceString nsString(dbname, request.getNS());
-        request.setNS(nsString.ns());
+        request.setNSS(nsString);
 
         // Do the validation of the batch that is shared with non-explained write batches.
         Status isValid = WriteBatchExecutor::validateBatch( request );
