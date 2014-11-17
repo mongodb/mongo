@@ -40,6 +40,13 @@ func (gw *GridWriter) WriteCell(data string) {
 	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], Cell{data, false})
 }
 
+//WriteCells writes multiple cells by calling WriteCell for each argument.
+func (gw *GridWriter) WriteCells(data ...string) {
+	for _, s := range data {
+		gw.WriteCell(s)
+	}
+}
+
 //Feed writes the given string into the current cell but allowing the cell contents
 //to extend past the width of the current column, and ends the row.
 func (gw *GridWriter) Feed(data string) {

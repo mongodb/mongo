@@ -1,5 +1,3 @@
-// Package mongotop implements the core logic and structures
-// for the mongotop tool.
 package mongotop
 
 import (
@@ -7,112 +5,103 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/mongotop/command"
 	"github.com/mongodb/mongo-tools/mongotop/options"
-	"github.com/mongodb/mongo-tools/mongotop/output"
 	"time"
 )
 
 // Wrapper for the mongotop functionality
 type MongoTop struct {
-	// generic mongo tool options
+	// Generic mongo tool options
 	Options *commonopts.ToolOptions
 
-	// mongotop-specific output options
+	// Mongotop-specific output options
 	OutputOptions *options.Output
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider
 
-	// for outputting the results
-	output.Outputter
-
-	// the sleep time
+	// Length of time to sleep between each polling.
 	Sleeptime time.Duration
 
-	// just run once and finish
+	// If set, print the output only once and then stop.
 	Once bool
+
+	previousServerStatus *ServerStatus
+	previousTop          *Top
 }
 
-// Connect to the database and spin, running the top command and outputting
-// the results appropriately.
-func (self *MongoTop) Run() error {
-
-	self.initializeOutputter()
-
-	// test the connection
-	session, err := self.SessionProvider.GetSession()
+func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
+	session, err := mt.SessionProvider.GetSession()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	session.Close()
+	defer session.Close()
 
-	connUrl := self.Options.Host
-	if self.Options.Port != "" {
-		connUrl = connUrl + ":" + self.Options.Port
+	var currentServerStatus ServerStatus
+	var currentTop Top
+	commandName := "top"
+	var dest interface{} = &currentTop
+	if mt.OutputOptions.Locks {
+		commandName = "serverStatus"
+		dest = &currentServerStatus
 	}
-	log.Logf(log.Always, "connected to: %v\n", connUrl)
-
-	// the results used to be compared to each other
-	var previousResults command.Command
-	if self.OutputOptions.Locks {
-		previousResults = &command.ServerStatus{}
+	err = session.DB("admin").Run(commandName, dest)
+	if err != nil {
+		mt.previousServerStatus = nil
+		mt.previousTop = nil
+		return nil, err
+	}
+	if mt.OutputOptions.Locks {
+		if mt.previousServerStatus != nil {
+			serverStatusDiff := currentServerStatus.Diff(*mt.previousServerStatus)
+			outDiff = serverStatusDiff
+		}
+		mt.previousServerStatus = &currentServerStatus
 	} else {
-		previousResults = &command.Top{}
+		if mt.previousTop != nil {
+			topDiff := currentTop.Diff(*mt.previousTop)
+			outDiff = topDiff
+		}
+		mt.previousTop = &currentTop
+	}
+	return outDiff, nil
+}
+
+// Connect to the database and periodically run a command to collect stats,
+// writing the results to standard out in the specified format.
+func (mt *MongoTop) Run() error {
+	connUrl := mt.Options.Host
+	if mt.Options.Port != "" {
+		connUrl = connUrl + ":" + mt.Options.Port
 	}
 
-	// populate the first run of the previous results
-	err = self.SessionProvider.RunCommand("admin", previousResults)
-	if err != nil {
-		return fmt.Errorf("error running top command: %v", err)
-	}
+	hasData := false
 
 	for {
-
-		// sleep
-		time.Sleep(self.Sleeptime)
-
-		var topResults command.Command
-		if self.OutputOptions.Locks {
-			topResults = &command.ServerStatus{}
-		} else {
-			topResults = &command.Top{}
-		}
-
-		// run the top command against the database
-		err = self.SessionProvider.RunCommand("admin", topResults)
+		diff, err := mt.runDiff()
 		if err != nil {
-			return fmt.Errorf("error running top command: %v", err)
+			log.Logf(log.Always, "Error: %v\n", err)
+
+			// If this is the first time trying to poll the server and it fails,
+			// just stop now instead of trying over and over.
+			if !hasData {
+				return err
+			}
+			time.Sleep(mt.Sleeptime)
 		}
 
-		// diff the results
-		diff, err := topResults.Diff(previousResults)
-		if err != nil {
-			return fmt.Errorf("error computing diff: %v", err)
+		hasData = true
+
+		if diff != nil {
+			if mt.OutputOptions.Json {
+				fmt.Println(diff.JSON())
+			} else {
+				fmt.Println(diff.Grid())
+			}
+			if mt.Once {
+				return nil
+			}
 		}
-
-		// output the results
-		if err := self.Outputter.Output(diff); err != nil {
-			return fmt.Errorf("error outputting results: %v", err)
-		}
-
-		// update the previous results
-		previousResults = topResults
-
-		if self.Once {
-			return nil
-		}
-
-	}
-
-}
-
-// initializeOutputter creates the appropriate type of Outputter to be used,
-// based on whether or not the output is specified as json.
-func (self *MongoTop) initializeOutputter() {
-	if self.OutputOptions.Json {
-		self.Outputter = &output.JSONOutputter{}
-	} else {
-		self.Outputter = &output.GridOutputter{}
+		time.Sleep(mt.Sleeptime)
 	}
 }
