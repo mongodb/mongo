@@ -1139,7 +1139,8 @@ DB.prototype._getDefaultAuthenticationMechanism = function() {
         return this._defaultAuthenticationMechanism;
 
     // Use MONGODB-CR for v2.6 and earlier.
-    if (this.isMaster().maxWireVersion < 3) {
+    maxWireVersion = this.isMaster().maxWireVersion;
+    if (maxWireVersion == undefined || maxWireVersion < 3) {
         return "MONGODB-CR";
     }
     return "SCRAM-SHA-1";
