@@ -124,7 +124,7 @@ namespace mongo {
     public:
         ThreadSafeString( size_t size=256 )
             : _size( size ) , _buf( new char[size] ) {
-            memset( _buf , 0 , _size );
+            memset( _buf , '\0' , _size );
         }
 
         ~ThreadSafeString() {
@@ -132,25 +132,20 @@ namespace mongo {
         }
 
         std::string toString() const {
-            std::string s = _buf;
-            return s;
+            return _buf;
         }
 
-        ThreadSafeString& operator=( const char * str ) {
-            size_t s = strlen(str);
+        ThreadSafeString& operator=( const StringData& str ) {
+            size_t s = str.size();
             if ( s >= _size - 2 )
                 s = _size - 2;
-            strncpy( _buf , str , s );
-            _buf[s] = 0;
+            strncpy( _buf , str.rawData() , s );
+            _buf[s] = '\0';
             return *this;
         }
 
-        ThreadSafeString& operator=(const string& str) {
-            return (*this = str.c_str());
-        }
-
         bool empty() const {
-            return _buf == 0 || _buf[0] == 0;
+            return _buf[0] == '\0';
         }
 
     private:
