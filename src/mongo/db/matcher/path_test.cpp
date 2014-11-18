@@ -312,6 +312,26 @@ namespace mongo {
         ASSERT( !cursor.more() );
     }
 
+    // SERVER-15899: test iteration using a path that generates no elements, but traverses a long
+    // array containing subdocuments with nested arrays.
+    TEST( Path, NonMatchingLongArrayOfSubdocumentsWithNestedArrays ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b.x" ).isOK() );
+
+        // Build the document {a: [{b: []}, {b: []}, {b: []}, ...]}.
+        BSONObj subdoc = BSON( "b" << BSONArray() );
+        BSONArrayBuilder builder;
+        for ( int i = 0; i < 100 * 1000; ++i ) {
+            builder.append( subdoc );
+        }
+        BSONObj doc = BSON( "a" << builder.arr() );
+
+        BSONElementIterator cursor( &p, doc );
+
+        // The path "a.b.x" matches no elements.
+        ASSERT( !cursor.more() );
+    }
+
     // When multiple arrays are traversed implicitly in the same path,
     // ElementIterator::Context::arrayOffset() should always refer to the current offset of the
     // outermost array that is implicitly traversed.
