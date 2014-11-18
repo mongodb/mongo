@@ -20,6 +20,7 @@ flags = {
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_DIRECTORY',
 		'FILE_TYPE_LOG',
+		'FILE_TYPE_TURTLE',
 	],
 	'log_scan' : [
 		'LOGSCAN_FIRST',

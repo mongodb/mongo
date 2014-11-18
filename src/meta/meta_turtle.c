@@ -274,45 +274,50 @@ int
 __wt_turtle_update(
     WT_SESSION_IMPL *session, const char *key,  const char *value)
 {
-	FILE *fp;
+	WT_FH *fh;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	int vmajor, vminor, vpatch;
 	const char *version;
-	char *path;
 
-	fp = NULL;
-	path = NULL;
+	fh = NULL;
 
 	/*
 	 * Create the turtle setup file: we currently re-write it from scratch
 	 * every time.
 	 */
-	WT_RET(__wt_filename(session, WT_METADATA_TURTLE_SET, &path));
-	if ((fp = fopen(path, "w")) == NULL)
-		ret = __wt_errno();
-	__wt_free(session, path);
-	if (fp == NULL)
-		return (ret);
+	WT_RET(__wt_open(
+	    session, WT_METADATA_TURTLE_SET, 1, 1, WT_FILE_TYPE_TURTLE, &fh));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR_TEST((fprintf(fp,
+	WT_ERR(__wt_scr_alloc(session, 1000, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
-	    key, value) < 0), __wt_errno());
+	    key, value));
 
-	ret = fclose(fp);
-	fp = NULL;
-	WT_ERR_TEST(ret == EOF, __wt_errno());
+	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
+
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		WT_ERR(__wt_fsync(session, fh));
+
+	ret = __wt_close(session, fh);
+	fh = NULL;
+	WT_ERR(ret);
 
 	WT_ERR(
 	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
+
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		WT_ERR(__wt_directory_sync(session, NULL));
 
 	if (0) {
 err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 	}
 
-	if  (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+	if  (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
+	__wt_scr_free(&buf);
 	return (ret);
 }
