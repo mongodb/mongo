@@ -198,6 +198,21 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 		return "", fmt.Errorf("error connecting to db: %v", err)
 	}
 	defer session.Close()
+
+	// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
+	isRepl, err := self.SessionProvider.IsReplicaSet()
+	if err != nil {
+		return "", fmt.Errorf("error determining if connected to replica set: %v", err)
+	}
+
+	safety, err := util.BuildWriteConcern(self.StorageOptions.WriteConcern, isRepl)
+	if err != nil {
+		return "", fmt.Errorf("error parsing write concern: %v", err)
+	}
+
+	// configure the session with the appropriate write concern and ensure the
+	// socket does not timeout
+	session.SetSafe(safety)
 	session.SetSocketTimeout(0)
 
 	if displayConnUrl {
