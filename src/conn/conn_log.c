@@ -141,8 +141,8 @@ __log_archive_server(void *arg)
 						WT_ERR(__wt_log_recycle_rename(
 						    session, lognum));
 					else
-						WT_ERR(__wt_log_remove(
-						    session, lognum));
+						WT_ERR(__wt_log_remove(session,
+						    WT_LOG_FILENAME, lognum));
 				}
 			}
 		}
