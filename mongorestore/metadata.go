@@ -129,6 +129,14 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 		// update the namespace of the index before inserting
 		index.Options["ns"] = intent.Key()
 
+		// check for length violations before building the command
+		fullIndexName := fmt.Sprintf("%v.$%v", index.Options["ns"], index.Options["name"])
+		if len(fullIndexName) > 127 {
+			return fmt.Errorf(
+				"cannot restore index with namespace '%v': "+
+					"namespace is too long (max size is 127 characters)", fullIndexName)
+		}
+
 		// remove the index version, forcing an update,
 		// unless we specifically want to keep it
 		if !restore.OutputOptions.KeepIndexVersion {
