@@ -1024,14 +1024,14 @@ namespace {
         // Must hold global lock to get to here
         invariant(txn->lockState()->isW());
 
-        log(LogComponent::kNetworking) << "shutdown: going to close listening sockets..." << endl;
+        log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
-        log(LogComponent::kNetworking) << "shutdown: going to flush diaglog..." << endl;
+        log(LogComponent::kNetwork) << "shutdown: going to flush diaglog..." << endl;
         _diaglog.flush();
 
         /* must do this before unmapping mem or you may get a seg fault */
-        log(LogComponent::kNetworking) << "shutdown: going to close sockets..." << endl;
+        log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();

@@ -49,7 +49,7 @@ namespace logger {
             kControl,
             kGeo,
             kIndex,
-            kNetworking,
+            kNetwork,
             kQuery,
             kReplication,
             kSharding,
