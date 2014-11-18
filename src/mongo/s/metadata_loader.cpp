@@ -223,7 +223,7 @@ namespace mongo {
             if ( oldMetadata->getCollVersion().hasEqualEpoch( epoch ) ) {
 
                 fullReload = false;
-                dassert( oldMetadata->isValid() );
+                invariant( oldMetadata->isValid() );
 
                 versionMap[shard] = oldMetadata->_shardVersion;
                 metadata->_collVersion = oldMetadata->_collVersion;
@@ -285,7 +285,7 @@ namespace mongo {
                 metadata->fillRanges();
                 conn.done();
 
-                dassert( metadata->isValid() );
+                invariant( metadata->isValid() );
                 return Status::OK();
             }
             else if ( diffsApplied == 0 ) {
