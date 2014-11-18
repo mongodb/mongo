@@ -496,8 +496,13 @@ namespace {
         ssStatus.dwServiceSpecificExitCode = exitCode;
         ssStatus.dwControlsAccepted = dwControlsAccepted;
         ssStatus.dwCurrentState = reportState;
-        ssStatus.dwWin32ExitCode = reportState == SERVICE_STOPPED 
-            ? ERROR_SERVICE_SPECIFIC_ERROR : NO_ERROR;
+
+        // Only report ERROR_SERVICE_SPECIFIC_ERROR when the exit is not clean
+        if (reportState == SERVICE_STOPPED && exitCode != EXIT_CLEAN)
+            ssStatus.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
+        else
+            ssStatus.dwWin32ExitCode = NO_ERROR;
+
         ssStatus.dwWaitHint = waitHint;
         ssStatus.dwCheckPoint = 
             ( reportState == SERVICE_RUNNING || reportState == SERVICE_STOPPED ) ?
