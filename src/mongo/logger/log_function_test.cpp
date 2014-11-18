@@ -50,7 +50,7 @@ namespace {
     typedef LogTest<MessageEventDetailsEncoder> LogTestDetailsEncoder;
 
     // Constants for log component test cases.
-    const LogComponent componentA = LogComponent::kCommands;
+    const LogComponent componentA = LogComponent::kCommand;
     const LogComponent componentB = MONGO_LOG_DEFAULT_COMPONENT;
 
     // Tests pass through of log component:

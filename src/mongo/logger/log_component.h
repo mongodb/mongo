@@ -45,7 +45,7 @@ namespace logger {
         enum Value {
             kDefault = 0,
             kAccessControl,
-            kCommands,
+            kCommand,
             kControl,
             kGeo,
             kIndexing,

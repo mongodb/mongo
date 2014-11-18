@@ -130,7 +130,7 @@ namespace {
 
     // Constants for log component test cases.
     const LogComponent componentDefault = LogComponent::kDefault;
-    const LogComponent componentA = LogComponent::kCommands;
+    const LogComponent componentA = LogComponent::kCommand;
     const LogComponent componentB = LogComponent::kAccessControl;
     const LogComponent componentC = LogComponent::kNetworking;
     const LogComponent componentD = LogComponent::kStorage;

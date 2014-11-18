@@ -92,7 +92,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         switch (_value) {
         case kDefault: return createStringData("default");
         case kAccessControl: return createStringData("accessControl");
-        case kCommands: return createStringData("command");
+        case kCommand: return createStringData("command");
         case kControl: return createStringData("control");
         case kGeo: return createStringData("geo");
         case kIndexing: return createStringData("index");
@@ -137,7 +137,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         switch (_value) {
         case kDefault:              return createStringData("-       ");
         case kAccessControl:        return createStringData("ACCESS  ");
-        case kCommands:             return createStringData("COMMAND ");
+        case kCommand:              return createStringData("COMMAND ");
         case kControl:              return createStringData("CONTROL ");
         case kGeo:                  return createStringData("GEO     ");
         case kIndexing:             return createStringData("INDEX   ");
