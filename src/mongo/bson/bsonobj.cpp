@@ -657,7 +657,11 @@ namespace mongo {
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( name == e.fieldName() )
+            // We know that e has a cached field length since BSONObjIterator::next internally
+            // called BSONElement::size on the BSONElement that it returned, so it is more
+            // efficient to re-use that information by obtaining the field name as a
+            // StringData, which will be pre-populated with the cached length.
+            if ( name == e.fieldNameStringData() )
                 return e;
         }
         return BSONElement();
