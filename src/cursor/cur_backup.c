@@ -171,10 +171,9 @@ __backup_log_append(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int active)
 	if (conn->log) {
 		WT_ERR(__wt_log_get_all_files(
 		    session, &logfiles, &logcount, &cb->maxid, active));
-		for (i = 0; i < logcount; i++) {
+		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(
 			    session, cb, logfiles[i]));
-		}
 	}
 err:	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);

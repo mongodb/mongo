@@ -113,8 +113,8 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 */
 	__wt_spin_lock(session, &conn->hot_backup_lock);
 	locked = 1;
-	for (i = 0; i < logcount; i++) {
-		if (conn->hot_backup == 0 || backup_file) {
+	if (conn->hot_backup == 0 || backup_file != 0) {
+		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
 			if (lognum < min_lognum)

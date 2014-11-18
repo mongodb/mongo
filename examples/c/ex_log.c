@@ -25,7 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_log.c
- * 	demonstrates how to logging and log cursors.
+ * 	demonstrates how to use logging and log cursors.
  */
 #include <inttypes.h>
 #include <stdio.h>

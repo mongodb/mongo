@@ -24,8 +24,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * ex_log.c
- * 	demonstrates how to logging and log cursors.
+ * ex_backup.c
+ * 	demonstrates how to use incremental backup and log files.
  */
 #include <inttypes.h>
 #include <stdio.h>
@@ -58,7 +58,7 @@ static int
 compare_backups(WT_SESSION *session, int i)
 {
 	int ret;
-	char buf[1024];
+	char buf[1024], msg[8];
 
 	/*
 	 * We run 'wt dump' on both the full backup directory and the
@@ -92,14 +92,18 @@ compare_backups(WT_SESSION *session, int i)
 	(void)snprintf(buf, sizeof(buf), "cmp %s.%d %s.%d",
 	    full_out, i, incr_out, i);
 	ret = system(buf);
+	if (i == 0)
+		(void)strncpy(msg, "MAIN", sizeof(msg));
+	else
+		snprintf(msg, sizeof(msg), "%d", i);
 	if (ret == 0)
 		fprintf(stdout,
-		    "Iteration %d: Tables %s.%d and %s.%d identical\n",
-		    i, full_out, i, incr_out, i);
+		    "Iteration %s: Tables %s.%d and %s.%d identical\n",
+		    msg, full_out, i, incr_out, i);
 	else {
 		fprintf(stdout,
-		    "Iteration %d: Tables %s.%d and %s.%d differ\n",
-		    i, full_out, i, incr_out, i);
+		    "Iteration %s: Tables %s.%d and %s.%d differ\n",
+		    msg, full_out, i, incr_out, i);
 		exit(1);
 	}
 
