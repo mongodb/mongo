@@ -40,7 +40,7 @@ namespace mongo {
 WiredTigerEngineRuntimeConfigSetting::WiredTigerEngineRuntimeConfigSetting(
     WiredTigerKVEngine* engine)
     : ServerParameter(ServerParameterSet::getGlobal(),
-        "wiredtigerEngineRuntimeConfigSetting", false, true),
+        "wiredTigerEngineRuntimeConfigSetting", false, true),
         _engine(engine) {}
 
 
@@ -55,7 +55,7 @@ Status WiredTigerEngineRuntimeConfigSetting::set(const BSONElement& newValueElem
     }
     catch (MsgAssertionException msg) {
         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                "Invalid value for wiredtigerEngineRuntimeConfigSetting via setParameter command: " 
+                "Invalid value for wiredTigerEngineRuntimeConfigSetting via setParameter command: "
                 << newValueElement);
     }
 }

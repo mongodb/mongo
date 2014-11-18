@@ -15,7 +15,7 @@ else {
     var admin = conn.getDB( "admin" );
 
     function reconfigure(str) {
-        ret = admin.runCommand( { setParameter : 1, "wiredtigerEngineRuntimeConfigSetting" : str });
+        ret = admin.runCommand( { setParameter : 1, "wiredTigerEngineRuntimeConfigSetting" : str });
         print("ret: " + tojson(ret));
         return ret;
     }
