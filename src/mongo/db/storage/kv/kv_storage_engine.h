@@ -94,7 +94,6 @@ namespace mongo {
         // This must be the first member so it is destroyed last.
         boost::scoped_ptr<KVEngine> _engine;
 
-        bool _initialized;
         const bool _supportsDocLocking;
 
         boost::scoped_ptr<RecordStore> _catalogRecordStore;
