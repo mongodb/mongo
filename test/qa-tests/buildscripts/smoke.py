@@ -897,6 +897,7 @@ def report():
 suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "restore": ("restore/*.js", False),
                         "stat": ("stat/*.js", False),
+                        "bsondump": ("bsondump/*.js", False),
                     }
 
 def get_module_suites():
