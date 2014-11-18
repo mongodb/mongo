@@ -80,8 +80,6 @@ namespace mongo {
                                             const StringData& ident,
                                             const CollectionOptions& options) override;
 
-        virtual Status dropRecordStore(OperationContext* opCtx, const StringData& ident) override;
-
         virtual Status createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
                                                  const IndexDescriptor* desc) override;
 
@@ -89,8 +87,9 @@ namespace mongo {
                                                             const StringData& ident,
                                                             const IndexDescriptor* desc) override;
 
-        virtual Status dropSortedDataInterface(OperationContext* opCtx,
-                                               const StringData& ident) override;
+        virtual Status dropIdent(OperationContext* opCtx, const StringData& ident) override;
+
+        virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const override;
 
         virtual bool supportsDocLocking() const override {
             return true;

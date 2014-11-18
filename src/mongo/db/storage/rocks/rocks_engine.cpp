@@ -161,11 +161,6 @@ namespace mongo {
         }
     }
 
-    Status RocksEngine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
-        _db->Delete(rocksdb::WriteOptions(), kCollectionPrefix + ident.toString());
-        return _dropColumnFamily(ident);
-    }
-
     Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, const StringData& ident,
                                                   const IndexDescriptor* desc) {
         if (_existsColumnFamily(ident)) {
@@ -185,9 +180,24 @@ namespace mongo {
                                        Ordering::make(desc->keyPattern()));
     }
 
-    Status RocksEngine::dropSortedDataInterface(OperationContext* opCtx, const StringData& ident) {
-        _db->Delete(rocksdb::WriteOptions(), kOrderingPrefix + ident.toString());
+    Status RocksEngine::dropIdent(OperationContext* opCtx, const StringData& ident) {
+        rocksdb::WriteBatch wb;
+        // TODO is there a more efficient way?
+        wb.Delete(kOrderingPrefix + ident.toString());
+        wb.Delete(kCollectionPrefix + ident.toString());
+        auto s = _db->Write(rocksdb::WriteOptions(), &wb);
+        if (!s.ok()) {
+            return toMongoStatus(s);
+        }
         return _dropColumnFamily(ident);
+    }
+
+    std::vector<std::string> RocksEngine::getAllIdents( OperationContext* opCtx ) const {
+        std::vector<std::string> indents;
+        for (auto& entry : _identColumnFamilyMap) {
+            indents.push_back(entry.first);
+        }
+        return indents;
     }
 
     // non public api
