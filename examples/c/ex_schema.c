@@ -126,12 +126,29 @@ main(void)
 	    "index:poptable:country_plus_year", "columns=(country,year)");
 	/*! [Create an index with a composite key] */
 
+	/*! [Create an immutable index] */
+	/* Create an immutable index. */
+	ret = session->create(session,
+	    "index:poptable:immutable_year", "columns=(year),immutable");
+	/*! [Create an immutable index] */
+
 	/* Insert the records into the table. */
 	ret = session->open_cursor(
 	    session, "table:poptable", NULL, "append", &cursor);
 	for (p = pop_data; p->year != 0; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
+	}
+	ret = cursor->close(cursor);
+
+	/* Update records in the table. */
+	ret = session->open_cursor(session,
+	    "table:poptable", NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_key(cursor, &recno);
+		ret = cursor->get_value(cursor, &country, &year, &population);
+		cursor->set_value(cursor, country, year, population + 1);
+		ret = cursor->update(cursor);
 	}
 	ret = cursor->close(cursor);
 

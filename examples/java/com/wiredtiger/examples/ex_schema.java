@@ -135,6 +135,12 @@ public class ex_schema {
             "columns=(country)");
         /*! [Create an index] */
 
+        /*! [Create an immutable index] */
+        /* Create an index with a simple key. */
+        ret = session.create("index:poptable:immutable_year",
+            "columns=(year),immutable");
+        /*! [Create an immutable index] */
+
         /*! [Create an index with a composite key] */
         /* Create an index with a composite key (country,year). */
         ret = session.create("index:poptable:country_plus_year",
