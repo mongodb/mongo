@@ -569,7 +569,8 @@ __session_truncate(WT_SESSION *wt_session,
 
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
-	 * is specified, we don't need a URI.
+	 * is specified, we don't need a URI.  One exception is the log URI
+	 * which may truncate (archive) log files for a backup cursor.
 	 *
 	 * If no URI is specified, and both cursors are specified, start/stop
 	 * must reference the same object.
@@ -577,7 +578,8 @@ __session_truncate(WT_SESSION *wt_session,
 	 * Any specified cursor must have been initialized.
 	 */
 	if ((uri == NULL && start == NULL && stop == NULL) ||
-	    (uri != NULL && (start != NULL || stop != NULL)))
+	    (uri != NULL && !WT_PREFIX_MATCH(uri, "log:") &&
+	    (start != NULL || stop != NULL)))
 		WT_ERR_MSG(session, EINVAL,
 		    "the truncate method should be passed either a URI or "
 		    "start/stop cursors, but not both");
@@ -586,8 +588,19 @@ __session_truncate(WT_SESSION *wt_session,
 		/* Disallow objects in the WiredTiger name space. */
 		WT_ERR(__wt_str_name_check(session, uri));
 
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_truncate(session, uri, cfg));
+		if (WT_PREFIX_MATCH(uri, "log:")) {
+			/*
+			 * Verify the user only gave the URI prefix and not
+			 * a specific target name after that.
+			 */
+			if (!WT_STREQ(uri, "log:"))
+				WT_ERR_MSG(session, EINVAL,
+				    "the truncate method should not specify any"
+				    "target after the log: URI prefix.");
+			ret = __wt_log_truncate_files(session, start, cfg);
+		} else
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_schema_truncate(session, uri, cfg));
 		goto done;
 	}
 

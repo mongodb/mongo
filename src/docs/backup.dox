@@ -84,12 +84,7 @@ recovery time necessary to switch to the copy, perform a full backup of
 the database.  For example, an application might do a full backup of the
 database once a week during a quiet period, and then incrementally copy
 new log files into the backup directory for the rest of the week.
-
-WiredTiger log files are named "WiredTigerLog.[number]" where "[number]"
-is a 10-digit value, for example, WiredTigerLog.0000000001".  The log
-file with the largest number in its name is the most recent log file
-written.  To incrementally add log files to a backup, simply copy newly
-created log files from the database home to the backup copy.
+Incremental backups may also save time when the tables are very large.
 
 @copydoc doc_bulk_durability
 
@@ -103,27 +98,29 @@ and removing log files from the original database home:
 
 1. Perform a full backup of the database (as described above).
 
-2. Copy the log files from the database home to the backup directory.
-   It is not an error to copy a log file which has been copied before,
-   but care should be taken to ensure each log file is completely copied
+2. Perform a full database checkpoint.
+
+3. Open a cursor on the \c "backup:" data source, with the
+   \c "target=(\"log:\\")" target specifed, which begins the
+   process of an incremental backup.
+
+4. Copy each log file returned by the WT_CURSOR::next method to the backup
+   directory.  It is not an error to copy a log file which has been copied
+   before, but care should be taken to ensure each log file is completely copied
    as the most recent log file may change in size while being copied.
-   A way to ensure safety is to copy the most recent log file copied
-   during an incremental backup as part of the next incremental backup.
-   For example, if log files 10 through 12 were copied in an incremental
-   backup, the next incremental backup would begin by copying log file
-   12 again.
 
-3. Perform a checkpoint in the database.
+5. If all log files have been successfully copied, archive the log
+   files by calling the WT_SESSION::truncate method with the URI
+   <code>log:</code> and specifying the backup cursor as the
+   start cursor to that method.
 
-4. Discard log files in the database home that are no longer needed.  The
-   log files that are no longer needed include the log files that were
-   copied in step 2 except for the most recent log file in the database
-   home at that time.  For example, if log files 10 through 12 were
-   copied in step 2, then log files 10 and 11 can be discarded once step
-   3 completes.
+6. Close the backup cursor.
 
-Steps 2, 3 and 4 can be repeated any number of times before step 1 is
-repeated.
+Steps 2-6 can be repeated any number of times before step 1 is
+repeated.  These steps can be repeated as long as the backup database
+directory has not been opened, recovery run and become live.  Once
+the database becomes live, you must repeat all steps 1-6 to another,
+different backup database directory.
 
 @section backup_o_direct Backup and O_DIRECT
 

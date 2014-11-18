@@ -248,6 +248,7 @@ extern int __wt_conn_dhandle_discard_single( WT_SESSION_IMPL *session, WT_DATA_H
 extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
@@ -312,7 +313,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, const c
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern void __wt_log_written_reset(WT_SESSION_IMPL *session);
 extern int __wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp);
-extern int __wt_log_get_active_files( 	WT_SESSION_IMPL *session, char ***filesp, u_int *countp);
+extern int __wt_log_get_all_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp, uint32_t *maxid, int active_only);
 extern void __wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count);
 extern int __wt_log_filename(WT_SESSION_IMPL *session, uint32_t id, WT_ITEM *buf);
 extern int __wt_log_extract_lognum( WT_SESSION_IMPL *session, const char *name, uint32_t *id);
