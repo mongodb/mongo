@@ -127,13 +127,29 @@ namespace mongo {
         virtual void restoreLockState(const LockSnapshot& stateToRestore);
 
         /**
-         * Posts a request to the lock manager for the specified lock to be acquired and returns
-         * immediately.
+         * These two methods allow for lock requests to be acquired in a non-blocking way. There
+         * can be only one outstanding pending lock request per locker object. I.e., for each call
+         * to lockBegin, which does not return LOCK_OK, there needs to be a corresponding call to
+         * lockComplete or unlock.
          *
-         * NOTE: Must only be used to implement the actual lock call and for unit tests, because
-         * it skips any internal consistency checks.
+         * lockBegin posts a request to the lock manager for the specified lock to be acquired
+         * and returns immediately with the result of the acquisition. The result can be one of:
+         *
+         * LOCK_OK - Nothing more needs to be done. The lock is granted.
+         * LOCK_WAITING - The request has been queued up and will be granted as soon as the lock
+         *      is free. If this result is returned, typically lockComplete needs to be called in
+         *      order to wait for the actual grant to occur. If the caller no longer needs to wait
+         *      for the grant to happen, unlock needs to be called with the same resource passed
+         *      to lockBegin.
          */
-        LockResult lockImpl(ResourceId resId, LockMode mode);
+        LockResult lockBegin(ResourceId resId, LockMode mode);
+
+        /**
+         * Waits for the completion of a lock, previously requested through lockBegin. Must only be
+         * called, if lockBegin returned LOCK_WAITING. The resId argument must match what was
+         * previously passed to lockBegin.
+         */
+        LockResult lockComplete(ResourceId resId, unsigned timeoutMs, bool checkDeadlock);
 
     private:
 

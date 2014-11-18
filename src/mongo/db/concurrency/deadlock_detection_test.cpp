@@ -37,8 +37,8 @@ namespace mongo {
         LockerForTests locker1(0);
         LockerForTests locker2(1);
 
-        locker1.lockImpl(resId, MODE_S);
-        locker2.lockImpl(resId, MODE_S);
+        ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_S));
+        ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resId, MODE_S));
 
         DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
         ASSERT(!wfg1.check().hasCycle());
@@ -54,14 +54,14 @@ namespace mongo {
         LockerForTests locker1(1);
         LockerForTests locker2(2);
 
-        ASSERT_EQUALS(LOCK_OK, locker1.lockImpl(resIdA, MODE_X));
-        ASSERT_EQUALS(LOCK_OK, locker2.lockImpl(resIdB, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
 
         // 1 -> 2
-        ASSERT_EQUALS(LOCK_WAITING, locker1.lockImpl(resIdB, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resIdB, MODE_X));
 
         // 2 -> 1
-        ASSERT_EQUALS(LOCK_WAITING, locker2.lockImpl(resIdA, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resIdA, MODE_X));
 
         DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
         ASSERT(wfg1.check().hasCycle());
@@ -81,12 +81,12 @@ namespace mongo {
         LockerForTests locker2(2);
 
         // Both acquire lock in intent mode
-        ASSERT_EQUALS(LOCK_OK, locker1.lockImpl(resId, MODE_IX));
-        ASSERT_EQUALS(LOCK_OK, locker2.lockImpl(resId, MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resId, MODE_IX));
 
         // Both try to upgrade
-        ASSERT_EQUALS(LOCK_WAITING, locker1.lockImpl(resId, MODE_X));
-        ASSERT_EQUALS(LOCK_WAITING, locker2.lockImpl(resId, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resId, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resId, MODE_X));
 
         DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
         ASSERT(wfg1.check().hasCycle());
@@ -107,17 +107,17 @@ namespace mongo {
         LockerForTests locker2(2);
         LockerForTests lockerIndirect(3);
 
-        ASSERT_EQUALS(LOCK_OK, locker1.lockImpl(resIdA, MODE_X));
-        ASSERT_EQUALS(LOCK_OK, locker2.lockImpl(resIdB, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
 
         // 1 -> 2
-        ASSERT_EQUALS(LOCK_WAITING, locker1.lockImpl(resIdB, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resIdB, MODE_X));
 
         // 2 -> 1
-        ASSERT_EQUALS(LOCK_WAITING, locker2.lockImpl(resIdA, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resIdA, MODE_X));
 
         // 3 -> 2
-        ASSERT_EQUALS(LOCK_WAITING, lockerIndirect.lockImpl(resIdA, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, lockerIndirect.lockBegin(resIdA, MODE_X));
 
         DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
         ASSERT(wfg1.check().hasCycle());
@@ -143,17 +143,17 @@ namespace mongo {
         LockerForTests writer(3);
 
         // This sequence simulates the deadlock which occurs during flush
-        ASSERT_EQUALS(LOCK_OK, writer.lockImpl(resIdFlush, MODE_IX));
-        ASSERT_EQUALS(LOCK_OK, writer.lockImpl(resIdDb, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, writer.lockBegin(resIdFlush, MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, writer.lockBegin(resIdDb, MODE_X));
 
-        ASSERT_EQUALS(LOCK_OK, reader.lockImpl(resIdFlush, MODE_IS));
+        ASSERT_EQUALS(LOCK_OK, reader.lockBegin(resIdFlush, MODE_IS));
 
         // R -> W
-        ASSERT_EQUALS(LOCK_WAITING, reader.lockImpl(resIdDb, MODE_S));
+        ASSERT_EQUALS(LOCK_WAITING, reader.lockBegin(resIdDb, MODE_S));
 
         // R -> W
         // F -> W
-        ASSERT_EQUALS(LOCK_WAITING, flush.lockImpl(resIdFlush, MODE_S));
+        ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(resIdFlush, MODE_S));
 
         // W yields its flush lock, so now f is granted in mode S
         //
@@ -164,14 +164,14 @@ namespace mongo {
         //
         // R -> W
         // F -> R
-        ASSERT_EQUALS(LOCK_WAITING, flush.lockImpl(resIdFlush, MODE_X));
+        ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(resIdFlush, MODE_X));
 
         // W comes back from the commit and tries to re-acquire the flush lock
         //
         // R -> W
         // F -> R
         // W -> F
-        ASSERT_EQUALS(LOCK_WAITING, writer.lockImpl(resIdFlush, MODE_IX));
+        ASSERT_EQUALS(LOCK_WAITING, writer.lockBegin(resIdFlush, MODE_IX));
 
         // Run deadlock detection from the point of view of each of the involved lockers
         DeadlockDetector wfgF(*getGlobalLockManager(), &flush);
