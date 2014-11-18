@@ -328,9 +328,10 @@ but is otherwise the same:
 @section schema_index_immutable Immutable indices
 
 It is possible to create an index with the \c immutable configuration
-setting enabled. This setting tells WiredTiger that the index will never
-be updated. This is an optimization, it saves a remove and insert into
-the index whenever a value in the primary table is updated.
+setting enabled. This setting tells WiredTiger that the index keys for a
+record do not change when records are updated. This is an optimization
+that it saves a remove and insert into the index whenever a value in the
+primary table is updated.
 
 If immutable is configured when updates should alter the content of
 the index it is possible to corrupt data.

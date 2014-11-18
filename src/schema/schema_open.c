@@ -141,9 +141,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->source));
 
 	WT_ERR(__wt_config_getones(session, idx->config, "immutable", &cval));
-	if (cval.val == 0)
-		F_CLR(idx, WT_INDEX_IMMUTABLE);
-	else
+	if (cval.val)
 		F_SET(idx, WT_INDEX_IMMUTABLE);
 
 	WT_ERR(__wt_extractor_config(
