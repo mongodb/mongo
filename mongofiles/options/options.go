@@ -1,6 +1,9 @@
 package options
 
 type StorageOptions struct {
+	// Specified database to use. defaults to 'test' if none is specified
+	DB string `short:"d" default:"test" long:"db" description:"database to use"`
+
 	// 'LocalFileName' is an option that specifies what filename to use for (put|get)
 	LocalFileName string `long:"local" short:"l" description:"local filename for put|get (default is to use the same name as 'gridfs filename')"`
 

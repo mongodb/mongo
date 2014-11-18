@@ -26,7 +26,7 @@ const (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongofiles", Usage, commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := commonopts.New("mongofiles", Usage, commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	storageOpts := &options.StorageOptions{}
 	opts.AddOptions(storageOpts)
@@ -48,6 +48,9 @@ func main() {
 		return
 	}
 	log.SetVerbosity(opts.Verbosity)
+
+	// add the specified database to the namespace options struct
+	opts.Namespace.DB = storageOpts.DB
 
 	// create a session provider to connect to the db
 	mf := mongofiles.MongoFiles{

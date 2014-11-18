@@ -204,20 +204,16 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 		log.Logf(log.Always, "connected to: %v\n", connUrl)
 	}
 
-	if self.ToolOptions.Namespace.DB == "" {
-		self.ToolOptions.Namespace.DB = "test"
-	}
-
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
 	// it's ok to validate only <db>.<prefix>.chunks (the longer one)
-	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.ToolOptions.Namespace.DB,
+	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.StorageOptions.DB,
 		self.StorageOptions.GridFSPrefix))
 
 	if err != nil {
 		return "", err
 	}
 	// get GridFS handle
-	gfs := session.DB(self.ToolOptions.Namespace.DB).GridFS(self.StorageOptions.GridFSPrefix)
+	gfs := session.DB(self.StorageOptions.DB).GridFS(self.StorageOptions.GridFSPrefix)
 
 	var output string
 
