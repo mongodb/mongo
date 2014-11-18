@@ -126,7 +126,6 @@ main(void)
 	    "index:poptable:country_plus_year", "columns=(country,year)");
 	/*! [Create an index with a composite key] */
 
-
 	/*! [Create an immutable index] */
 	/* Create an immutable index. */
 	ret = session->create(session,
