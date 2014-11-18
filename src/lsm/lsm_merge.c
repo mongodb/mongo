@@ -499,10 +499,12 @@ err:	if (locked)
 		WT_TRET(__wt_bloom_close(bloom));
 	if (ret != 0 && created_chunk) {
 		/* Drop the newly-created files on error. */
-		WT_WITH_SCHEMA_LOCK(session,
-		    tret = __wt_schema_drop(session, chunk->uri, drop_cfg));
-		WT_TRET(tret);
-		if (create_bloom) {
+		if (chunk->uri != NULL) {
+			WT_WITH_SCHEMA_LOCK(session, tret =
+			    __wt_schema_drop(session, chunk->uri, drop_cfg));
+			WT_TRET(tret);
+		}
+		if (create_bloom && chunk->bloom_uri != NULL) {
 			WT_WITH_SCHEMA_LOCK(session,
 			    tret = __wt_schema_drop(
 			    session, chunk->bloom_uri, drop_cfg));
