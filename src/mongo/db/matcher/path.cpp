@@ -144,17 +144,25 @@ namespace mongo {
     }
 
 
-    bool BSONElementIterator::more() {
-        if ( _subCursor ) {
+    bool BSONElementIterator::subCursorHasMore() {
+        // While we still are still finding arrays along the path, keep traversing deeper.
+        while ( _subCursor ) {
 
-            if ( _subCursor->more() )
+            if ( _subCursor->more() ) {
                 return true;
-
+            }
             _subCursor.reset();
 
+            // If the subcursor doesn't have more, see if the current element is an array offset
+            // match (see comment in BSONElementIterator::more() for an example).  If it is indeed
+            // an array offset match, create a new subcursor and examine it.
             if ( _arrayIterationState.isArrayOffsetMatch( _arrayIterationState._current.fieldName() ) ) {
                 if ( _arrayIterationState.nextEntireRest() ) {
-                    _next.reset( _arrayIterationState._current, _arrayIterationState._current, true );
+                    // Our path terminates at the array offset.  _next should point at the current
+                    // array element.
+                    _next.reset( _arrayIterationState._current,
+                                 _arrayIterationState._current,
+                                 true );
                     _arrayIterationState._current = BSONElement();
                     return true;
                 }
@@ -163,19 +171,28 @@ namespace mongo {
                 _subCursorPath->init( _arrayIterationState.restOfPath.substr( _arrayIterationState.nextPieceOfPath.size() + 1 ) );
                 _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
 
-                // If we're here, we must be able to traverse nonleaf arrays
+                // If we're here, we must be able to traverse nonleaf arrays.
                 dassert(_path->shouldTraverseNonleafArrays());
                 dassert(_subCursorPath->shouldTraverseNonleafArrays());
 
-                _subCursor.reset( new BSONElementIterator( _subCursorPath.get(), _arrayIterationState._current.Obj() ) );
+                _subCursor.reset( new BSONElementIterator( _subCursorPath.get(),
+                                                           _arrayIterationState._current.Obj() ) );
                 _arrayIterationState._current = BSONElement();
-                return more();
             }
 
         }
 
-        if ( !_next.element().eoo() )
+        return false;
+    }
+
+    bool BSONElementIterator::more() {
+        if ( subCursorHasMore() ) {
             return true;
+        }
+
+        if ( !_next.element().eoo() ) {
+            return true;
+        }
 
         if ( _state == DONE ){
             return false;
@@ -191,17 +208,17 @@ namespace mongo {
                 return true;
             }
 
-            // its an array
+            // It's an array.
 
             _arrayIterationState.reset( _path->fieldRef(), idxPath + 1 );
 
             if (_arrayIterationState.hasMore && !_path->shouldTraverseNonleafArrays()) {
-                // Don't allow traversing the array
+                // Don't allow traversing the array.
                 _state = DONE;
                 return false;
             }
             else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
-                // Return the leaf array
+                // Return the leaf array.
                 _next.reset(e, BSONElement(), true);
                 _state = DONE;
                 return true;
@@ -209,56 +226,78 @@ namespace mongo {
 
             _arrayIterationState.startIterator( e );
             _state = IN_ARRAY;
-            return more();
+
+            invariant( _next.element().eoo() );
         }
 
         if ( _state == IN_ARRAY ) {
+            // We're traversing an array.  Look at each array element.
 
             while ( _arrayIterationState.more() ) {
 
-                BSONElement x = _arrayIterationState.next();
+                BSONElement eltInArray = _arrayIterationState.next();
                 if ( !_arrayIterationState.hasMore ) {
-                    _next.reset( x, x, false );
+                    // Our path terminates at this array.  _next should point at the current array
+                    // element.
+                    _next.reset( eltInArray, eltInArray, false );
                     return true;
                 }
 
-                // i have deeper to go
+                // Our path does not terminate at this array; there's a subpath left over.  Inspect
+                // the current array element to see if it could match the subpath.
 
-                if ( x.type() == Object ) {
+                if ( eltInArray.type() == Object ) {
+                    // The current array element is a subdocument.  See if the subdocument generates
+                    // any elements matching the remaining subpath.
                     _subCursorPath.reset( new ElementPath() );
                     _subCursorPath->init( _arrayIterationState.restOfPath );
                     _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
 
-                    _subCursor.reset( new BSONElementIterator( _subCursorPath.get(), x.Obj() ) );
-                    return more();
+                    _subCursor.reset( new BSONElementIterator( _subCursorPath.get(),
+                                                               eltInArray.Obj() ) );
+                    if ( subCursorHasMore() ) {
+                        return true;
+                    }
                 }
-
-
-                if ( _arrayIterationState.isArrayOffsetMatch( x.fieldName() ) ) {
+                else if ( _arrayIterationState.isArrayOffsetMatch( eltInArray.fieldName() ) ) {
+                    // The path we're traversing has an array offset component, and the current
+                    // array element corresponds to the offset we're looking for (for example: our
+                    // path has a ".0" component, and we're looking at the first element of the
+                    // array, so we should look inside this element).
 
                     if ( _arrayIterationState.nextEntireRest() ) {
-                        _next.reset( x, x, false );
+                        // Our path terminates at the array offset.  _next should point at the
+                        // current array element.
+                        _next.reset( eltInArray, eltInArray, false );
                         return true;
                     }
 
-                    if ( x.isABSONObj() ) {
+                    invariant( eltInArray.type() != Object ); // Handled above.
+                    if ( eltInArray.type() == Array ) {
+                        // The current array element is itself an array.  See if the nested array
+                        // has any elements matching the remainihng.
                         _subCursorPath.reset( new ElementPath() );
                         _subCursorPath->init( _arrayIterationState.restOfPath.substr( _arrayIterationState.nextPieceOfPath.size() + 1 ) );
                         _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
-                        BSONElementIterator* real = new BSONElementIterator( _subCursorPath.get(), _arrayIterationState._current.Obj() );
+                        BSONElementIterator* real =
+                            new BSONElementIterator( _subCursorPath.get(),
+                                                     _arrayIterationState._current.Obj() );
                         _subCursor.reset( real );
                         real->_arrayIterationState.reset( _subCursorPath->fieldRef(), 0 );
-                        real->_arrayIterationState.startIterator( x );
+                        real->_arrayIterationState.startIterator( eltInArray );
                         real->_state = IN_ARRAY;
                         _arrayIterationState._current = BSONElement();
-                        return more();
+                        if ( subCursorHasMore() ) {
+                            return true;
+                        }
                     }
                 }
 
             }
 
-            if ( _arrayIterationState.hasMore )
+            if ( _arrayIterationState.hasMore ) {
                 return false;
+            }
 
             _next.reset( _arrayIterationState._theArray, BSONElement(), true );
             _state = DONE;

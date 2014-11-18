@@ -129,6 +129,12 @@ namespace mongo {
         Context next();
 
     private:
+        /**
+         * Helper for more().  Recurs on _subCursor (which traverses the remainder of a path through
+         * subdocuments of an array).
+         */
+        bool subCursorHasMore();
+
         const ElementPath* _path;
         BSONObj _context;
 

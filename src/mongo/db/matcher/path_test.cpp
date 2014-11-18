@@ -311,6 +311,26 @@ namespace mongo {
         ASSERT( !cursor.more() );
     }
 
+    // SERVER-15899: test iteration using a path that generates no elements, but traverses a long
+    // array containing subdocuments with nested arrays.
+    TEST( Path, NonMatchingLongArrayOfSubdocumentsWithNestedArrays ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b.x" ).isOK() );
+
+        // Build the document {a: [{b: []}, {b: []}, {b: []}, ...]}.
+        BSONObj subdoc = BSON( "b" << BSONArray() );
+        BSONArrayBuilder builder;
+        for ( int i = 0; i < 100 * 1000; ++i ) {
+            builder.append( subdoc );
+        }
+        BSONObj doc = BSON( "a" << builder.arr() );
+
+        BSONElementIterator cursor( &p, doc );
+
+        // The path "a.b.x" matches no elements.
+        ASSERT( !cursor.more() );
+    }
+
     TEST( SimpleArrayElementIterator, SimpleNoArrayLast1 ) {
         BSONObj obj = BSON( "a" << BSON_ARRAY( 5 << BSON( "x" << 6 ) << BSON_ARRAY( 7 << 9 ) << 11 ) );
         SimpleArrayElementIterator i( obj["a"], false );
