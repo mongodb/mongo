@@ -24,7 +24,7 @@ runMongoProgram.apply(null, args);
 db.foo.drop()
 
 assert.eq( 0 , db.foo.count() , "after drop" );
-args = ['mongorestore', '-h', master.host, '/data/db/jstests_tool_dumpsecondary_external/'];
+args = ['mongorestore', '-h', master.host, '--dir', '/data/db/jstests_tool_dumpsecondary_external/'];
 if (jsTest.options().keyFile) {
     args = args.concat(authargs);
 }

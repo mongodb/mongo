@@ -94,7 +94,7 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.system.indexes.count(), "indexes not dropped" );
 
-t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", dumppath + dbname );
+t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", "--dir", dumppath + dbname );
 
 db = db.getSiblingDB(dbname);
 

@@ -9,7 +9,7 @@ db = t.startDB();
 
 output = db.output
 
-doc = { _id : 5 , x : 17 };
+doc = { x : 17, _id: 5 };
 
 db.oplog.insert( { ts : new Timestamp() , "op" : "i" , "ns" : output.getFullName() , "o" : doc } );
 

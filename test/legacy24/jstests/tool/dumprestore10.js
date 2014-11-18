@@ -48,7 +48,7 @@ runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--out",
 
 step("try mongorestore with write concern");
 
-runMongoProgram( "mongorestore", "--w", "2", "--host", "127.0.0.1:"+replTest.ports[0], "--dir", data );
+runMongoProgram( "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:"+replTest.ports[0], "--dir", data );
 
 var x = 0;
 
