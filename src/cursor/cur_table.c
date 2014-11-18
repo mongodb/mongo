@@ -728,11 +728,16 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 		cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL, NULL
 	};
 	u_int i;
+	int complete;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	if (!table->cg_complete)
+	/* If the table is incomplete, wait on the table lock and recheck. */
+	complete = table->cg_complete;
+	if (!complete)
+		WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
+	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "Can't use '%s' until all column groups are created",
 		    table->name);

@@ -404,12 +404,12 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		cfg_arg[0] = (char *)&args;
 
 		/*
-		 * We're likely holding the schema lock inside the statistics
+		 * We're likely holding the handle lock inside the statistics
 		 * logging thread, not to mention calling __wt_conn_btree_apply
 		 * from there as well.  Save/restore the handle.
 		 */
 		saved_dhandle = dhandle;
-		WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_DHANDLE_LOCK(session,
 		    ret = __wt_conn_btree_apply(
 		    session, 1, __curstat_checkpoint, cfg_arg));
 		session->dhandle = saved_dhandle;
