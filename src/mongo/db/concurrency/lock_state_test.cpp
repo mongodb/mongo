@@ -246,7 +246,7 @@ namespace {
                 lockers[i].reset(new LockerForTests(LockerId(100 + i)));
             }
 
-            LockerImpl<false> locker(1);
+            LockerImpl<true> locker(1);
 
             // Do some warm-up loops
             for (int i = 0; i < 1000; i++) {
