@@ -379,9 +379,12 @@ namespace {
             DiskLoc loc = it->getNext();
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
-
             v.push_back( obj["ident"].String() );
-            BSONObj idxIdent = obj["idxIdent"].Obj();
+
+            BSONElement e = obj["idxIdent"];
+            if ( !e.isABSONObj() )
+                continue;
+            BSONObj idxIdent = e.Obj();
 
             BSONObjIterator sub( idxIdent );
             while ( sub.more() ) {
