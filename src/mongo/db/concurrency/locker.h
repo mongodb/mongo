@@ -62,8 +62,8 @@ namespace mongo {
          * X  - Stops all activity. Used for administrative operations (repl state changes,
          *          shutdown, etc).
          *
-         * This method can be called recursively, but each call to beginTransaction must be
-         * accompanied by a call to endTransaction.
+         * This method can be called recursively, but each call to lockGlobal must be accompanied
+         * by a call to unlockAll.
          *
          * @param mode Mode in which the global lock should be acquired. Also indicates the intent
          *              of the operation.
@@ -75,6 +75,18 @@ namespace mongo {
          *          code and neither lock will be acquired.
          */
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX) = 0;
+
+        /**
+         * Requests *only* the global lock to be acquired in the specified mode. Does not do the
+         * full MMAP V1 concurrency control functionality, which acquires the flush lock as well.
+         *
+         * Should only be used for cases, where no data reads or writes will be performed, such as
+         * replication step-down.
+         *
+         * See the comments for lockBegin/Complete for more information on the semantics.
+         */
+        virtual LockResult lockGlobalBegin(LockMode mode) = 0;
+        virtual LockResult lockGlobalComplete(unsigned timeoutMs) = 0;
 
         /**
          * Decrements the reference count on the global lock.  If the reference count on the
