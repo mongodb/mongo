@@ -325,6 +325,20 @@ but is otherwise the same:
 
 @snippet ex_schema.c Search in a composite index
 
+@section schema_index_immutable Immutable indices
+
+It is possible to create an index with the \c immutable configuration
+setting enabled. This setting tells WiredTiger that the index will never
+be updated. This is an optimization, it saves a remove and insert into
+the index whenever a value in the primary table is updated.
+
+If immutable is configured when updates should alter the content of
+the index it is possible to corrupt data.
+
+An example of using an immutable index is:
+
+@snippet ex_schema.c Create an immutable index
+
 @section schema_index_projections Index cursor projections
 
 By default, index cursors return all of the table's value columns from
