@@ -102,7 +102,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kSharding: return createStringData("sharding");
         case kStorage: return createStringData("storage");
         case kJournal: return createStringData("journal");
-        case kWrites: return createStringData("write");
+        case kWrite: return createStringData("write");
         case kNumLogComponents: return createStringData("total");
         // No default. Compiler should complain if there's a log component that's not handled.
         }
@@ -147,7 +147,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
         case kSharding:             return createStringData("SHARDING");
         case kStorage:              return createStringData("STORAGE ");
         case kJournal:              return createStringData("JOURNAL ");
-        case kWrites:               return createStringData("WRITE   ");
+        case kWrite:                return createStringData("WRITE   ");
         case kNumLogComponents:     return createStringData("TOTAL   ");
         // No default. Compiler should complain if there's a log component that's not handled.
         }

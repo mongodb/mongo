@@ -99,7 +99,7 @@ namespace {
         case dbInsert:
         case dbUpdate:
         case dbDelete:
-            return LogComponent::kWrites;
+            return LogComponent::kWrite;
         default:
             return LogComponent::kQuery;
         }
@@ -593,7 +593,7 @@ namespace {
             }
             catch ( const WriteConflictException& dle ) {
                 if ( multi ) {
-                    log(LogComponent::kWrites) << "Had WriteConflict during multi update, aborting";
+                    log(LogComponent::kWrite) << "Had WriteConflict during multi update, aborting";
                     throw;
                 }
                 WriteConflictException::logAndBackoff( attempt++, "update", ns.toString() );

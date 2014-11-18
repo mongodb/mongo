@@ -55,7 +55,7 @@ namespace logger {
             kSharding,
             kStorage,
             kJournal,
-            kWrites,
+            kWrite,
             kNumLogComponents
         };
 
