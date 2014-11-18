@@ -61,6 +61,7 @@ __session_add_btree(
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
 
+	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
 	return (0);
 }
 
@@ -289,19 +290,12 @@ static void
 __session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
-	WT_DATA_HANDLE *saved_dhandle;
-
 	SLIST_REMOVE(
 	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
 
-	saved_dhandle = session->dhandle;
-	session->dhandle = dhandle_cache->dhandle;
+	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
 
 	__wt_overwrite_and_free(session, dhandle_cache);
-	__wt_conn_btree_close(session);
-
-	/* Restore the original handle in the session. */
-	session->dhandle = saved_dhandle;
 }
 
 /*
@@ -373,13 +367,11 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t hash;
-	int needinc;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 	WT_ASSERT(session, !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	dhandle = NULL;
-	needinc = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
@@ -401,13 +393,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * We didn't find a match in the session cache, now check the
 		 * shared handle list.
 		 */
-		dhandle = NULL;
 		WT_WITH_DHANDLE_LOCK(session, ret =
 		    __wt_conn_dhandle_find(session, uri, checkpoint, flags));
-		if (ret == 0) {
-			dhandle = session->dhandle;
-			needinc = 1;
-		}
+		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}
 
@@ -415,29 +403,29 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		/* Try to lock the handle; if this succeeds, we're done. */
 		if ((ret = __wt_session_lock_dhandle(session, flags)) == 0)
 			goto done;
+		WT_RET_NOTFOUND_OK(ret);
 
 		/* We found the data handle, don't try to get it again. */
 		LF_SET(WT_DHANDLE_HAVE_REF);
 	}
 
-	WT_RET_NOTFOUND_OK(ret);
-
 	/* Sweep the handle list to remove any dead handles. */
 	WT_RET(__session_dhandle_sweep(session, flags));
 
 	/*
-	 * Acquire the schema lock if we don't already hold it, find
-	 * and/or open the handle.
+	 * Acquire the schema lock if we don't already hold it, find and/or
+	 * open the handle.
+	 *
+	 * We need the schema lock for this call so that if we lock a handle in
+	 * order to open it, that doesn't race with a schema-changing operation
+	 * such as drop.
 	 */
 	WT_WITH_SCHEMA_LOCK(session, ret =
 	    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 	WT_RET(ret);
 
-	if (dhandle_cache != NULL) {
+	if (dhandle_cache == NULL)
 		WT_RET(__session_add_btree(session, NULL));
-		if (needinc)
-			(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
-	}
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));

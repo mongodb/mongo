@@ -177,7 +177,6 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	if (ret == 0) {
 		dhandle = session->dhandle;
 		WT_RET(__conn_dhandle_open_lock(session, dhandle, flags));
-		(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
 		return (0);
 	}
 	WT_RET_NOTFOUND_OK(ret);
@@ -418,15 +417,8 @@ __conn_btree_open(
 
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-		/*
-		 * If the open failed, close the handle.  If there was no
-		 * reference to the handle in this session, we incremented the
-		 * session reference count, so decrement it here.  Otherwise,
-		 * just close the handle without decrementing.
-		 */
-		if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
-			__wt_conn_btree_close(session);
-		else if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		/* If the open failed, close the handle. */
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
 	}
 
@@ -561,16 +553,6 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 
 err:	session->dhandle = saved_dhandle;
 	return (ret);
-}
-
-/*
- * __wt_conn_btree_close --
- *	Discard a reference to an open btree file handle.
- */
-void
-__wt_conn_btree_close(WT_SESSION_IMPL *session)
-{
-	(void)WT_ATOMIC_SUB4(session->dhandle->session_ref, 1);
 }
 
 /*
