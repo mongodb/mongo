@@ -63,8 +63,8 @@ namespace mongo {
          * Constructs a StringData, for the case where the length of std::string is not known. 'c'
          * must be a pointer to a null-terminated string.
          */
-        StringData( const char* c )
-            : _data(c), _size((c == NULL) ? 0 : std::string::npos) {}
+        StringData( const char* str )
+            : _data(str), _size((str == NULL) ? 0 : std::strlen(str)) {}
 
         /**
          * Constructs a StringData explicitly, for the case where the length of the std::string is
@@ -133,7 +133,7 @@ namespace mongo {
          */
         const char* rawData() const { return _data; }
 
-        size_t size() const { fillSize(); return _size; }
+        size_t size() const { return _size; }
         bool empty() const { return size() == 0; }
         std::string toString() const { return std::string(_data, size()); }
         char operator[] ( unsigned pos ) const { return _data[pos]; }
@@ -158,21 +158,15 @@ namespace mongo {
 
     private:
         const char* _data;        // is not guaranted to be null terminated (see "notes" above)
-        mutable size_t _size;     // 'size' does not include the null terminator
-
-        void fillSize() const {
-            if (_size == std::string::npos) {
-                _size = strlen(_data);
-            }
-        }
+        size_t _size;     // 'size' does not include the null terminator
     };
 
     inline bool operator==(const StringData& lhs, const StringData& rhs) {
-        return lhs.compare(rhs) == 0;
+        return (lhs.size() == rhs.size()) && (lhs.compare(rhs) == 0);
     }
 
     inline bool operator!=(const StringData& lhs, const StringData& rhs) {
-        return lhs.compare(rhs) != 0;
+        return !(lhs == rhs);
     }
 
     inline bool operator<(const StringData& lhs, const StringData& rhs) {
