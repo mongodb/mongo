@@ -42,6 +42,7 @@ type MongoDump struct {
 	useStdout       bool
 	query           bson.M
 	oplogCollection string
+	isMongos        bool
 	authVersion     int
 	progressManager *progress.Manager
 }
@@ -89,6 +90,14 @@ func (dump *MongoDump) Init() error {
 		dump.useStdout = true
 	}
 	dump.sessionProvider = db.NewSessionProvider(*dump.ToolOptions)
+	dump.isMongos, err = dump.sessionProvider.IsMongos()
+	if err != nil {
+		return fmt.Errorf("Error determining if server is mongos: %v", err)
+	}
+	// return a helpful error message for mongos
+	if dump.OutputOptions.Repair && dump.isMongos {
+		return fmt.Errorf("Error: --repair flag cannot be used on a mongos")
+	}
 	dump.manager = intents.NewIntentManager()
 	dump.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)
 	return nil
@@ -96,12 +105,7 @@ func (dump *MongoDump) Init() error {
 
 // Dump handles some final options checking and executes MongoDump
 func (dump *MongoDump) Dump() error {
-	err := dump.ValidateOptions()
-	// TODO is this duplicated?
-	if err != nil {
-		return fmt.Errorf("Bad Option: %v", err)
-	}
-
+	var err error
 	if dump.InputOptions.Query != "" {
 		// parse JSON then convert extended JSON values
 		var asJSON interface{}
@@ -349,7 +353,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		var repairCounter int64
 		if err := dump.dumpIterToWriter(repairIter, out, &repairCounter); err != nil {
 			if strings.Index(err.Error(), "no such cmd: repairCursor") > 0 {
-				// return a more helpful error message for early server versions
+				// return a helpful error message for early server versions
 				return fmt.Errorf(
 					"error: --repair flag cannot be used on mongodb versions before 2.7.8.")
 			}

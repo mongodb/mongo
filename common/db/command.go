@@ -99,6 +99,25 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	return hasSetName || hasHosts, nil
 }
 
+// IsMongos() returns a boolean representing whether the connected server
+// is a mongos along with any error that occurs.
+func (sp *SessionProvider) IsMongos() (bool, error) {
+	session, err := sp.GetSession()
+	if err != nil {
+		return false, err
+	}
+	defer session.Close()
+	masterDoc := struct {
+		Msg string `bson:"msg"`
+	}{}
+	if err = session.Run("isMaster", &masterDoc); err != nil {
+		return false, err
+	}
+	// isdbgrid is always the msg value when calling isMaster on a mongos
+	// see http://docs.mongodb.org/manual/core/sharded-cluster-query-router/
+	return masterDoc.Msg == "isdbgrid", nil
+}
+
 func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	session, err := sp.GetSession()
 	if err != nil {

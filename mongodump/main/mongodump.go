@@ -43,6 +43,9 @@ func main() {
 		runtime.GOMAXPROCS(outputOpts.MaxProcs)
 	}
 
+	// don't attempt to discover other members of a replica set
+	opts.Direct = true
+
 	dump := mongodump.MongoDump{
 		ToolOptions:   opts,
 		OutputOptions: outputOpts,
