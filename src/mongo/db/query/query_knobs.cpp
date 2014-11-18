@@ -64,4 +64,8 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1024 * 1024);
 
+    // Yield every 128 cycles or 10ms.
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldIterations, int, 128);
+    MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
+
 }  // namespace mongo

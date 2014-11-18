@@ -31,15 +31,14 @@
 #include "mongo/db/query/plan_yield_policy.h"
 
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
 #include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
-    // Yield every 128 cycles or 10ms.  These values were inherited from v2.6, which just copied
-    // them from v2.4.
     PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec)
-        : _elapsedTracker(128, 10),
+        : _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
           _planYielding(exec) { }
 
     bool PlanYieldPolicy::shouldYield() {

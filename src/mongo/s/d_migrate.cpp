@@ -64,6 +64,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -554,7 +555,8 @@ namespace mongo {
                 return false;
             }
 
-            ElapsedTracker tracker (128, 10); // same as ClientCursor::_yieldSometimesTracker
+            ElapsedTracker tracker(internalQueryExecYieldIterations,
+                                   internalQueryExecYieldPeriodMS);
 
             int allocSize;
             {

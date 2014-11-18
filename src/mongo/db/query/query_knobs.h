@@ -98,4 +98,12 @@ namespace mongo {
 
     extern int internalQueryExecMaxBlockingSortBytes;
 
+    // Yield after this many "should yield?" checks. Only applies to storage engines that
+    // do not support doc-level locking.
+    extern int internalQueryExecYieldIterations;
+
+    // Yield if it's been at least this many milliseconds since we last yielded. Only applies
+    // to storage engines that do not support doc-level locking.
+    extern int internalQueryExecYieldPeriodMS;
+
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -843,14 +845,25 @@ namespace mongo {
         ExecInsertsState state(_txn, &request);
         normalizeInserts(request, &state.normalizedInserts);
 
-        ElapsedTracker elapsedTracker(128, 10); // 128 hits or 10 ms, matching RunnerYieldPolicy's
+        // Yield frequency is based on the same constants used by PlanYieldPolicy.
+        ElapsedTracker elapsedTracker(internalQueryExecYieldIterations,
+                                      internalQueryExecYieldPeriodMS);
 
         for (state.currIndex = 0;
              state.currIndex < state.request->sizeWriteOps();
              ++state.currIndex) {
 
             if (elapsedTracker.intervalHasElapsed()) {
-                // Consider yielding between inserts.
+                // Consider yielding between inserts. We never yield for storage engines that
+                // support document-level locking. TODO: as an optimization, this should only
+                // yield if another thread is waiting for our lock.
+                if (!supportsDocLocking() && state.hasLock()) {
+                    // Release our locks. They get reacquired when insertOne() calls
+                    // ExecInsertsState::lockAndCheck(). Since the lock manager guarantees FIFO
+                    // queues waiting on locks, there is no need to explicitly sleep or give up
+                    // control of the processor here.
+                    state.unlock();
+                }
 
                 _txn->checkForInterrupt();
                 elapsedTracker.resetLastTime();
