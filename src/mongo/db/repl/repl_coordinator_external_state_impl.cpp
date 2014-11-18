@@ -195,6 +195,12 @@ namespace {
             return StatusWith<OpTime>(ex.toStatus());
         }
     }
+    StatusWith<OpTime>
+    ReplicationCoordinatorExternalStateImpl::logOpMessage(OperationContext* txn,
+                                                          const std::string& msg) {
+        logOpComment(txn, BSON("msg" << msg));
+        return StatusWith<OpTime>(txn->getClient()->getLastOp());
+    }
 
     bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host) {
         return repl::isSelf(host);
