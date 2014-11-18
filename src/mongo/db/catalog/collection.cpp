@@ -557,7 +557,7 @@ namespace mongo {
                 IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
                 while( i.more() ) {
                     const IndexDescriptor* descriptor = i.next();
-                    log(LogComponent::kIndexing) << "validating index " << descriptor->indexNamespace() << endl;
+                    log(LogComponent::kIndex) << "validating index " << descriptor->indexNamespace() << endl;
                     IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
                     invariant( iam );
 
