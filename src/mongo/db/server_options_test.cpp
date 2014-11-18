@@ -410,9 +410,9 @@ namespace {
 
         // Journaling - explicitly set to 2 in configuration.
         ASSERT_TRUE(::mongo::logger::globalLogDomain()->hasMinimumLogSeverity(
-                          ::mongo::logger::LogComponent::kJournaling));
+                          ::mongo::logger::LogComponent::kJournal));
         ASSERT_EQUALS(::mongo::logger::globalLogDomain()->getMinimumLogSeverity(
-                          ::mongo::logger::LogComponent::kJournaling),
+                          ::mongo::logger::LogComponent::kJournal),
                       ::mongo::logger::LogSeverity::Debug(2));
     }
 

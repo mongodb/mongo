@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournal
 
 #include "mongo/platform/basic.h"
 

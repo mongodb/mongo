@@ -134,7 +134,7 @@ namespace {
     const LogComponent componentB = LogComponent::kAccessControl;
     const LogComponent componentC = LogComponent::kNetwork;
     const LogComponent componentD = LogComponent::kStorage;
-    const LogComponent componentE = LogComponent::kJournaling;
+    const LogComponent componentE = LogComponent::kJournal;
 
     // No log component declared at file scope.
     // Component severity configuration:

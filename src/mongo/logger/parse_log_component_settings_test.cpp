@@ -134,7 +134,7 @@ namespace {
         ASSERT_EQUALS(result.getValue()[2].level, 3);
         ASSERT_EQUALS(result.getValue()[2].component, LogComponent::kStorage);
         ASSERT_EQUALS(result.getValue()[3].level, 5);
-        ASSERT_EQUALS(result.getValue()[3].component, LogComponent::kJournaling);
+        ASSERT_EQUALS(result.getValue()[3].component, LogComponent::kJournal);
     }
 
     TEST(Multi, FailBadComponent) {
