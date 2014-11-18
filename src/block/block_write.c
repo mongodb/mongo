@@ -174,7 +174,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    offset +
 	    fh->extend_len + (wt_off_t)align_size >= fh->extend_size))) {
 		fh->extend_size = offset + fh->extend_len * 2;
-		if (fh->fallocate_available) {
+		if (fh->fallocate_available != WT_FALLOCATE_NOT_AVAILABLE) {
 			/*
 			 * Release any locally acquired lock if it's not needed
 			 * to extend the file, extending the file might require
