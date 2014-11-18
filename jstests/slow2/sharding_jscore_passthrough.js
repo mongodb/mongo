@@ -125,6 +125,7 @@ files.forEach(function(x) {
         'block_check_supported|' +
         'stages.*|' +
         'top|' +
+        'repair_cursor1|' +
         'touch1|' +
         'query_oplogreplay|' + // no local db on mongos
         'dbcase|' + // undo after fixing SERVER-11735
