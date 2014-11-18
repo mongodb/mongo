@@ -122,12 +122,18 @@ namespace repl {
             _finalStatus = _vetoStatus;
             return;
         }
-        if (_rsConfig->getConfigVersion() == 1 && !_down.empty()) {
+        if (_rsConfig->getConfigVersion() == 1 && !_badResponses.empty()) {
             str::stream message;
-            message << "Could not contact the following nodes during replica set initiation: " <<
-                _down.front().toString();
-            for (size_t i = 1; i < _down.size(); ++i) {
-                message << ", " << _down[i].toString();
+            message << "replSetInitiate quorum check failed because not all proposed set members "
+                       "responded affirmatively: ";
+            for (std::vector<std::pair<HostAndPort, Status> >::const_iterator it =
+                        _badResponses.begin();
+                    it != _badResponses.end();
+                    ++it) {
+                if (it != _badResponses.begin()) {
+                    message << ", ";
+                }
+                message << it->first.toString() << " failed with " << it->second.reason();
             }
             _finalStatus = Status(ErrorCodes::NodeNotFound, message);
             return;
@@ -153,6 +159,18 @@ namespace repl {
                     message << ", " << _voters[i].toString();
                 }
             }
+            if (!_badResponses.empty()) {
+                message << "; the following nodes did not respond affirmatively: ";
+                for (std::vector<std::pair<HostAndPort, Status> >::const_iterator it =
+                            _badResponses.begin();
+                        it != _badResponses.end();
+                        ++it) {
+                    if (it != _badResponses.begin()) {
+                        message << ", ";
+                    }
+                    message << it->first.toString() << " failed with " << it->second.reason();
+                }
+            }
             _finalStatus = Status(ErrorCodes::NodeNotFound, message);
             return;
         }
@@ -167,7 +185,7 @@ namespace repl {
         if (!response.isOK()) {
             warning() << "Failed to complete heartbeat request to " << request.target <<
                 "; " << response.getStatus();
-            _down.push_back(request.target);
+            _badResponses.push_back(std::make_pair(request.target, response.getStatus()));
             return;
         }
 
@@ -187,7 +205,7 @@ namespace repl {
             warning() << "Got error (" << hbStatus
                       << ") response on heartbeat request to " << request.target
                       << "; " << hbResp;
-            _down.push_back(request.target);
+            _badResponses.push_back(std::make_pair(request.target, hbStatus));
             return;
         }
 

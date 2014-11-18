@@ -201,7 +201,7 @@ namespace {
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(
-                status, "Could not contact the following nodes during replica set initiation");
+                status, "replSetInitiate quorum check failed because not all proposed set members");
         ASSERT_REASON_CONTAINS(status, "h1:1");
         ASSERT_REASON_CONTAINS(status, "h2:1");
         ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -308,7 +308,7 @@ namespace {
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(
-                status, "Could not contact the following nodes during replica set initiation");
+                status, "replSetInitiate quorum check failed because not all proposed set members");
         ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
         ASSERT_REASON_CONTAINS(status, "h2:1");
         ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
@@ -696,8 +696,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded; required 2 but only");
         ASSERT_REASON_CONTAINS(status, "h1:1");
-        ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
-        ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
+        ASSERT_REASON_CONTAINS(status, "h2:1 failed with");
+        ASSERT_REASON_CONTAINS(status, "h3:1 failed with");
         ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
         ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
     }
