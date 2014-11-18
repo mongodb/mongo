@@ -110,7 +110,6 @@ struct __wt_session_impl {
 	struct {
 		WT_DATA_HANDLE *dhandle;
 		const char *name;
-		int busy;
 	} *ckpt_handle;			/* Handle list */
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */

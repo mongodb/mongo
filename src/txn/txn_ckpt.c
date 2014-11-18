@@ -179,14 +179,14 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 	/* If we have already locked the handles, apply the operation. */
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
-		if (session->ckpt_handle[i].busy)
-			WT_WITH_DHANDLE_LOCK(session,
-			    ret = __wt_conn_btree_apply_single(session,
-			    session->ckpt_handle[i].name, NULL, op, cfg));
-		else
+		if (session->ckpt_handle[i].dhandle != NULL)
 			WT_WITH_DHANDLE(session,
 			    session->ckpt_handle[i].dhandle,
 			    ret = (*op)(session, cfg));
+		else
+			WT_WITH_DHANDLE_LOCK(session,
+			    ret = __wt_conn_btree_apply_single(session,
+			    session->ckpt_handle[i].name, NULL, op, cfg));
 		WT_RET(ret);
 	}
 
@@ -263,7 +263,6 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 		ret = 0;
 		WT_RET(__wt_strdup(session, name,
 		    &session->ckpt_handle[session->ckpt_handle_next].name));
-		session->ckpt_handle[session->ckpt_handle_next++].busy = 1;
 	}
 
 	session->dhandle = saved_dhandle;
@@ -467,7 +466,7 @@ err:	/*
 		    NULL));
 
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
-		if (session->ckpt_handle[i].busy) {
+		if (session->ckpt_handle[i].dhandle == NULL) {
 			__wt_free(session, session->ckpt_handle[i].name);
 			continue;
 		}
