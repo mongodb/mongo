@@ -660,7 +660,11 @@ namespace {
 
         // This is a replica set
         response->noteReplSet();
-        response->setSetName(ourSetName);
+
+        // For 2.6 compatibility
+        if (_currentConfig.isInitialized()) {
+            response->setSetName(ourSetName);
+        }
         response->setState(myState.s);
         if (myState.primary()) {
             response->setElectionTime(_electionTime);

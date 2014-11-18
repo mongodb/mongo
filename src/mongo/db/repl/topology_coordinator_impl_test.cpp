@@ -3249,7 +3249,7 @@ namespace {
         ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
-        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS("", response.getReplicaSetName());
         ASSERT_EQUALS(-2, response.getVersion());
     }
 
