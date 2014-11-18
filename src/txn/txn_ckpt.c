@@ -262,7 +262,7 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	else if (ret == EBUSY) {
 		ret = 0;
 		WT_RET(__wt_strdup(session, name,
-		    &session->ckpt_handle[session->ckpt_handle_next].name));
+		    &session->ckpt_handle[session->ckpt_handle_next++].name));
 	}
 
 	session->dhandle = saved_dhandle;
