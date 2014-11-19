@@ -120,7 +120,7 @@ namespace {
                              "accessControl" << BSON("verbosity" << 0) <<
                              "storage" <<
                                  BSON("verbosity" << 3 <<
-                                      "journaling" << BSON("verbosity" << 5)));
+                                      "journal" << BSON("verbosity" << 5)));
 
         StatusWith<Settings> result = parseLogComponentSettings(input);
 
@@ -142,7 +142,7 @@ namespace {
                              "accessControl"<< BSON("verbosity" << 5) <<
                              "storage" <<
                                  BSON("verbosity" << 4 <<
-                                      "journaling" << BSON("verbosity" << 6)) <<
+                                      "journal" << BSON("verbosity" << 6)) <<
                              "No Such Component" << BSON("verbosity" << 2) <<
                              "extrafield" << 123);
 
@@ -171,7 +171,7 @@ namespace {
 
     TEST(DeeplyNested, FailLast) {
         BSONObj input = BSON("storage" <<
-                             BSON("journaling" <<
+                             BSON("journal" <<
                                   BSON("No Such Component" << "bad")));
 
         StatusWith<Settings> result = parseLogComponentSettings(input);
@@ -179,6 +179,6 @@ namespace {
         ASSERT_NOT_OK(result.getStatus());
         ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
         ASSERT_EQUALS(result.getStatus().reason(),
-                      "Invalid component name storage.journaling.No Such Component");
+                      "Invalid component name storage.journal.No Such Component");
     }
 }
