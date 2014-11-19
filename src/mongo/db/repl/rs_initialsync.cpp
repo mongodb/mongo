@@ -35,6 +35,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
@@ -53,6 +54,37 @@
 namespace mongo {
 namespace repl {
 namespace {
+
+    /**
+     * Truncates the oplog (removes any documents) and resets internal variables that were
+     * originally initialized or affected by using values from the oplog at startup time.  These 
+     * include the last applied optime, the last fetched optime, and the sync source blacklist.
+     * Also resets the bgsync thread so that it reconnects its sync source after the oplog has been
+     * truncated.
+     */
+    void truncateAndResetOplog(OperationContext* txn, 
+                               ReplicationCoordinator* replCoord,
+                               BackgroundSync* bgsync) {
+        Client::WriteContext ctx(txn, rsoplog);
+        // Note: the following order is important.
+        // The bgsync thread uses an empty optime as a sentinel to know to wait
+        // for initial sync; thus, we must
+        // ensure the lastAppliedOptime is empty before restarting the bgsync thread
+        // via stop().
+        // We must clear the sync source blacklist after calling stop()
+        // because the bgsync thread, while running, may update the blacklist.
+        replCoord->setMyLastOptime(txn, OpTime());
+        bgsync->stop();
+        replCoord->clearSyncSourceBlacklist();
+
+        // Truncate the oplog in case there was a prior initial sync that failed.
+        Collection* collection = ctx.getCollection();
+        fassert(28565, collection);
+        WriteUnitOfWork wunit(txn);
+        Status status = collection->truncate(txn);
+        fassert(28564, status);
+        wunit.commit();
+    }
 
     bool _initialSyncClone(OperationContext* txn,
                            Cloner& cloner,
@@ -102,7 +134,6 @@ namespace {
      *
      * @param syncer either initial sync (can reclone missing docs) or "normal" sync (no recloning)
      * @param r      the oplog reader
-     * @param source the sync target
      * @return if applying the oplog succeeded
      */
     bool _initialSyncApplyOplog( OperationContext* ctx,
@@ -220,16 +251,17 @@ namespace {
      * if everything worked, and ErrorCode::InitialSyncFailure for all other error cases.
      */
     Status _initialSync() {
-        BackgroundSync* bgsync(BackgroundSync::get());
-        InitialSync init(bgsync);
-        SyncTail tail(bgsync, multiSyncApply);
+
         log() << "initial sync pending";
+
+        BackgroundSync* bgsync(BackgroundSync::get());
+        OperationContextImpl txn;
+        ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
+
+        truncateAndResetOplog(&txn, replCoord, bgsync);
 
         OplogReader r;
         OpTime now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
-        OperationContextImpl txn;
-
-        ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
         while (r.getHost().empty()) {
             // We must prime the sync source selector so that it considers all candidates regardless
@@ -247,6 +279,7 @@ namespace {
             }
         }
 
+        InitialSync init(bgsync);
         init.setHostname(r.getHost().toString());
 
         BSONObj lastOp = r.getLastOp(rsoplog);
@@ -322,6 +355,8 @@ namespace {
 
         msg = "oplog sync 3 of 3";
         log() << msg;
+
+        SyncTail tail(bgsync, multiSyncApply);
         if (!_initialSyncApplyOplog(&txn, tail, &r)) {
             return Status(ErrorCodes::InitialSyncFailure,
                           str::stream() << "initial sync failed: " << msg);
@@ -379,6 +414,7 @@ namespace {
                     break;
                 }
                 if (status == ErrorCodes::InitialSyncOplogSourceMissing) {
+                    sleepsecs(1);
                     return;
                 }
             }
