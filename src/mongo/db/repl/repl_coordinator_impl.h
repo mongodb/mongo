@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/hostandport.h"
@@ -847,9 +848,17 @@ namespace repl {
         // Whether we slept last time we attempted an election but possibly tied with other nodes.
         bool _sleptLastElection;                                                          // (X)
 
-        // Flag that indicates whether writes to databases other than "local" are allowed.  Used
-        // to answer the canAcceptWritesForDatabase() question.
+        // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
+        // answer the canAcceptWritesForDatabase() question.  Always true for standalone nodes and
+        // masters in master-slave relationships.
         bool _canAcceptNonLocalWrites;                                                    // (GX)
+
+        // Flag that indicates whether reads from databases other than "local" are allowed.  Unlike
+        // _canAcceptNonLocalWrites, above, this question is about admission control on secondaries,
+        // and we do not require that its observers be strongly synchronized.  Accidentally
+        // providing the prior value for a limited period of time is acceptable.  Also unlike
+        // _canAcceptNonLocalWrites, its value is only meaningful on replica set secondaries.
+        AtomicUInt32 _canServeNonLocalReads;                                              // (S)
     };
 
 } // namespace repl

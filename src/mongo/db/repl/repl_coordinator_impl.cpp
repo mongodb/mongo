@@ -148,7 +148,8 @@ namespace {
         _rsConfigState(kConfigPreStart),
         _thisMembersConfigIndex(-1),
         _sleptLastElection(false),
-        _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)) {
+        _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)),
+        _canServeNonLocalReads(0U) {
 
         if (!isReplEnabled()) {
             return;
@@ -1217,23 +1218,18 @@ namespace {
         if (canAcceptWritesForDatabase(ns.db())) {
             return Status::OK();
         }
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        Mode replMode = _getReplicationMode_inlock();
-        if (replMode == modeMasterSlave && _settings.slave == SimpleSlave) {
+        if (_settings.slave || _settings.master) {
             return Status::OK();
         }
         if (slaveOk) {
-            if (replMode == modeMasterSlave || replMode == modeNone) {
+            if (_canServeNonLocalReads.loadRelaxed()) {
                 return Status::OK();
             }
-            if (_getCurrentMemberState_inlock().secondary()) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::NotMasterOrSecondaryCode,
-                         "not master or secondary; cannot currently read from this replSet member");
+            return Status(
+                    ErrorCodes::NotMasterOrSecondaryCode,
+                    "not master or secondary; cannot currently read from this replSet member");
         }
-        return Status(ErrorCodes::NotMasterNoSlaveOkCode,
-                      "not master and slaveOk=false");
+        return Status(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
     }
 
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
@@ -1887,6 +1883,14 @@ namespace {
             result = kActionCloseAllConnections;
         }
         else {
+            if (_currentState.secondary() && !newState.primary()) {
+                // Switching out of SECONDARY, but not to PRIMARY.
+                _canServeNonLocalReads.store(0U);
+            }
+            else if (newState.secondary()) {
+                // Switching into SECONDARY, but not from PRIMARY.
+                _canServeNonLocalReads.store(1U);
+            }
             result = kActionChooseNewSyncSource;
         }
         _currentState = newState;
