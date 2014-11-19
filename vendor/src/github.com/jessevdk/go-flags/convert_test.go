@@ -71,7 +71,7 @@ func TestConvertToString(t *testing.T) {
 		true,
 
 		[]int{-3, 4, -2},
-		map[int]float64{-2: 4.5, -3: 0.1},
+		map[int]float64{-2: 4.5},
 
 		new(bool),
 		float32(5.2),
@@ -104,7 +104,7 @@ func TestConvertToString(t *testing.T) {
 		"true",
 
 		"[-3, 4, -2]",
-		"{-2:4.5, -3:0.1}",
+		"{-2:4.5}",
 
 		"false",
 		"5.2",
@@ -171,13 +171,5 @@ func TestWrapText(t *testing.T) {
       occaecat cupidatat non proident, sunt in culpa qui officia
       deserunt mollit anim id est laborum.`
 
-	if got != expected {
-		ret, err := helpDiff(got, expected)
-
-		if err != nil {
-			t.Errorf("Unexpected wrapped text, expected:\n\n%s\n\nbut got\n\n%s", expected, got)
-		} else {
-			t.Errorf("Unexpected wrapped text:\n\n%s", ret)
-		}
-	}
+	assertDiff(t, got, expected, "wrapped text")
 }

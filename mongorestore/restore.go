@@ -26,11 +26,11 @@ func (restore *MongoRestore) RestoreIntents() error {
 	restore.progressManager.Start()
 	defer restore.progressManager.Stop()
 
-	if restore.OutputOptions.JobThreads > 0 {
+	if restore.OutputOptions.NumParallelCollections > 0 {
 		resultChan := make(chan error)
 
 		// start a goroutine for each job thread
-		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
+		for i := 0; i < restore.OutputOptions.NumParallelCollections; i++ {
 			go func(id int) {
 				log.Logf(log.DebugHigh, "starting restore routine with id=%v", id)
 				for {
@@ -51,7 +51,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 		}
 
 		// wait until all goroutines are done or one of them errors out
-		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
+		for i := 0; i < restore.OutputOptions.NumParallelCollections; i++ {
 			select {
 			case err := <-resultChan:
 				if err != nil {
@@ -234,18 +234,18 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 		defer restore.progressManager.Detach(bar)
 	}
 
-	MaxInsertThreads := restore.OutputOptions.BulkWriters
-	if restore.OutputOptions.PreserveDocOrder {
+	MaxInsertThreads := restore.ToolOptions.BulkWriters
+	if restore.OutputOptions.MaintainInsertionOrder {
 		MaxInsertThreads = 1
 	}
-	docChan := make(chan bson.Raw, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
+	docChan := make(chan bson.Raw, restore.ToolOptions.BulkBufferSize*MaxInsertThreads)
 	resultChan := make(chan error, MaxInsertThreads)
 	killChan := make(chan struct{})
 	// make sure goroutines clean up on error
 	defer close(killChan)
 
 	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int64, restore.OutputOptions.BulkBufferSize*MaxInsertThreads)
+	bytesReadChan := make(chan int64, restore.ToolOptions.BulkBufferSize*MaxInsertThreads)
 	go func() {
 		for {
 			select {
@@ -272,7 +272,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	for i := 0; i < MaxInsertThreads; i++ {
 		go func() {
-			bulk := db.NewBufferedBulkInserter(collection, restore.OutputOptions.BulkBufferSize, false)
+			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, false)
 			for {
 				select {
 				case rawDoc, alive := <-docChan:

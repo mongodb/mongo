@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongoimport"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
+	"os"
 )
 
 func main() {

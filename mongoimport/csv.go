@@ -10,16 +10,20 @@ import (
 // CSVInputReader is a struct that implements the InputReader interface for a
 // CSV input source
 type CSVInputReader struct {
+
 	// Fields is a list of field names in the BSON documents to be imported
 	Fields []string
-	// csvReader is the underlying reader used to read data in from the CSV
-	// or CSV file
+
+	// csvReader is the underlying reader used to read data in from the CSV or CSV file
 	csvReader *csv.Reader
+
 	// csvRecord stores each line of input we read from the underlying reader
 	csvRecord []string
-	// numProcessed tracks the number of CSV records processed by the underlying
-	// reader
+
+	// numProcessed tracks how many the number of CSV records processed by the underlying reader
 	numProcessed uint64
+
+	numDecoders int
 }
 
 // CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
@@ -30,7 +34,7 @@ type CSVConvertibleDoc struct {
 
 // NewCSVInputReader returns a CSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
-func NewCSVInputReader(fields []string, in io.Reader) *CSVInputReader {
+func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInputReader {
 	csvReader := csv.NewReader(in)
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
@@ -39,6 +43,7 @@ func NewCSVInputReader(fields []string, in io.Reader) *CSVInputReader {
 		Fields:       fields,
 		csvReader:    csvReader,
 		numProcessed: uint64(0),
+		numDecoders:  numDecoders,
 	}
 }
 
@@ -68,7 +73,7 @@ func (csvInputReader *CSVInputReader) ReadHeadersFromSource() ([]string, error) 
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	csvRecordChan := make(chan ConvertibleDoc, numDecodingWorkers)
+	csvRecordChan := make(chan ConvertibleDoc, csvInputReader.numDecoders)
 	var err error
 
 	go func() {
@@ -92,7 +97,7 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan
 			csvInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, csvRecordChan, readChan, errChan)
+	streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readChan, errChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for CSV input. It

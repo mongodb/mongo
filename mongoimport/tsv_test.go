@@ -23,7 +23,7 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", 2},
 				bson.DocElem{"c", "3e"},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -40,7 +40,7 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", "3e"},
 				bson.DocElem{"field3", " may"},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -57,7 +57,7 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", "Inline"},
 				bson.DocElem{"d", 14},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -81,7 +81,7 @@ func TestTSVStreamDocument(t *testing.T) {
 					bson.DocElem{"c", 6},
 				},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -108,7 +108,7 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", `"`},
 				bson.DocElem{"c", 6},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -133,7 +133,7 @@ func TestTSVStreamDocument(t *testing.T) {
 				}
 				fileHandle, err := os.Open("testdata/test.tsv")
 				So(err, ShouldBeNil)
-				tsvInputReader := NewTSVInputReader(fields, fileHandle)
+				tsvInputReader := NewTSVInputReader(fields, fileHandle, 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go tsvInputReader.StreamDocument(true, docChan, errChan)
@@ -150,7 +150,7 @@ func TestTSVSetHeader(t *testing.T) {
 		Convey("setting the header should read the first line of the TSV", func() {
 			contents := "extraHeader1\textraHeader2\textraHeader3\n"
 			fields := []string{}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(tsvInputReader.SetHeader(true), ShouldBeNil)
 			So(len(tsvInputReader.Fields), ShouldEqual, 3)
 		})
@@ -158,7 +158,7 @@ func TestTSVSetHeader(t *testing.T) {
 			"the header line with the existing fields", func() {
 			contents := "extraHeader\textraHeader2\textraHeader3\n\n"
 			fields := []string{"a", "b", "c"}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			// if SetHeader() is called with fields already passed in,
 			// the header should be replaced with the read header line
 			So(tsvInputReader.SetHeader(true), ShouldBeNil)
@@ -173,7 +173,7 @@ func TestTSVGetHeaders(t *testing.T) {
 	Convey("With a TSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte{}))
+			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte{}), 1)
 			So(tsvInputReader.GetHeaders(), ShouldResemble, fields)
 		})
 	})
@@ -186,7 +186,7 @@ func TestTSVReadHeadersFromSource(t *testing.T) {
 			expectedHeaders := []string{"1", "2", "3"}
 			fileHandle, err := os.Open("testdata/test.tsv")
 			So(err, ShouldBeNil)
-			tsvInputReader := NewTSVInputReader([]string{}, fileHandle)
+			tsvInputReader := NewTSVInputReader([]string{}, fileHandle, 1)
 			headers, err := tsvInputReader.ReadHeadersFromSource()
 			So(err, ShouldBeNil)
 			So(headers, ShouldResemble, expectedHeaders)

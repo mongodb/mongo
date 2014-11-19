@@ -9,7 +9,6 @@ import (
 	"github.com/mongodb/mongo-tools/mongorestore"
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"os"
-	"runtime"
 )
 
 func main() {
@@ -36,9 +35,6 @@ func main() {
 	}
 
 	log.SetVerbosity(opts.Verbosity)
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	log.Logf(log.Info, "running mongorestore with %v job threads", outputOpts.JobThreads)
 
 	targetDir, err := getTargetDirFromArgs(extraArgs, os.Args, inputOpts.Directory)
 	if err != nil {

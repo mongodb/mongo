@@ -29,6 +29,12 @@ type Group struct {
 	// (Command embeds Group) in the built-in generated help and man pages.
 	LongDescription string
 
+	// The namespace of the group
+	Namespace string
+
+	// The parent of the group or nil if it has no parent
+	parent interface{}
+
 	// All the options in the group
 	options []*Option
 
@@ -46,6 +52,8 @@ type Group struct {
 // options are in the group.
 func (g *Group) AddGroup(shortDescription string, longDescription string, data interface{}) (*Group, error) {
 	group := newGroup(shortDescription, longDescription, data)
+
+	group.parent = g
 
 	if err := group.scan(); err != nil {
 		return nil, err

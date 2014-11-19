@@ -56,19 +56,6 @@ type IngestOptions struct {
 	// Specifies the number of operating system threads to use during the import process
 	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"if given, documents should be inserted in the order of their appearance in the input source"`
 
-	// Specifies the number of operating system threads to use during the import process
-	// TODO: hide this option
-	NumOSThreads *int `long:"numOsThreads" description:"number of operating system threads to use (defaults to the number of logical CPUs)"`
-
-	// Specifies the number of threads to use in processing data read from the input source
-	NumDecodingWorkers *int `long:"numDecodingWorkers" description:"number of goroutines to use for converting JSON to BSON (defaults to the number of logical CPUs)"`
-
-	// Specifies the number of threads to use in sending processed data over to the server
-	NumInsertionWorkers *int `long:"numInsertionWorkers" description:"number of goroutines to use in ingesting data (defaults to 1)"`
-
-	// Specifies the maximum number of documents in each batch sent over to the server
-	BatchSize *int `long:"batchSize"  description:"number of documents to insert in a single batch"`
-
 	// Specifies the write concern for each write operation that mongoimport writes to the target database.
 	// By default, mongoimport waits for a majority of members from the replica set to respond before returning.
 	WriteConcern string `long:"writeConcern" default:"majority" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`

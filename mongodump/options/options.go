@@ -19,8 +19,6 @@ type OutputOptions struct {
 	DumpDBUsersAndRoles        bool     `long:"dumpDbUsersAndRoles" description:"Dump user and role definitions for the given database"`
 	ExcludedCollections        []string `long:"excludeCollection" description:"Collections to exclude from the dump"`
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"Exclude all collections from the dump that have the given prefix"`
-	JobThreads                 int      `long:"numParallelCollections" short:"j" description:"Number of collections to dump in parallel" default:"4"`
-	MaxProcs                   int      `long:"numCPUThreads" description:"GOMAXPROCS for testing"` // TODO: hide this option
 }
 
 func (self *OutputOptions) Name() string {

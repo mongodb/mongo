@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -112,6 +113,23 @@ func TestCommandEstimate(t *testing.T) {
 	_, err := p.ParseArgs([]string{})
 
 	assertError(t, err, ErrCommandRequired, "Please specify one command of: add or remove")
+}
+
+func TestCommandEstimate2(t *testing.T) {
+	var opts = struct {
+		Value bool `short:"v"`
+
+		Cmd1 struct {
+		} `command:"remove"`
+
+		Cmd2 struct {
+		} `command:"add"`
+	}{}
+
+	p := NewParser(&opts, None)
+	_, err := p.ParseArgs([]string{"rmive"})
+
+	assertError(t, err, ErrUnknownCommand, "Unknown command `rmive', did you mean `remove'?")
 }
 
 type testCommand struct {
@@ -265,7 +283,7 @@ func TestRequiredOnCommand(t *testing.T) {
 		} `command:"cmd"`
 	}{}
 
-	assertParseFail(t, ErrRequired, "the required flag `-v' was not specified", &opts, "cmd")
+	assertParseFail(t, ErrRequired, fmt.Sprintf("the required flag `%cv' was not specified", defaultShortOptDelimiter), &opts, "cmd")
 }
 
 func TestRequiredAllOnCommand(t *testing.T) {
@@ -278,7 +296,7 @@ func TestRequiredAllOnCommand(t *testing.T) {
 		} `command:"cmd"`
 	}{}
 
-	assertParseFail(t, ErrRequired, "the required flags `-v' and `--missing' were not specified", &opts, "cmd")
+	assertParseFail(t, ErrRequired, fmt.Sprintf("the required flags `%smissing' and `%cv' were not specified", defaultLongOptDelimiter, defaultShortOptDelimiter), &opts, "cmd")
 }
 
 func TestDefaultOnCommand(t *testing.T) {

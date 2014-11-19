@@ -2,7 +2,6 @@ package flags
 
 import (
 	"fmt"
-	"reflect"
 )
 
 // ErrorType represents the type of error.
@@ -55,7 +54,36 @@ const (
 )
 
 func (e ErrorType) String() string {
-	return reflect.TypeOf(e).Name()
+	switch e {
+	case ErrUnknown:
+		return "unknown"
+	case ErrExpectedArgument:
+		return "expected argument"
+	case ErrUnknownFlag:
+		return "unknown flag"
+	case ErrUnknownGroup:
+		return "unknown group"
+	case ErrMarshal:
+		return "marshal"
+	case ErrHelp:
+		return "help"
+	case ErrNoArgumentForBool:
+		return "no argument for bool"
+	case ErrRequired:
+		return "required"
+	case ErrShortNameTooLong:
+		return "short name too long"
+	case ErrDuplicatedFlag:
+		return "duplicated flag"
+	case ErrTag:
+		return "tag"
+	case ErrCommandRequired:
+		return "command required"
+	case ErrUnknownCommand:
+		return "unknown command"
+	}
+
+	return "unrecognized error type"
 }
 
 // Error represents a parser error. The error returned from Parse is of this

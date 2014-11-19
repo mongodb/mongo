@@ -25,7 +25,7 @@ func TestCSVStreamDocument(t *testing.T) {
 		Convey("badly encoded CSV should result in a parsing error", func() {
 			contents := `1, 2, foo"bar`
 			fields := []string{"a", "b", "c"}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -34,7 +34,7 @@ func TestCSVStreamDocument(t *testing.T) {
 		Convey("escaped quotes are parsed correctly", func() {
 			contents := `1, 2, "foo""bar"`
 			fields := []string{"a", "b", "c"}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -43,7 +43,7 @@ func TestCSVStreamDocument(t *testing.T) {
 		Convey("whitespace separated quoted strings are still an error", func() {
 			contents := `1, 2, "foo"  "bar"`
 			fields := []string{"a", "b", "c"}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -57,7 +57,7 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", 2},
 				bson.DocElem{"c", `foo" "bar`},
 			}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -72,7 +72,7 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", 2},
 				bson.DocElem{"c", " 3e"},
 			}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -89,7 +89,7 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", " 3e"},
 				bson.DocElem{"field3", " may"},
 			}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -108,7 +108,7 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", " 3e"},
 				bson.DocElem{"field3", " may"},
 			}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -124,7 +124,7 @@ func TestCSVStreamDocument(t *testing.T) {
 		Convey("nested CSV fields causing header collisions should error", func() {
 			contents := `1, 2f , " 3e" , " may", june`
 			fields := []string{"a", "b.c", "field3"}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -145,7 +145,7 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", 5},
 				bson.DocElem{"c", 6},
 			}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go csvInputReader.StreamDocument(true, docChan, errChan)
@@ -164,7 +164,7 @@ func TestCSVSetHeader(t *testing.T) {
 			func() {
 				contents := "extraHeader1, extraHeader2, extraHeader3"
 				fields := []string{}
-				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 				So(csvInputReader.SetHeader(true), ShouldBeNil)
 				So(len(csvInputReader.Fields), ShouldEqual, 3)
 			})
@@ -172,24 +172,24 @@ func TestCSVSetHeader(t *testing.T) {
 		Convey("setting non-colliding nested CSV headers should not raise an error", func() {
 			contents := "a, b, c"
 			fields := []string{}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 			contents = "a.b.c, a.b.d, c"
 			fields = []string{}
-			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 
 			contents = "a.b, ab, a.c"
 			fields = []string{}
-			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 
 			contents = "a, ab, ac, dd"
 			fields = []string{}
-			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 4)
 		})
@@ -197,17 +197,17 @@ func TestCSVSetHeader(t *testing.T) {
 		Convey("setting colliding nested CSV headers should raise an error", func() {
 			contents := "a, a.b, c"
 			fields := []string{}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldNotBeNil)
 
 			contents = "a.b.c, a.b.d.c, a.b.d"
 			fields = []string{}
-			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldNotBeNil)
 
 			contents = "a, a, a"
 			fields = []string{}
-			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.SetHeader(true), ShouldNotBeNil)
 		})
 
@@ -216,32 +216,32 @@ func TestCSVSetHeader(t *testing.T) {
 				contents := "c, a., b"
 				fields := []string{}
 				So(err, ShouldBeNil)
-				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents))).SetHeader(true), ShouldNotBeNil)
+				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header that starts in a dot should error",
 			func() {
 				contents := "c, .a, b"
 				fields := []string{}
-				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents))).SetHeader(true), ShouldNotBeNil)
+				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header that contains multiple consecutive dots should error",
 			func() {
 				contents := "c, a..a, b"
 				fields := []string{}
-				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents))).SetHeader(true), ShouldNotBeNil)
+				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetHeader(true), ShouldNotBeNil)
 
 				contents = "c, a.a, b.b...b"
 				fields = []string{}
-				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents))).SetHeader(true), ShouldNotBeNil)
+				So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header using an empty file should return EOF",
 			func() {
 				contents := ""
 				fields := []string{}
-				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 				So(csvInputReader.SetHeader(true), ShouldEqual, io.EOF)
 				So(len(csvInputReader.Fields), ShouldEqual, 0)
 			})
@@ -250,7 +250,7 @@ func TestCSVSetHeader(t *testing.T) {
 			func() {
 				contents := "extraHeader1,extraHeader2,extraHeader3"
 				fields := []string{"a", "b", "c"}
-				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)))
+				csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 				So(csvInputReader.SetHeader(true), ShouldBeNil)
 				// if SetHeader() is called with fields already passed in,
 				// the header should be replaced with the read header line
@@ -274,7 +274,7 @@ func TestCSVSetHeader(t *testing.T) {
 				}
 				fileHandle, err := os.Open("testdata/test.csv")
 				So(err, ShouldBeNil)
-				csvInputReader := NewCSVInputReader(fields, fileHandle)
+				csvInputReader := NewCSVInputReader(fields, fileHandle, 1)
 
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
@@ -291,7 +291,7 @@ func TestCSVGetHeaders(t *testing.T) {
 	Convey("With a CSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
-			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte{}))
+			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte{}), 1)
 			So(csvInputReader.GetHeaders(), ShouldResemble, fields)
 		})
 	})
@@ -304,7 +304,7 @@ func TestCSVReadHeadersFromSource(t *testing.T) {
 			expectedHeaders := []string{"1", "2", "3"}
 			fileHandle, err := os.Open("testdata/test.csv")
 			So(err, ShouldBeNil)
-			csvInputReader := NewCSVInputReader([]string{}, fileHandle)
+			csvInputReader := NewCSVInputReader([]string{}, fileHandle, 1)
 			headers, err := csvInputReader.ReadHeadersFromSource()
 			So(err, ShouldBeNil)
 			So(headers, ShouldResemble, expectedHeaders)

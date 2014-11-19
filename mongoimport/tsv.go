@@ -23,9 +23,11 @@ type TSVInputReader struct {
 	tsvReader *bufio.Reader
 	// tsvRecord stores each line of input we read from the underlying reader
 	tsvRecord string
-	// numProcessed tracks the number of TSV records processed by the underlying
-	// reader
+	// numProcessed tracks the number of TSV records processed by the underlying reader
 	numProcessed uint64
+
+	// numDecoders is the number of concurrent goroutines to use for decoding
+	numDecoders int
 }
 
 // TSVConvertibleDoc implements the ConvertibleDoc interface for TSV input
@@ -37,11 +39,12 @@ type TSVConvertibleDoc struct {
 
 // NewTSVInputReader returns a TSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
-func NewTSVInputReader(fields []string, in io.Reader) *TSVInputReader {
+func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInputReader {
 	return &TSVInputReader{
 		Fields:       fields,
 		tsvReader:    bufio.NewReader(in),
 		numProcessed: uint64(0),
+		numDecoders:  numDecoders,
 	}
 }
 
@@ -80,7 +83,7 @@ func (tsvInputReader *TSVInputReader) ReadHeadersFromSource() ([]string, error) 
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	tsvRecordChan := make(chan ConvertibleDoc, numDecodingWorkers)
+	tsvRecordChan := make(chan ConvertibleDoc, tsvInputReader.numDecoders)
 	var err error
 
 	go func() {
@@ -104,7 +107,7 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan
 			tsvInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, tsvRecordChan, readChan, errChan)
+	streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readChan, errChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for TSV input. It

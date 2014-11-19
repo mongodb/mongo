@@ -65,13 +65,6 @@ type ExportOutput interface {
 // ValidateSettings returns an error if any settings specified on the command line
 // were invalid, or nil if they are valid.
 func (exp *MongoExport) ValidateSettings() error {
-	// TODO - on legacy mongoexport, if -d is blank, it assumes some default database.
-	// Do we want to use that same behavior? It seems very odd to assume the DB
-	// when only a collection is provided, but that's the behavior of the legacy tools.
-	if err := exp.ToolOptions.Validate(); err != nil {
-		return err
-	}
-
 	// Namespace must have a valid database if none is specified,
 	// use 'test'
 	if exp.ToolOptions.Namespace.DB == "" {

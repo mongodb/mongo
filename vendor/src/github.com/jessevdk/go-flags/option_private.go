@@ -2,12 +2,16 @@ package flags
 
 import (
 	"reflect"
+	"strings"
+	"syscall"
 )
 
 // Set the value of an option to the specified value. An error will be returned
 // if the specified value could not be converted to the corresponding option
 // value type.
 func (option *Option) set(value *string) error {
+	option.isSet = true
+
 	if option.isFunc() {
 		return option.call(value)
 	} else if value != nil {
@@ -29,19 +33,76 @@ func (option *Option) canArgument() bool {
 	return !option.isBool()
 }
 
-func (option *Option) clear() {
+func (option *Option) emptyValue() reflect.Value {
 	tp := option.value.Type()
 
-	switch tp.Kind() {
-	case reflect.Func:
-		// Skip
-	case reflect.Map:
-		// Empty the map
-		option.value.Set(reflect.MakeMap(tp))
-	default:
-		zeroval := reflect.Zero(tp)
-		option.value.Set(zeroval)
+	if tp.Kind() == reflect.Map {
+		return reflect.MakeMap(tp)
 	}
+
+	return reflect.Zero(tp)
+}
+
+func (option *Option) empty() {
+	if !option.isFunc() {
+		option.value.Set(option.emptyValue())
+	}
+}
+
+func (option *Option) clearDefault() {
+	usedDefault := option.Default
+	if envKey := option.EnvDefaultKey; envKey != "" {
+		// os.Getenv() makes no distinction between undefined and
+		// empty values, so we use syscall.Getenv()
+		if value, ok := syscall.Getenv(envKey); ok {
+			if option.EnvDefaultDelim != "" {
+				usedDefault = strings.Split(value,
+					option.EnvDefaultDelim)
+			} else {
+				usedDefault = []string{value}
+			}
+		}
+	}
+
+	if len(usedDefault) > 0 {
+		option.empty()
+
+		for _, d := range usedDefault {
+			option.set(&d)
+		}
+	} else {
+		tp := option.value.Type()
+
+		switch tp.Kind() {
+		case reflect.Map:
+			if option.value.IsNil() {
+				option.empty()
+			}
+		case reflect.Slice:
+			if option.value.IsNil() {
+				option.empty()
+			}
+		}
+	}
+}
+
+func (option *Option) valueIsDefault() bool {
+	// Check if the value of the option corresponds to its
+	// default value
+	emptyval := option.emptyValue()
+
+	checkvalptr := reflect.New(emptyval.Type())
+	checkval := reflect.Indirect(checkvalptr)
+
+	checkval.Set(emptyval)
+
+	if len(option.Default) != 0 {
+		for _, v := range option.Default {
+			convert(v, checkval, option.tag)
+		}
+	}
+
+	return reflect.DeepEqual(option.value.Interface(), checkval.Interface())
 }
 
 func (option *Option) isUnmarshaler() Unmarshaler {

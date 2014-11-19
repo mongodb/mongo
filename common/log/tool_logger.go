@@ -2,7 +2,6 @@ package log
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/options"
 	"io"
 	"os"
 	"sync"
@@ -30,11 +29,21 @@ type ToolLogger struct {
 	verbosity int
 }
 
-func (tl *ToolLogger) SetVerbosity(verbosity *options.Verbosity) {
-	if verbosity.Quiet {
+type VerbosityLevel interface {
+	Level() int
+	IsQuiet() bool
+}
+
+func (tl *ToolLogger) SetVerbosity(level VerbosityLevel) {
+	if level == nil {
+		tl.verbosity = 0
+		return
+	}
+
+	if level.IsQuiet() {
 		tl.verbosity = -1
 	} else {
-		tl.verbosity = len(verbosity.Verbose)
+		tl.verbosity = level.Level()
 	}
 }
 
@@ -74,7 +83,7 @@ func (tl *ToolLogger) log(msg string) {
 	fmt.Fprintf(tl.writer, "%v\t%v\n", time.Now().Format(tl.format), msg)
 }
 
-func NewToolLogger(verbosity *options.Verbosity) *ToolLogger {
+func NewToolLogger(verbosity VerbosityLevel) *ToolLogger {
 	tl := &ToolLogger{
 		mutex:  &sync.Mutex{},
 		writer: os.Stderr, // default to stderr
@@ -111,10 +120,7 @@ var globalToolLogger *ToolLogger
 func init() {
 	if globalToolLogger == nil {
 		// initialize tool logger with verbosity level = 0
-		globalToolLogger = NewToolLogger(&options.Verbosity{
-			[]bool{}, // Verbose
-			false,    // Quiet
-		})
+		globalToolLogger = NewToolLogger(nil)
 	}
 }
 
@@ -126,7 +132,7 @@ func Log(minVerb int, msg string) {
 	globalToolLogger.Log(minVerb, msg)
 }
 
-func SetVerbosity(verbosity *options.Verbosity) {
+func SetVerbosity(verbosity VerbosityLevel) {
 	globalToolLogger.SetVerbosity(verbosity)
 }
 

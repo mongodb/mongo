@@ -5,7 +5,10 @@ package options
 import (
 	"fmt"
 	"github.com/jessevdk/go-flags"
+	"github.com/mongodb/mongo-tools/common/log"
 	"os"
+	"runtime"
+	"strconv"
 )
 
 const (
@@ -33,6 +36,7 @@ type ToolOptions struct {
 	*Auth
 	*Kerberos
 	*Namespace
+	*HiddenOptions
 
 	//Force direct connection to the server and disable the
 	//drivers automatic repl set discovery logic.
@@ -42,15 +46,22 @@ type ToolOptions struct {
 	parser *flags.Parser
 }
 
+type HiddenOptions struct {
+	MaxProcs       int
+	BulkWriters    int
+	BulkBufferSize int
+
+	// Specifies the number of threads to use in processing data read from the input source
+	NumDecodingWorkers int
+
+	// Specifies the number of threads to use in sending processed data over to the server
+	NumInsertionWorkers int
+}
+
 type Namespace struct {
 	// Specified database and collection
 	DB         string `short:"d" long:"db" description:"database to use"`
 	Collection string `short:"c" long:"collection" description:"collection to use"`
-
-	// DBPath for direct-storage interface
-	DBPath         string `long:"dbpath"`
-	DirectoryPerDB bool   `long:"directoryperdb" default:"false"`
-	Journal        bool   `long:"journal" default:"false"`
 }
 
 // Struct holding generic options
@@ -63,6 +74,14 @@ type General struct {
 type Verbosity struct {
 	Verbose []bool `short:"v" long:"verbose" description:"Set verbosity level"`
 	Quiet   bool   `long:"quiet" description:"Run in quiet mode, attempting to limit the amount of output"`
+}
+
+func (v Verbosity) Level() int {
+	return len(v.Verbose)
+}
+
+func (v Verbosity) IsQuiet() bool {
+	return v.Quiet
 }
 
 // Struct holding connection-related options
@@ -109,22 +128,30 @@ type EnabledOptions struct {
 
 // Ask for a new instance of tool options
 func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
+	hiddenOpts := &HiddenOptions{
+		BulkWriters:    1,
+		BulkBufferSize: 10000,
+	}
+
 	opts := &ToolOptions{
 		AppName:    appName,
 		VersionStr: VersionStr,
 		UsageStr:   usageStr,
 
-		General:    &General{},
-		Verbosity:  &Verbosity{},
-		Connection: &Connection{},
-		SSL:        &SSL{},
-		Auth:       &Auth{},
-		Namespace:  &Namespace{},
-		Kerberos:   &Kerberos{},
-		parser:     flags.NewNamedParser(appName, flags.None),
+		General:       &General{},
+		Verbosity:     &Verbosity{},
+		Connection:    &Connection{},
+		SSL:           &SSL{},
+		Auth:          &Auth{},
+		Namespace:     &Namespace{},
+		HiddenOptions: hiddenOpts,
+		Kerberos:      &Kerberos{},
+		parser:        flags.NewNamedParser(appName, flags.None),
 	}
 
-	opts.parser.Usage = usageStr
+	opts.parser.UnknownOptionHandler = func(option string, args []string) ([]string, error) {
+		return parseHiddenOption(hiddenOpts, option, args)
+	}
 
 	if _, err := opts.parser.AddGroup("general options", "", opts.General); err != nil {
 		panic(fmt.Errorf("couldn't register general options: %v", err))
@@ -156,6 +183,12 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 			panic(fmt.Errorf("couldn't register namespace options"))
 		}
 	}
+
+	if opts.MaxProcs <= 0 {
+		opts.MaxProcs = runtime.NumCPU()
+	}
+	log.Logf(log.Info, "Setting num cpus to %v", opts.MaxProcs)
+	runtime.GOMAXPROCS(opts.MaxProcs)
 	return opts
 }
 
@@ -211,12 +244,40 @@ func (self *ToolOptions) Parse() ([]string, error) {
 	return self.parser.Parse()
 }
 
-//Validate() runs validation checks that are global to all tools.
-func (self *ToolOptions) Validate() error {
-	switch {
-	case self.DBPath != "" && self.Host != "":
-		return fmt.Errorf("--dbpath is not allowed when --host is specified")
+func parseHiddenOption(opts *HiddenOptions, option string, args []string) ([]string, error) {
+	if option == "dbpath" || option == "directoryperdb" || option == "journal" {
+		return args, fmt.Errorf(`--dbpath and related flags are not supported in 2.8 tools.
+See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
+	var err error
+	optionValue, err := getInt(args)
+	switch option {
+	case "numThreads":
+		opts.MaxProcs = optionValue
+	case "numInsertionWorkersPerCollection":
+		opts.BulkWriters = optionValue
+	case "batchSize":
+		opts.BulkBufferSize = optionValue
+	case "numDecodingWorkers":
+		opts.NumDecodingWorkers = optionValue
+	case "numInsertionWorkers":
+		opts.NumInsertionWorkers = optionValue
+	default:
+		return args, fmt.Errorf(`unknown option "%v"`, option)
+	}
+	if err != nil {
+		return args, fmt.Errorf(`error parsing value for "%v": %v`, option, err)
+	}
+	return args[1:], nil
+}
 
-	return nil
+func getInt(args []string) (int, error) {
+	if len(args) == 0 {
+		return 0, fmt.Errorf("no value specified")
+	}
+	val, err := strconv.Atoi(args[0])
+	if err != nil {
+		return 0, fmt.Errorf("expected an integer value but got '%v'")
+	}
+	return val, nil
 }

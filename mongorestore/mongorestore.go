@@ -38,12 +38,8 @@ type MongoRestore struct {
 func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two separate flags,
 	// and we need to be able to see if they're both being used. We default to
-	// true here and then see if noobjcheck is enable.
+	// true here and then see if noobjcheck is enabled.
 	log.Log(log.DebugHigh, "checking options")
-	err := restore.ToolOptions.Validate()
-	if err != nil {
-		return err
-	}
 	restore.objCheck = true
 	if restore.InputOptions.NoObjcheck {
 		restore.objCheck = false
@@ -74,6 +70,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		if !restore.InputOptions.OplogReplay {
 			return fmt.Errorf("cannot use --oplogLimit without --oplogReplay enabled")
 		}
+		var err error
 		restore.oplogLimit, err = ParseTimestampFlag(restore.InputOptions.OplogLimit)
 		if err != nil {
 			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err)
@@ -97,7 +94,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		restore.tempRolesCol = "temproles"
 	}
 
-	if restore.OutputOptions.BulkWriters < 0 {
+	if restore.ToolOptions.HiddenOptions.BulkWriters < 0 {
 		return fmt.Errorf(
 			"cannot specify a negative number of insertion workers per collection")
 	}
@@ -147,7 +144,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// 2. Restore them...
-	if restore.OutputOptions.JobThreads > 0 {
+	if restore.OutputOptions.NumParallelCollections > 0 {
 		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {
 		// use legacy restoration order if we are single-threaded

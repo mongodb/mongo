@@ -6,16 +6,23 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 )
 
 type iniValue struct {
-	Name  string
-	Value string
+	Name       string
+	Value      string
+	Quoted     bool
+	LineNumber uint
 }
 
 type iniSection []iniValue
-type ini map[string]iniSection
+type ini struct {
+	File     string
+	Sections map[string]iniSection
+}
 
 func readFullLine(reader *bufio.Reader) (string, error) {
 	var line []byte
@@ -57,13 +64,19 @@ func optionIniName(option *Option) string {
 	return option.field.Name
 }
 
-func writeGroupIni(group *Group, namespace string, writer io.Writer, options IniOptions) {
+func writeGroupIni(cmd *Command, group *Group, namespace string, writer io.Writer, options IniOptions) {
 	var sname string
 
 	if len(namespace) != 0 {
-		sname = namespace + "." + group.ShortDescription
-	} else {
-		sname = group.ShortDescription
+		sname = namespace
+	}
+
+	if cmd.Group != group && len(group.ShortDescription) != 0 {
+		if len(sname) != 0 {
+			sname += "."
+		}
+
+		sname += group.ShortDescription
 	}
 
 	sectionwritten := false
@@ -80,7 +93,7 @@ func writeGroupIni(group *Group, namespace string, writer io.Writer, options Ini
 
 		val := option.value
 
-		if (options&IniIncludeDefaults) == IniNone && reflect.DeepEqual(val.Interface(), option.defaultValue.Interface()) {
+		if (options&IniIncludeDefaults) == IniNone && option.valueIsDefault() {
 			continue
 		}
 
@@ -95,40 +108,49 @@ func writeGroupIni(group *Group, namespace string, writer io.Writer, options Ini
 
 		oname := optionIniName(option)
 
-		commentOption := ""
-		if (options&(IniIncludeDefaults|IniCommentDefaults)) == IniIncludeDefaults|IniCommentDefaults && reflect.DeepEqual(val.Interface(), option.defaultValue.Interface()) {
-			commentOption = "; "
-		}
+		commentOption := (options&(IniIncludeDefaults|IniCommentDefaults)) == IniIncludeDefaults|IniCommentDefaults && option.valueIsDefault()
 
-		switch val.Type().Kind() {
+		kind := val.Type().Kind()
+		switch kind {
 		case reflect.Slice:
-			for idx := 0; idx < val.Len(); idx++ {
-				v, _ := convertToString(val.Index(idx), option.tag)
-				fmt.Fprintf(writer, "%s%s = %s\n", commentOption, oname, v)
-			}
+			kind = val.Type().Elem().Kind()
 
 			if val.Len() == 0 {
-				fmt.Fprintf(writer, "; %s =\n", oname)
+				writeOption(writer, oname, kind, "", "", true, option.iniQuote)
+			} else {
+				for idx := 0; idx < val.Len(); idx++ {
+					v, _ := convertToString(val.Index(idx), option.tag)
+
+					writeOption(writer, oname, kind, "", v, commentOption, option.iniQuote)
+				}
 			}
 		case reflect.Map:
-			for _, key := range val.MapKeys() {
-				k, _ := convertToString(key, option.tag)
-				v, _ := convertToString(val.MapIndex(key), option.tag)
-
-				fmt.Fprintf(writer, "%s%s = %s:%s\n", commentOption, oname, k, v)
-			}
+			kind = val.Type().Elem().Kind()
 
 			if val.Len() == 0 {
-				fmt.Fprintf(writer, "; %s =\n", oname)
+				writeOption(writer, oname, kind, "", "", true, option.iniQuote)
+			} else {
+				mkeys := val.MapKeys()
+				keys := make([]string, len(val.MapKeys()))
+				kkmap := make(map[string]reflect.Value)
+
+				for i, k := range mkeys {
+					keys[i], _ = convertToString(k, option.tag)
+					kkmap[keys[i]] = k
+				}
+
+				sort.Strings(keys)
+
+				for _, k := range keys {
+					v, _ := convertToString(val.MapIndex(kkmap[k]), option.tag)
+
+					writeOption(writer, oname, kind, k, v, commentOption, option.iniQuote)
+				}
 			}
 		default:
 			v, _ := convertToString(val, option.tag)
 
-			if len(v) != 0 {
-				fmt.Fprintf(writer, "%s%s = %s\n", commentOption, oname, v)
-			} else {
-				fmt.Fprintf(writer, "%s%s =\n", commentOption, oname)
-			}
+			writeOption(writer, oname, kind, "", v, commentOption, option.iniQuote)
 		}
 
 		if comments {
@@ -141,9 +163,30 @@ func writeGroupIni(group *Group, namespace string, writer io.Writer, options Ini
 	}
 }
 
+func writeOption(writer io.Writer, optionName string, optionType reflect.Kind, optionKey string, optionValue string, commentOption bool, forceQuote bool) {
+	if forceQuote || (optionType == reflect.String && !isPrint(optionValue)) {
+		optionValue = strconv.Quote(optionValue)
+	}
+
+	comment := ""
+	if commentOption {
+		comment = "; "
+	}
+
+	fmt.Fprintf(writer, "%s%s =", comment, optionName)
+
+	if optionKey != "" {
+		fmt.Fprintf(writer, " %s:%s", optionKey, optionValue)
+	} else if optionValue != "" {
+		fmt.Fprintf(writer, " %s", optionValue)
+	}
+
+	fmt.Fprintln(writer)
+}
+
 func writeCommandIni(command *Command, namespace string, writer io.Writer, options IniOptions) {
 	command.eachGroup(func(group *Group) {
-		writeGroupIni(group, namespace, writer, options)
+		writeGroupIni(command, group, namespace, writer, options)
 	})
 
 	for _, c := range command.commands {
@@ -177,7 +220,7 @@ func writeIniToFile(parser *IniParser, filename string, options IniOptions) erro
 	return nil
 }
 
-func readIniFromFile(filename string) (ini, error) {
+func readIniFromFile(filename string) (*ini, error) {
 	file, err := os.Open(filename)
 
 	if err != nil {
@@ -189,8 +232,11 @@ func readIniFromFile(filename string) (ini, error) {
 	return readIni(file, filename)
 }
 
-func readIni(contents io.Reader, filename string) (ini, error) {
-	ret := make(ini)
+func readIni(contents io.Reader, filename string) (*ini, error) {
+	ret := &ini{
+		File:     filename,
+		Sections: make(map[string]iniSection),
+	}
 
 	reader := bufio.NewReader(contents)
 
@@ -198,7 +244,7 @@ func readIni(contents io.Reader, filename string) (ini, error) {
 	section := make(iniSection, 0, 10)
 	sectionname := ""
 
-	ret[sectionname] = section
+	ret.Sections[sectionname] = section
 
 	var lineno uint
 
@@ -239,11 +285,11 @@ func readIni(contents io.Reader, filename string) (ini, error) {
 			}
 
 			sectionname = name
-			section = ret[name]
+			section = ret.Sections[name]
 
 			if section == nil {
 				section = make(iniSection, 0, 10)
-				ret[name] = section
+				ret.Sections[name] = section
 			}
 
 			continue
@@ -262,13 +308,30 @@ func readIni(contents io.Reader, filename string) (ini, error) {
 
 		name := strings.TrimSpace(keyval[0])
 		value := strings.TrimSpace(keyval[1])
+		quoted := false
+
+		if len(value) != 0 && value[0] == '"' {
+			if v, err := strconv.Unquote(value); err == nil {
+				value = v
+
+				quoted = true
+			} else {
+				return nil, &IniError{
+					Message:    err.Error(),
+					File:       filename,
+					LineNumber: lineno,
+				}
+			}
+		}
 
 		section = append(section, iniValue{
-			Name:  name,
-			Value: value,
+			Name:       name,
+			Value:      value,
+			Quoted:     quoted,
+			LineNumber: lineno,
 		})
 
-		ret[sectionname] = section
+		ret.Sections[sectionname] = section
 	}
 
 	return ret, nil
@@ -294,17 +357,16 @@ func (i *IniParser) matchingGroups(name string) []*Group {
 	return nil
 }
 
-func (i *IniParser) parse(ini ini) error {
+func (i *IniParser) parse(ini *ini) error {
 	p := i.parser
 
-	for name, section := range ini {
+	var quotesLookup = make(map[*Option]bool)
+
+	for name, section := range ini.Sections {
 		groups := i.matchingGroups(name)
 
 		if len(groups) == 0 {
-			return newError(
-				ErrUnknownGroup,
-				fmt.Sprintf("could not find option group `%s'", name),
-			)
+			return newErrorf(ErrUnknownGroup, "could not find option group `%s'", name)
 		}
 
 		for _, inival := range section {
@@ -326,10 +388,11 @@ func (i *IniParser) parse(ini ini) error {
 
 			if opt == nil {
 				if (p.Options & IgnoreUnknown) == None {
-					return newError(
-						ErrUnknownFlag,
-						fmt.Sprintf("unknown option: %s", inival.Name),
-					)
+					return &IniError{
+						Message:    fmt.Sprintf("unknown option: %s", inival.Name),
+						File:       ini.File,
+						LineNumber: inival.LineNumber,
+					}
 				}
 
 				continue
@@ -339,14 +402,50 @@ func (i *IniParser) parse(ini ini) error {
 
 			if !opt.canArgument() && len(inival.Value) == 0 {
 				pval = nil
+			} else {
+				if opt.value.Type().Kind() == reflect.Map {
+					parts := strings.SplitN(inival.Value, ":", 2)
+
+					// only handle unquoting
+					if len(parts) == 2 && parts[1][0] == '"' {
+						if v, err := strconv.Unquote(parts[1]); err == nil {
+							parts[1] = v
+
+							inival.Quoted = true
+						} else {
+							return &IniError{
+								Message:    err.Error(),
+								File:       ini.File,
+								LineNumber: inival.LineNumber,
+							}
+						}
+
+						s := parts[0] + ":" + parts[1]
+
+						pval = &s
+					}
+				}
 			}
 
 			if err := opt.set(pval); err != nil {
-				return wrapError(err)
+				return &IniError{
+					Message:    err.Error(),
+					File:       ini.File,
+					LineNumber: inival.LineNumber,
+				}
+			}
+
+			// either all INI values are quoted or only values who need quoting
+			if _, ok := quotesLookup[opt]; !inival.Quoted || !ok {
+				quotesLookup[opt] = inival.Quoted
 			}
 
 			opt.tag.Set("_read-ini-name", inival.Name)
 		}
+	}
+
+	for opt, quoted := range quotesLookup {
+		opt.iniQuote = quoted
 	}
 
 	return nil

@@ -17,7 +17,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 		Convey("an error should be thrown if a plain JSON document is supplied",
 			func() {
 				contents := `{"a": "ae"}`
-				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -28,7 +28,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 			"error out",
 			func() {
 				contents := `{"a":3},{"b":4}]`
-				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -39,7 +39,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 			"error out",
 			func() {
 				contents := `[{"a": "ae"}`
-				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -54,7 +54,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 			func() {
 				fileHandle, err := os.Open("testdata/test_plain.json")
 				So(err, ShouldBeNil)
-				jsonInputReader := NewJSONInputReader(true, fileHandle)
+				jsonInputReader := NewJSONInputReader(true, fileHandle, 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -77,7 +77,7 @@ func TestJSONArrayStreamDocument(t *testing.T) {
 				}
 				fileHandle, err := os.Open("testdata/test_array.json")
 				So(err, ShouldBeNil)
-				jsonInputReader := NewJSONInputReader(true, fileHandle)
+				jsonInputReader := NewJSONInputReader(true, fileHandle, 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				// TODO check error
@@ -101,7 +101,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 			func() {
 				contents := `{"a": "ae"}`
 				expectedRead := bson.D{bson.DocElem{"a", "ae"}}
-				jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -114,7 +114,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 			contents := `{"a": "ae"}{"b": "dc"}`
 			expectedReadOne := bson.D{bson.DocElem{"a", "ae"}}
 			expectedReadTwo := bson.D{bson.DocElem{"b", "dc"}}
-			jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)))
+			jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -127,7 +127,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 			func() {
 				contents := `{"a": "ae", "b": 2.0}`
 				expectedRead := bson.D{bson.DocElem{"a", "ae"}, bson.DocElem{"b", 2.0}}
-				jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -137,7 +137,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 
 		Convey("JSON arrays should return an error", func() {
 			contents := `[{"a": "ae", "b": 2.0}]`
-			jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)))
+			jsonInputReader := NewJSONInputReader(false, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
 			docChan := make(chan bson.D)
 			go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -166,7 +166,7 @@ func TestJSONPlainStreamDocument(t *testing.T) {
 				}
 				fileHandle, err := os.Open("testdata/test_plain.json")
 				So(err, ShouldBeNil)
-				jsonInputReader := NewJSONInputReader(false, fileHandle)
+				jsonInputReader := NewJSONInputReader(false, fileHandle, 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -192,7 +192,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 		Convey("reading a JSON array separator should consume [",
 			func() {
 				contents := `[{"a": "ae"}`
-				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
 				// at this point it should have consumed all bytes up to `{`
 				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
@@ -201,14 +201,14 @@ func TestReadJSONArraySeparator(t *testing.T) {
 			"corresponding opening bracket should error out ",
 			func() {
 				contents := `]`
-				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
 			})
 		Convey("reading an opening JSON array separator without a "+
 			"corresponding closing bracket should error out ",
 			func() {
 				contents := `[`
-				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
 				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
 			})
@@ -216,7 +216,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 			"closing bracket should return EOF",
 			func() {
 				contents := `[]`
-				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
 				So(jsonImporter.readJSONArraySeparator(), ShouldEqual, io.EOF)
 			})
@@ -224,7 +224,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 			"bracket but then additional characters after that, should error",
 			func() {
 				contents := `[]a`
-				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonImporter := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
 				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
 			})
@@ -232,7 +232,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 			"error out",
 			func() {
 				contents := `[{"a":3}x{"b":4}]`
-				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -244,7 +244,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 			"valid objects should error out",
 			func() {
 				contents := `[{"a":3},b{"b":4}]`
-				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader := NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan := make(chan error)
 				docChan := make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)
@@ -252,7 +252,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 				So(jsonInputReader.readJSONArraySeparator(), ShouldNotBeNil)
 
 				contents = `[{"a":3},,{"b":4}]`
-				jsonInputReader = NewJSONInputReader(true, bytes.NewReader([]byte(contents)))
+				jsonInputReader = NewJSONInputReader(true, bytes.NewReader([]byte(contents)), 1)
 				errChan = make(chan error)
 				docChan = make(chan bson.D)
 				go jsonInputReader.StreamDocument(true, docChan, errChan)

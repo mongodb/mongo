@@ -7,7 +7,6 @@ package flags
 import (
 	"os"
 	"path"
-	"reflect"
 )
 
 // A Parser provides command line option parsing. It can contain several
@@ -21,6 +20,16 @@ type Parser struct {
 
 	// Option flags changing the behavior of the parser.
 	Options Options
+
+	// NamespaceDelimiter separates group namespaces and option long names
+	NamespaceDelimiter string
+
+	// UnknownOptionsHandler is a function which gets called when the parser
+	// encounters an unknown option. The function receives the unknown option
+	// name and the remaining command line arguments.
+	// It should return a new list of remaining arguments to continue parsing,
+	// or an error to indicate a parse failure.
+	UnknownOptionHandler func(option string, args []string) ([]string, error)
 
 	internalError error
 }
@@ -88,23 +97,34 @@ func ParseArgs(data interface{}, args []string) ([]string, error) {
 // group should not be added. The options parameter specifies a set of options
 // for the parser.
 func NewParser(data interface{}, options Options) *Parser {
-	ret := NewNamedParser(path.Base(os.Args[0]), options)
+	p := NewNamedParser(path.Base(os.Args[0]), options)
 
 	if data != nil {
-		_, ret.internalError = ret.AddGroup("Application Options", "", data)
+		g, err := p.AddGroup("Application Options", "", data)
+
+		if err == nil {
+			g.parent = p
+		}
+
+		p.internalError = err
 	}
 
-	return ret
+	return p
 }
 
 // NewNamedParser creates a new parser. The appname is used to display the
 // executable name in the built-in help message. Option groups and commands can
 // be added to this parser by using AddGroup and AddCommand.
 func NewNamedParser(appname string, options Options) *Parser {
-	return &Parser{
-		Command: newCommand(appname, "", "", nil),
-		Options: options,
+	p := &Parser{
+		Command:            newCommand(appname, "", "", nil),
+		Options:            options,
+		NamespaceDelimiter: ".",
 	}
+
+	p.Command.parent = p
+
+	return p
 }
 
 // Parse parses the command line arguments from os.Args using Parser.ParseArgs.
@@ -128,30 +148,33 @@ func (p *Parser) ParseArgs(args []string) ([]string, error) {
 		return nil, p.internalError
 	}
 
-	p.eachCommand(func(c *Command) {
-		c.eachGroup(func(g *Group) {
-			g.storeDefaults()
-
-			for _, option := range g.options {
-				switch option.value.Type().Kind() {
-				case reflect.Func, reflect.Map, reflect.Slice:
-					option.clear()
-				}
-			}
-		})
-	}, true)
+	p.clearIsSet()
 
 	// Add built-in help group to all commands if necessary
 	if (p.Options & HelpFlag) != None {
 		p.addHelpGroups(p.showBuiltinHelp)
 	}
 
+	compval := os.Getenv("GO_FLAGS_COMPLETION")
+
+	if len(compval) != 0 {
+		comp := &completion{parser: p}
+
+		if compval == "verbose" {
+			comp.ShowDescriptions = true
+		}
+
+		comp.execute(args)
+
+		return nil, nil
+	}
+
 	s := &parseState{
 		args:    args,
 		retargs: make([]string, 0, len(args)),
-		command: p.Command,
-		lookup:  p.makeLookup(),
 	}
+
+	p.fillParseState(s)
 
 	for !s.eof() {
 		arg := s.pop()
@@ -159,7 +182,7 @@ func (p *Parser) ParseArgs(args []string) ([]string, error) {
 		// When PassDoubleDash is set and we encounter a --, then
 		// simply append all the rest as arguments and break out
 		if (p.Options&PassDoubleDash) != None && arg == "--" {
-			s.retargs = append(s.retargs, s.args...)
+			s.addArgs(s.args...)
 			break
 		}
 
@@ -174,32 +197,36 @@ func (p *Parser) ParseArgs(args []string) ([]string, error) {
 		}
 
 		var err error
-		var options []*Option
 
 		prefix, optname, islong := stripOptionPrefix(arg)
-		optname, argument := splitOption(prefix, optname, islong)
+		optname, _, argument := splitOption(prefix, optname, islong)
 
 		if islong {
-			options, err = p.parseLong(s, optname, argument)
+			err = p.parseLong(s, optname, argument)
 		} else {
-			options, err = p.parseShort(s, optname, argument)
+			err = p.parseShort(s, optname, argument)
 		}
 
 		if err != nil {
 			ignoreUnknown := (p.Options & IgnoreUnknown) != None
 			parseErr := wrapError(err)
 
-			if !(parseErr.Type == ErrUnknownFlag && ignoreUnknown) {
+			if parseErr.Type != ErrUnknownFlag || (!ignoreUnknown && p.UnknownOptionHandler == nil) {
 				s.err = parseErr
 				break
 			}
 
 			if ignoreUnknown {
-				s.retargs = append(s.retargs, arg)
-			}
-		} else {
-			for _, option := range options {
-				delete(s.lookup.required, option)
+				s.addArgs(arg)
+			} else if p.UnknownOptionHandler != nil {
+				modifiedArgs, err := p.UnknownOptionHandler(optname, s.args)
+
+				if err != nil {
+					s.err = err
+					break
+				}
+
+				s.args = modifiedArgs
 			}
 		}
 	}
@@ -208,39 +235,30 @@ func (p *Parser) ParseArgs(args []string) ([]string, error) {
 		p.eachCommand(func(c *Command) {
 			c.eachGroup(func(g *Group) {
 				for _, option := range g.options {
-					tp := option.value.Type()
-
-					switch tp.Kind() {
-					case reflect.Map:
-						if option.value.Len() == 0 {
-							for _, k := range option.defaultValue.MapKeys() {
-								option.value.SetMapIndex(k, option.defaultValue.MapIndex(k))
-							}
-						}
-					case reflect.Slice:
-						if reflect.DeepEqual(option.value.Interface(), reflect.Zero(tp).Interface()) {
-							option.value.Set(option.defaultValue)
-						}
+					if option.isSet {
+						continue
 					}
+
+					option.clearDefault()
 				}
 			})
 		}, true)
 
-		s.checkRequired()
+		s.checkRequired(p)
 	}
 
 	var reterr error
 
 	if s.err != nil {
-		reterr = p.printError(s.err)
+		reterr = s.err
 	} else if len(s.command.commands) != 0 && !s.command.SubcommandsOptional {
-		reterr = p.printError(s.estimateCommand())
+		reterr = s.estimateCommand()
 	} else if cmd, ok := s.command.data.(Commander); ok {
-		reterr = p.printError(cmd.Execute(s.retargs))
+		reterr = cmd.Execute(s.retargs)
 	}
 
 	if reterr != nil {
-		return append([]string{s.arg}, s.args...), reterr
+		return append([]string{s.arg}, s.args...), p.printError(reterr)
 	}
 
 	return s.retargs, nil

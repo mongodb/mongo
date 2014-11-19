@@ -1,6 +1,8 @@
 go-flags: a go library for parsing command line arguments
 =========================================================
 
+[![GoDoc](https://godoc.org/github.com/jessevdk/go-flags?status.png)](https://godoc.org/github.com/jessevdk/go-flags) [![Build Status](https://travis-ci.org/jessevdk/go-flags.svg?branch=master)](https://travis-ci.org/jessevdk/go-flags) [![Coverage Status](https://img.shields.io/coveralls/jessevdk/go-flags.svg)](https://coveralls.io/r/jessevdk/go-flags?branch=master)
+
 This library provides similar functionality to the builtin flag library of
 go, but provides much more functionality and nicer formatting. From the
 documentation:
@@ -25,6 +27,7 @@ Supported features:
 * Supports same option multiple times (can store in slice or last option counts)
 * Supports maps
 * Supports function callbacks
+* Supports namespaces for (nested) option groups
 
 The flags package uses structs, reflection and struct field tags
 to allow users to specify command line options. This results in very simple

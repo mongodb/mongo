@@ -80,7 +80,7 @@ func TestUnmarshalError(t *testing.T) {
 		Value marshalled `short:"v"`
 	}{}
 
-	assertParseFail(t, ErrMarshal, "invalid argument for flag `-v' (expected flags.marshalled): `invalid' is not a valid value, please specify `yes' or `no'", &opts, "-vinvalid")
+	assertParseFail(t, ErrMarshal, fmt.Sprintf("invalid argument for flag `%cv' (expected flags.marshalled): `invalid' is not a valid value, please specify `yes' or `no'", defaultShortOptDelimiter), &opts, "-vinvalid")
 }
 
 func TestMarshalError(t *testing.T) {

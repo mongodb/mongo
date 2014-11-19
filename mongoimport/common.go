@@ -194,13 +194,16 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // channel in parallel and then sends over the processed data to the outputChan
 // channel - either in sequence or concurrently (depending on the value of
 // ordered) - in which the data was received
-func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan chan bson.D, errChan chan error) {
+func streamDocuments(ordered bool, numDecoders int, inputChan chan ConvertibleDoc, outputChan chan bson.D, errChan chan error) {
+	if numDecoders == 0 {
+		numDecoders = 1
+	}
 	var importWorkers []*ImportWorker
 	// initialize all our concurrent processing threads
 	wg := &sync.WaitGroup{}
 	inChan := inputChan
 	outChan := outputChan
-	for i := 0; i < numDecodingWorkers; i++ {
+	for i := 0; i < numDecoders; i++ {
 		if ordered {
 			// TODO: experiment with buffered channel size; the buffer size of
 			// inChan should always be the same as that of outChan
@@ -234,7 +237,7 @@ func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan cha
 // tokensToBSON reads in slice of records - along with ordered fields names -
 // and returns a BSON document for the record.
 func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) {
-	log.Logf(log.DebugLow, "got line: %v", tokens)
+	log.Logf(log.DebugHigh, "got line: %v", tokens)
 	var parsedValue interface{}
 	document := bson.D{}
 	for index, token := range tokens {

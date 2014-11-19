@@ -113,6 +113,33 @@ func TestGroupNestedInline(t *testing.T) {
 	}
 }
 
+func TestGroupNestedInlineNamespace(t *testing.T) {
+	var opts = struct {
+		Opt string `long:"opt"`
+
+		Group struct {
+			Opt   string `long:"opt"`
+			Group struct {
+				Opt string `long:"opt"`
+			} `group:"Subsubgroup" namespace:"sap"`
+		} `group:"Subgroup" namespace:"sip"`
+	}{}
+
+	p, ret := assertParserSuccess(t, &opts, "--opt", "a", "--sip.opt", "b", "--sip.sap.opt", "c", "rest")
+
+	assertStringArray(t, ret, []string{"rest"})
+
+	assertString(t, opts.Opt, "a")
+	assertString(t, opts.Group.Opt, "b")
+	assertString(t, opts.Group.Group.Opt, "c")
+
+	for _, name := range []string{"Subgroup", "Subsubgroup"} {
+		if p.Command.Group.Find(name) == nil {
+			t.Errorf("Expected to find group '%s'", name)
+		}
+	}
+}
+
 func TestDuplicateShortFlags(t *testing.T) {
 	var opts struct {
 		Verbose   []bool   `short:"v" long:"verbose" description:"Show verbose debug information"`

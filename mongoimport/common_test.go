@@ -102,51 +102,51 @@ func TestValidateHeaders(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("if headerLine is true, the first line in the input should be used", func() {
-			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle), true)
+			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle, 1), true)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 2)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, strings.Split(strings.Replace(contents, " ", "", -1), ","))
 		})
 		Convey("if headerLine is false, the fields passed in should be used", func() {
-			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle), false)
+			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle, 1), false)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 3)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, fields)
 		})
 		Convey("if the fields contain '..', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a..a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a..a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields start/end in a '.', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{".a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{".a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a."}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a."}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields collide, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "a.a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "a.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields don't collide, no error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "aa"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "aa"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
 		})
 		Convey("if the fields contain the same keys, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 	})
@@ -509,7 +509,7 @@ func TestStreamDocuments(t *testing.T) {
 				inputChannel <- csvConvertibleDoc
 			}
 			close(inputChannel)
-			streamDocuments(true, inputChannel, outputChannel, errorChannel)
+			streamDocuments(true, 3, inputChannel, outputChannel, errorChannel)
 			// ensure documents are streamed out and processed in the correct manner
 			for _, expectedDocument := range expectedDocuments {
 				So(<-outputChannel, ShouldResemble, expectedDocument)
@@ -525,7 +525,7 @@ func TestStreamDocuments(t *testing.T) {
 			}
 			inputChannel <- csvConvertibleDoc
 			close(inputChannel)
-			go streamDocuments(true, inputChannel, outputChannel, errorChannel)
+			go streamDocuments(true, 3, inputChannel, outputChannel, errorChannel)
 			// ensure that an error is returned on the error channel
 			So(<-errorChannel, ShouldNotBeNil)
 		})

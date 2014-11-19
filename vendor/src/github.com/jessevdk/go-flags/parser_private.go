@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
 
 type parseState struct {
-	arg     string
-	args    []string
-	retargs []string
-	err     error
+	arg        string
+	args       []string
+	retargs    []string
+	positional []*Arg
+	err        error
 
 	command *Command
 	lookup  lookup
@@ -41,18 +43,62 @@ func (p *parseState) peek() string {
 	return p.args[0]
 }
 
-func (p *parseState) checkRequired() error {
-	required := p.lookup.required
+func (p *parseState) checkRequired(parser *Parser) error {
+	c := parser.Command
+
+	var required []*Option
+
+	for c != nil {
+		c.eachGroup(func(g *Group) {
+			for _, option := range g.options {
+				if !option.isSet && option.Required {
+					required = append(required, option)
+				}
+			}
+		})
+
+		c = c.Active
+	}
 
 	if len(required) == 0 {
+		if len(p.positional) > 0 && p.command.ArgsRequired {
+			var reqnames []string
+
+			for _, arg := range p.positional {
+				if arg.isRemaining() {
+					break
+				}
+
+				reqnames = append(reqnames, "`"+arg.Name+"`")
+			}
+
+			if len(reqnames) == 0 {
+				return nil
+			}
+
+			var msg string
+
+			if len(reqnames) == 1 {
+				msg = fmt.Sprintf("the required argument %s was not provided", reqnames[0])
+			} else {
+				msg = fmt.Sprintf("the required arguments %s and %s were not provided",
+					strings.Join(reqnames[:len(reqnames)-1], ", "), reqnames[len(reqnames)-1])
+			}
+
+			p.err = newError(ErrRequired, msg)
+			return p.err
+		}
+
 		return nil
 	}
 
 	names := make([]string, 0, len(required))
 
-	for k := range required {
+	for _, k := range required {
 		names = append(names, "`"+k.String()+"'")
 	}
+
+	sort.Strings(names)
 
 	var msg string
 
@@ -113,18 +159,34 @@ func (p *parseState) estimateCommand() error {
 func (p *Parser) parseOption(s *parseState, name string, option *Option, canarg bool, argument *string) (err error) {
 	if !option.canArgument() {
 		if argument != nil {
-			msg := fmt.Sprintf("bool flag `%s' cannot have an argument", option)
-			return newError(ErrNoArgumentForBool, msg)
+			return newErrorf(ErrNoArgumentForBool, "bool flag `%s' cannot have an argument", option)
 		}
 
 		err = option.set(nil)
-	} else if argument != nil {
-		err = option.set(argument)
-	} else if canarg && !s.eof() {
-		arg := s.pop()
-		err = option.set(&arg)
+	} else if argument != nil || (canarg && !s.eof()) {
+		var arg string
+
+		if argument != nil {
+			arg = *argument
+		} else {
+			arg = s.pop()
+
+			// Accept any single character arguments including '-'.
+			// '-' is the special file name for the standard input or the standard output in many cases.
+			if len(arg) > 1 && argumentIsOption(arg) {
+				return newErrorf(ErrExpectedArgument, "expected argument for flag `%s', but got option `%s'", option, arg)
+			}
+		}
+
+		if option.tag.Get("unquote") != "false" {
+			arg, err = unquoteIfPossible(arg)
+		}
+
+		if err == nil {
+			err = option.set(&arg)
+		}
 	} else if option.OptionalArgument {
-		option.clear()
+		option.empty()
 
 		for _, v := range option.OptionalValue {
 			err = option.set(&v)
@@ -134,38 +196,31 @@ func (p *Parser) parseOption(s *parseState, name string, option *Option, canarg 
 			}
 		}
 	} else {
-		msg := fmt.Sprintf("expected argument for flag `%s'", option)
-		err = newError(ErrExpectedArgument, msg)
+		err = newErrorf(ErrExpectedArgument, "expected argument for flag `%s'", option)
 	}
 
 	if err != nil {
 		if _, ok := err.(*Error); !ok {
-			msg := fmt.Sprintf("invalid argument for flag `%s' (expected %s): %s",
+			err = newErrorf(ErrMarshal, "invalid argument for flag `%s' (expected %s): %s",
 				option,
 				option.value.Type(),
 				err.Error())
-
-			err = newError(ErrMarshal, msg)
 		}
 	}
 
 	return err
 }
 
-func (p *Parser) parseLong(s *parseState, name string, argument *string) (options []*Option, err error) {
+func (p *Parser) parseLong(s *parseState, name string, argument *string) error {
 	if option := s.lookup.longNames[name]; option != nil {
-		options = append(options, option)
-
 		// Only long options that are required can consume an argument
 		// from the argument list
 		canarg := !option.OptionalArgument
 
-		err := p.parseOption(s, name, option, canarg, argument)
-
-		return options, err
+		return p.parseOption(s, name, option, canarg, argument)
 	}
 
-	return nil, newError(ErrUnknownFlag, fmt.Sprintf("unknown flag `%s'", name))
+	return newErrorf(ErrUnknownFlag, "unknown flag `%s'", name)
 }
 
 func (p *Parser) splitShortConcatArg(s *parseState, optname string) (string, *string) {
@@ -185,7 +240,7 @@ func (p *Parser) splitShortConcatArg(s *parseState, optname string) (string, *st
 	return optname, nil
 }
 
-func (p *Parser) parseShort(s *parseState, optname string, argument *string) (options []*Option, err error) {
+func (p *Parser) parseShort(s *parseState, optname string, argument *string) error {
 	if argument == nil {
 		optname, argument = p.splitShortConcatArg(s, optname)
 	}
@@ -194,17 +249,15 @@ func (p *Parser) parseShort(s *parseState, optname string, argument *string) (op
 		shortname := string(c)
 
 		if option := s.lookup.shortNames[shortname]; option != nil {
-			options = append(options, option)
-
 			// Only the last short argument can consume an argument from
 			// the arguments list, and only if it's non optional
 			canarg := (i+utf8.RuneLen(c) == len(optname)) && !option.OptionalArgument
 
 			if err := p.parseOption(s, shortname, option, canarg, argument); err != nil {
-				return options, err
+				return err
 			}
 		} else {
-			return nil, newError(ErrUnknownFlag, fmt.Sprintf("unknown flag `%s'", shortname))
+			return newErrorf(ErrUnknownFlag, "unknown flag `%s'", shortname)
 		}
 
 		// Only the first option can have a concatted argument, so just
@@ -212,26 +265,50 @@ func (p *Parser) parseShort(s *parseState, optname string, argument *string) (op
 		argument = nil
 	}
 
-	return options, nil
+	return nil
 }
 
-func (p *Parser) parseNonOption(s *parseState) error {
-	if cmd := s.lookup.commands[s.arg]; cmd != nil {
-		if err := s.checkRequired(); err != nil {
+func (p *parseState) addArgs(args ...string) error {
+	for len(p.positional) > 0 && len(args) > 0 {
+		arg := p.positional[0]
+
+		if err := convert(args[0], arg.value, arg.tag); err != nil {
 			return err
 		}
 
-		s.command.Active = cmd
+		if !arg.isRemaining() {
+			p.positional = p.positional[1:]
+		}
 
-		s.command = cmd
-		s.lookup = cmd.makeLookup()
+		args = args[1:]
+	}
+
+	p.retargs = append(p.retargs, args...)
+	return nil
+}
+
+func (p *Parser) parseNonOption(s *parseState) error {
+	if len(s.positional) > 0 {
+		return s.addArgs(s.arg)
+	}
+
+	if cmd := s.lookup.commands[s.arg]; cmd != nil {
+		s.command.Active = cmd
+		cmd.fillParseState(s)
 	} else if (p.Options & PassAfterNonOption) != None {
 		// If PassAfterNonOption is set then all remaining arguments
 		// are considered positional
-		s.retargs = append(append(s.retargs, s.arg), s.args...)
+		if err := s.addArgs(s.arg); err != nil {
+			return err
+		}
+
+		if err := s.addArgs(s.args...); err != nil {
+			return err
+		}
+
 		s.args = []string{}
 	} else {
-		s.retargs = append(s.retargs, s.arg)
+		return s.addArgs(s.arg)
 	}
 
 	return nil
@@ -250,4 +327,14 @@ func (p *Parser) printError(err error) error {
 	}
 
 	return err
+}
+
+func (p *Parser) clearIsSet() {
+	p.eachCommand(func(c *Command) {
+		c.eachGroup(func(g *Group) {
+			for _, option := range g.options {
+				option.isSet = false
+			}
+		})
+	}, true)
 }

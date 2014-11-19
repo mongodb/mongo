@@ -27,6 +27,12 @@ type Option struct {
 	// The default value of the option.
 	Default []string
 
+	// The optional environment default value key name.
+	EnvDefaultKey string
+
+	// The optional delimiter string for EnvDefaultKey values.
+	EnvDefaultDelim string
+
 	// If true, specifies that the argument to an option flag is optional.
 	// When no argument to the flag is specified on the command line, the
 	// value of Default will be set in the field this option represents.
@@ -53,15 +59,71 @@ type Option struct {
 	// passwords.
 	DefaultMask string
 
+	// The group which the option belongs to
+	group *Group
+
 	// The struct field which the option represents.
 	field reflect.StructField
 
 	// The struct field value which the option represents.
 	value reflect.Value
 
-	defaultValue reflect.Value
-	iniUsedName  string
-	tag          multiTag
+	// Determines if the option will be always quoted in the INI output
+	iniQuote bool
+
+	tag   multiTag
+	isSet bool
+}
+
+// LongNameWithNamespace returns the option's long name with the group namespaces
+// prepended by walking up the option's group tree. Namespaces and the long name
+// itself are separated by the parser's namespace delimiter. If the long name is
+// empty an empty string is returned.
+func (option *Option) LongNameWithNamespace() string {
+	if len(option.LongName) == 0 {
+		return ""
+	}
+
+	// fetch the namespace delimiter from the parser which is always at the
+	// end of the group hierarchy
+	namespaceDelimiter := ""
+	g := option.group
+
+	for {
+		if p, ok := g.parent.(*Parser); ok {
+			namespaceDelimiter = p.NamespaceDelimiter
+
+			break
+		}
+
+		switch i := g.parent.(type) {
+		case *Command:
+			g = i.Group
+		case *Group:
+			g = i
+		}
+	}
+
+	// concatenate long name with namespace
+	longName := option.LongName
+	g = option.group
+
+	for g != nil {
+		if g.Namespace != "" {
+			longName = g.Namespace + namespaceDelimiter + longName
+		}
+
+		switch i := g.parent.(type) {
+		case *Command:
+			g = i.Group
+		case *Group:
+			g = i
+		case *Parser:
+			g = nil
+		}
+	}
+
+	return longName
 }
 
 // String converts an option to a human friendly readable string describing the
@@ -78,12 +140,12 @@ func (option *Option) String() string {
 		if len(option.LongName) != 0 {
 			s = fmt.Sprintf("%s%s, %s%s",
 				string(defaultShortOptDelimiter), short,
-				defaultLongOptDelimiter, option.LongName)
+				defaultLongOptDelimiter, option.LongNameWithNamespace())
 		} else {
 			s = fmt.Sprintf("%s%s", string(defaultShortOptDelimiter), short)
 		}
 	} else if len(option.LongName) != 0 {
-		s = fmt.Sprintf("%s%s", defaultLongOptDelimiter, option.LongName)
+		s = fmt.Sprintf("%s%s", defaultLongOptDelimiter, option.LongNameWithNamespace())
 	}
 
 	return s

@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestShortRequired(t *testing.T) {
 		Value bool `short:"v" required:"true"`
 	}{}
 
-	assertParseFail(t, ErrRequired, "the required flag `-v' was not specified", &opts)
+	assertParseFail(t, ErrRequired, fmt.Sprintf("the required flag `%cv' was not specified", defaultShortOptDelimiter), &opts)
 }
 
 func TestShortMultiConcat(t *testing.T) {
@@ -143,7 +144,7 @@ func TestShortMultiWithEqualArg(t *testing.T) {
 		Value string `short:"v"`
 	}{}
 
-	assertParseFail(t, ErrExpectedArgument, "expected argument for flag `-v'", &opts, "-ffv=value")
+	assertParseFail(t, ErrExpectedArgument, fmt.Sprintf("expected argument for flag `%cv'", defaultShortOptDelimiter), &opts, "-ffv=value")
 }
 
 func TestShortMultiArg(t *testing.T) {
@@ -165,7 +166,7 @@ func TestShortMultiArgConcatFail(t *testing.T) {
 		Value string `short:"v"`
 	}{}
 
-	assertParseFail(t, ErrExpectedArgument, "expected argument for flag `-v'", &opts, "-ffvvalue")
+	assertParseFail(t, ErrExpectedArgument, fmt.Sprintf("expected argument for flag `%cv'", defaultShortOptDelimiter), &opts, "-ffvvalue")
 }
 
 func TestShortMultiArgConcat(t *testing.T) {

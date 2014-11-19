@@ -35,6 +35,10 @@ type JSONInputReader struct {
 	// separator. It is a reader consisting of the decoder's buffer and the
 	// underlying reader
 	separatorReader io.Reader
+
+	// numDecoders is the number of concurrent goroutines to allow to be used
+	// for decoding the input stream
+	numDecoders int
 }
 
 // JSONConvertibleDoc implements the ConvertibleDoc interface for JSON input
@@ -60,12 +64,13 @@ var (
 
 // NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader
-func NewJSONInputReader(isArray bool, in io.Reader) *JSONInputReader {
+func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
 	return &JSONInputReader{
 		IsArray:            isArray,
 		Decoder:            json.NewDecoder(in),
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
+		numDecoders:        numDecoders,
 	}
 }
 
@@ -90,7 +95,7 @@ func (jsonInputReader *JSONInputReader) ReadHeadersFromSource() ([]string, error
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
 func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
-	rawChan := make(chan ConvertibleDoc, numDecodingWorkers)
+	rawChan := make(chan ConvertibleDoc, jsonInputReader.numDecoders)
 	var err error
 	go func() {
 		for {
@@ -116,7 +121,7 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 			jsonInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, rawChan, readChan, errChan)
+	streamDocuments(ordered, jsonInputReader.numDecoders, rawChan, readChan, errChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for JSON input. It
@@ -126,7 +131,7 @@ func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", 1, err)
 	}
-	log.Logf(log.DebugLow, "got line: %v", document)
+	log.Logf(log.DebugHigh, "got line: %v", document)
 	// TODO: perhaps move this to decode.go
 	bsonD, err := bsonutil.GetExtendedBsonD(document)
 	if err != nil {

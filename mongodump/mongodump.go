@@ -49,9 +49,6 @@ type MongoDump struct {
 
 // ValidateOptions checks for any incompatible sets of options
 func (dump *MongoDump) ValidateOptions() error {
-	if err := dump.ToolOptions.Validate(); err != nil {
-		return err
-	}
 	switch {
 	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Namespace.Collection == "":
 		return fmt.Errorf("can only dump a single collection to stdout")
@@ -75,8 +72,6 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
 	case dump.OutputOptions.Repair && dump.InputOptions.Query != "":
 		return fmt.Errorf("cannot run a query with --repair enabled")
-	case dump.OutputOptions.JobThreads < 1:
-		return fmt.Errorf("number of processing threads must be >= 1")
 	}
 	return nil
 }
@@ -260,7 +255,10 @@ func (dump *MongoDump) Dump() error {
 func (dump *MongoDump) DumpIntents() error {
 	resultChan := make(chan error)
 
-	jobs := dump.OutputOptions.JobThreads
+	jobs := dump.ToolOptions.HiddenOptions.MaxProcs
+	if jobs <= 0 {
+		jobs = 1
+	}
 	if jobs > 1 {
 		dump.manager.Finalize(intents.LongestTaskFirst)
 	} else {

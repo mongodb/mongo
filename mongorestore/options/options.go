@@ -14,17 +14,13 @@ func (self *InputOptions) Name() string {
 }
 
 type OutputOptions struct {
-	Drop             bool   `long:"drop" description:"Drop each collection before import"`
-	WriteConcern     string `long:"writeConcern" default:"majority" description:"Write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
-	NoIndexRestore   bool   `long:"noIndexRestore" description:"Don't restore indexes"`
-	NoOptionsRestore bool   `long:"noOptionsRestore" description:"Don't restore options"`
-	KeepIndexVersion bool   `long:"keepIndexVersion" description:"Don't update index version"`
-
-	JobThreads       int  `long:"numParallelCollections" short:"j" description:"Number of collections to restore in parallel" default:"4"`
-	BulkWriters      int  `long:"numInsertionWorkersPerCollection" description:"Number of insert connections per collection" default:"1"`
-	BulkBufferSize   int  `long:"batchSize" description:"Maximum number of documents to coalesce into a single bulk insertion" default:"10000"`
-	PreserveDocOrder bool `long:"preserveOrder" description:"Preserve order of documents during restoration"`
-	// TODO: add hidden option for NumOSThreads to set GOMAXPROCS on CLI
+	Drop                   bool   `long:"drop" description:"Drop each collection before import"`
+	WriteConcern           string `long:"writeConcern" default:"majority" description:"Write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}'"`
+	NoIndexRestore         bool   `long:"noIndexRestore" description:"Don't restore indexes"`
+	NoOptionsRestore       bool   `long:"noOptionsRestore" description:"Don't restore options"`
+	KeepIndexVersion       bool   `long:"keepIndexVersion" description:"Don't update index version"`
+	MaintainInsertionOrder bool   `long:"maintainInsertionOrder" description:"Preserve order of documents during restoration"`
+	NumParallelCollections int    `long:"numParallelCollections" short:"j" description:"Number of collections to restore in parallel" default:"4"`
 }
 
 func (self *OutputOptions) Name() string {
