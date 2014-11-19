@@ -1061,7 +1061,6 @@ namespace {
         bool needRestore = false;
 
         if ( _forParallelCollectionScan ) {
-            invariant( _savedRecoveryUnit != txn->recoveryUnit() );
             // parallel collection scan or something
             needRestore = true;
             _savedRecoveryUnit = txn->recoveryUnit();
