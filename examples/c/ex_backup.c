@@ -40,12 +40,12 @@
 
 #include <wiredtiger.h>
 
-static const char *home = "WT_HOME_LOG";
-static const char *home_full = "WT_HOME_LOG_FULL";
-static const char *home_incr = "WT_HOME_LOG_INCR";
+static const char * const home = "WT_HOME_LOG";
+static const char * const home_full = "WT_HOME_LOG_FULL";
+static const char * const home_incr = "WT_HOME_LOG_INCR";
 
-static const char *full_out = "./backup_full";
-static const char *incr_out = "./backup_incr";
+static const char * const full_out = "./backup_full";
+static const char * const incr_out = "./backup_incr";
 
 static const char * const uri = "table:logtest";
 
