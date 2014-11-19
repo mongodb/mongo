@@ -3,19 +3,29 @@ Building MongoDB
 
 To build MongoDB, you will need:
 
-* A modern C++ compiler. MongoDB has been tested with Clang 3.x, GCC 4.1+, and Visual Studio 201x. Older versions
-of the compilers are not supported.
+* A modern C++ compiler. One of the following is required.
+    * GCC 4.8.2 or newer
+    * Clang 3.4 (or Apple XCode 5.1.1 Clang) or newer
+    * Visual Studio 2013 Update 2 or newer
 * Python 2.7
 * SCons 2.3
 
 for the target x86, or x86-64 platform. More detailed platform instructions can be found below.
+
+MongoDB Tools
+--------------
+
+The MongoDB command line tools (mongodump, mongorestore, mongoimport, mongoexport, etc)
+have been rewritten in [Go](http://golang.org/) and are no longer included in this repository.
+
+The source for the tools is now available at [mongodb/mongo-tools](https://github.com/mongodb/mongo-tools).
 
 SCons
 ---------------
 
 For detail information about building, please see [the build manual](http://www.mongodb.org/about/contributors/tutorial/build-mongodb-from-source/)
 
-If you want to build everything (mongod, mongo, tools, etc):
+If you want to build everything (mongod, mongo, tests, etc):
 
     $ scons all
 
@@ -36,7 +46,6 @@ SCons Targets
 * mongos
 * mongo
 * core (includes mongod, mongos, mongo)
-* tools (includes all tools)
 * all
 
 Windows
@@ -45,10 +54,9 @@ Windows
 See [the windows build manual](http://www.mongodb.org/about/contributors/tutorial/build-mongodb-from-source/#windows-specific-instructions)
 
 Build requirements:
-* VC++ 2010 Express or later, OR Visual Studio 2010 or later
+* Visual Studio 2013 Update 2 or newer
 * Python 2.7, ActiveState ActivePython 2.7.x Community Edition for Windows is recommended
 * SCons
-* Boost 1.35 (or higher)
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
 
