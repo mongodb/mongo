@@ -55,7 +55,7 @@ static const char * const uri = "table:logtest";
 #define	MAX_KEYS	10000
 
 static int
-compare_backups(WT_SESSION *session, int i)
+compare_backups(int i)
 {
 	int ret;
 	char buf[1024], msg[8];
@@ -312,7 +312,7 @@ main(void)
 		 */
 		ret = take_incr_backup(session, i);
 
-		ret = compare_backups(session, i);
+		ret = compare_backups(i);
 	}
 
 	/*
@@ -320,6 +320,6 @@ main(void)
 	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
-	ret = compare_backups(session, 0);
+	ret = compare_backups(0);
 	return (ret);
 }
