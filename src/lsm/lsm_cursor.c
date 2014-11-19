@@ -33,14 +33,18 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	int have_primary, ovfl, waited;
 
 	lsm_tree = clsm->lsm_tree;
-	if (clsm->nchunks == 0 ||
-	    (primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
-		return (0);
-	session = (WT_SESSION_IMPL *)primary->session;
-	primary_chunk = clsm->primary_chunk;
-	have_primary = (primary_chunk != NULL &&
-	    primary_chunk->switch_txn == WT_TXN_NONE);
 	ovfl = 0;
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+
+	if (clsm->nchunks == 0)
+		have_primary = 0;
+	else {
+		if ((primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
+			return (0);
+		primary_chunk = clsm->primary_chunk;
+		have_primary = (primary_chunk != NULL &&
+		    primary_chunk->switch_txn == WT_TXN_NONE);
+	}
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree

@@ -498,10 +498,8 @@ __lsm_tree_open(
 	 */
 	WT_ERR(__lsm_tree_open_check(session, lsm_tree));
 
-	if (lsm_tree->nchunks == 0) {
+	if (lsm_tree->nchunks == 0)
 		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
-	}
 
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
