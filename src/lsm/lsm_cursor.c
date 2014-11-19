@@ -36,9 +36,10 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	ovfl = 0;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
-	if (clsm->nchunks == 0)
+	if (clsm->nchunks == 0) {
+		primary = NULL;
 		have_primary = 0;
-	else {
+	} else {
 		if ((primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
 			return (0);
 		primary_chunk = clsm->primary_chunk;
