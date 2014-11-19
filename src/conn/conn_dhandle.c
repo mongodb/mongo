@@ -189,7 +189,6 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
-	dhandle->session_ref = 1;
 
 	dhandle->name_hash = __wt_hash_city64(name, strlen(name));
 	WT_ERR(__wt_strdup(session, name, &dhandle->name));
