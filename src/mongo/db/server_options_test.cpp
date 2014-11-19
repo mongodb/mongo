@@ -368,7 +368,7 @@ namespace {
                          "            verbosity: 0\n"
                          "        storage:\n"
                          "            verbosity: -1\n"
-                         "            journaling:\n"
+                         "            journal:\n"
                          "                verbosity: 2\n");
 
         ASSERT_OK(parser.run(options, argv, env_map, &environment));
