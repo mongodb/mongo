@@ -99,8 +99,16 @@ namespace repl {
             }
 
             const MemberState memberState = replCoord->getCurrentMemberState();
-            if (replCoord->getCurrentMemberState().arbiter()) {
+
+            // An arbiter can never transition to any other state, and doesn't replicate, ever
+            if (memberState.arbiter()) {
                 break;
+            }
+
+            // If we are removed then we don't belong to the set anymore
+            if (memberState.removed()) {
+                sleepsecs(5);
+                continue;
             }
 
             try {
