@@ -36,6 +36,7 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_optime.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
@@ -1007,9 +1008,11 @@ namespace {
         const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
         const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
-        ReplicationCoordinatorExternalState::ScopedLocker lk(
-                txn, _externalState->getGlobalSharedLockAcquirer(), stepdownTime);
-        if (!lk.gotLock()) {
+        boost::scoped_ptr<Lock::GlobalRead> lk;
+        try {
+            lk.reset(new Lock::GlobalRead(txn->lockState(), stepdownTime.total_milliseconds()));
+        }
+        catch (const DBTryLockTimeoutException&) {
             return Status(ErrorCodes::ExceededTimeLimit,
                           "Could not acquire the global shared lock within the amount of time "
                                   "specified that we should step down for");

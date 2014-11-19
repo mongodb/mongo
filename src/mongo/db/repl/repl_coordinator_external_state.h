@@ -55,9 +55,6 @@ namespace repl {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalState);
     public:
 
-        class GlobalSharedLockAcquirer;
-        class ScopedLocker;
-
         ReplicationCoordinatorExternalState();
         virtual ~ReplicationCoordinatorExternalState();
 
@@ -146,12 +143,6 @@ namespace repl {
         virtual void signalApplierToChooseNewSyncSource() = 0;
 
         /**
-         * Returns an instance of GlobalSharedLockAcquirer that can be used to acquire the global
-         * shared lock.
-         */
-        virtual GlobalSharedLockAcquirer* getGlobalSharedLockAcquirer() = 0;
-
-        /**
          * Returns an OperationContext, owned by the caller, that may be used in methods of
          * the same instance that require an OperationContext.
          */
@@ -164,40 +155,6 @@ namespace repl {
          * for "txn".
          */
         virtual void dropAllTempCollections(OperationContext* txn) = 0;
-    };
-
-    /**
-     * Interface that encapsulates acquiring the global shared lock.
-     */
-    class ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer {
-    public:
-
-        virtual ~GlobalSharedLockAcquirer();
-
-        virtual bool try_lock(OperationContext* txn, const Milliseconds& timeout) = 0;
-    };
-
-    /**
-     * Class used to acquire the global shared lock, using a given implementation of
-     * GlobalSharedLockAcquirer.
-     */
-    class ReplicationCoordinatorExternalState::ScopedLocker {
-    public:
-
-        /**
-         * Takes ownership of the passed in GlobalSharedLockAcquirer.
-         */
-        ScopedLocker(OperationContext* txn,
-                     GlobalSharedLockAcquirer* locker,
-                     const Milliseconds& timeout);
-        ~ScopedLocker();
-
-        bool gotLock() const;
-
-    private:
-
-        boost::scoped_ptr<ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer> _locker;
-        bool _gotLock;
     };
 
 } // namespace repl

@@ -59,8 +59,6 @@ namespace repl {
         virtual void closeConnections();
         virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
-        virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
-                getGlobalSharedLockAcquirer();
         virtual OperationContext* createOperationContext(const std::string& threadName);
         virtual void dropAllTempCollections(OperationContext* txn);
 
