@@ -216,7 +216,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	 * generations.
 	 */
 	if (nchunks < merge_min ||
-	    chunk->generation > youngest->generation + max_gap) {
+	    lsm_tree->chunk[end_chunk]->generation >
+	    youngest->generation + max_gap) {
 		for (i = 0; i < nchunks; i++) {
 			chunk = lsm_tree->chunk[start_chunk + i];
 			WT_ASSERT(session,
@@ -354,15 +355,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 				WT_ERR(EINTR);
-			/*
-			 * Help out with switching chunks in case the
-			 * checkpoint worker is busy.
-			 */
-			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-				WT_WITH_SCHEMA_LOCK(session, ret =
-				    __wt_lsm_tree_switch(session, lsm_tree));
-				WT_ERR(ret);
-			}
+
 			WT_STAT_FAST_CONN_INCRV(session,
 			    lsm_rows_merged, LSM_MERGE_CHECK_INTERVAL);
 			++lsm_tree->merge_progressing;
@@ -506,11 +499,14 @@ err:	if (locked)
 		WT_TRET(__wt_bloom_close(bloom));
 	if (ret != 0 && created_chunk) {
 		/* Drop the newly-created files on error. */
-		WT_WITH_SCHEMA_LOCK(session,
-		    tret = __wt_schema_drop(session, chunk->uri, drop_cfg));
-		WT_TRET(tret);
-		if (create_bloom) {
-			WT_WITH_SCHEMA_LOCK(session, tret = __wt_schema_drop(
+		if (chunk->uri != NULL) {
+			WT_WITH_SCHEMA_LOCK(session, tret =
+			    __wt_schema_drop(session, chunk->uri, drop_cfg));
+			WT_TRET(tret);
+		}
+		if (create_bloom && chunk->bloom_uri != NULL) {
+			WT_WITH_SCHEMA_LOCK(session,
+			    tret = __wt_schema_drop(
 			    session, chunk->bloom_uri, drop_cfg));
 			WT_TRET(tret);
 		}

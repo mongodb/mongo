@@ -84,11 +84,11 @@ err:	if (cursor != NULL)
 }
 
 /*
- * __checkpoint_apply --
+ * __checkpoint_apply_all --
  *	Apply an operation to all files involved in a checkpoint.
  */
 static int
-__checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
+__checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 	int (*op)(WT_SESSION_IMPL *, const char *[]), int *fullp)
 {
 	WT_CONFIG targetconf;
@@ -167,6 +167,33 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
+ * __checkpoint_apply --
+ *	Apply an operation to all handles locked for a checkpoint.
+ */
+static int
+__checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
+	int (*op)(WT_SESSION_IMPL *, const char *[]))
+{
+	WT_DECL_RET;
+	u_int i;
+
+	/* If we have already locked the handles, apply the operation. */
+	for (i = 0; i < session->ckpt_handle_next; ++i) {
+		if (session->ckpt_handle[i].dhandle != NULL)
+			WT_WITH_DHANDLE(session,
+			    session->ckpt_handle[i].dhandle,
+			    ret = (*op)(session, cfg));
+		else
+			WT_WITH_DHANDLE_LOCK(session,
+			    ret = __wt_conn_btree_apply_single(session,
+			    session->ckpt_handle[i].name, NULL, op, cfg));
+		WT_RET(ret);
+	}
+
+	return (0);
+}
+
+/*
  * __checkpoint_data_source --
  *	Checkpoint all data sources.
  */
@@ -217,8 +244,7 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Should not be called with anything other than a file object. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
-	WT_ASSERT(session,
-	    memcmp(session->dhandle->name, "file:", strlen("file:")) == 0);
+	WT_ASSERT(session, WT_PREFIX_MATCH(session->dhandle->name, "file:"));
 
 	/* Make sure there is space for the next entry. */
 	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
@@ -229,17 +255,14 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	saved_dhandle = session->dhandle;
 	session->dhandle = NULL;
 
-	/* Ignore busy files, we'll deal with them in the checkpoint. */
-	switch (ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) {
-	case 0:
-		session->ckpt_handle[
-		    session->ckpt_handle_next++] = session->dhandle;
-		break;
-	case EBUSY:
+	/* Record busy file names, we'll deal with them in the checkpoint. */
+	if ((ret = __wt_session_get_btree(session, name, NULL, NULL, 0)) == 0)
+		session->ckpt_handle[session->ckpt_handle_next++].dhandle =
+		    session->dhandle;
+	else if (ret == EBUSY) {
 		ret = 0;
-		break;
-	default:
-		break;
+		WT_RET(__wt_strdup(session, name,
+		    &session->ckpt_handle[session->ckpt_handle_next++].name));
 	}
 
 	session->dhandle = saved_dhandle;
@@ -253,48 +276,9 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_DECL_RET;
-	u_int i;
+	WT_UNUSED(cfg);
 
-	/* Should not be called with any handle reference. */
-	WT_ASSERT(session, session->dhandle == NULL);
-
-	/*
-	 * Get a list of handles we want to flush; this may pull closed objects
-	 * into the session cache, but we're going to do that eventually anyway.
-	 */
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __checkpoint_apply(session, cfg, __wt_checkpoint_list, NULL));
-	WT_ERR(ret);
-
-	/* Walk the list, flushing the leaf pages from each file. */
-	for (i = 0; i < session->ckpt_handle_next; ++i) {
-		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
-		    ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
-		WT_ERR(ret);
-	}
-
-	/*
-	 * The underlying flush routine scheduled an asynchronous flush after
-	 * writing the leaf pages, but in order to minimize I/O while holding
-	 * the schema lock, do a flush and wait for the completion. Do it after
-	 * flushing the pages to give the asynchronous flush as much time as
-	 * possible before we wait.
-	 */
-	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		for (i = 0; i < session->ckpt_handle_next; ++i) {
-			WT_WITH_DHANDLE(session, session->ckpt_handle[i],
-			    ret = __wt_checkpoint_sync(session, NULL));
-			WT_ERR(ret);
-		}
-
-err:	for (i = 0; i < session->ckpt_handle_next; ++i)
-		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
-		    WT_TRET(__wt_session_release_btree(session)));
-
-	__wt_free(session, session->ckpt_handle);
-	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
-	return (ret);
+	return (__wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
 }
 
 /*
@@ -333,11 +317,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
-	int full, logging, tracking;
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, session_begin_transaction),
 	      "isolation=snapshot", NULL };
 	void *saved_meta_next;
+	int full, logging, tracking;
+	u_int i;
 
 	conn = S2C(session);
 	saved_isolation = session->isolation;
@@ -348,7 +333,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Do a pass over the configuration arguments and figure out what kind
 	 * kind of checkpoint this is.
 	 */
-	WT_RET(__checkpoint_apply(session, cfg, NULL, &full));
+	WT_RET(__checkpoint_apply_all(session, cfg, NULL, &full));
+
+	/*
+	 * Get a list of handles we want to flush; this may pull closed objects
+	 * into the session cache, but we're going to do that eventually anyway.
+	 */
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_DHANDLE_LOCK(session,
+		ret = __checkpoint_apply_all(
+		session, cfg, __wt_checkpoint_list, NULL)));
+	WT_ERR(ret);
 
 	/*
 	 * Update the global oldest ID so we do all possible cleanup.
@@ -363,7 +358,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_write_leaves(session, cfg));
+	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
+
+	/*
+	 * The underlying flush routine scheduled an asynchronous flush
+	 * after writing the leaf pages, but in order to minimize I/O
+	 * while holding the schema lock, do a flush and wait for the
+	 * completion. Do it after flushing the pages to give the
+	 * asynchronous flush as much time as possible before we wait.
+	 */
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Acquire the schema lock. */
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
@@ -395,7 +400,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		logging = 1;
 	}
 
-	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
 
 	/* Commit the transaction before syncing the file(s). */
 	WT_ERR(__wt_txn_commit(session, NULL));
@@ -405,8 +410,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__checkpoint_apply(
-		    session, cfg, __wt_checkpoint_sync, NULL));
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
@@ -430,6 +434,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
+	WT_ERR(ret);
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC)) {
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __wt_checkpoint_sync(session, NULL));
+		WT_ERR(ret);
+	}
 	if (full) {
 		WT_ERR(__wt_epoch(session, &stop));
 		__checkpoint_stats(session, &start, &stop);
@@ -460,6 +470,18 @@ err:	/*
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
+
+	for (i = 0; i < session->ckpt_handle_next; ++i) {
+		if (session->ckpt_handle[i].dhandle == NULL) {
+			__wt_free(session, session->ckpt_handle[i].name);
+			continue;
+		}
+		WT_WITH_DHANDLE(session, session->ckpt_handle[i].dhandle,
+		    WT_TRET(__wt_session_release_btree(session)));
+	}
+
+	__wt_free(session, session->ckpt_handle);
+	session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
 
 	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);

@@ -15,7 +15,7 @@ util_copyright(void)
 
 	printf("%s\n\n",
 	    "This program is free software: you can redistribute it and/or\n"
-	    "modify it under the terms of version 3 of the GNU General\n"
+	    "modify it under the terms of versions 2 or 3 of the GNU General\n"
 	    "Public License as published by the Free Software Foundation.");
 
 	printf("%s\n\n",

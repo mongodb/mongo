@@ -67,36 +67,41 @@ __wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
 }
 
 /*
- * __wt_log_get_active_files --
+ * __wt_log_get_all_files --
  *	Retrieve the list of active log files (those that are not candidates
  *	for archiving).
  */
 int
-__wt_log_get_active_files(
-	WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
+__wt_log_get_all_files(WT_SESSION_IMPL *session,
+    char ***filesp, u_int *countp, uint32_t *maxid, int active_only)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
 	char **files;
-	uint32_t id;
+	uint32_t id, max;
 	u_int count, i;
 
 	id = 0;
 	log = S2C(session)->log;
 
+	*maxid = 0;
 	WT_RET(__wt_log_get_files(session, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
-	for (i = 0; i < count; ) {
+	for (max = 0, i = 0; i < count; ) {
 		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
-		if (id < log->ckpt_lsn.file) {
+		if (active_only && id < log->ckpt_lsn.file) {
 			__wt_free(session, files[i]);
 			files[i] = files[count - 1];
 			files[--count] = NULL;
-		} else
+		} else {
+			if (id > max)
+				max = id;
 			i++;
+		}
 	}
 
+	*maxid = max;
 	*filesp = files;
 	*countp = count;
 
@@ -546,7 +551,8 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * Pre-allocate on the first real write into the log file.
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD) {
-		if (!log->log_fh->fallocate_available ||
+		if (log->log_fh->fallocate_available ==
+		    WT_FALLOCATE_NOT_AVAILABLE ||
 		    (ret = __wt_fallocate(session, log->log_fh,
 		    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
 			ret = __wt_ftruncate(session, log->log_fh,

@@ -14,7 +14,7 @@
 void
 __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 {
-	fh->fallocate_available = 1;
+	fh->fallocate_available = WT_FALLOCATE_AVAILABLE;
 
 	/*
 	 * We use a separate handle for file size changes, so there's no need

@@ -152,6 +152,7 @@ static const WT_CONFIG_CHECK confchk_index_meta[] = {
 	{ "app_metadata", "string", NULL, NULL },
 	{ "columns", "list", NULL, NULL },
 	{ "extractor", "string", NULL, NULL },
+	{ "immutable", "boolean", NULL, NULL },
 	{ "index_key_columns", "int", NULL, NULL },
 	{ "key_format", "format", NULL, NULL },
 	{ "source", "string", NULL, NULL },
@@ -217,6 +218,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "format", "string", "choices=[\"btree\"]", NULL },
 	{ "huffman_key", "string", NULL, NULL },
 	{ "huffman_value", "string", NULL, NULL },
+	{ "immutable", "boolean", NULL, NULL },
 	{ "internal_item_max", "int", "min=0", NULL },
 	{ "internal_key_truncate", "boolean", NULL, NULL },
 	{ "internal_page_max", "int", "min=512B,max=512MB", NULL },
@@ -560,8 +562,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_file_meta
 	},
 	{ "index.meta",
-	  "app_metadata=,columns=,extractor=,index_key_columns=,"
-	  "key_format=u,source=,type=file,value_format=u",
+	  "app_metadata=,columns=,extractor=,immutable=0,index_key_columns="
+	  ",key_format=u,source=,type=file,value_format=u",
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
@@ -588,7 +590,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checksum=uncompressed,"
 	  "colgroups=,collator=,columns=,dictionary=0,exclusive=0,"
-	  "extractor=,format=btree,huffman_key=,huffman_value=,"
+	  "extractor=,format=btree,huffman_key=,huffman_value=,immutable=0,"
 	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB"
 	  ",key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=32KB,"
 	  "lsm=(auto_throttle=,bloom=,bloom_bit_count=16,bloom_config=,"

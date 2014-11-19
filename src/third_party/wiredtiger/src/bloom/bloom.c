@@ -4,6 +4,11 @@
  *
  * See the file LICENSE for redistribution information.
  */
+/*
+ * Less Hashing, Same Performance: Building a Better Bloom Filter
+ *	by Adam Kirsch, Michael Mitzenmacher
+ *	Random Structures & Algorithms, Volume 33 Issue 2, September 2008
+ */
 
 #include "wt_internal.h"
 

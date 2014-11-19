@@ -71,6 +71,121 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 }
 
 /*
+ * __log_archive_once --
+ *	Perform one iteration of log archiving.  Must be called with the
+ *	log archive lock held.
+ */
+static int
+__log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint32_t lognum, min_lognum;
+	u_int i, locked, logcount;
+	char **logfiles;
+
+	conn = S2C(session);
+	log = conn->log;
+	logcount = 0;
+	logfiles = NULL;
+
+	/*
+	 * If we're coming from a backup cursor we want the smaller of
+	 * the last full log file copied in backup or the checkpoint LSN.
+	 */
+	if (backup_file != 0)
+		min_lognum = WT_MIN(log->ckpt_lsn.file, backup_file);
+	else
+		min_lognum = log->ckpt_lsn.file;
+	WT_RET(__wt_verbose(session, WT_VERB_LOG,
+	    "log_archive: archive to LSN %" PRIu32, min_lognum));
+
+	/*
+	 * Main archive code.  Get the list of all log files and
+	 * remove any earlier than the checkpoint LSN.
+	 */
+	WT_RET(__wt_dirlist(session, conn->log_path,
+	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
+
+	/*
+	 * We can only archive files if a hot backup is not in progress or
+	 * if we are the backup.
+	 */
+	__wt_spin_lock(session, &conn->hot_backup_lock);
+	locked = 1;
+	if (conn->hot_backup == 0 || backup_file != 0) {
+		for (i = 0; i < logcount; i++) {
+			WT_ERR(__wt_log_extract_lognum(
+			    session, logfiles[i], &lognum));
+			if (lognum < min_lognum)
+				WT_ERR(
+				    __wt_log_remove(session, lognum));
+		}
+	}
+	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	locked = 0;
+	__wt_log_files_free(session, logfiles, logcount);
+	logfiles = NULL;
+	logcount = 0;
+
+	/*
+	 * Indicate what is our new earliest LSN.  It is the start
+	 * of the log file containing the last checkpoint.
+	 */
+	log->first_lsn.file = min_lognum;
+	log->first_lsn.offset = 0;
+
+	if (0) {
+err:		__wt_err(session, ret, "log archive server error");
+	}
+	if (locked)
+		__wt_spin_unlock(session, &conn->hot_backup_lock);
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
+	return (ret);
+}
+
+/*
+ * __wt_log_truncate_files --
+ *	Truncate log files via archive once. Requires that the server is not
+ *	currently running.
+ */
+int
+__wt_log_truncate_files(
+    WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint32_t backup_file, locked;
+
+	WT_UNUSED(cfg);
+	conn = S2C(session);
+	log = conn->log;
+	if (F_ISSET(conn, WT_CONN_SERVER_RUN) && conn->archive)
+		WT_RET_MSG(session, EINVAL,
+		    "Attempt to archive manually while a server is running");
+
+	backup_file = 0;
+	if (cursor != NULL)
+		backup_file = WT_CURSOR_BACKUP_ID(cursor);
+	WT_ASSERT(session, backup_file <= log->alloc_lsn.file);
+	WT_RET(__wt_verbose(session, WT_VERB_LOG,
+	    "log_truncate: Archive once up to %" PRIu32,
+	    backup_file));
+	WT_RET(__wt_writelock(session, log->log_archive_lock));
+	locked = 1;
+	WT_ERR(__log_archive_once(session, backup_file));
+	WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
+	locked = 0;
+err:
+	if (locked)
+		WT_RET(__wt_writeunlock(session, log->log_archive_lock));
+	return (ret);
+}
+
+/*
  * __log_archive_server --
  *	The log archiving server thread.
  */
@@ -80,18 +195,13 @@ __log_archive_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LSN lsn;
 	WT_SESSION_IMPL *session;
-	uint32_t lognum;
-	u_int i, locked_archive, locked_backup, logcount;
-	char **logfiles;
+	u_int locked;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked_archive = locked_backup = logcount = 0;
-	logfiles = NULL;
-
+	locked = 0;
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
 		 * If archiving is reconfigured and turned off, wait until it
@@ -110,62 +220,23 @@ __log_archive_server(void *arg)
 			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
 		}
-
-		locked_archive = 1;
-		lsn = log->ckpt_lsn;
-		lsn.offset = 0;
-		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-		    "log_archive: ckpt LSN %" PRIu32 ",%" PRIu64,
-		    lsn.file, lsn.offset));
+		locked = 1;
 		/*
-		 * Main archive code.  Get the list of all log files and
-		 * remove any earlier than the checkpoint LSN.
+		 * Perform the archive.
 		 */
-		WT_ERR(__wt_dirlist(session, conn->log_path,
-		    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
-
-		/*
-		 * We can only archive files if a hot backup is not in progress.
-		 */
-		__wt_spin_lock(session, &conn->hot_backup_lock);
-		locked_backup = 1;
-		for (i = 0; i < logcount; i++) {
-			if (conn->hot_backup == 0) {
-				WT_ERR(__wt_log_extract_lognum(
-				    session, logfiles[i], &lognum));
-				if (lognum < lsn.file)
-					WT_ERR(
-					    __wt_log_remove(session, lognum));
-			}
-		}
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
-		locked_backup = 0;
-		__wt_log_files_free(session, logfiles, logcount);
-		logfiles = NULL;
-		logcount = 0;
-
-		/*
-		 * Indicate what is our new earliest LSN.  It is the start
-		 * of the log file containing the last checkpoint.
-		 */
-		log->first_lsn = lsn;
-		log->first_lsn.offset = 0;
+		WT_ERR(__log_archive_once(session, 0));
 		WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
-		locked_archive = 0;
+		locked = 0;
 
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
 	}
 
 	if (0) {
-err:		WT_PANIC_MSG(session, ret, "log archive server error");
+err:		__wt_err(session, ret, "log archive server error");
 	}
-	if (locked_archive)
-		WT_TRET(__wt_writeunlock(session, log->log_archive_lock));
-	if (locked_backup)
-		__wt_spin_unlock(session, &conn->hot_backup_lock);
-	if (logfiles != NULL)
-		__wt_log_files_free(session, logfiles, logcount);
+	if (locked)
+		(void)__wt_writeunlock(session, log->log_archive_lock);
 	return (NULL);
 }
 

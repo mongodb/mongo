@@ -24,6 +24,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+/*
+ * Slicing-by-8 algorithm by Michael E. Kounavis and Frank L. Berry, described
+ * in "Novel Table Lookup-Based Algorithms for High-Performance CRC Generation",
+ * IEEE Transactions on Computers, Volume 57 Issue 11, November 2008.
+ *
+ * See also Peter Kanowski's posting:
+ *	http://www.strchr.com/crc32_popcnt
+ *
+ * The big endian version calculates the same result at each step, except the
+ * value of the crc is byte reversed from what it would be at that step for
+ * little endian.
+ */
 
 #include "wt_internal.h"
 
@@ -1093,17 +1105,6 @@ static const uint32_t g_crc_slicing[8][256] = {
 /*
  * __wt_cksum_sw --
  *	Return a checksum for a chunk of memory, computed in software.
- *
- * Slicing-by-8 algorithm by Michael E. Kounavis and Frank L. Berry from
- * Intel Corp.:
- * http://www.intel.com/technology/comms/perfnet/download/CRC_generators.pdf
- *
- * Based on Peter Kanowski's posting:
- *	http://www.strchr.com/crc32_popcnt
- *
- * The big endian version calculates the same result at each step, except the
- * value of the crc is byte reversed from what it would be at that step for
- * little endian.
  */
 static uint32_t
 __wt_cksum_sw(const void *chunk, size_t len)

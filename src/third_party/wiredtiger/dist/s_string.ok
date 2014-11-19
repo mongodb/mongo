@@ -92,6 +92,7 @@ EMSG
 EMail
 ENOENT
 ENOMEM
+ENOSYS
 ENOTSUP
 ENV
 EOF
@@ -118,6 +119,7 @@ FOREACH
 FREAD
 FREELIST
 FTRUNCATE
+FULLFSYNC
 Fasttrack
 Filesystems
 FindFirstFile
@@ -143,6 +145,7 @@ GetModuleHandleEx
 GetProcAddress
 Givargis
 Google
+HFS
 HHHH
 HHHHLL
 HHHLL
@@ -154,6 +157,7 @@ IFF
 IKEY
 IMPL
 IMPL's
+INCR
 INDX
 INIT
 INITIALIZER
@@ -219,6 +223,7 @@ Marsaglia's
 Mellor
 Metadata
 Mewhort
+Mitzenmacher
 MoveFile
 Multi
 Multithreaded
@@ -268,6 +273,7 @@ REF's
 REFs
 REQ
 RET
+RHEL
 RLE
 RNG
 ROCKSDB
@@ -327,6 +333,7 @@ Timespec
 Timestamp
 TryCV
 TxnID
+UDF
 UID
 UIDs
 UINT
@@ -658,6 +665,7 @@ hval
 hw
 iS
 iSh
+ibackup
 icount
 idx
 ifdef's
