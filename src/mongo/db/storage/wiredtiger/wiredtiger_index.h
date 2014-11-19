@@ -103,10 +103,6 @@ namespace mongo {
                                const DiskLoc& loc,
                                bool dupsAllowed ) = 0;
 
-        class BulkBuilder;
-        class StandardBulkBuilder;
-        class UniqueBulkBuilder;
-
         class IndexCursor : public SortedDataInterface::Cursor {
         public:
             IndexCursor(const WiredTigerIndex& idx,
