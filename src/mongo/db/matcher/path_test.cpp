@@ -32,6 +32,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/db/matcher/path.h"
 
 namespace mongo {
@@ -328,6 +329,94 @@ namespace mongo {
         BSONElementIterator cursor( &p, doc );
 
         // The path "a.b.x" matches no elements.
+        ASSERT( !cursor.more() );
+    }
+
+    // When multiple arrays are traversed implicitly in the same path,
+    // ElementIterator::Context::arrayOffset() should always refer to the current offset of the
+    // outermost array that is implicitly traversed.
+    TEST( Path, NestedArrayImplicitTraversal ) {
+        ElementPath p;
+        ASSERT( p.init( "a.b" ).isOK() );
+        BSONObj doc = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( cursor.more() );
+        ElementIterator::Context e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 2, e.element().numberInt() );
+        ASSERT_EQUALS( "0", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 3, e.element().numberInt() );
+        ASSERT_EQUALS( "0", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( Array, e.element().type() );
+        ASSERT_EQUALS( BSON( "0" << 2 << "1" << 3 ), e.element().Obj() );
+        ASSERT_EQUALS( "0", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 4, e.element().numberInt() );
+        ASSERT_EQUALS( "1", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 5, e.element().numberInt() );
+        ASSERT_EQUALS( "1", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( Array, e.element().type() );
+        ASSERT_EQUALS( BSON( "0" << 4 << "1" << 5 ), e.element().Obj() );
+        ASSERT_EQUALS( "1", e.arrayOffset().fieldNameStringData() );
+
+        ASSERT( !cursor.more() );
+    }
+
+    // SERVER-14886: when an array is being traversed explictly at the same time that a nested array
+    // is being traversed implicitly, ElementIterator::Context::arrayOffset() should return the
+    // current offset of the array being implicitly traversed.
+    TEST( Path, ArrayOffsetWithImplicitAndExplicitTraversal ) {
+        ElementPath p;
+        ASSERT( p.init( "a.0.b" ).isOK() );
+        BSONObj doc = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
+        BSONElementIterator cursor( &p, doc );
+
+        ASSERT( cursor.more() );
+        ElementIterator::Context e = cursor.next();
+        ASSERT_EQUALS( EOO, e.element().type() );
+        ASSERT_EQUALS( "0", e.arrayOffset().fieldNameStringData() ); // First elt of outer array.
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 2, e.element().numberInt() );
+        ASSERT_EQUALS( "0", e.arrayOffset().fieldNameStringData() ); // First elt of inner array.
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( NumberInt, e.element().type() );
+        ASSERT_EQUALS( 3, e.element().numberInt() );
+        ASSERT_EQUALS( "1", e.arrayOffset().fieldNameStringData() ); // Second elt of inner array.
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( Array, e.element().type() );
+        ASSERT_EQUALS( BSON( "0" << 2 << "1" << 3 ), e.element().Obj() );
+        ASSERT( e.arrayOffset().eoo() );
+
+        ASSERT( cursor.more() );
+        e = cursor.next();
+        ASSERT_EQUALS( EOO, e.element().type() );
+        ASSERT_EQUALS( "1", e.arrayOffset().fieldNameStringData() ); // Second elt of outer array.
+
         ASSERT( !cursor.more() );
     }
 

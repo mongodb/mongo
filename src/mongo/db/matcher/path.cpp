@@ -310,7 +310,14 @@ namespace mongo {
     ElementIterator::Context BSONElementIterator::next() {
         if ( _subCursor ) {
             Context e = _subCursor->next();
-            e.setArrayOffset( _arrayIterationState._current );
+            // Use our array offset if we have one, otherwise copy our subcursor's.  This has the
+            // effect of preferring the outermost array offset, in the case where we are implicitly
+            // traversing nested arrays and have multiple candidate array offsets.  For example,
+            // when we use the path "a.b" to generate elements from the document {a: [{b: [1, 2]}]},
+            // the element with a value of 2 should be returned with an array offset of 0.
+            if ( !_arrayIterationState._current.eoo() ) {
+                e.setArrayOffset( _arrayIterationState._current );
+            }
             return e;
         }
         Context x = _next;
