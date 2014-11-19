@@ -54,6 +54,7 @@ using mongo::HostAndPort;
 using mongo::MockReplicaSet;
 using mongo::ReadPreference;
 using mongo::ReadPreferenceSetting;
+using mongo::repl::ReplicaSetConfig;
 using mongo::ReplicaSetMonitor;
 using mongo::ReplicaSetMonitorPtr;
 using mongo::ScopedDbConnection;
@@ -1429,6 +1430,37 @@ namespace mongo_test {
         monitor->startOrContinueRefresh().refreshAll();
     }
 
+namespace {
+    /**
+     * Takes a ReplicaSetConfig and a node to remove and returns a new config with equivalent
+     * members minus the one specified to be removed.  NOTE: Does not copy over properties of the
+     * members other than their id and host.
+     */
+    ReplicaSetConfig _getConfigWithMemberRemoved(
+            const ReplicaSetConfig& oldConfig, const HostAndPort& toRemove) {
+        BSONObjBuilder newConfigBuilder;
+        newConfigBuilder.append("_id", oldConfig.getReplSetName());
+        newConfigBuilder.append("version", oldConfig.getConfigVersion());
+
+        BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
+        for (ReplicaSetConfig::MemberIterator member = oldConfig.membersBegin();
+                member != oldConfig.membersEnd(); ++member) {
+            if (member->getHostAndPort() == toRemove) {
+                continue;
+            }
+
+            membersBuilder.append(BSON("_id" << member->getId() <<
+                                       "host" << member->getHostAndPort().toString()));
+        }
+
+        membersBuilder.done();
+        ReplicaSetConfig newConfig;
+        ASSERT_OK(newConfig.initialize(newConfigBuilder.obj()));
+        ASSERT_OK(newConfig.validate());
+        return newConfig;
+    }
+} // namespace
+
     // Stress test case for a node that is previously a primary being removed from the set.
     // This test goes through configurations with different positions for the primary node
     // in the host list returned from the isMaster command. The test here is to make sure
@@ -1445,11 +1477,10 @@ namespace mongo_test {
         seedList.insert(HostAndPort(replSet.getPrimary()));
         ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
 
-        const MockReplicaSet::ReplConfigMap origConfig = replSet.getReplConfig();
+        const ReplicaSetConfig& origConfig = replSet.getReplConfig();
         mongo::ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(replSetName);
 
         for (size_t idxToRemove = 0; idxToRemove < NODE_COUNT; idxToRemove++) {
-            MockReplicaSet::ReplConfigMap newConfig = origConfig;
 
             replSet.setConfig(origConfig);
             // Make sure the monitor sees the change
@@ -1470,9 +1501,10 @@ namespace mongo_test {
             // Make sure the monitor sees the new primary
             replMonitor->startOrContinueRefresh().refreshAll();
 
-            newConfig.erase(hostToRemove);
+            mongo::repl::ReplicaSetConfig newConfig = _getConfigWithMemberRemoved(
+                    origConfig, HostAndPort(hostToRemove));
             replSet.setConfig(newConfig);
-            replSet.setPrimary(newConfig.begin()->first);
+            replSet.setPrimary(newConfig.getMemberAt(0).getHostAndPort().toString());
             // Force refresh -> should not crash
             replMonitor->startOrContinueRefresh().refreshAll();
         }
@@ -1494,25 +1526,39 @@ namespace mongo_test {
             ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
 
-            mongo::MockReplicaSet::ReplConfigMap config = _replSet->getReplConfig();
+            mongo::repl::ReplicaSetConfig oldConfig = _replSet->getReplConfig();
+
+            mongo::BSONObjBuilder newConfigBuilder;
+            newConfigBuilder.append("_id", oldConfig.getReplSetName());
+            newConfigBuilder.append("version", oldConfig.getConfigVersion());
+
+            mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
 
             {
                 const string host(_replSet->getPrimary());
-                map<string, string>& tag = config[host].tags;
-                tag.clear();
-                tag["dc"] = "ny";
-                tag["num"] = "1";
+                const mongo::repl::MemberConfig* member =
+                        oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                membersBuilder.append(BSON("_id" << member->getId() <<
+                                           "host" << host <<
+                                           "tags" << BSON("dc" << "ny" <<
+                                                          "num" << "1")));
             }
 
             {
                 const string host(_replSet->getSecondaries().front());
-                map<string, string>&  tag = config[host].tags;
-                tag.clear();
-                tag["dc"] = "ny";
-                tag["num"] = "2";
+                const mongo::repl::MemberConfig* member =
+                        oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                membersBuilder.append(BSON("_id" << member->getId() <<
+                                           "host" << host <<
+                                           "tags" << BSON("dc" << "ny" <<
+                                                          "num" << "2")));
             }
 
-            _replSet->setConfig(config);
+            membersBuilder.done();
+            mongo::repl::ReplicaSetConfig newConfig;
+            fassert(28572, newConfig.initialize(newConfigBuilder.done()));
+            fassert(28571, newConfig.validate());
+            _replSet->setConfig(newConfig);
 
         }
 

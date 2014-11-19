@@ -433,14 +433,21 @@ namespace {
                     mongo::MockConnRegistry::get()->getConnStrHook());
 
             {
-                mongo::MockReplicaSet::ReplConfigMap config = _replSet->getReplConfig();
+                mongo::repl::ReplicaSetConfig oldConfig = _replSet->getReplConfig();
 
+                mongo::BSONObjBuilder newConfigBuilder;
+                newConfigBuilder.append("_id", oldConfig.getReplSetName());
+                newConfigBuilder.append("version", oldConfig.getConfigVersion());
+
+                mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
                 {
                     const string host(_replSet->getPrimary());
-                    map<string, string>& tag = config[host].tags;
-                    tag.clear();
-                    tag["dc"] = "ny";
-                    tag["p"] = "1";
+                    const mongo::repl::MemberConfig* member =
+                            oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                    membersBuilder.append(BSON("_id" << member->getId() <<
+                                               "host" << host <<
+                                               "tags" << BSON("dc" << "ny" <<
+                                                              "p" << "1")));
                     _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
                 }
 
@@ -449,46 +456,58 @@ namespace {
 
                 {
                     const string host(*secIter);
-                    map<string, string>&  tag = config[host].tags;
-                    tag.clear();
-                    tag["dc"] = "sf";
-                    tag["s"] = "1";
-                    tag["group"] = "1";
+                    const mongo::repl::MemberConfig* member =
+                            oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                    membersBuilder.append(BSON("_id" << member->getId() <<
+                                               "host" << host <<
+                                               "tags" << BSON("dc" << "sf" <<
+                                                              "s" << "1" <<
+                                                              "group" << "1")));
                     _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
                 }
 
                 {
                     ++secIter;
                     const string host(*secIter);
-                    map<string, string>&  tag = config[host].tags;
-                    tag.clear();
-                    tag["dc"] = "ma";
-                    tag["s"] = "2";
-                    tag["group"] = "1";
+                    const mongo::repl::MemberConfig* member =
+                            oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                    membersBuilder.append(BSON("_id" << member->getId() <<
+                                               "host" << host <<
+                                               "tags" << BSON("dc" << "ma" <<
+                                                              "s" << "2" <<
+                                                              "group" << "1")));
                     _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
                 }
 
                 {
                     ++secIter;
                     const string host(*secIter);
-                    map<string, string>&  tag = config[host].tags;
-                    tag.clear();
-                    tag["dc"] = "eu";
-                    tag["s"] = "3";
+                    const mongo::repl::MemberConfig* member =
+                            oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                    membersBuilder.append(BSON("_id" << member->getId() <<
+                                               "host" << host <<
+                                               "tags" << BSON("dc" << "eu" <<
+                                                              "s" << "3")));
                     _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
                 }
 
                 {
                     ++secIter;
                     const string host(*secIter);
-                    map<string, string>&  tag = config[host].tags;
-                    tag.clear();
-                    tag["dc"] = "jp";
-                    tag["s"] = "4";
+                    const mongo::repl::MemberConfig* member =
+                            oldConfig.findMemberByHostAndPort(HostAndPort(host));
+                    membersBuilder.append(BSON("_id" << member->getId() <<
+                                               "host" << host <<
+                                               "tags" << BSON("dc" << "jp" <<
+                                                              "s" << "4")));
                     _replSet->getNode(host)->insert(IdentityNS, BSON(HostField(host)));
                 }
 
-                _replSet->setConfig(config);
+                membersBuilder.done();
+                mongo::repl::ReplicaSetConfig newConfig;
+                fassert(28569, newConfig.initialize(newConfigBuilder.done()));
+                fassert(28568, newConfig.validate());
+                _replSet->setConfig(newConfig);
             }
         }
 

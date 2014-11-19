@@ -42,7 +42,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/sync.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
@@ -1389,25 +1389,6 @@ namespace ReplTests {
         }
     };
 
-    /** Check ReplSetConfig::MemberCfg equality */
-    class ReplSetMemberCfgEquality : public Base {
-    public:
-        void run() {
-            ReplSetConfig::MemberCfg m1, m2;
-            verify(m1 == m2);
-            m1.tags["x"] = "foo";
-            verify(m1 != m2);
-            m2.tags["y"] = "bar";
-            verify(m1 != m2);
-            m1.tags["y"] = "bar";
-            verify(m1 != m2);
-            m2.tags["x"] = "foo";
-            verify(m1 == m2);
-            m1.tags.clear();
-            verify(m1 != m2);
-        }
-    };
-
     class SyncTest : public Sync {
     public:
         bool returnEmpty;
@@ -1517,7 +1498,6 @@ namespace ReplTests {
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
-            add< ReplSetMemberCfgEquality >();
             add< ShouldRetry >();
         }
     };

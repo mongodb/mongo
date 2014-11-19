@@ -1097,7 +1097,8 @@ env.Library('mocklib', [
         'dbtests/mock/mock_remote_db_server.cpp',
         'dbtests/mock/mock_replica_set.cpp'
     ],
-    LIBDEPS=['clientdriver'])
+    LIBDEPS=['clientdriver',
+             '$BUILD_DIR/mongo/db/repl/replica_set_messages'])
 
 test = env.Install(
     '#/',

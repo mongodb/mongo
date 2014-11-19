@@ -32,12 +32,16 @@
 #include <set>
 #include <string>
 
+using mongo::BSONArrayBuilder;
 using mongo::BSONElement;
 using mongo::BSONObj;
+using mongo::BSONObjBuilder;
 using mongo::BSONObjIterator;
 using mongo::ConnectionString;
+using mongo::HostAndPort;
 using mongo::MockRemoteDBServer;
 using mongo::MockReplicaSet;
+using mongo::repl::ReplicaSetConfig;
 
 using std::set;
 using std::string;
@@ -255,13 +259,45 @@ namespace mongo_test {
         ASSERT(expectedMembers == memberList);
     }
 
+namespace {
+    /**
+     * Takes a ReplicaSetConfig and a node to remove and returns a new config with equivalent
+     * members minus the one specified to be removed.  NOTE: Does not copy over properties of the
+     * members other than their id and host.
+     */
+    ReplicaSetConfig _getConfigWithMemberRemoved(
+            const ReplicaSetConfig& oldConfig, const HostAndPort& toRemove) {
+        BSONObjBuilder newConfigBuilder;
+        newConfigBuilder.append("_id", oldConfig.getReplSetName());
+        newConfigBuilder.append("version", oldConfig.getConfigVersion());
+
+        BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
+        for (ReplicaSetConfig::MemberIterator member = oldConfig.membersBegin();
+                member != oldConfig.membersEnd(); ++member) {
+            if (member->getHostAndPort() == toRemove) {
+                continue;
+            }
+
+            membersBuilder.append(BSON("_id" << member->getId() <<
+                                       "host" << member->getHostAndPort().toString()));
+        }
+
+        membersBuilder.done();
+        ReplicaSetConfig newConfig;
+        ASSERT_OK(newConfig.initialize(newConfigBuilder.obj()));
+        ASSERT_OK(newConfig.validate());
+        return newConfig;
+    }
+} // namespace
+
     TEST(MockReplicaSetTest, IsMasterReconfigNodeRemoved) {
         MockReplicaSet replSet("n", 3);
 
-        MockReplicaSet::ReplConfigMap config = replSet.getReplConfig();
+        ReplicaSetConfig oldConfig = replSet.getReplConfig();
         const string hostToRemove("$n1:27017");
-        config.erase(hostToRemove);
-        replSet.setConfig(config);
+        ReplicaSetConfig newConfig = _getConfigWithMemberRemoved(oldConfig,
+                                                                 HostAndPort(hostToRemove));
+        replSet.setConfig(newConfig);
 
         {
             // Check isMaster for node still in set
@@ -309,10 +345,11 @@ namespace mongo_test {
     TEST(MockReplicaSetTest, replSetGetStatusReconfigNodeRemoved) {
         MockReplicaSet replSet("n", 3);
 
-        MockReplicaSet::ReplConfigMap config = replSet.getReplConfig();
+        ReplicaSetConfig oldConfig = replSet.getReplConfig();
         const string hostToRemove("$n1:27017");
-        config.erase(hostToRemove);
-        replSet.setConfig(config);
+        ReplicaSetConfig newConfig = _getConfigWithMemberRemoved(oldConfig,
+                                                                 HostAndPort(hostToRemove));
+        replSet.setConfig(newConfig);
 
         {
             // Check replSetGetStatus for node still in set
