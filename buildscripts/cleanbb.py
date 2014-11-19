@@ -3,6 +3,7 @@
 import re
 import sys
 import os, os.path
+import shutil
 import utils
 import time
 from optparse import OptionParser
@@ -92,6 +93,14 @@ def cleanup( root , nokill ):
             if os.path.exists(foo):
                 if not tryToRemove(foo):
                     raise Exception("Couldn't remove file '%s' after 60 seconds" % foo)
+
+    # delete all directories under root.
+    for directoryEntry in os.listdir(root):
+        if directoryEntry == 'diskfulltest':
+            continue
+        path = root + '/' + directoryEntry
+        if os.path.isdir(path):
+           shutil.rmtree(path, ignore_errors=True)
 
 if __name__ == "__main__":
     parser = OptionParser(usage="read the script")

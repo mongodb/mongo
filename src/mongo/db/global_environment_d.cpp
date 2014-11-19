@@ -38,7 +38,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -72,9 +74,18 @@ namespace mongo {
 
         const StorageEngine::Factory* factory = _storageFactories[name];
 
-        uassert(18656, "cannot start database with an unknown storage engine: " + name, factory);
+        uassert(18656, str::stream()
+            << "Cannot start server with an unknown storage engine: " << name,
+            factory);
+
+        // Do not proceed if data directory has been used by a different storage engine previously.
+        StorageEngineMetadata::validate(storageGlobalParams.dbpath, name);
+
         _storageEngine = factory->create(storageGlobalParams);
         _storageEngine->finishInit();
+
+        // Write a new metadata file if it is not present.
+        StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, name);
     }
 
     void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,

@@ -70,3 +70,21 @@ env.Library(
         ],
     LIBDEPS=[]
     )
+
+env.Library(
+    target='storage_engine_metadata',
+    source=[
+        'storage_engine_metadata.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        ]
+    )
+
+env.CppUnitTest(
+    target= 'storage_engine_metadata_test',
+    source = 'storage_engine_metadata_test.cpp',
+    LIBDEPS=[
+        'storage_engine_metadata',
+    ],
+)
