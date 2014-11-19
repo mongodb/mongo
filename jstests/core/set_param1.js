@@ -19,8 +19,8 @@ printjson(old.logComponentVerbosity);
 assert.neq( undefined, old.logComponentVerbosity, "log component verbosity not available" );
 assert.eq( old.logLevel, old.logComponentVerbosity.verbosity,
            "default component verbosity should match logLevel" );
-assert.neq( undefined, old.logComponentVerbosity.storage.journaling.verbosity,
-            "journaling verbosity not available" );
+assert.neq( undefined, old.logComponentVerbosity.storage.journal.verbosity,
+            "journal verbosity not available" );
 
 // Non-object log component verbosity should be rejected.
 assert.commandFailed(db.adminCommand( { "setParameter" : 1 ,
@@ -29,7 +29,7 @@ assert.commandFailed(db.adminCommand( { "setParameter" : 1 ,
 // Non-numeric verbosity for component should be rejected.
 assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
                                           logComponentVerbosity :
-                                              { storage : { journaling : {
+                                              { storage : { journal : {
                                                   verbosity : "not a number" } } } } ) );
 
 // Invalid component shall be rejected
@@ -47,7 +47,7 @@ assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
             accessControl : { verbosity : 0 },
             storage : {
                 verbosity : 3,
-                journaling : { verbosity : 5 }
+                journal : { verbosity : 5 }
             } } } ) );
 
     var result = assert.commandWorked( db.adminCommand(
@@ -56,7 +56,7 @@ assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
     assert.eq( 2, result.verbosity );
     assert.eq( 0, result.accessControl.verbosity );
     assert.eq( 3, result.storage.verbosity );
-    assert.eq( 5, result.storage.journaling.verbosity );
+    assert.eq( 5, result.storage.journal.verbosity );
 })();
 
 
@@ -71,7 +71,7 @@ assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
             accessControl : { verbosity : 5 },
             storage : {
                 verbosity : 4,
-                journaling : { verbosity : 6 }
+                journal : { verbosity : 6 }
             },
             NoSuchComponent : { verbosity : 2 },
             extraField : 123 } } ) );
@@ -82,18 +82,18 @@ assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
     assert.eq( 2, result.verbosity );
     assert.eq( 0, result.accessControl.verbosity );
     assert.eq( 3, result.storage.verbosity );
-    assert.eq( 5, result.storage.journaling.verbosity );
+    assert.eq( 5, result.storage.journal.verbosity );
 })();
 
 
-// Clear verbosity for default and journaling.
+// Clear verbosity for default and journal.
 (function () {
     assert.commandWorked( db.adminCommand( {
         "setParameter" : 1 ,
         logComponentVerbosity : {
             verbosity: -1,
             storage : {
-                journaling : { verbosity : -1 } } } } ) );
+                journal : { verbosity : -1 } } } } ) );
 
     var result = assert.commandWorked( db.adminCommand(
                    { "getParameter": 1, logComponentVerbosity : 1} )).logComponentVerbosity;
@@ -101,7 +101,7 @@ assert.commandFailed( db.adminCommand( { "setParameter" : 1 ,
     assert.eq( 0,  result.verbosity );
     assert.eq( 0,  result.accessControl.verbosity );
     assert.eq( 3,  result.storage.verbosity );
-    assert.eq( -1, result.storage.journaling.verbosity );
+    assert.eq( -1, result.storage.journal.verbosity );
 })();
 
 

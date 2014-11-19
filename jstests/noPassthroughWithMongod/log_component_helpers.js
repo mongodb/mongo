@@ -25,11 +25,11 @@
     assert.eq(mongo.getLogComponents().verbosity, 0);
 
     // setLogLevel - valid log component
-    mongo.setLogLevel(2, "storage.journaling");
-    assert.eq(mongo.getLogComponents().storage.journaling.verbosity, 2);
+    mongo.setLogLevel(2, "storage.journal");
+    assert.eq(mongo.getLogComponents().storage.journal.verbosity, 2);
 
-    db.setLogLevel(1, "storage.journaling");
-    assert.eq(mongo.getLogComponents().storage.journaling.verbosity, 1);
+    db.setLogLevel(1, "storage.journal");
+    assert.eq(mongo.getLogComponents().storage.journal.verbosity, 1);
 
     // setLogLevel - invalid argument
     assert.throws(mongo.setLogLevel, [2, 24]);
