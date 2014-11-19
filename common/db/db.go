@@ -12,6 +12,13 @@ import (
 
 const MaxBSONSize = 16 * 1024 * 1024
 
+type sessionFlag uint32
+
+const (
+	None      sessionFlag = 0
+	Monotonic sessionFlag = 1 << iota
+)
+
 type GetConnectorFunc func(opts options.ToolOptions) DBConnector
 
 var GetConnectorFuncs []GetConnectorFunc
@@ -27,6 +34,9 @@ type SessionProvider struct {
 
 	// the master session to use for connection pooling
 	masterSession *mgo.Session
+
+	// flags for generating the master session
+	flags sessionFlag
 }
 
 func (self *SessionProvider) RunCommand(dbToUse string,
@@ -62,8 +72,26 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to db server: %v", err)
 	}
+	// handle session flags
+	if (self.flags & Monotonic) > 0 {
+		self.masterSession.SetMode(mgo.Monotonic, true)
+	}
 	// copy the provider's master session, for connection pooling
 	return self.masterSession.Copy(), nil
+}
+
+// SetFlags allows certain modifications to the masterSession after
+// initial creation.
+func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+
+	// make sure this is not done after initial creation
+	if self.masterSession != nil {
+		panic("cannot set session provider flags after calling GetSession()")
+	}
+
+	self.flags = flagBits
 }
 
 //NewSessionProvider constructs a session provider but does not attempt to

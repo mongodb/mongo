@@ -90,6 +90,9 @@ func (dump *MongoDump) Init() error {
 		dump.useStdout = true
 	}
 	dump.sessionProvider = db.NewSessionProvider(*dump.ToolOptions)
+	// ensure we allow secondary reads
+	dump.sessionProvider.SetFlags(db.Monotonic)
+
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
 		return fmt.Errorf("Error determining if server is mongos: %v", err)
