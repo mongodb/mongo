@@ -119,8 +119,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
 			if (lognum < min_lognum)
-				WT_ERR(
-				    __wt_log_remove(session, lognum));
+				WT_ERR(__wt_log_remove(session, lognum));
 		}
 	}
 	__wt_spin_unlock(session, &conn->hot_backup_lock);

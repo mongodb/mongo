@@ -532,8 +532,7 @@ __curtable_update(WT_CURSOR *cursor)
 
 		/* Remove only if the key exists. */
 		if (ret == 0) {
-			WT_ERR(
-			    __apply_idx(ctable,
+			WT_ERR(__apply_idx(ctable,
 			    offsetof(WT_CURSOR, remove), 1));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
