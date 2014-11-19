@@ -38,6 +38,10 @@
 
 namespace mongo {
 
+    class Locker;
+    struct LockHead;
+
+
     /**
      * Lock modes.
      *
@@ -207,6 +211,124 @@ namespace mongo {
 
     // Type to uniquely identify a given locker object
     typedef uint64_t LockerId;
+
+
+    /**
+     * Interface on which granted lock requests will be notified. See the contract for the notify
+     * method for more information and also the LockManager::lock call.
+     *
+     * The default implementation of this method would simply block on an event until notify has
+     * been invoked (see CondVarLockGrantNotification).
+     *
+     * Test implementations could just count the number of notifications and their outcome so that
+     * they can validate locks are granted as desired and drive the test execution.
+     */
+    class LockGrantNotification {
+    public:
+        virtual ~LockGrantNotification() {}
+
+        /**
+         * This method is invoked at most once for each lock request and indicates the outcome of
+         * the lock acquisition for the specified resource id.
+         *
+         * Cases where it won't be called are if a lock acquisition (be it in waiting or converting
+         * state) is cancelled through a call to unlock.
+         *
+         * IMPORTANT: This callback runs under a spinlock for the lock manager, so the work done
+         *            inside must be kept to a minimum and no locks or operations which may block
+         *            should be run. Also, no methods which call back into the lock manager should
+         *            be invoked from within this methods (LockManager is not reentrant).
+         *
+         * @resId ResourceId for which a lock operation was previously called.
+         * @result Outcome of the lock operation.
+         */
+        virtual void notify(ResourceId resId, LockResult result) = 0;
+    };
+
+
+    /**
+     * There is one of those entries per each request for a lock. They hang on a linked list off
+     * the LockHead and also are in a map for each Locker. This structure is not thread-safe.
+     *
+     * LockRequest are owned by the Locker class and it controls their lifetime. They should not
+     * be deleted while on the LockManager though (see the contract for the lock/unlock methods).
+     */
+    struct LockRequest {
+
+        enum Status {
+            STATUS_NEW,
+            STATUS_GRANTED,
+            STATUS_WAITING,
+            STATUS_CONVERTING,
+        };
+
+        /**
+         * Used for initialization of a LockRequest, which might have been retrieved from cache.
+         */
+        void initNew(Locker* locker, LockGrantNotification* notify);
+
+
+        //
+        // These fields are maintained by the Locker class
+        //
+
+        // This is the Locker, which created this LockRequest. Pointer is not owned, just
+        // referenced. Must outlive the LockRequest.
+        Locker* locker;
+
+        // Not owned, just referenced. If a request is in the WAITING or CONVERTING state, must
+        // live at least until LockManager::unlock is cancelled or the notification has been
+        // invoked.
+        LockGrantNotification* notify;
+
+
+        //
+        // These fields are maintained by both the LockManager and Locker class
+        //
+
+        // If the request cannot be granted right away, whether to put it at the front or at the
+        // end of the queue. By default, requests are put at the back. If a request is requested
+        // to be put at the front, this effectively bypasses fairness. Default is FALSE.
+        bool enqueueAtFront;
+
+        // When this request is granted and as long as it is on the granted queue, the particular
+        // resource's policy will be changed to "compatibleFirst". This means that even if there
+        // are pending requests on the conflict queue, if a compatible request comes in it will be
+        // granted immediately. This effectively turns off fairness.
+        bool compatibleFirst;
+
+        // How many times has LockManager::lock been called for this request. Locks are released
+        // when their recursive count drops to zero.
+        unsigned recursiveCount;
+
+
+        //
+        // These fields are owned and maintained by the LockManager class exclusively
+        //
+
+        // Pointer to the lock to which this request belongs, or null if this request has not yet
+        // been assigned to a lock. The LockHead should be alive as long as there are LockRequests
+        // on it, so it is safe to have this pointer hanging around.
+        LockHead* lock;
+
+        // The reason intrusive linked list is used instead of the std::list class is to allow
+        // for entries to be removed from the middle of the list in O(1) time, if they are known
+        // instead of having to search for them and we cannot persist iterators, because the list
+        // can be modified while an iterator is held.
+        LockRequest* prev;
+        LockRequest* next;
+
+        // Current status of this request.
+        Status status;
+
+        // If not granted, the mode which has been requested for this lock. If granted, the mode
+        // in which it is currently granted.
+        LockMode mode;
+
+        // This value is different from MODE_NONE only if a conversion is requested for a lock and
+        // that conversion cannot be immediately granted.
+        LockMode convertMode;
+    };
 
 } // namespace mongo
 
