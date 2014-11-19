@@ -538,18 +538,6 @@ namespace {
         _canAcceptNonLocalWrites = true;
         lk.unlock();
         _externalState->dropAllTempCollections(txn.get());
-        const MemberConfig& me = _rsConfig.getMemberAt(_thisMembersConfigIndex);
-        const StatusWith<OpTime> msgStatus = _externalState->logOpMessage(
-                                                    txn.get(),
-                                                    str::stream() << "Primary is now host:"
-                                                                  << me.getHostAndPort().toString()
-                                                                  << " configVersion:"
-                                                                  << _rsConfig.getConfigVersion()
-                                                                  << " _id:" << me.getId());
-        if (!msgStatus.isOK()) {
-            warning() << "Could not record oplog entry that we are now primary due to "
-                      << msgStatus;
-        }
         log() << "transition to primary complete; database writes are now permitted";
     }
 

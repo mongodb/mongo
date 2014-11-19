@@ -59,8 +59,6 @@ namespace repl {
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-        virtual StatusWith<OpTime> logOpMessage(OperationContext* txn,
-                                                const std::string& msg);
         virtual void closeConnections();
         virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
