@@ -74,7 +74,7 @@ __curextract_insert(WT_CURSOR *cursor) {
  *	Apply an operation to all indices of a table.
  */
 static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_cursor_get_key,		/* get-key */
 	    __wt_cursor_get_value,		/* get-value */
@@ -103,8 +103,11 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 
 	for (i = 0; i < ctable->table->nindices; i++, cp++) {
-		f = *(int (**)(WT_CURSOR *))((uint8_t *)*cp + func_off);
 		idx = ctable->table->indices[i];
+		if (skip_immutable && F_ISSET(idx, WT_INDEX_IMMUTABLE))
+			continue;
+
+		f = *(int (**)(WT_CURSOR *))((uint8_t *)*cp + func_off);
 		if (idx->extractor) {
 			extract_cursor.iface = iface;
 			extract_cursor.iface.session = &session->iface;
@@ -491,7 +494,7 @@ __curtable_insert(WT_CURSOR *cursor)
 		WT_ERR((*cp)->insert(*cp));
 	}
 
-	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert)));
+	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), 0));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -530,7 +533,8 @@ __curtable_update(WT_CURSOR *cursor)
 		/* Remove only if the key exists. */
 		if (ret == 0) {
 			WT_ERR(
-			    __apply_idx(ctable, offsetof(WT_CURSOR, remove)));
+			    __apply_idx(ctable,
+			    offsetof(WT_CURSOR, remove), 1));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
 			    cursor->value_format, value_copy));
@@ -542,7 +546,7 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_ERR(ret);
 
 	if (ctable->table->nindices > 0)
-		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert)));
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), 1));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	__wt_scr_free(&value_copy);
@@ -568,7 +572,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		WT_ERR(ret);
-		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove)));
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), 0));
 	}
 
 	APPLY_CG(ctable, remove);
@@ -619,7 +623,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 				APPLY_CG(stop, search);
 				WT_ERR(ret);
 				WT_ERR(__apply_idx(
-				    stop, offsetof(WT_CURSOR, remove)));
+				    stop, offsetof(WT_CURSOR, remove), 0));
 			} while ((ret = wt_stop->prev(wt_stop)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 
@@ -634,7 +638,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 				APPLY_CG(start, search);
 				WT_ERR(ret);
 				WT_ERR(__apply_idx(
-				    start, offsetof(WT_CURSOR, remove)));
+				    start, offsetof(WT_CURSOR, remove), 0));
 				if (stop != NULL)
 					WT_ERR(wt_start->compare(
 					    wt_start, wt_stop,
@@ -724,11 +728,16 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 		cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL, NULL
 	};
 	u_int i;
+	int complete;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	if (!table->cg_complete)
+	/* If the table is incomplete, wait on the table lock and recheck. */
+	complete = table->cg_complete;
+	if (!complete)
+		WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
+	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "Can't use '%s' until all column groups are created",
 		    table->name);

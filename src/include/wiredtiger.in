@@ -980,6 +980,9 @@ struct __wt_session {
 	 * Permitted values are empty (off)\, \c "english"\, \c "utf8<file>" or
 	 * \c "utf16<file>". See @ref huffman for more information., a string;
 	 * default empty.}
+	 * @config{immutable, configure the index to be immutable - that is an
+	 * index is not changed by any update to a record in the table., a
+	 * boolean flag; default \c false.}
 	 * @config{internal_item_max, the largest key stored within an internal
 	 * node\, in bytes.  If non-zero\, any key larger than the specified
 	 * size will be stored as an overflow item (which may require additional

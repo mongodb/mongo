@@ -87,9 +87,10 @@ __wt_directory_sync(WT_SESSION_IMPL *session, char *path)
 	 * there are historic Linux filesystems requiring this), do an explicit
 	 * fsync on a file descriptor for the directory to be sure.
 	 */
-	if ((dir = strrchr(path, '/')) == NULL)
-		path = (char *)".";
-	else
+	if (path == NULL || (dir = strrchr(path, '/')) == NULL) {
+		dir = NULL;
+		path = (char *)S2C(session)->home;
+	} else
 		*dir = '\0';
 	WT_SYSCALL_RETRY(((fd =
 	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);

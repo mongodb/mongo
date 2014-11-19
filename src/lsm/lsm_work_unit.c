@@ -138,8 +138,8 @@ __wt_lsm_work_switch(
 	*entryp = NULL;
 
 	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-		WT_WITH_SCHEMA_LOCK(session, ret =
-		    __wt_lsm_tree_switch(session, entry->lsm_tree));
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_lsm_tree_switch(session, entry->lsm_tree));
 		/* Failing to complete the switch is fine */
 		if (ret == EBUSY) {
 			if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH))

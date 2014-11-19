@@ -106,7 +106,11 @@ struct __wt_session_impl {
 	void	*block_manager;		/* Block-manager support */
 	int	(*block_manager_cleanup)(WT_SESSION_IMPL *);
 
-	WT_DATA_HANDLE **ckpt_handle;	/* Checkpoint support */
+					/* Checkpoint support */
+	struct {
+		WT_DATA_HANDLE *dhandle;
+		const char *name;
+	} *ckpt_handle;			/* Handle list */
 	u_int   ckpt_handle_next;	/* Next empty slot */
 	size_t  ckpt_handle_allocated;	/* Bytes allocated */
 

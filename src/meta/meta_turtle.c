@@ -158,7 +158,7 @@ int
 __wt_turtle_init(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
-	int exist;
+	int exist, exist_incr;
 	char *metaconf;
 
 	metaconf = NULL;
@@ -180,11 +180,22 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * creation doesn't fully complete, we won't have a turtle file and we
 	 * will repeat the process until we succeed.
 	 *
-	 * If there's already a turtle file, we're done.
+	 * Incremental backups can occur only run recovery is run and it becomes
+	 * live.  So if there is a turtle file and an incremental backup file
+	 * that is an error.  Otherwise, if there's already a turtle file,
+	 * we're done.
 	 */
+	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
 	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist)
+	if (exist) {
+		if (exist_incr)
+			WT_RET_MSG(session, EINVAL,
+			    "Incremental backup after running recovery "
+			    "is not allowed.");
 		return (0);
+	}
+	if (exist_incr)
+		F_SET(S2C(session), WT_CONN_WAS_BACKUP);
 
 	/* Create the metadata file. */
 	WT_RET(__metadata_init(session));
@@ -200,6 +211,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
 	/* Remove the backup file if it exists, we'll never read it again. */
+	if (exist_incr)
+		WT_ERR(__wt_remove(session, WT_INCREMENTAL_BACKUP));
 	WT_ERR(__wt_exist(session, WT_METADATA_BACKUP, &exist));
 	if (exist)
 		WT_ERR(__wt_remove(session, WT_METADATA_BACKUP));
@@ -274,45 +287,50 @@ int
 __wt_turtle_update(
     WT_SESSION_IMPL *session, const char *key,  const char *value)
 {
-	FILE *fp;
+	WT_FH *fh;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	int vmajor, vminor, vpatch;
 	const char *version;
-	char *path;
 
-	fp = NULL;
-	path = NULL;
+	fh = NULL;
 
 	/*
 	 * Create the turtle setup file: we currently re-write it from scratch
 	 * every time.
 	 */
-	WT_RET(__wt_filename(session, WT_METADATA_TURTLE_SET, &path));
-	if ((fp = fopen(path, "w")) == NULL)
-		ret = __wt_errno();
-	__wt_free(session, path);
-	if (fp == NULL)
-		return (ret);
+	WT_RET(__wt_open(
+	    session, WT_METADATA_TURTLE_SET, 1, 1, WT_FILE_TYPE_TURTLE, &fh));
 
 	version = wiredtiger_version(&vmajor, &vminor, &vpatch);
-	WT_ERR_TEST((fprintf(fp,
+	WT_ERR(__wt_scr_alloc(session, 1000, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n%s\n%s\n" "major=%d,minor=%d,patch=%d\n%s\n%s\n",
 	    WT_METADATA_VERSION_STR, version,
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
-	    key, value) < 0), __wt_errno());
+	    key, value));
 
-	ret = fclose(fp);
-	fp = NULL;
-	WT_ERR_TEST(ret == EOF, __wt_errno());
+	WT_ERR(__wt_write(session, fh, 0, buf->size, buf->data));
+
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		WT_ERR(__wt_fsync(session, fh));
+
+	ret = __wt_close(session, fh);
+	fh = NULL;
+	WT_ERR(ret);
 
 	WT_ERR(
 	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
+
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
+		WT_ERR(__wt_directory_sync(session, NULL));
 
 	if (0) {
 err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 	}
 
-	if  (fp != NULL)
-		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
+	if  (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
+	__wt_scr_free(&buf);
 	return (ret);
 }

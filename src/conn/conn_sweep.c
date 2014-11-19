@@ -21,11 +21,7 @@ __sweep(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/*
-	 * Session's cache handles unless the session itself is closed, at which
-	 * time the handle reference counts are immediately decremented.  Don't
-	 * discard handles that have been open recently.
-	 */
+	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
 
 	dhandle = SLIST_FIRST(&conn->dhlh);
@@ -52,6 +48,11 @@ __sweep(WT_SESSION_IMPL *session)
 			    ret = __wt_cache_op(
 			    session, NULL, WT_SYNC_WRITE_LEAVES));
 			WT_RET(ret);
+
+			/* Re-check that this looks like a good candidate. */
+			if (dhandle->session_ref != 0 ||
+			    now - dhandle->timeofdeath <= WT_DHANDLE_SWEEP_WAIT)
+				continue;
 
 			/*
 			 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we
@@ -80,7 +81,8 @@ __sweep(WT_SESSION_IMPL *session)
 		 * why we don't do any special handling of EBUSY returns above,
 		 * that path never cleared the handle-open flag.
 		 */
-		ret = __wt_conn_dhandle_discard_single(session, dhandle, 0);
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __wt_conn_dhandle_discard_single(session, 0));
 		if (ret == EBUSY)
 			ret = 0;
 		WT_RET(ret);

@@ -292,6 +292,9 @@ index_only_config = [
 	Config('extractor', '', r'''
         configure custom extractor for indices.  Value must be an extractor
         name created with WT_CONNECTION::add_extractor'''),
+	Config('immutable', 'false', r'''
+        configure the index to be immutable - that is an index is not changed
+		by any update to a record in the table''', type='boolean'),
 ]
 
 colgroup_meta = common_meta + source_meta

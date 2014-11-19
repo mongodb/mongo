@@ -43,6 +43,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	char *cgconfig;
 	u_int i;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+
 	if (table->cg_complete)
 		return (0);
 
@@ -139,6 +141,10 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->source));
+
+	WT_ERR(__wt_config_getones(session, idx->config, "immutable", &cval));
+	if (cval.val)
+		F_SET(idx, WT_INDEX_IMMUTABLE);
 
 	WT_ERR(__wt_extractor_config(
 	    session, idx->config, &idx->extractor, &idx->extractor_owned));
@@ -360,7 +366,7 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
  */
 int
 __wt_schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
+    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
@@ -374,6 +380,8 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	cursor = NULL;
 	table = NULL;
 	tablename = NULL;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
@@ -434,6 +442,15 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
+
+	if (!ok_incomplete && !table->cg_complete)
+		WT_ERR_MSG(session, EINVAL, "'%s' cannot be used "
+		    "until all column groups are created",
+		    table->name);
+
+	/* Copy the schema generation into the new table. */
+	table->schema_gen = S2C(session)->schema_gen;
+
 	*tablep = table;
 
 	if (0) {
