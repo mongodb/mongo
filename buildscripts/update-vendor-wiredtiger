@@ -6,7 +6,7 @@
 
 set -o errexit
 
-REMOTEBRANCH=develop
+REMOTEBRANCH="mongodb-2.8"
 LOCALBRANCH=$(git symbolic-ref HEAD)
 
 # Ensure working directory is TOPLEVEL/src/third_party
