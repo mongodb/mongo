@@ -258,3 +258,27 @@ if ( typeof _threadInject != "undefined" ){
         assert.eq( 0, nFailed, msg );
     }
 }
+
+if ( typeof CountDownLatch !== 'undefined' ) {
+    CountDownLatch = Object.extend(function(count) {
+        if (! (this instanceof CountDownLatch)) {
+            return new CountDownLatch(count);
+        }
+        this._descriptor = CountDownLatch._new.apply(null, arguments);
+
+        // NOTE: The following methods have to be defined on the instance itself,
+        //       and not on its prototype. This is because properties on the
+        //       prototype are lost during the serialization to BSON that occurs
+        //       when passing data to a child thread.
+
+        this.await = function() {
+            CountDownLatch._await(this._descriptor);
+        };
+        this.countDown = function() {
+            CountDownLatch._countDown(this._descriptor);
+        };
+        this.getCount = function() {
+            return CountDownLatch._getCount(this._descriptor);
+        };
+    }, CountDownLatch);
+}
