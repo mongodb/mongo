@@ -1008,15 +1008,20 @@ namespace {
         const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
         const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
-        boost::scoped_ptr<Lock::GlobalRead> lk;
-        try {
-            lk.reset(new Lock::GlobalRead(txn->lockState(), stepdownTime.total_milliseconds()));
+        LockResult lockState = txn->lockState()->lockGlobalBegin(MODE_S);
+        // TODO(spencer): SERVER-15310 Kill all operations here.
+
+        if (lockState == LOCK_WAITING) {
+            lockState = txn->lockState()->lockGlobalComplete(stepdownTime.total_milliseconds());
+            if (lockState == LOCK_TIMEOUT) {
+                return Status(ErrorCodes::ExceededTimeLimit,
+                              "Could not acquire the global shared lock within the amount of time "
+                                      "specified that we should step down for");
+            }
         }
-        catch (const DBTryLockTimeoutException&) {
-            return Status(ErrorCodes::ExceededTimeLimit,
-                          "Could not acquire the global shared lock within the amount of time "
-                                  "specified that we should step down for");
-        }
+        invariant(lockState == LOCK_OK);
+        ON_BLOCK_EXIT(&Locker::unlockAll, txn->lockState());
+        // From this point onward we are guaranteed to be holding the global shared lock.
 
         boost::unique_lock<boost::mutex> lock(_mutex);
         if (!_getCurrentMemberState_inlock().primary()) {
