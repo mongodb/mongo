@@ -100,11 +100,12 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 		min_lognum = log->ckpt_lsn.file;
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_archive: archive to LSN %" PRIu32, min_lognum));
+
 	/*
 	 * Main archive code.  Get the list of all log files and
 	 * remove any earlier than the checkpoint LSN.
 	 */
-	WT_ERR(__wt_dirlist(session, conn->log_path,
+	WT_RET(__wt_dirlist(session, conn->log_path,
 	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
 
 	/*
