@@ -176,6 +176,22 @@ namespace mongo {
         ASSERT_EQUALS( "2", details.elemMatchKey() );
     }
 
+    // SERVER-14886: when an array is being traversed explictly at the same time that a nested array
+    // is being traversed implicitly, the elemMatch key should refer to the offset of the array
+    // being implicitly traversed.
+    TEST( EqOp, ElemMatchKeyWithImplicitAndExplicitTraversal ) {
+        BSONObj operand = BSON( "a.0.b" << 3 );
+        BSONElement operandFirstElt = operand.firstElement();
+        EqualityMatchExpression eq;
+        ASSERT( eq.init( operandFirstElt.fieldName(), operandFirstElt ).isOK() );
+        MatchDetails details;
+        details.requestElemMatchKey();
+        BSONObj obj = fromjson("{a: [{b: [2, 3]}, {b: [4, 5]}]}");
+        ASSERT( eq.matchesBSON( obj, &details ) );
+        ASSERT( details.hasElemMatchKey() );
+        ASSERT_EQUALS( "1", details.elemMatchKey() );
+    }
+
     TEST( EqOp, Equality1 ) {
         EqualityMatchExpression eq1;
         EqualityMatchExpression eq2;
