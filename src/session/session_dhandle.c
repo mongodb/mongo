@@ -413,24 +413,25 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_RET(__session_dhandle_sweep(session, flags));
 
 	/*
-	 * Acquire the schema lock if we don't already hold it, find and/or
+	 * Acquire the schema lock and the data handle lock, find and/or
 	 * open the handle.
 	 *
 	 * We need the schema lock for this call so that if we lock a handle in
 	 * order to open it, that doesn't race with a schema-changing operation
 	 * such as drop.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret =
-	    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_DHANDLE_LOCK(session, ret =
+		__wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
 	WT_RET(ret);
 
-	if (dhandle_cache == NULL)
+done:	if (dhandle_cache == NULL)
 		WT_RET(__session_add_btree(session, NULL));
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
 
-done:	/* Increment the data-source's in-use counter. */
+	/* Increment the data-source's in-use counter. */
 	__wt_session_dhandle_incr_use(session);
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
