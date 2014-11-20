@@ -63,8 +63,9 @@ func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 		if err != nil {
 			return nil
 		}
-
-		if reflect.TypeOf(fieldVal) == reflect.TypeOf(bson.M{}) || reflect.TypeOf(fieldVal) == reflect.TypeOf([]interface{}{}) {
+		if fieldVal == nil {
+			rowOut = append(rowOut, "")
+		} else if reflect.TypeOf(fieldVal) == reflect.TypeOf(bson.M{}) || reflect.TypeOf(fieldVal) == reflect.TypeOf([]interface{}{}) {
 			buf, err := json.Marshal(fieldVal)
 			if err != nil {
 				rowOut = append(rowOut, "")
