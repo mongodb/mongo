@@ -137,6 +137,7 @@ namespace mongo {
                                  vector<BSONObj>* indexes ) {
 
             invariant( indexes && indexes->empty() );
+            ScopedTransaction transaction( txn, MODE_IS );
             Lock::DBLock dbLock( txn->lockState(), dbName, MODE_IS );
 
             Database* db = dbHolder().get( txn, dbName );

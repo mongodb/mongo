@@ -736,6 +736,7 @@ namespace mongo {
     private:
         bool _lockAndCheckImpl(WriteOpResult* result, bool intentLock=true);
 
+        ScopedTransaction _transaction;
         // Guard object for the write lock on the target database.
         scoped_ptr<Lock::DBLock> _writeLock;
         scoped_ptr<Lock::CollectionLock> _collLock;
@@ -943,6 +944,7 @@ namespace mongo {
         txn(txn),
         request(aRequest),
         currIndex(0),
+        _transaction(txn, MODE_IX),
         _collection(NULL) {
     }
 
@@ -1200,6 +1202,7 @@ namespace mongo {
             }
 
             if ( createCollection ) {
+                ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
                 Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
                 Database* db = ctx.db();
@@ -1216,6 +1219,7 @@ namespace mongo {
             }
 
             ///////////////////////////////////////////
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(),
                                          nsString.ns(),

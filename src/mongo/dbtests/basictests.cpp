@@ -353,6 +353,7 @@ namespace BasicTests {
     public:
         void run() {
             OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite lk(txn.lockState());
 
             Database db("dbtests_basictests_ownsns", NULL );

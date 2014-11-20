@@ -126,6 +126,7 @@ namespace mongo {
 
             if ( !ok && errmsg == "no-collection" ) {
                 // Take X lock so we can create collection, then re-run operation.
+                ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
                 Client::Context ctx(txn, ns, false /* don't check version */);
                 Database* db = ctx.db();
@@ -402,6 +403,7 @@ namespace mongo {
                 }
             }
 
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, ns);
 

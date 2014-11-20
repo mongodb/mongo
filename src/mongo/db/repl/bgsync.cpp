@@ -521,6 +521,7 @@ namespace {
     long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         BSONObj oplogEntry;
         try {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), "local", MODE_X);
             bool success = Helpers::getLast(txn, rsoplog, oplogEntry);
             if (!success) {

@@ -111,6 +111,7 @@ namespace mongo {
             invariant(from_collection.coll() != "system.indexes");
 
             // XXX: can probably take dblock instead
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
 
             // Make sure database still exists after we resume from the temp release
@@ -317,6 +318,7 @@ namespace mongo {
         const NamespaceString nss(ns);
         const string dbname = nss.db().toString();
 
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbWrite(txn->lockState(), dbname, MODE_X);
 
         Database* db = dbHolder().openDb(txn, dbname);

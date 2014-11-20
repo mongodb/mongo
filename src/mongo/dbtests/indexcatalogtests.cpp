@@ -33,6 +33,7 @@ namespace IndexCatalogTests {
     public:
         IndexIteratorTests() {
             OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
             Client::Context ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);
@@ -45,6 +46,7 @@ namespace IndexCatalogTests {
 
         ~IndexIteratorTests() {
             OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
             Client::Context ctx(&txn, _ns);
             WriteUnitOfWork wuow(&txn);

@@ -149,6 +149,7 @@ namespace repl {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
         const OpTime ts = op["ts"]._opTime();
@@ -265,6 +266,7 @@ namespace repl {
             return;
         }
 
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
         Lock::CollectionLock lk2(txn->lockState(), rsoplog, MODE_IX);
 
@@ -335,6 +337,7 @@ namespace repl {
             return;
         }
 
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
         if( logNS == 0 ) {
@@ -459,6 +462,7 @@ namespace repl {
     }
 
     void createOplog(OperationContext* txn) {
+        ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
 
         const char * ns = "local.oplog.$main";

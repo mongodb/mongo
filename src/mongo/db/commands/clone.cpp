@@ -114,6 +114,7 @@ namespace mongo {
 
             set<string> clonedColls;
 
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
 
             Cloner cloner;

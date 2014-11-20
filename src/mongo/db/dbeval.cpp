@@ -150,6 +150,7 @@ namespace mongo {
                 return dbEval(txn, dbname, cmdObj, result, errmsg);
             }
 
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
             // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
             Client::Context ctx(txn,  dbname );

@@ -532,6 +532,7 @@ namespace mongo {
     }
 
     void dropAllDatabasesExceptLocal(OperationContext* txn) {
+        ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
 
         vector<string> n;

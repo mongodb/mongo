@@ -50,17 +50,20 @@ namespace {
 } // namespace
 
     void clearInitialSyncFlag(OperationContext* txn) {
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
         Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
     }
 
     void setInitialSyncFlag(OperationContext* txn) {
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_X);
         Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
     }
 
     bool getInitialSyncFlag() {
         OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock lk(txn.lockState(), "local", MODE_X);
         BSONObj mv;
         bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
@@ -72,11 +75,13 @@ namespace {
     }
 
     void setMinValid(OperationContext* ctx, OpTime ts) {
+        ScopedTransaction transaction(ctx, MODE_IX);
         Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
         Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
     }
 
     OpTime getMinValid(OperationContext* txn) {
+        ScopedTransaction transaction(txn, MODE_IS);
         Lock::DBLock lk(txn->lockState(), "local", MODE_S);
         BSONObj mv;
         bool found = Helpers::getSingleton(txn, minvalidNS, mv);

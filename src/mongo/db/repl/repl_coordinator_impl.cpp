@@ -529,6 +529,7 @@ namespace {
         }
         lk.unlock();
         boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext("rsDrain"));
+        ScopedTransaction transaction(txn.get(), MODE_X);
         Lock::GlobalWrite globalWriteLock(txn->lockState());
         lk.lock();
         if (!_isWaitingForDrainToComplete) {

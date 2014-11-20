@@ -134,6 +134,7 @@ namespace mongo {
                 // the simple fsync command case
                 if (sync) {
                     // can this be GlobalRead? and if it can, it should be nongreedy.
+                    ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite w(txn->lockState());
                     getDur().commitNow(txn);
 
@@ -152,6 +153,7 @@ namespace mongo {
         SimpleMutex::scoped_lock lkf(filesLockedFsync);
 
         OperationContextImpl txn;   // XXX?
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
 
         SimpleMutex::scoped_lock lk(fsyncCmd.m);

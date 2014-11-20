@@ -334,6 +334,7 @@ namespace mongo {
             if (_useIncremental) {
                 // We don't want to log the deletion of incLong as it isn't replicated. While
                 // harmless, this would lead to a scary looking warning on the secondaries.
+                ScopedTransaction(_txn, MODE_IX);
                 Lock::DBLock lk(_txn->lockState(),
                                 nsToDatabaseSubstring(_config.incLong),
                                 MODE_X);
@@ -538,6 +539,7 @@ namespace mongo {
 
             invariant( !txn->lockState()->isLocked() );
 
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lock(txn->lockState()); // TODO(erh): this is how it was, but seems it doesn't need to be global
             return postProcessCollectionNonAtomic(txn, op, pm);
         }
@@ -576,6 +578,7 @@ namespace mongo {
             if (_config.outputOptions.outType == Config::REPLACE ||
                     _safeCount(_db, _config.outputOptions.finalNamespace) == 0) {
 
+                ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lock(txn->lockState()); // TODO(erh): why global???
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.outputOptions.finalNamespace );
@@ -598,6 +601,7 @@ namespace mongo {
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
                 auto_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
                 while (cursor->more()) {
+                    ScopedTransaction(_txn, MODE_IX);
                     Lock::DBLock lock(_txn->lockState(),
                                       nsToDatabaseSubstring(_config.outputOptions.finalNamespace),
                                       MODE_X);
@@ -617,6 +621,7 @@ namespace mongo {
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
+                    ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
                     BSONObj temp = cursor->nextSafe();
                     BSONObj old;

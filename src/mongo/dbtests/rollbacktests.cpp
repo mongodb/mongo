@@ -46,6 +46,7 @@ namespace RollbackTests {
 
 namespace {
     void dropDatabase( OperationContext* txn, const NamespaceString& nss ) {
+        ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite globalWriteLock( txn->lockState() );
         Database* db = dbHolder().get( txn, nss.db() );
 
@@ -60,6 +61,7 @@ namespace {
         return std::find( names.begin(), names.end(), ns ) != names.end();
     }
     void createCollection( OperationContext* txn, const NamespaceString& nss ) {
+        ScopedTransaction transaction( txn, MODE_IX );
         Lock::DBLock dbXLock( txn->lockState(), nss.db(), MODE_X );
         Client::Context ctx( txn, nss.ns() );
         {
@@ -155,6 +157,7 @@ namespace {
             NamespaceString nss( ns );
             dropDatabase( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, ns );
             {
@@ -184,6 +187,7 @@ namespace {
             NamespaceString nss( ns );
             dropDatabase( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, ns );
             {
@@ -225,6 +229,7 @@ namespace {
             dropDatabase( &txn, source );
             dropDatabase( &txn, target );
 
+            ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
             Client::Context ctx( &txn, source );
 
@@ -272,6 +277,7 @@ namespace {
             dropDatabase( &txn, source );
             dropDatabase( &txn, target );
 
+            ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite globalWriteLock( txn.lockState() );
             Client::Context ctx( &txn, source );
 
@@ -332,6 +338,7 @@ namespace {
             OperationContextImpl txn;
             dropDatabase( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, nss );
 
@@ -382,6 +389,7 @@ namespace {
             OperationContextImpl txn;
             dropDatabase( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, nss );
 
@@ -416,6 +424,7 @@ namespace {
             OperationContextImpl txn;
             dropDatabase( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, nss );
 
@@ -467,6 +476,7 @@ namespace {
             dropDatabase( &txn, nss );
             createCollection( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
             Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
 
@@ -509,6 +519,7 @@ namespace {
             dropDatabase( &txn, nss );
             createCollection( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
             Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
 
@@ -563,6 +574,7 @@ namespace {
             dropDatabase( &txn, nss );
             createCollection( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
             Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
 
@@ -607,6 +619,7 @@ namespace {
             dropDatabase( &txn, nss );
             createCollection( &txn, nss );
 
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
             Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
 
@@ -669,6 +682,7 @@ namespace {
             OperationContextImpl txn;
             NamespaceString nss( ns );
             dropDatabase( &txn, nss );
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, nss.ns() );
             string idxNameA = "indexA";

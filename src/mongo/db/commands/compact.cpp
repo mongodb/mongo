@@ -146,6 +146,7 @@ namespace mongo {
                 compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
 
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), db, MODE_X);
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(txn, ns);

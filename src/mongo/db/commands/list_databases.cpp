@@ -87,6 +87,7 @@ namespace mongo {
                 b.append( "name", dbname );
 
                 {
+                    ScopedTransaction transaction(txn, MODE_IS);
                     Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
                     Database* db = dbHolder().get( txn, dbname );

@@ -595,6 +595,7 @@ namespace mongo {
         {
             // Exclusive collection lock needed since we're now potentially changing the metadata,
             // and don't want reads/writes to be ongoing.
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
@@ -977,6 +978,7 @@ namespace mongo {
                 return true;
             }
 
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
             return checkConfigOrInit(txn, configdb, authoritative, errmsg, result, true);
         }
@@ -1265,6 +1267,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, dbname);
 

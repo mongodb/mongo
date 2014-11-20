@@ -535,6 +535,7 @@ namespace {
             const stdx::function<void (OperationContext*)>& callback) {
         Client::initThreadIfNotAlready();
         OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite lk(txn.lockState());
         callback(&txn);
     }

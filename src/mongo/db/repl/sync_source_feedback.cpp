@@ -77,6 +77,7 @@ namespace repl {
     void SyncSourceFeedback::ensureMe(OperationContext* txn) {
         string myname = getHostName();
         {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dlk(txn->lockState(), "local", MODE_X);
             Client::Context ctx(txn, "local");
 

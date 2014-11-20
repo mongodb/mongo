@@ -63,6 +63,7 @@ namespace mongo {
 
             {
                 // Remove _id range [_min, _max).
+                ScopedTransaction transaction(&txn, MODE_IX);
                 Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_X);
                 Client::Context ctx(&txn,  ns );
 

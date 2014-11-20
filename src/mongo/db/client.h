@@ -113,6 +113,7 @@ namespace mongo {
         Lock::DBLock& lock() { return _dbLock; }
 
     private:
+        ScopedTransaction _transaction;
         Lock::DBLock _dbLock; // not const, as we may need to relock for implicit create
         Database* _db;
         bool _justCreated;

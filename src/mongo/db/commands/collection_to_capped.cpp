@@ -161,6 +161,7 @@ namespace mongo {
                 return false;
             }
 
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, dbname);
 
@@ -214,6 +215,7 @@ namespace mongo {
                  bool fromRepl ) {
             // calls renamecollection which does a global lock, so we must too:
             //
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
             Client::Context ctx(txn, dbname);
 

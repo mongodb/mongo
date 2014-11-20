@@ -252,6 +252,7 @@ namespace mongo {
 
         OperationContextImpl txn;
 
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite lk(txn.lockState());
         AutoGetOrCreateDb autoDb(&txn, "local", mongo::MODE_X);
         Database* db = autoDb.getDb();
@@ -310,6 +311,7 @@ namespace mongo {
      */
     static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
         // This is helpful for the query below to work as you can't open files when readlocked
+        ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
         if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
             DBDirectClient c(txn);
@@ -322,6 +324,7 @@ namespace mongo {
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite lk(txn.lockState());
 
         vector<string> dbNames;

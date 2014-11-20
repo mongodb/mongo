@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
 
@@ -173,6 +174,37 @@ namespace mongo {
         OperationContext* const _txn;
 
         bool _ended;
+    };
+
+    class Database;
+
+    /**
+     * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
+     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage 
+     * engine can release resources, such as snapshots or locks, that it may have acquired during
+     * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
+     * so write conflicts cannot happen on completing a ScopedTransaction.
+     *
+     * TODO: The ScopedTransaction should hold the global lock
+     */
+    class ScopedTransaction {
+        MONGO_DISALLOW_COPYING(ScopedTransaction);
+    public:
+        /**
+         * The mode for the transaction indicates whether the transaction will write (MODE_IX) or
+         * only read (MODE_IS), or needs to run without other writers (MODE_S) or any other
+         * operations (MODE_X) on the server.
+         */
+        ScopedTransaction(OperationContext* txn, LockMode mode) : _txn(txn) { }
+
+        ~ScopedTransaction() {
+            if (!_txn->lockState()->isLocked()) {
+                _txn->recoveryUnit()->commitAndRestart();
+            }
+        }
+
+    private:
+        OperationContext* _txn;
     };
 
 }  // namespace mongo

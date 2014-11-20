@@ -170,6 +170,7 @@ namespace repl {
         bool exists = Helpers::getSingleton(txn, "local.me", _me);
 
         if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
             WriteUnitOfWork wunit(txn);
             // clean out local.me
@@ -820,6 +821,7 @@ namespace repl {
                 }
                 // obviously global isn't ideal, but non-repl set is old so 
                 // keeping it simple
+                ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 save(txn);
             }
@@ -871,6 +873,7 @@ namespace repl {
                 log() << "repl:   " << ns << " oplog is empty" << endl;
             }
             {
+                ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 save(txn);
             }
@@ -943,6 +946,7 @@ namespace repl {
                 const bool moreInitialSyncsPending = !addDbNextPass.empty() && n;
 
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
+                    ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lk(txn->lockState());
                     
                     if (tailing) {
@@ -959,6 +963,7 @@ namespace repl {
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) {
                     // periodically note our progress, in case we are doing a lot of work and crash
+                    ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lk(txn->lockState());
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
@@ -1000,6 +1005,7 @@ namespace repl {
                         verify( justOne );
                         oplogReader.putBack( op );
                         _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
+                        ScopedTransaction transaction(txn, MODE_X);
                         Lock::GlobalWrite lk(txn->lockState());
                         if ( n > 0 ) {
                             syncedTo = last;
@@ -1082,6 +1088,7 @@ namespace repl {
     int _replMain(OperationContext* txn, ReplSource::SourceVector& sources, int& nApplied) {
         {
             ReplInfo r("replMain load sources");
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
             ReplSource::loadAll(txn, sources);
 
@@ -1153,6 +1160,7 @@ namespace repl {
         while ( 1 ) {
             int s = 0;
             {
+                ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
@@ -1184,6 +1192,7 @@ namespace repl {
             }
 
             {
+                ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 verify( syncing == 1 );
                 syncing--;
@@ -1310,6 +1319,7 @@ namespace repl {
         }
 
         OperationContextImpl txn; // XXX
+        ScopedTransaction transaction(&txn, MODE_S);
         Lock::GlobalRead lk(txn.lockState());
 
         for( unsigned i = a; i <= b; i++ ) {

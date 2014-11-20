@@ -66,6 +66,7 @@ namespace repl {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();

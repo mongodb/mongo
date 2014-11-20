@@ -82,6 +82,7 @@ namespace mongo {
 
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
             DBDirectClient db(txn);
@@ -137,6 +138,7 @@ namespace mongo {
                 // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
                 // commit to happen with a subset of ops applied.
                 // TODO figure out what to do about this.
+                ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
                 invariant(txn->lockState()->isRecursive());
 

@@ -198,7 +198,8 @@ namespace mongo {
     AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn,
                                          const StringData& ns,
                                          LockMode mode)
-            : _dbLock(txn->lockState(), ns, mode),
+            :  _transaction(txn, MODE_IX),
+               _dbLock(txn->lockState(), ns, mode),
               _db(dbHolder().get(txn, ns)) {
         invariant(mode == MODE_IX || mode == MODE_X);
         _justCreated = false;

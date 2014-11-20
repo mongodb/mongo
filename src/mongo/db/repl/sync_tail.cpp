@@ -474,6 +474,7 @@ namespace repl {
 
 namespace {
     void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
+        ScopedTransaction transaction(txn, MODE_S);
         Lock::GlobalRead readLock(txn->lockState());
 
         if (replCoord->getMaintenanceMode()) {
@@ -647,6 +648,7 @@ namespace {
         OpTime lastOpTime;
         {
             OperationContextImpl txn; // XXX?
+            ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock lk(txn.lockState(), "local", MODE_X);
             WriteUnitOfWork wunit(&txn);
 
@@ -757,6 +759,7 @@ namespace {
                 if (!st->syncApply(&txn, *it)) {
                     bool status;
                     {
+                        ScopedTransaction transaction(&txn, MODE_X);
                         Lock::GlobalWrite lk(txn.lockState());
                         status = st->shouldRetry(&txn, *it);
                     }

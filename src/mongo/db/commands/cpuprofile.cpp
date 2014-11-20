@@ -133,6 +133,7 @@ namespace mongo {
                                            std::string &errmsg,
                                            BSONObjBuilder &result,
                                            bool fromRepl ) {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             // The lock here is just to prevent concurrency, nothing will write.
             Client::Context ctx(txn, db);
@@ -152,6 +153,7 @@ namespace mongo {
                                           std::string &errmsg,
                                           BSONObjBuilder &result,
                                           bool fromRepl ) {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), db, MODE_X);
             Client::Context ctx(txn, db);
 

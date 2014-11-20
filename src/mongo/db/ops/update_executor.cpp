@@ -137,6 +137,7 @@ namespace mongo {
                        locker->isLockHeldForMode( ResourceId( RESOURCE_DATABASE, nsString.db() ),
                                                   MODE_X ) );
 
+            ScopedTransaction transaction(_txn, MODE_IX);
             Lock::DBLock lk(_txn->lockState(), nsString.db(), MODE_X);
 
             WriteUnitOfWork wuow(_txn);

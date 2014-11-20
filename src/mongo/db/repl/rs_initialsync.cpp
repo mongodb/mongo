@@ -116,6 +116,7 @@ namespace {
             options.syncIndexes = ! dataPass;
 
             // Make database stable
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
             if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
@@ -200,6 +201,7 @@ namespace {
             if (!init->syncApply(txn, op)) {
                 bool retry;
                 {
+                    ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lk(txn->lockState());
                     retry = init->shouldRetry(txn, op);
                 }

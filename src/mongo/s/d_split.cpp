@@ -793,6 +793,7 @@ namespace mongo {
             //
             
             {
+                ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 

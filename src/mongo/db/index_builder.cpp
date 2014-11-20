@@ -72,6 +72,7 @@ namespace mongo {
         txn.getCurOp()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
 
+        ScopedTransaction transaction(&txn, MODE_IX);
         Lock::DBLock dlk(txn.lockState(), ns.db(), MODE_X);
         Client::Context ctx(&txn, ns.getSystemIndexesCollection());
 

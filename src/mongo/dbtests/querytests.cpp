@@ -161,6 +161,7 @@ namespace QueryTests {
         void run() {
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  "unittests.querytests" );
 
@@ -632,6 +633,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
+            ScopedTransaction transaction(&_txn, MODE_IX);
             Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
             Client::Context ctx(&_txn,  ns );
 
@@ -1071,6 +1073,7 @@ namespace QueryTests {
     class DirectLocking : public ClientBase {
     public:
         void run() {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn, "unittests.DirectLocking");
             _client.remove( "a.b", BSONObj() );

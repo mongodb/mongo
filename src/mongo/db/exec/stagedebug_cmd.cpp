@@ -121,6 +121,7 @@ namespace mongo {
             // TODO A write lock is currently taken here to accommodate stages that perform writes
             //      (e.g. DeleteStage).  This should be changed to use a read lock for read-only
             //      execution trees.
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, dbname);
 

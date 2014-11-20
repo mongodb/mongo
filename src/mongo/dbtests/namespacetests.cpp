@@ -526,6 +526,7 @@ namespace NamespaceTests {
 
                 OperationContextImpl txn;
 
+                ScopedTransaction transaction(&txn, MODE_IX);
                 Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
 
                 bool justCreated;
@@ -569,6 +570,7 @@ namespace NamespaceTests {
 
                 OperationContextImpl txn;
 
+                ScopedTransaction transaction(&txn, MODE_IX);
                 Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
 
                 bool justCreated;

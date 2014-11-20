@@ -147,6 +147,7 @@ namespace QueryStageFetch {
     class FetchStageFilter : public QueryStageFetchBase {
     public:
         void run() {
+            ScopedTransaction transaction(&_txn, MODE_IX);
             Lock::DBLock lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
             Client::Context ctx(&_txn, ns());
             Database* db = ctx.db();

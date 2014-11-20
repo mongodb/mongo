@@ -112,6 +112,7 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
+            ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );

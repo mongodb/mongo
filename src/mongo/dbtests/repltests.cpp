@@ -131,6 +131,7 @@ namespace ReplTests {
             return _client.findOne( cllNS(), BSONObj() );
         }
         int count() const {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  ns() );
             Database* db = ctx.db();
@@ -151,6 +152,7 @@ namespace ReplTests {
         }
         int opCount() {
             OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite lk(txn.lockState());
             Client::Context ctx(&txn,  cllNS() );
 
@@ -171,6 +173,7 @@ namespace ReplTests {
             return count;
         }
         void applyAllOperations() {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             vector< BSONObj > ops;
             {
@@ -202,6 +205,7 @@ namespace ReplTests {
             }
         }
         void printAll( const char *ns ) {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  ns );
 
@@ -223,6 +227,7 @@ namespace ReplTests {
         }
         // These deletes don't get logged.
         void deleteAll( const char *ns ) const {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  ns );
             WriteUnitOfWork wunit(&_txn);
@@ -244,6 +249,7 @@ namespace ReplTests {
             wunit.commit();
         }
         void insert( const BSONObj &o ) const {
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  ns() );
             WriteUnitOfWork wunit(&_txn);
@@ -1409,6 +1415,7 @@ namespace ReplTests {
             bool threw = false;
             BSONObj o = BSON("ns" << ns() << "o" << BSON("foo" << "bar") << "o2" << BSON("_id" << "in oplog" << "foo" << "bar"));
 
+            ScopedTransaction transaction(&_txn, MODE_X);
             Lock::GlobalWrite lk(_txn.lockState());
 
             // this should fail because we can't connect

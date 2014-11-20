@@ -125,6 +125,7 @@ namespace {
         std::string myname = getHostName();
         OID myRID;
         {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lock(txn->lockState(), meDatabaseName, MODE_X);
 
             BSONObj me;
@@ -171,6 +172,7 @@ namespace {
             OperationContext* txn,
             const BSONObj& config) {
         try {
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();

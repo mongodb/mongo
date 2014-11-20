@@ -573,6 +573,7 @@ namespace {
                 uassertStatusOK(executor.prepare());
 
                 //  Tentatively take an intent lock, fix up if we need to create the collection
+                ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
                 if (dbHolder().get(txn, ns.db()) == NULL) {
                     //  If DB doesn't exist, don't implicitly create it in Client::Context
@@ -606,6 +607,7 @@ namespace {
             UpdateExecutor executor(txn, &request, &op.debug());
             uassertStatusOK(executor.prepare());
 
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
             Database* db = ctx.db();
@@ -968,6 +970,7 @@ namespace {
         {
             const bool isIndexBuild = (nsToCollectionSubstring(ns) == "system.indexes");
             const LockMode mode = isIndexBuild ? MODE_X : MODE_IX;
+            ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), mode);
             Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), mode);
 
@@ -995,6 +998,7 @@ namespace {
         }
 
         // Collection didn't exist so try again with MODE_X
+        ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
@@ -1057,6 +1061,7 @@ namespace {
 
         repl::getGlobalReplicationCoordinator()->shutdown();
 
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite lk(txn.lockState());
         log() << "now exiting" << endl;
 
