@@ -172,8 +172,7 @@ __backup_log_append(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int active)
 		WT_ERR(__wt_log_get_all_files(
 		    session, &logfiles, &logcount, &cb->maxid, active));
 		for (i = 0; i < logcount; i++)
-			WT_ERR(__backup_list_append(
-			    session, cb, logfiles[i]));
+			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
 err:	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
@@ -255,8 +254,7 @@ __backup_start(
 		WT_ERR(__backup_list_append(
 		    session, cb, WT_INCREMENTAL_BACKUP));
 	} else {
-		WT_ERR(__backup_list_append(
-		    session, cb, WT_METADATA_BACKUP));
+		WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
 		if (exist)
 			WT_ERR(__backup_list_append(

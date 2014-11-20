@@ -255,12 +255,21 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	WT_ITEM *buf, *item;
+	WT_ITEM *buf, *item, tmp;
 	size_t sz;
 	va_list ap_copy;
 	const char *fmt, *str;
 
+	buf = &cursor->key;
+	tmp.mem = NULL;
+
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
+	if (F_ISSET(cursor, WT_CURSTD_KEY_SET) && WT_DATA_IN_ITEM(buf)) {
+		tmp = *buf;
+		buf->mem = NULL;
+		buf->memsize = 0;
+	}
+
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -273,7 +282,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		if (cursor->recno == 0)
 			WT_ERR_MSG(session, EINVAL,
 			    "Record numbers must be greater than zero");
-		cursor->key.data = &cursor->recno;
+		buf->data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
 		/* Fast path some common cases and special case WT_ITEMs. */
@@ -282,14 +291,12 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		    WT_STREQ(fmt, "u")) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
-			cursor->key.data = item->data;
+			buf->data = item->data;
 		} else if (WT_STREQ(fmt, "S")) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;
-			cursor->key.data = (void *)str;
+			buf->data = (void *)str;
 		} else {
-			buf = &cursor->key;
-
 			va_copy(ap_copy, ap);
 			ret = __wt_struct_sizev(
 			    session, &sz, cursor->key_format, ap_copy);
@@ -307,12 +314,23 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		WT_ERR_MSG(session, EINVAL,
 		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
 	cursor->saved_err = 0;
-	cursor->key.size = sz;
+	buf->size = sz;
 	F_SET(cursor, WT_CURSTD_KEY_EXT);
 	if (0) {
 err:		cursor->saved_err = ret;
 	}
 
+	/*
+	 * If we copied the key, either put the memory back into the cursor,
+	 * or if we allocated some memory in the meantime, free it.
+	 */
+	if (tmp.mem != NULL) {
+		if (buf->mem == NULL) {
+			buf->mem = tmp.mem;
+			buf->memsize = tmp.memsize;
+		} else
+			__wt_free(session, tmp.mem);
+	}
 	API_END(session, ret);
 }
 
@@ -389,13 +407,22 @@ void
 __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 {
 	WT_DECL_RET;
-	WT_ITEM *buf, *item;
+	WT_ITEM *buf, *item, tmp;
 	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
 	va_list ap_copy;
 	size_t sz;
 
+	buf = &cursor->value;
+	tmp.mem = NULL;
+
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	if (F_ISSET(cursor, WT_CURSTD_VALUE_SET) && WT_DATA_IN_ITEM(buf)) {
+		tmp = *buf;
+		buf->mem = NULL;
+		buf->memsize = 0;
+	}
+
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
 	/* Fast path some common cases. */
@@ -404,15 +431,14 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 	    WT_STREQ(fmt, "u")) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
-		cursor->value.data = item->data;
+		buf->data = item->data;
 	} else if (WT_STREQ(fmt, "S")) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
-		cursor->value.data = str;
+		buf->data = str;
 	} else if (WT_STREQ(fmt, "t") ||
 	    (isdigit(fmt[0]) && WT_STREQ(fmt + 1, "t"))) {
 		sz = 1;
-		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
 	} else {
@@ -421,17 +447,29 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 		    &sz, cursor->value_format, ap_copy);
 		va_end(ap_copy);
 		WT_ERR(ret);
-		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
 		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
 		    cursor->value_format, ap));
 	}
 	F_SET(cursor, WT_CURSTD_VALUE_EXT);
-	cursor->value.size = sz;
+	buf->size = sz;
 
 	if (0) {
 err:		cursor->saved_err = ret;
 	}
+
+	/*
+	 * If we copied the value, either put the memory back into the cursor,
+	 * or if we allocated some memory in the meantime, free it.
+	 */
+	if (tmp.mem != NULL) {
+		if (buf->mem == NULL) {
+			buf->mem = tmp.mem;
+			buf->memsize = tmp.memsize;
+		} else
+			__wt_free(session, tmp.mem);
+	}
+
 	API_END(session, ret);
 }
 

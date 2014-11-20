@@ -243,7 +243,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR **cp;
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
-	WT_ITEM *item;
+	WT_ITEM *item, *tmp;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	u_int i;
@@ -259,9 +259,40 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_slice(session,
 		    ctable->cg_cursors, ctable->plan, 0,
 		    cursor->value_format, &cursor->value);
-	} else
+	} else {
+		/*
+		 * The user may be passing us pointers returned by get_value
+		 * that point into the buffers we are about to update.
+		 * Move them aside first.
+		 */
+		for (i = 0, cp = ctable->cg_cursors;
+		    i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			item = &(*cp)->value;
+			if (F_ISSET(*cp, WT_CURSTD_VALUE_SET) &&
+			    WT_DATA_IN_ITEM(item)) {
+				ctable->cg_valcopy[i] = *item;
+				item->mem = NULL;
+				item->memsize = 0;
+			}
+		}
+
 		ret = __wt_schema_project_in(session,
 		    ctable->cg_cursors, ctable->plan, ap);
+
+		for (i = 0, cp = ctable->cg_cursors;
+		    i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			tmp = &ctable->cg_valcopy[i];
+			if (tmp->mem != NULL) {
+				item = &(*cp)->value;
+				if (item->mem == NULL) {
+					item->mem = tmp->mem;
+					item->memsize = tmp->memsize;
+				} else
+					__wt_free(session, tmp->mem);
+			}
+		}
+
+	}
 	va_end(ap);
 
 	for (i = 0, cp = ctable->cg_cursors;
@@ -532,8 +563,7 @@ __curtable_update(WT_CURSOR *cursor)
 
 		/* Remove only if the key exists. */
 		if (ret == 0) {
-			WT_ERR(
-			    __apply_idx(ctable,
+			WT_ERR(__apply_idx(ctable,
 			    offsetof(WT_CURSOR, remove), 1));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
@@ -701,6 +731,7 @@ __curtable_close(WT_CURSOR *cursor)
 	if (cursor->value_format != ctable->table->value_format)
 		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
+	__wt_free(session, ctable->cg_valcopy);
 	__wt_free(session, ctable->idx_cursors);
 	__wt_schema_release_table(session, ctable->table);
 	/* The URI is owned by the table. */
@@ -744,6 +775,8 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 
 	WT_RET(__wt_calloc_def(session,
 	    WT_COLGROUPS(table), &ctable->cg_cursors));
+	WT_RET(__wt_calloc_def(session,
+	    WT_COLGROUPS(table), &ctable->cg_valcopy));
 
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
