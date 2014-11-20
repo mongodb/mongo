@@ -29,7 +29,10 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/base/init.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
@@ -38,7 +41,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -60,6 +65,10 @@ namespace mongo {
 
             virtual StringData getCanonicalName() const {
                 return kWiredTigerEngineName;
+            }
+
+            virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
+                return Status::OK();
             }
         };
     } // namespace

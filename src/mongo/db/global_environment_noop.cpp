@@ -51,6 +51,10 @@ namespace mongo {
         return false;
     }
 
+    StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
+        return NULL;
+    }
+
     void GlobalEnvironmentNoop::setKillAllOperations() { }
 
     void GlobalEnvironmentNoop::unsetKillAllOperations() { }

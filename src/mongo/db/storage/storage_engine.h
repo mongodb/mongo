@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+    class BSONObj;
     class DatabaseCatalogEntry;
     class OperationContext;
     class RecoveryUnit;
@@ -73,6 +74,12 @@ namespace mongo {
              * data file incompatibilities.
              */
             virtual StringData getCanonicalName() const = 0;
+
+            /**
+             * Validates creation options for a collection in the StorageEngine.
+             * Returns an error if the creation options are not valid.
+             */
+            virtual Status validateCollectionStorageOptions(const BSONObj& options) const = 0;
         };
 
         /**

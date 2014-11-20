@@ -93,23 +93,15 @@ namespace mongo {
         ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
             "{storageEngine: {storageEngine1: 1}}")));
 
-        // "storageEngine" must contain exactly one field.
+        // Empty "storageEngine" not allowed
         ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
             "{storageEngine: {}}")));
-        ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
-            "{storageEngine: {storageEngine1: {}, storageEngine2: {}}}")));
-
-        // Field under "storageEngine" must match storage engine name argument of parse.
-        ASSERT_NOT_OK( CollectionOptions().parse(fromjson(
-            "{storageEngine: {unknownStorageEngine: {}}}"), "storageEngine1"));
-        ASSERT_OK( CollectionOptions().parse(fromjson(
-            "{storageEngine: {storageEngine1: {}}}"), "storageEngine1"));
     }
 
     TEST(CollectionOptions, ParseEngineField) {
         CollectionOptions opts;
         ASSERT_OK(opts.parse(fromjson("{unknownField: 1, "
-            "storageEngine: {storageEngine1: {x: 1, y: 2}}}"), "storageEngine1"));
+            "storageEngine: {storageEngine1: {x: 1, y: 2}, storageEngine2: {a: 1, b:2}}}")));
         checkRoundTrip(opts);
 
         // Unrecognized field should not be present in BSON representation.
@@ -126,6 +118,12 @@ namespace mongo {
         BSONObj storageEngine1 = storageEngine.getObjectField("storageEngine1");
         ASSERT_EQUALS(1, storageEngine1.getIntField("x"));
         ASSERT_EQUALS(2, storageEngine1.getIntField("y"));
+
+        ASSERT_TRUE(storageEngine.getField("storageEngine2").isABSONObj());
+        BSONObj storageEngine2 = storageEngine.getObjectField("storageEngine2");
+        ASSERT_EQUALS(1, storageEngine2.getIntField("a"));
+        ASSERT_EQUALS(2, storageEngine2.getIntField("b"));
+
     }
 
     TEST(CollectionOptions, ResetStorageEngineField) {

@@ -108,6 +108,33 @@ namespace mongo {
         return _storageFactories.count(name);
     }
 
+    StorageFactoriesIterator* GlobalEnvironmentMongoD::makeStorageFactoriesIterator() {
+        return new StorageFactoriesIteratorMongoD(_storageFactories.begin(),
+                                                  _storageFactories.end());
+    }
+
+    StorageFactoriesIteratorMongoD::StorageFactoriesIteratorMongoD(
+        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& begin,
+        const GlobalEnvironmentMongoD::FactoryMap::const_iterator& end) :
+        _curr(begin), _end(end) {
+    }
+
+
+    StorageFactoriesIteratorMongoD::~StorageFactoriesIteratorMongoD() {
+    }
+
+    bool StorageFactoriesIteratorMongoD::more() const {
+        return _curr != _end;
+    }
+
+    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::next() {
+        return _curr++->second;
+    }
+
+    const StorageEngine::Factory* const & StorageFactoriesIteratorMongoD::get() const {
+        return _curr->second;
+    }
+
     void GlobalEnvironmentMongoD::setKillAllOperations() {
         boost::mutex::scoped_lock clientLock(Client::clientsMutex);
         _globalKill = true;

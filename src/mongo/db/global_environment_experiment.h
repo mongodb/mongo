@@ -55,6 +55,17 @@ namespace mongo {
         virtual ~KillOpListenerInterface() {}
     };
 
+    class StorageFactoriesIterator {
+        MONGO_DISALLOW_COPYING(StorageFactoriesIterator);
+    public:
+        virtual ~StorageFactoriesIterator() { }
+        virtual bool more() const = 0;
+        virtual const StorageEngine::Factory* const & next() = 0;
+        virtual const StorageEngine::Factory* const & get() const = 0;
+    protected:
+        StorageFactoriesIterator() { }
+    };
+
     class GlobalEnvironmentExperiment {
         MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
@@ -76,6 +87,12 @@ namespace mongo {
          * Returns true if "name" refers to a registered storage engine.
          */
         virtual bool isRegisteredStorageEngine(const std::string& name) = 0;
+
+        /**
+         * Produce an iterator over all registered storage engine factories.
+         * Caller owns the returned object and is responsible for deleting when finished.
+         */
+        virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
 
         /**
          * Set the storage engine.  The engine must have been registered via registerStorageEngine.

@@ -41,6 +41,8 @@ namespace mongo {
 
         bool isRegisteredStorageEngine(const std::string& name);
 
+        StorageFactoriesIterator* makeStorageFactoriesIterator();
+
         bool killOperation(unsigned int opId);
 
         void killAllUserOperations(const OperationContext* txn);
