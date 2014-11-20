@@ -318,6 +318,10 @@ struct __wt_cursor_table {
 	const char **cfg;		/* Saved configuration string */
 
 	WT_CURSOR **cg_cursors;
+	WT_ITEM *cg_valcopy;		/*
+					 * Copies of column group values, for
+					 * overlapping set_value calls.
+					 */
 	WT_CURSOR **idx_cursors;
 };
 

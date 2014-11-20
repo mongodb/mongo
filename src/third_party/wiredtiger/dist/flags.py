@@ -102,6 +102,7 @@ flags = {
 	],
 	'session' : [
 		'SESSION_CAN_WAIT',
+		'SESSION_CLEAR_EVICT_WALK',
 		'SESSION_DISCARD_FORCE',
 		'SESSION_HANDLE_LIST_LOCKED',
 		'SESSION_INTERNAL',
@@ -142,8 +143,7 @@ bits = [2 ** i for i in range(0, 32)]
 # each flag, find a bit that's not currently in use by any method using the
 # flag.
 flag_bit = {}		# Dictionary [flag] : [bit value]
-for f in sorted(flag_cnt.items(),\
-    key = lambda k_v : (k_v[1], k_v[0]), reverse = True):
+for f in sorted(flag_cnt.items(), key = lambda k_v : (-k_v[1], k_v[0])):
 	mask = 0xffffffff
 	for m in flag_name[f[0]]:
 		mask &= ~name_mask[m]

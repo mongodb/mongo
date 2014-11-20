@@ -33,14 +33,19 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	int have_primary, ovfl, waited;
 
 	lsm_tree = clsm->lsm_tree;
-	if (clsm->nchunks == 0 ||
-	    (primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
-		return (0);
-	session = (WT_SESSION_IMPL *)primary->session;
-	primary_chunk = clsm->primary_chunk;
-	have_primary = (primary_chunk != NULL &&
-	    primary_chunk->switch_txn == WT_TXN_NONE);
 	ovfl = 0;
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+
+	if (clsm->nchunks == 0) {
+		primary = NULL;
+		have_primary = 0;
+	} else {
+		if ((primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
+			return (0);
+		primary_chunk = clsm->primary_chunk;
+		have_primary = (primary_chunk != NULL &&
+		    primary_chunk->switch_txn == WT_TXN_NONE);
+	}
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
@@ -69,8 +74,9 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			 * small chunks.
 			 */
 			WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
-			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			if (lsm_tree->nchunks == 0 ||
+			    (clsm->dsk_gen == lsm_tree->dsk_gen &&
+			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))) {
 				ret = __wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree);
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
@@ -95,6 +101,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	 */
 	if (ovfl || !have_primary) {
 		for (waited = 0;
+		    lsm_tree->nchunks == 0 ||
 		    clsm->dsk_gen == lsm_tree->dsk_gen;
 		    ++waited) {
 			if (waited % 100 == 0)
@@ -115,10 +122,12 @@ static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 {
 	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	uint64_t *switch_txnp;
 	uint64_t snap_min;
 
+	lsm_tree = clsm->lsm_tree;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
 	/* Merge cursors never update. */
@@ -137,12 +146,14 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		 * In case this call blocks, the check will be repeated before
 		 * proceeding.
 		 */
-		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+		if (clsm->dsk_gen != lsm_tree->dsk_gen &&
+		    lsm_tree->nchunks != 0)
 			goto open;
 
 		WT_RET(__wt_cache_full_check(session));
 
-		if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
+		if (clsm->dsk_gen != lsm_tree->dsk_gen &&
+		    lsm_tree->nchunks != 0)
 			goto open;
 
 		/* Update the maximum transaction ID in the primary chunk. */
@@ -362,6 +373,15 @@ __clsm_open_cursors(
 	lsm_tree = clsm->lsm_tree;
 	chunk = NULL;
 
+	if (update) {
+		if (txn->isolation == TXN_ISO_SNAPSHOT)
+			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
+	} else
+		F_SET(clsm, WT_CLSM_OPEN_READ);
+
+	if (lsm_tree->nchunks == 0)
+		return (0);
+
 	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw";
 	ckpt_cfg[2] = NULL;
@@ -373,42 +393,8 @@ __clsm_open_cursors(
 
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
-	if (update) {
-		if (txn->isolation == TXN_ISO_SNAPSHOT)
-			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
-	} else
-		F_SET(clsm, WT_CLSM_OPEN_READ);
-
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
 	locked = 1;
-
-	/*
-	 * If there is no in-memory chunk in the tree for an update operation,
-	 * create one.
-	 *
-	 * !!!
-	 * It is exceeding unlikely that we get here at all, but if we were to
-	 * switch chunks in this thread and our transaction roll back, it would
-	 * leave the metadata inconsistent.  Signal for the LSM worker thread
-	 * to create the chunk instead to avoid the issue.
-	 */
-	if (update && (lsm_tree->nchunks == 0 ||
-	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) == NULL ||
-	    chunk->switch_txn != WT_TXN_NONE)) {
-		/* Release our lock because switch will get a write lock. */
-		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-		locked = 0;
-		WT_ERR(__wt_lsm_tree_readunlock(session, lsm_tree));
-
-		/*
-		 * Give the worker thread a chance to run before locking the
-		 * tree again -- we will loop in __clsm_enter until there is an
-		 * in-memory chunk in the tree.
-		 */
-		__wt_sleep(0, 1000);
-		WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
-		locked = 1;
-	}
 
 	/* Merge cursors have already figured out how many chunks they need. */
 retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {

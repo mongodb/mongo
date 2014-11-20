@@ -17,15 +17,18 @@ static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
  *	Free an LSM tree structure.
  */
 static int
-__lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 
 	/* We may be destroying an lsm_tree before it was added. */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+		WT_ASSERT(session, final ||
+		    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
+	}
 
 	if (lsm_tree->collator_owned &&
 	    lsm_tree->collator->terminate != NULL)
@@ -117,17 +120,19 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	/* We are shutting down: the handle list lock isn't required. */
+
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
 		/*
 		 * Tree close assumes that we have a reference to the tree
 		 * so it can tell when it's safe to do the close. We could
-		 * got through tree get here, but short circuit instead. There
+		 * get the tree here, but we short circuit instead. There
 		 * is no need to decrement the reference count since destroy
 		 * is unconditional.
 		 */
 		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
-		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+		WT_TRET(__lsm_tree_discard(session, lsm_tree, 1));
 	}
 
 	return (ret);
@@ -404,7 +409,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Discard our partially populated handle. */
-	ret = __lsm_tree_discard(session, lsm_tree);
+	ret = __lsm_tree_discard(session, lsm_tree, 0);
 	lsm_tree = NULL;
 
 	/*
@@ -419,7 +424,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
-err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 	}
 	__wt_scr_free(&buf);
 	return (ret);
@@ -498,11 +503,6 @@ __lsm_tree_open(
 	 */
 	WT_ERR(__lsm_tree_open_check(session, lsm_tree));
 
-	if (lsm_tree->nchunks == 0) {
-		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
-	}
-
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
 
@@ -524,7 +524,7 @@ __lsm_tree_open(
 	*treep = lsm_tree;
 
 	if (0) {
-err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 	}
 	return (ret);
 }
@@ -553,27 +553,37 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			 * there are references held.
 			 */
 			if ((exclusive && lsm_tree->refcnt > 0) ||
-			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE))
-			    return (EBUSY);
+			    lsm_tree->exclusive)
+				return (EBUSY);
 
 			if (exclusive) {
-				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+				/*
+				 * Make sure we win the race to switch on the
+				 * exclusive flag.
+				 */
+				if (!WT_ATOMIC_CAS1(lsm_tree->exclusive, 0, 1))
+					return (EBUSY);
+				/* Make sure there are no readers */
 				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
-					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+					lsm_tree->exclusive = 0;
 					return (EBUSY);
 				}
-			} else
+			} else {
 				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 
-			/*
-			 * If we got a reference, but an exclusive reference
-			 * beat us to it, give our reference up.
-			 */
-			if (!exclusive &&
-			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
-				(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
-				return (EBUSY);
+				/*
+				 * We got a reference, check if an exclusive
+				 * lock beat us to it.
+				 */
+				if (lsm_tree->exclusive) {
+					WT_ASSERT(session,
+					    lsm_tree->refcnt > 1);
+					(void)WT_ATOMIC_SUB4(
+					    lsm_tree->refcnt, 1);
+					return (EBUSY);
+				}
 			}
+
 			*treep = lsm_tree;
 			return (0);
 		}
@@ -590,8 +600,11 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
+	if (lsm_tree->exclusive) {
+		WT_ASSERT(session, lsm_tree->refcnt == 1);
+		lsm_tree->exclusive = 0;
+	}
 	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
-	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
@@ -873,7 +886,8 @@ __wt_lsm_tree_drop(
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
 
@@ -946,7 +960,8 @@ err:	if (locked)
 	 * Discard this LSM tree structure. The first operation on the renamed
 	 * tree will create a new one.
 	 */
-	WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
 
@@ -1007,7 +1022,8 @@ err:	if (locked)
 		 * the last good version of the metadata will be used, resulting
 		 * in a valid (not truncated) tree.
 		 */
-		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+		WT_WITH_DHANDLE_LOCK(session,
+		    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	}
 	return (ret);
 }

@@ -9,13 +9,14 @@
 
 static int   __evict_clear_walks(WT_SESSION_IMPL *);
 static int   __evict_has_work(WT_SESSION_IMPL *, uint32_t *);
-static int   __evict_lru(WT_SESSION_IMPL *, uint32_t);
 static int   __evict_lru_cmp(const void *, const void *);
 static int   __evict_lru_pages(WT_SESSION_IMPL *, int);
+static int   __evict_lru_walk(WT_SESSION_IMPL *, uint32_t);
 static int   __evict_pass(WT_SESSION_IMPL *);
 static int   __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
 static int   __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
 static void *__evict_worker(void *);
+static int __evict_server_work(WT_SESSION_IMPL *);
 
 /*
  * __evict_read_gen --
@@ -480,7 +481,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
 		    conn->cache_size, bytes_inuse, cache->bytes_dirty));
 
-		WT_RET(__evict_lru(session, flags));
+		WT_RET(__evict_lru_walk(session, flags));
+		WT_RET(__evict_server_work(session));
 
 		/*
 		 * If we're making progress, keep going; if we're not making
@@ -507,7 +509,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 /*
  * __evict_clear_walks --
- *	Clear the eviction walk points for all files.
+ *	Clear the eviction walk points for any file a session is waiting on.
  */
 static int
 __evict_clear_walks(WT_SESSION_IMPL *session)
@@ -515,31 +517,23 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_REF *ref;
+	WT_SESSION_IMPL *s;
+	u_int i, session_cnt;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	cache->evict_file_next = NULL;
 
-	/*
-	 * Lock the dhandle list so sweeping cannot change the pointers out
-	 * from under us.
-	 *
-	 * NOTE: we don't hold the schema lock, so we have to take care
-	 * that the handles we see are open and valid.
-	 */
-	__wt_spin_lock(session, &conn->dhandle_lock);
-
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
-		/* Ignore non-file handles, or handles that aren't open. */
-		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
-		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+		if (!s->active || !F_ISSET(s, WT_SESSION_CLEAR_EVICT_WALK))
 			continue;
+		if (s->dhandle == cache->evict_file_next)
+			cache->evict_file_next = NULL;
 
-		btree = dhandle->handle;
-		session->dhandle = dhandle;
+		session->dhandle = s->dhandle;
+		btree = s->dhandle->handle;
 		if ((ref = btree->evict_ref) != NULL) {
 			/*
 			 * Clear evict_ref first, in case releasing it forces
@@ -551,8 +545,6 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 		}
 		session->dhandle = NULL;
 	}
-
-	__wt_spin_unlock(session, &conn->dhandle_lock);
 
 	return (ret);
 }
@@ -567,18 +559,11 @@ __evict_tree_walk_clear(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	int locked;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
 
-	/*
-	 * Drop the handle lock if we are holding it: the eviction server needs
-	 * it to find the handle and clear the walk point.
-	  */
-	locked = F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);
-	if (locked)
-		__wt_spin_unlock(session, &S2C(session)->dhandle_lock);
+	F_SET(session, WT_SESSION_CLEAR_EVICT_WALK);
 
 	while (btree->evict_ref != NULL && ret == 0) {
 		F_SET(cache, WT_EVICT_CLEAR_WALKS);
@@ -586,8 +571,7 @@ __evict_tree_walk_clear(WT_SESSION_IMPL *session)
 		    session, cache->evict_waiter_cond, 100000);
 	}
 
-	if (locked)
-		__wt_spin_lock(session, &S2C(session)->dhandle_lock);
+	F_CLR(session, WT_SESSION_CLEAR_EVICT_WALK);
 
 	return (ret);
 }
@@ -716,13 +700,14 @@ __evict_lru_pages(WT_SESSION_IMPL *session, int is_app)
 }
 
 /*
- * __evict_lru --
- *	Evict pages from the cache based on their read generation.
+ * __evict_lru_walk --
+ *	Add pages to the LRU queue to be evicted from cache.
  */
 static int
-__evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
+__evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
 	uint32_t candidates, entries, i;
@@ -730,7 +715,8 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__evict_walk(session, &entries, flags));
+	if ((ret = __evict_walk(session, &entries, flags)) != 0)
+		return (ret == EBUSY ? 0 : ret);
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
@@ -791,14 +777,30 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
+	return (0);
+}
+
+/*
+ * __evict_server_work --
+ *	Evict pages from the cache based on their read generation.
+ */
+static int
+__evict_server_work(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
 	if (S2C(session)->evict_workers > 1) {
 		WT_STAT_FAST_CONN_INCR(
 		    session, cache_eviction_server_not_evicting);
+
 		/*
 		 * If there are candidates queued, give other threads a chance
 		 * to access them before gathering more.
 		 */
-		if (candidates > 10 && cache->evict_current != NULL)
+		if (cache->evict_candidates > 10 &&
+		    cache->evict_current != NULL)
 			__wt_yield();
 	} else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
@@ -821,6 +823,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int max_entries, old_slot, retries, slot;
+	WT_DECL_SPINLOCK_ID(id);
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
@@ -850,12 +853,10 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 
 	/*
 	 * Lock the dhandle list so sweeping cannot change the pointers out
-	 * from under us.
-	 *
-	 * NOTE: we don't hold the schema lock, so we have to take care
-	 * that the handles we see are open and valid.
+	 * from under us.  If the lock is not available, give up: there may be
+	 * other work for us to do without a new walk.
 	 */
-	__wt_spin_lock(session, &conn->dhandle_lock);
+	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
 
 retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		/* Ignore non-file handles, or handles that aren't open. */
