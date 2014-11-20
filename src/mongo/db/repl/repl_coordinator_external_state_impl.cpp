@@ -72,17 +72,23 @@ namespace {
 }  // namespace
 
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() :
-        _nextThreadId(0) {}
+        _startedThreads(false)
+        , _nextThreadId(0) {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
     void ReplicationCoordinatorExternalStateImpl::startThreads() {
+        boost::lock_guard<boost::mutex> lk(_threadMutex);
+        if (_startedThreads) {
+            return;
+        }
+        log() << "Starting replication applier threads";
         _applierThread.reset(new boost::thread(runSyncThread));
         BackgroundSync* bgsync = BackgroundSync::get();
         _producerThread.reset(new boost::thread(stdx::bind(&BackgroundSync::producerThread,
                                                            bgsync)));
         _syncSourceFeedbackThread.reset(new boost::thread(stdx::bind(&SyncSourceFeedback::run,
                                                                      &_syncSourceFeedback)));
-        newReplUp();
+        _startedThreads = true;
     }
 
     void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext* txn) {
@@ -90,12 +96,21 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
-        _syncSourceFeedback.shutdown();
-        _syncSourceFeedbackThread->join();
-        _applierThread->join();
-        BackgroundSync* bgsync = BackgroundSync::get();
-        bgsync->shutdown();
-        _producerThread->join();
+        boost::lock_guard<boost::mutex> lk(_threadMutex);
+        if (_startedThreads) {
+            log() << "Stopping replication applier threads";
+            _syncSourceFeedback.shutdown();
+            _syncSourceFeedbackThread->join();
+            _applierThread->join();
+            BackgroundSync* bgsync = BackgroundSync::get();
+            bgsync->shutdown();
+            _producerThread->join();
+        }
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn) {
+        createOplog(txn);
+        logOpInitiate(txn, BSON("msg" << "initiating set"));
     }
 
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {

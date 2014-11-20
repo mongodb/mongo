@@ -39,10 +39,8 @@ namespace mongo {
 
 namespace repl {
 
-    // These functions redefine the function for logOp(),
-    // for either master/slave or replica sets.
+    // Redefines the function for logOp() to master/slave.
     void oldRepl();  // master-slave
-    void newReplUp();// replica set after startup
 
     // Create a new capped collection for the oplog if it doesn't yet exist.
     // This will be either local.oplog.rs (replica sets) or local.oplog.$main (master/slave)

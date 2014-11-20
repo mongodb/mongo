@@ -59,7 +59,9 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalState();
 
         /**
-         * Starts the background sync, producer, and sync source feedback threads, and sets up logOp
+         * Starts the background sync, producer, and sync source feedback threads
+         *
+         * NOTE: Only starts threads if they are not already started,
          */
         virtual void startThreads() = 0;
 
@@ -73,6 +75,11 @@ namespace repl {
          * the threads it started.
          */
         virtual void shutdown() = 0;
+
+        /**
+         * Creates the oplog and writes the first entry.
+         */
+        virtual void initiateOplog(OperationContext* txn) = 0;
 
         /**
          * Simple wrapper around SyncSourceFeedback::forwardSlaveHandshake.  Signals to the

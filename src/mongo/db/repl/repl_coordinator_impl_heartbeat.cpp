@@ -424,6 +424,10 @@ namespace {
                 }
                 return;
             }
+
+            lk.unlock();
+
+            _externalState->startThreads();
         }
 
         const stdx::function<void (const ReplicationExecutor::CallbackData&)> reconfigFinishFn(

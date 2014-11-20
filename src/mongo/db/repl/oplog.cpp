@@ -145,17 +145,6 @@ namespace repl {
         return std::pair<OpTime,long long>(ts, hashNew);
     }
 
-    static void _logOpUninitialized(OperationContext* txn,
-                                    const char *opstr,
-                                    const char *ns,
-                                    const char *logNS,
-                                    const BSONObj& obj,
-                                    BSONObj *o2,
-                                    bool *bb,
-                                    bool fromMigrate ) {
-        uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
-    }
-
     /** write an op to the oplog that is already built.
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
@@ -404,10 +393,7 @@ namespace repl {
                           const BSONObj& obj,
                           BSONObj *o2,
                           bool *bb,
-                          bool fromMigrate ) = _logOpUninitialized;
-    void newReplUp() {
-        _logOp = _logOpRS;
-    }
+                          bool fromMigrate ) = _logOpRS;
 
     void oldRepl() { _logOp = _logOpOld; }
 

@@ -268,6 +268,7 @@ namespace {
             lk.unlock();
         }
         _performPostMemberStateUpdateAction(action);
+        _externalState->startThreads();
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -296,8 +297,6 @@ namespace {
 
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
-
-        _externalState->startThreads();
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);
         if (doneLoadingConfig) {
@@ -1875,6 +1874,12 @@ namespace {
         configStateGuard.Dismiss();
         fassert(18654, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
+
+        if (status.isOK()) {
+            // Create the oplog with the first entry, and start repl threads.
+            _externalState->initiateOplog(txn);
+            _externalState->startThreads();
+        }
         return status;
     }
 
