@@ -1,0 +1,6 @@
+security:
+  authorization: enabled
+  sasl:
+    serviceName: mockservice
+setParameter:
+  authenticationMechanisms: GSSAPI

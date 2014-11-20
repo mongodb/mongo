@@ -11,7 +11,7 @@ var getToolTest;
 
   getToolTest = function(name) {
     var toolTest = new ToolTest(name, TOOLS_TEST_CONFIG);
-    var db = t.startDB();
+    var db = toolTest.startDB();
 
     db.getSiblingDB('admin').createUser({
       user: AUTH_USER,
@@ -28,6 +28,7 @@ var getToolTest;
 var getCommonToolArguments = function() {
   return [
     '--username', AUTH_USER,
-    '--password', AUTH_PASSWORD
+    '--password', AUTH_PASSWORD,
+    '--authenticationDatabase', 'admin'
   ];
 };
