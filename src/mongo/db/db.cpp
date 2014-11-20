@@ -775,12 +775,14 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
         (InitializerContext* context) {
-    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorImpl(
+    repl::ReplicationCoordinatorImpl* replCoord = new repl::ReplicationCoordinatorImpl(
             getGlobalReplSettings(),
             new repl::ReplicationCoordinatorExternalStateImpl,
             new repl::NetworkInterfaceImpl,
             new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
-            static_cast<int64_t>(curTimeMillis64())));
+            static_cast<int64_t>(curTimeMillis64()));
+    repl::setGlobalReplicationCoordinator(replCoord);
+    getGlobalEnvironment()->registerKillOpListener(replCoord);
     return Status::OK();
 }
 
