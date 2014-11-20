@@ -85,13 +85,13 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint32_t lognum, min_lognum;
-	u_int i, locked, logcount;
-	char **logfiles;
+	u_int i, locked, logcount, num_archived, reccount, recycled;
+	char **logfiles, **recfiles;
 
 	conn = S2C(session);
 	log = conn->log;
-	logcount = 0;
-	logfiles = NULL;
+	logcount = num_archived = reccount = 0;
+	logfiles = recfiles = NULL;
 
 	/*
 	 * If we're coming from a backup cursor we want the smaller of
@@ -118,10 +118,12 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	__wt_spin_lock(session, &conn->hot_backup_lock);
 	locked = 1;
 	if (conn->hot_backup == 0 || backup_file != 0) {
+		num_archived = 0;
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
 			if (lognum < min_lognum) {
+				num_archived++;
 				if (conn->log_recycle)
 					WT_ERR(__wt_log_recycle_rename(
 					    session, lognum));
@@ -139,14 +141,48 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * them to be reused.  We've moved them aside while holding the backup
 	 * lock and now we can process them without the lock.
 	 */
-	if (conn->log_recycle)
+	if (conn->log_recycle) {
+		if (conn->log_recycle_max == 0) {
+			/*
+			 * If checkpoints based on log size are set, use that
+			 * as the number of log files to keep.  Otherwise
+			 * compute it based on how many we just archived.
+			 */
+			if (WT_CKPT_LOGSIZE(conn))
+				conn->log_recycle_max =
+				    (uint32_t)(conn->ckpt_logsize/
+				    conn->log_file_max);
+			else
+				conn->log_recycle_max = num_archived;
+		} else
+			conn->log_recycle_max = WT_MAX(conn->log_recycle_max,
+			    num_archived);
+		WT_STAT_FAST_CONN_SET(session,
+		    log_recycle_max, conn->log_recycle_max);
+		WT_ERR(__wt_dirlist(session, conn->log_path,
+		    WT_LOG_RECYCLENAME, WT_DIRLIST_INCLUDE,
+		    &recfiles, &reccount));
+		recycled = reccount;
+		__wt_log_files_free(session, recfiles, reccount);
+		recfiles = NULL;
+		reccount = 0;
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
-			if (lognum < min_lognum)
-				WT_ERR(__wt_log_recycle(
-				    session, lognum));
+			if (lognum < min_lognum) {
+				if (recycled < conn->log_recycle_max) {
+					recycled++;
+					WT_ERR(__wt_log_recycle(
+					    session, lognum));
+				} else {
+					WT_STAT_FAST_CONN_INCR(session,
+					    log_recycle_removed);
+					WT_ERR(__wt_log_remove(
+					    session, WT_LOG_ARCHNAME, lognum));
+				}
+			}
 		}
+	}
 
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
@@ -166,6 +202,8 @@ err:		__wt_err(session, ret, "log archive server error");
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
+	if (recfiles != NULL)
+		__wt_log_files_free(session, recfiles, reccount);
 	return (ret);
 }
 

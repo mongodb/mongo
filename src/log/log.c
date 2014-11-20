@@ -426,6 +426,7 @@ __log_alloc_recycle(WT_SESSION_IMPL *session, uint32_t to_num)
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_alloc_recycle: rename log %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
+	WT_STAT_FAST_CONN_INCR(session, log_recycle_reused);
 	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 
 err:	__wt_scr_free(&from_path);
@@ -588,6 +589,7 @@ __wt_log_recycle(WT_SESSION_IMPL *session, uint32_t lognum)
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_recycle: recycle log %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
+	WT_STAT_FAST_CONN_INCR(session, log_recycle_files);
 	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 err:	__wt_scr_free(&from_path);
 	__wt_scr_free(&to_path);
