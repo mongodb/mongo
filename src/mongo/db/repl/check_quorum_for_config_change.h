@@ -90,11 +90,11 @@ namespace repl {
         // Index of the local node's member configuration in _rsConfig.
         const int _myIndex;
 
+        // List of nodes believed to be down.
+        std::vector<HostAndPort> _down;
+
         // List of voting nodes that have responded affirmatively.
         std::vector<HostAndPort> _voters;
-
-        // List of nodes with bad responses and the bad response status they returned.
-        std::vector<std::pair<HostAndPort, Status> > _badResponses;
 
         // Total number of responses and timeouts processed.
         int _numResponses;

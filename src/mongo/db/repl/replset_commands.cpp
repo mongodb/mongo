@@ -567,12 +567,11 @@ namespace {
                 sleepsecs(data["delay"].numberInt());
             }
 
-            Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
             /* we don't call ReplSetCommand::check() here because heartbeat
                checks many things that are pre-initialization. */
             if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                status = Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
-                return appendCommandStatus(result, status);
+                errmsg = "not running with --replSet";
+                return false;
             }
 
             /* we want to keep heartbeat connections open when relinquishing primary.
@@ -584,7 +583,7 @@ namespace {
             }
 
             ReplSetHeartbeatArgs args;
-            status = args.initialize(cmdObj);
+            Status status = args.initialize(cmdObj);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
