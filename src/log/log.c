@@ -649,13 +649,23 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
 	/*
-	 * Clean up any old interim archive files.
+	 * Clean up any old interim archive and recycle files.
+	 * We clean up recycle files because settings have changed upon reboot
+	 * and we want those settings to take effect right away.
 	 */
 	WT_RET(__wt_log_get_files(session,
 	    WT_LOG_ARCHNAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		WT_ERR(__wt_log_remove(session, WT_LOG_ARCHNAME, lognum));
+	}
+	__wt_log_files_free(session, logfiles, logcount);
+	logfiles = NULL;
+	WT_ERR(__wt_log_get_files(session,
+	    WT_LOG_RECYCLENAME, &logfiles, &logcount));
+	for (i = 0; i < logcount; i++) {
+		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+		WT_ERR(__wt_log_remove(session, WT_LOG_RECYCLENAME, lognum));
 	}
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
