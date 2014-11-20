@@ -114,6 +114,7 @@ error_code("NotExactValueField", 111)
 error_code("WriteConflict", 112)
 error_code("InitialSyncFailure", 113)
 error_code("InitialSyncOplogSourceMissing", 114)
+error_code("CommandNotSupported", 115)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

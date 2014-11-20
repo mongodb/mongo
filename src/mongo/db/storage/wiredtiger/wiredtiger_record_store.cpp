@@ -627,14 +627,6 @@ namespace {
     }
 
 
-    RecordIterator* WiredTigerRecordStore::getIteratorForRepair( OperationContext* txn ) const {
-        return new Iterator(*this,
-                            txn,
-                            DiskLoc(),
-                            CollectionScanParams::FORWARD,
-                            true);
-    }
-
     std::vector<RecordIterator*> WiredTigerRecordStore::getManyIterators(
             OperationContext* txn ) const {
         // XXX do we want this to actually return a set of iterators?

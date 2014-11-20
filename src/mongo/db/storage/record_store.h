@@ -217,9 +217,11 @@ namespace mongo {
         /**
          * Constructs an iterator over a potentially corrupted store, which can be used to salvage
          * damaged records. The iterator might return every record in the store if all of them 
-         * are reachable and not corrupted.
+         * are reachable and not corrupted.  Returns NULL if not supported.
          */
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const = 0;
+        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const {
+            return NULL;
+        }
 
         /**
          * Returns many iterators that partition the RecordStore into many disjoint sets. Iterating
