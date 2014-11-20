@@ -211,8 +211,6 @@ namespace mongo {
 
         virtual void dump() const;
 
-        virtual unsigned recursiveCount() const { return _recursive; }
-
         virtual bool isW() const;
         virtual bool isR() const;
         virtual bool hasAnyReadLock() const;
@@ -220,7 +218,6 @@ namespace mongo {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
-        virtual bool isRecursive() const;
 
         virtual void assertWriteLocked(const StringData& ns) const;
 
@@ -236,8 +233,6 @@ namespace mongo {
 
         bool _batchWriter;
         bool _lockPendingParallelWriter;
-
-        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
     };
 
     typedef LockerImpl<false> DefaultLockerImpl;

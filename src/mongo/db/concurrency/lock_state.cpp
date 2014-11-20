@@ -188,11 +188,6 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isRecursive() const {
-        return recursiveCount() > 1;
-    }
-
-    template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::assertWriteLocked(const StringData& ns) const {
         if (!isWriteLocked(ns)) {
             dump();
@@ -270,8 +265,7 @@ namespace {
         : _id(id),
           _wuowNestingLevel(0),
           _batchWriter(false),
-          _lockPendingParallelWriter(false),
-          _recursive(0) {
+          _lockPendingParallelWriter(false) {
 
     }
 
