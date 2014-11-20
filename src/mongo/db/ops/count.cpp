@@ -103,9 +103,16 @@ namespace mongo {
         }
 
         BSONObj query = cmd.getObjectField("query");
-        const std::string hint = cmd.getStringField("hint");
-        const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
-        
+
+        BSONObj hintObj;
+        if (Object == cmd["hint"].type()) {
+            hintObj = cmd["hint"].Obj();
+        }
+        else {
+            const std::string hint = cmd.getStringField("hint");
+            hintObj = BSON("$hint" << hint);
+        }
+
         // count of all objects
         if (query.isEmpty()) {
             return applySkipLimit(collection->numRecords(), cmd);
