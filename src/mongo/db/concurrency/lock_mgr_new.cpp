@@ -128,25 +128,76 @@ namespace {
          * Used for initialization of a LockHead, which might have been retrieved from cache and
          * also in order to keep the LockHead structure a POD.
          */
-        void initNew(const ResourceId& resId);
+        void initNew(ResourceId resId) {
+            resourceId = resId;
+
+            grantedList.reset();
+            memset(grantedCounts, 0, sizeof(grantedCounts));
+            grantedModes = 0;
+
+            conflictList.reset();
+            memset(conflictCounts, 0, sizeof(conflictCounts));
+            conflictModes = 0;
+
+            conversionsCount = 0;
+            compatibleFirstCount = 0;
+        }
 
         /**
          * Locates the request corresponding to the particular locker or returns NULL. Must be
          * called with the bucket holding this lock head locked.
          */
-        LockRequest* findRequest(LockerId lockerId) const;
+        LockRequest* findRequest(LockerId lockerId) const {
+            // Check the granted queue first
+            for (LockRequest* it = grantedList._front; it != NULL; it = it->next) {
+                if (it->locker->getId() == lockerId) {
+                    return it;
+                }
+            }
 
-        // Used by the changeGrantedModeCount/changeConflictModeCount methods to indicate whether
-        // the particular mode is coming or going away.
-        enum ChangeModeCountAction {
-            Increment = 1, Decrement = -1
-        };
+            // Check the conflict queue second
+            for (LockRequest* it = conflictList._front; it != NULL; it = it->next) {
+                if (it->locker->getId() == lockerId) {
+                    return it;
+                }
+            }
+
+            return NULL;
+        }
 
         // Methods to maintain the granted queue
-        void changeGrantedModeCount(LockMode mode, ChangeModeCountAction action);
+        void incGrantedModeCount(LockMode mode) {
+            invariant(grantedCounts[mode] >= 0);
+            if (++grantedCounts[mode] == 1) {
+                invariant((grantedModes & modeMask(mode)) == 0);
+                grantedModes |= modeMask(mode);
+            }
+        }
+
+        void decGrantedModeCount(LockMode mode) {
+            invariant(grantedCounts[mode] >= 1);
+            if (--grantedCounts[mode] == 0) {
+                invariant((grantedModes & modeMask(mode)) == modeMask(mode));
+                grantedModes &= ~modeMask(mode);
+            }
+        }
 
         // Methods to maintain the conflict queue
-        void changeConflictModeCount(LockMode mode, ChangeModeCountAction count);
+        void incConflictModeCount(LockMode mode) {
+            invariant(conflictCounts[mode] >= 0);
+            if (++conflictCounts[mode] == 1) {
+                invariant((conflictModes & modeMask(mode)) == 0);
+                conflictModes |= modeMask(mode);
+            }
+        }
+
+        void decConflictModeCount(LockMode mode) {
+            invariant(conflictCounts[mode] >= 1);
+            if (--conflictCounts[mode] == 0) {
+                invariant((conflictModes & modeMask(mode)) == modeMask(mode));
+                conflictModes &= ~modeMask(mode);
+            }
+        }
 
 
         // Id of the resource which this lock protects
@@ -207,84 +258,10 @@ namespace {
 
 
     //
-    // LockHead
-    //
-
-    void LockHead::initNew(const ResourceId& resId) {
-        resourceId = resId;
-
-        grantedList.reset();
-        memset(grantedCounts, 0, sizeof(grantedCounts));
-        grantedModes = 0;
-
-        conflictList.reset();
-        memset(conflictCounts, 0, sizeof(conflictCounts));
-        conflictModes = 0;
-
-        conversionsCount = 0;
-        compatibleFirstCount = 0;
-    }
-
-    LockRequest* LockHead::findRequest(LockerId lockerId) const {
-        // Check the granted queue first
-        for (LockRequest* it = grantedList._front; it != NULL; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        // Check the conflict queue second
-        for (LockRequest* it = conflictList._front; it != NULL; it = it->next) {
-            if (it->locker->getId() == lockerId) {
-                return it;
-            }
-        }
-
-        return NULL;
-    }
-
-    void LockHead::changeGrantedModeCount(LockMode mode, ChangeModeCountAction action) {
-        if (action == Increment) {
-            invariant(grantedCounts[mode] >= 0);
-            if (++grantedCounts[mode] == 1) {
-                invariant((grantedModes & modeMask(mode)) == 0);
-                grantedModes |= modeMask(mode);
-            }
-        }
-        else {
-            invariant(action == Decrement);
-            invariant(grantedCounts[mode] >= 1);
-            if (--grantedCounts[mode] == 0) {
-                invariant((grantedModes & modeMask(mode)) == modeMask(mode));
-                grantedModes &= ~modeMask(mode);
-            }
-        }
-    }
-
-    void LockHead::changeConflictModeCount(LockMode mode, ChangeModeCountAction action) {
-        if (action == Increment) {
-            invariant(conflictCounts[mode] >= 0);
-            if (++conflictCounts[mode] == 1) {
-                invariant((conflictModes & modeMask(mode)) == 0);
-                conflictModes |= modeMask(mode);
-            }
-        }
-        else {
-            invariant(action == Decrement);
-            invariant(conflictCounts[mode] >= 1);
-            if (--conflictCounts[mode] == 0) {
-                invariant((conflictModes & modeMask(mode)) == modeMask(mode));
-                conflictModes &= ~modeMask(mode);
-            }
-        }
-    }
-
-
-    //
     // LockManager
     //
 
-    //  Have more buckets than CPUs to reduce contention on lock and caches
+    // Have more buckets than CPUs to reduce contention on lock and caches
     const unsigned LockManager::_numLockBuckets(128);
 
     LockManager::LockManager() {
@@ -343,7 +320,7 @@ namespace {
                 lock->conflictList.push_back(request);
             }
 
-            lock->changeConflictModeCount(mode, LockHead::Increment);
+            lock->incConflictModeCount(mode);
 
             return LOCK_WAITING;
         }
@@ -353,7 +330,7 @@ namespace {
             request->mode = mode;
 
             lock->grantedList.push_back(request);
-            lock->changeGrantedModeCount(mode, LockHead::Increment);
+            lock->incGrantedModeCount(mode);
 
             if (request->compatibleFirst) {
                 lock->compatibleFirstCount++;
@@ -422,13 +399,13 @@ namespace {
             request->convertMode = newMode;
 
             lock->conversionsCount++;
-            lock->changeGrantedModeCount(request->convertMode, LockHead::Increment);
+            lock->incGrantedModeCount(request->convertMode);
 
             return LOCK_WAITING;
         }
         else {  // No conflict, existing request
-            lock->changeGrantedModeCount(newMode, LockHead::Increment);
-            lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
+            lock->incGrantedModeCount(newMode);
+            lock->decGrantedModeCount(request->mode);
             request->mode = newMode;
 
             return LOCK_OK;
@@ -457,7 +434,7 @@ namespace {
             invariant(request->recursiveCount == 0);
 
             lock->conflictList.remove(request);
-            lock->changeConflictModeCount(request->mode, LockHead::Decrement);
+            lock->decConflictModeCount(request->mode);
         }
         else if (request->status == LockRequest::STATUS_CONVERTING) {
             // This cancels a pending convert request
@@ -468,7 +445,7 @@ namespace {
             request->status = LockRequest::STATUS_GRANTED;
 
             lock->conversionsCount--;
-            lock->changeGrantedModeCount(request->convertMode, LockHead::Decrement);
+            lock->decGrantedModeCount(request->convertMode);
 
             request->convertMode = MODE_NONE;
 
@@ -481,7 +458,7 @@ namespace {
 
             // Remove from the granted list
             lock->grantedList.remove(request);
-            lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
+            lock->decGrantedModeCount(request->mode);
 
             if (request->compatibleFirst) {
                 lock->compatibleFirstCount--;
@@ -512,8 +489,8 @@ namespace {
         LockBucket* bucket = _getBucket(lock->resourceId);
         SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
-        lock->changeGrantedModeCount(newMode, LockHead::Increment);
-        lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
+        lock->incGrantedModeCount(newMode);
+        lock->decGrantedModeCount(request->mode);
         request->mode = newMode;
 
         _onLockModeChanged(lock, true);
@@ -581,7 +558,7 @@ namespace {
 
                 if (!conflicts(iter->convertMode, grantedModesWithoutCurrentRequest)) {
                     lock->conversionsCount--;
-                    lock->changeGrantedModeCount(iter->mode, LockHead::Decrement);
+                    lock->decGrantedModeCount(iter->mode);
                     iter->status = LockRequest::STATUS_GRANTED;
                     iter->mode = iter->convertMode;
                     iter->convertMode = MODE_NONE;
@@ -611,8 +588,8 @@ namespace {
             lock->conflictList.remove(iter);
             lock->grantedList.push_back(iter);
 
-            lock->changeGrantedModeCount(iter->mode, LockHead::Increment);
-            lock->changeConflictModeCount(iter->mode, LockHead::Decrement);
+            lock->incGrantedModeCount(iter->mode);
+            lock->decConflictModeCount(iter->mode);
 
             if (iter->compatibleFirst) {
                 lock->compatibleFirstCount++;
