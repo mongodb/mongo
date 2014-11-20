@@ -169,6 +169,8 @@ struct __wt_lsm_tree {
 	int collator_owned;
 
 	int refcnt;			/* Number of users of the tree */
+	int8_t exclusive;		/* Tree is locked exclusively */
+
 #define	LSM_TREE_MAX_QUEUE	100
 	int queue_ref;
 	WT_RWLOCK *rwlock;
@@ -218,9 +220,6 @@ struct __wt_lsm_tree {
 #define	WT_LSM_TREE_OPEN		0x08	/* The tree is open */
 #define	WT_LSM_TREE_THROTTLE		0x10	/* Throttle updates */
 	uint32_t flags;
-
-#define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */
-	uint8_t flags_atomic;
 };
 
 /*
