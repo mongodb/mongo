@@ -875,6 +875,24 @@ env.CppUnitTest('range_deleter_stat_test',
                 [ 'db/range_deleter_stat_test.cpp' ],
                 LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
+env.Library(
+    target='storage_engine_metadata',
+    source=[
+        'db/storage/storage_engine_metadata.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+    ]
+)
+
+env.CppUnitTest(
+    target= 'storage_engine_metadata_test',
+    source = 'db/storage/storage_engine_metadata_test.cpp',
+    LIBDEPS=[
+        'storage_engine_metadata',
+    ],
+)
+
 env.Library("serveronly", serverOnlyFiles,
             LIBDEPS=["coreshard",
                      "db/auth/authmongod",
