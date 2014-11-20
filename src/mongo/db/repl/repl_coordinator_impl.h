@@ -459,7 +459,7 @@ namespace repl {
          * to decide whether or not to finish a step down.
          * Should only be called from executor callbacks.
          */
-        void _signalStepDownWaiters(const ReplicationExecutor::CallbackData& cbData);
+        void _signalStepDownWaitersFromCallback(const ReplicationExecutor::CallbackData& cbData);
         void _signalStepDownWaiters();
 
         /**

@@ -799,7 +799,7 @@ namespace {
         }
 
         _replExecutor.scheduleWork(
-                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
                            this,
                            stdx::placeholders::_1));
     }
@@ -813,7 +813,7 @@ namespace {
         }
 
         _replExecutor.scheduleWork(
-                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
                            this,
                            stdx::placeholders::_1));
     }
@@ -1060,7 +1060,7 @@ namespace {
         fassert(18809, cbh.getStatus());
         cbh = _replExecutor.scheduleWorkAt(
                 waitUntil,
-                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
                            this,
                            stdx::placeholders::_1));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -1072,7 +1072,7 @@ namespace {
         return result;
     }
 
-    void ReplicationCoordinatorImpl::_signalStepDownWaiters(
+    void ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback(
             const ReplicationExecutor::CallbackData& cbData) {
         if (!cbData.status.isOK()) {
             return;
