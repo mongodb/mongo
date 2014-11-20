@@ -29,7 +29,7 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 /*
  * __wt_log_written_reset --
  *	Interface to reset the amount of log written during this
- *	during this checkpoint period.  Called from the checkpoint code.
+ *	checkpoint period.  Called from the checkpoint code.
  */
 void
 __wt_log_written_reset(WT_SESSION_IMPL *session)
@@ -46,11 +46,11 @@ __wt_log_written_reset(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_log_get_files --
- *	Retrieve the list of all existing log files.
+ * __log_get_files --
+ *	Retrieve the list of all log-related files of the given prefix type.
  */
-int
-__wt_log_get_files(WT_SESSION_IMPL *session,
+static int
+__log_get_files(WT_SESSION_IMPL *session,
     const char *file_prefix, char ***filesp, u_int *countp)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -69,8 +69,8 @@ __wt_log_get_files(WT_SESSION_IMPL *session,
 
 /*
  * __wt_log_get_all_files --
- *	Retrieve the list of active log files (those that are not candidates
- *	for archiving).
+ *	Retrieve the list of log files, either all of them or only the active
+ *	ones (those that are not candidates for archiving).
  */
 int
 __wt_log_get_all_files(WT_SESSION_IMPL *session,
@@ -86,7 +86,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	log = S2C(session)->log;
 
 	*maxid = 0;
-	WT_RET(__wt_log_get_files(session, WT_LOG_FILENAME, &files, &count));
+	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
 	for (max = 0, i = 0; i < count; ) {
@@ -128,7 +128,8 @@ __wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count)
 
 /*
  * __log_filename --
- *	Given a log number, return a WT_ITEM of a generated log file name.
+ *	Given a log number, return a WT_ITEM of a generated log file name
+ *	of the given prefix type.
  */
 static int
 __log_filename(WT_SESSION_IMPL *session,
@@ -250,7 +251,8 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	slot->slot_start_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	/*
-	 * Pre-allocate on the first real write into the log file.
+	 * Pre-allocate on the first real write into the log file, if it
+	 * was just created (i.e. not recycled).
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
@@ -408,7 +410,8 @@ __log_alloc_recycle(WT_SESSION_IMPL *session, uint32_t to_num)
 	/*
 	 * If there are no recyclable files, return WT_NOTFOUND.
 	 */
-	WT_ERR(__wt_log_get_files(session,
+	logfiles = NULL;
+	WT_ERR(__log_get_files(session,
 	    WT_LOG_RECYCLENAME, &logfiles, &logcount));
 	if (logcount == 0)
 		return (WT_NOTFOUND);
@@ -427,6 +430,10 @@ __log_alloc_recycle(WT_SESSION_IMPL *session, uint32_t to_num)
 	    "log_alloc_recycle: rename log %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
 	WT_STAT_FAST_CONN_INCR(session, log_recycle_reused);
+	/*
+	 * All file setup, writing the header and pre-allocation was done
+	 * before.  We only need to rename it.
+	 */
 	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 
 err:	__wt_scr_free(&from_path);
@@ -458,6 +465,7 @@ __log_reset_file(WT_SESSION_IMPL *session, uint32_t lognum)
 	 * - Truncating to the offset of the first record.
 	 * - Pre-allocating the file if needed.
 	 */
+	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 0, &log_fh, WT_LOG_ARCHNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
@@ -514,7 +522,7 @@ __log_truncate(WT_SESSION_IMPL *session,
 	 */
 	if (this_log)
 		goto err;
-	WT_ERR(__wt_log_get_files(session,
+	WT_ERR(__log_get_files(session,
 	    WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
@@ -653,15 +661,14 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * We clean up recycle files because settings have changed upon reboot
 	 * and we want those settings to take effect right away.
 	 */
-	WT_RET(__wt_log_get_files(session,
-	    WT_LOG_ARCHNAME, &logfiles, &logcount));
+	WT_RET(__log_get_files(session, WT_LOG_ARCHNAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		WT_ERR(__wt_log_remove(session, WT_LOG_ARCHNAME, lognum));
 	}
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
-	WT_ERR(__wt_log_get_files(session,
+	WT_ERR(__log_get_files(session,
 	    WT_LOG_RECYCLENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
@@ -672,8 +679,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	/*
 	 * Now look at the log files and set our LSNs.
 	 */
-	WT_ERR(__wt_log_get_files(session,
-	    WT_LOG_FILENAME, &logfiles, &logcount));
+	WT_ERR(__log_get_files(session, WT_LOG_FILENAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		lastlog = WT_MAX(lastlog, lognum);
@@ -1004,7 +1010,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	    create_log, &log->log_fh, WT_LOG_FILENAME, log->fileid));
 	/*
 	 * If we created the log, write a header.  Otherwise it's already there.
-	 * We need to setup the LSNs.  If we're using a recycled log record,
+	 * We need to setup the LSNs.  If we're using a recycled log file,
 	 * set the end LSN and alloc LSN to the end of the header because the
 	 * header is already in the file.  Otherwise it will be filled in
 	 * when writing to the log file and the LSN values will be updated.
@@ -1191,7 +1197,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		allocsize = LOG_ALIGN;
 		lastlog = 0;
 		firstlog = UINT32_MAX;
-		WT_RET(__wt_log_get_files(session,
+		WT_RET(__log_get_files(session,
 		    WT_LOG_FILENAME, &logfiles, &logcount));
 		if (logcount == 0)
 			/*

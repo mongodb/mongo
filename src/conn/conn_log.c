@@ -102,11 +102,11 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	else
 		min_lognum = log->ckpt_lsn.file;
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
-	    "log_archive: archive to LSN %" PRIu32, min_lognum));
+	    "log_archive: archive to log number %" PRIu32, min_lognum));
 
 	/*
 	 * Main archive code.  Get the list of all log files and
-	 * remove any earlier than the checkpoint LSN.
+	 * remove or recycle any earlier than the minimum log number.
 	 */
 	WT_RET(__wt_dirlist(session, conn->log_path,
 	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
@@ -144,7 +144,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	if (conn->log_recycle) {
 		if (conn->log_recycle_max == 0) {
 			/*
-			 * If checkpoints based on log size are set, use that
+			 * If checkpoints are based on log size, use that
 			 * as the number of log files to keep.  Otherwise
 			 * compute it based on how many we just archived.
 			 */
@@ -166,15 +166,25 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 		__wt_log_files_free(session, recfiles, reccount);
 		recfiles = NULL;
 		reccount = 0;
+		/*
+		 * Recycle up to the maximum number to keep that we just
+		 * computed and detected.  If we have extra, remove them.
+		 */
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
 			if (lognum < min_lognum) {
 				if (recycled < conn->log_recycle_max) {
+					/*
+					 * Keep it.  Set it up.
+					 */
 					recycled++;
 					WT_ERR(__wt_log_recycle(
 					    session, lognum));
 				} else {
+					/*
+					 * Extra one.  Remove it.
+					 */
 					WT_STAT_FAST_CONN_INCR(session,
 					    log_recycle_removed);
 					WT_ERR(__wt_log_remove(
@@ -233,7 +243,7 @@ __wt_log_truncate_files(
 		backup_file = WT_CURSOR_BACKUP_ID(cursor);
 	WT_ASSERT(session, backup_file <= log->alloc_lsn.file);
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
-	    "log_truncate: Archive once up to %" PRIu32,
+	    "log_truncate_files: Archive once up to %" PRIu32,
 	    backup_file));
 	WT_RET(__wt_writelock(session, log->log_archive_lock));
 	locked = 1;
@@ -277,8 +287,8 @@ __log_archive_server(void *arg)
 				    "log_archive: Blocked due to open log "
 				    "cursor holding archive lock"));
 			}
-			WT_ERR(
-			    __wt_cond_wait(session, conn->arch_cond, 1000000));
+			WT_ERR(__wt_cond_wait(
+			    session, conn->arch_cond, WT_MILLION));
 			continue;
 		}
 		locked = 1;
@@ -290,7 +300,7 @@ __log_archive_server(void *arg)
 		locked = 0;
 
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
+		WT_ERR(__wt_cond_wait(session, conn->arch_cond, WT_MILLION));
 	}
 
 	if (0) {
