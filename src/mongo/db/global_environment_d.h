@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    class Client;
+
     class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
     public:
         GlobalEnvironmentMongoD();
@@ -60,6 +62,8 @@ namespace mongo {
 
         bool killOperation(unsigned int opId);
 
+        void killAllUserOperations(const OperationContext* txn);
+
         void registerKillOpListener(KillOpListenerInterface* listener);
 
         void registerOperationContext(OperationContext* txn);
@@ -71,6 +75,9 @@ namespace mongo {
         OperationContext* newOpCtx();
 
     private:
+
+        bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
+
         bool _globalKill;
 
         typedef unordered_set<OperationContext*> OperationContextSet;

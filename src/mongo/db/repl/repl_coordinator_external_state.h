@@ -138,6 +138,12 @@ namespace repl {
         virtual void closeConnections() = 0;
 
         /**
+         * Kills all operations that have a Client that is associated with an incoming user
+         * connection.  Used during stepdown.
+         */
+        virtual void killAllUserOperations(OperationContext* txn) = 0;
+
+        /**
          * Clears all cached sharding metadata on this server.  This is called after stepDown to
          * ensure that if the node becomes primary again in the future it will reload an up-to-date
          * version of the sharding data.

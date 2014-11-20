@@ -212,6 +212,7 @@ namespace mongo {
         void setRemoteID(const OID& rid) { _remoteId = rid;  } // Only used for master/slave
         OID getRemoteID() const { return _remoteId; } // Only used for master/slave
         ConnectionId getConnectionId() const { return _connectionId; }
+        bool isFromUserConnection() const { return _connectionId > 0; }
 
     private:
         Client(const std::string& desc, AbstractMessagingPort *p = 0);

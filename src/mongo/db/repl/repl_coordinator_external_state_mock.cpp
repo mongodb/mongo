@@ -135,6 +135,8 @@ namespace repl {
         _connectionsClosed = true;
     }
 
+    void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationContext* txn) {}
+
     void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
 
     void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}

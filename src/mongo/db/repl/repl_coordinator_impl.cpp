@@ -1018,7 +1018,10 @@ namespace {
         const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
         LockResult lockState = txn->lockState()->lockGlobalBegin(MODE_S);
-        // TODO(spencer): SERVER-15310 Kill all operations here.
+        // We've requested the global shared lock which will stop new writes from coming in,
+        // but existing writes could take a long time to finish, so kill all user operations
+        // to help us get the global lock faster.
+        _externalState->killAllUserOperations(txn);
 
         if (lockState == LOCK_WAITING) {
             lockState = txn->lockState()->lockGlobalComplete(stepdownTime.total_milliseconds());

@@ -43,6 +43,8 @@ namespace mongo {
 
         bool killOperation(unsigned int opId);
 
+        void killAllUserOperations(const OperationContext* txn);
+
         void setKillAllOperations();
 
         void unsetKillAllOperations();

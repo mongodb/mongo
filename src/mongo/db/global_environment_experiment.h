@@ -115,6 +115,12 @@ namespace mongo {
         virtual bool killOperation(unsigned int opId) = 0;
 
         /**
+         * Kills all operations that have a Client that is associated with an incoming user
+         * connection, except for the one associated with txn.
+         */
+        virtual void killAllUserOperations(const OperationContext* txn) = 0;
+
+        /**
          * Registers a listener to be notified each time an op is killed.
          *
          * listener does not become owned by the environment. As there is currently no way to
