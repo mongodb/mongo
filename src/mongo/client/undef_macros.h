@@ -46,6 +46,8 @@
 #pragma pop_macro("verify")
 #undef invariant
 #pragma pop_macro("invariant")
+#undef invariantOK
+#pragma pop_macro("invariantOK")
 #undef DESTRUCTOR_GUARD
 #pragma pop_macro("DESTRUCTOR_GUARD")
 

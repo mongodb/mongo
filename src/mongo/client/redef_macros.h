@@ -41,6 +41,9 @@
 #pragma push_macro("invariant")
 #undef invariant
 #define invariant MONGO_invariant
+#pragma push_macro("invariantOK")
+#undef invariantOK
+#define invariantOK MONGO_invariantOK
 #pragma push_macro("dassert")
 #undef dassert
 #define dassert MONGO_dassert

@@ -75,12 +75,13 @@ namespace mongo {
         return Status(ErrorCodes::UnknownError, s);
     }
 
-    inline void invariantWTOK(int retCode) {
-        if (MONGO_likely(retCode == 0))
-            return;
-
-        fassertFailedWithStatus(28519, wtRCToStatus(retCode));
-    }
+#define invariantWTOK(expression) do { \
+        int _invariantWTOK_retCode = expression; \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) { \
+            invariantOKFailed(#expression, wtRCToStatus(_invariantWTOK_retCode), \
+                              __FILE__, __LINE__); \
+        } \
+    } while (false)
 
     struct WiredTigerItem : public WT_ITEM {
         WiredTigerItem(const void *d, size_t s) {
