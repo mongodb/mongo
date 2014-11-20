@@ -227,31 +227,6 @@ namespace {
         log() << ss.str() << std::endl;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::enterScopedLock(Lock::ScopedLock* lock) {
-        _recursive++;
-        if (_recursive == 1) {
-            invariant(_scopedLk == NULL);
-            _scopedLk = lock;
-        }
-    }
-
-    template<bool IsForMMAPV1>
-    Lock::ScopedLock* LockerImpl<IsForMMAPV1>::getCurrentScopedLock() const {
-        invariant(_recursive == 1);
-        return _scopedLk;
-    }
-
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::leaveScopedLock(Lock::ScopedLock* lock) {
-        if (_recursive == 1) {
-            // Sanity check we are releasing the same lock
-            invariant(_scopedLk == lock);
-            _scopedLk = NULL;
-        }
-        _recursive--;
-    }
-
 
     //
     // CondVarLockGrantNotification
@@ -296,8 +271,7 @@ namespace {
           _wuowNestingLevel(0),
           _batchWriter(false),
           _lockPendingParallelWriter(false),
-          _recursive(0),
-          _scopedLk(NULL) {
+          _recursive(0) {
 
     }
 

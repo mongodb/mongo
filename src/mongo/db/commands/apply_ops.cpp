@@ -140,7 +140,12 @@ namespace mongo {
                 // TODO figure out what to do about this.
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
-                invariant(txn->lockState()->isRecursive());
+
+                // Ensures that yielding will not happen (see the comment above).
+                DEV {
+                    Locker::LockSnapshot lockSnapshot;
+                    invariant(!txn->lockState()->saveLockStateAndUnlock(&lockSnapshot));
+                };
 
                 Client::Context ctx(txn, ns);
                 bool failed = repl::applyOperation_inlock(txn,

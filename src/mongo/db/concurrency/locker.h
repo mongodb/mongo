@@ -33,7 +33,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_mgr_new.h"
 
 namespace mongo {
@@ -272,13 +271,6 @@ namespace mongo {
          * lock).
          */
         virtual bool hasLockPending() const = 0;
-
-        // ----
-
-        // Those are only used for TempRelease. Eventually they should be removed.
-        virtual void enterScopedLock(Lock::ScopedLock* lock) = 0;
-        virtual Lock::ScopedLock* getCurrentScopedLock() const = 0;
-        virtual void leaveScopedLock(Lock::ScopedLock* lock) = 0;
 
         // Used for the replication parallel log op application threads
         virtual void setIsBatchWriter(bool newValue) = 0;
