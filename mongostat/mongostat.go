@@ -131,12 +131,14 @@ func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep t
 	go func() {
 		rowCount := 0
 		warned := false
+		hasData := false
 		for {
 			newStat := <-cluster.ReportChan
-			if newStat.Error != nil {
+			if newStat.Error != nil && !hasData {
 				done <- newStat.Error
 				return
 			}
+			hasData = true
 
 			//If this mongod is running a storage engine other than mmapv1,
 			//print a warning about the non-applicable fields.
