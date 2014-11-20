@@ -373,6 +373,12 @@ __clsm_open_cursors(
 	lsm_tree = clsm->lsm_tree;
 	chunk = NULL;
 
+	if (update) {
+		if (txn->isolation == TXN_ISO_SNAPSHOT)
+			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
+	} else
+		F_SET(clsm, WT_CLSM_OPEN_READ);
+
 	if (lsm_tree->nchunks == 0)
 		return (0);
 
@@ -386,12 +392,6 @@ __clsm_open_cursors(
 		    session, &c->key, c->key.data, c->key.size));
 
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-
-	if (update) {
-		if (txn->isolation == TXN_ISO_SNAPSHOT)
-			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
-	} else
-		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
 	locked = 1;
