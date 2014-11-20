@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongodump"
 	"github.com/mongodb/mongo-tools/mongodump/options"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -17,11 +18,19 @@ func main() {
 	outputOpts := &options.OutputOptions{}
 	opts.AddOptions(outputOpts)
 
-	_, err := opts.Parse()
+	extraArgs, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v\n\n", err)
 		opts.PrintHelp(true)
 		return
+	}
+
+	if len(extraArgs) > 0 {
+		log.Logf(log.Always,
+			"error: mongodump does not accept positional arguments (%v) see help text",
+			strings.Join(extraArgs, ", "))
+		opts.PrintHelp(true)
+		os.Exit(1)
 	}
 
 	// print help, if specified
