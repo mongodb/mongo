@@ -30,7 +30,9 @@ func (restore *MongoRestore) RestoreOplog() error {
 	log.Log(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
 	if intent == nil {
+		// this should not be reached
 		log.Log(log.Always, "no oplog.bson file in root of the dump directory, skipping oplog application")
+		return nil
 	}
 
 	fileInfo, err := os.Lstat(intent.BSONPath)

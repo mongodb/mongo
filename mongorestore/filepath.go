@@ -46,6 +46,7 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 
 func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 	log.Logf(log.DebugHigh, "using %v as dump root directory", fullpath)
+	foundOplog := false
 	entries, err := ioutil.ReadDir(fullpath)
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
@@ -61,6 +62,10 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 			}
 		} else {
 			if entry.Name() == "oplog.bson" {
+				if restore.InputOptions.OplogReplay {
+					log.Log(log.DebugLow, "found oplog.bson file to replay")
+				}
+				foundOplog = true
 				restore.manager.Put(&intents.Intent{
 					C:        "oplog", //TODO make this a helper in intent
 					BSONPath: filepath.Join(fullpath, entry.Name()),
@@ -71,6 +76,11 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 					filepath.Join(fullpath, entry.Name()))
 			}
 		}
+	}
+	if restore.InputOptions.OplogReplay && !foundOplog {
+		return fmt.Errorf(
+			"no %v/oplog.bson file to replay; make sure you run mongodump with --oplog.",
+			fullpath)
 	}
 	return nil
 }
