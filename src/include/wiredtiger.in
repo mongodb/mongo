@@ -1891,7 +1891,7 @@ struct __wt_connection {
  * the files are created relative to the database home., a string; default \c
  * "".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recycle, recycle rather than remove
- * archived log files., a boolean flag; default \c false.}
+ * archived log files., a boolean flag; default \c true.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}

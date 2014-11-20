@@ -992,13 +992,22 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	}
 	WT_RET(__log_openfile(session,
 	    create_log, &log->log_fh, WT_LOG_FILENAME, log->fileid));
-	log->alloc_lsn.file = log->fileid;
-	log->alloc_lsn.offset = log->log_fh->size;
 	/*
 	 * If we created the log, write a header.  Otherwise it's already there.
+	 * We need to setup the LSNs.  If we're using a recycled log record,
+	 * set the end LSN and alloc LSN to the end of the header because the
+	 * header is already in the file.  Otherwise it will be filled in
+	 * when writing to the log file and the LSN values will be updated.
 	 */
-	if (create_log)
+	if (create_log) {
+		log->alloc_lsn.file = log->fileid;
+		log->alloc_lsn.offset = log->log_fh->size;
 		WT_RET(__log_file_header(session, NULL, &end_lsn, 0));
+	} else {
+		log->alloc_lsn.file = log->fileid;
+		log->alloc_lsn.offset = LOG_FIRST_RECORD;
+		end_lsn = log->alloc_lsn;
+	}
 
 	/*
 	 * If we're called from connection creation code, we need to update
