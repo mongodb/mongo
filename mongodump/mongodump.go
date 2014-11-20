@@ -358,6 +358,10 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 				return fmt.Errorf(
 					"error: --repair flag cannot be used on mongodb versions before 2.7.8.")
 			}
+			if strings.Index(err.Error(), "repair iterator not supported") > 0 {
+				// helpful error message if the storage engine does not support repair (WiredTiger)
+				return fmt.Errorf("error: --repair is not supported by the connected storage engine")
+			}
 			return fmt.Errorf("repair error: %v", err)
 		}
 		log.Logf(log.Always,
