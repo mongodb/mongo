@@ -71,6 +71,7 @@
 #include "mongo/db/startup_warnings.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
@@ -683,6 +684,10 @@ namespace mongo {
             uassert(12590,  ss.str().c_str(),
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
+
+        // Read storage engine metadata file (introduced in 2.8) if present.
+        // Do not start server if storage engine in metadata is not 'mmapv1'.
+        StorageEngineMetadata::validate(storageGlobalParams.dbpath, "mmapv1");
 
         // TODO check non-journal subdirs if using directory-per-db
         checkReadAhead(storageGlobalParams.dbpath);

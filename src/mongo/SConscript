@@ -965,6 +965,7 @@ mongod = env.Install(
                                 "ntservice",
                                 "serveronly",
                                 "mongod_options",
+                                "storage_engine_metadata",
                                 ] ) )
 Default( mongod )
 
