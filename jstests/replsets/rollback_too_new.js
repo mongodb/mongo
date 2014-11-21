@@ -9,45 +9,37 @@
     var conns = replTest.startSet();
     replTest.initiate({"_id": name,
                        "members": [
-                           { "_id": 0, "host": nodes[0], priority: 3 },
+                           { "_id": 0, "host": nodes[0] },
                            { "_id": 1, "host": nodes[1] },
-                           { "_id": 2, "host": nodes[2], arbiterOnly: true}],
+                           { "_id": 2, "host": nodes[2], priority: 0 }],
                        "settings": {
-                           "chainingAllowed": false,
+                           "chainingAllowed": false
                        }
                       });
-    var a_conn = conns[0];
-    var b_conn = conns[1];
-    var AID = replTest.getNodeId(a_conn);
-    var BID = replTest.getNodeId(b_conn);
+    var c_conn = conns[2];
+    var CID = replTest.getNodeId(c_conn);
 
     // get master and do an initial write
     var master = replTest.getMaster();
-    assert.eq(master, conns[0], "conns[0] assumed to be master");
-    assert.eq(a_conn.host, master.host, "a_conn assumed to be master");
-    var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
-    assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
+    var options = {writeConcern: {w: 3, wtimeout: 60000}};
+    assert.writeOK(master.getDB(name).foo.insert({x: 1}, options));
 
-    // remove node B from the set
-    replTest.stop(BID);
-
-    // add an oplog entry from the distant future as the most recent entry on node A
-    var future_oplog_entry = master.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+    // add an oplog entry from the distant future as the most recent entry on node C
+    var future_oplog_entry = conns[2].getDB("local").oplog.rs.find().sort({$natural: -1})[0];
     future_oplog_entry["ts"] = new Timestamp(future_oplog_entry["ts"].getTime() + 200000, 1);
-    var options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
-    assert.writeOK(master.getDB("local").oplog.rs.insert(future_oplog_entry, options));
+    options = {writeConcern: {w: 1, wtimeout: 60000}};
+    assert.writeOK(conns[2].getDB("local").oplog.rs.insert(future_oplog_entry, options));
 
-    // take down node A, allow node B to become master and do one write to it
-    // in order to force a rollback on A
-    replTest.stop(AID);
-    replTest.restart(BID);
-    master = replTest.getMaster();
-    assert.eq(b_conn.host, master.host, "b_conn assumed to be master");
+    replTest.stop(CID);
+
+    // do one write to master
+    // in order to trigger a rollback on C
     assert.writeOK(master.getDB(name).foo.insert({x: 2}, options));
 
-    // restart node A, which should attempt to rollback but then fassert.
+    // Node C should connect to new master as a sync source because chaining is disallowed.
+    // C is ahead of master but it will still connect to it.
     clearRawMongoProgramOutput();
-    replTest.restart(AID);
+    replTest.restart(CID);
     assert.soon(function() {
         try {
             return rawMongoProgramOutput().match(
@@ -55,7 +47,7 @@
         } catch (e) {
             return false;
         }
-    }, "A failed to fassert", 60 * 1000);
+    }, "node C failed to fassert", 60 * 1000);
 
     replTest.stopSet();
 
