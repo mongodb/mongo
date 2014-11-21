@@ -255,7 +255,10 @@ func (dump *MongoDump) Dump() error {
 func (dump *MongoDump) DumpIntents() error {
 	resultChan := make(chan error)
 
-	jobs := dump.ToolOptions.HiddenOptions.MaxProcs
+	var jobs int
+	if dump.ToolOptions != nil && dump.ToolOptions.HiddenOptions != nil {
+		jobs = dump.ToolOptions.HiddenOptions.MaxProcs
+	}
 	if jobs <= 0 {
 		jobs = 1
 	}
