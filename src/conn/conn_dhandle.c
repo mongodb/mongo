@@ -80,7 +80,7 @@ __conn_dhandle_open_lock(
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
-			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
+			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN) ? 1 : 0;
 			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
