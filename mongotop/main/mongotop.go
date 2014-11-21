@@ -12,16 +12,10 @@ import (
 	"time"
 )
 
-const (
-	// the default sleep time, in seconds
-	DEFAULT_SLEEP_TIME = 1
-)
-
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.New("mongotop",
-		"<options> <sleeptime>",
+	opts := commonopts.New("mongotop", "<options> <sleeptime>",
 		commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add mongotop-specific options
@@ -44,23 +38,27 @@ func main() {
 		return
 	}
 
-	// pull out the sleeptime
-	// TODO: validate args length
-	sleeptime := DEFAULT_SLEEP_TIME
+	if len(extra) > 1 {
+		log.Logf(log.Always, "too many positional arguments")
+		opts.PrintHelp(true)
+		os.Exit(1)
+	}
+
+	sleeptime := 1 // default to 1 second sleep time
 	if len(extra) > 0 {
 		sleeptime, err = strconv.Atoi(extra[0])
-		if err != nil {
+		if err != nil || sleeptime <= 0 {
 			log.Logf(log.Always, "bad sleep time: %v", extra[0])
 			os.Exit(1)
 		}
 	}
-
-	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(*opts)
-	if err != nil {
-		log.Logf(log.Always, "error initializing database session: %v", err)
+	if outputOpts.RowCount < 0 {
+		log.Logf(log.Always, "invalid value for row count: %v", outputOpts.RowCount)
 		os.Exit(1)
 	}
+
+	// create a session provider to connect to the db
+	sessionProvider := db.NewSessionProvider(*opts)
 
 	// instantiate a mongotop instance
 	top := &mongotop.MongoTop{
@@ -68,7 +66,6 @@ func main() {
 		OutputOptions:   outputOpts,
 		SessionProvider: sessionProvider,
 		Sleeptime:       time.Duration(sleeptime) * time.Second,
-		Once:            outputOpts.Once,
 	}
 
 	// kick it off

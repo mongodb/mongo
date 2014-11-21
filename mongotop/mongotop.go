@@ -23,9 +23,6 @@ type MongoTop struct {
 	// Length of time to sleep between each polling.
 	Sleeptime time.Duration
 
-	// If set, print the output only once and then stop.
-	Once bool
-
 	previousServerStatus *ServerStatus
 	previousTop          *Top
 }
@@ -76,8 +73,13 @@ func (mt *MongoTop) Run() error {
 	}
 
 	hasData := false
+	numPrinted := 0
 
 	for {
+		if mt.OutputOptions.RowCount > 0 && numPrinted > mt.OutputOptions.RowCount {
+			return nil
+		}
+		numPrinted++
 		diff, err := mt.runDiff()
 		if err != nil {
 			log.Logf(log.Always, "Error: %v\n", err)
@@ -97,9 +99,6 @@ func (mt *MongoTop) Run() error {
 				fmt.Println(diff.JSON())
 			} else {
 				fmt.Println(diff.Grid())
-			}
-			if mt.Once {
-				return nil
 			}
 		}
 		time.Sleep(mt.Sleeptime)
