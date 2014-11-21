@@ -490,7 +490,13 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
-			__wt_sleep(0, 1000);
+			/*
+			 * Back off if we aren't making progress: walks hold
+			 * the handle list lock, which blocks other operations
+			 * that can free space in cache, such as LSM discarding
+			 * handles.
+			 */
+			__wt_sleep(0, 1000 * loop);
 			if (F_ISSET(cache, WT_EVICT_STUCK))
 				break;
 			if (loop == 100) {
@@ -858,6 +864,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 * other work for us to do without a new walk.
 	 */
 	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
+	F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
 
 retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (F_ISSET(cache, WT_EVICT_CLEAR_WALKS))
@@ -930,9 +937,12 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 
 	/*
 	 * Walk the list of files a few times if we don't find enough pages.
-	 * Take care not to skip files on subsequent passes.
+	 * Try two passes through all the files, then only keep going if we
+	 * are finding more candidates.  Take care not to skip files on
+	 * subsequent passes.
 	 */
-	if (ret == 0 && slot < max_entries && ++retries < 10) {
+	if (ret == 0 && slot < max_entries && (++retries < 2 ||
+	    (retries < 10 && slot > 0))) {
 		cache->evict_file_next = NULL;
 		goto retry;
 	}
@@ -940,6 +950,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 	/* Remember the file we should visit first, next loop. */
 done:	cache->evict_file_next = dhandle;
 
+	F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 
 	*entriesp = slot;
