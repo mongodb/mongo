@@ -339,20 +339,6 @@ namespace mongo {
         }
     } cmdForceError;
 
-    class AvailableQueryOptions : public Command {
-    public:
-        AvailableQueryOptions() : Command( "availableQueryOptions" , false , "availablequeryoptions" ) {}
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return NONE; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            result << "options" << QueryOption_AllSupported;
-            return true;
-        }
-    } availableQueryOptionsCmd;
-
     class GetLogCmd : public Command {
     public:
         GetLogCmd() : Command( "getLog" ){}

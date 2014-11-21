@@ -2477,6 +2477,33 @@ namespace mongo {
             }
         }
 
+        class AvailableQueryOptions : public Command {
+        public:
+          AvailableQueryOptions(): Command("availableQueryOptions",
+                                           false ,
+                                           "availablequeryoptions") {
+          }
+
+          virtual LockType locktype() const { return NONE; }
+          virtual bool slaveOk() const { return true; }
+          virtual bool isWriteCommandForConfigServer() const { return false; }
+          virtual Status checkAuthForCommand(ClientBasic* client,
+                                             const std::string& dbname,
+                                             const BSONObj& cmdObj) {
+              return Status::OK();
+          }
+
+          virtual bool run(const string& dbname,
+                           BSONObj& cmdObj,
+                           int,
+                           string& errmsg,
+                           BSONObjBuilder& result,
+                           bool) {
+              result << "options" << QueryOption_AllSupportedForSharding;
+              return true;
+          }
+        } availableQueryOptionsCmd;
+
     } // namespace pub_grid_cmds
 
     void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
