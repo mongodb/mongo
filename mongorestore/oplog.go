@@ -53,7 +53,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	entryArray := make([]interface{}, 0, 1024)
 	rawOplogEntry := &bson.Raw{}
 
-	var totalBytes int64
+	var totalBytes, totalOps int64
 	var entrySize, bufferedBytes int
 
 	bar := progress.ProgressBar{
@@ -93,6 +93,10 @@ func (restore *MongoRestore) RestoreOplog() error {
 		if err != nil {
 			return fmt.Errorf("error reading oplog: %v", err)
 		}
+		if entryAsOplog.Operation == "n" {
+			//skip no-ops
+			continue
+		}
 		if !restore.TimestampBeforeLimit(entryAsOplog.Timestamp) {
 			log.Logf(
 				log.DebugLow,
@@ -103,6 +107,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 			break
 		}
 
+		totalOps++
 		bufferedBytes += entrySize
 		totalBytes += int64(entrySize)
 		entryArray = append(entryArray, entryAsOplog)
@@ -115,6 +120,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		}
 	}
 
+	log.Logf(log.Info, "applied %v ops", totalOps)
 	return nil
 
 }
