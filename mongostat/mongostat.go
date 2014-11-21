@@ -263,7 +263,7 @@ func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) *Nod
 
 //Report collects the stat info for a single node, and sends the result on
 //the "out" channel. If it fails, the error is stored in the NodeMonitor Err field.
-func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool) *StatLine {
+func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, sampleSecs int64) *StatLine {
 	result := &ServerStatus{}
 	s, err := node.sessionProvider.GetSession()
 	if err != nil {
@@ -295,7 +295,7 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool) 
 
 	var statLine *StatLine
 	if node.LastStatus != nil && result != nil {
-		statLine = NewStatLine(*node.LastStatus, *result, node.host, all)
+		statLine = NewStatLine(*node.LastStatus, *result, node.host, all, sampleSecs)
 		return statLine
 	}
 
@@ -329,7 +329,8 @@ func (node *NodeMonitor) Watch(sleep time.Duration, discover chan string, cluste
 	go func() {
 		cycle := uint64(0)
 		for {
-			statLine := node.Poll(discover, node.All, cycle%10 == 1)
+			sampleDiff := int64(sleep / time.Second)
+			statLine := node.Poll(discover, node.All, cycle%10 == 1, sampleDiff)
 			if statLine != nil {
 				cluster.Update(*statLine)
 			}

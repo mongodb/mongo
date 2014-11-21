@@ -622,8 +622,12 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 	return returnVal
 }
 
+func diff(newVal, oldVal, sampleTime int64) int64 {
+	return (newVal - oldVal) / sampleTime
+}
+
 //NewStatLine constructs a StatLine object from two ServerStatus objects.
-func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine {
+func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs int64) *StatLine {
 	returnVal := &StatLine{
 		Key:       key,
 		Host:      newStat.Host,
@@ -642,21 +646,21 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 	}
 
 	if newStat.Opcounters != nil && oldStat.Opcounters != nil {
-		returnVal.Insert = newStat.Opcounters.Insert - oldStat.Opcounters.Insert
-		returnVal.Query = newStat.Opcounters.Query - oldStat.Opcounters.Query
-		returnVal.Update = newStat.Opcounters.Update - oldStat.Opcounters.Update
-		returnVal.Delete = newStat.Opcounters.Delete - oldStat.Opcounters.Delete
-		returnVal.GetMore = newStat.Opcounters.GetMore - oldStat.Opcounters.GetMore
-		returnVal.Command = newStat.Opcounters.Command - oldStat.Opcounters.Command
+		returnVal.Insert = diff(newStat.Opcounters.Insert, oldStat.Opcounters.Insert, sampleSecs)
+		returnVal.Query = diff(newStat.Opcounters.Query, oldStat.Opcounters.Query, sampleSecs)
+		returnVal.Update = diff(newStat.Opcounters.Update, oldStat.Opcounters.Update, sampleSecs)
+		returnVal.Delete = diff(newStat.Opcounters.Delete, oldStat.Opcounters.Delete, sampleSecs)
+		returnVal.GetMore = diff(newStat.Opcounters.GetMore, oldStat.Opcounters.GetMore, sampleSecs)
+		returnVal.Command = diff(newStat.Opcounters.Command, oldStat.Opcounters.Command, sampleSecs)
 	}
 
 	if newStat.OpcountersRepl != nil && oldStat.OpcountersRepl != nil {
-		returnVal.InsertR = newStat.OpcountersRepl.Insert - oldStat.OpcountersRepl.Insert
-		returnVal.QueryR = newStat.OpcountersRepl.Query - oldStat.OpcountersRepl.Query
-		returnVal.UpdateR = newStat.OpcountersRepl.Update - oldStat.OpcountersRepl.Update
-		returnVal.DeleteR = newStat.OpcountersRepl.Delete - oldStat.OpcountersRepl.Delete
-		returnVal.GetMoreR = newStat.OpcountersRepl.GetMore - oldStat.OpcountersRepl.GetMore
-		returnVal.CommandR = newStat.OpcountersRepl.Command - oldStat.OpcountersRepl.Command
+		returnVal.InsertR = diff(newStat.OpcountersRepl.Insert, oldStat.OpcountersRepl.Insert, sampleSecs)
+		returnVal.QueryR = diff(newStat.OpcountersRepl.Query, oldStat.OpcountersRepl.Query, sampleSecs)
+		returnVal.UpdateR = diff(newStat.OpcountersRepl.Update, oldStat.OpcountersRepl.Update, sampleSecs)
+		returnVal.DeleteR = diff(newStat.OpcountersRepl.Delete, oldStat.OpcountersRepl.Delete, sampleSecs)
+		returnVal.GetMoreR = diff(newStat.OpcountersRepl.GetMore, oldStat.OpcountersRepl.GetMore, sampleSecs)
+		returnVal.CommandR = diff(newStat.OpcountersRepl.Command, oldStat.OpcountersRepl.Command, sampleSecs)
 	}
 
 	if newStat.BackgroundFlushing != nil && oldStat.BackgroundFlushing != nil {
@@ -704,7 +708,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 
 	if oldStat.ExtraInfo != nil && newStat.ExtraInfo != nil &&
 		oldStat.ExtraInfo.PageFaults != nil && newStat.ExtraInfo.PageFaults != nil {
-		returnVal.Faults = *(newStat.ExtraInfo.PageFaults) - *(oldStat.ExtraInfo.PageFaults)
+		returnVal.Faults = diff(*(newStat.ExtraInfo.PageFaults), *(oldStat.ExtraInfo.PageFaults), sampleSecs)
 	}
 	if !returnVal.IsMongos {
 		prevLocks := parseLocks(oldStat)
@@ -724,9 +728,8 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 			//Get the entry with the highest lock
 			highestLocked := lockdiffs[len(lockdiffs)-1]
 
-			//TODO use server uptime since the previous sampling?
-			//var timeDiffMillis int64
-			//timeDiffMillis = newStat.UptimeMillis - stat.UptimeMillis
+			var timeDiffMillis int64
+			timeDiffMillis = newStat.UptimeMillis - oldStat.UptimeMillis
 
 			lockToReport := highestLocked.Writes
 
@@ -745,7 +748,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 
 			returnVal.HighestLocked = &LockStatus{
 				DBName:     highestLocked.Namespace,
-				Percentage: percentageInt64(lockToReport, 1000),
+				Percentage: percentageInt64(lockToReport, timeDiffMillis),
 				Global:     false,
 			}
 		}
@@ -766,8 +769,8 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool) *StatLine 
 	}
 
 	if oldStat.Network != nil && newStat.Network != nil {
-		returnVal.NetIn = newStat.Network.BytesIn - oldStat.Network.BytesIn
-		returnVal.NetOut = newStat.Network.BytesOut - oldStat.Network.BytesOut
+		returnVal.NetIn = diff(newStat.Network.BytesIn, oldStat.Network.BytesIn, sampleSecs)
+		returnVal.NetOut = diff(newStat.Network.BytesOut, oldStat.Network.BytesOut, sampleSecs)
 	}
 
 	if newStat.Connections != nil {
