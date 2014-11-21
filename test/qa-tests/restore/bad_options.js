@@ -10,12 +10,16 @@
 
     // run restore with both --objcheck and --noobjcheck specified
     var ret = toolTest.runTool('restore', '--objcheck', '--noobjcheck',
-            'mongorestore/testdata/dump_empty');
+            'restore/testdata/dump_empty');
     assert.neq(0, ret);
 
     // run restore with --oplogLimit with a bad timestamp
     ret = toolTest.runTool('restore', '--oplogReplay', '--oplogLimit', 'xxx',
-        'mongorestore/testdata/dump_with_oplog');
+        'restore/testdata/dump_with_oplog');
+    assert.neq(0, ret);
+
+    // run restore with a negative --w value
+    ret = toolTest.runTool('restore', '--w', '-1', 'restore/testdata/dump_empty');
     assert.neq(0, ret);
 
     toolTest.stop();

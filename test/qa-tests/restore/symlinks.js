@@ -16,7 +16,7 @@
     var dbTwo = toolTest.db.getSiblingDB('dbTwo');
 
     // restore the data
-    var ret = toolTest.runTool('restore', 'mongorestore/testdata/dump_with_soft_links');
+    var ret = toolTest.runTool('restore', 'restore/testdata/dump_with_soft_links');
     assert.eq(0, ret);
 
     // make sure the data was restored properly

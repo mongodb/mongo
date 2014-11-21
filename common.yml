@@ -932,7 +932,7 @@ tasks:
           mv ./mongodb/mongo${extension} .
           mv test/qa-tests/* .
           chmod +x mongo*
-          python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 mongorestore
+          python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 restore
 
 - name: text
   commands:
