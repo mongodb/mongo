@@ -1,21 +1,12 @@
-// Test is disabled because of SERVER-15269
-
-if (0) {
-/*
+/**
  * Verify that killing an instance of mongod while it is in a long running computation or infinite
  * loop still leads to clean shutdown, and that said shutdown is prompt.
  *
- * For our purposes, "prompt" is defined as "before stopMongod() decides to send a SIGKILL" and also
- * "before mongod starts executing the next pending operation after the currently executing one."
- *
- * This is also a regression test for SERVER-1818.  By queuing up a collection drop behind an
- * infinitely looping operation, we ensure that killall interrupts the drop command (drop is
- * normally a short lived operation and is otherwise difficult to kill deterministically).  The
- * subsequent drop() on restart would historically assert if the data integrity issue caused by
- * SERVER-1818 occurred.
+ * For our purposes, "prompt" is defined as "before stopMongod() decides to send a SIGKILL", which
+ * would not result in a zero return code.
  */
 
-port = allocatePorts( 1 )[ 0 ]
+var port = allocatePorts( 1 )[ 0 ]
 
 var baseName = "jstests_disk_killall";
 var dbpath = MongoRunner.dataPath + baseName;
@@ -23,16 +14,12 @@ var dbpath = MongoRunner.dataPath + baseName;
 var mongod = startMongod( "--port", port, "--dbpath", dbpath, "--nohttpinterface" );
 var db = mongod.getDB( "test" );
 var collection = db.getCollection( baseName );
-
 assert.writeOK(collection.insert({}));
 
-s1 = startParallelShell( "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )", port );
-// HACK(schwerin): startParallelShell's return value should allow you to block until the command has
-// started, for some definition of started.
+var s1 = startParallelShell(
+            "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )",
+            port);
 sleep( 1000 );
-
-s2 = startParallelShell( "db." + baseName + ".drop()", port );
-sleep( 1000 );  // HACK(schwerin): See above.
 
 /**
  * 0 == mongod's exit code on Windows, or when it receives TERM, HUP or INT signals.  On UNIX
@@ -40,14 +27,12 @@ sleep( 1000 );  // HACK(schwerin): See above.
  * doesn't stop in a reasonable amount of time, stopMongod sends a KILL signal, in which case mongod
  * will not exit cleanly.  We're checking in this assert that mongod will stop quickly even while
  * evaling an infinite loop in server side js.
- *
- * NOTE: 14 is sometimes returned instead due to SERVER-2652.
  */
 var exitCode = stopMongod( port );
-assert( exitCode in [0, 14], "got unexpected exitCode: " + exitCode );
+assert.eq(0, exitCode, "got unexpected exitCode");
 
+// Waits for shell to complete
 s1();
-s2();
 
 mongod = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath );
 db = mongod.getDB( "test" );
@@ -57,4 +42,3 @@ assert( collection.stats().ok );
 assert( collection.drop() );
 
 stopMongod( port );
-}
