@@ -11,14 +11,14 @@
     // run the restore with the blank collection file and no
     // metadata file. it should succeed, but insert nothing.
     var ret = toolTest.runTool('restore', '--db', 'test',
-            '--collection', 'blank', 'restore/testdata/blankcoll/blank.bson');
+            '--collection', 'blank', 'jstests/restore/testdata/blankcoll/blank.bson');
     assert.eq(0, ret);
     assert.eq(0, toolTest.db.getSiblingDB('test').blank.count());
 
     // run the restore with the blank collection file and a blank
     // metadata file. it should succeed, but insert nothing.
     var ret = toolTest.runTool('restore', '--db', 'test',
-            '--collection', 'blank', 'restore/testdata/blankcoll/blank_metadata.bson');
+            '--collection', 'blank', 'jstests/restore/testdata/blankcoll/blank_metadata.bson');
     assert.eq(0, ret);
     assert.eq(0, toolTest.db.getSiblingDB('test').blank.count());
 

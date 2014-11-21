@@ -9,7 +9,7 @@
 
     // run the restore with the blank db directory. it should succeed, but
     // insert nothing.
-    var ret = toolTest.runTool('restore', '--db', 'test', 'restore/testdata/blankdb');
+    var ret = toolTest.runTool('restore', '--db', 'test', 'jstests/restore/testdata/blankdb');
     assert.eq(0, ret);
 
     // success

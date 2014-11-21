@@ -23,7 +23,7 @@
 
     // restore the data, without --oplogReplay. _ids 0-9, which appear in the
     // collection's bson file, should be restored.
-    var ret = toolTest.runTool('restore', 'restore/testdata/dump_with_oplog');
+    var ret = toolTest.runTool('restore', 'jstests/restore/testdata/dump_with_oplog');
     assert.eq(0, ret);
     assert.eq(10, testColl.count());
     for (var i = 0; i < 10; i++) {
@@ -35,7 +35,7 @@
 
     // restore the data, with --oplogReplay. _ids 10-14, appearing 
     // in the oplog.bson file, should be inserted as well.
-    ret = toolTest.runTool('restore', '--oplogReplay', 'restore/testdata/dump_with_oplog');
+    ret = toolTest.runTool('restore', '--oplogReplay', 'jstests/restore/testdata/dump_with_oplog');
     assert.eq(0, ret);
     assert.eq(15, testColl.count());
     for (var i = 0; i < 15; i++) {
@@ -48,7 +48,7 @@
     // restore the data, with --oplogReplay and --oplogLimit with a
     // value that will filter out { _id: 14 } from getting inserted.
     ret = toolTest.runTool('restore', '--oplogReplay', '--oplogLimit',
-                '1416342266:0', 'restore/testdata/dump_with_oplog');
+                '1416342266:0', 'jstests/restore/testdata/dump_with_oplog');
     assert.eq(0, ret);
     assert.eq(14, testColl.count());
     for (var i = 0; i < 14; i++) {
