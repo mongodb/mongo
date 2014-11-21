@@ -19,7 +19,10 @@ t.runTool( "oplog" , "--oplogns" , db.getName() + ".oplog" , "--from" , "127.0.0
 
 assert.eq( 1 , output.count() , "after" );
 
-assert.eq( doc , output.findOne() , "after check" );
+var res = output.findOne()
+assert.eq( doc["x"], res["x"], "have same val for x after check" )
+assert.eq( doc["_id"], res["_id"], "have same val for _id after check" )
+assert.eq( Object.keys(doc).length, Object.keys(res).length, "have same amount of keys after check" )
 
 t.stop();
 
