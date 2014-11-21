@@ -722,17 +722,14 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
         BSONObj arr = e.Obj();
+        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
+        BSONObjIterator i( arr );
+
         if ( arr.firstElement().type() == Object &&
              mongoutils::str::equals( "$elemMatch",
                                       arr.firstElement().Obj().firstElement().fieldName() ) ) {
             // $all : [ { $elemMatch : {} } ... ]
 
-            std::auto_ptr<AllElemMatchOp> temp( new AllElemMatchOp() );
-            Status s = temp->init( name );
-            if ( !s.isOK() )
-                return StatusWithMatchExpression( s );
-
-            BSONObjIterator i( arr );
             while ( i.more() ) {
                 BSONElement hopefullyElemMatchElement = i.next();
 
@@ -751,17 +748,15 @@ namespace mongo {
                 }
 
                 StatusWithMatchExpression inner =
-                    _parseElemMatch( "", hopefullyElemMatchObj.firstElement(), level );
+                    _parseElemMatch( name, hopefullyElemMatchObj.firstElement(), level );
                 if ( !inner.isOK() )
                     return inner;
-                temp->add( static_cast<ArrayMatchingMatchExpression*>( inner.getValue() ) );
+                myAnd->add( inner.getValue() );
             }
 
-            return StatusWithMatchExpression( temp.release() );
+            return StatusWithMatchExpression( myAnd.release() );
         }
 
-        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
-        BSONObjIterator i( arr );
         while ( i.more() ) {
             BSONElement e = i.next();
 

@@ -1635,26 +1635,12 @@ namespace {
         addIndex(BSON("foo.b" << 1));
         runQuery(fromjson("{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}"));
 
-        ASSERT_EQUALS(getNumSolutions(), 5U);
+        assertNumSolutions(3U);
         assertSolutionExists("{cscan: {dir: 1, filter: {foo:{$all:"
                                 "[{$elemMatch:{a:1,b:1}},{$elemMatch:{a:2,b:2}}]}}}}");
-        // Two solutions exist for 'foo.a' which differ only by assignment of index tags.
-        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {'foo.a': 1}}}}}", 2);
-        // Two solutions exist for 'foo.b' which differ only by assignment of index tags.
-        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}", 2);
 
-        // TODO: We're not checking for the filter above because canonically sorting
-        // the filter means that we cannot distinguish between match expressions that
-        // are tagged differently. We may want to add this capability to the query
-        // planner test lib in the future.
-        /*assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{a:1,b:1}},{$elemMatch:{a:2,b:2}}]}}, "
-                                "node: {ixscan: {filter: null, pattern: {'foo.a': 1}}}}}");
-        assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{a:2,b:2}},{$elemMatch:{a:1,b:1}}]}}, "
-                                "node: {ixscan: {filter: null, pattern: {'foo.a': 1}}}}}");
-        assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{b:1,a:1}},{$elemMatch:{a:2,b:2}}]}}, "
-                                "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");
-        assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{b:2,a:2}},{$elemMatch:{a:1,b:1}}]}}, "
-                                "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");*/
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {'foo.a': 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");
     }
 
     TEST_F(QueryPlannerTest, BasicAllElemMatch2) {
@@ -1668,6 +1654,24 @@ namespace {
         assertSolutionExists("{fetch: {filter: {a:{$all:[{$elemMatch:{x:3}},{$elemMatch:{y:5}}]}},"
                                 "node: {ixscan: {pattern: {'a.x': 1},"
                                     "bounds: {'a.x': [[3,3,true,true]]}}}}}");
+    }
+
+    // SERVER-16256
+    TEST_F(QueryPlannerTest, AllElemMatchCompound) {
+        // true means multikey
+        addIndex(BSON("d" << 1 << "a.b" << 1 << "a.c" << 1), true);
+
+        runQuery(fromjson("{d: 1, a: {$all: [{$elemMatch: {b: 2, c: 2}},"
+                                            "{$elemMatch: {b: 3, c: 3}}]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {$and: [{a: {$elemMatch: {b: 2, c: 2}}},"
+                                                      "{a: {$elemMatch: {b: 3, c: 3}}}]},"
+                                "node: {ixscan: {filter: null, pattern: {d:1,'a.b':1,'a.c':1},"
+                                    "bounds: {d: [[1,1,true,true]],"
+                                             "'a.b': [[2,2,true,true]],"
+                                             "'a.c': [[2,2,true,true]]}}}}}");
     }
 
     // SERVER-13677

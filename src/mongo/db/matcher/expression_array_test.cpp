@@ -291,7 +291,7 @@ namespace mongo {
     }
     */
 
-    TEST( AllElemMatchOp, MatchesElement ) {
+    TEST( AndOfElemMatch, MatchesElement ) {
 
 
         BSONObj baseOperanda1 = BSON( "a" << 1 );
@@ -322,36 +322,35 @@ namespace mongo {
         auto_ptr<AndMatchExpression> and2( new AndMatchExpression() );
         and2->add( eqa2.release() );
         and2->add( eqb2.release() );
+        // and2 = { a : 2, b : 2 }
 
         auto_ptr<ElemMatchObjectMatchExpression> elemMatch2( new ElemMatchObjectMatchExpression() );
         elemMatch2->init( "x", and2.release() );
         // elemMatch2 = { x : { $elemMatch : { a : 2, b : 2 } } }
 
-        AllElemMatchOp op;
-        op.init( "" );
-        op.add( elemMatch1.release() );
-        op.add( elemMatch2.release() );
+        auto_ptr<AndMatchExpression> andOfEM( new AndMatchExpression() );
+        andOfEM->add( elemMatch1.release() );
+        andOfEM->add( elemMatch2.release() );
 
         BSONObj nonArray = BSON( "x" << 4 );
-        ASSERT( !op.matchesSingleElement( nonArray[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( nonArray[ "x" ] ) );
         BSONObj emptyArray = BSON( "x" << BSONArray() );
-        ASSERT( !op.matchesSingleElement( emptyArray[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( emptyArray[ "x" ] ) );
         BSONObj nonObjArray = BSON( "x" << BSON_ARRAY( 4 ) );
-        ASSERT( !op.matchesSingleElement( nonObjArray[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( nonObjArray[ "x" ] ) );
         BSONObj singleObjMatch = BSON( "x" << BSON_ARRAY( BSON( "a" << 1 << "b" << 1 ) ) );
-        ASSERT( !op.matchesSingleElement( singleObjMatch[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( singleObjMatch[ "x" ] ) );
         BSONObj otherObjMatch = BSON( "x" << BSON_ARRAY( BSON( "a" << 2 << "b" << 2 ) ) );
-        ASSERT( !op.matchesSingleElement( otherObjMatch[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( otherObjMatch[ "x" ] ) );
         BSONObj bothObjMatch = BSON( "x" << BSON_ARRAY( BSON( "a" << 1 << "b" << 1 ) <<
                                                         BSON( "a" << 2 << "b" << 2 ) ) );
-        ASSERT( op.matchesSingleElement( bothObjMatch[ "x" ] ) );
+        ASSERT( andOfEM->matchesSingleElement( bothObjMatch[ "x" ] ) );
         BSONObj noObjMatch = BSON( "x" << BSON_ARRAY( BSON( "a" << 1 << "b" << 2 ) <<
                                                       BSON( "a" << 2 << "b" << 1 ) ) );
-        ASSERT( !op.matchesSingleElement( noObjMatch[ "x" ] ) );
+        ASSERT( !andOfEM->matchesSingleElement( noObjMatch[ "x" ] ) );
     }
 
-
-    TEST( AllElemMatchOp, Matches ) {
+    TEST( AndOfElemMatch, Matches ) {
         BSONObj baseOperandgt1 = BSON( "$gt" << 1 );
         auto_ptr<ComparisonMatchExpression> gt1( new GTMatchExpression() );
         ASSERT( gt1->init( "", baseOperandgt1[ "$gt" ] ).isOK() );
@@ -364,6 +363,7 @@ namespace mongo {
         elemMatch1->init( "x" );
         elemMatch1->add( gt1.release() );
         elemMatch1->add( lt1.release() );
+        // elemMatch1 = { x : { $elemMatch : { $gt : 1 , $lt : 10 } } }
 
         BSONObj baseOperandgt2 = BSON( "$gt" << 101 );
         auto_ptr<ComparisonMatchExpression> gt2( new GTMatchExpression() );
@@ -377,46 +377,27 @@ namespace mongo {
         elemMatch2->init( "x" );
         elemMatch2->add( gt2.release() );
         elemMatch2->add( lt2.release() );
+        // elemMatch2 = { x : { $elemMatch : { $gt : 101 , $lt : 110 } } }
 
-        AllElemMatchOp op;
-        op.init( "x" );
-        op.add( elemMatch1.release() );
-        op.add( elemMatch2.release() );
-
+        auto_ptr<AndMatchExpression> andOfEM( new AndMatchExpression() );
+        andOfEM->add( elemMatch1.release() );
+        andOfEM->add( elemMatch2.release() );
 
         BSONObj nonArray = BSON( "x" << 4 );
-        ASSERT( !op.matchesBSON( nonArray, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( nonArray, NULL ) );
         BSONObj emptyArray = BSON( "x" << BSONArray() );
-        ASSERT( !op.matchesBSON( emptyArray, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( emptyArray, NULL ) );
         BSONObj nonNumberArray = BSON( "x" << BSON_ARRAY( "q" ) );
-        ASSERT( !op.matchesBSON( nonNumberArray, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( nonNumberArray, NULL ) );
         BSONObj singleMatch = BSON( "x" << BSON_ARRAY( 5 ) );
-        ASSERT( !op.matchesBSON( singleMatch, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( singleMatch, NULL ) );
         BSONObj otherMatch = BSON( "x" << BSON_ARRAY( 105 ) );
-        ASSERT( !op.matchesBSON( otherMatch, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( otherMatch, NULL ) );
         BSONObj bothMatch = BSON( "x" << BSON_ARRAY( 5 << 105 ) );
-        ASSERT( op.matchesBSON( bothMatch, NULL ) );
+        ASSERT( andOfEM->matchesBSON( bothMatch, NULL ) );
         BSONObj neitherMatch = BSON( "x" << BSON_ARRAY( 0 << 200 ) );
-        ASSERT( !op.matchesBSON( neitherMatch, NULL ) );
+        ASSERT( !andOfEM->matchesBSON( neitherMatch, NULL ) );
     }
-
-    /**
-    TEST( AllElemMatchOp, MatchesIndexKey ) {
-        BSONObj baseOperand = BSON( "$lt" << 5 );
-        auto_ptr<LtOp> lt( new ComparisonMatchExpression() );
-        ASSERT( lt->init( "a", baseOperand[ "$lt" ] ).isOK() );
-        auto_ptr<ElemMatchValueMatchExpression> elemMatchValueOp( new ElemMatchValueMatchExpression() );
-        ASSERT( elemMatchValueOp->init( "a", lt.release() ).isOK() );
-        OwnedPointerVector<MatchMatchExpression> subMatchExpressions;
-        subMatchExpressions.mutableVector().push_back( elemMatchValueOp.release() );
-        AllElemMatchOp allElemMatchOp;
-        ASSERT( allElemMatchOp.init( &subMatchExpressions ).isOK() );
-        IndexSpec indexSpec( BSON( "a" << 1 ) );
-        BSONObj indexKey = BSON( "" << "3" );
-        ASSERT( MatchMatchExpression::PartialMatchResult_Unknown ==
-                allElemMatchOp.matchesIndexKey( indexKey, indexSpec ) );
-    }
-    */
 
     TEST( SizeMatchExpression, MatchesElement ) {
         BSONObj match = BSON( "a" << BSON_ARRAY( 5 << 6 ) );

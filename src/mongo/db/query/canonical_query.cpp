@@ -122,7 +122,6 @@ namespace {
         case MatchExpression::OR: return "or"; break;
         case MatchExpression::NOR: return "nr"; break;
         case MatchExpression::NOT: return "nt"; break;
-        case MatchExpression::ALL: return "al"; break;
         case MatchExpression::ELEM_MATCH_OBJECT: return "eo"; break;
         case MatchExpression::ELEM_MATCH_VALUE: return "ev"; break;
         case MatchExpression::SIZE: return "sz"; break;

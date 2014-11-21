@@ -1109,42 +1109,12 @@ namespace mongo {
             else if (Indexability::arrayUsesIndexOnChildren(root)) {
                 QuerySolutionNode* solution = NULL;
 
-                if (MatchExpression::ALL == root->matchType()) {
-                    // Here, we formulate an AND of all the sub-clauses.
-                    auto_ptr<AndHashNode> ahn(new AndHashNode());
-
-                    for (size_t i = 0; i < root->numChildren(); ++i) {
-                        QuerySolutionNode* node = buildIndexedDataAccess(query,
-                                                                         root->getChild(i),
-                                                                         true,
-                                                                         indices);
-                        if (NULL != node) {
-                            ahn->children.push_back(node);
-                        }
-                    }
-
-                    // No children, no point in hashing nothing.
-                    if (0 == ahn->children.size()) { return NULL; }
-
-                    // AND of one child is just that child.
-                    if (1 == ahn->children.size()) {
-                        solution = ahn->children[0];
-                        ahn->children.clear();
-                        ahn.reset();
-                    }
-                    else {
-                        // More than one child.
-                        solution = ahn.release();
-                    }
-                }
-                else {
-                    verify(MatchExpression::ELEM_MATCH_OBJECT);
-                    // The child is an AND.
-                    verify(1 == root->numChildren());
-                    solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
-                    if (NULL == solution) {
-                        return NULL;
-                    }
+                invariant(MatchExpression::ELEM_MATCH_OBJECT);
+                // The child is an AND.
+                invariant(1 == root->numChildren());
+                solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
+                if (NULL == solution) {
+                    return NULL;
                 }
 
                 // There may be an array operator above us.
