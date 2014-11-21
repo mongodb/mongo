@@ -468,6 +468,7 @@ def skipTest(path):
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),
+                           ("sharding", "copydb_from_mongos.js"), # SERVER-13080
                            ("jstests", "bench_test1.js"),
                            ("jstests", "bench_test2.js"),
                            ("jstests", "bench_test3.js"),
