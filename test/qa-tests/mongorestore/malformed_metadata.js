@@ -12,7 +12,7 @@
     // metadata.json file.
     var ret = toolTest.runTool('restore', '--db', 'dbOne',
             '--collection', 'malformed_metadata',
-            'testdata/dump_with_malformed/dbOne/malformed_metadata.bson');
+            'mongorestore/testdata/dump_with_malformed/dbOne/malformed_metadata.bson');
     assert.neq(0, ret);
 
     toolTest.stop();

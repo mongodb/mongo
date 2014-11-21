@@ -10,7 +10,7 @@
     // run restore, targeting a malformed bson file
     var ret = toolTest.runTool('restore', '--db', 'dbOne', 
             '--collection', 'malformed_coll',
-            'testdata/dump_with_malformed/dbOne/malformed_coll.bson');
+            'mongorestore/testdata/dump_with_malformed/dbOne/malformed_coll.bson');
     assert.neq(0, ret);
 
     toolTest.stop();
