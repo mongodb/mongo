@@ -425,6 +425,13 @@ static int
 __lsm_discard_handle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
+	/*
+	 * Kludge: if the cache is full, interrupt the eviction server sweep so
+	 * that we don't wait too long to discard this handle (which will free
+	 * space in cache.
+	 */
+	F_SET(S2C(session)->cache, WT_EVICT_CLEAR_WALKS);
+
 	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));

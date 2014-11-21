@@ -490,6 +490,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * sleep, it's not something we can fix.
 		 */
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
+			__wt_sleep(0, 1000);
 			if (F_ISSET(cache, WT_EVICT_STUCK))
 				break;
 			if (loop == 100) {
@@ -859,6 +860,9 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
 
 retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+		if (F_ISSET(cache, WT_EVICT_CLEAR_WALKS))
+			goto done;
+
 		/* Ignore non-file handles, or handles that aren't open. */
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
@@ -934,7 +938,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 	}
 
 	/* Remember the file we should visit first, next loop. */
-	cache->evict_file_next = dhandle;
+done:	cache->evict_file_next = dhandle;
 
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 
