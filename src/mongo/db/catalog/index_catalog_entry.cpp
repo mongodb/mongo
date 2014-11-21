@@ -75,8 +75,8 @@ namespace mongo {
           _accessMethod( NULL ),
           _headManager(new HeadManagerImpl(this)),
           _ordering( Ordering::make( descriptor->keyPattern() ) ),
-          _isReady( false ),
-          _wantToSetIsMultikey( false ) {
+          _isReady( false ) {
+
         _descriptor->_cachedEntry = this;
     }
 
@@ -146,31 +146,29 @@ namespace mongo {
             invariant(!_ice->_isMultikey);
         }
 
-        virtual void commit() {}
-        virtual void rollback() { _ice->_isMultikey = false; }
+        virtual void commit() { _ice->_isMultikey = true; }
+        virtual void rollback() { }
 
-        IndexCatalogEntry* _ice;
+    private:
+        IndexCatalogEntry* const _ice;
     };
 
-    void IndexCatalogEntry::setMultikey( OperationContext* txn ) {
-        if ( isMultikey( txn ) )
-            return;
-
-        if ( !_isReady && txn->lockState() &&
-             !txn->lockState()->isCollectionLockedForMode( _ns, MODE_X ) ) {
-            // We don't have an exclusive lock, so can't set is multi key.
-            // But, we're building it in an IX lock, so we keep track and will set it later
-            _wantToSetIsMultikey = true;
+    void IndexCatalogEntry::setMultikey(OperationContext* txn) {
+        if (isMultikey(txn)) {
             return;
         }
 
-        const ResourceId collRes = ResourceId(RESOURCE_COLLECTION, _ns);
-        LockResult res = txn->lockState()->lock(collRes, MODE_X, UINT_MAX, true);
-        if (res == LOCK_DEADLOCK) throw WriteConflictException();
-        invariant(res == LOCK_OK);
+        // Only one thread should set the multi-key value per collection, because the metadata for
+        // a collection is one large document.
+        Lock::ResourceLock collMDLock(txn->lockState(),
+                                      ResourceId(RESOURCE_METADATA, _collection->ns()),
+                                      MODE_X);
 
-        // Lock will be held until end of WUOW to ensure rollback safety.
-        ON_BLOCK_EXIT(&Locker::unlock, txn->lockState(), collRes);
+        // Check again in case we blocked on the MD lock and another thread beat us to setting the
+        // multiKey metadata for this index.
+        if (isMultikey(txn)) {
+            return;
+        }
 
         if ( _collection->setIndexIsMultikey( txn,
                                               _descriptor->indexName(),
@@ -182,8 +180,9 @@ namespace mongo {
             }
         }
 
+        // We should only enable the multi-key value after the transaction has committed and the
+        // multi-key property has been persisted.
         txn->recoveryUnit()->registerChange(new SetMultikeyChange(this));
-        _isMultikey = true;
     }
 
     // ----

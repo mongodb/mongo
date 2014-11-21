@@ -497,10 +497,6 @@ namespace {
         IndexCatalogEntry* entry = _catalog->_entries.find( desc );
         fassert( 17331, entry && entry == _entry );
 
-        if ( entry->wantToSetIsMultikey() ) {
-            entry->setMultikey(_txn);
-        }
-
         entry->setIsReady( true );
     }
 

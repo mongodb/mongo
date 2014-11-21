@@ -87,8 +87,6 @@ namespace mongo {
         // if this ready is ready for queries
         bool isReady( OperationContext* txn ) const;
 
-        bool wantToSetIsMultikey() const { return _wantToSetIsMultikey; }
-
     private:
 
         class SetMultikeyChange;
@@ -119,8 +117,6 @@ namespace mongo {
         bool _isReady; // cache of NamespaceDetails info
         DiskLoc _head; // cache of IndexDetails
         bool _isMultikey; // cache of NamespaceDetails info
-
-        bool _wantToSetIsMultikey; // see ::setMultikey
     };
 
     class IndexCatalogEntryContainer {
