@@ -245,8 +245,16 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
 	    !chunk->evicted) {
-		if ((ret = __lsm_discard_handle(
-		    session, chunk->uri, NULL)) == 0)
+		/*
+		 * Hold the handle list lock throughout this operation.
+		 * Otherwise, there is a trylock when closing the handle
+		 * that will fail if the handle list lock is busy (e.g,
+		 * when the cache is full).
+		 */
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __lsm_discard_handle(
+		    session, chunk->uri, NULL));
+		if (ret == 0)
 			chunk->evicted = 1;
 		else if (ret == EBUSY)
 			ret = 0;
