@@ -117,30 +117,10 @@ namespace mongo {
     }
 
     void PoolForHost::flush() {
-        vector<StoredConnection> all;
-        while ( ! _pool.empty() ) {
+        while (!_pool.empty()) {
             StoredConnection c = _pool.top();
             _pool.pop();
-            bool res;
-            bool alive = false;
-            try {
-                c.conn->isMaster( res );
-                alive = true;
-            } catch ( const DBException e ) {
-                // There's something wrong with this connection, swallow the exception and do not
-                // put the connection back in the pool.
-                LOG(1) << "Exception thrown when checking pooled connection to " <<
-                    c.conn->getServerAddress() << ": " << causedBy(e) << endl;
-                delete c.conn;
-                c.conn = NULL;
-            }
-            if ( alive ) {
-                all.push_back( c );
-            }
-        }
-
-        for ( vector<StoredConnection>::iterator i=all.begin(); i != all.end(); ++i ) {
-            _pool.push( *i );
+            delete c.conn;
         }
     }
 
