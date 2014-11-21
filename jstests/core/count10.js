@@ -1,8 +1,5 @@
 // Test that interrupting a count returns an error code.
 
-
-if (0) {// SERVER-14143
-
 t = db.count10;
 t.drop();
 
@@ -59,4 +56,3 @@ assert(res.message.match(/count failed/) !== null);
 assert(res.message.match(/\"code\"/) !== null);
 
 s();
-}

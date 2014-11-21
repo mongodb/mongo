@@ -317,11 +317,12 @@ namespace {
                 _pools.pop_back();
             }
 
+            scope->reset();
             ScopeAndPool toStore = {scope, poolName};
             _pools.push_front(toStore);
         }
 
-        boost::shared_ptr<Scope> tryAcquire(const string& poolName) {
+        boost::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
             scoped_lock lk(_mutex);
 
             for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
@@ -330,6 +331,7 @@ namespace {
                     _pools.erase(it);
                     scope->incTimesUsed();
                     scope->reset();
+                    scope->registerOperation(txn);
                     return scope;
                 }
             }
@@ -369,6 +371,8 @@ namespace {
 
         // wrappers for the derived (_real) scope
         void reset() { _real->reset(); }
+        void registerOperation(OperationContext* txn) { _real->registerOperation(txn); }
+        void unregisterOperation() { _real->unregisterOperation(); }
         void init(const BSONObj* data) { _real->init(data); }
         void localConnectForDbEval(OperationContext* txn, const char* dbName) {
             invariant(!"localConnectForDbEval should only be called from dbEval");
@@ -438,9 +442,10 @@ namespace {
                                                  const string& db,
                                                  const string& scopeType) {
         const string fullPoolName = db + scopeType;
-        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(fullPoolName);
+        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
         if (!s) {
             s.reset(newScope());
+            s->registerOperation(txn);
         }
 
         auto_ptr<Scope> p;
@@ -451,8 +456,6 @@ namespace {
     }
 
     void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;
-    const char* (*ScriptEngine::_checkInterruptCallback)() = 0;
-    unsigned (*ScriptEngine::_getCurrentOpIdCallback)() = 0;
     ScriptEngine* globalScriptEngine = 0;
 
     bool hasJSReturn(const string& code) {

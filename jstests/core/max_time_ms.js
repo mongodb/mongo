@@ -1,7 +1,5 @@
 // Tests query/command option $maxTimeMS.
 
-if (0) {// SERVER-14143
-
 var t = db.max_time_ms;
 var exceededTimeLimit = 50; // ErrorCodes::ExceededTimeLimit
 var cursor;
@@ -312,5 +310,3 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut",
                                      mode: "alwaysOn"}).ok);
 assert.doesNotThrow(function() { t.find({}).maxTimeMS(1).count(); });
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
-
-}

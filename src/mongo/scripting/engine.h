@@ -54,6 +54,8 @@ namespace mongo {
 
         virtual void reset() = 0;
         virtual void init(const BSONObj* data) = 0;
+        virtual void registerOperation(OperationContext* txn) = 0;
+        virtual void unregisterOperation() = 0;
 
         void init(const char* data) {
             BSONObj o(data);
@@ -227,25 +229,6 @@ namespace mongo {
         // poll for interrupts.  the interrupt functions must not wait indefinitely on a lock.
         virtual void interrupt(unsigned opId) {}
         virtual void interruptAll() {}
-        static void setGetCurrentOpIdCallback(unsigned (*func)()) {
-            _getCurrentOpIdCallback = func;
-        }
-        static bool haveGetCurrentOpIdCallback() { return _getCurrentOpIdCallback; }
-        static unsigned getCurrentOpId() {
-            massert(13474, "no _getCurrentOpIdCallback", _getCurrentOpIdCallback);
-            return _getCurrentOpIdCallback();
-        }
-        static void setCheckInterruptCallback(const char* (*func)()) {
-            _checkInterruptCallback = func;
-        }
-        static bool haveCheckInterruptCallback() { return _checkInterruptCallback; }
-        static const char* checkInterrupt() {
-            return _checkInterruptCallback ? _checkInterruptCallback() : "";
-        }
-        static bool interrupted() {
-            const char* r = checkInterrupt();
-            return r && r[0];
-        }
 
         static std::string getInterpreterVersionString();
 
@@ -255,8 +238,6 @@ namespace mongo {
 
     private:
         static void (*_connectCallback)(DBClientWithCommands&);
-        static const char* (*_checkInterruptCallback)();
-        static unsigned (*_getCurrentOpIdCallback)();
     };
 
     void installGlobalUtils(Scope& scope);
