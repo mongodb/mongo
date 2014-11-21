@@ -151,6 +151,9 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
+	if ((ret = system("rm -rf WT_TEST && mkdir WT_TEST")) != 0)
+		die(ret, "directory cleanup call failed");
+
 	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
@@ -158,8 +161,8 @@ wt_startup(char *config_open)
 	    config_open == NULL ? "" : config_open);
 
 	if ((ret = wiredtiger_open(
-	    NULL, &event_handler, config_buf, &conn)) != 0)
-		die("wiredtiger_open", ret);
+	    "WT_TEST", &event_handler, config_buf, &conn)) != 0)
+		die(ret, "wiredtiger_open");
 }
 
 /*
@@ -172,7 +175,7 @@ wt_shutdown(void)
 	int ret;
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die("conn.close", ret);
+		die(ret, "conn.close");
 }
 
 /*
@@ -184,8 +187,8 @@ shutdown(void)
 {
 	int ret;
 
-	if ((ret = system("rm -f WiredTiger* __wt*")) != 0)
-		die("system cleanup call failed", ret);
+	if ((ret = system("rm -rf WT_TEST")) != 0)
+		die(ret, "directory cleanup call failed");
 }
 
 static int
@@ -241,9 +244,17 @@ onint(int signo)
  *	Report an error and quit.
  */
 void
-die(const char *m, int e)
+die(int e, const char *fmt, ...)
 {
-	fprintf(stderr, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
+	va_list ap;
+
+	fprintf(stderr, "%s: ", progname);
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	if (e != 0)
+		fprintf(stderr, ": %s", wiredtiger_strerror(e));
+	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
 

@@ -35,11 +35,11 @@ obj_bulk(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
-			die("session.create", ret);
+			die(ret, "session.create");
 
 	if (ret == 0) {
 		if ((ret = session->open_cursor(
@@ -47,12 +47,12 @@ obj_bulk(void)
 			/* Yield so that other threads can interfere. */
 			sched_yield();
 			if ((ret = c->close(c)) != 0)
-				die("cursor.close", ret);
+				die(ret, "cursor.close");
 		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
-			die("session.open_cursor", ret);
+			die(ret, "session.open_cursor");
 	}
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -63,18 +63,18 @@ obj_cursor(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
 		if (ret != ENOENT && ret != EBUSY)
-			die("session.open_cursor", ret);
+			die(ret, "session.open_cursor");
 	} else {
 		if ((ret = cursor->close(cursor)) != 0)
-			die("cursor.close", ret);
+			die(ret, "cursor.close");
 	}
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -84,14 +84,14 @@ obj_create(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
-			die("session.create", ret);
+			die(ret, "session.create");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -101,14 +101,14 @@ obj_drop(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->drop(session, uri, NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
-			die("session.drop", ret);
+			die(ret, "session.drop");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -118,15 +118,15 @@ obj_checkpoint(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	/* Force the checkpoint so it has to be taken. */
 	if ((ret = session->checkpoint(session, "force")) != 0)
 		if (ret != ENOENT)
-			die("session.checkpoint", ret);
+			die(ret, "session.checkpoint");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -136,14 +136,14 @@ obj_upgrade(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->upgrade(session, uri, NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
-			die("session.upgrade", ret);
+			die(ret, "session.upgrade");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
 
 void
@@ -153,12 +153,12 @@ obj_verify(void)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		die(ret, "conn.session");
 
 	if ((ret = session->verify(session, uri, NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
-			die("session.verify", ret);
+			die(ret, "session.verify");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }
