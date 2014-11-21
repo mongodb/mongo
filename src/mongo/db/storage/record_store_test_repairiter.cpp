@@ -55,6 +55,10 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
 
+            // returns NULL if getIteratorForRepair is not supported
+            if (it == NULL) {
+                return;
+            }
             ASSERT( it->isEOF() );
             ASSERT_EQUALS( DiskLoc(), it->curr() );
             ASSERT_EQUALS( DiskLoc(), it->getNext() );
@@ -105,6 +109,10 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
+            // returns NULL if getIteratorForRepair is not supported
+            if (it == NULL) {
+                return;
+            }
 
             while ( !it->isEOF() ) {
                 DiskLoc loc = it->getNext();
