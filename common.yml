@@ -86,6 +86,7 @@ mongo_tools_variables:
       - name: log
       - name: pool
       - name: progress
+      - name: qa-tests
       - name: text
       - name: unit
       - name: util
