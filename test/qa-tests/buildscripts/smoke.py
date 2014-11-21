@@ -870,6 +870,7 @@ suiteGlobalConfig = {"js": ("core/*.js", True),
                      "mmap_v1": ("mmap_v1/*.js", True),
                      "gle": ("gle/*.js", True),
                      "rocksDB": ("rocksDB/*.js", True),
+                     "restore": ("restore/*.js", False),
                      "slow1": ("slow1/*.js", True),
                      "slow2": ("slow2/*.js", True),
                      }
