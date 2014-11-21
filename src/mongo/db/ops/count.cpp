@@ -108,7 +108,7 @@ namespace mongo {
         if (Object == cmd["hint"].type()) {
             hintObj = cmd["hint"].Obj();
         }
-        else {
+        else if (String == cmd["hint"].type()) {
             const std::string hint = cmd.getStringField("hint");
             hintObj = BSON("$hint" << hint);
         }
