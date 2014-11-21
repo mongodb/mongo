@@ -13,12 +13,6 @@
             'testdata/dump_empty');
     assert.neq(0, ret);
 
-    // run restore with both --collection and --oplogReplay specified
-    ret = toolTest.runTool('restore', '--oplogReplay', '--db', 'db_empty', 
-            '--collection', 'coll_empty',
-            'testdata/dump_empty/db_empty/coll_empty.bson');
-    assert.neq(0, ret);
-
     toolTest.stop();
 
 }());
