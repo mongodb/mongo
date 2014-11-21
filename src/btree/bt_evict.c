@@ -856,9 +856,9 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 * from under us.  If the lock is not available, give up: there may be
 	 * other work for us to do without a new walk.
 	 */
-	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
+retry:	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
 
-retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		/* Ignore non-file handles, or handles that aren't open. */
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
@@ -924,13 +924,18 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 			break;
 	}
 
-	/* Walk the list of files a few times if we don't find enough pages. */
-	if (ret == 0 && slot < max_entries && ++retries < 10)
+	/*
+	 * Walk the list of files a few times if we don't find enough pages.
+	 * Give up the handle list lock in case other threads are waiting for
+	 * it, and take care not to skip files on subsequent passes.
+	 */
+	if (ret == 0 && slot < max_entries && ++retries < 10) {
+		cache->evict_file_next = NULL;
+		__wt_spin_unlock(session, &conn->dhandle_lock);
 		goto retry;
+	}
 
 	/* Remember the file we should visit first, next loop. */
-	if (dhandle != NULL)
-		dhandle = SLIST_NEXT(dhandle, l);
 	cache->evict_file_next = dhandle;
 
 	__wt_spin_unlock(session, &conn->dhandle_lock);
