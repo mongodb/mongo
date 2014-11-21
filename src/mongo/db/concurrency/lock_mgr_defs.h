@@ -142,8 +142,7 @@ namespace mongo {
         // Generic resources
         RESOURCE_DATABASE,
         RESOURCE_COLLECTION,
-        RESOURCE_DOCUMENT,
-        RESOURCE_MMAPv1_EXTENT_MANAGER, // Only for MMAPv1 engine, keyed on database name
+        RESOURCE_METADATA,
 
         // Counts the rest. Always insert new resource types above this entry.
         ResourceTypesCount

@@ -61,8 +61,8 @@ namespace mongo {
     TEST(FastMapNoAlloc, NotEmpty) {
         TestFastMapNoAlloc map;
 
-        map.insert(ResourceId(RESOURCE_DOCUMENT, 1))->initNew(101, "Item101");
-        map.insert(ResourceId(RESOURCE_DOCUMENT, 2))->initNew(102, "Item102");
+        map.insert(ResourceId(RESOURCE_COLLECTION, 1))->initNew(101, "Item101");
+        map.insert(ResourceId(RESOURCE_COLLECTION, 2))->initNew(102, "Item102");
         ASSERT(!map.empty());
 
         TestFastMapNoAlloc::Iterator it = map.begin();
@@ -88,49 +88,49 @@ namespace mongo {
     TEST(FastMapNoAlloc, FindNonExisting) {
         TestFastMapNoAlloc map;
 
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 0)));
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
     }
 
     TEST(FastMapNoAlloc, FindAndRemove) {
         TestFastMapNoAlloc map;
 
         for (int i = 0; i < 6; i++) {
-            map.insert(ResourceId(RESOURCE_DOCUMENT, i))->initNew(
+            map.insert(ResourceId(RESOURCE_COLLECTION, i))->initNew(
                                                 i, "Item" + boost::lexical_cast<std::string>(i));
         }
 
         for (int i = 0; i < 6; i++) {
-            ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, i)).finished());
+            ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, i)).finished());
 
-            ASSERT_EQUALS(i, map.find(ResourceId(RESOURCE_DOCUMENT, i))->id);
+            ASSERT_EQUALS(i, map.find(ResourceId(RESOURCE_COLLECTION, i))->id);
 
             ASSERT_EQUALS("Item" + boost::lexical_cast<std::string>(i),
-                          map.find(ResourceId(RESOURCE_DOCUMENT, i))->value);
+                          map.find(ResourceId(RESOURCE_COLLECTION, i))->value);
         }
 
         // Remove a middle entry
-        map.find(ResourceId(RESOURCE_DOCUMENT, 2)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 2)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 2)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 2)));
 
         // Remove entry after first
-        map.find(ResourceId(RESOURCE_DOCUMENT, 1)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 1)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 1)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 1)));
 
         // Remove entry before last
-        map.find(ResourceId(RESOURCE_DOCUMENT, 4)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 4)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 4)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 4)));
 
         // Remove first entry
-        map.find(ResourceId(RESOURCE_DOCUMENT, 0)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 0)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 0)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 0)));
 
         // Remove last entry
-        map.find(ResourceId(RESOURCE_DOCUMENT, 5)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 5)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 5)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 5)));
 
         // Remove final entry
-        map.find(ResourceId(RESOURCE_DOCUMENT, 3)).remove();
-        ASSERT(!map.find(ResourceId(RESOURCE_DOCUMENT, 3)));
+        map.find(ResourceId(RESOURCE_COLLECTION, 3)).remove();
+        ASSERT(!map.find(ResourceId(RESOURCE_COLLECTION, 3)));
     }
 
     TEST(FastMapNoAlloc, RemoveAll) {
@@ -138,10 +138,10 @@ namespace mongo {
         unordered_map<ResourceId, TestStruct> checkMap;
 
         for (int i = 1; i <= 6; i++) {
-            map.insert(ResourceId(RESOURCE_DOCUMENT, i))->initNew(
+            map.insert(ResourceId(RESOURCE_COLLECTION, i))->initNew(
                                                 i, "Item" + boost::lexical_cast<std::string>(i));
 
-            checkMap[ResourceId(RESOURCE_DOCUMENT, i)].initNew(
+            checkMap[ResourceId(RESOURCE_COLLECTION, i)].initNew(
                                                 i, "Item" + boost::lexical_cast<std::string>(i));
         }
 

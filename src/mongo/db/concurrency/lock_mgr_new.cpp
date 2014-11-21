@@ -103,8 +103,7 @@ namespace {
         "MMAPV1Flush",
         "Database",
         "Collection",
-        "Document",
-        "MMAPV1ExtentManager"
+        "Metadata",
     };
 
     // Ensure we do not add new types without updating the names array

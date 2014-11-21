@@ -44,10 +44,12 @@
 
 namespace mongo {
 namespace {
-    // This is never used with KVEngines that support doc-level locking so this should never
-    // conflict with anything else.
-    // This must be locked *before* _identLock.
-    const ResourceId catalogRID(RESOURCE_DOCUMENT, StringData("KVCatalog"));
+    // This is a global resource, which protects accesses to the catalog metadata (instance-wide).
+    // It is never used with KVEngines that support doc-level locking so this should never conflict
+    // with anything else.
+    //
+    // NOTE: Must be locked *before* _identLock.
+    const ResourceId resourceIdCatalogMetadata(RESOURCE_METADATA, 1ULL);
 }
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
@@ -145,9 +147,13 @@ namespace {
                                      const CollectionOptions& options ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
+
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe && opCtx->lockState())
-            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+        if (!_isRsThreadSafe && opCtx->lockState()) {
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
+                                             resourceIdCatalogMetadata,
+                                             MODE_X));
+        }
 
         const string ident = _newUniqueIdent("collection");
 
@@ -200,8 +206,11 @@ namespace {
                                    DiskLoc* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe && opCtx->lockState())
-            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_S));
+        if (!_isRsThreadSafe && opCtx->lockState()) {
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
+                                             resourceIdCatalogMetadata,
+                                             MODE_S));
+        }
 
         DiskLoc dl;
         {
@@ -239,9 +248,13 @@ namespace {
     void KVCatalog::putMetaData( OperationContext* opCtx,
                                  const StringData& ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
+
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe && opCtx->lockState())
-            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+        if (!_isRsThreadSafe && opCtx->lockState()) {
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
+                                             resourceIdCatalogMetadata,
+                                             MODE_X));
+        }
 
         DiskLoc loc;
         BSONObj obj = _findEntry( opCtx, ns, &loc );
@@ -288,9 +301,13 @@ namespace {
                                         const StringData& fromNS,
                                         const StringData& toNS,
                                         bool stayTemp ) {
+
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe && opCtx->lockState())
-            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+        if (!_isRsThreadSafe && opCtx->lockState()) {
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
+                                             resourceIdCatalogMetadata,
+                                             MODE_X));
+        }
 
         DiskLoc loc;
         BSONObj old = _findEntry( opCtx, fromNS, &loc ).getOwned();
@@ -337,8 +354,11 @@ namespace {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
         boost::scoped_ptr<Lock::ResourceLock> rLk;
-        if (!_isRsThreadSafe && opCtx->lockState())
-            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+        if (!_isRsThreadSafe && opCtx->lockState()) {
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
+                                             resourceIdCatalogMetadata,
+                                             MODE_X));
+        }
 
         boost::mutex::scoped_lock lk( _identsLock );
         const NSToIdentMap::iterator it = _idents.find(ns.toString());

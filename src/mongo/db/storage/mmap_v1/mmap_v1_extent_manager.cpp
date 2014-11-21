@@ -105,7 +105,8 @@ namespace mongo {
         : _dbname(dbname.toString()),
           _path(path.toString()),
           _directoryPerDB(directoryPerDB),
-          _rid(RESOURCE_MMAPv1_EXTENT_MANAGER, dbname) {
+          _rid(RESOURCE_METADATA, dbname) {
+
     }
 
     boost::filesystem::path MmapV1ExtentManager::fileName( int n ) const {
