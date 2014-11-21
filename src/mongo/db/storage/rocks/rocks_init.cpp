@@ -45,6 +45,10 @@ namespace mongo {
             virtual StorageEngine* create( const StorageGlobalParams& params ) const {
                 return new KVStorageEngine(new RocksEngine(params.dbpath));
             }
+
+            virtual StringData getCanonicalName() const {
+                return "rocksExperiment";
+            }
         };
     } // namespace
 

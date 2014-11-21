@@ -111,6 +111,8 @@ namespace {
 
 } // namespace
 
+    const std::string kWiredTigerEngineName = "wiredTiger";
+
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(const StringData& ns,
                                                                         const CollectionOptions& options,
                                                                         const StringData& extraStrings) {
@@ -127,11 +129,11 @@ namespace {
         // Warn about unrecognized fields that may be introduced in newer versions of this
         // storage engine instead of raising an error.
         // Ensure that 'configString' field is a string. Warn if this is not the case.
-        BSONForEach(elem, options.storageEngine.getObjectField("wiredtiger")) {
+        BSONForEach(elem, options.storageEngine.getObjectField(kWiredTigerEngineName)) {
             if (elem.fieldNameStringData() == "configString") {
                 if (elem.type() != String) {
                     return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
-                        << "storageEngine.wiredtiger.configString must be a string. "
+                        << "storageEngine.wiredTiger.configString must be a string. "
                         << "Not adding 'configString' value "
                         << elem << " to collection configuration");
                     continue;
@@ -142,7 +144,7 @@ namespace {
                 // Return error on first unrecognized field.
                 return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
                     << '\'' << elem.fieldNameStringData() << '\''
-                    << " is not a supported option in storageEngine.wiredtiger");
+                    << " is not a supported option in storageEngine.wiredTiger");
             }
         }
 
@@ -246,6 +248,10 @@ namespace {
         }
     }
 
+    const char* WiredTigerRecordStore::name() const {
+        return kWiredTigerEngineName.c_str();
+    }
+
     long long WiredTigerRecordStore::dataSize( OperationContext *txn ) const {
         return _dataSize.load();
     }
@@ -276,7 +282,7 @@ namespace {
         appendCustomStats( txn, &b, 1 );
         BSONObj obj = b.obj();
 
-        BSONObj blockManager = obj["wiredtiger"].Obj()["block-manager"].Obj();
+        BSONObj blockManager = obj[kWiredTigerEngineName].Obj()["block-manager"].Obj();
         BSONElement fileSize = blockManager["file size in bytes"];
         invariant( fileSize.type() );
 
@@ -692,7 +698,7 @@ namespace {
 
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
-        BSONObjBuilder bob(output->subobjStart("wiredtiger"));
+        BSONObjBuilder bob(output->subobjStart(kWiredTigerEngineName));
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
@@ -713,7 +719,7 @@ namespace {
         }
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
-        BSONObjBuilder bob(result->subobjStart("wiredtiger"));
+        BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {

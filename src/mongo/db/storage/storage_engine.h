@@ -65,6 +65,14 @@ namespace mongo {
              * Return a new instance of the StorageEngine.  Caller owns the returned pointer.
              */
             virtual StorageEngine* create(const StorageGlobalParams& params) const = 0;
+
+            /**
+             * Returns the name of the storage engine.
+             *
+             * Implementations that change the value of the returned string can cause
+             * data file incompatibilities.
+             */
+            virtual StringData getCanonicalName() const = 0;
         };
 
         /**

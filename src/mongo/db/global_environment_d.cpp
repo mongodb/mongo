@@ -78,14 +78,16 @@ namespace mongo {
             << "Cannot start server with an unknown storage engine: " << name,
             factory);
 
+        std::string canonicalName = factory->getCanonicalName().toString();
+
         // Do not proceed if data directory has been used by a different storage engine previously.
-        StorageEngineMetadata::validate(storageGlobalParams.dbpath, name);
+        StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
 
         _storageEngine = factory->create(storageGlobalParams);
         _storageEngine->finishInit();
 
         // Write a new metadata file if it is not present.
-        StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, name);
+        StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, canonicalName);
     }
 
     void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,

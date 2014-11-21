@@ -37,6 +37,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -48,7 +49,7 @@ namespace mongo {
     using std::string;
 
     WiredTigerServerStatusSection::WiredTigerServerStatusSection(WiredTigerKVEngine* engine)
-        : ServerStatusSection("wiredtiger"),
+        : ServerStatusSection(kWiredTigerEngineName),
           _engine(engine) { }
 
     bool WiredTigerServerStatusSection::includeByDefault() const {

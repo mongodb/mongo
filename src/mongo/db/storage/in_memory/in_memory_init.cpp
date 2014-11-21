@@ -45,6 +45,10 @@ namespace mongo {
             virtual StorageEngine* create(const StorageGlobalParams& params) const {
                 return new KVStorageEngine(new InMemoryEngine());
             }
+
+            virtual StringData getCanonicalName() const {
+                return "inMemoryExperiment";
+            }
         };
 
     } // namespace

@@ -5,8 +5,8 @@
 //
 var ss = db.serverStatus();
 
-// Test is only valid in the WT suites which run against a mongod with wiredtiger enabled
-if (ss.storageEngine.name != "wiredtiger") {
+// Test is only valid in the WT suites which run against a mongod with WiredTiger enabled
+if (ss.storageEngine.name !== "wiredTiger") {
     print("Skipping reconfigwt.js since this server does not have WiredTiger enabled");
 }
 else {

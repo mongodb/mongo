@@ -37,7 +37,7 @@ namespace mongo {
     class WiredTigerKVEngine;
 
     /**
-     * Adds "wiredtiger" to the results of db.serverStatus().
+     * Adds "wiredTiger" to the results of db.serverStatus().
      */
     class WiredTigerServerStatusSection : public ServerStatusSection {
     public:
