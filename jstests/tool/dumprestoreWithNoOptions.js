@@ -40,7 +40,7 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore", "--w=1");
+t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore", "--writeConcern=1");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
@@ -67,7 +67,7 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore" , "-d", dbname2, "--dir" , dumppath + dbname, "--noOptionsRestore", "--w=1");
+t.runTool( "restore" , "-d", dbname2, "--dir" , dumppath + dbname, "--noOptionsRestore", "--writeConcern=1");
 
 db = db.getSiblingDB(dbname2);
 
@@ -99,7 +99,7 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", dumppath + dbname, "--w=1");
+t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", dumppath + dbname, "--writeConcern=1");
 
 db = db.getSiblingDB(dbname);
 

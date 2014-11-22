@@ -52,7 +52,7 @@ MongoRunner.runMongoTool( "mongodump",
 
 step("try mongorestore from $timestamp");
 
-runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+port, "--dir", data, "--w", 1);
+runMongoProgram( "mongorestore", "--host", "127.0.0.1:"+port, "--dir", data, "--writeConcern", 1);
 var x = 9;
 x = conn.getDB("local").getCollection("oplog.rs").count();
 
