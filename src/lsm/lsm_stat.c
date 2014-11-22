@@ -80,8 +80,7 @@ __curstat_lsm_init(
 		ret = __wt_curstat_open(session, uribuf->data,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
-		if (ret == WT_NOTFOUND &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
 			    session, uribuf->data, cfg, &stat_cursor);
 		WT_ERR(ret);
