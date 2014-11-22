@@ -56,7 +56,7 @@ assert.eq(0, coll.count(), "didn't drop foo coll");
 
 // This test depends on W=0 to mask unique index violations.
 // This should be fixed once we implement TOOLS-341
-t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass", "--w", "0");
+t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass", "--writeConcern", "0");
 
 assert.soon("admindb.system.users.findOne()", "no data after restore");
 assert.eq(4, admindb.system.users.count(), "didn't restore users");
@@ -80,7 +80,7 @@ admindb.createRole({role: "customRole2", roles: [], privileges:[]});
 admindb.dropUser("root");
 admindb.logout();
 
-t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass", "--drop", "--w", "0");
+t.runTool("restore", "--dir", t.ext, "--username", "restore", "--password", "pass", "--drop", "--writeConcern", "0");
 
 admindb.auth("root", "pass");
 assert.soon("1 == admindb.system.users.find({user:'root'}).count()", "didn't restore users 2");
