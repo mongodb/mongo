@@ -28,6 +28,7 @@
 #include "thread.h"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
+pthread_rwlock_t single;			/* Single thread */
 u_int nops;					/* Operations */
 const char *uri;				/* Object */
 const char *config;				/* Object config */
@@ -55,22 +56,25 @@ main(int argc, char *argv[])
 		const char *desc;
 		const char *config;
 	} *cp, configs[] = {
-		{ "file:__wt",	NULL, NULL },
-		{ "table:__wt",	NULL, NULL },
+		{ "file:wt",	NULL, NULL },
+		{ "table:wt",	NULL, NULL },
 /* Configure for a modest cache size. */
 #define	LSM_CONFIG	"lsm=(chunk_size=1m,merge_max=2),leaf_page_max=4k"
-		{ "lsm:__wt",	NULL, LSM_CONFIG },
-		{ "table:__wt",	" [lsm]", "type=lsm," LSM_CONFIG },
+		{ "lsm:wt",	NULL, LSM_CONFIG },
+		{ "table:wt",	" [lsm]", "type=lsm," LSM_CONFIG },
 		{ NULL,		NULL, NULL }
 	};
 	u_int nthreads;
-	int ch, cnt, runs;
+	int ch, cnt, ret, runs;
 	char *config_open;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
 	else
 		++progname;
+
+	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
+		die(ret, "pthread_rwlock_init: single");
 
 	config_open = NULL;
 	nops = 1000;

@@ -46,10 +46,14 @@ extern u_int nops;				/* Operations per thread */
 extern const char *uri;				/* Object */
 extern const char *config;			/* Object config */
 
+extern pthread_rwlock_t single;			/* Single-thread */
+
 int  fop_start(u_int);
 void obj_bulk(void);
+void obj_bulk_unique(void);
 void obj_checkpoint(void);
 void obj_create(void);
+void obj_create_unique(void);
 void obj_cursor(void);
 void obj_drop(void);
 void obj_upgrade(void);

@@ -27,6 +27,8 @@
 
 #include "thread.h"
 
+static u_int uid = 1;
+
 void
 obj_bulk(void)
 {
@@ -42,15 +44,51 @@ obj_bulk(void)
 			die(ret, "session.create");
 
 	if (ret == 0) {
+		sched_yield();
 		if ((ret = session->open_cursor(
 		    session, uri, NULL, "bulk", &c)) == 0) {
-			/* Yield so that other threads can interfere. */
-			sched_yield();
 			if ((ret = c->close(c)) != 0)
 				die(ret, "cursor.close");
 		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
 			die(ret, "session.open_cursor");
 	}
+	if ((ret = session->close(session, NULL)) != 0)
+		die(ret, "session.close");
+}
+
+void
+obj_bulk_unique(void)
+{
+	WT_CURSOR *c;
+	WT_SESSION *session;
+	int ret;
+	char new_uri[64];
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die(ret, "conn.session");
+
+	/* Generate a unique object name. */
+	if ((ret = pthread_rwlock_wrlock(&single)) != 0)
+		die(ret, "pthread_rwlock_wrlock single");
+	(void)snprintf(new_uri, sizeof(new_uri), "%s.%u", uri, ++uid);
+	if ((ret = pthread_rwlock_unlock(&single)) != 0)
+		die(ret, "pthread_rwlock_unlock single");
+
+	if ((ret = session->create(session, new_uri, config)) != 0)
+		die(ret, "session.create: %s", new_uri);
+
+	sched_yield();
+	if ((ret =
+	    session->open_cursor(session, new_uri, NULL, "bulk", &c)) != 0)
+		die(ret, "session.open_cursor: %s", new_uri);
+
+	if ((ret = c->close(c)) != 0)
+		die(ret, "cursor.close");
+
+	while ((ret = session->drop(session, new_uri, NULL)) != 0)
+		if (ret != EBUSY)
+			die(ret, "session.drop: %s", new_uri);
+
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -89,6 +127,35 @@ obj_create(void)
 	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			die(ret, "session.create");
+
+	if ((ret = session->close(session, NULL)) != 0)
+		die(ret, "session.close");
+}
+
+void
+obj_create_unique(void)
+{
+	WT_SESSION *session;
+	int ret;
+	char new_uri[64];
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die(ret, "conn.session");
+
+	/* Generate a unique object name. */
+	if ((ret = pthread_rwlock_wrlock(&single)) != 0)
+		die(ret, "pthread_rwlock_wrlock single");
+	(void)snprintf(new_uri, sizeof(new_uri), "%s.%d", uri, ++uid);
+	if ((ret = pthread_rwlock_unlock(&single)) != 0)
+		die(ret, "pthread_rwlock_unlock single");
+
+	if ((ret = session->create(session, new_uri, config)) != 0)
+		die(ret, "session.create");
+
+	sched_yield();
+	while ((ret = session->drop(session, new_uri, NULL)) != 0)
+		if (ret != EBUSY)
+			die(ret, "session.drop: %s", new_uri);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
