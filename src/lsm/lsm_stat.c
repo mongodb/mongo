@@ -58,6 +58,9 @@ __curstat_lsm_init(
 	WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
 	locked = 1;
 
+	/* Initialize the statistics. */
+	__wt_stat_init_dsrc_stats(stats);
+
 	/*
 	 * For each chunk, aggregate its statistics, as well as any associated
 	 * bloom filter statistics, into the total statistics.
@@ -91,15 +94,8 @@ __curstat_lsm_init(
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(new, lsm_generation_max, chunk->generation);
 
-		/*
-		 * We want to aggregate the table's statistics.  Get a base set
-		 * of statistics from the first chunk, then aggregate statistics
-		 * from each new chunk.
-		 */
-		if (i == 0)
-			*stats = *new;
-		else
-			__wt_stat_aggregate_dsrc_stats(new, stats);
+		/* Aggregate statistics from each new chunk. */
+		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
