@@ -3,7 +3,7 @@
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = MongoDB
-PROJECT_NUMBER         = 2.8.0-rc2-pre-
+PROJECT_NUMBER         = 2.8.0-rc1
 OUTPUT_DIRECTORY       = docs/doxygen
 CREATE_SUBDIRS         = NO
 OUTPUT_LANGUAGE        = English
