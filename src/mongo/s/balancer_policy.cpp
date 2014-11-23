@@ -479,8 +479,8 @@ namespace mongo {
             }
 
             if ( numJumboChunks ) {
-                error() << "shard: " << from << "ns: " << ns
-                        << "has too many chunks, but they are all jumbo "
+                error() << "shard: " << from << " ns: " << ns
+                        << " has too many chunks, but they are all jumbo "
                         << " numJumboChunks: " << numJumboChunks
                         << endl;
                 continue;
