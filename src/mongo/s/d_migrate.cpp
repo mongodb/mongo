@@ -1682,6 +1682,20 @@ namespace mongo {
                         return;
                     }
 
+                    BSONObj idxPattern(idx["key"].Obj());
+                    bool hasIndex = collection->getIndexCatalog()->
+                            findIndexByKeyPattern(idxPattern, true /* include unfinished */);
+
+                    if (collection->numRecords() > 0 && !hasIndex) {
+                        errmsg = str::stream() << "aborting migration, shard is missing "
+                                               << "indexes and collection is not empty. "
+                                               << "Non-trivial index creation should be "
+                                               << "scheduled manually";
+                        warning() << errmsg;
+                        state = FAIL;
+                        return;
+                    }
+
                     Status status = collection->getIndexCatalog()->createIndex( idx, false );
                     if ( !status.isOK() && status.code() != ErrorCodes::IndexAlreadyExists ) {
                         errmsg = str::stream() << "failed to create index before migrating data. "
