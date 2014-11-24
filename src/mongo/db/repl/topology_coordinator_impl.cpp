@@ -463,7 +463,7 @@ namespace {
         response->append("fresher", weAreFresher);
 
         std::string errmsg;
-        bool doVeto = _shouldVetoMember(args.id, now, lastOpApplied, &errmsg);
+        bool doVeto = _shouldVetoMember(args, now, lastOpApplied, &errmsg);
         response->append("veto", doVeto);
         if (doVeto) {
             response->append("errmsg", errmsg);
@@ -471,10 +471,18 @@ namespace {
         *result = Status::OK();
     }
 
-    bool TopologyCoordinatorImpl::_shouldVetoMember(unsigned int memberID,
-                                                    const Date_t& now,
-                                                    const OpTime& lastOpApplied,
-                                                    std::string* errmsg) const {
+    bool TopologyCoordinatorImpl::_shouldVetoMember(
+            const ReplicationCoordinator::ReplSetFreshArgs& args,
+            const Date_t& now,
+            const OpTime& lastOpApplied,
+            std::string* errmsg) const {
+
+        if (_currentConfig.getConfigVersion() < args.cfgver) {
+            // We are stale; do not veto.
+            return false;
+        }
+
+        const unsigned int memberID = args.id;
         const int hopefulIndex = _getMemberIndex(memberID);
         invariant(hopefulIndex != _selfIndex);
         const int highestPriorityIndex = _getHighestPriorityElectableIndex(now, lastOpApplied);

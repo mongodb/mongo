@@ -237,10 +237,10 @@ namespace repl {
         // Returns the current "ping" value for the given member by their address
         int _getPing(const HostAndPort& host);
 
-        // Determines if we will veto the member specified by "memberID", given that the last op
+        // Determines if we will veto the member specified by "args.id", given that the last op
         // we have applied locally is "lastOpApplied".
         // If we veto, the errmsg will be filled in with a reason
-        bool _shouldVetoMember(unsigned int memberID,
+        bool _shouldVetoMember(const ReplicationCoordinator::ReplSetFreshArgs& args,
                                const Date_t& now,
                                const OpTime& lastOpApplied,
                                std::string* errmsg) const;
