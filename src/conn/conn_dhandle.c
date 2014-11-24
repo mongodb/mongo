@@ -649,6 +649,12 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session)
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
 
+	/*
+	 * Kludge: interrupt the eviction server in case it is holding the
+	 * handle list lock.
+	 */
+	F_SET(S2C(session)->cache, WT_EVICT_CLEAR_WALKS);
+
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_DHANDLE_LOCK(session, ret = __conn_dhandle_remove(session));
 

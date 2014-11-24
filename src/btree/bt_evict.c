@@ -13,7 +13,7 @@ static int   __evict_lru_cmp(const void *, const void *);
 static int   __evict_lru_pages(WT_SESSION_IMPL *, int);
 static int   __evict_lru_walk(WT_SESSION_IMPL *, uint32_t);
 static int   __evict_pass(WT_SESSION_IMPL *);
-static int   __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
+static int   __evict_walk(WT_SESSION_IMPL *, uint32_t);
 static int   __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
 static void *__evict_worker(void *);
 static int __evict_server_work(WT_SESSION_IMPL *);
@@ -722,12 +722,13 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	if ((ret = __evict_walk(session, &entries, flags)) != 0)
+	if ((ret = __evict_walk(session, flags)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
 
+	entries = cache->evict_entries;
 	qsort(cache->evict,
 	    entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 
@@ -822,7 +823,7 @@ __evict_server_work(WT_SESSION_IMPL *session)
  *	Fill in the array by walking the next set of pages.
  */
 static int
-__evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
+__evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -830,10 +831,13 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int max_entries, old_slot, retries, slot;
+	int incr, locked;
 	WT_DECL_SPINLOCK_ID(id);
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
+	dhandle = NULL;
+	incr = locked = 0;
 	retries = 0;
 
 	/* Increment the shared read generation. */
@@ -847,28 +851,51 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
 	 */
 	__wt_txn_update_oldest(session);
 
-	/*
-	 * Set the starting slot in the queue and the maximum pages added
-	 * per walk.
-	 */
-	slot = cache->evict_entries;
-	max_entries = slot + WT_EVICT_WALK_INCR;
 	if (cache->evict_current == NULL)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
 	else
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_not_empty);
 
 	/*
-	 * Lock the dhandle list so sweeping cannot change the pointers out
-	 * from under us.  If the lock is not available, give up: there may be
-	 * other work for us to do without a new walk.
+	 * Set the starting slot in the queue and the maximum pages added
+	 * per walk.
 	 */
-	WT_RET(__wt_spin_trylock(session, &conn->dhandle_lock, &id));
-	F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+	slot = cache->evict_entries;
+	max_entries = slot + WT_EVICT_WALK_INCR;
 
-retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+retry:	while (slot < max_entries && ret == 0) {
+		/*
+		 * If another thread is waiting on the eviction server to clear
+		 * the walk point in a tree, give up.
+		 */
 		if (F_ISSET(cache, WT_EVICT_CLEAR_WALKS))
-			goto done;
+			break;
+
+		/*
+		 * Lock the dhandle list to find the next handle and bump its
+		 * reference count to keep it alive while we sweep.
+		 */
+		if (!locked) {
+			if ((ret = __wt_spin_trylock(
+			    session, &conn->dhandle_lock, &id)) != 0)
+				break;
+			locked = 1;
+		}
+
+		if (dhandle == NULL)
+			dhandle = SLIST_FIRST(&conn->dhlh);
+		else {
+			if (incr) {
+				WT_ASSERT(session, dhandle->session_ref > 0);
+				(void)WT_ATOMIC_SUB4(dhandle->session_ref, 1);
+				incr = 0;
+			}
+			dhandle = SLIST_NEXT(dhandle, l);
+		}
+
+		/* If we reach the end of the list, we're done. */
+		if (dhandle == NULL)
+			break;
 
 		/* Ignore non-file handles, or handles that aren't open. */
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
@@ -908,6 +935,11 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		btree->evict_walk_skips = 0;
 		old_slot = slot;
 
+		(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
+		incr = 1;
+		__wt_spin_unlock(session, &conn->dhandle_lock);
+		locked = 0;
+
 		__wt_spin_lock(session, &cache->evict_walk_lock);
 
 		/*
@@ -930,9 +962,17 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		else
 			btree->evict_walk_period = WT_MIN(
 			    WT_MAX(1, 2 * btree->evict_walk_period), 1000);
+	}
 
-		if (ret != 0 || slot >= max_entries)
-			break;
+	if (incr) {
+		WT_ASSERT(session, dhandle->session_ref > 0);
+		(void)WT_ATOMIC_SUB4(dhandle->session_ref, 1);
+		incr = 0;
+	}
+
+	if (locked) {
+		__wt_spin_unlock(session, &conn->dhandle_lock);
+		locked = 0;
 	}
 
 	/*
@@ -941,19 +981,16 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 	 * are finding more candidates.  Take care not to skip files on
 	 * subsequent passes.
 	 */
-	if (ret == 0 && slot < max_entries && (++retries < 2 ||
-	    (retries < 10 && slot > 0))) {
+	if (!F_ISSET(cache, WT_EVICT_CLEAR_WALKS) && ret == 0 &&
+	    slot < max_entries && (retries < 2 || (retries < 10 && slot > 0))) {
 		cache->evict_file_next = NULL;
+		++retries;
 		goto retry;
 	}
 
 	/* Remember the file we should visit first, next loop. */
-done:	cache->evict_file_next = dhandle;
-
-	F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
-	__wt_spin_unlock(session, &conn->dhandle_lock);
-
-	*entriesp = slot;
+	cache->evict_file_next = dhandle;
+	cache->evict_entries = slot;
 	return (ret);
 }
 
@@ -1047,7 +1084,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		    page->type == WT_PAGE_ROW_INT) &&
 		    ++internal_pages > WT_EVICT_WALK_PER_FILE / 2 &&
 		    !LF_ISSET(WT_EVICT_PASS_AGGRESSIVE))
-			break;
+			continue;
 
 		/*
 		 * If this page has never been considered for eviction,
