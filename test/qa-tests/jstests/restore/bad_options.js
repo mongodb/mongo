@@ -19,9 +19,19 @@
     assert.neq(0, ret);
 
     // run restore with a negative --w value
-    ret = toolTest.runTool('restore', '--w', '-1', 'restore/testdata/dump_empty');
+    ret = toolTest.runTool('restore', '--w', '-1', 'jstests/restore/testdata/dump_empty');
     assert.neq(0, ret);
 
+    // run restore with an invalid db name
+    ret = toolTest.runTool('restore', '--db', 'billy.crystal', 'jstests/restore/testdata/blankdb');
+    assert.neq(0, ret);
+
+    // run restore with an invalid collection name
+    ret = toolTest.runTool('restore', '--db', 'test', '--collection', '$money', 
+            'jstests/restore/testdata/blankcoll/blank.bson');
+    assert.neq(0, ret);
+
+    // success
     toolTest.stop();
 
 }());
