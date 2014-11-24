@@ -85,14 +85,24 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	 */
 	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
 	for (i = 0; i < end; i++) {
-		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
+		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK) ||
+		    (*chunkp == NULL &&
+		    !F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_STABLE) &&
+		    !lsm_tree->chunk[i]->evicted)) {
 			(void)WT_ATOMIC_ADD4(lsm_tree->chunk[i]->refcnt, 1);
 			WT_RET(__wt_verbose(session, WT_VERB_LSM,
 			    "Flush%s: return chunk %u of %u: %s",
 			    force ? " w/ force" : "", i, end - 1,
 			    lsm_tree->chunk[i]->uri));
 			*chunkp = lsm_tree->chunk[i];
-			break;
+			/*
+			 * Discards are opportunistic, flip a coin to decide
+			 * whether to try, but take the first real flush we
+			 * find.
+			 */
+			if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK) ||
+			    __wt_random(session->rnd) & 1)
+				break;
 		}
 	}
 

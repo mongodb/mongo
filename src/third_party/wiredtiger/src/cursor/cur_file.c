@@ -459,17 +459,18 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	if (WT_PREFIX_MATCH(uri, "file:")) {
 		/*
 		 * If we are opening a bulk cursor, get the handle while
-		 * holding the schema lock.  This prevents a bulk cursor open
-		 * failing with EBUSY due to a database-wide checkpoint.
+		 * holding the checkpoint lock.  This prevents a bulk cursor
+		 * open failing with EBUSY due to a database-wide checkpoint.
 		 */
-		if (bulk) {
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_session_get_btree_ckpt(
-			    session, uri, cfg, flags));
-			WT_RET(ret);
-		} else
-			WT_RET(__wt_session_get_btree_ckpt(
-			    session, uri, cfg, flags));
+		if (bulk)
+			__wt_spin_lock(
+			    session, &S2C(session)->checkpoint_lock);
+		ret = __wt_session_get_btree_ckpt(
+		    session, uri, cfg, flags);
+		if (bulk)
+			__wt_spin_unlock(
+			    session, &S2C(session)->checkpoint_lock);
+		WT_RET(ret);
 	} else
 		WT_RET(__wt_bad_object_type(session, uri));
 
