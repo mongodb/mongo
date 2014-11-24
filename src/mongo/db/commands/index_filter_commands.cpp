@@ -140,6 +140,10 @@ namespace mongo {
         return false;
     }
 
+    bool IndexFilterCommand::slaveOverrideOk() const {
+        return true;
+    }
+
     void IndexFilterCommand::help(stringstream& ss) const {
         ss << helpText;
     }

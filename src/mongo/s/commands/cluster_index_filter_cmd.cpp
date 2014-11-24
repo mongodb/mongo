@@ -62,6 +62,10 @@ namespace mongo {
             return false;
         }
 
+        bool slaveOverrideOk() const {
+            return true;
+        }
+
         LockType locktype() const {
             return Command::NONE;
         }
