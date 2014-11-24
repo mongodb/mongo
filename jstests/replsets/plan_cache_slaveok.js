@@ -1,4 +1,4 @@
-// Verify that the plan cache commands can be run on secondaries, but only
+// Verify that the plan cache and index filter commands can be run on secondaries, but only
 // if slave ok is explicitly set.
 
 var name = "plan_cache_slaveok";
@@ -20,6 +20,24 @@ function assertPlanCacheCommandsSucceed(db) {
         planCacheClear: name,
         query: {a: 1}
     }));
+
+    // setFilter
+    assert.commandWorked(db.runCommand({
+        planCacheSetFilter: name,
+        query: {a: 1},
+        indexes: [{a: 1}]
+    }));
+
+    // listFilters
+    assert.commandWorked(db.runCommand({
+        planCacheListFilters: name
+    }));
+
+    // clearFilters
+    assert.commandWorked(db.runCommand({
+        planCacheClearFilters: name,
+        query: {a: 1}
+    }));
 }
 
 function assertPlanCacheCommandsFail(db) {
@@ -37,6 +55,24 @@ function assertPlanCacheCommandsFail(db) {
     // .clear()
     assert.commandFailed(db.runCommand({
         planCacheClear: name,
+        query: {a: 1}
+    }));
+
+    // setFilter
+    assert.commandFailed(db.runCommand({
+        planCacheSetFilter: name,
+        query: {a: 1},
+        indexes: [{a: 1}]
+    }));
+
+    // listFilters
+    assert.commandFailed(db.runCommand({
+        planCacheListFilters: name
+    }));
+
+    // clearFilters
+    assert.commandFailed(db.runCommand({
+        planCacheClearFilters: name,
         query: {a: 1}
     }));
 }

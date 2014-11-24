@@ -58,6 +58,10 @@ namespace mongo {
             return false;
         }
 
+        bool slaveOverrideOk() const {
+            return true;
+        }
+
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
         void help(stringstream& ss) const {
