@@ -1720,7 +1720,7 @@ def doConfigure(myenv):
             print("Using the leak sanitizer requires a valid symbolizer")
             Exit(1)
 
-    if using_msvc():
+    if using_msvc() and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
         #
         myenv.Append( CCFLAGS=["/Gw", "/Gy"] )
