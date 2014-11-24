@@ -29,7 +29,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/shell/shell_utils_launcher.h"
 
@@ -271,9 +271,10 @@ namespace mongo {
 
             {
                 stringstream ss;
-                ss << "shell: started program";
-                for (unsigned i=0; i < _argv.size(); i++)
+                ss << "shell: started program (sh" << _pid << "): ";
+                for (unsigned i = 0; i < _argv.size(); i++) {
                     ss << " " << _argv[i];
+                }
                 log() << ss.str() << endl;
             }
 
