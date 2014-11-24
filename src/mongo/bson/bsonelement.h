@@ -473,8 +473,8 @@ namespace mongo {
                 totalSize = -1;
                 fieldNameSize_ = -1;
                 if ( maxLen != -1 ) {
-                    int size = (int) strnlen( fieldName(), maxLen - 1 );
-                    uassert( 10333 ,  "Invalid field name", size != -1 );
+                    size_t size = strnlen( fieldName(), maxLen - 1 );
+                    uassert( 10333 ,  "Invalid field name", size < size_t(maxLen - 1) );
                     fieldNameSize_ = size + 1;
                 }
             }

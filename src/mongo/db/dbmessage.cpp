@@ -84,7 +84,7 @@ namespace mongo {
 
             // Validate there is room for a null byte in the buffer
             // Strings can be zero length
-            uassert(18633, "Failed to parse ns string", _nsLen <= (limit - 1));
+            uassert(18633, "Failed to parse ns string", _nsLen < limit);
 
             _nextjsobj += _nsLen + 1; // skip namespace + null
         }
