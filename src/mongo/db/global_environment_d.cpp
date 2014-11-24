@@ -81,7 +81,7 @@ namespace mongo {
         std::string canonicalName = factory->getCanonicalName().toString();
 
         // Do not proceed if data directory has been used by a different storage engine previously.
-        //StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
+        StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
 
         _storageEngine = factory->create(storageGlobalParams);
         _storageEngine->finishInit();
