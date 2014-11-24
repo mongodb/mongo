@@ -53,39 +53,31 @@ __sweep(WT_SESSION_IMPL *session)
 			if (dhandle->session_ref != 0 ||
 			    now - dhandle->timeofdeath <= WT_DHANDLE_SWEEP_WAIT)
 				continue;
-
-			/*
-			 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we
-			 * want opens to block on us rather than returning an
-			 * EBUSY error to the application.
-			 */
-			ret = __wt_try_writelock(session, dhandle->rwlock);
-			if (ret == EBUSY) {
-				ret = 0;
-				continue;
-			}
-			WT_RET(ret);
-
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_btree_sync_and_close(session, 0));
-			if (ret == EBUSY)
-				ret = 0;
-
-			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
-			WT_RET(ret);
 		}
 
 		/*
-		 * Attempt to discard the handle (the called function checks the
-		 * handle-open flag after acquiring appropriate locks, which is
-		 * why we don't do any special handling of EBUSY returns above,
-		 * that path never cleared the handle-open flag.
+		 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
+		 * opens to block on us rather than returning an EBUSY error to
+		 * the application.
+		 */
+		if ((ret =
+		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
+			continue;
+		WT_RET(ret);
+
+		/*
+		 * Attempt to discard the handle.  The called function
+		 * re-checks that the handle is not in use, which is why we
+		 * don't do any special handling of EBUSY returns above.
 		 */
 		WT_WITH_DHANDLE(session, dhandle,
 		    ret = __wt_conn_dhandle_discard_single(session, 0));
-		if (ret == EBUSY)
-			ret = 0;
-		WT_RET(ret);
+
+		/* If the handle wasn't discarded, drop our lock. */
+		if (ret != 0)
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+
+		WT_RET_BUSY_OK(ret);
 	}
 	return (0);
 }

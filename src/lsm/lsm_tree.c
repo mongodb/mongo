@@ -23,6 +23,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 
+	WT_UNUSED(final);	/* Only used in diagnostic builds */
+
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		WT_ASSERT(session, final ||
@@ -127,7 +129,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * Tree close assumes that we have a reference to the tree
 		 * so it can tell when it's safe to do the close. We could
 		 * get the tree here, but we short circuit instead. There
-		 * is no need to decrement the reference count since destroy
+		 * is no need to decrement the reference count since discard
 		 * is unconditional.
 		 */
 		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
@@ -431,6 +433,68 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 }
 
 /*
+ * __lsm_tree_find --
+ *	Find an LSM tree structure for the given name. Optionally get exclusive
+ *	access to the handle. Exclusive access works separately to the LSM tree
+ *	lock - since operations that need exclusive access may also need to
+ *	take the LSM tree lock for example outstanding work unit operations.
+ */
+static int
+__lsm_tree_find(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, WT_LSM_TREE **treep)
+{
+	WT_LSM_TREE *lsm_tree;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+
+	/* See if the tree is already open. */
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+		if (strcmp(uri, lsm_tree->name) == 0) {
+			/*
+			 * Short circuit if the handle is already held
+			 * exclusively or exclusive access is requested and
+			 * there are references held.
+			 */
+			if ((exclusive && lsm_tree->refcnt > 0) ||
+			    lsm_tree->exclusive)
+				return (EBUSY);
+
+			if (exclusive) {
+				/*
+				 * Make sure we win the race to switch on the
+				 * exclusive flag.
+				 */
+				if (!WT_ATOMIC_CAS1(lsm_tree->exclusive, 0, 1))
+					return (EBUSY);
+				/* Make sure there are no readers */
+				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
+					lsm_tree->exclusive = 0;
+					return (EBUSY);
+				}
+			} else {
+				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
+
+				/*
+				 * We got a reference, check if an exclusive
+				 * lock beat us to it.
+				 */
+				if (lsm_tree->exclusive) {
+					WT_ASSERT(session,
+					    lsm_tree->refcnt > 0);
+					(void)WT_ATOMIC_SUB4(
+					    lsm_tree->refcnt, 1);
+					return (EBUSY);
+				}
+			}
+
+			*treep = lsm_tree;
+			return (0);
+		}
+
+	return (WT_NOTFOUND);
+}
+
+/*
  * __lsm_tree_open_check --
  *	Validate the configuration of an LSM tree.
  */
@@ -483,11 +547,8 @@ __lsm_tree_open(
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
-	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
-		if (strcmp(uri, lsm_tree->name) == 0) {
-			*treep = lsm_tree;
-			return (0);
-		}
+	if ((ret = __lsm_tree_find(session, uri, 0, treep)) != WT_NOTFOUND)
+		return (ret);
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
@@ -531,65 +592,21 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 
 /*
  * __wt_lsm_tree_get --
- *	Get an LSM tree structure for the given name. Optionally get exclusive
- *	access to the handle. Exclusive access works separately to the LSM
- *	tree lock - since operations that need exclusive access may also need
- *	to take the LSM tree lock for example outstanding work unit operations.
+ *	Find an LSM tree handle or open a new one.
  */
 int
 __wt_lsm_tree_get(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, WT_LSM_TREE **treep)
 {
-	WT_LSM_TREE *lsm_tree;
+	WT_DECL_RET;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	/* See if the tree is already open. */
-	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
-		if (strcmp(uri, lsm_tree->name) == 0) {
-			/*
-			 * Short circuit if the handle is already held
-			 * exclusively or exclusive access is requested and
-			 * there are references held.
-			 */
-			if ((exclusive && lsm_tree->refcnt > 0) ||
-			    lsm_tree->exclusive)
-				return (EBUSY);
+	ret = __lsm_tree_find(session, uri, exclusive, treep);
+	if (ret == WT_NOTFOUND)
+		ret = __lsm_tree_open(session, uri, treep);
 
-			if (exclusive) {
-				/*
-				 * Make sure we win the race to switch on the
-				 * exclusive flag.
-				 */
-				if (!WT_ATOMIC_CAS1(lsm_tree->exclusive, 0, 1))
-					return (EBUSY);
-				/* Make sure there are no readers */
-				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
-					lsm_tree->exclusive = 0;
-					return (EBUSY);
-				}
-			} else {
-				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
-
-				/*
-				 * We got a reference, check if an exclusive
-				 * lock beat us to it.
-				 */
-				if (lsm_tree->exclusive) {
-					WT_ASSERT(session,
-					    lsm_tree->refcnt > 1);
-					(void)WT_ATOMIC_SUB4(
-					    lsm_tree->refcnt, 1);
-					return (EBUSY);
-				}
-			}
-
-			*treep = lsm_tree;
-			return (0);
-		}
-
-	/* Open a new tree. */
-	return (__lsm_tree_open(session, uri, treep));
+	return (ret);
 }
 
 /*
@@ -600,10 +617,8 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	if (lsm_tree->exclusive) {
-		WT_ASSERT(session, lsm_tree->refcnt == 1);
+	if (lsm_tree->exclusive)
 		lsm_tree->exclusive = 0;
-	}
 	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
 }
 

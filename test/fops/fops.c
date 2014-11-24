@@ -32,8 +32,10 @@ static void  print_stats(u_int);
 
 typedef struct {
 	int bulk;				/* bulk load */
+	int bulk_unique;			/* bulk load of new file */
 	int ckpt;				/* session.checkpoint */
 	int create;				/* session.create */
+	int create_unique;			/* session.create of new file */
 	int cursor;				/* session.open_cursor */
 	int drop;				/* session.drop */
 	int upgrade;				/* session.upgrade */
@@ -81,7 +83,7 @@ fop_start(u_int nthreads)
 	if ((run_stats = calloc(
 	    (size_t)(nthreads), sizeof(*run_stats))) == NULL ||
 	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
-		die("calloc", errno);
+		die(errno, "calloc");
 
 	(void)gettimeofday(&start, NULL);
 
@@ -89,7 +91,7 @@ fop_start(u_int nthreads)
 	for (i = 0; i < nthreads; ++i)
 		if ((ret = pthread_create(
 		    &tids[i], NULL, fop, (void *)(uintptr_t)i)) != 0)
-			die("pthread_create", ret);
+			die(ret, "pthread_create");
 
 	/* Wait for the threads. */
 	for (i = 0; i < nthreads; ++i)
@@ -117,16 +119,16 @@ static void *
 fop(void *arg)
 {
 	STATS *s;
+	uintptr_t id;
 	u_int i;
-	int id;
 
-	id = (int)(uintptr_t)arg;
+	id = (uintptr_t)arg;
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 7) {
+		switch (r() % 9) {
 		case 0:
 			++s->bulk;
 			obj_bulk();
@@ -155,6 +157,14 @@ fop(void *arg)
 			++s->verify;
 			obj_verify();
 			break;
+		case 7:
+			++s->bulk_unique;
+			obj_bulk_unique();
+			break;
+		case 8:
+			++s->create_unique;
+			obj_create_unique();
+			break;
 		}
 
 	return (NULL);
@@ -175,6 +185,7 @@ print_stats(u_int nthreads)
 		printf(
 		    "%2d: bulk %3d, ckpt %3d, create %3d, cursor %3d, "
 		    "drop %3d, upg %3d, vrfy %3d\n",
-		    id, s->bulk, s->ckpt, s->create, s->cursor,
+		    id, s->bulk + s->bulk_unique, s->ckpt,
+		    s->create + s->create_unique, s->cursor,
 		    s->drop, s->upgrade, s->verify);
 }

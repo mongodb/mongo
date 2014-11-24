@@ -80,7 +80,7 @@ __conn_dhandle_open_lock(
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
-			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
+			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN) ? 1 : 0;
 			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
@@ -131,6 +131,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	uint64_t hash;
 
+	WT_UNUSED(flags);	/* Only used in diagnostic builds */
 	conn = S2C(session);
 
 	/* We must be holding the handle list lock at a higher level. */
@@ -626,14 +627,9 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	conn = S2C(session);
 	dhandle = session->dhandle;
 
-	WT_ASSERT(session,
-	    final || F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	/*
-	 * Check if the handle was reacquired by a session while we waited;
-	 * this should only happen when called from the periodic sweep code, of
-	 * course.
-	 */
+	/* Check if the handle was reacquired by a session while we waited. */
 	if (!final && dhandle->session_ref != 0)
 		return (EBUSY);
 
@@ -654,20 +650,16 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 
 	dhandle = session->dhandle;
 
-	/*
-	 * We're called from the periodic sweep function and the final close;
-	 * the former wants to continue if the handle is suddenly found to be
-	 * busy, the latter wants to shut things down.
-	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		if (!final)
-			WT_ERR(EBUSY);
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
-	}
 
 	/*
-	 * Try to remove the handle, protected by the data handle lock.
+	 * Kludge: interrupt the eviction server in case it is holding the
+	 * handle list lock.
 	 */
+	F_SET(S2C(session)->cache, WT_EVICT_CLEAR_WALKS);
+
+	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_DHANDLE_LOCK(session,
 	    ret = __conn_dhandle_remove(session, final));
 
@@ -686,8 +678,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 
-err:	WT_ASSERT(session, !final || ret == 0);
-	return (ret);
+err:	return (ret);
 }
 
 /*

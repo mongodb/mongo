@@ -22,7 +22,7 @@ typedef struct __wt_meta_track {
 		WT_ST_SET		/* Reset a metadata entry */
 	} op;
 	char *a, *b;			/* Strings */
-	WT_BTREE *btree;		/* Locked handle */
+	WT_DATA_HANDLE *dhandle;	/* Locked handle */
 	int created;			/* Handle on newly created file */
 } WT_META_TRACK;
 
@@ -97,6 +97,7 @@ static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
 	WT_BM *bm;
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	int tret;
 
@@ -112,15 +113,16 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		break;
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
 		if (!unroll) {
-			bm = trk->btree->bm;
-			WT_WITH_BTREE(session, trk->btree,
+			btree = trk->dhandle->handle;
+			bm = btree->bm;
+			WT_WITH_DHANDLE(session, trk->dhandle,
 			    WT_TRET(bm->checkpoint_resolve(bm, session)));
 		}
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		if (unroll && trk->created)
-			F_SET(trk->btree->dhandle, WT_DHANDLE_DISCARD);
-		WT_WITH_BTREE(session, trk->btree,
+			F_SET(trk->dhandle, WT_DHANDLE_DISCARD);
+		WT_WITH_DHANDLE(session, trk->dhandle,
 		    WT_TRET(__wt_session_release_btree(session)));
 		break;
 	case WT_ST_FILEOP:	/* File operation */
@@ -175,7 +177,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 free:	trk->op = WT_ST_EMPTY;
 	__wt_free(session, trk->a);
 	__wt_free(session, trk->b);
-	trk->btree = NULL;
+	trk->dhandle = NULL;
 
 	return (ret);
 }
@@ -216,7 +218,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	/*
 	 * If the operation succeeded and we aren't relying on the log for
-	 * durability, checkpoint the metadata. */
+	 * durability, checkpoint the metadata.
+	 */
 	if (!unroll && ret == 0 && session->metafile != NULL &&
 	    !S2C(session)->logging)
 		WT_WITH_BTREE(session, session->metafile,
@@ -278,7 +281,7 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_CHECKPOINT;
-	trk->btree = S2BT(session);
+	trk->dhandle = session->dhandle;
 	return (0);
 }
 /*
@@ -359,7 +362,7 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_LOCK;
-	trk->btree = S2BT(session);
+	trk->dhandle = session->dhandle;
 	trk->created = created;
 	return (0);
 }
