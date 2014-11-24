@@ -356,6 +356,21 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 }
 
 /*
+ * __session_dhandle_find --
+ *	Search for a data handle in the connection and add it to a session's
+ *	cache.  Since the data handle isn't locked, this must be called holding
+ *	the handle list lock, and we must increment the handle's reference
+ *	count before releasing it.
+ */
+static int
+__session_dhandle_find(WT_SESSION_IMPL *session,
+    const char *uri, const char *checkpoint, uint32_t flags)
+{
+	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint, flags));
+	return (__session_add_btree(session, NULL));
+}
+
+/*
  * __wt_session_get_btree --
  *	Get a btree handle for the given name, set session->dhandle.
  */
@@ -390,11 +405,11 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		session->dhandle = dhandle;
 	else {
 		/*
-		 * We didn't find a match in the session cache, now check the
-		 * shared handle list.
+		 * We didn't find a match in the session cache, now search the
+		 * shared handle list and cache any handle we find.
 		 */
 		WT_WITH_DHANDLE_LOCK(session, ret =
-		    __wt_conn_dhandle_find(session, uri, checkpoint, flags));
+		    __session_dhandle_find(session, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -422,16 +437,16 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		__wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
 	WT_RET(ret);
 
-done:	if (dhandle_cache == NULL) {
+	if (!LF_SET(WT_DHANDLE_HAVE_REF))
 		WT_RET(__session_add_btree(session, NULL));
-		/* Sweep the handle list to remove any dead handles. */
-		WT_RET(__session_dhandle_sweep(session, flags));
-	}
+
+	/* Sweep the handle list to remove any dead handles. */
+	WT_RET(__session_dhandle_sweep(session, flags));
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
 
-	/* Increment the data-source's in-use counter. */
+done:	/* Increment the data-source's in-use counter. */
 	__wt_session_dhandle_incr_use(session);
 
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
