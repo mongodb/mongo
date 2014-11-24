@@ -13,8 +13,7 @@ for( i = 0; i < 100000; ++i ) {
 }
 
 targetId = 1000*1000;
-mc.insert( { _id:targetId, val:[ 1, 2, 3 ] } );
-master.getDB( 'd' ).getLastError();
+assert.writeOK(mc.insert({ _id: targetId, val: [ 1, 2, 3 ] }));
 
 slave = rt.start( false );
 sc = slave.getDB( 'd' )[ 'c' ];

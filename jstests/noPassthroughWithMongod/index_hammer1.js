@@ -2,9 +2,10 @@
 t = db.index_hammer1;
 t.drop();
 
+var bulk = t.initializeUnorderedBulkOp();
 for ( i=0; i<10000; i++ )
-    t.insert( { x : i , y : i } );
-db.getLastError();
+    bulk.insert({ x: i, y: i });
+assert.writeOK(bulk.execute());
 
 ops = []
 

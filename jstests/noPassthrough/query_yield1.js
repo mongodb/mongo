@@ -14,9 +14,11 @@ q = function(){ var x=this.n; for ( var i=0; i<250; i++ ){ x = x * 2; } return f
 
 while ( true ){
     function fill(){
+        var bulk = t.initializeUnorderedBulkOp();
         for ( ; i<N; i++ ){
-            t.insert( { _id : i , n : 1 } )
+            bulk.insert({ _id: i, n: 1 });
         }
+        assert.writeOK(bulk.execute());
     }
     
      function timeQuery(){
@@ -58,7 +60,7 @@ num = 0;
 start = new Date();
 biggestMe = 0;
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
-    var me = Date.timeFunc( function(){ t.insert( { x : 1 } ); db.getLastError(); } )
+    var me = Date.timeFunc( function(){ t.insert( { x : 1 } ); });
     var x = db.currentOp()
 
     if ( num++ == 0 ){

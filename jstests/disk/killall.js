@@ -21,8 +21,7 @@ var mongod = startMongod( "--port", port, "--dbpath", dbpath, "--nohttpinterface
 var db = mongod.getDB( "test" );
 var collection = db.getCollection( baseName );
 
-collection.save( {} );
-assert( ! db.getLastError() );
+assert.writeOK(collection.insert({}));
 
 s1 = startParallelShell( "db." + baseName + ".count( { $where: function() { while( 1 ) { ; } } } )", port );
 // HACK(schwerin): startParallelShell's return value should allow you to block until the command has

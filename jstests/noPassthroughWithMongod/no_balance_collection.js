@@ -68,9 +68,11 @@ sh.waitForBalancer(true)
 // Make sure auto-migrates on insert don't move chunks
 var lastMigration = sh._lastMigration( collB )
 
+var bulk = collB.initializeUnorderedBulkOp();
 for( var i = 0; i < 1000000; i++ ){
-    collB.insert({ _id : i, hello : "world" })
+    bulk.insert({ _id: i, hello: "world" });
 }
+assert.writeOK(bulk.execute());
 
 printjson( lastMigration )
 printjson( sh._lastMigration( collB ) )

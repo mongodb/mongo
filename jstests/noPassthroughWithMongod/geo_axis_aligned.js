@@ -17,15 +17,14 @@ centers = []
 bounds = []
 
 for( var s = 0; s < scale.length; s++ ){
-	for ( var i = 0; i < radius.length; i++ ) {
-		radii.push( radius[i] * scale[s] )
-	}
-	
-	for ( var j = 0; j < center.length; j++ ) {
-		centers.push( [ center[j][0] * scale[s], center[j][1] * scale[s] ] )
-		bounds.push( [ bound[j][0] * scale[s], bound[j][1] * scale[s] ] )
-	}	
+    for ( var i = 0; i < radius.length; i++ ) {
+        radii.push( radius[i] * scale[s] )
+    }
 
+    for ( var j = 0; j < center.length; j++ ) {
+        centers.push( [ center[j][0] * scale[s], center[j][1] * scale[s] ] )
+        bounds.push( [ bound[j][0] * scale[s], bound[j][1] * scale[s] ] )
+    }
 }
 
 radius = radii
@@ -34,75 +33,74 @@ bound = bounds
 
 
 for ( var b = 0; b < bits.length; b++ ) {
-	
-	
-	printjson( radius )
-	printjson( centers )
-	
-	for ( var i = 0; i < radius.length; i++ ) {
-		for ( var j = 0; j < center.length; j++ ) {
-			
-			printjson( { center : center[j], radius : radius[i], bits : bits[b] } );
+    printjson( radius )
+    printjson( centers )
 
-			t.drop()
-			
-			// Make sure our numbers are precise enough for this test
-			if( (center[j][0] - radius[i] == center[j][0]) || (center[j][1] - radius[i] == center[j][1]) )
-				continue;
-			
-			t.save( { "_id" : 1, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] } } );
-			t.save( { "_id" : 2, "loc" : { "x" : center[j][0], "y" : center[j][1] } } );
-			t.save( { "_id" : 3, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] } } );
-			t.save( { "_id" : 4, "loc" : { "x" : center[j][0], "y" : center[j][1] + radius[i] } } );
-			t.save( { "_id" : 5, "loc" : { "x" : center[j][0], "y" : center[j][1] - radius[i] } } );
-			t.save( { "_id" : 6, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] + radius[i] } } );
-			t.save( { "_id" : 7, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] + radius[i] } } );
-			t.save( { "_id" : 8, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] - radius[i] } } );
-			t.save( { "_id" : 9, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] - radius[i] } } );
+    for ( var i = 0; i < radius.length; i++ ) {
+        for ( var j = 0; j < center.length; j++ ) {
+            printjson( { center : center[j], radius : radius[i], bits : bits[b] } );
 
-			t.ensureIndex( { loc : "2d" }, { max : bound[j][1], min : bound[j][0], bits : bits[b] } );
-			
-			if( db.getLastError() ) continue;
-			
-			print( "DOING WITHIN QUERY ")
-			r = t.find( { "loc" : { "$within" : { "$center" : [ center[j], radius[i] ] } } } );
-			
-			//printjson( r.toArray() );
-			
-			assert.eq( 5, r.count() );
+            t.drop()
 
-			// FIXME: surely code like this belongs in utils.js.
-			a = r.toArray();
-			x = [];
-			for ( k in a )
-				x.push( a[k]["_id"] )
-			x.sort()
-			assert.eq( [ 1, 2, 3, 4, 5 ], x );
+            // Make sure our numbers are precise enough for this test
+            if( (center[j][0] - radius[i] == center[j][0]) || (center[j][1] - radius[i] == center[j][1]) )
+                continue;
 
-			print( " DOING NEAR QUERY ")
-			//printjson( center[j] )
-			r = t.find( { loc : { $near : center[j], $maxDistance : radius[i] } }, { _id : 1 } )
-			assert.eq( 5, r.count() );
-			
-			print( " DOING DIST QUERY ")
-			
-			a = db.runCommand({ geoNear : "axisaligned", near : center[j], maxDistance : radius[i] }).results
-			assert.eq( 5, a.length );
-			
-			//printjson( a );
-			
-			var distance = 0;
-			for( var k = 0; k < a.length; k++ ){
-				//print( a[k].dis )
-				//print( distance )
-				assert.gte( a[k].dis, distance );
-				//printjson( a[k].obj )
-				//print( distance = a[k].dis );
-			}
-			
-			r = t.find( { loc : { $within : { $box : [ [ center[j][0] - radius[i], center[j][1] - radius[i] ], [ center[j][0] + radius[i], center[j][1] + radius[i] ] ] } } }, { _id : 1 } )
-			assert.eq( 9, r.count() );
+            t.save( { "_id" : 1, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] } } );
+            t.save( { "_id" : 2, "loc" : { "x" : center[j][0], "y" : center[j][1] } } );
+            t.save( { "_id" : 3, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] } } );
+            t.save( { "_id" : 4, "loc" : { "x" : center[j][0], "y" : center[j][1] + radius[i] } } );
+            t.save( { "_id" : 5, "loc" : { "x" : center[j][0], "y" : center[j][1] - radius[i] } } );
+            t.save( { "_id" : 6, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] + radius[i] } } );
+            t.save( { "_id" : 7, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] + radius[i] } } );
+            t.save( { "_id" : 8, "loc" : { "x" : center[j][0] - radius[i], "y" : center[j][1] - radius[i] } } );
+            t.save( { "_id" : 9, "loc" : { "x" : center[j][0] + radius[i], "y" : center[j][1] - radius[i] } } );
 
-		}
-	}
+            var res = t.ensureIndex({ loc: "2d" },
+                                    { max: bound[j][1],
+                                      min : bound[j][0],
+                                      bits : bits[b] });
+
+            // ensureIndex fails when this iteration inserted coordinates that are out of bounds.
+            // These are invalid cases, so we skip them.
+            if (!res.ok) continue;
+
+            print( "DOING WITHIN QUERY ")
+            r = t.find( { "loc" : { "$within" : { "$center" : [ center[j], radius[i] ] } } } );
+
+            assert.eq( 5, r.count() );
+
+            // FIXME: surely code like this belongs in utils.js.
+            a = r.toArray();
+            x = [];
+            for ( k in a )
+                x.push( a[k]["_id"] )
+            x.sort()
+            assert.eq( [ 1, 2, 3, 4, 5 ], x );
+
+            print( " DOING NEAR QUERY ")
+            //printjson( center[j] )
+            r = t.find( { loc : { $near : center[j], $maxDistance : radius[i] } }, { _id : 1 } )
+            assert.eq( 5, r.count() );
+
+            print( " DOING DIST QUERY ")
+
+            a = db.runCommand({ geoNear : "axisaligned", near : center[j], maxDistance : radius[i] }).results
+            assert.eq( 5, a.length );
+
+            var distance = 0;
+            for( var k = 0; k < a.length; k++ ){
+                assert.gte( a[k].dis, distance );
+
+            }
+
+            r = t.find({ loc: { $within: { $box: [ [ center[j][0] - radius[i],
+                                                     center[j][1] - radius[i] ],
+                                                   [ center[j][0] + radius[i],
+                                                     center[j][1] + radius[i] ]]}}},
+                       { _id: 1 } );
+            assert.eq( 9, r.count() );
+
+        }
+    }
 }

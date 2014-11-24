@@ -38,9 +38,11 @@ var secondDB = second.getDB('bgIndexSec');
 var size = 500000;
 
 jsTest.log("creating test data " + size + " documents");
+var bulk = masterDB.jstests_bgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
-    masterDB.jstests_bgsec.save( {i:i} );
+    bulk.insert({ i: i });
 }
+assert.writeOK(bulk.execute());
 
 jsTest.log("Starting background indexing");
 masterDB.jstests_bgsec.ensureIndex( {i:1}, {background:true} );

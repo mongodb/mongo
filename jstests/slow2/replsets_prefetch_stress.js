@@ -8,8 +8,7 @@ replTest.initiate();
 var master = replTest.getMaster();
 c = master.getDB( 'd' )[ 'c' ];
 
-c.insert( { _id:0 } );
-master.getDB( 'd' ).getLastError();
+assert.writeOK(c.insert({ _id: 0 }));
 replTest.awaitReplication();
 
 // Create a:1 index.
@@ -22,10 +21,11 @@ for( i = 0; i < 10000; ++i ) {
 }
 
 // Insert documents with multikey values.
+var bulk = c.initializeUnorderedBulkOp();
 for( i = 0; i < 1000; ++i ) {
-    c.insert( { a:multikeyValues } );
+    bulk.insert({ a: multikeyValues });
 }
-master.getDB( 'd' ).getLastError();
+assert.writeOK(bulk.execute());
 replTest.awaitReplication(300000);
 
 // Check document counts on all nodes.  On error a node might go down or fail to sync all data, see

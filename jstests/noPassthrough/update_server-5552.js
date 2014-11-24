@@ -1,5 +1,3 @@
-
-
 load( "jstests/libs/slow_weekly_util.js" )
 testServer = new SlowWeeklyMongod( "update_server-5552" )
 db = testServer.getDB( "test" );
@@ -9,9 +7,11 @@ t.drop()
 
 N = 10000;
 
-for ( i=0; i<N; i++ ) 
-    t.insert( { _id : i , x : 1 } )
-db.getLastError();
+var bulk = t.initializeUnorderedBulkOp();
+for ( i=0; i<N; i++ ) {
+    bulk.insert({ _id: i, x: 1 });
+}
+assert.writeOK(bulk.execute());
 
 join = startParallelShell( "while( db.foo.findOne( { _id : 0 } ).x == 1 ); db.foo.ensureIndex( { x : 1 } );" )
 

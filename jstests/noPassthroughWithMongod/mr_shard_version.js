@@ -11,11 +11,12 @@ var numDocs = 500000
 var numKeys = 1000
 var numTests = 3
 
+var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < numDocs; i++ ){
-    coll.insert({ _id : i, key : "" + ( i % numKeys ), value : i % numKeys })
+    bulk.insert({ _id: i, key: "" + ( i % numKeys ), value: i % numKeys });
 }
+assert.writeOK(bulk.execute());
 
-assert.eq( null, coll.getDB().getLastError() )
 assert.eq( numDocs, coll.find().itcount() )
 
 var halfId = coll.find().itcount() / 2

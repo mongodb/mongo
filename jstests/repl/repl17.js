@@ -11,7 +11,6 @@ md = master.getDB( 'd' );
 for( i = 0; i < 1000; ++i ) {
     md[ ''+i ].save( {} );
 }
-md.getLastError();
 
 slave = rt.start( false );
 sd = slave.getDB( 'd' );

@@ -59,18 +59,15 @@ function work() {
     log("work");
     try {
         var d = conn.getDB("test");
-        
-        big = new Array( 5000 ).toString();
+        var big = new Array( 5000 ).toString();
+        var bulk = d.foo.initializeUnorderedBulkOp();
         // This part of the test depends on the partition size used in the build env
         // Currently, unused, but with larger partitions insert enough documents here
         // to create a second db file
-        for( i = 0; i < 1; ++i ) {
-            d.foo.insert( { _id:i, b:big } );
+        for( i = 0; i < 10000; ++i ) {
+            bulk.insert({ _id: i, b: big });
         }
-        
-        gle = d.getLastError();
-        if ( gle )
-            throw gle;
+        assert.writeOK(bulk.execute());
     } catch ( e ) {
         print( e );
         raise( e );

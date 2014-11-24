@@ -12,11 +12,14 @@ S = ""
 while ( S.length < 500 )
     S += "123123312312";
 
+var bulk = db.foo.initializeUnorderedBulkOp();
+var bulk2 = db.bar.initializeUnorderedBulkOp();
 for ( i=0; i<N; i++ ){
-    db.foo.insert( { _id : i , s : S } )
-    db.bar.insert( { _id : i , s : S , s2 : S } )
-    db.getLastError()
+    bulk.insert({ _id: i, s: S });
+    bulk2.insert({ _id: i, s: S, s2: S });
 }
+assert.writeOK(bulk.execute());
+assert.writeOK(bulk2.execute());
 
 db.printShardingStatus()
 

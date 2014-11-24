@@ -26,9 +26,11 @@ print( "Shell ==== Creating test.query_yield2 collection ..." );
 print( "Shell ==== Adding documents until a time-wasting query takes over 2 seconds to complete" );
 while ( true ){
     function fill() {
+        var bulk = t.initializeUnorderedBulkOp();
         for ( ; i < N; ++i ) {
-            t.insert( { _id : i , n : 1 } )
+            bulk.insert({ _id: i , n: 1 });
         }
+        assert.writeOK(bulk.execute());
     }
     function timeQuery() {
         return Date.timeFunc( 
@@ -100,7 +102,7 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ) {
     if ( num == 0 ) {
         print( "Shell ==== Starting loop " + num + ", inserting 1 document" );
     }
-    insertTime = Date.timeFunc( function() { t.insert( { x : 1 } ); db.getLastError(); } );
+    insertTime = Date.timeFunc( function() { t.insert({ x: 1 } ); });
     currentOp = db.currentOp();
     len = currentOp.inprog.length;
     print( "Shell ==== Time to insert document " + num + " was " + insertTime + " ms, db.currentOp().inprog.length is " + len );

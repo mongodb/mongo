@@ -41,9 +41,7 @@ function doTest() {
     //assert.eq(1, m.getDB(db.getName()).fsync2.count());
     
     assert( m.getDB("admin").$cmd.sys.unlock.findOne().ok );
-    
-    db.getLastError();
-    
+
     assert.eq( 2, db.fsync2.count() );
     
 }

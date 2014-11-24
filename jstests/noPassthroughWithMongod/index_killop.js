@@ -5,10 +5,11 @@ t.drop();
 
 // Insert a large number of documents, enough to ensure that an index build on these documents will
 // be interrupted before complete.
+var bulk = t.initializeUnorderedBulkOp();
 for( i = 0; i < 1e6; ++i ) {
-    t.save( { a:i } );
+    bulk.insert({ a: i });
 }
-db.getLastError();
+assert.writeOK(bulk.execute());
 
 function debug( x ) {
 //    printjson( x );
@@ -23,7 +24,7 @@ function getIndexBuildOpId() {
                         // Identify the index build as an insert into the 'test.system.indexes'
                         // namespace.  It is assumed that no other clients are concurrently
                         // accessing the 'test' database.
-                        if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
+                        if ( op.op == 'query' && 'createIndexes' in op.query ) {
                             debug( op.opid );
                             indexBuildOpId = op.opid;
                         }
@@ -33,9 +34,8 @@ function getIndexBuildOpId() {
 
 /** Test that building an index with @param 'options' can be aborted using killop. */
 function testAbortIndexBuild( options ) {
-
-    // Create an index asynchronously by using a new connection.
-    new Mongo( db.getMongo().host ).getCollection( t.toString() ).createIndex( { a:1 }, options );
+    var createIdx = startParallelShell('var coll = db.jstests_slownightly_index_killop; \
+                                        coll.createIndex({ a: 1 }, ' + tojson(options) + ');');
 
     // When the index build starts, find its op id.
     assert.soon( function() { return ( opId = getIndexBuildOpId() ) != -1; } );
@@ -44,6 +44,8 @@ function testAbortIndexBuild( options ) {
 
     // Wait for the index build to stop.
     assert.soon( function() { return getIndexBuildOpId() == -1; } );
+    createIdx();
+
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
     assert.eq( [ { _id:1 } ], t.getIndexKeys() );
