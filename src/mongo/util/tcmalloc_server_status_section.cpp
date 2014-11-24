@@ -39,7 +39,9 @@ namespace {
         TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
         virtual bool includeByDefault() const { return false; }
         
-        virtual BSONObj generateSection(const BSONElement& configElement) const {
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const {
+
             BSONObjBuilder builder;
 
             // For a list of properties see the "Generic Tcmalloc Status" section of

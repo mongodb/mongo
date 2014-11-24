@@ -74,7 +74,8 @@ namespace mongo {
          * @param configElement the element from the actual command related to this section
          *                      so if the section is 'foo', this is cmdObj['foo']
          */
-        virtual BSONObj generateSection(const BSONElement& configElement) const = 0;
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const = 0;
 
     private:
         const std::string _sectionName;
@@ -85,7 +86,8 @@ namespace mongo {
         OpCounterServerStatusSection( const std::string& sectionName, OpCounters* counters );
         virtual bool includeByDefault() const { return true; }
         
-        virtual BSONObj generateSection(const BSONElement& configElement) const;
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const;
 
     private:
         const OpCounters* _counters;

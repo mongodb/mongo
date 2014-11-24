@@ -725,9 +725,13 @@ namespace mongo {
             DurSSS() : ServerStatusSection( "dur" ){}
             virtual bool includeByDefault() const { return true; }
             
-            BSONObj generateSection(const BSONElement& configElement) const {
-                if (!storageGlobalParams.dur)
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
+
+                if (!storageGlobalParams.dur) {
                     return BSONObj();
+                }
+
                 return dur::stats.asObj();
             }
                 

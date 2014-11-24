@@ -57,11 +57,13 @@ namespace mongo {
     }
 
     BSONObj WiredTigerServerStatusSection::generateSection(
-        const BSONElement& configElement) const {
+                OperationContext* txn,
+                const BSONElement& configElement) const {
 
-        boost::scoped_ptr<WiredTigerRecoveryUnit> recoveryUnit(
-            dynamic_cast<WiredTigerRecoveryUnit*>(_engine->newRecoveryUnit()));
-        WiredTigerSession* session = recoveryUnit->getSession();
+        WiredTigerSession* session =
+            dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession();
+        invariant(session);
+
         WT_SESSION* s = session->getSession();
         invariant(s);
         const string uri = "statistics:";

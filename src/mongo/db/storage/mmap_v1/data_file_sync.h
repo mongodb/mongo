@@ -45,7 +45,8 @@ namespace mongo {
 
         void run();
 
-        virtual BSONObj generateSection(const BSONElement& configElement) const;
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const;
 
     private:
         void _flushed(int ms);

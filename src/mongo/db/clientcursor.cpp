@@ -323,11 +323,13 @@ namespace mongo {
         CursorServerStats() : ServerStatusSection( "cursors" ){}
         virtual bool includeByDefault() const { return true; }
 
-        BSONObj generateSection(const BSONElement& configElement) const {
+        BSONObj generateSection(OperationContext* txn,
+                                const BSONElement& configElement) const {
             BSONObjBuilder b;
             _appendCursorStats( b );
             return b.obj();
         }
+
     } cursorServerStats;
 
 } // namespace mongo

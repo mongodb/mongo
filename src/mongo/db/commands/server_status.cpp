@@ -118,7 +118,7 @@ namespace mongo {
                 if ( ! include )
                     continue;
                 
-                BSONObj data = section->generateSection(e);
+                BSONObj data = section->generateSection(txn, e);
                 if ( data.isEmpty() )
                     continue;
 
@@ -187,7 +187,8 @@ namespace mongo {
         : ServerStatusSection( sectionName ), _counters( counters ){
     }
 
-    BSONObj OpCounterServerStatusSection::generateSection(const BSONElement& configElement) const {
+    BSONObj OpCounterServerStatusSection::generateSection(OperationContext* txn,
+                                                          const BSONElement& configElement) const {
         return _counters->getObj();
     }
     
@@ -203,7 +204,9 @@ namespace mongo {
             Connections() : ServerStatusSection( "connections" ){}
             virtual bool includeByDefault() const { return true; }
             
-            BSONObj generateSection(const BSONElement& configElement) const {
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
+
                 BSONObjBuilder bb;
                 bb.append( "current" , Listener::globalTicketHolder.used() );
                 bb.append( "available" , Listener::globalTicketHolder.available() );
@@ -218,7 +221,9 @@ namespace mongo {
             ExtraInfo() : ServerStatusSection( "extra_info" ){}
             virtual bool includeByDefault() const { return true; }
             
-            BSONObj generateSection(const BSONElement& configElement) const {
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
+
                 BSONObjBuilder bb;
                 
                 bb.append("note", "fields vary by platform");
@@ -227,6 +232,7 @@ namespace mongo {
                 
                 return bb.obj();
             }
+
         } extraInfo;
 
 
@@ -235,7 +241,9 @@ namespace mongo {
             Asserts() : ServerStatusSection( "asserts" ){}
             virtual bool includeByDefault() const { return true; }
             
-            BSONObj generateSection(const BSONElement& configElement) const {
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
+
                 BSONObjBuilder asserts;
                 asserts.append( "regular" , assertionCount.regular );
                 asserts.append( "warning" , assertionCount.warning );
@@ -253,7 +261,9 @@ namespace mongo {
             Network() : ServerStatusSection( "network" ){}
             virtual bool includeByDefault() const { return true; }
             
-            BSONObj generateSection(const BSONElement& configElement) const {
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
+
                 BSONObjBuilder b;
                 networkCounter.append( b );
                 return b.obj();
@@ -267,7 +277,8 @@ namespace mongo {
             Security() : ServerStatusSection( "security" ) {}
             virtual bool includeByDefault() const { return true; }
 
-            BSONObj generateSection(const BSONElement& configElement) const {
+            BSONObj generateSection(OperationContext* txn,
+                                    const BSONElement& configElement) const {
                 BSONObj result;
                 if (getSSLManager()) {
                     result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();

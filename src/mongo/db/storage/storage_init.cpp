@@ -33,8 +33,8 @@
 
 namespace mongo {
 
-    // TODO: Does this belong here?
-    namespace {
+// TODO: Does this belong here?
+namespace {
 
         class StorageSSS : public ServerStatusSection {
         public:
@@ -45,12 +45,13 @@ namespace mongo {
 
             virtual bool includeByDefault() const { return true; }
 
-            virtual BSONObj generateSection(const BSONElement& configElement) const {
+            virtual BSONObj generateSection(OperationContext* txn,
+                                            const BSONElement& configElement) const {
+
                 return BSON( "name" << storageGlobalParams.engine );
             }
 
         } storageSSS;
 
-    }  // namespace
-
+}  // namespace
 }  // namespace mongo

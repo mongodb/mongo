@@ -153,17 +153,18 @@ namespace mongo {
     void BackgroundJob::jobBody() {
 
         const string threadName = name();
-        if( ! threadName.empty() )
-            setThreadName( threadName.c_str() );
+        if (!threadName.empty()) {
+            setThreadName(threadName.c_str());
+        }
 
         LOG(1) << "BackgroundJob starting: " << threadName << endl;
 
         try {
             run();
         }
-        catch ( std::exception& e ) {
+        catch (const std::exception& e) {
             error() << "backgroundjob " << threadName << " exception: " << e.what();
-            throw e;
+            throw;
         }
 
         // We must cache this value so that we can use it after we leave the following scope.

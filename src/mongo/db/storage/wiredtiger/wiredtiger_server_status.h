@@ -43,7 +43,8 @@ namespace mongo {
     public:
         WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
         virtual bool includeByDefault() const;
-        virtual BSONObj generateSection(const BSONElement& configElement) const;
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const;
     private:
         WiredTigerKVEngine* _engine;
     };

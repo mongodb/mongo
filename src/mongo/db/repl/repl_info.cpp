@@ -139,18 +139,21 @@ namespace repl {
         ReplicationInfoServerStatus() : ServerStatusSection( "repl" ){}
         bool includeByDefault() const { return true; }
         
-        BSONObj generateSection(const BSONElement& configElement) const {
-            if ( ! getGlobalReplicationCoordinator()->isReplEnabled() )
+        BSONObj generateSection(OperationContext* txn,
+                                const BSONElement& configElement) const {
+
+            if (!getGlobalReplicationCoordinator()->isReplEnabled()) {
                 return BSONObj();
+            }
             
             int level = configElement.numberInt();
             
             BSONObjBuilder result;
+            appendReplicationInfo(txn, result, level);
 
-            OperationContextImpl txn;   // XXX?
-            appendReplicationInfo(&txn, result, level);
             return result.obj();
         }
+
     } replicationInfoServerStatus;
 
     class OplogInfoServerStatus : public ServerStatusSection {
@@ -158,19 +161,21 @@ namespace repl {
         OplogInfoServerStatus() : ServerStatusSection( "oplog" ){}
         bool includeByDefault() const { return false; }
 
-        BSONObj generateSection(const BSONElement& configElement) const {
+        BSONObj generateSection(OperationContext* txn,
+                                const BSONElement& configElement) const {
+
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             if (!replCoord->isReplEnabled()) {
                 return BSONObj();
             }
 
-            OperationContextImpl txn;
             BSONObjBuilder result;
             result.append("latestOptime", replCoord->getMyLastOptime());
+
             BSONObj o;
             uassert(17347,
                     "Problem reading earliest entry from oplog",
-                    Helpers::getSingleton(&txn, rsoplog, o));
+                    Helpers::getSingleton(txn, rsoplog, o));
             result.append("earliestOptime", o["ts"]._opTime());
             return result.obj();
         }

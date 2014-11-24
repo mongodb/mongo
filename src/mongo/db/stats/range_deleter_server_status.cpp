@@ -56,7 +56,9 @@ namespace mongo {
         RangeDeleterServerStatusSection() : ServerStatusSection( "rangeDeleter" ){}
         bool includeByDefault() const { return false; }
 
-        BSONObj generateSection(const BSONElement& configElement) const {
+        BSONObj generateSection(OperationContext* txn,
+                                const BSONElement& configElement) const {
+
             RangeDeleter* deleter = getDeleter();
             if (!deleter) {
                 return BSONObj();
@@ -93,5 +95,6 @@ namespace mongo {
 
             return result.obj();
         }
+
     } rangeDeleterServerStatusSection;
 }

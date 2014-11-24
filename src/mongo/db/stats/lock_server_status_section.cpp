@@ -77,7 +77,9 @@ namespace mongo {
 
         virtual bool includeByDefault() const { return true; }
 
-        virtual BSONObj generateSection(const BSONElement& configElement) const {
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const {
+
             BSONObjBuilder t;
 
             t.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
@@ -126,7 +128,9 @@ namespace mongo {
         LockStatsServerStatusSection() : ServerStatusSection("locks"){}
         virtual bool includeByDefault() const { return true; }
 
-        BSONObj generateSection(const BSONElement& configElement) const {
+        BSONObj generateSection(OperationContext* txn,
+                                const BSONElement& configElement) const {
+
             BSONObjBuilder b;
 
             // SERVER-14978: Need to report the global and per-DB lock stats here
