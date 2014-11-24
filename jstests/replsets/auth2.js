@@ -1,72 +1,40 @@
+
+var testInvalidAuthStates = function() {
+    print("check that 0 is in recovering");
+    rs.waitForState(rs.nodes[0], rs.RECOVERING);
+
+    print("shut down 1, 0 still in recovering.");
+    rs.stop(1);
+    sleep(5);
+
+    rs.waitForState(rs.nodes[0], rs.RECOVERING);
+
+    print("shut down 2, 0 becomes a secondary.");
+    rs.stop(2);
+
+    rs.waitForState(rs.nodes[0], rs.SECONDARY);
+
+    rs.restart(1, {"keyFile" : path+"key1"});
+    rs.restart(2, {"keyFile" : path+"key1"});
+};
+
 var name = "rs_auth2";
-var port = allocatePorts(3);
 var path = "jstests/libs/";
 
 print("change permissions on #1 & #2");
 run("chmod", "600", path+"key1");
 run("chmod", "600", path+"key2");
 
-var setupReplSet = function() {
-    print("start up rs");
-    var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
-    rs.startSet();
-    rs.initiate();
+var rs = new ReplSetTest({name: name, nodes: 3});
+var nodes = rs.startSet();
+var hostnames = rs.nodeList();
+rs.initiate({ "_id" : name,
+                    "members" : [
+                        {"_id" : 0, "host" : hostnames[0], "priority" : 2},
+                        {"_id" : 1, "host" : hostnames[1]},
+                        {"_id" : 2, "host" : hostnames[2]}
+                    ]});
 
-    print("getting master");
-    rs.getMaster();
-
-    print("getting secondaries");
-    assert.soon(function() {
-        var result1 = rs.nodes[1].getDB("admin").runCommand({isMaster: 1});
-        var result2 = rs.nodes[2].getDB("admin").runCommand({isMaster: 1});
-        return result1.secondary && result2.secondary;
-    });
-
-    return rs;
-};
-
-var testInvalidAuthStates = function() {
-    print("check that 0 is in recovering");
-    assert.soon(function() {
-        try {
-            var result = m.adminCommand({isMaster: 1});
-            printjson(result);
-            printjson(m.adminCommand("replSetGetStatus"));
-            printjson(rs.nodes[1].adminCommand("replSetGetStatus"));
-            printjson(rs.nodes[2].adminCommand("replSetGetStatus"));
-            return !result.ismaster && !result.secondary;
-        }
-        catch ( e ) {
-            print( e );
-        }
-    }, "node0 isn't recovering");
-
-    print("shut down 1, 0 still in recovering.");
-    rs.stop(1);
-    sleep(5);
-
-    assert.soon(function() {
-        var result = m.adminCommand({isMaster: 1});
-        printjson(m.adminCommand("replSetGetStatus"));
-        printjson(result);
-        return !result.ismaster && !result.secondary;
-    }, "node0 isn't recovering");
-
-    print("shut down 2, 0 becomes a secondary.");
-    rs.stop(2);
-
-    assert.soon(function() {
-        var result = m.adminCommand({isMaster: 1});
-        printjson(m.adminCommand("replSetGetStatus"));
-        printjson(result);
-        return result.secondary;
-    }, "node0 isn't secondary");
-
-    rs.restart(1, {"keyFile" : path+"key1"});
-    rs.restart(2, {"keyFile" : path+"key1"});
-};
-
-var rs = setupReplSet();
 var master = rs.getMaster();
 
 print("add an admin user");
