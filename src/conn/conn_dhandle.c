@@ -619,7 +619,7 @@ err:	session->dhandle = NULL;
  *	Remove a handle from the shared list.
  */
 static int
-__conn_dhandle_remove(WT_SESSION_IMPL *session)
+__conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -628,6 +628,10 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session)
 	dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+
+	/* Check if the handle was reacquired by a session while we waited. */
+	if (!final && dhandle->session_ref != 0)
+		return (EBUSY);
 
 	SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 	return (0);
@@ -639,7 +643,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session)
  *	Close/discard a single data handle.
  */
 int
-__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session)
+__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -649,8 +653,15 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session)
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
 
+	/*
+	 * Kludge: interrupt the eviction server in case it is holding the
+	 * handle list lock.
+	 */
+	F_SET(S2C(session)->cache, WT_EVICT_CLEAR_WALKS);
+
 	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_DHANDLE_LOCK(session, ret = __conn_dhandle_remove(session));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __conn_dhandle_remove(session, final));
 
 	/*
 	 * After successfully removing the handle, clean it up.
@@ -696,7 +707,7 @@ restart:
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
 		goto restart;
 	}
 
@@ -712,7 +723,7 @@ restart:
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
 
 	return (ret);
 }

@@ -44,11 +44,11 @@ __session_dhandle_decr_use(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_add_btree --
+ * __session_add_dhandle --
  *	Add a handle to the session's cache.
  */
 static int
-__session_add_btree(
+__session_add_dhandle(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
@@ -367,7 +367,7 @@ __session_dhandle_find(WT_SESSION_IMPL *session,
     const char *uri, const char *checkpoint, uint32_t flags)
 {
 	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint, flags));
-	return (__session_add_btree(session, NULL));
+	return (__session_add_dhandle(session, NULL));
 }
 
 /*
@@ -438,7 +438,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_RET(ret);
 
 	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
-		WT_RET(__session_add_btree(session, NULL));
+		WT_RET(__session_add_dhandle(session, NULL));
 
 	/* Sweep the handle list to remove any dead handles. */
 	WT_RET(__session_dhandle_sweep(session, flags));
