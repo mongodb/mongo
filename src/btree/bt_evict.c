@@ -831,13 +831,13 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int max_entries, old_slot, retries, slot;
-	int incr, locked;
+	int incr, dhandle_locked;
 	WT_DECL_SPINLOCK_ID(id);
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
 	dhandle = NULL;
-	incr = locked = 0;
+	incr = dhandle_locked = 0;
 	retries = 0;
 
 	/* Increment the shared read generation. */
@@ -875,11 +875,11 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * Lock the dhandle list to find the next handle and bump its
 		 * reference count to keep it alive while we sweep.
 		 */
-		if (!locked) {
+		if (!dhandle_locked) {
 			if ((ret = __wt_spin_trylock(
 			    session, &conn->dhandle_lock, &id)) != 0)
 				break;
-			locked = 1;
+			dhandle_locked = 1;
 		}
 
 		if (dhandle == NULL)
@@ -938,7 +938,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
 		incr = 1;
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		locked = 0;
+		dhandle_locked = 0;
 
 		__wt_spin_lock(session, &cache->evict_walk_lock);
 
@@ -970,9 +970,9 @@ retry:	while (slot < max_entries && ret == 0) {
 		incr = 0;
 	}
 
-	if (locked) {
+	if (dhandle_locked) {
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		locked = 0;
+		dhandle_locked = 0;
 	}
 
 	/*
