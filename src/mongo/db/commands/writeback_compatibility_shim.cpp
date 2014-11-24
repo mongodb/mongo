@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -87,7 +88,7 @@ namespace mongo {
 
             // Prevent v2.6 mongos from spamming writebacklisten retries
             const int kSleepSecsBeforeMessage = 5;
-            sleep(kSleepSecsBeforeMessage);
+            sleepsecs(kSleepSecsBeforeMessage);
 
             return appendCommandStatus(result, Status(ErrorCodes::CommandNotFound, errMsg));
         }
