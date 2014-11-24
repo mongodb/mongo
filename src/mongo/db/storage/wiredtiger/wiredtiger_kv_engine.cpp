@@ -36,6 +36,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"

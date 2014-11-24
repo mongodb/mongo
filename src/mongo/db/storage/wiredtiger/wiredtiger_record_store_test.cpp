@@ -33,6 +33,7 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record_store_test_harness.h"

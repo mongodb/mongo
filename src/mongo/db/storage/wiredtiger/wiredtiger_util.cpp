@@ -38,12 +38,39 @@
 #include <limits>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
     using std::string;
+
+    Status wtRCToStatus_slow(int retCode, const char* prefix ) {
+        if (retCode == 0)
+            return Status::OK();
+
+        if ( retCode == WT_ROLLBACK ) {
+            //printStackTrace();
+            throw WriteConflictException();
+        }
+
+        fassert( 28559, retCode != WT_PANIC );
+
+        str::stream s;
+        if ( prefix )
+            s << prefix << " ";
+        s << retCode << ": " << wiredtiger_strerror(retCode);
+
+        if (retCode == EINVAL) {
+            return Status(ErrorCodes::BadValue, s);
+        }
+
+        // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
+        return Status(ErrorCodes::UnknownError, s);
+    }
 
     int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s,
                                          const std::string& uri ) {

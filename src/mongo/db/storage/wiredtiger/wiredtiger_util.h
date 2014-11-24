@@ -34,10 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -47,6 +44,8 @@ namespace mongo {
         return false;
     }
 
+    Status wtRCToStatus_slow(int retCode, const char* prefix );
+
     /**
      * converts wiredtiger return codes to mongodb statuses.
      */
@@ -54,25 +53,7 @@ namespace mongo {
         if (MONGO_likely(retCode == 0))
             return Status::OK();
 
-
-        if ( retCode == WT_ROLLBACK ) {
-            //printStackTrace();
-            throw WriteConflictException();
-        }
-
-        fassert( 28559, retCode != WT_PANIC );
-
-        str::stream s;
-        if ( prefix )
-            s << prefix << " ";
-        s << retCode << ": " << wiredtiger_strerror(retCode);
-
-        if (retCode == EINVAL) {
-            return Status(ErrorCodes::BadValue, s);
-        }
-
-        // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
-        return Status(ErrorCodes::UnknownError, s);
+        return wtRCToStatus_slow(retCode, prefix);
     }
 
 #define invariantWTOK(expression) do { \

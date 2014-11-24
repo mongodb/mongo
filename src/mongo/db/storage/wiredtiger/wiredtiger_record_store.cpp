@@ -33,6 +33,7 @@
 
 #include <wiredtiger.h>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
@@ -42,8 +43,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
 //#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << x
