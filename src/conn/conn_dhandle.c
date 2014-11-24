@@ -131,6 +131,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	uint64_t hash;
 
+	WT_UNUSED(flags);	/* Only used in diagnostic builds */
 	conn = S2C(session);
 
 	/* We must be holding the handle list lock at a higher level. */
