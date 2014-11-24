@@ -12,6 +12,7 @@ assert.eq( 1 , s.config.chunks.count()  , "setup1" );
 s.config.settings.find().forEach( printjson )
 
 db = s.getDB( "test" );
+db.getMongo().forceWriteMode('legacy'); // SERVER-13402
 
 bigString = ""
 while ( bigString.length < 10000 )
@@ -115,7 +116,7 @@ function diff1(){
     var myid = doUpdate( bulk, false );
     var res = assert.writeOK(bulk.execute());
 
-    assert.eq( 1, res.nModified,
+    assert.eq( 1, res.nMatched, // SERVER-13001
                "diff myid: " + myid + " 2: " + res.toString() + "\n" +
                " correct count is: " + counts[myid] +
                " db says count is: " + tojson(db.foo.findOne({ _id: myid })) );

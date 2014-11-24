@@ -3,6 +3,7 @@ function setupMoveChunkTest(st) {
     st.stopBalancer();
 
     var testdb = st.getDB( "test" );
+    testdb.getMongo().forceWriteMode('legacy'); // SERVER-13402
     var testcoll = testdb.foo;
 
     st.adminCommand( { enablesharding : "test" } );
