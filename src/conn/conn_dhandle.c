@@ -618,7 +618,7 @@ err:	session->dhandle = NULL;
  *	Remove a handle from the shared list.
  */
 static int
-__conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
+__conn_dhandle_remove(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -626,16 +626,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	conn = S2C(session);
 	dhandle = session->dhandle;
 
-	WT_ASSERT(session,
-	    final || F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
-
-	/*
-	 * Check if the handle was reacquired by a session while we waited;
-	 * this should only happen when called from the periodic sweep code, of
-	 * course.
-	 */
-	if (!final && dhandle->session_ref != 0)
-		return (EBUSY);
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 	return (0);
@@ -647,29 +638,18 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
  *	Close/discard a single data handle.
  */
 int
-__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
+__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	dhandle = session->dhandle;
 
-	/*
-	 * We're called from the periodic sweep function and the final close;
-	 * the former wants to continue if the handle is suddenly found to be
-	 * busy, the latter wants to shut things down.
-	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		if (!final)
-			WT_ERR(EBUSY);
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
-	}
 
-	/*
-	 * Try to remove the handle, protected by the data handle lock.
-	 */
-	WT_WITH_DHANDLE_LOCK(session,
-	    ret = __conn_dhandle_remove(session, final));
+	/* Try to remove the handle, protected by the data handle lock. */
+	WT_WITH_DHANDLE_LOCK(session, ret = __conn_dhandle_remove(session));
 
 	/*
 	 * After successfully removing the handle, clean it up.
@@ -686,8 +666,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 
-err:	WT_ASSERT(session, !final || ret == 0);
-	return (ret);
+err:	return (ret);
 }
 
 /*
@@ -716,7 +695,7 @@ restart:
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session)));
 		goto restart;
 	}
 
@@ -732,7 +711,7 @@ restart:
 	/* Close the metadata file handle. */
 	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session)));
 
 	return (ret);
 }
