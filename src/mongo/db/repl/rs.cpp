@@ -835,15 +835,16 @@ namespace {
                 {
                     scoped_lock lck( replSettings.discoveredSeeds_mx );
                     if( replSettings.discoveredSeeds.size() > 0 ) {
-                        for (set<string>::iterator i = replSettings.discoveredSeeds.begin(); 
-                             i != replSettings.discoveredSeeds.end(); 
-                             i++) {
+                        for (set<string>::iterator i = replSettings.discoveredSeeds.begin();
+                             i != replSettings.discoveredSeeds.end();) {
                             try {
                                 configs.mutableVector().push_back( ReplSetConfig::make(HostAndPort(*i)) );
+                                ++i;
                             }
-                            catch( DBException& ) {
-                                LOG(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
-                                replSettings.discoveredSeeds.erase(*i);
+                            catch(const DBException& ex) {
+                                log() << "replSet exception trying to load config from "
+                                    "discovered seed " << *i << "; " << ex.toString() << rsLog;
+                                replSettings.discoveredSeeds.erase(*(i++));
                             }
                         }
                     }
