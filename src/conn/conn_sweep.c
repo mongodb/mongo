@@ -66,22 +66,12 @@ __sweep(WT_SESSION_IMPL *session)
 		WT_RET(ret);
 
 		/*
-		 * Check if the handle was reacquired by a session while we
-		 * waited.
-		 */
-		if (dhandle->session_ref != 0) {
-			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
-			continue;
-		}
-
-		/*
-		 * Attempt to discard the handle (the called function re-checks
-		 * the handle-open flag, which is why we don't do any special
-		 * handling of EBUSY returns above, that path never cleared the
-		 * handle-open flag.
+		 * Attempt to discard the handle.  The called function
+		 * re-checks that the handle is not in use, which is why we
+		 * don't do any special handling of EBUSY returns above.
 		 */
 		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __wt_conn_dhandle_discard_single(session));
+		    ret = __wt_conn_dhandle_discard_single(session, 0));
 
 		/* If the handle wasn't discarded, drop our lock. */
 		if (ret != 0)
