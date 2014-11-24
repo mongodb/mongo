@@ -170,12 +170,12 @@ namespace replset {
              ++it) {
             try {
                 if (!st->syncApply(*it, convertUpdatesToUpserts)) {
-                    fassertFailedNoTrace(18693);
+                    fassertFailedNoTrace(16359);
                 }
             } catch (const DBException& e) {
                 error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
-                fassertFailedNoTrace(18692);
+                fassertFailedNoTrace(16360);
             }
         }
     }
@@ -351,7 +351,7 @@ namespace replset {
                 else if (currentOpTime > endOpTime) {
                     severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
                             << " without seeing it. Rollback?" << rsLog;
-                    fassertFailedNoTrace(0);
+                    fassertFailedNoTrace(18693);
                 }
 
                 // apply replication batch limits
@@ -363,7 +363,7 @@ namespace replset {
 
             if (ops.empty()) {
                 severe() << "got no ops for batch...";
-                fassertFailedNoTrace(0);
+                fassertFailedNoTrace(18692);
             }
 
             const BSONObj lastOp = ops.back().getOwned();
