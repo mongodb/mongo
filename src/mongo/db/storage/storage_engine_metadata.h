@@ -49,15 +49,15 @@ namespace mongo {
 
         /**
          * Validates metadata in data directory against current storage engine.
-         * If the directory is empty, there is nothing to do.
-         * If the directory is not empty, do the following.
-         *     1) If the metadata file is missing, assume the existing data directory
-         *        has been initialized by the 'mmapv1' storage engine (created by a
-         *        server prior to 2.8).
-         *        Raise an error if the current storage engine is not 'mmapv1'.
-         *     2) If the metadata file exists, ensure that the information in the file
-         *        is consistent with the current storage engine. Otherwise, raise an error.
-         *     3) If the metadata file exists but is not readable (eg. corrupted), raise an error.
+         * 1) If the metadata file exists, ensure that the information in the file
+         *    is consistent with the current storage engine. Otherwise, raise an error.
+         * 2) If the metadata file exists but is not readable (eg. corrupted), raise an error.
+         * 3) If the metadata file does not exist, look for local.ns or local/local.ns
+         *    in the data directory. If we detect either file, raise an error
+         *    only if the current storage engine is not 'mmapv1'.
+         *    This makes validation more forgiving of situations where
+         *    application data is placed in the data directory prior
+         *    to server start up.
          */
         static void validate(const std::string& dbpath, const std::string& storageEngine);
 

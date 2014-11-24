@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <ios>
 #include <ostream>
@@ -179,6 +180,7 @@ namespace {
     }
 
     // Data directory is not empty but metadata is missing.
+    // Data directory contains local.ns.
     // Current storage engine is 'mmapv1'.
     TEST(StorageEngineMetadataTest, ValidateMissingMetadataStorageEngineMMapV1) {
         TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataStorageEngineMMapV1");
@@ -191,6 +193,7 @@ namespace {
     }
 
     // Data directory is not empty but metadata is missing.
+    // Data directory contains local.ns.
     // Current storage engine is not 'mmapv1'.
     TEST(StorageEngineMetadataTest, ValidateMissingMetadataStorageEngineNotMMapV1) {
         TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataStorageEngineNotMMapV1");
@@ -200,6 +203,60 @@ namespace {
             ofs << "unused data" << std::endl;
         }
         ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine1"), UserException);
+    }
+
+    // Data directory is not empty but metadata is missing.
+    // Data directory contains local/local.ns.
+    // Current storage engine is 'mmapv1'.
+    TEST(StorageEngineMetadataTest, ValidateMissingMetadataDirectoryPerDb1) {
+        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataDirectoryPerDb1");
+        {
+            boost::filesystem::create_directory(tempDir.path() + "/local");
+            std::string filename(tempDir.path() + "/local/local.ns");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+    }
+
+    // Data directory is not empty but metadata is missing.
+    // Data directory contains local.ns.
+    // Current storage engine is not 'mmapv1'.
+    TEST(StorageEngineMetadataTest, ValidateMissingMetadataDirectoryPerDb2) {
+        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataDirectoryPerDb2");
+        {
+            boost::filesystem::create_directory(tempDir.path() + "/local");
+            std::string filename(tempDir.path() + "/local/local.ns");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine1"), UserException);
+    }
+
+    // Data directory is not empty but metadata is missing.
+    // Data directory does not contain either local.ns or local/local.ns.
+    // Current storage engine is 'mmapv1'.
+    TEST(StorageEngineMetadataTest, ValidateMissingMetadataMissingMMapV1Files1) {
+        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataMissingMMapV1Files1");
+        {
+            std::string filename(tempDir.path() + "/user_data.txt");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+    }
+
+    // Data directory is not empty but metadata is missing.
+    // Data directory does not contain either local.ns or local/local.ns.
+    // Current storage engine is not 'mmapv1'.
+    TEST(StorageEngineMetadataTest, ValidateMissingMetadataMissingMMapV1Files2) {
+        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataMissingMMapV1Files2");
+        {
+            std::string filename(tempDir.path() + "/user_data.txt");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        StorageEngineMetadata::validate(tempDir.path(), "engine1");
     }
 
     TEST(StorageEngineMetadataTest, ValidateMetadataMatchesStorageEngine) {

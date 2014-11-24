@@ -52,30 +52,44 @@ namespace {
 
     const std::string kMetadataBasename = "storage.bson";
 
+    /**
+     * Returns true if local.ns is found in 'directory' or 'directory'/local/.
+     */
+    bool containsMMapV1LocalNsFile(const std::string& directory) {
+        boost::filesystem::path directoryPath(directory);
+        return boost::filesystem::exists(directoryPath / "local.ns") ||
+            boost::filesystem::exists((directoryPath / "local") / "local.ns");
+    }
+
 }  // namespace
 
     // static
     void StorageEngineMetadata::validate(const std::string& dbpath,
                                          const std::string& storageEngine) {
-        if (boost::filesystem::is_empty(dbpath)) {
+        std::string previousStorageEngine;
+        if (boost::filesystem::exists(boost::filesystem::path(dbpath) / kMetadataBasename)) {
+            StorageEngineMetadata metadata(dbpath);
+            Status status = metadata.read();
+            if (status.isOK()) {
+                previousStorageEngine = metadata.getStorageEngine();
+            }
+            else {
+                // The storage metadata file is present but there was an issue
+                // reading its contents.
+                severe() << "Unable to verify the storage engine";
+                uassertStatusOK(status);
+            }
+        }
+        else if (containsMMapV1LocalNsFile(dbpath)) {
+            previousStorageEngine = "mmapv1";
+
+        }
+        else {
+            // Directory contains neither metadata nor mmapv1 files.
+            // Allow validation to succeed.
             return;
         }
 
-        StorageEngineMetadata metadata(dbpath);
-        Status status = metadata.read();
-        std::string previousStorageEngine;
-        if (status.isOK()) {
-            previousStorageEngine = metadata.getStorageEngine();
-        }
-        else if (status.code() == ErrorCodes::NonExistentPath) {
-            previousStorageEngine = "mmapv1";
-        }
-        else {
-            // The storage metadata file is present but there was an issue
-            // reading its contents.
-            severe() << "Unable to verify the storage engine";
-            uassertStatusOK(status);
-        }
         uassert(28574, str::stream()
             << "Cannot start server. Detected data files in " << dbpath
             << " created by storage engine '" << previousStorageEngine
