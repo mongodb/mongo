@@ -58,7 +58,37 @@
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(newCollectionsUsePowerOf2Sizes, bool, true);
+    namespace {
+        bool newCollectionsUsePowerOf2SizesFlag = true; // Unused, needed for server parameter.
+
+        /**
+         * Declaration for the "newCollectionsUsePowerOf2Sizes" server parameter,
+         * which is now deprecated in 2.8.
+         * Note that:
+         * - setting to true performs a no-op.
+         * - setting to false will fail.
+         */
+        class NewCollectionsUsePowerOf2SizesParameter : public ExportedServerParameter<bool> {
+        public:
+            NewCollectionsUsePowerOf2SizesParameter() :
+                ExportedServerParameter<bool>(ServerParameterSet::getGlobal(),
+                "newCollectionsUsePowerOf2Sizes",
+                &newCollectionsUsePowerOf2SizesFlag,
+                true,
+                true) {}
+
+            virtual Status validate(const bool& potentialNewValue) {
+                if (!potentialNewValue) {
+                    return Status(ErrorCodes::BadValue,
+                        "newCollectionsUsePowerOf2Sizes cannot be set to false. "
+                        "Use noPadding instead during createCollection.");
+                }
+
+                return Status::OK();
+            }
+
+        } exportedNewCollectionsUsePowerOf2SizesParameter;
+    }
 
     /**
      * Registers the insertion of a new entry in the _collections cache with the RecoveryUnit,
@@ -618,8 +648,10 @@ namespace mongo {
             if ( options.flagsSet ) {
                 md.setUserFlag( txn, options.flags );
             }
-            else if ( newCollectionsUsePowerOf2Sizes ) {
-                md.setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
+            else {
+                // For compatibility with previous versions if the user sets no flags,
+                // we set Flag_UsePowerOf2Sizes in case the user downgrades
+                md.setUserFlag(txn, NamespaceDetails::Flag_UsePowerOf2Sizes);
             }
         }
         else if ( options.cappedMaxDocs > 0 ) {
