@@ -437,7 +437,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		__wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
 	WT_RET(ret);
 
-	if (!LF_SET(WT_DHANDLE_HAVE_REF))
+	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
 		WT_RET(__session_add_dhandle(session, NULL));
 
 	/* Sweep the handle list to remove any dead handles. */
