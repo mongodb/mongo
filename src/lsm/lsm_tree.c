@@ -23,6 +23,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 
+	WT_UNUSED(final);	/* Only used in diagnostic builds */
+
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		WT_ASSERT(session, final ||

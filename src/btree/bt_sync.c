@@ -294,7 +294,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			    page->modify != NULL &&
 			    !__wt_txn_visible_all(session,
 			    page->modify->rec_max_txn))
-				return (EBUSY);
+				WT_ERR(EBUSY);
 			if (syncop == WT_SYNC_DISCARD_FORCE)
 				F_SET(session, WT_SESSION_DISCARD_FORCE);
 			__wt_ref_out(session, ref);
