@@ -24,10 +24,9 @@ printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._i
 coll.ensureIndex({ sk : 1 });
 assert( admin.runCommand({ shardCollection : coll + "", key : { sk : 1 } }).ok );
 
-coll.insert({ _id : 12345, sk : 67890, hello : "world" });
-coll.update({ _id : 12345 }, { $set : { baz : 'biz' } });
-coll.update({ sk : 67890 }, { $set : { baz : 'boz' } });
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(coll.insert({ _id : 12345, sk : 67890, hello : "world" }));
+assert.writeOK(coll.update({ _id : 12345 }, { $set : { baz : 'biz' } }));
+assert.writeOK(coll.update({ sk : 67890 }, { $set : { baz : 'boz' } }));
 
 assert( admin.runCommand({ moveChunk : coll + "", 
                            find : { sk : 0 }, 

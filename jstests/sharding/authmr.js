@@ -20,19 +20,12 @@ var test1User = {
     roles: [{role: 'readWrite', db: 'test1', hasRole: true, canDelegate: false}]
 };
 
-function assertGLEOK(status) {
-    assert(status.ok && status.err === null,
-           "Expected OK status object; found " + tojson(status));
-}
-
 function assertRemove(collection, pattern) {
-    collection.remove(pattern);
-    assertGLEOK(collection.getDB().getLastErrorObj());
+    assert.writeOK(collection.remove(pattern));
 }
 
 function assertInsert(collection, obj) {
-    collection.insert(obj);
-    assertGLEOK(collection.getDB().getLastErrorObj());
+    assert.writeOK(collection.insert(obj));
 }
 
 var cluster = new ShardingTest("authwhere", 1, 0, 1,

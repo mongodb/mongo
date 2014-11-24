@@ -14,9 +14,21 @@ s.adminCommand( { enablesharding : "mrShard" } )
 s.adminCommand( { shardcollection : "mrShard.srcSharded", key : { "_id" : 1 } } )
 db = s.getDB( "mrShard" );
 
-for (j=0; j<100; j++) for (i=0; i<512; i++){ db.srcNonSharded.save({j:j, i:i})}
-for (j=0; j<100; j++) for (i=0; i<512; i++){ db.srcSharded.save({j:j, i:i})}
-db.getLastError();
+var bulk = db.srcNonSharded.initializeUnorderedBulkOp();
+for (j = 0; j < 100; j++) {
+    for (i = 0; i < 512; i++) {
+        bulk.insert({ j: j, i: i });
+    }
+}
+assert.writeOK(bulk.execute());
+
+bulk = db.srcSharded.initializeUnorderedBulkOp();
+for (j = 0; j < 100; j++) {
+    for (i = 0; i < 512; i++) {
+        bulk.insert({ j: j, i: i });
+    }
+}
+assert.writeOK(bulk.execute());
 
 function map() { emit(this.i, 1); }
 function reduce(key, values) { return Array.sum(values) } 

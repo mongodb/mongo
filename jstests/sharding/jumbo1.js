@@ -14,17 +14,17 @@ while ( big.length < 10000 )
     big += "."
 
 x = 0;
+var bulk = db.foo.initializeUnorderedBulkOp();
 for ( ; x < 500; x++ )
-    db.foo.insert( { x : x , big : big } )
+    bulk.insert( { x : x , big : big } );
 
 for ( i=0; i<500; i++ )
-    db.foo.insert( { x : x , big : big } )
+    bulk.insert( { x : x , big : big } );
 
 for ( ; x < 2000; x++ )
-    db.foo.insert( { x : x , big : big } )
+    bulk.insert( { x : x , big : big } );
 
-
-db.getLastError();
+assert.writeOK( bulk.execute() );
 
 sh.status(true)
 

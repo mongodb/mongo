@@ -31,11 +31,10 @@ assert( admin.runCommand({ split : coll + "", middle : { _id : 60 } }).ok );
 st.printShardingStatus();
 
 // Insert data to allow 0->20 and 40->60 to be merged, but too much for 20->40
-coll.insert({ _id : 0 });
-coll.insert({ _id : 20 });
-coll.insert({ _id : 30 });
-coll.insert({ _id : 40 });
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(coll.insert({ _id : 0 }));
+assert.writeOK(coll.insert({ _id : 20 }));
+assert.writeOK(coll.insert({ _id : 30 }));
+assert.writeOK(coll.insert({ _id : 40 }));
 
 jsTest.log( "Merging chunks with another empty chunk..." );
 

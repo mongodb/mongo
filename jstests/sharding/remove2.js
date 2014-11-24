@@ -110,11 +110,12 @@ var str = 'a';
 while( str.length < 1024 * 16 ) {
     str += str;
 }
-for( var i = 0; i < 300; i++ ){
-    coll.insert( { i : i % 10, str : str } );
-}
 
-coll.getDB().getLastError();
+var bulk = coll.initializeUnorderedBulkOp();
+for( var i = 0; i < 300; i++ ){
+    bulk.insert({ i: i % 10, str: str });
+}
+assert.writeOK(bulk.execute());
 
 assert.eq( 300, coll.find().itcount() );
 

@@ -26,9 +26,10 @@ s.adminCommand( { split : "test.foo" , middle : { _id : N/2 } } )
 s.adminCommand({ moveChunk: "test.foo", find: { _id: 3 },
     to: s.getNonPrimaries("test")[0], _waitForDelete: true });
 
+var bulk = db.foo.initializeUnorderedBulkOp();
 for ( i=0; i<N; i++ )
-    db.foo.insert( { _id : i } )
-db.getLastError();
+    bulk.insert( { _id : i } );
+assert.writeOK(bulk.execute());
 
 x = db.foo.stats();
 assert.eq( N , x.count , "coll total count expected" )

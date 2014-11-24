@@ -26,17 +26,19 @@ jsTest.log( "Insert a bunch of data into the low chunk of a collection," +
 var data128k = "x";
 for ( var i = 0; i < 7; i++ ) data128k += data128k;
 
+var bulk = coll.initializeUnorderedBulkOp();
 for ( var i = 0; i < 1024; i++ ) {
-    coll.insert({ _id : -(i + 1) });
+    bulk.insert({ _id : -(i + 1) });
 }
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(bulk.execute());
 
 jsTest.log( "Insert 32 docs into the high chunk of a collection" );
 
+bulk = coll.initializeUnorderedBulkOp();
 for ( var i = 0; i < 32; i++ ) {
-    coll.insert({ _id : i });
+    bulk.insert({ _id : i });
 }
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(bulk.execute());
 
 jsTest.log( "Split off MaxKey chunk..." );
 

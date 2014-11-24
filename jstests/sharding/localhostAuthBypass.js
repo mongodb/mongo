@@ -41,18 +41,10 @@ var assertCannotRunCommands = function(mongo, st) {
     // CRUD
     var test = mongo.getDB("test");
     assert.throws( function() { test.system.users.findOne(); });
-
-    test.foo.save({_id:0});
-    assert(test.getLastError());
-    
+    assert.writeError(test.foo.save({ _id: 0 }));
     assert.throws( function() { test.foo.findOne({_id:0}); });
-    
-    test.foo.update({_id:0}, {$set:{x:20}});
-    assert(test.getLastError());
-    
-    test.foo.remove({_id:0});
-    assert(test.getLastError());
-
+    assert.writeError(test.foo.update({ _id: 0 }, { $set: { x: 20 }}));
+    assert.writeError(test.foo.remove({ _id: 0 }));
 
     // Multi-shard
     assert.throws(function() { 
@@ -86,15 +78,10 @@ var assertCanRunCommands = function(mongo, st) {
     // this will throw if it fails
     test.system.users.findOne();
 
-    test.foo.save({_id: 0});
-    assert(test.getLastError() == null);
-    
-    test.foo.update({_id: 0}, {$set:{x:20}});
-    assert(test.getLastError() == null);
-    
-    test.foo.remove({_id: 0});
-    assert(test.getLastError() == null);
-    
+    assert.writeOK(test.foo.save({ _id: 0 }));
+    assert.writeOK(test.foo.update({ _id: 0 }, { $set: { x: 20 }}));
+    assert.writeOK(test.foo.remove({ _id: 0 }));
+
     // Multi-shard
     test.foo.mapReduce(
         function() { emit(1, 1); }, 

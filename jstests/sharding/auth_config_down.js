@@ -14,8 +14,7 @@ var configs = st._configServers
 printjson( configs )
 st.printShardingStatus()
 
-mongos.getCollection( "foo.bar" ).insert({ hello : "world" })
-assert.eq( null, mongos.getDB( "foo" ).getLastError() )
+assert.writeOK(mongos.getCollection( "foo.bar" ).insert({ hello : "world" }));
 
 var stopOrder = [ 1, 0 ]
 

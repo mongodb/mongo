@@ -9,42 +9,38 @@ var testDoc = { "_id": 123, "categoryId": 9881, "store": "NEW" }
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc)
-offerChange.update({ "_id": 123 }, { $set: { "store": "NEWEST" } }, true, false);
-var gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert.writeError(offerChange.update({ _id: 123 }, { $set: { store: "NEWEST" } }, true, false));
 var doc = offerChange.findOne();
 assert(friendlyEqual(doc, testDoc), 'doc changed: ' + tojson(doc));
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc)
-offerChange.update({ "_id": 123 }, { "_id": 123, "categoryId": 9881, "store": "NEWEST" }, true, false);
-var gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
-var doc = offerChange.findOne();
+assert.writeError(offerChange.update({ _id: 123 },
+                                     { _id: 123, categoryId: 9881, store: "NEWEST" },
+                                     true, false));
+doc = offerChange.findOne();
 assert(friendlyEqual(doc, testDoc), 'doc changed: ' + tojson(doc));
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc)
-offerChange.save({ "_id": 123, "categoryId": 9881, "store": "NEWEST" })
-var gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
-var doc = offerChange.findOne();
+assert.writeError(offerChange.save({ "_id": 123, "categoryId": 9881, "store": "NEWEST" }));
+doc = offerChange.findOne();
 assert(friendlyEqual(doc, testDoc), 'doc changed: ' + tojson(doc));
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc);
-offerChange.update({ "_id": 123, "store": "NEW" }, { "_id": 123, "categoryId": 9881, "store": "NEWEST" }, true, false);
-var gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
-var doc = offerChange.findOne();
+assert.writeError(offerChange.update({ _id: 123, store: "NEW" },
+                                     { _id: 123, categoryId: 9881, store: "NEWEST" },
+                                     true, false));
+doc = offerChange.findOne();
 assert(friendlyEqual(doc, testDoc), 'doc changed: ' + tojson(doc));
 
 offerChange.remove({}, false);
 offerChange.insert(testDoc);
-offerChange.update({ "_id": 123, "categoryId": 9881 }, { "_id": 123, "categoryId": 9881, "store": "NEWEST" }, true, false);
-var gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
-var doc = offerChange.findOne();
+assert.writeError(offerChange.update({ _id: 123, categoryId: 9881 },
+                                     { _id: 123, categoryId: 9881, store: "NEWEST" },
+                                     true, false));
+doc = offerChange.findOne();
 assert(friendlyEqual(doc, testDoc), 'doc changed: ' + tojson(doc));
 
 st.stop();

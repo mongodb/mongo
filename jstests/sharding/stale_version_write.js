@@ -12,12 +12,10 @@ var mongosB = st.s1
 jsTest.log( "Adding new collections...")
 
 var collA = mongosA.getCollection( jsTestName() + ".coll" )
-collA.insert({ hello : "world" })
-assert.eq( null, collA.getDB().getLastError() )
+assert.writeOK(collA.insert({ hello : "world" }));
 
 var collB = mongosB.getCollection( "" + collA )
-collB.insert({ hello : "world" })
-assert.eq( null, collB.getDB().getLastError() )
+assert.writeOK(collB.insert({ hello : "world" }));
 
 jsTest.log( "Enabling sharding..." )
 
@@ -27,10 +25,9 @@ printjson( mongosA.getDB( "admin" ).runCommand({ shardCollection : "" + collA, k
 // MongoD doesn't know about the config shard version *until* MongoS tells it
 collA.findOne()
 
-jsTest.log( "Trigger wbl..." )
+jsTest.log( "Trigger shard version mismatch..." );
 
-collB.insert({ goodbye : "world" })
-assert.eq( null, collB.getDB().getLastError() )
+assert.writeOK(collB.insert({ goodbye : "world" }));
 
 print( "Inserted..." )
 

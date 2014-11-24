@@ -105,9 +105,8 @@ s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
 s.admin.runCommand({ movechunk: "test.foo4", find: { num: 20 },
                      to: s.getOther( s.getServer( "test" ) ).name });
 
-db.foo4.save( { num : 5 } );
-db.foo4.save( { num : 15 } );
-db.getLastError();
+assert.writeOK(db.foo4.save( { num : 5 } ));
+assert.writeOK(db.foo4.save( { num : 15 } ));
 s.sync();
 assert.eq( 1 , a.foo4.count() , "ua1" );
 assert.eq( 1 , b.foo4.count() , "ub1" );
@@ -121,9 +120,7 @@ assert( b.foo4.getIndexes()[1].unique , "ub3" );
 assert.eq( 2 , db.foo4.count() , "uc1" )
 db.foo4.save( { num : 7 } )
 assert.eq( 3 , db.foo4.count() , "uc2" )
-db.foo4.save( { num : 7 } )
-gle = db.getLastErrorObj();
-assert( gle.err , "uc3" )
+assert.writeError(db.foo4.save( { num : 7 } ));
 assert.eq( 3 , db.foo4.count() , "uc4" )
 
 // --- don't let you convertToCapped ----
@@ -181,15 +178,13 @@ assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count 
 
 // ---- can't shard non-empty collection without index -----
 
-db.foo8.save( { a : 1 } );
-db.getLastError();
+assert.writeOK(db.foo8.save( { a : 1 } ));
 assert( ! s.admin.runCommand( { shardcollection : "test.foo8" , key : { a : 1 } } ).ok , "non-empty collection" );
 
 
 // ---- can't shard non-empty collection with null values in shard key ----
 
-db.foo9.save( { b : 1 } );
-db.getLastError();
+assert.writeOK(db.foo9.save( { b : 1 } ));
 db.foo9.ensureIndex( { a : 1 } );
 assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } } ).ok , "entry with null value" );
 

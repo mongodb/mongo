@@ -19,16 +19,15 @@ conn.setLogLevel( 3 )
 var coll = conn.getCollection( "test.countSlaveOk" )
 coll.drop()
 
+var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < 300; i++ ){
-    coll.insert( { i : i % 10 } )
+    bulk.insert({ i: i % 10 });
 }
+assert.writeOK(bulk.execute());
 
 var connA = conn
 var connB = new Mongo( st.s.host )
 var connC = new Mongo( st.s.host )
-
-// Make sure the writes get through, otherwise we can continue to error these one-at-a-time
-coll.getDB().getLastError()
 
 st.printShardingStatus()
 
@@ -64,7 +63,6 @@ try {
     coll.find({ i : 0 }).count()
     
     print( "Should not reach here!" )
-    printjson( coll.getDB().getLastError() )                 
     assert( false )
     
 }

@@ -25,13 +25,11 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
 //
 // Insert documents into collection and create text index.
 //
-coll.insert({_id: 1, a: "pizza"});
-coll.insert({_id: -1, a: "pizza pizza"});
-coll.insert({_id: 2, a: "pizza pizza pizza"});
-coll.insert({_id: -2, a: "pizza pizza pizza pizza"});
-assert.gleSuccess(coll.getDB());
-coll.ensureIndex({a: "text"});
-assert.gleSuccess(coll.getDB());
+assert.writeOK(coll.insert({ _id: 1, a: "pizza" }));
+assert.writeOK(coll.insert({ _id: -1, a: "pizza pizza" }));
+assert.writeOK(coll.insert({ _id: 2, a: "pizza pizza pizza" }));
+assert.writeOK(coll.insert({ _id: -2, a: "pizza pizza pizza pizza"}));
+assert.commandWorked(coll.ensureIndex({ a: "text" }));
 
 //
 // Execute query with sort on document score, verify results are in correct order.

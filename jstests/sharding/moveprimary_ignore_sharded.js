@@ -32,12 +32,9 @@ for( var i = 0; i < 3; i++ ){
     collsFooB.push( mongosB.getCollection( "foo.coll" + i ) )
     collsBarA.push( mongosA.getCollection( "bar.coll" + i ) )
     collsBarB.push( mongosB.getCollection( "bar.coll" + i ) )
-    
-    collsFooA[i].insert({ hello : "world" })
-    assert.eq( null, collsFooA[i].getDB().getLastError() )
-    collsBarA[i].insert({ hello : "world" })
-    assert.eq( null, collsBarA[i].getDB().getLastError() )
-    
+
+    assert.writeOK(collsFooA[i].insert({ hello : "world" }));
+    assert.writeOK(collsBarA[i].insert({ hello : "world" }));
 }
 
 // Enable sharding

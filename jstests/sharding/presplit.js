@@ -12,11 +12,12 @@ while ( bigString.length < 10000 ){
 db = s.getDB( "test" );
 inserted = 0;
 num = 0;
+var bulk = db.foo.initializeUnorderedBulkOp();
 while ( inserted < ( 20 * 1024 * 1024 ) ){
-    db.foo.insert( { _id : num++ , s : bigString } );
+    bulk.insert({ _id: num++, s: bigString });
     inserted += bigString.length;
 }
-db.getLastError();
+assert.writeOK(bulk.execute());
 
 // Make sure that there's only one chunk holding all the data.
 s.printChunks();

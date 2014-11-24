@@ -37,7 +37,6 @@ var coll = mongos.getDB('test').user;
 var verifyInsert = function() {
     var beforeCount = coll.find().count();
     coll.insert({ x: 1 });
-    coll.getDB().getLastError();
     var afterCount = coll.find().count();
 
     assert.eq(beforeCount + 1, afterCount);

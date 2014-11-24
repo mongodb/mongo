@@ -54,7 +54,6 @@ assert.eq( 0 , s.config.big.find().itcount() , "C1" );
 for ( i=0; i<50; i++ ){
     s.config.big.insert( { _id : i } );
 }
-s.config.getLastError();
 assert.eq( 50 , s.config.big.find().itcount() , "C2" );
 assert.eq( 50 , s.config.big.find().count() , "C3" );
 assert.eq( 50 , s.config.big.find().batchSize(5).itcount() , "C4" );

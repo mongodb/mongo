@@ -31,11 +31,14 @@ else {
     for (var i = 0; i < 4*1024; i++) str += "a";
 }
 
-for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str})}
-
+var bulk = db.foo.initializeUnorderedBulkOp();
+for (j=0; j<100; j++) {
+    for (i=0; i<512; i++){
+        bulk.insert({ i: idInc++, val: valInc++, y:str });
+    }
+}
+assert.writeOK(bulk.execute());
 jsTest.log( "Documents inserted, waiting for error..." )
-
-db.getLastError();
 
 jsTest.log( "Doing double-checks of insert..." )
 
@@ -118,17 +121,15 @@ jsTest.log( )
 valInc = 0;
 for (j=0; j<100; j++){ 
     print( "Inserted document: " + (j * 100) );
-    for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str}) }
+    bulk = db.foo.initializeUnorderedBulkOp();
+    for (i=0; i<512; i++){
+        bulk.insert({ i : idInc++, val: valInc++, y: str });
+    }
     // wait for replication to catch up
-    db.runCommand({getLastError:1, w:2, wtimeout:10000});
+    assert.writeOK(bulk.execute({ w: 2 }));
 }
 
-jsTest.log( "Waiting for errors..." )
-
-assert.eq( null, db.getLastError() )
-
-jsTest.log( "No errors..." )
-
+jsTest.log( "No errors..." );
 
 map2 = function() { emit(this.val, 1); }
 reduce2 = function(key, values) { return Array.sum(values); }

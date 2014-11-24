@@ -1,3 +1,5 @@
+// TODO: move back to sharding suite after SERVER-13402 is fixed
+
 /**
  * This test sets moveParanoia flag and then check that the directory is created with the moved data
  */

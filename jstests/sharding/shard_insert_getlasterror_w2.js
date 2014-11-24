@@ -1,5 +1,4 @@
 // replica set as solo shard
-// getLastError(2) fails on about every 170 inserts on my Macbook laptop -Tony
 // TODO: Add assertion code that catches hang
 
 load('jstests/libs/grid.js')
@@ -18,11 +17,12 @@ function go() {
 
     // Add data to it
     var conn1a = repset1.getMaster()
-    var db1a = conn1a.getDB('test')
+    var db1a = conn1a.getDB('test');
+    var bulk = db1a.foo.initializeUnorderedBulkOp();
     for (var i = 0; i < N; i++) {
-        db1a['foo'].insert({x: i, text: Text})
-        db1a.getLastError(2)  // wait to be copied to at least one secondary
+        bulk.insert({ x: i, text: Text });
     }
+    assert.writeOK(bulk.execute({ w: 2 }));
 
     // Create 3 sharding config servers
     var configsetSpec = new ConfigSet(3)
@@ -49,18 +49,15 @@ function go() {
 
     // Test case where GLE should return an error
     db.foo.insert({_id:'a', x:1});
-    db.foo.insert({_id:'a', x:1});
-    var x = db.getLastErrorObj(2, 30000)
-    assert.neq(x.err, null, "C1 " + tojson(x));
+    assert.writeError(db.foo.insert({ _id: 'a', x: 1 },
+                                    { writeConcern: { w: 2, wtimeout: 30000 }}));
 
     // Add more data
+    bulk = db.foo.initializeUnorderedBulkOp();
     for (var i = N; i < 2*N; i++) {
-        db['foo'].insert({x: i, text: Text})
-        var x = db.getLastErrorObj(2, 30000)  // wait to be copied to at least one secondary
-            if (i % 30 == 0) print(i)
-        if (i % 100 == 0 || x.err != null) printjson(x);
-        assert.eq(x.err, null, "C2 " + tojson(x));
+        bulk.insert({ x: i, text: Text});
     }
+    assert.writeOK(bulk.execute({ w: 2, wtimeout: 30000 }));
 
     // take down the slave and make sure it fails over
     repset1.stop(1);
@@ -83,8 +80,6 @@ function go() {
     routerSpec.end()
     configsetSpec.end()
     repset1.stopSet()
-
-    print('shard_insert_getlasterror_w2.js SUCCESS')
 }
 
 //Uncomment below to execute

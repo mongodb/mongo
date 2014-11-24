@@ -111,15 +111,8 @@ assert.eq(coll.count({ _id : 1 }), 1);
 // NOTE: This is DIFFERENT from 2.4, since we don't need to contact a host we didn't get
 // successful writes from.
 coll.remove({ _id : 1 });
-// The insert throws if write commands are enabled, since we get a response
-if ( coll.getMongo().useWriteCommands() ) {
-    assert.throws( function() {
-        coll.insert([{ _id : 1 }, { _id : -1 }]);
-    });
-}
-else {
-    coll.insert([{ _id : 1 }, { _id : -1 }]);
-}
+coll.insert([{ _id : 1 }, { _id : -1 }]);
+
 printjson(gle = coll.getDB().runCommand({ getLastError : 1 }));
 assert(gle.ok);
 assert(gle.err);

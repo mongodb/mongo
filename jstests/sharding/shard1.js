@@ -43,7 +43,9 @@ assert.eq( 3 , db.foo.find().length() , "after sharding, no split count failed" 
 var invalidDB = s.getDB( "foobar" );
 // hack to bypass invalid database name checking at the DB constructor
 invalidDB._name = "foo bar";
-invalidDB.blah.insert( { x : 1 } );
+assert.throws(function() {
+    invalidDB.blah.insert({ x: 1 });
+});
 assert.isnull( s.config.databases.findOne( { _id : "foo bar" } ) );
 
 

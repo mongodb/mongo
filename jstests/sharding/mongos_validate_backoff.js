@@ -18,8 +18,7 @@ var timeBadInsert = function(){
     var start = new Date().getTime()
 
     // Bad insert, no shard key
-    coll.insert({ hello : "world" })
-    assert.neq( null, coll.getDB().getLastError() )
+    assert.writeError(coll.insert({ hello : "world" }));
 
     var end = new Date().getTime()    
 

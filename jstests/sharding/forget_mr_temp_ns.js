@@ -11,10 +11,11 @@ var admin = mongos.getDB( "admin" );
 var coll = mongos.getCollection( "foo.bar" );
 var outputColl = mongos.getCollection( (coll.getDB() + "") + ".mrOutput" ); 
 
+var bulk = coll.initializeUnorderedBulkOp();
 for ( var i = 0; i < 10; i++ ) {
-    coll.insert({ _id : i, even : (i % 2 == 0) });
+    bulk.insert({ _id : i, even : (i % 2 == 0) });
 }
-assert.eq( null, coll.getDB().getLastError() );
+assert.writeOK(bulk.execute());
 
 var map = function() { emit( this.even, 1 ); };
 var reduce = function( key, values ) { return Array.sum(values); };
