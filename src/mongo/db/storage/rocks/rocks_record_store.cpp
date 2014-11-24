@@ -60,6 +60,7 @@ namespace mongo {
           _cappedMaxSize(cappedMaxSize),
           _cappedMaxDocs(cappedMaxDocs),
           _cappedDeleteCallback(cappedDeleteCallback),
+          _identHash(StringData::Hasher()(id)),
           _dataSizeKey("datasize-" + id.toString()),
           _numRecordsKey("numrecords-" + id.toString()) {
         invariant( _db );
@@ -80,7 +81,7 @@ namespace mongo {
         iter->SeekToLast();
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
-            RecordId lastLoc = _makeDiskLoc( lastSlice );
+            RecordId lastLoc = _makeRecordId( lastSlice );
             _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
         }
         else {
@@ -128,6 +129,7 @@ namespace mongo {
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const RecordId& dl ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
+        ru->registerWrite(_hash(_identHash, dl));
 
         std::string oldValue;
         ru->Get(_columnFamily.get(), _makeKey(dl), &oldValue);
@@ -177,7 +179,7 @@ namespace mongo {
             invariant(numRecords(txn) > 0);
 
             rocksdb::Slice slice = iter->key();
-            RecordId oldest = _makeDiskLoc( slice );
+            RecordId oldest = _makeRecordId( slice );
 
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -200,6 +202,7 @@ namespace mongo {
 
         RecordId loc = _nextId();
 
+        ru->registerWrite(_hash(_identHash, loc));
         ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
 
         _changeNumRecords( txn, true );
@@ -227,6 +230,7 @@ namespace mongo {
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
+        ru->registerWrite(_hash(_identHash, loc));
 
         std::string old_value;
         auto status = ru->Get(_columnFamily.get(), _makeKey(loc), &old_value);
@@ -252,6 +256,7 @@ namespace mongo {
                                                 const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
+        ru->registerWrite(_hash(_identHash, loc));
 
         rocksdb::Slice key = _makeKey( loc );
 
@@ -489,7 +494,7 @@ namespace mongo {
         return rocksdb::Slice(reinterpret_cast<const char*>(&loc), sizeof(loc));
     }
 
-    RecordId RocksRecordStore::_makeDiskLoc( const rocksdb::Slice& slice ) {
+    RecordId RocksRecordStore::_makeRecordId( const rocksdb::Slice& slice ) {
         return reinterpret_cast<const RecordId*>( slice.data() )[0];
     }
 
@@ -531,6 +536,10 @@ namespace mongo {
         else {
             ru->incrementCounter(_numRecordsKey, &_numRecords,  -1);
         }
+    }
+
+    uint64_t RocksRecordStore::_hash(uint64_t identHash, const RecordId& loc) {
+        return identHash + RecordId::Hasher()(loc);
     }
 
     void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
@@ -661,7 +670,7 @@ namespace mongo {
 
     RecordId RocksRecordStore::Iterator::_decodeCurr() const {
         invariant(_iterator && _iterator->Valid());
-        return _makeDiskLoc(_iterator->key());
+        return _makeRecordId(_iterator->key());
     }
 
     bool RocksRecordStore::Iterator::_forward() const {

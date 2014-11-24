@@ -40,23 +40,23 @@
 #include <rocksdb/write_batch.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    RocksRecoveryUnit::RocksRecoveryUnit(rocksdb::DB* db, bool defaultCommit)
-        : _db(db),
-          _defaultCommit(defaultCommit),
+    RocksRecoveryUnit::RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db)
+        : _transactionEngine(transactionEngine),
+          _db(db),
+          _transaction(transactionEngine),
           _writeBatch(),
           _snapshot(NULL),
-          _destroyed(false),
           _depth(0) {}
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
-        if (!_destroyed) {
-            destroy();
-        }
+        _abort();
     }
 
     void RocksRecoveryUnit::beginUnitOfWork() {
@@ -68,41 +68,16 @@ namespace mongo {
             return; // only outermost gets committed.
         }
 
-        invariant(!_destroyed);
-
-        if ( !_writeBatch ) {
-            // nothing to be committed
-            return;
+        if (_writeBatch) {
+            _commit();
         }
 
-        for (auto pair : _deltaCounters) {
-            auto& counter = pair.second;
-            counter._value->fetch_add(counter._delta, std::memory_order::memory_order_relaxed);
-            long long newValue = counter._value->load(std::memory_order::memory_order_relaxed);
-
-            // TODO: make the encoding platform indepdent.
-            const char* nr_ptr = reinterpret_cast<char*>(&newValue);
-            writeBatch()->Put(pair.first, rocksdb::Slice(nr_ptr, sizeof(long long)));
-        }
-
-        rocksdb::Status status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
-        if ( !status.ok() ) {
-            log() << "uh oh: " << status.ToString();
-            invariant( !"rocks write batch commit failed" );
-        }
-
-        for (auto& change : _changes) {
-            change->commit();
-            delete change;
+        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+            (*it)->commit();
         }
         _changes.clear();
-        _deltaCounters.clear();
-        _writeBatch.reset();
 
-        if ( _snapshot ) {
-            _db->ReleaseSnapshot( _snapshot );
-            _snapshot = _db->GetSnapshot();
-        }
+        _releaseSnapshot();
     }
 
     void RocksRecoveryUnit::endUnitOfWork() {
@@ -118,12 +93,8 @@ namespace mongo {
     }
 
     void RocksRecoveryUnit::commitAndRestart() {
+        invariant( _depth == 0 );
         commitUnitOfWork();
-    }
-
-    void* RocksRecoveryUnit::writingPtr(void* data, size_t len) {
-        warning() << "RocksRecoveryUnit::writingPtr doesn't work";
-        return data;
     }
 
     // lazily initialized because Recovery Units are sometimes initialized just for reading,
@@ -139,50 +110,69 @@ namespace mongo {
         return _writeBatch.get();
     }
 
-    void RocksRecoveryUnit::registerChange(Change* change) { _changes.emplace_back(change); }
+    void RocksRecoveryUnit::registerChange(Change* change) { _changes.push_back(change); }
 
-    void RocksRecoveryUnit::destroy() {
-        if (_defaultCommit) {
-            commitUnitOfWork();
-        } else {
-            _deltaCounters.clear();
+    void RocksRecoveryUnit::_releaseSnapshot() {
+        if (_snapshot) {
+            _db->ReleaseSnapshot(_snapshot);
+            _snapshot = nullptr;
+        }
+    }
+
+    void RocksRecoveryUnit::_commit() {
+        invariant(_writeBatch);
+        for (auto pair : _deltaCounters) {
+            auto& counter = pair.second;
+            counter._value->fetch_add(counter._delta, std::memory_order::memory_order_relaxed);
+            long long newValue = counter._value->load(std::memory_order::memory_order_relaxed);
+
+            // TODO: make the encoding platform indepdent.
+            const char* nr_ptr = reinterpret_cast<char*>(&newValue);
+            writeBatch()->Put(pair.first, rocksdb::Slice(nr_ptr, sizeof(long long)));
         }
 
-        if (_writeBatch && _writeBatch->GetWriteBatch()->Count() > 0) {
-            for (auto& change : _changes) {
-                change->rollback();
-                delete change;
+        if (_writeBatch->GetWriteBatch()->Count() != 0) {
+            // Order of operations here is important. It needs to be synchronized with
+            // _transaction.recordSnapshotId() and _db->GetSnapshot() and
+            auto status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
+            if (!status.ok()) {
+                log() << "uh oh: " << status.ToString();
+                invariant(!"rocks write batch commit failed");
             }
+            _transaction.commit();
         }
-
-        releaseSnapshot();
-        _destroyed = true;
+        _deltaCounters.clear();
+        _writeBatch.reset();
     }
 
     void RocksRecoveryUnit::_abort() {
-        // TODO rollback?
-        _writeBatch.reset();
+        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                it != end; ++it) {
+            (*it)->rollback();
+        }
         _changes.clear();
+
+        _transaction.abort();
         _deltaCounters.clear();
+        _writeBatch.reset();
+
+        _releaseSnapshot();
     }
 
-    // XXX lazily initialized for now
-    // This is lazily initialized for simplicity so long as we still
-    // have database-level locking. If a method needs to access the snapshot,
-    // and it has not been initialized, then it knows it is the first
-    // method to access the snapshot, and can initialize it before using it.
     const rocksdb::Snapshot* RocksRecoveryUnit::snapshot() {
         if ( !_snapshot ) {
+            // Order of operations here is important. It needs to be synchronized with
+            // _db->Write() and _transaction.commit()
+            _transaction.recordSnapshotId();
             _snapshot = _db->GetSnapshot();
         }
 
         return _snapshot;
     }
 
-    void RocksRecoveryUnit::releaseSnapshot() {
-        if (_snapshot) {
-            _db->ReleaseSnapshot(_snapshot);
-            _snapshot = nullptr;
+    void RocksRecoveryUnit::registerWrite(uint64_t hash) {
+        if (!_transaction.registerWrite(hash)) {
+            throw WriteConflictException();
         }
     }
 

@@ -38,9 +38,11 @@
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -70,14 +72,122 @@ namespace mongo {
             return new RocksRecordStore("foo.bar", "1", _db.get(), _cf);
         }
 
-        virtual RecoveryUnit* newRecoveryUnit() { return new RocksRecoveryUnit(_db.get(), true); }
+        virtual RecoveryUnit* newRecoveryUnit() {
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get());
+        }
 
     private:
         string _testNamespace = "mongo-rocks-record-store-test";
         unittest::TempDir _tempDir;
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
+        RocksTransactionEngine _transactionEngine;
     };
 
     HarnessHelper* newHarnessHelper() { return new RocksRecordStoreHarnessHelper(); }
+
+    TEST(RocksRecordStoreTest, Isolation1 ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+
+        RecordId loc1;
+        RecordId loc2;
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                ASSERT_OK( res.getStatus() );
+                loc1 = res.getValue();
+
+                res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                ASSERT_OK( res.getStatus() );
+                loc2 = res.getValue();
+
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> t1( harnessHelper->newOperationContext() );
+            scoped_ptr<OperationContext> t2( harnessHelper->newOperationContext() );
+
+            scoped_ptr<WriteUnitOfWork> w1( new WriteUnitOfWork( t1.get() ) );
+            scoped_ptr<WriteUnitOfWork> w2( new WriteUnitOfWork( t2.get() ) );
+
+            rs->dataFor( t1.get(), loc1 );
+            rs->dataFor( t2.get(), loc1 );
+
+            ASSERT_OK( rs->updateRecord( t1.get(), loc1, "b", 2, false, NULL ).getStatus() );
+            ASSERT_OK( rs->updateRecord( t1.get(), loc2, "B", 2, false, NULL ).getStatus() );
+
+            try {
+                // this should fail
+                rs->updateRecord( t2.get(), loc1, "c", 2, false, NULL );
+                ASSERT( 0 );
+            }
+            catch ( WriteConflictException& dle ) {
+                w2.reset( NULL );
+                t2.reset( NULL );
+            }
+
+            w1->commit(); // this should succeed
+        }
+    }
+
+    TEST(RocksRecordStoreTest, Isolation2 ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+
+        RecordId loc1;
+        RecordId loc2;
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                ASSERT_OK( res.getStatus() );
+                loc1 = res.getValue();
+
+                res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                ASSERT_OK( res.getStatus() );
+                loc2 = res.getValue();
+
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> t1( harnessHelper->newOperationContext() );
+            scoped_ptr<OperationContext> t2( harnessHelper->newOperationContext() );
+
+            // ensure we start transactions
+            rs->dataFor( t1.get(), loc2 );
+            rs->dataFor( t2.get(), loc2 );
+
+            {
+                WriteUnitOfWork w( t1.get() );
+                ASSERT_OK( rs->updateRecord( t1.get(), loc1, "b", 2, false, NULL ).getStatus() );
+                w.commit();
+            }
+
+            {
+                WriteUnitOfWork w( t2.get() );
+                ASSERT_EQUALS( string("a"), rs->dataFor( t2.get(), loc1 ).data() );
+                try {
+                    // this should fail as our version of loc1 is too old
+                    rs->updateRecord( t2.get(), loc1, "c", 2, false, NULL );
+                    ASSERT( 0 );
+                }
+                catch ( WriteConflictException& dle ) {
+                }
+
+            }
+
+        }
+    }
 }

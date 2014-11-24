@@ -46,6 +46,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/util/string_map.h"
 
 namespace rocksdb {
@@ -148,6 +149,9 @@ namespace mongo {
         mutable boost::mutex _identColumnFamilyMapMutex;
         typedef StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle> > IdentColumnFamilyMap;
         IdentColumnFamilyMap _identColumnFamilyMap;
+
+        // This is for concurrency control
+        RocksTransactionEngine _transactionEngine;
 
         static const std::string kOrderingPrefix;
         static const std::string kCollectionPrefix;

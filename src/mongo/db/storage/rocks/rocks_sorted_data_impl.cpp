@@ -109,7 +109,8 @@ namespace mongo {
         class RocksCursor : public SortedDataInterface::Cursor {
         public:
             RocksCursor(OperationContext* txn, rocksdb::DB* db,
-                        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool forward, Ordering o)
+                        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool forward,
+                        Ordering o)
                 : _db(db),
                   _columnFamily(columnFamily),
                   _forward(forward),
@@ -434,6 +435,7 @@ namespace mongo {
         : _db(db),
           _columnFamily(cf),
           _ident(std::move(ident)),
+          _identHash(StringData::Hasher()(StringData(_ident))),
           _order(order),
           _numEntriesKey("numentries-" + _ident) {
         invariant(_db);
@@ -466,10 +468,9 @@ namespace mongo {
                 return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        ru->registerWrite(_hash(_identHash, key));
         if ( !dupsAllowed ) {
-            // TODO need key locking to support unique indexes.
             Status status = dupKeyCheck( txn, key, loc );
             if ( !status.isOK() ) {
                 return status;
@@ -488,10 +489,12 @@ namespace mongo {
                                       const RecordId& loc,
                                       bool dupsAllowed) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        ru->registerWrite(_hash(_identHash, key));
 
         const string keyData = makeString( key, loc );
 
         string dummy;
+
         if (ru->Get(_columnFamily.get(), keyData, &dummy).IsNotFound()) {
             return;
         }
@@ -585,4 +588,7 @@ namespace mongo {
         return new RocksIndexEntryComparator( order );
     }
 
+    uint64_t RocksSortedDataImpl::_hash(uint64_t identHash, const BSONObj& key) {
+        return identHash + key.hash();
+    }
 }

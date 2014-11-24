@@ -156,7 +156,9 @@ namespace mongo {
         void dropRsMetaData( OperationContext* opCtx );
 
         static rocksdb::Comparator* newRocksCollectionComparator();
+
     private:
+        static uint64_t _hash(uint64_t identHash, const RecordId& loc);
 
         // NOTE: RecordIterator might outlive the RecordStore
         class Iterator : public RecordIterator {
@@ -194,7 +196,7 @@ namespace mongo {
          */
         static rocksdb::ReadOptions _readOptions(OperationContext* opCtx = NULL);
 
-        static RecordId _makeDiskLoc( const rocksdb::Slice& slice );
+        static RecordId _makeRecordId( const rocksdb::Slice& slice );
 
         static RecordData _getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
                                       OperationContext* txn, const RecordId& loc);
@@ -217,6 +219,7 @@ namespace mongo {
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
+        uint64_t _identHash;
         AtomicUInt64 _nextIdNum;
         long long _dataSize;
         std::atomic<long long> _numRecords;

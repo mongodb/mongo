@@ -101,7 +101,7 @@ namespace mongo {
         static rocksdb::Comparator* newRocksComparator( const Ordering& order );
 
     private:
-        typedef RecordId RecordId;
+        static uint64_t _hash(uint64_t identHash, const BSONObj& key);
 
         rocksdb::DB* _db; // not owned
 
@@ -110,6 +110,7 @@ namespace mongo {
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
 
         std::string _ident;
+        uint64_t _identHash;
 
         // used to construct RocksCursors
         const Ordering _order;
