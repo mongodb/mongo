@@ -5,9 +5,10 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_LOG_ARCHNAME		"WiredTigerArchive"	/* Log archived name */
-#define	WT_LOG_FILENAME		"WiredTigerLog"		/* Log file name */
-#define	WT_LOG_RECYCLENAME	"WiredTigerRecycle"	/* Log recycled name */
+#define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
+#define	WT_LOG_PREPNAME	"WiredTigerPreplog"	/* Log prepared name */
+
+#define	WT_LOG_PREP_DEFAULT	10		/* Prepare up to 10 files */
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
@@ -103,6 +104,7 @@ typedef struct {
 	 * Log file information
 	 */
 	uint32_t	 fileid;	/* Current log file number */
+	uint32_t	 prep_fileid;	/* Prepared file number */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
 	WT_FH           *log_dir_fh;	/* Log directory file handle */

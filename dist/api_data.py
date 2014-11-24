@@ -532,8 +532,8 @@ common_wiredtiger_open = [
 	        the path to a directory into which the log files are written.
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
-	    Config('recycle', 'true', r'''
-	        recycle rather than remove archived log files''',
+	    Config('prepare', 'true', r'''
+	        prepare pre-allocated log files after archiving''',
 	        type='boolean'),
 	    ]),
 	Config('mmap', 'true', r'''

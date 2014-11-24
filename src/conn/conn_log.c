@@ -66,8 +66,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
-	WT_RET(__wt_config_gets(session, cfg, "log.recycle", &cval));
-	conn->log_recycle = cval.val != 0;
+	WT_RET(__wt_config_gets(session, cfg, "log.prepare", &cval));
+	conn->log_prepare = cval.val != 0;
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
@@ -85,7 +85,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint32_t lognum, min_lognum;
-	u_int i, locked, logcount, num_archived, reccount, recycled;
+	u_int i, locked, logcount, num_archived, reccount, prepared;
 	char **logfiles, **recfiles;
 
 	conn = S2C(session);
@@ -106,7 +106,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 
 	/*
 	 * Main archive code.  Get the list of all log files and
-	 * remove or recycle any earlier than the minimum log number.
+	 * remove any earlier than the minimum log number.
 	 */
 	WT_RET(__wt_dirlist(session, conn->log_path,
 	    WT_LOG_FILENAME, WT_DIRLIST_INCLUDE, &logfiles, &logcount));
@@ -124,45 +124,44 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 			    session, logfiles[i], &lognum));
 			if (lognum < min_lognum) {
 				num_archived++;
-				if (conn->log_recycle)
-					WT_ERR(__wt_log_recycle_rename(
-					    session, lognum));
-				else
-					WT_ERR(__wt_log_remove(
-					    session, WT_LOG_FILENAME, lognum));
+				WT_ERR(__wt_log_remove(
+				    session, WT_LOG_FILENAME, lognum));
 			}
 		}
 	}
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 	locked = 0;
+	__wt_log_files_free(session, logfiles, logcount);
+	logfiles = NULL;
+	logcount = 0;
 
 	/*
-	 * If we're recycling the log files, walk the files again and prepare
-	 * them to be reused.  We've moved them aside while holding the backup
-	 * lock and now we can process them without the lock.
+	 * If we're preparing the log files, walk the files again and
+	 * pre-allocate up to the maximum number.  We do this outside the
+	 * lock.
 	 */
-	if (conn->log_recycle) {
-		if (conn->log_recycle_max == 0) {
+	if (conn->log_prepare) {
+		if (conn->log_prepared_max == 0) {
 			/*
 			 * If checkpoints are based on log size, use that
 			 * as the number of log files to keep.  Otherwise
 			 * compute it based on how many we just archived.
 			 */
 			if (WT_CKPT_LOGSIZE(conn))
-				conn->log_recycle_max =
+				conn->log_prepared_max =
 				    (uint32_t)(conn->ckpt_logsize/
 				    conn->log_file_max);
 			else
-				conn->log_recycle_max = num_archived;
+				conn->log_prepared_max = WT_LOG_PREP_DEFAULT;
 		} else
-			conn->log_recycle_max = WT_MAX(conn->log_recycle_max,
+			conn->log_prepared_max = WT_MAX(conn->log_prepared_max,
 			    num_archived);
 		WT_STAT_FAST_CONN_SET(session,
-		    log_recycle_max, conn->log_recycle_max);
+		    log_prepared_max, conn->log_prepared_max);
 		WT_ERR(__wt_dirlist(session, conn->log_path,
-		    WT_LOG_RECYCLENAME, WT_DIRLIST_INCLUDE,
+		    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE,
 		    &recfiles, &reccount));
-		recycled = reccount;
+		prepared = reccount;
 		__wt_log_files_free(session, recfiles, reccount);
 		recfiles = NULL;
 		reccount = 0;
@@ -170,33 +169,9 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 		 * Recycle up to the maximum number to keep that we just
 		 * computed and detected.  If we have extra, remove them.
 		 */
-		for (i = 0; i < logcount; i++) {
-			WT_ERR(__wt_log_extract_lognum(
-			    session, logfiles[i], &lognum));
-			if (lognum < min_lognum) {
-				if (recycled < conn->log_recycle_max) {
-					/*
-					 * Keep it.  Set it up.
-					 */
-					recycled++;
-					WT_ERR(__wt_log_recycle(
-					    session, lognum));
-				} else {
-					/*
-					 * Extra one.  Remove it.
-					 */
-					WT_STAT_FAST_CONN_INCR(session,
-					    log_recycle_removed);
-					WT_ERR(__wt_log_remove(
-					    session, WT_LOG_ARCHNAME, lognum));
-				}
-			}
-		}
+		for (i = prepared; i < conn->log_prepared_max; i++)
+			WT_ERR(__wt_log_prepare(session, ++log->prep_fileid));
 	}
-
-	__wt_log_files_free(session, logfiles, logcount);
-	logfiles = NULL;
-	logcount = 0;
 
 	/*
 	 * Indicate what is our new earliest LSN.  It is the start
