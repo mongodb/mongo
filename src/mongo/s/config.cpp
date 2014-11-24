@@ -63,8 +63,6 @@ namespace mongo {
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
 
-    OID serverID;
-
     /* --- DBConfig --- */
 
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {

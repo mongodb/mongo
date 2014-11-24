@@ -1574,9 +1574,6 @@ namespace mongo {
         return splitThreshold;
     }
 
-    // ----- to be removed ---
-    extern OID serverID;
-
     // NOTE (careful when deprecating)
     //   currently the sharding is enabled because of a write or read (as opposed to a split or migrate), the shard learns
     //   its name and through the 'setShardVersion' command call
@@ -1594,8 +1591,6 @@ namespace mongo {
         Shard s = Shard::make(conn.getServerAddress());
         cmdBuilder.append("shard", s.getName());
         cmdBuilder.append("shardHost", s.getConnString());
-
-        cmdBuilder.appendOID("serverID", &serverID);
 
         if (ns.size() > 0) {
             version.addToBSON(cmdBuilder);
