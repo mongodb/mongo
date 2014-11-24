@@ -18,7 +18,7 @@
     // send back an error and cause mongorestore to error out.
     var ret = toolTest.runTool('restore', '--db', 'dbOne',
         '--collection', 'malformed_pass_noobjcheck',
-        '--noobjcheck', '--w', '0',
+        '--noobjcheck', '-w', '0',
         'jstests/restore/testdata/dump_with_malformed/dbOne/malformed_pass_noobjcheck.bson');
     assert.eq(0, ret);
 
