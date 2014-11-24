@@ -197,7 +197,7 @@ namespace mongo {
         : ScopedLock(lockState, mode == MODE_S || mode == MODE_IS ? 'r' : 'w'),
           _id(RESOURCE_DATABASE, db),
           _mode(mode) {
-        massert(28539, "need a valid database name", !db.empty() && !nsIsFull(db));
+        massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
         lockDB();
     }
 

@@ -485,7 +485,7 @@ namespace {
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
                                                     LockMode mode) const {
-        invariant(!nsIsFull(dbName));
+        invariant(nsIsDbOnly(dbName));
 
         if (isW()) return true;
         if (isR() && isSharedMode(mode)) return true;
