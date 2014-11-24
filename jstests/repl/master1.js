@@ -46,4 +46,4 @@ assert.eq( op.ts.i, lastop().ts.i );
 am().save( {} );
 sleep( 3000 ); // make sure dies on its own before stop() called
 
-assert.eq( 47 /*EXIT_CLOCK_SKEW*/, rt.stop( true ) );
+assert.neq( 0 /*EXIT_ABRUPT == 14 */, rt.stop( true ) );
