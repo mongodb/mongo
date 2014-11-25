@@ -17,7 +17,6 @@ am = function() {
 rt = new ReplTest( baseName );
 
 m = rt.start( true );
-m.forceWriteMode('legacy'); // for 2.6 only, see SERVER-13704
 
 am().save( {} );
 assert.eq( "i", lastop().op );
@@ -44,7 +43,6 @@ m.getDB( "local" ).runCommand( {godinsert:"oplog.$main", obj:op} );
 rt.stop( true );
 m = rt.start( true, null, true );
 assert.eq( op.ts.i, lastop().ts.i );
-m.forceWriteMode('legacy'); // for 2.6 only, see SERVER-13704
 am().save( {} );
 sleep( 3000 ); // make sure dies on its own before stop() called
 
