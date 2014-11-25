@@ -109,7 +109,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 				 * can interfere with checkpoints.
 				 */
 				if (__wt_random(session->rnd) & 1) {
-					WT_ATOMIC_SUB4(chunk->refcnt, 1);
+					(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 					chunk = NULL;
 					continue;
 				}
@@ -121,7 +121,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	}
 
 err:	if (ret != 0 && chunk != NULL)
-		WT_ATOMIC_SUB4(chunk->refcnt, 1);
+		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 	WT_RET(__wt_lsm_tree_readunlock(session, lsm_tree));
 
 	*chunkp = chunk;
