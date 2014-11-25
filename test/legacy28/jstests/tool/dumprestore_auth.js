@@ -27,22 +27,22 @@ testUserAdmin.createRole({role: "backupFoo",
    roles: []});
 testUserAdmin.createUser({user: 'backupFoo', pwd: 'password', roles: ['backupFoo']});
 
-var restoreActions = ["collMod", "createCollection","createIndex","dropCollection","insert"];
+var restoreActions = ["collMod", "createCollection","createIndex","dropCollection","insert","listCollections"];
 var restoreActionsFind = restoreActions;
 restoreActionsFind.push("find");
 testUserAdmin.createRole({role: "restoreChester",
        privileges: [{resource: {db: dbName, collection: "chester"}, actions: restoreActions},
                 {resource: {db: dbName, collection: "system.indexes"},
                  actions: restoreActions},
-                {resource: {db: dbName, collection: "system.namespaces"},
-                 actions: restoreActionsFind}],
+                {resource: {db: dbName, collection: ""}, actions:["listCollections"]},
+                ],
        roles: []});
 testUserAdmin.createRole({role: "restoreFoo",
        privileges: [{resource: {db: dbName, collection: "foo"}, actions:restoreActions},
                 {resource: {db: dbName, collection: "system.indexes"},
                  actions: restoreActions},
-                {resource: {db: dbName, collection: "system.namespaces"},
-                 actions: restoreActionsFind}],
+                {resource: {db: dbName, collection: ""}, actions:["listCollections"]},
+                ],
        roles: []});
 testUserAdmin.createUser({user: 'restoreChester', pwd: 'password', roles: ['restoreChester']});
 testUserAdmin.createUser({user: 'restoreFoo', pwd: 'password', roles: ['restoreFoo']});

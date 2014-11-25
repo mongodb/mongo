@@ -78,7 +78,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 // TODO: overly didactic comments on each step
 func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
-	collectionExists, err := restore.DBHasCollection(intent)
+	collectionExists, err := restore.CollectionExists(intent)
 	if err != nil {
 		return fmt.Errorf("error reading database: %v", err)
 	}

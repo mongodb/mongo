@@ -11,6 +11,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"sync"
 )
 
 type MongoRestore struct {
@@ -33,6 +34,10 @@ type MongoRestore struct {
 	objCheck   bool
 	oplogLimit bson.MongoTimestamp
 	useStdin   bool
+
+	// a map of database names to a list of collection names
+	knownCollections      map[string][]string
+	knownCollectionsMutex sync.Mutex
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {

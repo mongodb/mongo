@@ -94,30 +94,38 @@ func stripDBFromNS(ns string) string {
 	return ns
 }
 
-func (restore *MongoRestore) DBHasCollection(intent *intents.Intent) (bool, error) {
-	collectionNS := intent.Key()
-	result := bson.M{}
-	session, err := restore.SessionProvider.GetSession()
-	if err != nil {
-		return false, fmt.Errorf("error establishing connection: %v", err)
+// CollectionExists wraps mgo's CollectionNames() method to detect if the
+// given intent's collection exists
+func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, error) {
+	restore.knownCollectionsMutex.Lock()
+	defer restore.knownCollectionsMutex.Unlock()
+
+	// make sure the map exists
+	if restore.knownCollections == nil {
+		restore.knownCollections = map[string][]string{}
 	}
-	session.SetSocketTimeout(0)
-	defer session.Close()
-	err = session.DB(intent.DB).C("system.namespaces").Find(bson.M{"name": collectionNS}).One(&result)
-	if err != nil {
-		// handle case when using db connection
-		if err == mgo.ErrNotFound {
-			log.Logf(log.DebugHigh, "collection %v does not exists", collectionNS)
-			return false, nil
+
+	// first check if we haven't done listCollections for this database already
+	if restore.knownCollections[intent.DB] == nil {
+		// if the database name isn't in the cache, grab collection
+		// names from the server
+		session, err := restore.SessionProvider.GetSession()
+		if err != nil {
+			return false, fmt.Errorf("error establishing connection: %v", err)
 		}
-		return false, err
+		session.SetSocketTimeout(0)
+		defer session.Close()
+		collections, err := session.DB(intent.DB).CollectionNames()
+		if err != nil {
+			return false, err
+		}
+		// update the cache
+		restore.knownCollections[intent.DB] = collections
 	}
-	if len(result) > 0 {
-		log.Logf(log.DebugHigh, "collection %v already exists", collectionNS)
-		return true, nil
-	}
-	log.Logf(log.DebugHigh, "collection %v does not exists", collectionNS)
-	return false, nil
+
+	// now check the cache for the given collection name
+	exists := util.StringSliceContains(restore.knownCollections[intent.DB], intent.C)
+	return exists, nil
 }
 
 // CreateIndexes takes in an intent and an array of index documents and
@@ -246,7 +254,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
 	defer bsonSource.Close()
 
-	tempColExists, err := restore.DBHasCollection(&intents.Intent{DB: "admin", C: tempCol})
+	tempColExists, err := restore.CollectionExists(&intents.Intent{DB: "admin", C: tempCol})
 	if err != nil {
 		return err
 	}
