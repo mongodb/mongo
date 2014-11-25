@@ -45,6 +45,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
@@ -198,19 +199,75 @@ namespace {
 
 } // namespace
 
-    int WiredTigerIndex::Create(OperationContext* txn,
-                                const std::string& uri,
-                                const std::string& extraConfig,
-                                const IndexDescriptor* desc ) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession()->getSession();
+    // static
+    StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& options) {
+        BSONForEach(elem, options) {
+            if (elem.fieldNameStringData() == "configString") {
+                if (elem.type() != String) {
+                    return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
+                        << "configString must be a string. "
+                        << "Not adding 'configString' value "
+                        << elem << " to index configuration");
+                }
+                std::string configString = elem.String();
+                if (configString.empty()) {
+                    return StatusWith<std::string>(ErrorCodes::InvalidOptions,
+                        "configString must be not be an empty string.");
+                }
+                return StatusWith<std::string>(elem.String());
+            }
+            else {
+                // Return error on first unrecognized field.
+                return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
+                    << '\'' << elem.fieldNameStringData() << '\''
+                    << " is not a supported option.");
+            }
+        }
+        return StatusWith<std::string>(ErrorCodes::BadValue,
+            "Storage engine options document must not be empty.");
+    }
+
+    // static
+    StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& extraConfig,
+                                                                  const IndexDescriptor& desc) {
+        str::stream ss;
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        string default_config_pfx = "type=file,leaf_page_max=16k,";
-        // Indexes need to store the metadata for collation to work as expected.
-        string default_config_sfx = ",key_format=u,value_format=u,collator=mongo_index,app_metadata=";
+        ss << "type=file,leaf_page_max=16k,";
 
-        std::string config = default_config_pfx + extraConfig + default_config_sfx + desc->infoObj().jsonString();
+        ss << extraConfig;
+
+        // Indexes need to store the metadata for collation to work as expected.
+        ss << ",key_format=u,value_format=u,collator=mongo_index";
+
+        // Index metadata
+        ss << ",app_metadata=" << desc.infoObj().jsonString();
+
+        // Validate configuration object.
+        // Raise an error about unrecognized fields that may be introduced in newer versions of
+        // this storage engine.
+        // Ensure that 'configString' field is a string. Raise an error if this is not the case.
+        BSONElement storageEngineElement = desc.getInfoElement("storageEngine");
+        if (storageEngineElement.isABSONObj()) {
+            BSONObj storageEngine = storageEngineElement.Obj();
+            StatusWith<std::string> parseStatus =
+                parseIndexOptions(storageEngine.getObjectField(kWiredTigerEngineName));
+            if (!parseStatus.isOK()) {
+                return parseStatus;
+            }
+            if (!parseStatus.getValue().empty()) {
+                ss << "," << parseStatus.getValue();
+            }
+        }
+
+        return StatusWith<std::string>(ss);
+    }
+
+    int WiredTigerIndex::Create(OperationContext* txn,
+                                const std::string& uri,
+                                const std::string& config) {
+        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession()->getSession();
         LOG(1) << "create uri: " << uri << " config: " << config;
         return s->create(s, uri.c_str(), config.c_str());
     }

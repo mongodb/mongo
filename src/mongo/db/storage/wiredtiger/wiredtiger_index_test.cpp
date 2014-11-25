@@ -28,8 +28,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -67,8 +70,11 @@ namespace mongo {
 
             IndexDescriptor desc( NULL, "", spec );
 
+            StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+            ASSERT_OK(result.getStatus());
+
             string uri = "table:" + ns;
-            invariantWTOK( WiredTigerIndex::Create( &txn, uri, "", &desc ) );
+            invariantWTOK( WiredTigerIndex::Create(&txn, uri, result.getValue()));
 
             if ( unique )
                 return new WiredTigerIndexUnique( uri, &desc );
@@ -87,6 +93,52 @@ namespace mongo {
 
     HarnessHelper* newHarnessHelper() {
         return new MyHarnessHelper();
+    }
+
+    TEST(WiredTigerIndexTest, GenerateCreateStringEmptyDocument) {
+        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {}}}");
+        IndexDescriptor desc(NULL, "", spec);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+    }
+
+    TEST(WiredTigerIndexTest, GenerateCreateStringUnknownField) {
+        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {unknownField: 1}}}");
+        IndexDescriptor desc(NULL, "", spec);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+    }
+
+    TEST(WiredTigerIndexTest, GenerateCreateStringNonStringConfig) {
+        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 12345}}}");
+        IndexDescriptor desc(NULL, "", spec);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
+    }
+
+    TEST(WiredTigerIndexTest, GenerateCreateStringEmptyConfigString) {
+        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: ''}}}");
+        IndexDescriptor desc(NULL, "", spec);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+    }
+
+    TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigFormat) {
+        BSONObj spec = fromjson("{storageEngine: {wiredTiger: {configString: 'abc=def'}}}");
+        IndexDescriptor desc(NULL, "", spec);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        const Status& status = result.getStatus();
+        ASSERT_OK(status);
+        const std::string& config = result.getValue();
+        ASSERT_NOT_EQUALS(std::string::npos, config.find("abc=def"));
     }
 
 }

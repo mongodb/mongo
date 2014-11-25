@@ -260,7 +260,8 @@ namespace mongo {
         _checkIdentPath( ident );
         WiredTigerSession session( _conn, -1 );
 
-        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
+        StatusWith<std::string> result =
+            WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
         if (!result.isOK()) {
             return result.getStatus();
         }
@@ -298,7 +299,12 @@ namespace mongo {
                                                           const StringData& ident,
                                                           const IndexDescriptor* desc ) {
         _checkIdentPath( ident );
-        return wtRCToStatus( WiredTigerIndex::Create( opCtx, _uri( ident ), _indexOptions, desc ) );
+        StatusWith<std::string> result =
+            WiredTigerIndex::generateCreateString(_indexOptions, *desc);
+        if (!result.isOK()) {
+            return result.getStatus();
+        }
+        return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), result.getValue()));
     }
 
     SortedDataInterface* WiredTigerKVEngine::getSortedDataInterface( OperationContext* opCtx,

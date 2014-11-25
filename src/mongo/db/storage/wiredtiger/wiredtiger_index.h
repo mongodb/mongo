@@ -31,6 +31,7 @@
 #include <boost/shared_ptr.hpp>
 #include <wiredtiger.h>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -44,10 +45,34 @@ namespace mongo {
     class WiredTigerIndex : public SortedDataInterface {
     public:
 
+        /**
+         * Parses index options for wired tiger configuration string suitable for table creation.
+         * The document 'options' is typically obtained from the 'storageEngine.wiredTiger' field
+         * of an IndexDescriptor's info object.
+         */
+        static StatusWith<std::string> parseIndexOptions(const BSONObj& options);
+
+        /**
+         * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
+         * Configuration string is constructed from:
+         *     built-in defaults
+         *     'extraConfig'
+         *     storageEngine.wiredTiger.configString in index descriptor's info object.
+         * Performs simple validation on the supplied parameters.
+         * Returns error status if validation fails.
+         * Note that even if this function returns an OK status, WT_SESSION:create() may still
+         * fail with the constructed configuration string.
+         */
+        static StatusWith<std::string> generateCreateString(const std::string& extraConfig,
+                                                            const IndexDescriptor& desc);
+
+        /**
+         * Creates a WiredTiger table suitable for implementing a MongoDB index.
+         * 'config' should be created with generateCreateString().
+         */
         static int Create(OperationContext* txn,
                           const std::string& uri,
-                          const std::string& extraConfig,
-                          const IndexDescriptor* desc);
+                          const std::string& config);
 
         /**
          * @param unique - If this is a unique index.
