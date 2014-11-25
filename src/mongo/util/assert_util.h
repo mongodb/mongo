@@ -177,10 +177,10 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantOKFailed(const char *msg, const Status& status, const char *file, unsigned line);
-    MONGO_CLIENT_API void wasserted(const char *msg, const char *file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr, const Status& status, const char *file, unsigned line);
+    MONGO_CLIENT_API void wasserted(const char* expr, const char* file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedWithStatus(
