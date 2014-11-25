@@ -152,12 +152,15 @@ namespace mongo {
         /**
          * Attempt to bring the entirety of 'this' index into memory.
          *
-         * A no-op implementation is acceptable if the operation is not
-         * supported by the underlying storage engine.
+         * If the underlying storage engine does not support the operation,
+         * returns ErrorCodes::CommandNotSupported
          *
          * @return Status::OK()
          */
-        virtual Status touch(OperationContext* txn) const = 0;
+        virtual Status touch(OperationContext* txn) const {
+            return Status(ErrorCodes::CommandNotSupported,
+                          "this storage engine does not support touch");
+        }
 
         /**
          * Return the number of entries in 'this' index.

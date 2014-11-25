@@ -42,7 +42,8 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_OK( sorted->touch( opCtx.get() ) );
+            Status status = sorted->touch( opCtx.get() );
+            ASSERT( status.isOK() || status.code() == ErrorCodes::CommandNotSupported );
         }
     }
 
@@ -76,7 +77,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             // XXX does not verify the index was brought into memory
             //     (even if supported by storage engine)
-            ASSERT_OK( sorted->touch( opCtx.get() ) );
+            Status status = sorted->touch( opCtx.get() );
+            ASSERT( status.isOK() || status.code() == ErrorCodes::CommandNotSupported );
         }
     }
 

@@ -310,11 +310,6 @@ namespace {
         return false;
     }
 
-    Status WiredTigerIndex::touch(OperationContext* txn) const {
-        // already in memory...
-        return Status::OK();
-    }
-
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         return static_cast<long long>( WiredTigerUtil::getIdentSize( session->getSession(),

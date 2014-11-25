@@ -74,8 +74,6 @@ namespace mongo {
 
         virtual bool isEmpty(OperationContext* txn);
 
-        virtual Status touch(OperationContext* txn) const;
-
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
         bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc );

@@ -278,9 +278,16 @@ namespace mongo {
         /**
          * Load all data into cache.
          * What cache depends on implementation.
+         *
+         * If the underlying storage engine does not support the operation,
+         * returns ErrorCodes::CommandNotSupported
+         *
          * @param output (optional) - where to put detailed stats
          */
-        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const = 0;
+        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const {
+            return Status(ErrorCodes::CommandNotSupported,
+                          "this storage engine does not support touch");
+        }
 
         /**
          * @return Status::OK() if option hanlded
