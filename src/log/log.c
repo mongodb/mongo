@@ -252,7 +252,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	/*
 	 * Pre-allocate on the first real write into the log file, if it
-	 * was just created (i.e. not recycled).
+	 * was just created (i.e. not pre-allocated).
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
@@ -304,11 +304,11 @@ err:
  * __log_file_header --
  *	Create and write a log file header into a file handle.  If writing
  *	into the main log, it will be called locked.  If writing into a
- *	recycled log, it will be called unlocked.
+ *	pre-allocated log, it will be called unlocked.
  */
 static int
 __log_file_header(
-    WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, int recycle)
+    WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, int prealloc)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(buf);
@@ -352,11 +352,12 @@ __log_file_header(
 	 * do not need to call __log_release because we're not waiting for
 	 * any earlier operations to complete.
 	 */
-	if (recycle) {
+	if (prealloc) {
 		WT_ASSERT(session, fh != NULL);
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
+		log->prep_missed++;
 		WT_ERR(__log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
@@ -393,12 +394,12 @@ err:	__wt_scr_free(&path);
 }
 
 /*
- * __log_alloc_recycle --
- *	Look for a recycled log file and rename it to use as the next
+ * __log_alloc_prealloc --
+ *	Look for a pre-allocated log file and rename it to use as the next
  *	real log file.  Called locked.
  */
 static int
-__log_alloc_recycle(WT_SESSION_IMPL *session, uint32_t to_num)
+__log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 {
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
@@ -408,28 +409,28 @@ __log_alloc_recycle(WT_SESSION_IMPL *session, uint32_t to_num)
 	char **logfiles;
 
 	/*
-	 * If there are no recyclable files, return WT_NOTFOUND.
+	 * If there are no pre-allocated files, return WT_NOTFOUND.
 	 */
 	logfiles = NULL;
 	WT_ERR(__log_get_files(session,
-	    WT_LOG_RECYCLENAME, &logfiles, &logcount));
+	    WT_LOG_PREPNAME, &logfiles, &logcount));
 	if (logcount == 0)
 		return (WT_NOTFOUND);
 
 	/*
-	 * We have a recycled file to use.  Just use the first one.
+	 * We have a file to use.  Just use the first one.
 	 */
 	WT_ERR(__wt_log_extract_lognum(session, logfiles[0], &from_num));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
 	WT_ERR(__log_filename(session,
-	    from_num, WT_LOG_RECYCLENAME, from_path));
+	    from_num, WT_LOG_PREPNAME, from_path));
 	WT_ERR(__log_filename(session, to_num, WT_LOG_FILENAME, to_path));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "log_alloc_recycle: rename log %s to %s",
+	    "log_alloc_prealloc: rename log %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
-	WT_STAT_FAST_CONN_INCR(session, log_recycle_reused);
+	WT_STAT_FAST_CONN_INCR(session, log_prealloc_used);
 	/*
 	 * All file setup, writing the header and pre-allocation was done
 	 * before.  We only need to rename it.
@@ -440,42 +441,6 @@ err:	__wt_scr_free(&from_path);
 	__wt_scr_free(&to_path);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
-	return (ret);
-}
-
-/*
- * __log_reset_file --
- *	Reset a recycled log file.  Rewrite the file header because the
- *	log size may have been reconfigured or even the version may have
- *	changed across a reboot.
- */
-static int
-__log_reset_file(WT_SESSION_IMPL *session, uint32_t lognum)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_FH *log_fh, *tmp_fh;
-	WT_LOG *log;
-
-	conn = S2C(session);
-	log = conn->log;
-	/*
-	 * Resetting a recycled log file entails:
-	 * - Rewriting the header.
-	 * - Truncating to the offset of the first record.
-	 * - Pre-allocating the file if needed.
-	 */
-	log_fh = NULL;
-	WT_ERR(__log_openfile(session, 0, &log_fh, WT_LOG_ARCHNAME, lognum));
-	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
-	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
-	WT_ERR(__log_prealloc(session, log_fh));
-	tmp_fh = log_fh;
-	log_fh = NULL;
-	WT_ERR(__wt_close(session, tmp_fh));
-
-err:	if (log_fh != NULL)
-		WT_TRET(__wt_close(session, log_fh));
 	return (ret);
 }
 
@@ -548,59 +513,38 @@ err:	if (log_fh != NULL)
 }
 
 /*
- * __wt_log_recycle_rename --
- *	Given a log number, rename from the log file name to temporary archived
- *	file name.
+ * __wt_log_prealloc --
+ *	Given an old log number of an archived file, create a new pre-allocated
+ *	log file by resetting its header and pre-allocating it.
  */
 int
-__wt_log_recycle_rename(WT_SESSION_IMPL *session, uint32_t lognum)
+__wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 {
-	WT_DECL_ITEM(from_path);
-	WT_DECL_ITEM(to_path);
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *log_fh, *tmp_fh;
+	WT_LOG *log;
 
-	WT_RET(__wt_scr_alloc(session, 0, &from_path));
-	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_FILENAME, from_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_ARCHNAME, to_path));
-	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "log_recycle_rename: rename log %s to %s",
-	    (char *)from_path->data, (char *)to_path->data));
-	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
-err:	__wt_scr_free(&from_path);
-	__wt_scr_free(&to_path);
-	return (ret);
-}
-
-/*
- * __wt_log_recycle --
- *	Given a log number of an archived file, recycle that log file by
- *	clearing it and resetting its truncation.
- */
-int
-__wt_log_recycle(WT_SESSION_IMPL *session, uint32_t lognum)
-{
-	WT_DECL_ITEM(from_path);
-	WT_DECL_ITEM(to_path);
-	WT_DECL_RET;
-
-	WT_RET(__wt_scr_alloc(session, 0, &from_path));
-	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_ARCHNAME, from_path));
-	WT_ERR(__log_filename(session, lognum, WT_LOG_RECYCLENAME, to_path));
-
-	WT_ERR(__log_reset_file(session, lognum));
+	conn = S2C(session);
+	log = conn->log;
 	/*
-	 * After the file is setup, rename it to the recycle name so that the
-	 * logging subsystem can find it.
+	 * Preparing a log file entails:
+	 * - Writing the header.
+	 * - Truncating to the offset of the first record.
+	 * - Pre-allocating the file if needed.
 	 */
-	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "log_recycle: recycle log %s to %s",
-	    (char *)from_path->data, (char *)to_path->data));
-	WT_STAT_FAST_CONN_INCR(session, log_recycle_files);
-	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
-err:	__wt_scr_free(&from_path);
-	__wt_scr_free(&to_path);
+	log_fh = NULL;
+	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_PREPNAME, lognum));
+	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
+	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
+	WT_ERR(__log_prealloc(session, log_fh));
+	WT_STAT_FAST_CONN_INCR(session, log_prealloc_files);
+	tmp_fh = log_fh;
+	log_fh = NULL;
+	WT_ERR(__wt_close(session, tmp_fh));
+
+err:	if (log_fh != NULL)
+		WT_TRET(__wt_close(session, log_fh));
 	return (ret);
 }
 
@@ -657,22 +601,15 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
 	/*
-	 * Clean up any old interim archive and recycle files.
-	 * We clean up recycle files because settings have changed upon reboot
+	 * Clean up any old interim pre-allocated files.
+	 * We clean up these files because settings have changed upon reboot
 	 * and we want those settings to take effect right away.
 	 */
-	WT_RET(__log_get_files(session, WT_LOG_ARCHNAME, &logfiles, &logcount));
-	for (i = 0; i < logcount; i++) {
-		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		WT_ERR(__wt_log_remove(session, WT_LOG_ARCHNAME, lognum));
-	}
-	__wt_log_files_free(session, logfiles, logcount);
-	logfiles = NULL;
 	WT_ERR(__log_get_files(session,
-	    WT_LOG_RECYCLENAME, &logfiles, &logcount));
+	    WT_LOG_PREPNAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		WT_ERR(__wt_log_remove(session, WT_LOG_RECYCLENAME, lognum));
+		WT_ERR(__wt_log_remove(session, WT_LOG_PREPNAME, lognum));
 	}
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
@@ -984,12 +921,12 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	log->fileid++;
 
 	/*
-	 * If we're recycling log files, look for one.  If there aren't any
-	 * or we're not recycling, then create one.
+	 * If we're pre-allocating log files, look for one.  If there aren't any
+	 * or we're not pre-allocating, then create one.
 	 */
 	ret = 0;
-	if (conn->log_recycle) {
-		ret = __log_alloc_recycle(session, log->fileid);
+	if (conn->log_prealloc) {
+		ret = __log_alloc_prealloc(session, log->fileid);
 		/*
 		 * If ret is 0 it means we reused a file and we don't send the
 		 * create flag to __log_openfile.
@@ -1010,7 +947,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	    create_log, &log->log_fh, WT_LOG_FILENAME, log->fileid));
 	/*
 	 * If we created the log, write a header.  Otherwise it's already there.
-	 * We need to setup the LSNs.  If we're using a recycled log file,
+	 * We need to setup the LSNs.  If we're using a pre-allocated log file,
 	 * set the end LSN and alloc LSN to the end of the header because the
 	 * header is already in the file.  Otherwise it will be filled in
 	 * when writing to the log file and the LSN values will be updated.

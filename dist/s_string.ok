@@ -368,12 +368,11 @@ Wformat
 WinNT
 WiredTiger
 WiredTiger's
-WiredTigerArchive
 WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerInit
 WiredTigerLog
-WiredTigerRecycle
+WiredTigerPreplog
 WiredTigerStat
 WiredTigerTxn
 WithSeeds

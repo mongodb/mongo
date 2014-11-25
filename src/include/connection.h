@@ -256,9 +256,7 @@ struct __wt_connection_impl {
 	WT_LOG		*log;		/* Logging structure */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
-	int		 log_recycle;	/* Log file recycle configuration */
-					/* Maximum recycled log files */
-	uint32_t	 log_recycle_max;
+	uint32_t	 log_prealloc;	/* Log file pre-allocation */
 	uint32_t	 txn_logsync;	/* Log sync configuration */
 
 	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */

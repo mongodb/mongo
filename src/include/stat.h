@@ -195,11 +195,10 @@ struct __wt_connection_stats {
 	WT_STATS log_bytes_written;
 	WT_STATS log_close_yields;
 	WT_STATS log_max_filesize;
+	WT_STATS log_prealloc_files;
+	WT_STATS log_prealloc_max;
+	WT_STATS log_prealloc_used;
 	WT_STATS log_reads;
-	WT_STATS log_recycle_files;
-	WT_STATS log_recycle_max;
-	WT_STATS log_recycle_removed;
-	WT_STATS log_recycle_reused;
 	WT_STATS log_scan_records;
 	WT_STATS log_scan_rereads;
 	WT_STATS log_scans;
