@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
+namespace {
 
     Status cloneCollectionAsCapped( OperationContext* txn,
                                     Database* db,
@@ -123,6 +124,8 @@ namespace mongo {
         invariant( false ); // unreachable
     }
 
+} // namespace
+
     /* convertToCapped seems to use this */
     class CmdCloneCollectionAsCapped : public Command {
     public:
@@ -162,10 +165,11 @@ namespace mongo {
             }
 
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, dbname);
+            AutoGetDb autoDb(txn, dbname, MODE_X);
 
-            Status status = cloneCollectionAsCapped( txn, ctx.db(), from, to, size, temp, true );
+            Database* const db = autoDb.getDb();
+
+            Status status = cloneCollectionAsCapped(txn, db, from, to, size, temp, true);
             return appendCommandStatus( result, status );
         }
     } cmdCloneCollectionAsCapped;
@@ -213,13 +217,18 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl ) {
-            // calls renamecollection which does a global lock, so we must too:
-            //
-            ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite globalWriteLock(txn->lockState());
-            Client::Context ctx(txn, dbname);
 
-            Database* db = ctx.db();
+            ScopedTransaction transaction(txn, MODE_IX);
+            AutoGetDb autoDb(txn, dbname, MODE_X);
+
+            Database* const db = autoDb.getDb();
+            if (!db) {
+                return appendCommandStatus(
+                            result,
+                            Status(ErrorCodes::NamespaceNotFound,
+                                   str::stream() << "source database "
+                                                 << dbname << " does not exist"));
+            }
 
             stopIndexBuilds(txn, db, jsobj);
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());
