@@ -47,7 +47,7 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 	log.Logf(log.DebugHigh, "using %v as dump root directory", fullpath)
 	foundOplog := false
-	entries, err := ioutil.ReadDir(fullpath)
+	entries, err := readDirWithSymlinks(fullpath)
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
 	}
@@ -220,4 +220,33 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	restore.manager.Put(intent)
 
 	return nil
+}
+
+// readDirWithSymlinks acts like ioutil.ReadDir, except symlinks are treated
+// as directories instead of regular files
+func readDirWithSymlinks(fullpath string) ([]os.FileInfo, error) {
+	entries, err := ioutil.ReadDir(fullpath)
+	if err != nil {
+		return nil, err
+	}
+	for i, entry := range entries {
+		if entry.Mode()&os.ModeSymlink != 0 {
+			// update to a symlinked directory if the symlink flag is set
+			entries[i] = symlinkedDir{entry, fullpath}
+		}
+	}
+	return entries, nil
+
+}
+
+// SymlinkedDir wraps a FileInfo interface to treat symlinked directories as real
+type symlinkedDir struct {
+	os.FileInfo
+	fullpath string
+}
+
+// return true if the OS can get at the directory
+func (dir symlinkedDir) IsDir() bool {
+	_, err := ioutil.ReadDir(filepath.Join(dir.fullpath, dir.Name()))
+	return err == nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
+	newopts "github.com/mongodb/mongo-tools/mongorestore/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"strings"
 	"testing"
@@ -42,7 +43,8 @@ func TestCreateAllIntents(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: intents.NewCategorizingIntentManager(),
+			manager:      intents.NewCategorizingIntentManager(),
+			InputOptions: &newopts.InputOptions{},
 		}
 		log.SetWriter(&buff)
 
