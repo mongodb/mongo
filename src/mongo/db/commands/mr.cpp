@@ -673,16 +673,14 @@ namespace mongo {
                     canAcceptWritesForDatabase(nsToDatabase(ns.c_str())));
             Collection* coll = getCollectionOrUassert(ctx.db(), ns);
 
-            class BSONObjBuilder b;
+            BSONObjBuilder b;
             if ( !o.hasField( "_id" ) ) {
-                OID id;
-                id.init();
                 b.appendOID( "_id", NULL, true );
             }
             b.appendElements(o);
             BSONObj bo = b.obj();
 
-            coll->insertDocument( _txn, bo, true );
+            uassertStatusOK( coll->insertDocument( _txn, bo, true ).getStatus() );
             repl::logOp(_txn, "i", ns.c_str(), bo);
             wuow.commit();
         }
@@ -696,7 +694,7 @@ namespace mongo {
             Client::WriteContext ctx(_txn,  _config.incLong );
             WriteUnitOfWork wuow(_txn);
             Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
-            coll->insertDocument( _txn, o, true );
+            uassertStatusOK( coll->insertDocument( _txn, o, true ).getStatus() );
             wuow.commit();
         }
 
