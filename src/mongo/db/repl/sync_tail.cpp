@@ -345,7 +345,7 @@ namespace repl {
     }
 
     // Doles out all the work to the writer pool threads and waits for them to complete
-    OpTime SyncTail::multiApply( std::deque<BSONObj>& ops) {
+    OpTime SyncTail::multiApply(OperationContext* txn, std::deque<BSONObj>& ops) {
 
         if (getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
             // Use a ThreadPool to prefetch all the operations in a batch.
@@ -372,7 +372,7 @@ namespace repl {
         }
 
         applyOps(writerVectors);
-        return applyOpsToOplog(&ops);
+        return applyOpsToOplog(txn, &ops);
     }
 
 
@@ -458,7 +458,7 @@ namespace repl {
             bytesApplied += ops.getSize();
             entriesApplied += ops.getDeque().size();
 
-            const OpTime lastOpTime = multiApply(ops.getDeque());
+            const OpTime lastOpTime = multiApply(txn, ops.getDeque());
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {
@@ -573,7 +573,7 @@ namespace {
             // if we should crash and restart before updating the oplog
             OpTime minValid = lastOp["ts"]._opTime();
             setMinValid(&txn, minValid);
-            multiApply(ops.getDeque());
+            multiApply(&txn, ops.getDeque());
         }
     }
 
@@ -645,18 +645,17 @@ namespace {
         return false;
     }
 
-    OpTime SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
+    OpTime SyncTail::applyOpsToOplog(OperationContext* txn, std::deque<BSONObj>* ops) {
         OpTime lastOpTime;
-        OperationContextImpl txn;
         {
-            ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock lk(txn.lockState(), "local", MODE_X);
-            WriteUnitOfWork wunit(&txn);
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            WriteUnitOfWork wunit(txn);
 
             while (!ops->empty()) {
                 const BSONObj& op = ops->front();
                 // this updates lastOpTimeApplied
-                lastOpTime = _logOpObjRS(&txn, op);
+                lastOpTime = _logOpObjRS(txn, op);
                 ops->pop_front();
              }
             wunit.commit();
@@ -666,7 +665,7 @@ namespace {
         // buffer to drain and it's now empty.  This will acquire a global lock to drop all
         // temp collections, so we must release the above lock on the local database before
         // doing so.
-        BackgroundSync::get()->notify(&txn);
+        BackgroundSync::get()->notify(txn);
 
         return lastOpTime;
     }
