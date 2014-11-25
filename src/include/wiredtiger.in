@@ -1890,8 +1890,9 @@ struct __wt_connection {
  * which the log files are written.  If the value is not an absolute path name\,
  * the files are created relative to the database home., a string; default \c
  * "".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;prepare, prepare pre-allocated log files
- * after archiving., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, number of pre-allocated log
+ * files after archiving.  Requires archiving to be enabled., an integer greater
+ * than or equal to 0; default \c 2.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}
@@ -3185,11 +3186,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! log: maximum log file size */
 #define	WT_STAT_CONN_LOG_MAX_FILESIZE			1063
 /*! log: pre-allocated log files prepared */
-#define	WT_STAT_CONN_LOG_PREPARED_FILES			1064
-/*! log: maximum prepared log files to create */
-#define	WT_STAT_CONN_LOG_PREPARED_MAX			1065
-/*! log: prepared log files used */
-#define	WT_STAT_CONN_LOG_PREPARED_USED			1066
+#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1064
+/*! log: number of pre-allocated log files to create */
+#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1065
+/*! log: pre-allocated log files used */
+#define	WT_STAT_CONN_LOG_PREALLOC_USED			1066
 /*! log: log read operations */
 #define	WT_STAT_CONN_LOG_READS				1067
 /*! log: records processed by log scan */

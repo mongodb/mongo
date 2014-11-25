@@ -66,8 +66,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
-	WT_RET(__wt_config_gets(session, cfg, "log.prepare", &cval));
-	conn->log_prepare = cval.val != 0;
+	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
+	conn->log_prealloc = (uint32_t)cval.val;
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
@@ -85,7 +85,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint32_t lognum, min_lognum;
-	u_int i, locked, logcount, num_archived, reccount, prepared;
+	u_int i, locked, logcount, num_archived, prepared, reccount;
 	char **logfiles, **recfiles;
 
 	conn = S2C(session);
@@ -140,24 +140,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * pre-allocate up to the maximum number.  We do this outside the
 	 * lock.
 	 */
-	if (conn->log_prepare) {
-		if (conn->log_prepared_max == 0) {
-			/*
-			 * If checkpoints are based on log size, use that
-			 * as the number of log files to keep.  Otherwise
-			 * compute it based on how many we just archived.
-			 */
-			if (WT_CKPT_LOGSIZE(conn))
-				conn->log_prepared_max =
-				    (uint32_t)(conn->ckpt_logsize/
-				    conn->log_file_max);
-			else
-				conn->log_prepared_max = WT_LOG_PREP_DEFAULT;
-		} else
-			conn->log_prepared_max = WT_MAX(conn->log_prepared_max,
-			    num_archived);
-		WT_STAT_FAST_CONN_SET(session,
-		    log_prepared_max, conn->log_prepared_max);
+	if (conn->log_prealloc) {
 		WT_ERR(__wt_dirlist(session, conn->log_path,
 		    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE,
 		    &recfiles, &reccount));
@@ -166,11 +149,24 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 		recfiles = NULL;
 		reccount = 0;
 		/*
-		 * Recycle up to the maximum number to keep that we just
-		 * computed and detected.  If we have extra, remove them.
+		 * Adjust the number of files to pre-allocate if we find that
+		 * the critical path had to allocate them since we last ran.
 		 */
-		for (i = prepared; i < conn->log_prepared_max; i++)
-			WT_ERR(__wt_log_prepare(session, ++log->prep_fileid));
+		if (log->prep_missed > 0) {
+			conn->log_prealloc += log->prep_missed;
+			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+			    "Now pre-allocating up to %" PRIu32,
+			    conn->log_prealloc));
+			log->prep_missed = 0;
+		}
+		WT_STAT_FAST_CONN_SET(session,
+		    log_prealloc_max, conn->log_prealloc);
+		/*
+		 * Recycle up to the maximum number to keep that we just
+		 * computed and detected.
+		 */
+		for (i = prepared; i < (u_int)conn->log_prealloc; i++)
+			WT_ERR(__wt_log_prealloc(session, ++log->prep_fileid));
 	}
 
 	/*

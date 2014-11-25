@@ -252,7 +252,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	/*
 	 * Pre-allocate on the first real write into the log file, if it
-	 * was just created (i.e. not prepared).
+	 * was just created (i.e. not pre-allocated).
 	 */
 	if (log->alloc_lsn.offset == LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
@@ -304,11 +304,11 @@ err:
  * __log_file_header --
  *	Create and write a log file header into a file handle.  If writing
  *	into the main log, it will be called locked.  If writing into a
- *	prepared log, it will be called unlocked.
+ *	pre-allocated log, it will be called unlocked.
  */
 static int
 __log_file_header(
-    WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, int prepared)
+    WT_SESSION_IMPL *session, WT_FH *fh, WT_LSN *end_lsn, int prealloc)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(buf);
@@ -352,11 +352,12 @@ __log_file_header(
 	 * do not need to call __log_release because we're not waiting for
 	 * any earlier operations to complete.
 	 */
-	if (prepared) {
+	if (prealloc) {
 		WT_ASSERT(session, fh != NULL);
 		tmp.slot_fh = fh;
 	} else {
 		WT_ASSERT(session, fh == NULL);
+		log->prep_missed++;
 		WT_ERR(__log_acquire(session, logrec->len, &tmp));
 	}
 	WT_ERR(__log_fill(session, &myslot, 1, buf, NULL));
@@ -393,12 +394,12 @@ err:	__wt_scr_free(&path);
 }
 
 /*
- * __log_alloc_prepare --
- *	Look for a prepared log file and rename it to use as the next
+ * __log_alloc_prealloc --
+ *	Look for a pre-allocated log file and rename it to use as the next
  *	real log file.  Called locked.
  */
 static int
-__log_alloc_prepare(WT_SESSION_IMPL *session, uint32_t to_num)
+__log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 {
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
@@ -408,7 +409,7 @@ __log_alloc_prepare(WT_SESSION_IMPL *session, uint32_t to_num)
 	char **logfiles;
 
 	/*
-	 * If there are no prepared files, return WT_NOTFOUND.
+	 * If there are no pre-allocated files, return WT_NOTFOUND.
 	 */
 	logfiles = NULL;
 	WT_ERR(__log_get_files(session,
@@ -427,9 +428,9 @@ __log_alloc_prepare(WT_SESSION_IMPL *session, uint32_t to_num)
 	    from_num, WT_LOG_PREPNAME, from_path));
 	WT_ERR(__log_filename(session, to_num, WT_LOG_FILENAME, to_path));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "log_alloc_prepare: rename log %s to %s",
+	    "log_alloc_prealloc: rename log %s to %s",
 	    (char *)from_path->data, (char *)to_path->data));
-	WT_STAT_FAST_CONN_INCR(session, log_prepared_used);
+	WT_STAT_FAST_CONN_INCR(session, log_prealloc_used);
 	/*
 	 * All file setup, writing the header and pre-allocation was done
 	 * before.  We only need to rename it.
@@ -512,12 +513,12 @@ err:	if (log_fh != NULL)
 }
 
 /*
- * __wt_log_prepare --
- *	Given an old log number of an archived file, create a new prepared
+ * __wt_log_prealloc --
+ *	Given an old log number of an archived file, create a new pre-allocated
  *	log file by resetting its header and pre-allocating it.
  */
 int
-__wt_log_prepare(WT_SESSION_IMPL *session, uint32_t lognum)
+__wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -537,7 +538,7 @@ __wt_log_prepare(WT_SESSION_IMPL *session, uint32_t lognum)
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
 	WT_ERR(__log_prealloc(session, log_fh));
-	WT_STAT_FAST_CONN_INCR(session, log_prepared_files);
+	WT_STAT_FAST_CONN_INCR(session, log_prealloc_files);
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_close(session, tmp_fh));
@@ -600,8 +601,8 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
 	/*
-	 * Clean up any old interim prepared files.
-	 * We clean up prepared files because settings have changed upon reboot
+	 * Clean up any old interim pre-allocated files.
+	 * We clean up these files because settings have changed upon reboot
 	 * and we want those settings to take effect right away.
 	 */
 	WT_ERR(__log_get_files(session,
@@ -924,8 +925,8 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * or we're not pre-allocating, then create one.
 	 */
 	ret = 0;
-	if (conn->log_prepare) {
-		ret = __log_alloc_prepare(session, log->fileid);
+	if (conn->log_prealloc) {
+		ret = __log_alloc_prealloc(session, log->fileid);
 		/*
 		 * If ret is 0 it means we reused a file and we don't send the
 		 * create flag to __log_openfile.
@@ -946,7 +947,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	    create_log, &log->log_fh, WT_LOG_FILENAME, log->fileid));
 	/*
 	 * If we created the log, write a header.  Otherwise it's already there.
-	 * We need to setup the LSNs.  If we're using a prepared log file,
+	 * We need to setup the LSNs.  If we're using a pre-allocated log file,
 	 * set the end LSN and alloc LSN to the end of the header because the
 	 * header is already in the file.  Otherwise it will be filled in
 	 * when writing to the log file and the LSN values will be updated.
