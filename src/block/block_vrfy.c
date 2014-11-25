@@ -232,6 +232,22 @@ __wt_verify_ckpt_load(
 	}
 
 	/*
+	 * We don't need to list of blocks on a checkpoint's avail list, but we
+	 * read it to ensure it wasn't corrupted.  We could confirm correctness
+	 * of intermediate avail lists (that is, if they're logically the result
+	 * of the allocations and discards to this point). We don't because the
+	 * only avail list ever used is the one for the last checkpoint, which
+	 * is separately verified by checking it against all of the blocks found
+	 * in the file.
+	 */
+	el = &ci->avail;
+	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(
+		    session, block, el, ci->file_size));
+		__wt_block_extlist_free(session, el);
+	}
+
+	/*
 	 * The root page of the checkpoint appears on the alloc list, but not,
 	 * at least until the checkpoint is deleted, on a discard list.   To
 	 * handle this case, remove the root page from the accumulated list of
