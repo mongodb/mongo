@@ -1228,8 +1228,6 @@ if windows:
     distBinaries.extend(['mongod.pdb', 'mongos.pdb'])
 
 def installBinary( e, name ):
-    global distBinaries
-
     name = add_exe( name )
 
     if (solaris or linux) and (not has_option("nostrip")):
@@ -1242,10 +1240,11 @@ def installBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-def installExternalBinary( e, name ):
-    global distBinaries
-
-    name = env.File( "#/%s" % add_exe(name) )
+def installExternalBinary( e, name_str ):
+    name = env.File("#/%s" % add_exe(name_str))
+    if not name.isfile():
+        print("ERROR: external binary not found: %s" % name)
+        Exit(1)
 
     distBinaries.append(name)
     inst = e.Install( "$INSTALL_DIR/bin", name )
@@ -1253,10 +1252,15 @@ def installExternalBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-for t in rewrittenTools:
-    installExternalBinary(env, "src/mongo-tools/" + t)
 
-# old tools
+# "--use-new-tools" adds dependencies for rewritten (Go) tools
+# It is required for "dist" but optional for "install"
+if has_option("use-new-tools"):
+    toolsRoot = "src/mongo-tools"
+    for t in rewrittenTools:
+        installExternalBinary(env, "%s/%s" % (toolsRoot, t))
+
+# legacy tools
 installBinary(env, "mongoperf")
 env.Alias("tools", '#/' + add_exe("mongoperf"))
 
@@ -1304,16 +1308,28 @@ for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
   archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
                                      (full_dir, archive_dir))
 
-env.Command(
-    '#/${SERVER_ARCHIVE}',
-    ['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + 
-    distBinaries, ' '.join(['$PYTHON ${SOURCES[0]} -o $TARGET'] + archive_addition_transforms + 
-    module_banner_transforms + [
-            '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped=$SERVER_DIST_BASENAME/bin',
-            '--transform ${str(Dir(BUILD_DIR))}/mongo=$SERVER_DIST_BASENAME/bin',
-            '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-            '--transform src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-            '${TEMPFILE(SOURCES[1:])}']))
+# "dist" target is valid only when --use-new-tools is specified
+# Attempts to build release artifacts without tools must fail
+if has_option("use-new-tools"):
+    env.Command(
+        '#/${SERVER_ARCHIVE}',
+        ['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] +
+        distBinaries, ' '.join(['$PYTHON ${SOURCES[0]} -o $TARGET'] + archive_addition_transforms +
+        module_banner_transforms + [
+                '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped=$SERVER_DIST_BASENAME/bin',
+                '--transform ${str(Dir(BUILD_DIR))}/mongo=$SERVER_DIST_BASENAME/bin',
+                '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
+                '--transform src/mongo-tools=$SERVER_DIST_BASENAME/bin',
+                '${TEMPFILE(SOURCES[1:])}']))
+
+    env.Alias("dist", source='#/${SERVER_ARCHIVE}')
+else:
+    def failDist(env, target, source):
+        print("ERROR: 'dist' target only valid with --use-new-tools.")
+        Exit(1)
+    env.Alias("dist", [], [ failDist ] )
+    env.AlwaysBuild("dist")
+
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )
