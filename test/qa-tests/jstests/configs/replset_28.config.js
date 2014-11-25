@@ -12,6 +12,7 @@ var getToolTest;
 
     toolTest.m = master;
     toolTest.db = master.getDB(name);
+    toolTest.port = replTest.getPort(master);
 
     var oldStop = toolTest.stop;
     toolTest.stop = function() {

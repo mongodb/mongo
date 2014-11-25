@@ -4,8 +4,8 @@ var getToolTest;
   var TOOLS_TEST_CONFIG = {
     binVersion: '',
     sslMode: 'requireSSL',
-    sslPEMKeyFile: '../../libs/server.pem',
-    sslCAFile: '../../libs/ca.pem'
+    sslPEMKeyFile: 'jstests/libs/server.pem',
+    sslCAFile: 'jstests/libs/ca.pem'
   };
 
   getToolTest = function(name) {
@@ -18,6 +18,6 @@ var getToolTest;
 var getCommonToolArguments = function() {
   return [
     '--ssl',
-    '--sslPEMKeyFile', '../../libs/client.pem'
+    '--sslPEMKeyFile', 'jstests/libs/client.pem'
   ];
 };

@@ -5,7 +5,7 @@ var getToolTest;
 
   var TOOLS_TEST_CONFIG = {
     binVersion: '',
-    config: './kerberos.config.yml'
+    config: 'jstests/configs/kerberos.config.yml'
   };
 
   getToolTest = function(name) {

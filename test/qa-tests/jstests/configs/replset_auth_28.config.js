@@ -12,7 +12,7 @@ var AUTH_PASSWORD = 'Taco';
       nodes: 3,
       oplogSize: 5,
       auth: '',
-      keyFile: '../../legacy/jstests/libs/key1'
+      keyFile: 'jstests/libs/key1'
     });
 
     var nodes = replTest.startSet();
@@ -21,6 +21,7 @@ var AUTH_PASSWORD = 'Taco';
 
     toolTest.m = master;
     toolTest.db = master.getDB(name);
+    toolTest.port = replTest.getPort(master);
 
     var db = toolTest.db;
     db.getSiblingDB('admin').createUser({

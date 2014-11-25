@@ -1,9 +1,8 @@
 var getToolTest;
+var AUTH_USER = 'passwordIsTaco';
+var AUTH_PASSWORD = 'Taco';
 
 (function() {
-  var AUTH_USER = 'passwordIsTaco';
-  var AUTH_PASSWORD = 'Taco';
-
   var TOOLS_TEST_CONFIG = {
     binVersion: '',
     auth: ''
