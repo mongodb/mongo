@@ -120,8 +120,8 @@ namespace mongo {
 
         // handshakes for those connected to us
         {
-            for (OIDMemberMap::iterator itr = _members.begin();
-                 itr != _members.end(); ++itr) {
+            OIDMemberMap::iterator itr = _members.begin();
+            while (itr != _members.end()) {
                 BSONObjBuilder slaveCmd;
                 slaveCmd.append("replSetUpdatePosition", 1);
                 // outer handshake indicates this is a handshake command
@@ -134,8 +134,25 @@ namespace mongo {
                 BSONObj slaveRes;
                 try {
                     if (!_connection->runCommand("admin", slaveCmd.obj(), slaveRes)) {
-                        resetConnection();
-                        return false;
+                        if (slaveRes["errmsg"].str().find("node could not be found ")
+                                    != std::string::npos) {
+                            if (theReplSet->getMutableMember(itr->second->id())) {
+                                log() << "sync source does not have member " << itr->second->id()
+                                      << " in its config and neither do we, removing member from"
+                                         " tracking";
+                                OIDMemberMap::iterator removeItr = itr;
+                                ++itr;
+                                _slaveMap.erase(_slaveMap.find(removeItr->first));
+                                _members.erase(removeItr);
+                                continue;
+                            }
+                            // here the node exists in our config, so do not stop tracking it
+                            // and continue with the handshaking process
+                        }
+                        else {
+                            resetConnection();
+                            return false;
+                        }
                     }
                 }
                 catch (const DBException& e) {
@@ -144,6 +161,7 @@ namespace mongo {
                     resetConnection();
                     return false;
                 }
+                ++itr;
             }
         }
         return true;
@@ -321,6 +339,7 @@ namespace mongo {
                     }
                     else {
                         _handshakeNeeded = false;
+                        _positionChanged = true;
                     }
                 }
                 if (_positionChanged) {
