@@ -45,7 +45,6 @@ var explainOut = primary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandWorked(explainOut, "explain read op on primary");
 
 // Explain an update on the primary.
@@ -58,7 +57,6 @@ explainOut = primary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandWorked(explainOut, "explain write op on primary");
 
 // Plan should have an update stage at its root, reporting that it would
@@ -87,7 +85,6 @@ explainOut = secondary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandFailed(explainOut, "explain read op on secondary, slaveOk false");
 
 // Explain of count should succeed once slaveOk is true.
@@ -99,8 +96,52 @@ explainOut = secondary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandWorked(explainOut, "explain read op on secondary, slaveOk true");
+
+// Explain .find() on a secondary, setting slaveOk directly on the query.
+secondary.getDB("test").getMongo().setSlaveOk(false);
+assert.throws(function() {
+    secondary.getDB("test").explain_slaveok.explain("executionStats")
+                                           .find({a: 1})
+                                           .finish();
+});
+
+secondary.getDB("test").getMongo().setSlaveOk(false);
+explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
+                                                    .find({a: 1})
+                                                    .addOption(DBQuery.Option.slaveOk)
+                                                    .finish();
+assert.commandWorked(explainOut, "explain read op on secondary, slaveOk set to true on query");
+
+secondary.getDB("test").getMongo().setSlaveOk(true);
+explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
+                                                    .find({a: 1})
+                                                    .finish();
+assert.commandWorked(explainOut, "explain .find() on secondary, slaveOk set to true");
+
+// Explain .find() on a secondary, setting slaveOk to false with various read preferences.
+var readPrefModes = ["primary", "secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
+readPrefModes.forEach(function(prefString) {
+    secondary.getDB("test").getMongo().setSlaveOk(false);
+    explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
+                                                        .find({a: 1})
+                                                        .readPref(prefString)
+                                                        .finish();
+    assert.commandWorked(explainOut, "explain .find() on secondary, '"
+                                     + prefString
+                                     + "' read preference on query");
+
+    // Similarly should succeed if a read preference is set on the connection.
+    secondary.setReadPref(prefString);
+    explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
+                                                        .find({a: 1})
+                                                        .finish();
+    assert.commandWorked(explainOut, "explain .find() on secondary, '"
+                                     + prefString
+                                     + "' read preference on connection");
+    // Unset read pref on the connection.
+    secondary.setReadPref();
+});
 
 // Explain an update on the secondary with slaveOk off. Should fail because
 // slaveOk is required for explains on a secondary.
@@ -114,7 +155,6 @@ explainOut = secondary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandFailed(explainOut, "explain write op on secondary, slaveOk false");
 
 // Explain of the update should also fail with slaveOk on.
@@ -128,5 +168,4 @@ explainOut = secondary.getDB("test").runCommand({
     },
     verbosity: "executionStats"
 });
-printjson(explainOut);
 assert.commandFailed(explainOut, "explain write op on secondary, slaveOk true");

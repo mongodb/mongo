@@ -96,7 +96,7 @@ namespace mongo {
         // copied from Command::execCommand and should be abstracted. Until then, make
         // sure to keep it up to date.
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool canRunHere =
+        const bool canRunHere =
             replCoord->canAcceptWritesForDatabase(dbname) ||
             commToExplain->slaveOk() ||
             (commToExplain->slaveOverrideOk() && (options & QueryOption_SlaveOk));
