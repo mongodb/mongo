@@ -430,8 +430,7 @@ namespace mongo {
                 
                 Command* curCommand = curop.getCommand();
                 if (curCommand) {
-                    mutablebson::Document cmdToLog(curop.query(), 
-                            mutablebson::Document::kInPlaceDisabled);
+                    mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
                     curCommand->redactForLogging(&cmdToLog);
                     s << curCommand->name << " ";
                     s << cmdToLog.toString();
