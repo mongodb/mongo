@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
@@ -542,7 +543,7 @@ func TestFilterIngestError(t *testing.T) {
 		})
 
 		Convey("errLostConnection should be returned if stopOnError is true the err is io.EOF", func() {
-			So(filterIngestError(true, io.EOF), ShouldEqual, errLostConnection)
+			So(filterIngestError(true, io.EOF), ShouldEqual, db.ErrLostConnection)
 		})
 
 		Convey("no error should be returned if stopOnError is false the err is not nil", func() {
