@@ -34,6 +34,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
@@ -130,6 +131,18 @@ namespace mongo {
                     cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
                     if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ) {
                         result = result.getOwned();
+
+                        Status errStatus = Command::getStatusFromCommandResult(result);
+                        if (errStatus.code() == ErrorCodes::CommandNotFound) {
+                            severe() << "writebackListen command not supported by shard. This "
+                                     << "command has been deprecated in the newer versions of "
+                                     << "mongod. This happens when v2.6.x mongos tries to talk to "
+                                     << "mongod v2.8 or higher. Please consult the documentation "
+                                     << "for the recommended upgrade procedure if you intend "
+                                     << "to use newer versions.";
+                            fassertFailedNoTrace(28575);
+                        }
+
                         log() <<  "writebacklisten command failed!  "  << result << endl;
                         conn.done();
                         continue;
