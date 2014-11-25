@@ -12,8 +12,7 @@ for( var fields = 1; fields < maxFields; fields++ ){
     coll.drop()
     
     var totalPts = 500 * 1000
-
-    var bulk = coll.initializeUnorderedBulkOp();
+        
     // Add points in a 100x100 grid
     for( var i = 0; i < totalPts; i++ ){
         var ii = i % 10000
@@ -38,11 +37,10 @@ for( var fields = 1; fields < maxFields; fields++ ){
             
             doc[ "field" + j ] = field
         }
-
-        bulk.insert( doc );
+        
+        coll.insert( doc )
     }
-    assert.writeOK(bulk.execute());
-
+    
     // Create the query for the additional fields
     queryFields = {}
     for( var j = 0; j < fields; j++ ){

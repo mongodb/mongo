@@ -29,11 +29,9 @@ masterdb.createCollection(mastercol.getName(), {usePowerOf2Sizes: false});
 
 // create new collection. insert 24 docs, aged at one-hour intervalss
 now = (new Date()).getTime();
-var bulk = mastercol.initializeUnorderedBulkOp();
-for ( i=0; i<24; i++ ) {
-    bulk.insert({ x: new Date( now - ( 3600 * 1000 * i )) });
-}
-assert.writeOK(bulk.execute());
+for ( i=0; i<24; i++ )
+    mastercol.insert( { x : new Date( now - ( 3600 * 1000 * i ) ) } );
+masterdb.getLastError();
 rt.awaitReplication();
 assert.eq( 24 , mastercol.count() , "docs not inserted on primary" );
 assert.eq( 24 , slave1col.count() , "docs not inserted on secondary" );
@@ -50,7 +48,8 @@ assert.eq( 0 , slave1col.stats().userFlags , "userFlags not 0 on secondary");
 
 // create TTL index, wait for TTL monitor to kick in, then check that
 // userFlags get set to 1, and correct number of docs age out
-assert.commandWorked(mastercol.ensureIndex({ x: 1 }, { expireAfterSeconds: 20000 }));
+mastercol.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
+masterdb.getLastError();
 rt.awaitReplication();
 
 sleep(70*1000); // TTL monitor runs every 60 seconds, so wait 70

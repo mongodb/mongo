@@ -49,7 +49,9 @@ doTest = function(dropDups) {
             // wait for indexing to start
             assert.soon(function() { return 2 == db.system.indexes.count({ ns: "test." + baseName }) }, "no index created", 30000, 50);
             t.save({ i: 0, n: true });
+            //printjson(db.getLastError());
             t.save({ i: size - 1, n: true });
+            //printjson(db.getLastError());
         } catch (e) {
             // only a failure if we're still indexing
             // wait for parallel status to update to reflect indexing status

@@ -1,5 +1,4 @@
 // Test that opcounters get incremented properly.
-// Write command version also available at jstests/core.
 
 // Remember the global 'db' var
 var lastDB = db;

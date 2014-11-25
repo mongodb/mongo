@@ -134,18 +134,19 @@ wait(function() {
 
 print("add some more data 1");
 master.auth("bar", "baz");
-bulk = master.foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
-    bulk.insert({ x: i, foo: "bar" });
+    master.foo.insert({x:i, foo : "bar"});
 }
-assert.writeOK(bulk.execute({ w: 2 }));
+var result = master.runCommand({getlasterror:1, w:2, wtimeout:60000});
+printjson(result);
+
 
 print("resync");
 rs.restart(0, {"keyFile" : path+"key1"});
 
 
 print("add some more data 2");
-bulk = master.foo.initializeUnorderedBulkOp();
+var bulk = master.foo.initializeUnorderedBulkOp();
 for (var i=0; i<1000; i++) {
     bulk.insert({ x: i, foo: "bar" });
 }

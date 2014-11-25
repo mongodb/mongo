@@ -23,13 +23,11 @@ var conn = repset.getMaster()
 var db = conn.getDB('test')
 
 // Add data to it
-var bulk = db.foo.initializeUnorderedBulkOp();
-for (var i = 0; i < N; i++) {
-    bulk.insert({ x: i, text: Text });
-}
-// wait to be copied to at least one secondary (BUG hangs here)
-assert.writeOK(bulk.execute({ w: 2 }));
+for (var i = 0; i < N; i++)
+    db['foo'].insert({x: i, text: Text})
 
+// wait to be copied to at least one secondary (BUG hangs here)
+db.getLastError(2)
 
 print('getlasterror_w2.js SUCCESS')
 }

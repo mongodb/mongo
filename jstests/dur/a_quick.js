@@ -62,7 +62,8 @@ tst.log("start mongod without dur");
 var conn = startMongodEmpty("--port", 30000, "--dbpath", path1, "--nodur");
 tst.log("without dur work");
 var d = conn.getDB("test");
-assert.writeOK(d.foo.insert({ _id: 123 }));
+d.foo.insert({ _id:123 });
+d.getLastError();
 tst.log("stop without dur");
 stopMongod(30000);
 
@@ -71,7 +72,8 @@ tst.log("start mongod with dur");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path2, "--dur", "--durOptions", 8);
 tst.log("with dur work");
 d = conn.getDB("test");
-assert.writeOK(d.foo.insert({ _id: 123 }));
+d.foo.insert({ _id: 123 });
+d.getLastError(); // wait
 
 // we could actually do getlasterror fsync:1 now, but maybe this is agood 
 // as it will assure that commits happen on a timely basis.  a bunch of the other dur/*js

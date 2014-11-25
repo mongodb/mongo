@@ -30,24 +30,26 @@ function f(variant, quickCommits, paranoid) {
     print("closeall.js run test");
 
     print("wait for initial sync to finish") // SERVER-4852
-    assert.writeOK(db1.foo.insert({}, { writeConcern: { w: 2 }}));
-    assert.writeOK(db1.foo.remove({}, { writeConcern: { w: 2 }}));
+    db1.foo.insert({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
+    db1.foo.remove({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
     print("initial sync done")
 
-    var writeOps = startParallelShell('var coll = db.getSiblingDB("closealltest").foo; \
-                                       var bulk = coll.initializeUnorderedBulkOp(); \
-                                       for( var i = 0; i < ' + N + '; i++ ) { \
-                                           bulk.insert({ x: 1 }); \
-                                           if ( i % 7 == 0 ) \
-                                               bulk.insert({ x: 99, y: 2 }); \
-                                           if ( i % 49 == 0 ) \
-                                               bulk.find({ x: 99 }).update( \
-                                                   { a: 1, b: 2, c: 3, d: 4 }); \
-                                           if( i == 800 ) \
-                                               coll.ensureIndex({ x: 1 }); \
-                                       }', 30001);
-
-    for( var i = 0; i < N; i++ ) {
+    for( var i = 0; i < N; i++ ) { 
+            db1.foo.insert({x:1}); // this does wait for a return code so we will get some parallelism
+            if( i % 7 == 0 )
+                db1.foo.insert({x:99, y:2});
+            if( i %     49 == 0 )
+                db1.foo.update({ x: 99 }, { a: 1, b: 2, c: 3, d: 4 });
+            if (i % 100 == 0)
+                db1.foo.find();
+            if( i == 800 )
+                db1.foo.ensureIndex({ x: 1 });
         var res = null;
         try {
             if( variant == 1 )
@@ -59,6 +61,7 @@ function f(variant, quickCommits, paranoid) {
             res = db2.adminCommand("closeAllDatabases");
         }
         catch (e) {
+            sleep(5000); // sleeping a little makes console output order prettier
             print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i);
             try {
                 print("getlasterror:");
@@ -71,6 +74,8 @@ function f(variant, quickCommits, paranoid) {
                 print("got another exception : " + e);
             }
             print("\n\n\n");
+            // sleep a little to capture possible mongod output?
+            sleep(2000);
             throw e;
         }
         assert( res.ok, "closeAllDatabases res.ok=false");
@@ -82,8 +87,6 @@ function f(variant, quickCommits, paranoid) {
     print("closeall.js shutting down servers");
     stopMongod(30002);
     stopMongod(30001);
-
-    writeOps();
 }
 
 // Skip this test on 32-bit Windows (unfixable failures in MapViewOfFileEx)

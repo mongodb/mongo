@@ -1,4 +1,4 @@
-// Change a write concern mode from 2 to 3 servers
+// Change a getLastErrorMode from 2 to 3 servers
 
 var host = getHostName();
 var replTest = new ReplSetTest( {name: "rstag", nodes: 4, startPort: 31000} );

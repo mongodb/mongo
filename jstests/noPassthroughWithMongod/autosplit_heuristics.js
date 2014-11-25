@@ -60,11 +60,15 @@ printjson({ chunkSizeBytes : chunkSizeBytes,
             totalInserts : totalInserts });
 
 // Insert enough docs to trigger splits into all chunks
-var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < totalInserts; i++) {
-    bulk.insert({ _id : i % numChunks + (i / totalInserts) });
+    coll.insert({ _id : i % numChunks + (i / totalInserts) });
+    if ( i % ( numChunks * 1000 ) == 0 ) {
+        print( "Inserted " + i + " docs, " +
+               ( i * approxSize / numChunks ) + " bytes per chunk." );
+    }
 }
-assert.writeOK(bulk.execute());
+
+assert.eq(null, coll.getDB().getLastError());
 
 jsTest.log("Inserts completed...");
 
