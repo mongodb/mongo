@@ -17,7 +17,7 @@ static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
 /* The bit list ignores the first block: convert to/from a frag/offset. */
-#define	WT_wt_off_tO_FRAG(block, off)					\
+#define	WT_wt_off_TO_FRAG(block, off)					\
 	((off) / (block)->allocsize - 1)
 #define	WT_FRAG_TO_OFF(block, frag)					\
 	(((wt_off_t)(frag + 1)) * (block)->allocsize)
@@ -81,7 +81,7 @@ __wt_block_verify_start(
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
 	 */
-	block->frags = (uint64_t)WT_wt_off_tO_FRAG(block, size);
+	block->frags = (uint64_t)WT_wt_off_TO_FRAG(block, size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -252,7 +252,7 @@ __wt_verify_ckpt_load(
 	WT_RET(__bit_alloc(session, block->frags, &block->fragckpt));
 	el = &block->verify_alloc;
 	WT_EXT_FOREACH(ext, el->off) {
-		frag = (uint64_t)WT_wt_off_tO_FRAG(block, ext->off);
+		frag = (uint64_t)WT_wt_off_TO_FRAG(block, ext->off);
 		frags = (uint64_t)(ext->size / block->allocsize);
 		__bit_nset(block->fragckpt, frag, frag + (frags - 1));
 	}
@@ -342,7 +342,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    "non-existent file blocks",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint64_t)WT_wt_off_tO_FRAG(block, offset);
+	frag = (uint64_t)WT_wt_off_TO_FRAG(block, offset);
 	frags = (uint64_t)(size / block->allocsize);
 
 	/* It may be illegal to reference a particular chunk more than once. */
@@ -445,7 +445,7 @@ __verify_ckptfrag_add(
 		    "file blocks outside the checkpoint",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint64_t)WT_wt_off_tO_FRAG(block, offset);
+	frag = (uint64_t)WT_wt_off_TO_FRAG(block, offset);
 	frags = (uint64_t)(size / block->allocsize);
 
 	/* It is illegal to reference a particular chunk more than once. */
