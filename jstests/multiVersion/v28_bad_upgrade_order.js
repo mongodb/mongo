@@ -85,5 +85,6 @@ function testBadUpgrade(isRSCluster) {
     st.stop();
 }
 
-testBadUpgrade(false);
-testBadUpgrade(true);
+// TODO: SERVER-16321
+//testBadUpgrade(false);
+//testBadUpgrade(true);
