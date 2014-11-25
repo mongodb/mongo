@@ -1,5 +1,3 @@
-// TODO: move back to sharding suite after SERVER-13402 is fixed
-
 /**
  * This test checks that the moveChunk directory is not created
  */

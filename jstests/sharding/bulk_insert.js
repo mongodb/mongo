@@ -48,10 +48,21 @@ printjson(admin.runCommand({ moveChunk: collSh + "",
 
 var resetColls = function()
 {
-    assert.writeOK(collSh.remove({}));
-    assert.writeOK(collUn.remove({}));
-    assert.writeOK(collDi.remove({}));
-};
+    collSh.remove({})
+    assert.eq(null, collSh.getDB().getLastError());
+
+    collUn.remove({})
+    assert.eq(null, collUn.getDB().getLastError());
+
+    collDi.remove({})
+    assert.eq(null, collDi.getDB().getLastError());
+}
+
+var printPass = function(str)
+{
+    print(str);
+    return str;
+}
 
 var isDupKeyError = function(err)
 {
@@ -71,13 +82,16 @@ resetColls();
 var inserts = [{ukey : 0},
                {ukey : 1}]
 
-assert.writeOK(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.eq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(2, collSh.find().itcount());
 
-assert.writeOK(collUn.insert(inserts));
+collUn.insert(inserts);
+assert.eq(null, printPass(collUn.getDB().getLastError()));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeOK(collDi.insert(inserts));
+collDi.insert(inserts);
+assert.eq(null, printPass(collDi.getDB().getLastError()));
 assert.eq(2, collDi.find().itcount());
 
 jsTest.log("Bulk insert (no COE) with mongos error...")
@@ -87,7 +101,8 @@ var inserts = [{ukey : 0},
                {hello : "world"},
                {ukey : 1}]
 
-assert.writeError(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(1, collSh.find().itcount());
 
 jsTest.log("Bulk insert (no COE) with mongod error...")
@@ -97,13 +112,16 @@ var inserts = [{ukey : 0},
                {ukey : 0},
                {ukey : 1}]
 
-assert.writeError(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(1, collSh.find().itcount());
 
-assert.writeError(collUn.insert(inserts));
+collUn.insert(inserts);
+assert.neq(null, printPass(collUn.getDB().getLastError()));
 assert.eq(1, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts));
+collDi.insert(inserts);
+assert.neq(null, printPass(collDi.getDB().getLastError()));
 assert.eq(1, collDi.find().itcount());
 
 jsTest.log("Bulk insert (no COE) with mongod and mongos error...")
@@ -114,16 +132,22 @@ var inserts = [{ukey : 0},
                {ukey : 1},
                {hello : "world"}]
 
-var res = assert.writeError(collSh.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collSh.insert(inserts);
+var err = printPass(collSh.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(1, collSh.find().itcount());
 
-res = assert.writeError(collUn.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collUn.insert(inserts);
+var err = printPass(collUn.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(1, collUn.find().itcount());
 
-res = assert.writeError(collDi.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collDi.insert(inserts);
+var err = printPass(collDi.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(1, collDi.find().itcount());
 
 jsTest.log("Bulk insert (no COE) on second shard...")
@@ -132,13 +156,16 @@ resetColls();
 var inserts = [{ukey : 0},
                {ukey : -1}]
 
-assert.writeOK(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.eq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(2, collSh.find().itcount());
 
-assert.writeOK(collUn.insert(inserts));
+collUn.insert(inserts);
+assert.eq(null, printPass(collUn.getDB().getLastError()));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeOK(collDi.insert(inserts));
+collDi.insert(inserts);
+assert.eq(null, printPass(collDi.getDB().getLastError()));
 assert.eq(2, collDi.find().itcount());
 
 jsTest.log("Bulk insert to second shard (no COE) with mongos error...")
@@ -149,7 +176,8 @@ var inserts = [{ukey : 0},
                {ukey : -1},
                {hello : "world"}]
 
-assert.writeError(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(3, collSh.find().itcount());
 
 jsTest.log("Bulk insert to second shard (no COE) with mongod error...")
@@ -161,16 +189,20 @@ var inserts = [{ukey : 0},
                {ukey : -2},
                {ukey : -2}]
 
-assert.writeError(collSh.insert(inserts));
+collSh.insert(inserts);
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(4, collSh.find().itcount());
 
-assert.writeError(collUn.insert(inserts));
+collUn.insert(inserts);
+assert.neq(null, printPass(collUn.getDB().getLastError()));
 assert.eq(4, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts));
+collDi.insert(inserts);
+assert.neq(null, printPass(collDi.getDB().getLastError()));
 assert.eq(4, collDi.find().itcount());
 
-jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...")
+jsTest
+        .log("Bulk insert to third shard (no COE) with mongod and mongos error...")
 
 resetColls();
 var inserts = [{ukey : 0},
@@ -181,16 +213,22 @@ var inserts = [{ukey : 0},
                {ukey : 4},
                {hello : "world"}]
 
-res = assert.writeError(collSh.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collSh.insert(inserts);
+var err = printPass(collSh.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(5, collSh.find().itcount());
 
-res = assert.writeError(collUn.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collUn.insert(inserts);
+var err = printPass(collUn.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(5, collUn.find().itcount());
 
-res = assert.writeError(collDi.insert(inserts));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collDi.insert(inserts);
+var err = printPass(collDi.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(5, collDi.find().itcount());
 
 //
@@ -204,7 +242,8 @@ var inserts = [{ukey : 0},
                {hello : "world"},
                {ukey : 1}]
 
-assert.writeError(collSh.insert(inserts, 1)); // COE
+collSh.insert(inserts, 1); // COE
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(2, collSh.find().itcount());
 
 jsTest.log("Bulk insert (yes COE) with mongod error...")
@@ -214,13 +253,16 @@ var inserts = [{ukey : 0},
                {ukey : 0},
                {ukey : 1}]
 
-assert.writeError(collSh.insert(inserts, 1));
+collSh.insert(inserts, 1);
+assert.neq(null, printPass(collSh.getDB().getLastError()));
 assert.eq(2, collSh.find().itcount());
 
-assert.writeError(collUn.insert(inserts, 1));
+collUn.insert(inserts, 1);
+assert.neq(null, printPass(collUn.getDB().getLastError()));
 assert.eq(2, collUn.find().itcount());
 
-assert.writeError(collDi.insert(inserts, 1));
+collDi.insert(inserts, 1);
+assert.neq(null, printPass(collDi.getDB().getLastError()));
 assert.eq(2, collDi.find().itcount());
 
 jsTest
@@ -236,17 +278,23 @@ var inserts = [{ukey : 0},
                {hello : "world"}]
 
 // Last error here is mongos error
-res = assert.writeError(collSh.insert(inserts, 1));
-assert(!isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
+collSh.insert(inserts, 1);
+var err = printPass(collSh.getDB().getLastError());
+assert.neq(null, err);
+assert(!isDupKeyError(err));
 assert.eq(5, collSh.find().itcount());
 
 // Extra insert goes through, since mongos error "doesn't count"
-res = assert.writeError(collUn.insert(inserts, 1));
-assert.eq(6, res.nInserted, res.toString());
+collUn.insert(inserts, 1);
+var err = printPass(collUn.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(6, collUn.find().itcount());
 
-res = assert.writeError(collDi.insert(inserts, 1));
-assert.eq(6, res.nInserted, res.toString());
+collDi.insert(inserts, 1);
+var err = printPass(collDi.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(6, collDi.find().itcount());
 
 jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error "
@@ -262,17 +310,23 @@ var inserts = [{ukey : 0},
                {ukey : 4}]
 
 // Last error here is mongos error
-res = assert.writeError(collSh.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
+collSh.insert(inserts, 1);
+var err = printPass(collSh.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(5, collSh.find().itcount());
 
 // Extra insert goes through, since mongos error "doesn't count"
-res = assert.writeError(collUn.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
+collUn.insert(inserts, 1);
+var err = printPass(collUn.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(6, collUn.find().itcount());
 
-res = assert.writeError(collDi.insert(inserts, 1));
-assert(isDupKeyError(res.getWriteErrorAt(0).errmsg), res.toString());
+collDi.insert(inserts, 1);
+var err = printPass(collDi.getDB().getLastError());
+assert.neq(null, err);
+assert(isDupKeyError(err));
 assert.eq(6, collDi.find().itcount());
 
 //
@@ -297,7 +351,9 @@ printjson(admin.runCommand({moveChunk : collSh + "",
                             to : shards[0]._id,
                             _waitForDelete: true}));
 
-assert.writeOK(staleCollSh.insert(inserts));
+staleCollSh.insert(inserts);
+var err = printPass(staleCollSh.getDB().getLastError());
+assert.eq(null, err);
 
 //
 // Test when the objects to be bulk inserted are 10MB, and so can't be inserted
@@ -336,6 +392,8 @@ printjson(admin.runCommand({moveChunk : collSh + "",
                             to : shards[0]._id,
                             _waitForDelete: true}));
 
-assert.writeOK(staleCollSh.insert(inserts));
+staleCollSh.insert(inserts);
+var err = printPass(staleCollSh.getDB().getLastError());
+assert.eq(null, err);
 
 st.stop()

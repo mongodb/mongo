@@ -17,11 +17,12 @@ conn.setLogLevel( 3 )
 var coll = conn.getCollection( "test.groupSlaveOk" )
 coll.drop()
 
-var bulk = coll.initializeUnorderedBulkOp();
 for( var i = 0; i < 300; i++ ){
-    bulk.insert( { i : i % 10 } );
+    coll.insert( { i : i % 10 } )
 }
-assert.writeOK( bulk.execute() );
+
+// Make sure the writes get through, otherwise we can continue to error these one-at-a-time
+coll.getDB().getLastError()
 
 st.printShardingStatus()
 
@@ -50,15 +51,17 @@ assert.eq( 10, coll.group({ key : { i : true } ,
 try {
    
     conn.setSlaveOk( false ) 
-    var res = coll.group({ key : { i : true } , 
-                           reduce : function( obj, ctx ){ ctx.count += 1 } ,
-                           initial : { count : 0 } });
-
-    print( "Should not reach here! Group result: " + tojson(res) );
-    assert( false );
+    coll.group({ key : { i : true } , 
+                 reduce : function( obj, ctx ){ ctx.count += 1 } ,
+                 initial : { count : 0 } })
+    
+    print( "Should not reach here!" )
+    printjson( coll.getDB().getLastError() )                 
+    assert( false )
+    
 }
 catch( e ){
-    print( "Non-slaveOk'd connection failed." + tojson(e) )
+    print( "Non-slaveOk'd connection failed." )
 }
 
 // Finish

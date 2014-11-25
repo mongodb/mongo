@@ -37,9 +37,11 @@ assert.eq( 0, aggregate.toArray().length );
 
 c.save( {a:null,b:null} );
 c.save( {a:1,b:1} );
-assert.writeOK( c.remove( unsatisfiable ));
+c.remove( unsatisfiable );
+assert( !db.getLastError() );
 assert.eq( 2, c.count() );
-assert.writeOK( c.update( unsatisfiable, {$set:{c:1}}, false, true ));
+c.update( unsatisfiable, {$set:{c:1}}, false, true );
+assert( !db.getLastError() );
 assert.eq( 2, c.count() );
 assert.eq( 0, c.count( {c:1} ) );
 

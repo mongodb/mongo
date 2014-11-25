@@ -35,9 +35,10 @@ assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 90 }, to : shar
 st.printShardingStatus();
 
 // Insert some data into each of the consolidated ranges
-assert.writeOK(coll.insert({ _id : 0 }));
-assert.writeOK(coll.insert({ _id : 40 }));
-assert.writeOK(coll.insert({ _id : 110 }));
+coll.insert({ _id : 0 });
+coll.insert({ _id : 40 });
+coll.insert({ _id : 110 });
+assert.eq( null, coll.getDB().getLastError() );
 
 var staleCollection = staleMongos.getCollection( coll + "" );
 

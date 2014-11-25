@@ -26,7 +26,8 @@ st.printShardingStatus();
 
 jsTest.log("Making mongos stale...");
 
-assert.writeOK(coll.insert({ _id : 0 }));
+coll.insert({ _id : 0 });
+coll.getDB().getLastErrorObj();
 
 // Make sure the stale mongos knows about the collection at the original version
 assert.neq(null, staleMongos.getCollection(coll + "").findOne());
@@ -36,16 +37,27 @@ printjson(admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : sha
 
 jsTest.log("Running a stale insert...");
 
-// duplicate _id
-assert.writeError(staleMongos.getCollection(coll + "").insert({ _id : 0, dup : "key" }));
+staleMongos.getCollection(coll + "").insert({ _id : 0, dup : "key" });
 
+jsTest.log("Getting initial GLE result...");
+
+printjson(staleMongos.getDB(coll.getDB() + "").getLastErrorObj());
+printjson(staleMongos.getDB(coll.getDB() + "").getLastErrorObj());
 st.printShardingStatus();
 
 jsTest.log("Performing insert op on the same shard...");
 
-assert.writeOK(staleMongos.getCollection(coll + "").insert({ _id : 1, key : "isOk" }));
+staleMongos.getCollection(coll + "").insert({ _id : 1, key : "isOk" })
+
+jsTest.log("Getting GLE result...");
+
+printjson(staleMongos.getDB(coll.getDB() + "").getLastErrorObj());
+assert.eq(null, staleMongos.getDB(coll.getDB() + "").getLastError());
 
 jsTest.log("DONE!");
 
 st.stop();
+
+
+
 

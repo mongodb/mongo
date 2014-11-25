@@ -11,11 +11,9 @@ big = ""
 while ( big.length < 10000 )
     big += "eliot"
 
-var bulk = coll.initializeUnorderedBulkOp();
-for ( x=0; x<100; x++ ) {
-    bulk.insert( { x : x , big : big } );
-}
-assert.writeOK(bulk.execute());
+for ( x=0; x<100; x++ )
+    coll.insert( { x : x , big : big } )
+db.getLastError();
 
 db.printShardingStatus()
 
@@ -32,7 +30,8 @@ print( "direct : " + direct )
 directDB = direct.getDB( "test" )
 
 for ( done=0; done<2*1024*1024; done+=big.length ){
-    assert.writeOK(directDB.foo.insert( { x : 50 + Math.random() , big : big } ));
+    directDB.foo.insert( { x : 50 + Math.random() , big : big } )
+    directDB.getLastError();
 }
 
 db.printShardingStatus()

@@ -58,8 +58,8 @@ else {
 }
 
 login(adminUser);
-assert.writeOK(s.getDB( "config" ).settings.update({ _id: "chunksize" },
-                                                   { $set: { value : 1 }}, true ));
+s.getDB( "config" ).settings.update( { _id : "chunksize" }, {$set : {value : 1 }}, true );
+printjson(s.getDB("config").runCommand({getlasterror:1}));
 printjson(s.getDB("config").settings.find().toArray());
 
 print("restart mongos");
@@ -139,7 +139,9 @@ login(testUser);
 assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
-assert.writeOK(s.getDB("test").foo.insert({ x: 1 }));
+s.getDB("test").foo.insert({x:1});
+result = s.getDB("test").getLastErrorObj();
+assert.eq(result.err, null);
 assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 
 logout(testUser);
@@ -162,11 +164,15 @@ ReplSetTest.awaitRSClientHosts(s.s, d2.nodes, {ok: true });
 s.getDB("test").foo.remove({})
 
 var num = 100000;
-var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
 for (i=0; i<num; i++) {
-    bulk.insert({ _id: i, x: i, abc: "defg", date: new Date(), str: "all the talk on the market" });
+    s.getDB("test").foo.insert({_id:i, x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
-assert.writeOK(bulk.execute());
+
+// Make sure all data gets sent through
+printjson( s.getDB("test").getLastError() )
+for (var i = 0; i < s._connections.length; i++) { // SERVER-4356
+    s._connections[i].getDB("test").getLastError();
+}
 
 var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
@@ -196,7 +202,7 @@ if (numDocs != num) {
         lastDocNumber = docs[i].x;
         numDocsSeen++;
     }
-    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find()")
+    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find() even though getLastError was already called")
     assert.eq(num - numDocs, missingDocNumbers.length);
 
     load('jstests/libs/trace_missing_docs.js');
@@ -280,7 +286,9 @@ print( "   testing find that should work" );
 readOnlyDB.foo.findOne();
 
 print( "   testing write that should fail" );
-assert.writeError(readOnlyDB.foo.insert({ eliot: 1 }));
+readOnlyDB.foo.insert( { eliot : 1 } );
+result = readOnlyDB.getLastError();
+assert( ! result.ok , tojson( result ) )
 
 print( "   testing read command (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));

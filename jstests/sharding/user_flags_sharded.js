@@ -26,9 +26,8 @@ assert.eq( res.ok , 1 , "collMod failed" );
 
 // and insert some stuff, for the hell of it
 var numdocs = 20;
-for( i=0; i < numdocs; i++){
-    assert.writeOK(db1.getCollection( coll ).insert({ _id : i }));
-}
+for( i=0; i < numdocs; i++){ db1.getCollection( coll ).insert( {_id : i} ); }
+db1.getLastError()
 
 // Next verify that userFlags has changed to 0
 collstats = db1.getCollection( coll ).stats()

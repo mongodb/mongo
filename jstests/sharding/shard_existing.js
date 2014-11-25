@@ -15,11 +15,10 @@ print("NumDocs: " + numDocs + " DocSize: " + docSize + " TotalSize: " + totalSiz
 // turn off powerOf2Sizes as this tests regular allocation
 db.createCollection('data', {usePowerOf2Sizes: false});
 
-var bulk = db.data.initializeUnorderedBulkOp();
 for (i=0; i<numDocs; i++) {
-    bulk.insert({_id: i, s: bigString});
+    db.data.insert({_id: i, s: bigString});
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 assert.lt(totalSize, db.data.stats().size);
 

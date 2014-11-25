@@ -22,7 +22,8 @@ assert.commandWorked(db.adminCommand( { shardcollection : ns , key : { a : "hash
 db.printShardingStatus();
 
 // Create unique index
-assert.commandWorked(coll.ensureIndex({ a: 1, b: 1 }, { unique: true }));
+coll.ensureIndex({a:1, b:1}, {unique:true})
+assert.gleSuccess(db, "unique index failed");
 
 jsTest.log("------ indexes -------")
 jsTest.log(tojson(coll.getIndexes()));
@@ -32,7 +33,8 @@ jsTest.log("------ dropping sharded collection to start part 2 -------")
 coll.drop();
 
 //Create unique index
-assert.commandWorked(coll.ensureIndex({ a: 1, b: 1 }, { unique: true }));
+coll.ensureIndex({a:1, b:1}, {unique:true})
+assert.gleSuccess(db, "unique index failed 2");
 
 // shard a fresh collection using a hashed shard key
 assert.commandWorked(db.adminCommand( { shardcollection : ns , key : { a : "hashed" } } ),

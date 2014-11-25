@@ -14,9 +14,11 @@ var getDBSection = function (dbsArray, dbToFind) {
     return null;
 }
 
-assert.writeOK(mongos.getDB("blah").foo.insert({ _id: 1 }));
-assert.writeOK(mongos.getDB("foo").foo.insert({ _id: 1 }));
-assert.writeOK(mongos.getDB("raw").foo.insert({ _id: 1 }));
+mongos.getDB("blah").foo.insert({_id:1})
+mongos.getDB("foo").foo.insert({_id:1})
+mongos.getDB("raw").foo.insert({_id:1})
+//wait for writes to finish
+mongos.getDB("raw").getLastError()
 
 //verify that the config db is not on a shard
 var res = mongos.adminCommand("listDatabases");

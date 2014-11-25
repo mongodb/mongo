@@ -33,11 +33,12 @@ for (var splitPoint = 0; splitPoint < numBatch; splitPoint += 400) {
     testDB.adminCommand({ split: 'test.foo', middle: { a: splitPoint }});
 }
 
-var bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numBatch; ++i) {
-    bulk.insert({ a: numDocs + i, y: str, i: numDocs + i });
+    testDB.foo.save({ a: numDocs + i, y: str, i: numDocs + i });
 }
-assert.writeOK(bulk.execute());
+
+var GLE = testDB.getLastError();
+assert.eq(null, GLE, "Setup FAILURE: testDB.getLastError() returned" + GLE);
 
 numDocs += numBatch;
 
@@ -93,11 +94,12 @@ for (splitPoint = 0; splitPoint < numBatch; splitPoint += 400) {
     testDB.adminCommand({ split: 'test.foo', middle: { a: numDocs + splitPoint }});
 }
 
-bulk = testDB.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < numBatch; ++i) {
-    bulk.insert({ a: numDocs + i, y: str, i: numDocs + i });
+    testDB.foo.save({ a: numDocs + i, y: str, i: numDocs + i });
 }
-assert.writeOK(bulk.execute());
+
+GLE = testDB.getLastError();
+assert.eq(null, GLE, "Setup FAILURE: testDB.getLastError() returned" + GLE);
 jsTest.log("No errors on insert batch.");
 numDocs += numBatch;
 

@@ -14,65 +14,98 @@ st.printShardingStatus()
 
 print( "1: insert some invalid data" )
 
-var value = null;
+var value = null
+
+var checkError = function( shouldError ){
+    var error = coll.getDB().getLastError()
+    
+    if( error != null ) printjson( error )
+    
+    if( error == null && ! shouldError ) return
+    if( error != null && shouldError ) return
+    
+    if( error == null ) print( "No error detected!" )
+    else print( "Unexpected error!" )
+    
+    assert( false )
+}
 
 // Insert an object with invalid array key 
-assert.writeError(coll.insert({ i : [ 1, 2 ] }));
+coll.insert({ i : [ 1, 2 ] })
+checkError( true )
 
 // Insert an object with all the right fields, but an invalid array val for _id
-assert.writeError(coll.insert({ _id : [ 1, 2 ] , i : 3}));
+coll.insert({ _id : [ 1, 2 ] , i : 3})
+checkError( true )
 
 // Insert an object with valid array key
-assert.writeOK(coll.insert({ i : 1 }));
+coll.insert({ i : 1 })
+checkError( false )
 
 // Update the value with valid other field
 value = coll.findOne({ i : 1 })
-assert.writeOK(coll.update( value, { $set : { j : 2 } } ));
+coll.update( value, { $set : { j : 2 } } )
+checkError( false )
 
 // Update the value with invalid other fields
 value = coll.findOne({ i : 1 })
-assert.writeError(coll.update( value, Object.merge( value, { i : [ 3 ] } ) ));
+coll.update( value, Object.merge( value, { i : [ 3 ] } ) )
+checkError( true )
 
 // Multi-update the value with invalid other fields
 value = coll.findOne({ i : 1 })
-assert.writeError(coll.update( value, Object.merge( value, { i : [ 3, 4 ] } ), false, true));
+coll.update( value, Object.merge( value, { i : [ 3, 4 ] } ), false, true)
+checkError( true )
 
 // Multi-update the value with other fields (won't work, but no error)
 value = coll.findOne({ i : 1 })
-assert.writeOK(coll.update( Object.merge( value, { i : [ 1, 1 ] } ), { $set : { k : 4 } }, false, true));
+coll.update( Object.merge( value, { i : [ 1, 1 ] } ), { $set : { k : 4 } }, false, true)
+checkError( false )
 
 // Query the value with other fields (won't work, but no error)
 value = coll.findOne({ i : 1 })
 coll.find( Object.merge( value, { i : [ 1, 1 ] } ) ).toArray()
+checkError( false )
 
 // Can't remove using multikey, but shouldn't error
 value = coll.findOne({ i : 1 })
 coll.remove( Object.extend( value, { i : [ 1, 2, 3, 4 ] } ) )
+checkError( false )
 
 // Can't remove using multikey, but shouldn't error
 value = coll.findOne({ i : 1 })
-assert.writeOK(coll.remove( Object.extend( value, { i : [ 1, 2, 3, 4, 5 ] } ) ));
+coll.remove( Object.extend( value, { i : [ 1, 2, 3, 4, 5 ] } ) )
+error = coll.getDB().getLastError()
+assert.eq( error, null )
 assert.eq( coll.find().itcount(), 1 )
 
 value = coll.findOne({ i : 1 })
-assert.writeOK(coll.remove( Object.extend( value, { i : 1 } ) ));
+coll.remove( Object.extend( value, { i : 1 } ) )
+error = coll.getDB().getLastError()
+assert.eq( error, null )
 assert.eq( coll.find().itcount(), 0 )
 
 coll.ensureIndex({ _id : 1, i : 1, j: 1 });
 // Can insert document that will make index into a multi-key as long as it's not part of shard key.
 coll.remove({});
-assert.writeOK(coll.insert({ i: 1, j: [1, 2] }));
+coll.insert({ i: 1, j: [1, 2] });
+error = coll.getDB().getLastError();
+assert.eq( error, null );
 assert.eq( coll.find().itcount(), 1 );
 
 // Same is true for updates.
 coll.remove({});
 coll.insert({ _id: 1, i: 1 });
-assert.writeOK(coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] }));
+coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] });
+error = coll.getDB().getLastError();
+assert.eq( error, null );
 assert.eq( coll.find().itcount(), 1 );
 
 // Same for upserts.
 coll.remove({});
-assert.writeOK(coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] }, true));
+coll.update({ _id: 1, i: 1 }, { _id: 1, i:1, j: [1, 2] }, true);
+error = coll.getDB().getLastError();
+assert.eq( error, null );
 assert.eq( coll.find().itcount(), 1 );
 
 printjson( "Sharding-then-inserting-multikey tested, now trying inserting-then-sharding-multikey" )
@@ -81,7 +114,8 @@ printjson( "Sharding-then-inserting-multikey tested, now trying inserting-then-s
 var coll = mongos.getCollection( "" + coll + "2" )
 for( var i = 0; i < 10; i++ ){
     // TODO : does not check weird cases like [ i, i ]
-    assert.writeOK(coll.insert({ i : [ i, i + 1 ] }));
+    coll.insert({ i : [ i, i + 1 ] })
+    checkError( false )
 }
 
 coll.ensureIndex({ _id : 1, i : 1 })
@@ -99,7 +133,8 @@ st.printShardingStatus()
 var coll = mongos.getCollection( "" + coll + "3" )
 for( var i = 0; i < 10; i++ ){
     // TODO : does not check weird cases like [ i, i ]
-    assert.writeOK(coll.insert({ i : i }));
+    coll.insert({ i : i })
+    checkError( false )
 }
 
 coll.ensureIndex({ _id : 1, i : 1 })

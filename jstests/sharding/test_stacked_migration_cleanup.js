@@ -26,11 +26,10 @@ for (var i = 0; i < numChunks; i++) {
 jsTest.log("Inserting a lot of small documents...")
 
 // Insert a lot of small documents to make multiple cursor batches
-var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 10 * 1000; i++) {
-    bulk.insert({ _id : i });
+    coll.insert({ _id : i })
 }
-assert.writeOK(bulk.execute());
+assert.eq(null, coll.getDB().getLastError());
 
 jsTest.log("Opening a mongod cursor...");
 
@@ -48,11 +47,10 @@ for (var i = 0; i < numChunks; i++) {
 jsTest.log("Dropping and re-creating collection...")
 
 coll.drop()
-bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < numChunks; i++) {
-    bulk.insert({ _id : i });
+    coll.insert({ _id : i })
 }
-assert.writeOK(bulk.execute());
+assert.eq(null, coll.getDB().getLastError());
 
 sleep(10 * 1000);
 

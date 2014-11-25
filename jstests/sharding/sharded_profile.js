@@ -26,7 +26,8 @@ var profileColl = st.shard0.getDB(coll.getDB().toString()).system.profile;
 var inserts = [{ _id : 0 }, { _id : 1 }, { _id : 2 }];
 var staleColl = st.s1.getCollection(coll.toString());
 
-assert.writeOK(staleColl.insert(inserts));
+staleColl.insert(inserts);
+assert.gleOK(staleColl.getDB().getLastErrorObj());
 
 printjson(profileColl.find().toArray());
 

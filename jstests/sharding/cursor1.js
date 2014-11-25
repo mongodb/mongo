@@ -16,11 +16,10 @@ primary = s.getServer( "test" ).getDB( "test" );
 secondary = s.getOther( primary ).getDB( "test" );
 
 numObjs = 10;
-var bulk = db.foo.initializeUnorderedBulkOp();
-for (i=0; i < numObjs; i++){
-    bulk.insert({ _id: i });
-}
-assert.writeOK(bulk.execute());
+for (i=0; i < numObjs; i++){                                                                                                  
+    db.foo.insert({_id: i}); 
+} 
+db.getLastError();
 assert.eq( 1, s.config.chunks.count() , "test requires collection to have one chunk initially" );
 
 // we'll split the collection in two and move the second chunk while three cursors are open

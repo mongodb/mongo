@@ -24,25 +24,27 @@ var coll = db.foo;
 
 var longStr = 'a';
 while ( longStr.length < 1024 * 128 ) { longStr += longStr; }
-var bulk = coll.initializeUnorderedBulkOp();
 for( i=0 ; i<100; i++){
-    bulk.insert({ num: i, str: longStr });
-    bulk.insert({ num: i+100, x: i, str: longStr });
+    coll.save( {num : i, str : longStr} );
+    coll.save( {num : i+100 , x : i, str : longStr})
 }
-assert.writeOK(bulk.execute());
+db.getLastError();
 
 //no usable index yet, should throw
 assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
 
 //create usable index
-assert.commandWorked(coll.ensureIndex({ num: 1, x: 1 }));
+coll.ensureIndex({num : 1, x : 1});
+db.getLastError();
 
 //usable index, but doc with empty 'num' value, so still should throw
-assert.writeOK(coll.insert({ x: -5 }));
+coll.save({x : -5});
+assert( ! db.getLastError() , "save bad value didn't succeed");
 assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
 
 //remove the bad doc.  now should finally succeed
-assert.writeOK(coll.remove({ x: -5 }));
+coll.remove( {x : -5});
+assert( ! db.getLastError() , "remove bad value didn't succeed");
 var result1 = admin.runCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } );
 printjson( result1 );
 assert.eq( 1, result1.ok , "sharding didn't succeed");
@@ -141,27 +143,27 @@ for( i=0; i < 3; i++ ){
 
     // declare a longer index
     if ( i == 0 ) {
-        assert.commandWorked( coll2.ensureIndex( { skey : 1, extra : 1 } ));
+        coll2.ensureIndex( { skey : 1, extra : 1 } );
     }
     else if ( i == 1 ) {
-        assert.commandWorked( coll2.ensureIndex( { skey : 1, extra : -1 } ));
+        coll2.ensureIndex( { skey : 1, extra : -1 } );
     }
     else if ( i == 2 ) {
-        assert.commandWorked( coll2.ensureIndex( { skey : 1, extra : 1 , superfluous : -1 } ));
+        coll2.ensureIndex( { skey : 1, extra : 1 , superfluous : -1 } );
     }
+    db.getLastError();
 
     // then shard collection on prefix
     var shardRes = admin.runCommand( { shardCollection : coll2 + "", key : { skey : 1 } } );
     assert.eq( shardRes.ok , 1 , "collection not sharded" );
 
     // insert docs with same value for skey
-    bulk = coll2.initializeUnorderedBulkOp();
     for( var i = 0; i < 5; i++ ){
         for( var j = 0; j < 5; j++ ){
-            bulk.insert( { skey : 0, extra : i , superfluous : j } );
+            coll2.insert( { skey : 0, extra : i , superfluous : j } );
         }
     }
-    assert.writeOK( bulk.execute() );
+    assert.eq( null, coll2.getDB().getLastError() , "inserts didn't work" );
 
     // split on that key, and check it makes 2 chunks
     var splitRes = admin.runCommand( { split : coll2 + "", middle : { skey : 0 } } );

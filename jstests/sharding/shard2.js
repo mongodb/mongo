@@ -40,6 +40,8 @@ db.foo.save( { num : 1 , name : "eliot" } );
 db.foo.save( { num : 2 , name : "sara" } );
 db.foo.save( { num : -1 , name : "joe" } );
 
+db.getLastError();
+
 assert.eq( 3 , s.getServer( "test" ).getDB( "test" ).foo.find().length() , "not right directly to db A" );
 assert.eq( 3 , db.foo.find().length() , "not right on shard" );
 
@@ -70,16 +72,19 @@ placeCheck( 3 );
 
 // test inserts go to right server/shard
 
-assert.writeOK(db.foo.save( { num : 3 , name : "bob" } ));
+db.foo.save( { num : 3 , name : "bob" } );
+db.getLastError();
 assert.eq( 1 , primary.foo.find().length() , "after move insert go wrong place?" );
 assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
-assert.writeOK(db.foo.save( { num : -2 , name : "funny man" } ));
+db.foo.save( { num : -2 , name : "funny man" } );
+db.getLastError();
 assert.eq( 2 , primary.foo.find().length() , "after move insert go wrong place?" );
 assert.eq( 3 , secondary.foo.find().length() , "after move insert go wrong place?" );
 
 
-assert.writeOK(db.foo.save( { num : 0 , name : "funny guy" } ));
+db.foo.save( { num : 0 , name : "funny guy" } );
+db.getLastError();
 assert.eq( 2 , primary.foo.find().length() , "boundary A" );
 assert.eq( 4 , secondary.foo.find().length() , "boundary B" );
 
@@ -193,17 +198,22 @@ assert.isnull( db.foo.findOne( { num : 3 } ) , "remove test E" );
 
 placeCheck( 8 );
 
+// TODO: getLastError
+db.getLastError();
+db.getPrevError();
+
 // more update stuff
 
 printAll();
 total = db.foo.find().count();
-var res = assert.writeOK(db.foo.update( {}, { $inc: { x: 1 } }, false, true ));
+db.foo.update( {} , { $inc : { x : 1 } } , false , true );
+x = db.getLastErrorObj();
 printAll();
-assert.eq( total , res.nModified, res.toString() );
+assert.eq( total , x.n , "getLastError n A: " + tojson( x ) );
 
 
-res = db.foo.update( { num : -1 } , { $inc : { x : 1 } } , false , true );
-assert.eq( 1, res.nModified, res.toString() );
+db.foo.update( { num : -1 } , { $inc : { x : 1 } } , false , true );
+assert.eq( 1 , db.getLastErrorObj().n , "getLastErrorObj n B" );
 
 // ---- move all to the secondary
 

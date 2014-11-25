@@ -24,14 +24,11 @@ st.printShardingStatus(true);
 
 jsTest.log("Insert enough data to overwhelm a query batch.");
 
-var bulk = coll.initializeUnorderedBulkOp();
-var bulk2 = collUnsharded.initializeUnorderedBulkOp();
 for (var i = -150; i < 150; i++) {
-    bulk.insert({ _id : i });
-    bulk2.insert({ _id : i });
+    coll.insert({ _id : i });
+    collUnsharded.insert({ _id : i });
 }
-assert.writeOK(bulk.execute());
-assert.writeOK(bulk2.execute());
+assert.eq(null, coll.getDB().getLastError());
 
 jsTest.log("Open a cursor to a sharded and unsharded collection.");
 

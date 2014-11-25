@@ -32,7 +32,8 @@ printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._i
 printjson( admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }) )
 
 // Insert one document
-assert.writeOK(coll.insert({ hello : "world" }));
+coll.insert({ hello : "world" })
+assert.eq( null, coll.getDB().getLastError() )
 
 // Migrate the collection to and from shard2 so shard1 loads the shard2 host
 printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id, _waitForDelete : true }) )

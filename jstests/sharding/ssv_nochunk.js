@@ -13,7 +13,8 @@ configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
 
 var testDB = st.s.getDB('test');
 
-assert.writeOK(testDB.user.insert({ x: 1 }));
+testDB.user.insert({ x: 1 });
+testDB.runCommand({ getLastError: 1 });
 
 var doc = testDB.user.findOne();
 

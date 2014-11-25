@@ -1,4 +1,3 @@
-// TODO: move back to sharding suite after SERVER-13402 is fixed
 
 s = new ShardingTest( "migrateMemory" , 2 , 1 , 1 , { chunksize : 1 });
 

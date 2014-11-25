@@ -119,7 +119,8 @@ var oldChunks = config.chunks.find().toArray();
 
 var staleMongos = MongoRunner.runMongos({ configdb : configConnStr });
 brokenColl = staleMongos.getCollection(brokenColl.toString());
-assert.writeOK(brokenColl.insert({ hello : "world" }));
+brokenColl.insert({ hello : "world" });
+assert.eq(null, brokenColl.getDB().getLastError());
 
 // Modify the chunks to make shards at a higher version
 
@@ -129,9 +130,11 @@ assert.commandWorked(admin.runCommand({ moveChunk : brokenColl.toString(),
 
 // Rewrite the old chunks back to the config server
 
-assert.writeOK(config.chunks.remove({}));
+config.chunks.remove({});
+assert.eq(null, config.getLastError());
 for ( var i = 0; i < oldChunks.length; i++ )
-    assert.writeOK(config.chunks.insert(oldChunks[i]));
+    config.chunks.insert(oldChunks[i]);
+assert.eq(null, config.getLastError());
 
 // Stale mongos can no longer bring itself up-to-date!
 // END SETUP
