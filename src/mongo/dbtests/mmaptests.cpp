@@ -78,7 +78,7 @@ namespace MMapTests {
                     verify(p);
                     // write something to the private view as a test
                     if (storageGlobalParams.dur)
-                        MemoryMappedFile::makeWritable(p, 6);
+                        privateViews.makeWritable(p, 6);
                     strcpy(p, "hello");
                 }
                 if (storageGlobalParams.dur) {
@@ -109,7 +109,7 @@ namespace MMapTests {
                     char *p = (char *) f.getView();
                     verify(p);
                     if (storageGlobalParams.dur)
-                        MemoryMappedFile::makeWritable(p, 4);
+                        privateViews.makeWritable(p, 4);
                     strcpy(p, "zzz");
                 }
                 if (storageGlobalParams.dur) {

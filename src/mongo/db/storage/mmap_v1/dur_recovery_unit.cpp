@@ -192,7 +192,7 @@ namespace mongo {
         invariant(len < size_t(numeric_limits<int>::max()));
 
         // Windows requires us to adjust the address space *before* we write to anything.
-        MemoryMappedFile::makeWritable(data, len);
+        privateViews.makeWritable(data, len);
 
         _writes.push_back(Write(static_cast<char*>(data), len, _preimageBuffer.size()));
         _preimageBuffer.append(static_cast<char*>(data), len);

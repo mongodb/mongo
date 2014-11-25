@@ -55,9 +55,17 @@ namespace mongo {
     }
     const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
-
+    // MapViewMutex
+    //
+    // Protects:
+    //   1. Ensures all MapViewOfFile/UnMapViewOfFile operations are serialized to reduce chance of
+    //    "address in use" errors (error code 487)
+    // -   These errors can still occur if the memory is used for other purposes
+    //     (stack storage, heap)
+    //   2. Prevents calls to VirtualProtect while we remapping files.
+    // Lock Ordering:
+    //  - If taken, must be after previewViews._m to prevent deadlocks
     mutex mapViewMutex("mapView");
-    ourbitset writable;
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
@@ -65,6 +73,13 @@ namespace mongo {
     const unsigned long long memoryMappedFileLocationFloor = 256LL * 1024LL * 1024LL * 1024LL;
     static unsigned long long _nextMemoryMappedFileLocation = memoryMappedFileLocationFloor;
 
+    // nextMemoryMappedFileLocationMutex
+    //
+    // Protects:
+    //  Windows 64-bit specific allocation of virtual memory regions for
+    //  placing memory mapped files in memory
+    // Lock Ordering:
+    //  No restrictions
     static SimpleMutex _nextMemoryMappedFileLocationMutex("nextMemoryMappedFileLocationMutex");
 
     unsigned long long AlignNumber(unsigned long long number, unsigned long long granularity)
@@ -130,14 +145,6 @@ namespace mongo {
         return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
     }
 
-    /** notification on unmapping so we can clear writable bits */
-    void MemoryMappedFile::clearWritableBits(void *p) {
-        for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
-            writable.clear(i);
-            verify( !writable.get(i) );
-        }
-    }
-
     MemoryMappedFile::MemoryMappedFile()
         : _uniqueId(mmfNextId.fetchAndAdd(1)) {
         fd = 0;
@@ -152,10 +159,14 @@ namespace mongo {
         // Prevent flush and close from concurrently running
         boost::lock_guard<boost::mutex> lk(_flushMutex);
 
-        for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
-            clearWritableBits(*i);
-            UnmapViewOfFile(*i);
+        {
+            scoped_lock lk(mapViewMutex);
+
+            for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
+                UnmapViewOfFile(*i);
+            }
         }
+
         views.clear();
         if ( maphandle )
             CloseHandle(maphandle);
@@ -345,69 +356,6 @@ namespace mongo {
 
     extern mutex mapViewMutex;
 
-    __declspec(noinline) void makeChunkWritable(size_t chunkno) { 
-        scoped_lock lk(mapViewMutex);
-
-        if( writable.get(chunkno) ) // double check lock
-            return;
-
-        // remap all maps in this chunk.  common case is a single map, but could have more than one with smallfiles or .ns files
-        size_t chunkStart = chunkno * MemoryMappedFile::ChunkSize;
-        size_t chunkNext = chunkStart + MemoryMappedFile::ChunkSize;
-
-        scoped_lock lk2(privateViews._mutex());
-        map<void*,DurableMappedFile*>::iterator i = privateViews.finditer_inlock((void*) (chunkNext-1));
-        while( 1 ) {
-            const pair<void*,DurableMappedFile*> x = *(--i);
-            DurableMappedFile *mmf = x.second;
-            if( mmf == 0 )
-                break;
-
-            size_t viewStart = (size_t) x.first;
-            size_t viewEnd = (size_t) (viewStart + mmf->length());
-            if( viewEnd <= chunkStart )
-                break;
-
-            size_t protectStart = max(viewStart, chunkStart);
-            dassert(protectStart<chunkNext);
-
-            size_t protectEnd = min(viewEnd, chunkNext);
-            size_t protectSize = protectEnd - protectStart;
-            dassert(protectSize>0&&protectSize<=MemoryMappedFile::ChunkSize);
-
-            DWORD oldProtection;
-            bool ok = VirtualProtect( reinterpret_cast<void*>( protectStart ),
-                                      protectSize,
-                                      PAGE_WRITECOPY,
-                                      &oldProtection );
-            if ( !ok ) {
-                DWORD dosError = GetLastError();
-
-                if (dosError == ERROR_COMMITMENT_LIMIT) {
-                    // System has run out of memory between physical RAM & page file, tell the user
-                    BSONObjBuilder bb;
-
-                    ProcessInfo p;
-                    p.getExtraInfo(bb);
-
-                    log() << "MongoDB has exhausted the system memory capacity.";
-                    log() << "Current Memory Status: " << bb.obj().toString();
-                }
-
-                log() << "VirtualProtect for " << mmf->filename()
-                        << " chunk " << chunkno
-                        << " failed with " << errnoWithDescription( dosError )
-                        << " (chunk size is " << protectSize
-                        << ", address is " << hex << protectStart << dec << ")"
-                        << " in mongo::makeChunkWritable, terminating"
-                        << endl;
-                fassertFailed( 16362 );
-            }
-        }
-
-        writable.set(chunkno);
-    }
-
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
 
@@ -450,7 +398,6 @@ namespace mongo {
             break;
         }
 
-        clearWritableBits( privateMapAddress );
         views.push_back( privateMapAddress );
         return privateMapAddress;
     }
@@ -458,7 +405,10 @@ namespace mongo {
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         LockMongoFilesExclusive lockMongoFiles;
 
-        clearWritableBits(oldPrivateAddr);
+        privateViews.clearWritableBits(oldPrivateAddr, len);
+
+        scoped_lock lk(mapViewMutex);
+
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD dosError = GetLastError();
             log() << "UnMapViewOfFile for " << filename()
