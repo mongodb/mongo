@@ -625,16 +625,14 @@ namespace mongo {
             uassert(10004, "no longer master", isMasterNs(ns.c_str()));
             Collection* coll = getCollectionOrUassert(ctx.ctx().db(), ns);
 
-            class BSONObjBuilder b;
+            BSONObjBuilder b;
             if ( !o.hasField( "_id" ) ) {
-                OID id;
-                id.init();
                 b.appendOID( "_id", NULL, true );
             }
             b.appendElements(o);
             BSONObj bo = b.obj();
 
-            coll->insertDocument( bo, true );
+            uassertStatusOK( coll->insertDocument( bo, true ).getStatus() );
             logOp( "i", ns.c_str(), bo );
         }
 
@@ -646,7 +644,7 @@ namespace mongo {
 
             Client::WriteContext ctx( _config.incLong );
             Collection* coll = getCollectionOrUassert(ctx.ctx().db(), _config.incLong);
-            coll->insertDocument( o, true );
+            uassertStatusOK( coll->insertDocument( o, true ).getStatus() );
             getDur().commitIfNeeded();
         }
 
