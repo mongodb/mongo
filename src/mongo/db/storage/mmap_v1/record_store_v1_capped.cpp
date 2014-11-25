@@ -98,7 +98,7 @@ namespace mongo {
             // since we have to iterate all the extents (for now) to get
             // storage size
             if ( lenToAlloc > storageSize(txn) ) {
-                return StatusWith<DiskLoc>( ErrorCodes::BadValue,
+                return StatusWith<DiskLoc>( ErrorCodes::DocTooLargeForCapped,
                                             mongoutils::str::stream()
                                             << "document is larger than capped size "
                                             << lenToAlloc << " > " << storageSize(txn),
@@ -115,11 +115,6 @@ namespace mongo {
 
             invariant( lenToAlloc < 400000000 );
             int passes = 0;
-            int maxPasses = ( lenToAlloc / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
-            if ( maxPasses < 5000 ) {
-                // this is for bacwards safety since 5000 was the old value
-                maxPasses = 5000;
-            }
 
             // delete records until we have room and the max # objects limit achieved.
 
@@ -127,7 +122,7 @@ namespace mongo {
             //invariant( theCapExtent()->ns == ns );
 
             theCapExtent()->assertOk();
-            DiskLoc firstEmptyExtent;
+            DiskLoc firstEmptyExtent; // This prevents us from infinite looping.
             while ( 1 ) {
                 if ( _details->numRecords() < _details->maxCappedDocs() ) {
                     loc = __capAlloc( txn, lenToAlloc );
@@ -158,9 +153,15 @@ namespace mongo {
                         firstEmptyExtent = _details->capExtent();
                     advanceCapExtent( txn, _ns );
                     if ( firstEmptyExtent == _details->capExtent() ) {
+                        // All records have been deleted but there is still no room for this record.
+                        // Nothing we can do but fail.
                         _maybeComplain( txn, lenToAlloc );
-                        return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                                    "no space in capped collection" );
+                        return StatusWith<DiskLoc>(
+                            ErrorCodes::DocTooLargeForCapped,
+                            str::stream() << "document doesn't fit in capped collection."
+                                          << " size: " << lenToAlloc
+                                          << " storageSize:" << storageSize(txn),
+                            28575);
                     }
                     continue;
                 }
@@ -172,16 +173,15 @@ namespace mongo {
                 deleteRecord( txn, fr );
 
                 compact(txn);
-                if( ++passes > maxPasses ) {
+                if ((++passes % 5000) == 0) {
                     StringBuilder sb;
-                    sb << "passes >= maxPasses in CappedRecordStoreV1::cappedAlloc: ns: " << _ns
-                       << ", lenToAlloc: " << lenToAlloc
-                       << ", maxPasses: " << maxPasses
-                       << ", _maxDocsInCapped: " << _details->maxCappedDocs()
-                       << ", nrecords: " << _details->numRecords()
-                       << ", datasize: " << _details->dataSize();
-
-                    return StatusWith<DiskLoc>( ErrorCodes::InternalError, sb.str() );
+                    log() << "passes = " << passes << " in CappedRecordStoreV1::allocRecord:"
+                          << " ns: " << _ns
+                          << ", lenToAlloc: " << lenToAlloc
+                          << ", maxCappedDocs: " << _details->maxCappedDocs()
+                          << ", nrecords: " << _details->numRecords()
+                          << ", datasize: " << _details->dataSize()
+                          << ". Continuing to delete old records to make room.";
                 }
             }
 

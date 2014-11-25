@@ -422,6 +422,58 @@ namespace {
         }
     }
 
+    // Larger than storageSize (fails early)
+    TEST(CappedRecordStoreV1, OversizedRecordHuge) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
+        DummyCappedDocumentDeleteCallback cb;
+        CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+
+        {
+            LocAndSize records[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            md->setCapExtent(&txn, DiskLoc(0, 0));
+            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        }
+
+        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 16000, false);
+        ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
+        ASSERT_EQUALS(status.getStatus().location(), 16328);
+    }
+
+    // Smaller than storageSize, but larger than usable space (fails late)
+    TEST(CappedRecordStoreV1, OversizedRecordMedium) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( true, 0 );
+        DummyCappedDocumentDeleteCallback cb;
+        CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
+
+        {
+            LocAndSize records[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            md->setCapExtent(&txn, DiskLoc(0, 0));
+            md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
+        }
+
+        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 1004 - Record::HeaderSize, false);
+        ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
+        ASSERT_EQUALS(status.getStatus().location(), 28575);
+    }
+
     //
     // XXX The CappedRecordStoreV1Scrambler suite of tests describe existing behavior that is less
     // than ideal. Any improved implementation will need to be able to handle a collection that has
