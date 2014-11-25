@@ -3,10 +3,12 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db/command"
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
+	"io"
 	"sync"
 )
 
@@ -17,6 +19,12 @@ type sessionFlag uint32
 const (
 	None      sessionFlag = 0
 	Monotonic sessionFlag = 1 << iota
+)
+
+var (
+	ErrLostConnection     = errors.New("lost connection to server")
+	ErrNoReachableServers = errors.New("no reachable servers")
+	ErrNsNotFound         = errors.New("ns not found")
 )
 
 type GetConnectorFunc func(opts options.ToolOptions) DBConnector
@@ -108,6 +116,22 @@ func NewSessionProvider(opts options.ToolOptions) *SessionProvider {
 
 	return provider
 
+}
+
+// IsConnectionError returns a boolean indicating if a given error is due to
+// an error in an underlying DB connection (as opposed to some other write
+// failure such as a duplicate key error)
+func IsConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err.Error() == ErrNoReachableServers.Error() {
+		return true
+	}
+	if err.Error() == io.EOF.Error() {
+		return true
+	}
+	return false
 }
 
 // Initialize a session provider to connect to the database server, based on

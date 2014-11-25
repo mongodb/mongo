@@ -272,12 +272,21 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	for i := 0; i < MaxInsertThreads; i++ {
 		go func() {
-			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, false)
+			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
 			for {
 				select {
 				case rawDoc, alive := <-docChan:
 					if !alive {
-						resultChan <- bulk.Flush()
+						err := bulk.Flush()
+						if err != nil {
+							if !db.IsConnectionError(err) && !restore.OutputOptions.StopOnError {
+								// Suppress this error since it's not a severe connection error and
+								// the user has not specified --stopOnError
+								log.Logf(log.Always, "error: %v", err)
+								err = nil
+							}
+						}
+						resultChan <- err
 						return
 					}
 					if restore.objCheck {
@@ -288,10 +297,18 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 							return
 						}
 					}
+
 					err := bulk.Insert(rawDoc)
 					if err != nil {
-						resultChan <- err
-						return
+
+						if db.IsConnectionError(err) || restore.OutputOptions.StopOnError {
+							// Propagate this error, since it's either a fatal connection error
+							// or the user has turned on --stopOnError
+							resultChan <- err
+						} else {
+							// Otherwise just log the error but don't propagate it.
+							log.Logf(log.Always, "error: %v", err)
+						}
 					}
 					bytesReadChan <- int64(len(rawDoc.Data))
 				case <-killChan:

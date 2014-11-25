@@ -291,7 +291,7 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 		if err := collection.DropCollection(); err != nil {
 			// TODO: do all mongods (e.g. v2.4) return this same
 			// error message?
-			if err.Error() != errNsNotFound.Error() {
+			if err.Error() != db.ErrNsNotFound.Error() {
 				return 0, err
 			}
 		}

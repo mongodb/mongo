@@ -21,6 +21,7 @@ type OutputOptions struct {
 	KeepIndexVersion       bool   `long:"keepIndexVersion" description:"Don't update index version"`
 	MaintainInsertionOrder bool   `long:"maintainInsertionOrder" description:"Preserve order of documents during restoration"`
 	NumParallelCollections int    `long:"numParallelCollections" short:"j" description:"Number of collections to restore in parallel" default:"4"`
+	StopOnError            bool   `long:"stopOnError" description:"Stop restoring if an error is encountered on insert (off by default)" default:"false"`
 }
 
 func (self *OutputOptions) Name() string {

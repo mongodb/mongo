@@ -1,9 +1,9 @@
 package mongoimport
 
 import (
-	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
@@ -12,12 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-)
-
-var (
-	errLostConnection    = errors.New("lost connection to server")
-	errNoReachableServer = errors.New("no reachable servers")
-	errNsNotFound        = errors.New("ns not found")
 )
 
 // ConvertibleDoc is an interface implemented by special types which wrap data
@@ -141,14 +135,14 @@ func filterIngestError(stopOnError bool, err error) error {
 	if err == nil {
 		return nil
 	}
-	if err.Error() == errNoReachableServer.Error() {
+	if err.Error() == db.ErrNoReachableServers.Error() {
 		return err
 	}
 	if err.Error() == io.EOF.Error() {
-		err = errLostConnection
+		err = db.ErrLostConnection
 	}
 	log.Logf(log.Always, "error inserting documents: %v", err)
-	if stopOnError || err == errLostConnection {
+	if stopOnError || err == db.ErrLostConnection {
 		return err
 	}
 	return nil
