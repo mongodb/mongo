@@ -112,11 +112,11 @@ namespace mongo {
     // -----------------------
 
     WiredTigerSessionCache::WiredTigerSessionCache( WiredTigerKVEngine* engine )
-        : _engine( engine ), _conn( engine->getConnection() ), _shuttingDown(0) {
+        : _engine( engine ), _conn( engine->getConnection() ), _inShutdown(false) {
     }
 
     WiredTigerSessionCache::WiredTigerSessionCache( WT_CONNECTION* conn )
-        : _engine( NULL ), _conn( conn ), _shuttingDown(0) {
+        : _engine( NULL ), _conn( conn ), _inShutdown(false) {
     }
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
@@ -124,14 +124,14 @@ namespace mongo {
     }
 
     void WiredTigerSessionCache::shuttingDown() {
-        if (_shuttingDown.load()) return;
-        _shuttingDown.store(1);
-
         {
             // This ensures that any calls, which are currently inside of getSession/releaseSession
             // will be able to complete before we start cleaning up the pool. Any others, which are
-            // about to enter will return immediately because of _shuttingDown == true.
-            boost::lock_guard<boost::shared_mutex> lk(_shutdownLock);
+            // about to enter will return immediately because of _inShutdown == true.
+            boost::mutex::scoped_lock lk(_sessionLock);
+            if ( _inShutdown )
+                return;
+            _inShutdown = true;
         }
 
         closeAll();
@@ -154,14 +154,12 @@ namespace mongo {
     }
 
     WiredTigerSession* WiredTigerSessionCache::getSession() {
-        boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
-
-        // We should never be able to get here after _shuttingDown is set, because no new
-        // operations should be allowed to start.
-        invariant(!_shuttingDown.loadRelaxed());
-
         {
             boost::mutex::scoped_lock lk( _sessionLock );
+
+            // We should never be able to get here after _inShutdown is set, because no new
+            // operations should be allowed to start.
+            invariant(!_inShutdown);
 
             if (!_sessionPool.empty()) {
                 WiredTigerSession* cachedSession = _sessionPool.back();
@@ -175,11 +173,11 @@ namespace mongo {
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
-        invariant( session );
+        invariant(session);
         invariant(session->cursorsOut() == 0);
 
-        boost::shared_lock<boost::shared_mutex> shutdownLock(_shutdownLock);
-        if (_shuttingDown.loadRelaxed()) {
+        boost::mutex::scoped_lock lk(_sessionLock);
+        if ( _inShutdown ) {
             // Leak the session in order to avoid race condition with clean shutdown, where the
             // storage engine is ripped from underneath transactions, which are not "active"
             // (i.e., do not have any locks), but are just about to delete the recovery unit.
@@ -189,20 +187,23 @@ namespace mongo {
 
         // This checks that we are only caching idle sessions and not something which might hold
         // locks or otherwise prevent truncation.
-        {
+        DEV {
             WT_SESSION* ss = session->getSession();
             uint64_t range;
             invariantWTOK(ss->transaction_pinned_range(ss, &range));
             invariant(range == 0);
         }
 
-        if (_engine && _engine->haveDropsQueued() && session->epoch() < _engine->currentEpoch()) {
+        if (_engine) {
+            _engine->syncSizeInfoOccasionally();
+        }
+
+        if (_engine && session->epoch() < _engine->currentEpoch() && _engine->haveDropsQueued()) {
             delete session;
             _engine->dropAllQueued();
             return;
         }
 
-        boost::mutex::scoped_lock lk(_sessionLock);
         _sessionPool.push_back( session );
     }
 

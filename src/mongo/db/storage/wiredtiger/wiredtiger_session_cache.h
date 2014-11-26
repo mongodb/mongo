@@ -111,11 +111,7 @@ namespace mongo {
         mutable boost::mutex _sessionLock;
         SessionPool _sessionPool;
 
-        // Regular operations take it in shared mode. Shutdown sets the _shuttingDown flag and
-        // then takes it in exclusive mode. This ensures that all threads, which would return
-        // sessions to the cache would leak them.
-        boost::shared_mutex _shutdownLock;
-        AtomicUInt32 _shuttingDown; // Used as boolean - 0 = false, 1 = true
+        bool _inShutdown;
     };
 
 }

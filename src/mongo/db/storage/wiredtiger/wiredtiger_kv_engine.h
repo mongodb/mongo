@@ -112,9 +112,11 @@ namespace mongo {
         void dropAllQueued();
         bool haveDropsQueued() const;
 
-        int currentEpoch() const { return _epoch; }
+        int currentEpoch() const { return _epoch.loadRelaxed(); }
 
         void syncSizeInfo(bool sync) const;
+
+        void syncSizeInfoOccasionally() const;
 
     private:
 
@@ -132,7 +134,7 @@ namespace mongo {
         std::set<std::string> _identToDrop;
         mutable boost::mutex _identToDropMutex;
 
-        int _epoch; // this is how we keep track of if a session is too old
+        AtomicInt32 _epoch; // this is how we keep track of if a session is too old
 
         scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
         string _sizeStorerUri;
