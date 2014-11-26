@@ -199,10 +199,18 @@ env.Program("wt", [
     LIBS=[wtlib] + wtlibs)
 
 if GetOption("swig"):
-    env.SharedLibrary('_wiredtiger',
+    swiglib = env.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
                       SHLIBSUFFIX=".pyd",
                       LIBS=[wtlib])
+
+    copySwig = env.Command(
+        'lang/python/wiredtiger/__init__.py',
+        'lang/python/wiredtiger.py',
+        Copy('$TARGET', '$SOURCE'))
+    env.Depends(copySwig, swiglib)
+
+    env.Install('lang/python/wiredtiger/', swiglib)
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",
