@@ -71,7 +71,6 @@ func (o ObjectId) String() string {
 }
 
 func (r RegExp) String() string {
-	// TODO: need to escape forward slashes in pattern
 	return fmt.Sprintf("/%v/%v", r.Pattern, r.Options)
 }
 
