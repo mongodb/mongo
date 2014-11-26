@@ -10,7 +10,7 @@ var portRegex = /^sh\d+\| \S+:(\d+)(\s+\S+){16}/; // I counted like 22 fields, s
 
 function discoverTest(ports, connectHost) {
     clearRawMongoProgramOutput();
-    x = runMongoProgram.apply(null, [ "mongostat", "--host", connectHost, "--rowcount", 2, "--noheaders", "--discover" ]);
+    x = runMongoProgram.apply(null, [ "mongostat", "--host", connectHost, "--rowcount", 7, "--noheaders", "--discover" ]);
     return statOutputPortCheck(ports);
 }
 

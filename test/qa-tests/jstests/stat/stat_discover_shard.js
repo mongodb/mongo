@@ -20,6 +20,6 @@ assert(statOutputPortCheck(shardPorts), "--discover against a mongos sees all sh
 
 st.stop();
 
-assert.eq(exitCodeErr, stopMongoProgramByPid(pid), "mongostat --discover against a sharded cluster shouldn't error when the cluster goes down");
+assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "mongostat --discover against a sharded cluster shouldn't error when the cluster goes down");
 
 }());

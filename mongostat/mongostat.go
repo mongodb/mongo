@@ -265,13 +265,16 @@ func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) *Nod
 //the "out" channel. If it fails, the error is stored in the NodeMonitor Err field.
 func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, sampleSecs int64) *StatLine {
 	result := &ServerStatus{}
+	log.Logf(log.DebugHigh, "getting session on server: %v", node.host)
 	s, err := node.sessionProvider.GetSession()
 	if err != nil {
+		log.Logf(log.DebugLow, "got error getting session to server %v", node.host)
 		node.Err = err
 		node.LastStatus = nil
-		statLine := StatLine{Host: node.host, Error: err}
+		statLine := StatLine{Key: node.host, Host: node.host, Error: err}
 		return &statLine
 	}
+	log.Logf(log.DebugHigh, "got session on server: %v", node.host)
 
 	//The read pref for the session must be set to 'secondary' to enable using
 	//the driver with 'direct' connections, which disables the built-in
@@ -281,8 +284,9 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 
 	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
+		log.Logf(log.DebugLow, "got error calling serverStatus against server %v", node.host)
 		result = nil
-		statLine := StatLine{Host: node.host, Error: err}
+		statLine := StatLine{Key: node.host, Host: node.host, Error: err}
 		return &statLine
 	}
 
@@ -296,7 +300,6 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 	var statLine *StatLine
 	if node.LastStatus != nil && result != nil {
 		statLine = NewStatLine(*node.LastStatus, *result, node.host, all, sampleSecs)
-		return statLine
 	}
 
 	if result.Repl != nil && discover != nil {
@@ -308,6 +311,7 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 		}
 	}
 	if discover != nil && statLine != nil && statLine.IsMongos && checkShards {
+		log.Logf(log.DebugLow, "checking config database to discover shards")
 		shardCursor := s.DB("config").C("shards").Find(bson.M{}).Iter()
 		shard := ConfigShard{}
 		for shardCursor.Next(&shard) {
@@ -319,7 +323,7 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 		shardCursor.Close()
 	}
 
-	return nil
+	return statLine
 }
 
 //Watch spawns a goroutine to continuously collect and process stats for
@@ -330,8 +334,10 @@ func (node *NodeMonitor) Watch(sleep time.Duration, discover chan string, cluste
 		cycle := uint64(0)
 		for {
 			sampleDiff := int64(sleep / time.Second)
+			log.Logf(log.DebugHigh, "polling server: %v", node.host)
 			statLine := node.Poll(discover, node.All, cycle%10 == 1, sampleDiff)
 			if statLine != nil {
+				log.Logf(log.DebugHigh, "successfully got statline from host: %v", node.host)
 				cluster.Update(*statLine)
 			}
 			time.Sleep(sleep)
@@ -354,6 +360,7 @@ func (mstat *MongoStat) AddNewNode(fullhost string) {
 	defer mstat.nodesLock.Unlock()
 
 	if _, hasKey := mstat.Nodes[fullhost]; !hasKey {
+		log.Logf(log.DebugLow, "adding new host to monitoring: %v", fullhost)
 		//Create a new node monitor for this host.
 		node := NewNodeMonitor(*mstat.Options, fullhost, mstat.StatOptions.All)
 		mstat.Nodes[fullhost] = node

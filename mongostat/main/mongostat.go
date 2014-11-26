@@ -8,6 +8,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,21 +30,23 @@ func main() {
 		os.Exit(-1)
 	}
 
+	log.SetVerbosity(opts.Verbosity)
+
 	sleepInterval := 1
 	if len(extra) > 0 {
 		if len(extra) != 1 {
 			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
 			opts.PrintHelp(true)
-		os.Exit(-1)
+			os.Exit(-1)
 		}
 		sleepInterval, err = strconv.Atoi(extra[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Bad sleep interval: %v\n", extra[0])
-		os.Exit(-1)
+			os.Exit(-1)
 		}
 		if sleepInterval < 1 {
 			fmt.Fprintf(os.Stderr, "Sleep interval must be at least 1 second\n")
-		os.Exit(-1)
+			os.Exit(-1)
 		}
 	}
 
@@ -63,10 +66,17 @@ func main() {
 		formatter = &mongostat.JSONLineFormatter{}
 	}
 
-	var discoverChan chan string
+	seedHosts := []string{}
+	hostOption := strings.Split(opts.Host, ",")
+	for _, seedHost := range hostOption {
+		if opts.Port != "" {
+			seedHost = fmt.Sprintf("%s:%s", seedHost, opts.Port)
+		}
+		seedHosts = append(seedHosts, seedHost)
+	}
+
 	var cluster mongostat.ClusterMonitor
-	if statOpts.Discover {
-		discoverChan = make(chan string, 128)
+	if statOpts.Discover || len(seedHosts) > 1 {
 		cluster = &mongostat.AsyncClusterMonitor{
 			ReportChan:    make(chan mongostat.StatLine),
 			LastStatLines: map[string]*mongostat.StatLine{},
@@ -79,6 +89,11 @@ func main() {
 		}
 	}
 
+	var discoverChan chan string
+	if statOpts.Discover {
+		discoverChan = make(chan string, 128)
+	}
+
 	opts.Direct = true
 	stat := &mongostat.MongoStat{
 		Options:       opts,
@@ -89,12 +104,9 @@ func main() {
 		Cluster:       cluster,
 	}
 
-	seedHost := opts.Host
-	if opts.Port != "" {
-		seedHost = fmt.Sprintf("%s:%s", opts.Host, opts.Port)
+	for _, v := range seedHosts {
+		stat.AddNewNode(v)
 	}
-
-	stat.AddNewNode(seedHost)
 
 	// kick it off
 	err = stat.Run()

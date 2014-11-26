@@ -58,10 +58,9 @@ duration = Math.floor((endTime.valueOf() - startTime.valueOf()) / 1000);
 assert.eq(duration, 9, "sleep time affects the total time to produce a number or results");
 
 clearRawMongoProgramOutput();
-
 pid = startMongoProgramNoConnect("mongostat", "--host", rs.liveNodes.slaves[1].host, "--discover");
 
-sleep(4000);
+sleep(10000);
 
 assert(statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "specified host is seen");
 
@@ -92,6 +91,11 @@ assert(statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "after discovered i
 assert(statOutputPortCheck([ rs.liveNodes.slaves[0].port ]), "after discovered is restarted, discovered host is seen again");
 
 rs.stop(rs.liveNodes.slaves[1]);
+
+clearRawMongoProgramOutput();
+
+sleep(9000)
+
 
 assert(!statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "after specified host is stopped, specified host is not seen");
 

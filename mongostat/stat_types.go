@@ -24,7 +24,10 @@ func (slice StatLines) Len() int {
 }
 
 func (slice StatLines) Less(i, j int) bool {
-	return slice[i].Host < slice[j].Host
+	if slice[i].Key == slice[j].Key {
+		return slice[i].Host < slice[j].Host
+	}
+	return slice[i].Key < slice[j].Key
 }
 
 func (slice StatLines) Swap(i, j int) {
@@ -499,6 +502,10 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 	buf := &bytes.Buffer{}
 	out := &text.GridWriter{ColumnPadding: 1}
 
+	// Automatically turn on discover-style formatting if more than one host's
+	// output is being displayed (to include things like hostname column)
+	discover = discover || len(lines) > 1
+
 	if discover {
 		out.WriteCell(" ")
 	}
@@ -529,7 +536,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		mmap := line.StorageEngine == "mmapv1"
 
 		if discover {
-			out.WriteCell(line.Host)
+			out.WriteCell(line.Key)
 		}
 		if line.Error != nil {
 			out.Feed(line.Error.Error())
