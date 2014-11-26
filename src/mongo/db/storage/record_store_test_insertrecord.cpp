@@ -30,7 +30,7 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_docwriter.h"

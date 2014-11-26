@@ -35,8 +35,8 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/optime.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 namespace oploghack {

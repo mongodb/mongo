@@ -32,12 +32,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {

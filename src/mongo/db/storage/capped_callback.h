@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

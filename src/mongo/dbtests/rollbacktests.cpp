@@ -34,8 +34,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 

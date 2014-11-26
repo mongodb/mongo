@@ -31,9 +31,9 @@
 #pragma once
 
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 

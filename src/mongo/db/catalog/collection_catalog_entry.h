@@ -32,8 +32,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

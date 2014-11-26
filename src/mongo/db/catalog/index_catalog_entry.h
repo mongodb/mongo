@@ -34,7 +34,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

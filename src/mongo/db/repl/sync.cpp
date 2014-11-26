@@ -34,12 +34,12 @@
 
 #include <string>
 
-#include "mongo/db/jsobj.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

@@ -30,10 +30,9 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

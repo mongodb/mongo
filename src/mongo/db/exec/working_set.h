@@ -32,8 +32,8 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {

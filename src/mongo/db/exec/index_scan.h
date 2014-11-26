@@ -29,12 +29,12 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {

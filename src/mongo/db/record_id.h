@@ -1,5 +1,3 @@
-// in_memory_recovery_unit.h
-
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *
@@ -30,44 +28,6 @@
 
 #pragma once
 
-#include <vector>
+// TODO Remove once RecordId is more than just a typedef
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/recovery_unit.h"
-
-namespace mongo {
-
-    class SortedDataInterface;
-
-    class InMemoryRecoveryUnit : public RecoveryUnit {
-    public:
-        InMemoryRecoveryUnit() : _depth(0) {}
-        virtual ~InMemoryRecoveryUnit();
-
-        virtual void beginUnitOfWork();
-        virtual void commitUnitOfWork();
-        virtual void endUnitOfWork();
-
-        virtual bool awaitCommit() {
-            return true;
-        }
-
-        virtual void commitAndRestart() {}
-
-        virtual void registerChange(Change* change) {
-            _changes.push_back(ChangePtr(change));
-        }
-
-        virtual void* writingPtr(void* data, size_t len) {
-            invariant(!"don't call writingPtr");
-        }
-
-    private:
-        typedef boost::shared_ptr<Change> ChangePtr;
-        typedef std::vector<ChangePtr> Changes;
-
-        int _depth;
-        Changes _changes;
-    };
-
-}

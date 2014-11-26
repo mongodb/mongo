@@ -31,10 +31,10 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {

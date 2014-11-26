@@ -30,11 +30,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

@@ -36,8 +36,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

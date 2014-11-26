@@ -37,8 +37,8 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/timer.h"
 

@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/mmap_v1/catalog/index_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
 namespace mongo {
 

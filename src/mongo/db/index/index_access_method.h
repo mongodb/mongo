@@ -28,11 +28,11 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

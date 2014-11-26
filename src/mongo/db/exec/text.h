@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 #include <map>

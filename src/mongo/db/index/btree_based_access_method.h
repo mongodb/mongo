@@ -31,13 +31,13 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/mmap_v1/btree/bucket_deletion_notification.h"  // XXX HK this can go away
+#include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
 

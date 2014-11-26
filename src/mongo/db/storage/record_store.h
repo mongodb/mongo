@@ -32,8 +32,8 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 
 namespace mongo {

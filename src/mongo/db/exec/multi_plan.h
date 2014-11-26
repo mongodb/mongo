@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -37,6 +36,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

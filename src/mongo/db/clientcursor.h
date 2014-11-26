@@ -30,10 +30,10 @@
 
 #include <boost/thread/recursive_mutex.hpp>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/record_id.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/util/background.h"
 #include "mongo/util/net/message.h"

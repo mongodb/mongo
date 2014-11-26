@@ -33,11 +33,11 @@
 #include <queue>
 
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 

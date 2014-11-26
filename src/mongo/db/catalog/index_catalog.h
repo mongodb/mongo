@@ -33,9 +33,9 @@
 #include <vector>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {

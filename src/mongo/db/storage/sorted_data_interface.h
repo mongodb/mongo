@@ -28,9 +28,9 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/head_manager.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 
 #pragma once
