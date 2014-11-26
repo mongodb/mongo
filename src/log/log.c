@@ -521,6 +521,8 @@ int
 __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(from_path);
+	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
 	WT_FH *log_fh, *tmp_fh;
 	WT_LOG *log;
@@ -528,13 +530,21 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 	conn = S2C(session);
 	log = conn->log;
 	/*
-	 * Preparing a log file entails:
+	 * Preparing a log file entails creating a temporary file:
 	 * - Writing the header.
 	 * - Truncating to the offset of the first record.
 	 * - Pre-allocating the file if needed.
+	 * - Renaming it to the pre-allocated file name.
+	 */
+	WT_RET(__wt_scr_alloc(session, 0, &from_path));
+	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
+	WT_ERR(__log_filename(session, lognum, WT_LOG_TMPNAME, from_path));
+	WT_ERR(__log_filename(session, lognum, WT_LOG_PREPNAME, to_path));
+	/*
+	 * Set up the temporary file.
 	 */
 	log_fh = NULL;
-	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_PREPNAME, lognum));
+	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
 	WT_ERR(__log_prealloc(session, log_fh));
@@ -542,8 +552,17 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_close(session, tmp_fh));
+	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+	    "log_prealloc: rename %s to %s",
+	    (char *)from_path->data, (char *)to_path->data));
+	/*
+	 * Rename it into place and make it available.
+	 */
+	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 
-err:	if (log_fh != NULL)
+err:	__wt_scr_free(&from_path);
+	__wt_scr_free(&to_path);
+	if (log_fh != NULL)
 		WT_TRET(__wt_close(session, log_fh));
 	return (ret);
 }
@@ -588,6 +607,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	log = conn->log;
 	logfiles = NULL;
+	logcount = 0;
 	lastlog = 0;
 	firstlog = UINT32_MAX;
 
@@ -605,6 +625,15 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * We clean up these files because settings have changed upon reboot
 	 * and we want those settings to take effect right away.
 	 */
+	WT_ERR(__log_get_files(session,
+	    WT_LOG_TMPNAME, &logfiles, &logcount));
+	for (i = 0; i < logcount; i++) {
+		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+		WT_ERR(__wt_log_remove(session, WT_LOG_TMPNAME, lognum));
+	}
+	__wt_log_files_free(session, logfiles, logcount);
+	logfiles = NULL;
+	logcount = 0;
 	WT_ERR(__log_get_files(session,
 	    WT_LOG_PREPNAME, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {

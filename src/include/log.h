@@ -7,6 +7,7 @@
 
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
 #define	WT_LOG_PREPNAME	"WiredTigerPreplog"	/* Log pre-allocated name */
+#define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128

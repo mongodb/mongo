@@ -176,9 +176,8 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	log->first_lsn.file = min_lognum;
 	log->first_lsn.offset = 0;
 
-	if (0) {
+	if (0)
 err:		__wt_err(session, ret, "log archive server error");
-	}
 	if (locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 	if (logfiles != NULL)
