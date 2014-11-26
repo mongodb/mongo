@@ -1167,7 +1167,7 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 	 * merged).  Second, the "available" list is sorted by size as well as
 	 * by offset, and the fast-path append code doesn't support that, it's
 	 * limited to offset.  The test of "track size" is short-hand for "are
-	 * we reading the "available" list.
+	 * we reading the available-blocks list".
 	 */
 	func = el->track_size == 0 ? __block_append : __block_merge;
 	for (;;) {

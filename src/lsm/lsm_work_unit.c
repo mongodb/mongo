@@ -69,9 +69,12 @@ int
 __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp)
 {
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
 	u_int i, end;
 
 	*chunkp = NULL;
+	chunk = NULL;
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
@@ -86,29 +89,43 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
 	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK) ||
-		    (*chunkp == NULL &&
+		    (chunk == NULL &&
 		    !F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_STABLE) &&
 		    !lsm_tree->chunk[i]->evicted)) {
-			(void)WT_ATOMIC_ADD4(lsm_tree->chunk[i]->refcnt, 1);
-			WT_RET(__wt_verbose(session, WT_VERB_LSM,
+			chunk = lsm_tree->chunk[i];
+			(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			    "Flush%s: return chunk %u of %u: %s",
-			    force ? " w/ force" : "", i, end - 1,
-			    lsm_tree->chunk[i]->uri));
-			*chunkp = lsm_tree->chunk[i];
+			    force ? " w/ force" : "", i, end - 1, chunk->uri));
+
 			/*
-			 * Discards are opportunistic, flip a coin to decide
-			 * whether to try, but take the first real flush we
-			 * find.
+			 * If retrying a discard push an additional work unit
+			 * so there are enough to trigger checkpoints.
 			 */
-			if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK) ||
-			    __wt_random(session->rnd) & 1)
-				break;
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+				/*
+				 * Don't be overly zealous about pushing old
+				 * chunks from cache. Attempting too many drops
+				 * can interfere with checkpoints.
+				 */
+				if (__wt_random(session->rnd) & 1) {
+					(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
+					chunk = NULL;
+					continue;
+				}
+				WT_ERR(__wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
+			}
+			break;
 		}
 	}
 
+err:	if (ret != 0 && chunk != NULL)
+		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 	WT_RET(__wt_lsm_tree_readunlock(session, lsm_tree));
 
-	return (0);
+	*chunkp = chunk;
+	return (ret);
 }
 
 /*

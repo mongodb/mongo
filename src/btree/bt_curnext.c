@@ -287,8 +287,18 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1)
+		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1) {
+			/*
+			 * If we scanned all the way through a page without
+			 * finding a single record we could read, try to evict
+			 * the page as we release it.  Otherwise repeatedly
+			 * deleting from the beginning of a tree can have
+			 * quadratic performance.
+			 */
+			if (newpage)
+				page->read_gen = WT_READGEN_OLDEST;
 			return (WT_NOTFOUND);
+		}
 		++cbt->row_iteration_slot;
 
 		/*
