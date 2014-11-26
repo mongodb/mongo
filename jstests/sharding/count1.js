@@ -52,9 +52,9 @@ db.foo.save( { _id : 6 , name : "allan" } )
 assert.eq( 6 , db.foo.find().count() , "basic count" );
 
 // part 2
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
-s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> eliot) , [eliot -> sara]
+s.adminCommand({ split: "test.foo", middle: { name: "allan" }});
+s.adminCommand({ split: "test.foo", middle: { name: "sara" }});
+s.adminCommand({ split: "test.foo", middle: { name: "eliot" }});
 
 // MINKEY->allan,bob->eliot,joe,mark->sara,MAXKEY
 

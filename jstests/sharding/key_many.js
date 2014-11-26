@@ -94,9 +94,9 @@ for ( var i=0; i<types.length; i++ ){
     
     assert.eq( 6 , c.find().count() , curT.name + " basic count" );
     
-    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
-    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
-    s.adminCommand( { split : longName , find : makeObjectDotted( curT.values[3] ) } );
+    s.adminCommand({ split: longName, middle: makeObjectDotted(curT.values[0]) });
+    s.adminCommand({ split: longName, middle: makeObjectDotted(curT.values[2]) });
+    s.adminCommand({ split: longName, middle: makeObjectDotted(curT.values[5]) });
 
     s.admin.runCommand({ movechunk: longName, find: makeObjectDotted( curT.values[2] ),
                          to: secondary.getMongo().name, _waitForDelete : true });

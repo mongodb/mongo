@@ -1061,7 +1061,7 @@ namespace mongo {
 
                 BSONObj res;
                 if ( middle.isEmpty() ) {
-                    Status status = chunk->split(true /* force a split even if not enough data */,
+                    Status status = chunk->split(Chunk::atMedian,
                                                  NULL,
                                                  NULL);
                     if ( !status.isOK() ) {

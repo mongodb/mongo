@@ -851,20 +851,19 @@ namespace mongo {
                     return true;
                 }
 
-                const ChunkType* chunk = newChunks.vector().back();
-                KeyPattern kp(idx->keyPattern());
-                BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
-                BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), false));
+                const ChunkType* backChunk = newChunks.vector().back();
+                const ChunkType* frontChunk = newChunks.vector().front();
 
-                auto_ptr<PlanExecutor> exec(
-                        InternalPlanner::indexScan(txn, collection, idx, newmin, newmax, false));
+                if (checkIfSingleDoc(txn, collection, idx, backChunk)) {
+                    result.append("shouldMigrate",
+                                  BSON("min" << backChunk->getMin()
+                                       << "max" << backChunk->getMax()));
+                }
+                else if (checkIfSingleDoc(txn, collection, idx, frontChunk)) {
+                    result.append("shouldMigrate",
+                                  BSON("min" << frontChunk->getMin()
+                                       << "max" << frontChunk->getMax()));
 
-                // check if exactly one document found
-                if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
-                    if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
-                        result.append("shouldMigrate",
-                                      BSON("min" << chunk->getMin() << "max" << chunk->getMax()));
-                    }
                 }
             }
 
@@ -883,6 +882,27 @@ namespace mongo {
             if (chunk.isVersionSet())
                 chunk.getVersion().addToBSON(bb, ChunkType::DEPRECATED_lastmod());
             bb.done();
+        }
+
+        static bool checkIfSingleDoc(OperationContext* txn,
+                                     Collection* collection,
+                                     const IndexDescriptor* idx,
+                                     const ChunkType* chunk) {
+            KeyPattern kp(idx->keyPattern());
+            BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
+            BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
+
+            auto_ptr<PlanExecutor> exec(
+                InternalPlanner::indexScan(txn, collection, idx, newmin, newmax, false));
+
+            // check if exactly one document found
+            if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {
+                if (PlanExecutor::IS_EOF == exec->getNext(NULL, NULL)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
     } cmdSplitChunk;
