@@ -31,6 +31,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/global_environment_d.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
@@ -74,6 +77,10 @@ namespace mongo {
 
             virtual Status validateCollectionStorageOptions(const BSONObj& options) const {
                 return Status::OK();
+            }
+
+            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+                return WiredTigerIndex::parseIndexOptions(options).getStatus();
             }
         };
     } // namespace

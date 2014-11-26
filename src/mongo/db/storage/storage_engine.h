@@ -80,6 +80,12 @@ namespace mongo {
              * Returns an error if the creation options are not valid.
              */
             virtual Status validateCollectionStorageOptions(const BSONObj& options) const = 0;
+
+            /**
+             * Validates creation options for an index in the StorageEngine.
+             * Returns an error if the creation options are not valid.
+             */
+             virtual Status validateIndexStorageOptions(const BSONObj& options) const = 0;
         };
 
         /**

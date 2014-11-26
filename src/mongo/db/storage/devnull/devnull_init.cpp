@@ -53,6 +53,10 @@ namespace mongo {
             {
                 return Status::OK();
             }
+
+            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+                return Status::OK();
+            }
         };
     } // namespace
 
