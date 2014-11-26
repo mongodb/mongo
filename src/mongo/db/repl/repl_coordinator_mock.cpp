@@ -31,6 +31,7 @@
 #include "mongo/db/repl/repl_coordinator_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -270,9 +271,8 @@ namespace repl {
         return Status::OK();
     }
 
-    BSONObj ReplicationCoordinatorMock::getGetLastErrorDefault() {
-        // TODO
-        return BSONObj();
+    WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
+        return WriteConcernOptions();
     }
 
     Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {

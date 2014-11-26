@@ -175,20 +175,18 @@ namespace mongo {
                 (nFields == 2 && lastOpTimePresent) ||
                 (nFields == 3 && lastOpTimePresent && electionIdPresent);
 
+            WriteConcernOptions writeConcern;
+
             if (useDefaultGLEOptions) {
-                BSONObj getLastErrorDefault =
-                        repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
-                if (!getLastErrorDefault.isEmpty()) {
-                    writeConcernDoc = getLastErrorDefault;
-                }
+                writeConcern = repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
             }
+
+            Status status = writeConcern.parse( writeConcernDoc );
 
             //
             // Validate write concern no matter what, this matches 2.4 behavior
             //
 
-            WriteConcernOptions writeConcern;
-            Status status = writeConcern.parse( writeConcernDoc );
 
             if ( status.isOK() ) {
                 // Ensure options are valid for this host

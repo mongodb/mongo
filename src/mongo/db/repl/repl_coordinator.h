@@ -509,7 +509,7 @@ namespace repl {
         /**
          * Returns a BSONObj containing a representation of the current default write concern.
          */
-        virtual BSONObj getGetLastErrorDefault() = 0;
+        virtual WriteConcernOptions getGetLastErrorDefault() = 0;
 
         /**
          * Checks that the --replSet flag was passed when starting up the node and that the node

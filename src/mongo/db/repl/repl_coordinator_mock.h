@@ -174,7 +174,7 @@ namespace repl {
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
-        virtual BSONObj getGetLastErrorDefault();
+        virtual WriteConcernOptions getGetLastErrorDefault();
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 

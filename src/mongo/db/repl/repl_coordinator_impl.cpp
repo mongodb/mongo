@@ -2223,12 +2223,12 @@ namespace {
         return _rsConfig.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 
-    BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
+    WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
         boost::mutex::scoped_lock lock(_mutex);
         if (_rsConfig.isInitialized()) {
-            return _rsConfig.getDefaultWriteConcern().toBSON();
+            return _rsConfig.getDefaultWriteConcern();
         }
-        return BSONObj();
+        return WriteConcernOptions();
     }
 
     Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {

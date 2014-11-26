@@ -133,8 +133,8 @@ namespace mongo {
         NamespaceString nss(dbName, request.getNS());
         request.setNS(nss.ns());
 
-        BSONObj defaultWriteConcern =
-                repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+        WriteConcernOptions defaultWriteConcern =
+            repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
 
         WriteBatchExecutor writeBatchExecutor(txn,
                                               defaultWriteConcern,
