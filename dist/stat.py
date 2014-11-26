@@ -5,7 +5,7 @@ import re, string, sys, textwrap
 from dist import compare_srcfile
 
 # Read the source files.
-from stat_data import dsrc_stats, connection_stats
+from stat_data import groups, dsrc_stats, connection_stats
 
 def print_struct(title, name, base, stats):
 	'''Print the structures for the stat.h file.'''
@@ -181,6 +181,7 @@ prefix_info = 'prefix_list = [\n'
 for l in list(set(prefix_list)):
 	prefix_info += '    \'' + l + '\',\n'
 prefix_info += ']\n'
+group_info = 'groups = ' + str(groups)
 
 tmp_file = '__tmp'
 f = open(tmp_file, 'w')
@@ -188,5 +189,6 @@ f.write('# DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write(scale_info)
 f.write(clear_info)
 f.write(prefix_info)
+f.write(group_info)
 f.close()
 compare_srcfile(tmp_file, '../tools/stat_data.py')

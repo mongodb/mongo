@@ -19,7 +19,6 @@ import sys
 class Stat:
     def __init__(self, name, tag, desc, flags=''):
 	self.name = name
-        self.prefix = tag
 	self.desc = tag + ': ' + desc
 	self.flags = flags
 
@@ -27,44 +26,69 @@ class Stat:
 	return cmp(self.desc.lower(), other.desc.lower())
 
 class AsyncStat(Stat):
+    prefix = 'async'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'async', desc, flags)
+	Stat.__init__(self, name, AsyncStat.prefix, desc, flags)
 class BlockStat(Stat):
+    prefix = 'block-manager'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'block-manager', desc, flags)
+	Stat.__init__(self, name, BlockStat.prefix, desc, flags)
 class BtreeStat(Stat):
+    prefix = 'btree'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'btree', desc, flags)
+	Stat.__init__(self, name, BtreeStat.prefix, desc, flags)
 class CacheStat(Stat):
+    prefix = 'cache'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'cache', desc, flags)
+	Stat.__init__(self, name, CacheStat.prefix, desc, flags)
 class CompressStat(Stat):
+    prefix = 'compression'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'compression', desc, flags)
-class CursorStat(Stat):
-    def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'cursor', desc, flags)
+	Stat.__init__(self, name, CompressStat.prefix, desc, flags)
 class ConnStat(Stat):
+    prefix = 'connection'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'connection', desc, flags)
+	Stat.__init__(self, name, ConnStat.prefix, desc, flags)
+class CursorStat(Stat):
+    prefix = 'cursor'
+    def __init__(self, name, desc, flags=''):
+	Stat.__init__(self, name, CursorStat.prefix, desc, flags)
 class DhandleStat(Stat):
+    prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'data-handle', desc, flags)
+	Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
 class LogStat(Stat):
+    prefix = 'log'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'log', desc, flags)
+	Stat.__init__(self, name, LogStat.prefix, desc, flags)
 class LSMStat(Stat):
+    prefix = 'LSM'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'LSM', desc, flags)
+	Stat.__init__(self, name, LSMStat.prefix, desc, flags)
 class RecStat(Stat):
+    prefix = 'reconciliation'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'reconciliation', desc, flags)
+	Stat.__init__(self, name, RecStat.prefix, desc, flags)
 class SessionStat(Stat):
+    prefix = 'session'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'session', desc, flags)
+	Stat.__init__(self, name, SessionStat.prefix, desc, flags)
 class TxnStat(Stat):
+    prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, 'transaction', desc, flags)
+	Stat.__init__(self, name, TxnStat.prefix, desc, flags)
+
+##########################################
+# Groupings of useful statistics:
+# A pre-defined dictionary containing the group name as the key and the
+# list of prefix tags that comprise that group.
+##########################################
+groups = {}
+groups['cursor'] = [CursorStat.prefix, SessionStat.prefix]
+groups['evict'] = [CacheStat.prefix, ConnStat.prefix, BlockStat.prefix]
+groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
+groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
+groups['system'] = [ConnStat.prefix, DhandleStat.prefix, SessionStat.prefix]
 
 ##########################################
 # CONNECTION statistics
@@ -252,17 +276,17 @@ connection_stats = [
     SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
 
     ##########################################
-    # Total Btree cursor operations
+    # Total cursor operations
     ##########################################
-    BtreeStat('cursor_create', 'cursor create calls'),
-    BtreeStat('cursor_insert', 'cursor insert calls'),
-    BtreeStat('cursor_next', 'cursor next calls'),
-    BtreeStat('cursor_prev', 'cursor prev calls'),
-    BtreeStat('cursor_remove', 'cursor remove calls'),
-    BtreeStat('cursor_reset', 'cursor reset calls'),
-    BtreeStat('cursor_search', 'cursor search calls'),
-    BtreeStat('cursor_search_near', 'cursor search near calls'),
-    BtreeStat('cursor_update', 'cursor update calls'),
+    CursorStat('cursor_create', 'cursor create calls'),
+    CursorStat('cursor_insert', 'cursor insert calls'),
+    CursorStat('cursor_next', 'cursor next calls'),
+    CursorStat('cursor_prev', 'cursor prev calls'),
+    CursorStat('cursor_remove', 'cursor remove calls'),
+    CursorStat('cursor_reset', 'cursor reset calls'),
+    CursorStat('cursor_search', 'cursor search calls'),
+    CursorStat('cursor_search_near', 'cursor search near calls'),
+    CursorStat('cursor_update', 'cursor update calls'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('name'))

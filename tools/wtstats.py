@@ -39,7 +39,8 @@ tool_dir = os.path.split(sys.argv[0])[0]
 sys.path = [ os.path.join(tool_dir, "3rdparty") ] + sys.path
 
 try:
-    from stat_data import no_scale_per_second_list, no_clear_list, prefix_list
+    from stat_data \
+        import groups, no_scale_per_second_list, no_clear_list, prefix_list
 except ImportError:
     print >>sys.stderr, "Could not import stat_data.py, it should be\
             in the same directory as %s" % sys.argv[0]
@@ -190,25 +191,35 @@ def common_suffix(a, b):
         b = b[1:]
     return b
 
-def output_series(results, prefix=None):
+def output_series(results, prefix=None, grouplist=[]):
     # open the output file based on prefix
     if prefix == None:
         outputname = args.output + '.html'
-    else:
+    elif len(grouplist) == 0:
         outputname = args.output +'.' + prefix + '.html'
+    else:
+        outputname = args.output +'.group.' + prefix + '.html'
 
-    if prefix != None:
+    if prefix != None and len(grouplist) == 0:
         this_series = []
         for title, yaxis, ydata in results:
             if not prefix in title:
                 continue
-            # print 'Appending to dataset: ' + title
+            #print 'Appending to dataset: ' + title
             this_series.append((title, yaxis, ydata))
+    elif prefix != None and len(grouplist) > 0:
+        this_series = []
+        for title, yaxis, ydata in results:
+            for subgroup in grouplist:
+                if not subgroup in title:
+                    continue
+                # print 'Appending to dataset: ' + title
+                this_series.append((title, yaxis, ydata))
     else:
         this_series = results
 
     if len(this_series) == 0:
-        print 'Prefix: ' + prefix + ' has no data'
+        print 'Output: ' + outputname + ' has no data.  Do not create.'
         return
 
     #---------------------------------------
@@ -284,3 +295,5 @@ output_series(results)
 if args.all:
     for prefix in prefix_list:
         output_series(results, prefix)
+    for group in groups.keys():
+        output_series(results, group, groups[group])
