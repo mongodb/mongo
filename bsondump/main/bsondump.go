@@ -31,6 +31,8 @@ func main() {
 		return
 	}
 
+	log.SetVerbosity(opts.Verbosity)
+
 	// pull out the filename
 	filename := ""
 	if len(extra) == 0 {
@@ -56,13 +58,18 @@ func main() {
 		Out:             os.Stdout,
 	}
 
+	log.Logf(log.DebugLow, "running bsondump with objcheck: %v", bsonDumpOpts.ObjCheck)
+
+	var numFound int
 	if bsonDumpOpts.Type == "debug" {
-		err = dumper.Debug()
+		numFound, err = dumper.Debug()
 	} else if bsonDumpOpts.Type == "json" || bsonDumpOpts.Type == "" {
-		err = dumper.Dump()
+		numFound, err = dumper.Dump()
 	} else {
 		err = fmt.Errorf("Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
 	}
+
+	log.Logf(log.Always, "%v objects found", numFound)
 	if err != nil {
 		log.Log(log.Always, err.Error())
 		os.Exit(1)
