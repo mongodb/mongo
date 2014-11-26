@@ -42,9 +42,9 @@ namespace mongo {
     public:
         virtual ~HeadManager() { }
 
-        virtual const DiskLoc getHead(OperationContext* txn) const = 0;
+        virtual const RecordId getHead(OperationContext* txn) const = 0;
 
-        virtual void setHead(OperationContext* txn, const DiskLoc newHead) = 0;
+        virtual void setHead(OperationContext* txn, const RecordId newHead) = 0;
     };
 
 }  // namespace mongo

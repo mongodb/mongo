@@ -459,10 +459,10 @@ namespace mongo {
         }
 
         bool sortedByDiskLoc() const {
-            // Projections destroy the DiskLoc.  By returning true here, this kind of implies that a
+            // Projections destroy the RecordId.  By returning true here, this kind of implies that a
             // fetch could still be done upstream.
             //
-            // Perhaps this should be false to not imply that there *is* a DiskLoc?  Kind of a
+            // Perhaps this should be false to not imply that there *is* a RecordId?  Kind of a
             // corner case.
             return children[0]->sortedByDiskLoc();
         }

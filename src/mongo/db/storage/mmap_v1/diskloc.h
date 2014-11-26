@@ -44,12 +44,16 @@ namespace mongo {
 
     template< class Version > class BtreeBucket;
 
+    // TODO make DiskLoc and RecordId different types
+    class RecordId;
+    typedef RecordId DiskLoc;
+
 #pragma pack(1)
     /** represents a disk location/offset on disk in a database.  64 bits.
         it is assumed these will be passed around by value a lot so don't do anything to make them large
         (such as adding a virtual function)
      */
-    class DiskLoc {
+    class RecordId {
         int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
@@ -65,8 +69,17 @@ namespace mongo {
             MaxFiles=16000
         };
 
-        DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
-        DiskLoc() { Null(); }
+        RecordId(int a, int Ofs) : _a(a), ofs(Ofs) { }
+        RecordId() { Null(); }
+
+        // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
+        // headers must precede Records in a file.
+        static DiskLoc min() { return DiskLoc(0, 0); }
+
+        // Maximum allowed DiskLoc.
+        // No Record may begin at this location because the minimum size of a Record is larger than
+        // one byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
+        static DiskLoc max() { return DiskLoc(0x7fffffff, 0x7ffffffe); }
 
         bool questionable() const {
             return ofs < -1 ||
@@ -163,14 +176,5 @@ namespace mongo {
     inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
         return stream << loc.toString();
     }
-
-    // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
-    // headers must precede Records in a file.
-    const DiskLoc minDiskLoc(0, 0);
-
-    // Maximum allowed DiskLoc.
-    // No Record may begin at this location because the minimum size of a Record is larger than one
-    // byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
-    const DiskLoc maxDiskLoc(0x7fffffff, 0x7ffffffe);
 
 } // namespace mongo

@@ -50,7 +50,7 @@ namespace mongo {
     MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
     void BtreeBasedAccessMethod::InvalidateCursorsNotification::aboutToDeleteBucket(
-            const DiskLoc& bucket) {
+            const RecordId& bucket) {
         BtreeIndexCursor::aboutToDeleteBucket(bucket);
     }
 
@@ -67,7 +67,7 @@ namespace mongo {
     // Find the keys for obj, put them in the tree pointing to loc
     Status BtreeBasedAccessMethod::insert(OperationContext* txn,
                                           const BSONObj& obj,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const InsertDeleteOptions& options,
                                           int64_t* numInserted) {
         *numInserted = 0;
@@ -127,7 +127,7 @@ namespace mongo {
 
     void BtreeBasedAccessMethod::removeOneKey(OperationContext* txn,
                                               const BSONObj& key,
-                                              const DiskLoc& loc,
+                                              const RecordId& loc,
                                               bool dupsAllowed) {
         try {
             _newInterface->unindex(txn, key, loc, dupsAllowed);
@@ -149,7 +149,7 @@ namespace mongo {
     // Remove the provided doc from the index.
     Status BtreeBasedAccessMethod::remove(OperationContext* txn,
                                           const BSONObj &obj,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const InsertDeleteOptions &options,
                                           int64_t* numDeleted) {
 
@@ -195,7 +195,7 @@ namespace mongo {
 
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            cursor->locate(*i, DiskLoc());
+            cursor->locate(*i, RecordId());
         }
 
         return Status::OK();
@@ -206,23 +206,23 @@ namespace mongo {
         return _newInterface->touch(txn);
     }
 
-    DiskLoc BtreeBasedAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
+    RecordId BtreeBasedAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn, 1));
-        cursor->locate(key, minDiskLoc);
+        cursor->locate(key, RecordId::min());
 
         // A null bucket means the key wasn't found (nor was anything found after it).
         if (cursor->isEOF()) {
-            return DiskLoc();
+            return RecordId();
         }
 
         // We found something but it could be a key after 'key'.  Examine what we're pointing at.
         if (0 != key.woCompare(cursor->getKey(), BSONObj(), false)) {
             // If the keys don't match, return "not found."
-            return DiskLoc();
+            return RecordId();
         }
 
-        // Return the DiskLoc found.
-        return cursor->getDiskLoc();
+        // Return the RecordId found.
+        return cursor->getRecordId();
     }
 
     Status BtreeBasedAccessMethod::validate(OperationContext* txn, bool full, int64_t* numKeys,
@@ -241,7 +241,7 @@ namespace mongo {
     Status BtreeBasedAccessMethod::validateUpdate(OperationContext* txn,
                                                   const BSONObj &from,
                                                   const BSONObj &to,
-                                                  const DiskLoc &record,
+                                                  const RecordId &record,
                                                   const InsertDeleteOptions &options,
                                                   UpdateTicket* status) {
 
@@ -312,7 +312,7 @@ namespace mongo {
     Status BtreeBasedAccessMethod::commitBulk(IndexAccessMethod* bulkRaw,
                                               bool mayInterrupt,
                                               bool dupsAllowed,
-                                              set<DiskLoc>* dupsToDrop) {
+                                              set<RecordId>* dupsToDrop) {
 
         BtreeBasedBulkAccessMethod* bulk = static_cast<BtreeBasedBulkAccessMethod*>(bulkRaw);
 

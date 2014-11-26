@@ -128,7 +128,7 @@ namespace mongo {
     }
 
     void CachedPlanStage::invalidate(OperationContext* txn,
-                                     const DiskLoc& dl,
+                                     const RecordId& dl,
                                      InvalidationType type) {
         if (! _usingBackupChild) {
             _mainChildPlan->invalidate(txn, dl, type);

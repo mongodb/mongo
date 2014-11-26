@@ -65,10 +65,10 @@ namespace QueryStageSortTests {
             _client.insert(ns(), obj);
         }
 
-        void getLocs(set<DiskLoc>* out, Collection* coll) {
+        void getLocs(set<RecordId>* out, Collection* coll) {
             RecordIterator* it = coll->getIterator(&_txn);
             while (!it->isEOF()) {
-                DiskLoc nextLoc = it->getNext();
+                RecordId nextLoc = it->getNext();
                 out->insert(nextLoc);
             }
             delete it;
@@ -78,10 +78,10 @@ namespace QueryStageSortTests {
          * We feed a mix of (key, unowned, owned) data to the sort stage.
          */
         void insertVarietyOfObjects(MockStage* ms, Collection* coll) {
-            set<DiskLoc> locs;
+            set<RecordId> locs;
             getLocs(&locs, coll);
 
-            set<DiskLoc>::iterator it = locs.begin();
+            set<RecordId>::iterator it = locs.begin();
 
             for (int i = 0; i < numObj(); ++i, ++it) {
                 ASSERT_FALSE(it == locs.end());
@@ -269,7 +269,7 @@ namespace QueryStageSortTests {
             fillData();
 
             // The data we're going to later invalidate.
-            set<DiskLoc> locs;
+            set<RecordId> locs;
             getLocs(&locs, coll);
 
             // Build the mock scan stage which feeds the data.
@@ -294,7 +294,7 @@ namespace QueryStageSortTests {
 
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
             ss->saveState();
-            set<DiskLoc>::iterator it = locs.begin();
+            set<RecordId>::iterator it = locs.begin();
             ss->invalidate(&_txn, *it++, INVALIDATION_DELETION);
             ss->restoreState(&_txn);
 

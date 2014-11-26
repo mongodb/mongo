@@ -40,14 +40,14 @@
 namespace mongo {
 
     /**
-     * Reads from N children, each of which must have a valid DiskLoc.  Uses a hash table to
+     * Reads from N children, each of which must have a valid RecordId.  Uses a hash table to
      * intersect the outputs of the N children, and outputs the intersection.
      *
-     * Preconditions: Valid DiskLoc.  More than one child.
+     * Preconditions: Valid RecordId.  More than one child.
      *
-     * Any DiskLoc that we keep a reference to that is invalidated before we are able to return it
+     * Any RecordId that we keep a reference to that is invalidated before we are able to return it
      * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
-     * operates with DiskLocs, we are unable to evaluate the AND for the invalidated DiskLoc, and it
+     * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
      * must be fully matched later.
      */
     class AndHashStage : public PlanStage {
@@ -79,7 +79,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -119,12 +119,12 @@ namespace mongo {
 
         // _dataMap is filled out by the first child and probed by subsequent children.  This is the
         // hash table that we create by intersecting _children and probe with the last child.
-        typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
+        typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
         DataMap _dataMap;
 
         // Keeps track of what elements from _dataMap subsequent children have seen.
         // Only used while _hashingChildren.
-        typedef unordered_set<DiskLoc, DiskLoc::Hasher> SeenMap;
+        typedef unordered_set<RecordId, RecordId::Hasher> SeenMap;
         SeenMap _seenMap;
 
         // True if we're still intersecting _children[0..._children.size()-1].

@@ -61,10 +61,10 @@ namespace mongo {
 
                 RecordIterator *rIter = *vIter;
                 ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( DiskLoc(), rIter->curr() );
-                ASSERT_EQUALS( DiskLoc(), rIter->getNext() );
+                ASSERT_EQUALS( RecordId(), rIter->curr() );
+                ASSERT_EQUALS( RecordId(), rIter->getNext() );
                 ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( DiskLoc(), rIter->curr() );
+                ASSERT_EQUALS( RecordId(), rIter->curr() );
 
                 delete rIter;
             }
@@ -82,7 +82,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -91,7 +91,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -106,7 +106,7 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        set<DiskLoc> remain( locs, locs + nToInsert );
+        set<RecordId> remain( locs, locs + nToInsert );
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             vector<RecordIterator*> v = rs->getManyIterators( opCtx.get() );
@@ -116,15 +116,15 @@ namespace mongo {
 
                 RecordIterator *rIter = *vIter;
                 while ( !rIter->isEOF() ) {
-                    DiskLoc loc = rIter->curr();
+                    RecordId loc = rIter->curr();
                     ASSERT( 1 == remain.erase( loc ) );
                     ASSERT_EQUALS( loc, rIter->getNext() );
                 }
 
-                ASSERT_EQUALS( DiskLoc(), rIter->curr() );
-                ASSERT_EQUALS( DiskLoc(), rIter->getNext() );
+                ASSERT_EQUALS( RecordId(), rIter->curr() );
+                ASSERT_EQUALS( RecordId(), rIter->getNext() );
                 ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( DiskLoc(), rIter->curr() );
+                ASSERT_EQUALS( RecordId(), rIter->curr() );
 
                 delete rIter;
             }

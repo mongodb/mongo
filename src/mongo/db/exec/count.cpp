@@ -180,7 +180,7 @@ namespace mongo {
         }
     }
 
-    void CountStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void CountStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         if (_child.get()) {
             _child->invalidate(txn, dl, type);

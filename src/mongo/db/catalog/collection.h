@@ -129,20 +129,20 @@ namespace mongo {
 
         bool requiresIdIndex() const;
 
-        BSONObj docFor(OperationContext* txn, const DiskLoc& loc) const;
+        BSONObj docFor(OperationContext* txn, const RecordId& loc) const;
 
         /**
          * @param out - contents set to the right docs if exists, or nothing.
          * @return true iff loc exists
          */
-        bool findDoc(OperationContext* txn, const DiskLoc& loc, BSONObj* out) const;
+        bool findDoc(OperationContext* txn, const RecordId& loc, BSONObj* out) const;
 
         // ---- things that should move to a CollectionAccessMethod like thing
         /**
          * Default arguments will return all items in the collection.
          */
         RecordIterator* getIterator( OperationContext* txn,
-                                     const DiskLoc& start = DiskLoc(),
+                                     const RecordId& start = RecordId(),
                                      const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
 
         /**
@@ -161,7 +161,7 @@ namespace mongo {
         int64_t countTableScan( OperationContext* txn, const MatchExpression* expression );
 
         void deleteDocument( OperationContext* txn,
-                             const DiskLoc& loc,
+                             const RecordId& loc,
                              bool cappedOK = false,
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
@@ -172,15 +172,15 @@ namespace mongo {
          *
          * If enforceQuota is false, quotas will be ignored.
          */
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const DocWriter* doc,
                                             bool enforceQuota );
 
-        StatusWith<DiskLoc> insertDocument( OperationContext* txn,
+        StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const BSONObj& doc,
                                             MultiIndexBlock* indexBlock,
                                             bool enforceQuota );
@@ -195,7 +195,7 @@ namespace mongo {
          * Caller takes ownership of the returned RecordFetcher*.
          */
         RecordFetcher* documentNeedsFetch( OperationContext* txn,
-                                           const DiskLoc& loc ) const;
+                                           const RecordId& loc ) const;
 
         /**
          * updates the document @ oldLocation with newDoc
@@ -203,8 +203,8 @@ namespace mongo {
          * if not, it is moved
          * @return the post update location of the doc (may or may not be the same as oldLocation)
          */
-        StatusWith<DiskLoc> updateDocument( OperationContext* txn,
-                                            const DiskLoc& oldLocation,
+        StatusWith<RecordId> updateDocument( OperationContext* txn,
+                                            const RecordId& oldLocation,
                                             const BSONObj& newDoc,
                                             bool enforceQuota,
                                             OpDebug* debug );
@@ -213,7 +213,7 @@ namespace mongo {
          * right now not allowed to modify indexes
          */
         Status updateDocumentWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
@@ -254,7 +254,7 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
 
         // -----------
 
@@ -284,18 +284,18 @@ namespace mongo {
     private:
 
         Status recordStoreGoingToMove( OperationContext* txn,
-                                       const DiskLoc& oldLocation,
+                                       const RecordId& oldLocation,
                                        const char* oldBuffer,
                                        size_t oldSize );
 
-        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc );
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc );
 
         /**
          * same semantics as insertDocument, but doesn't do:
          *  - some user error checks
          *  - adjust padding
          */
-        StatusWith<DiskLoc> _insertDocument( OperationContext* txn,
+        StatusWith<RecordId> _insertDocument( OperationContext* txn,
                                              const BSONObj& doc,
                                              bool enforceQuota );
 

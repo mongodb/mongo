@@ -272,11 +272,11 @@ namespace mongo {
         // ----- data modifiers ------
 
         // this throws for now
-        Status indexRecord(OperationContext* txn, const BSONObj& obj, const DiskLoc &loc);
+        Status indexRecord(OperationContext* txn, const BSONObj& obj, const RecordId &loc);
 
         void unindexRecord(OperationContext* txn,
                            const BSONObj& obj,
-                           const DiskLoc& loc,
+                           const RecordId& loc,
                            bool noWarn);
 
         // ------- temp internal -------
@@ -311,12 +311,12 @@ namespace mongo {
         Status _indexRecord(OperationContext* txn,
                             IndexCatalogEntry* index,
                             const BSONObj& obj,
-                            const DiskLoc &loc );
+                            const RecordId &loc );
 
         Status _unindexRecord(OperationContext* txn,
                               IndexCatalogEntry* index,
                               const BSONObj& obj,
-                              const DiskLoc &loc,
+                              const RecordId &loc,
                               bool logIfError);
 
         /**

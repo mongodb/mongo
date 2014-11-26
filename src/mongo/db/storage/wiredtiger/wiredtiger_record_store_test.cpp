@@ -151,15 +151,15 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        DiskLoc loc1;
-        DiskLoc loc2;
+        RecordId loc1;
+        RecordId loc2;
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
                 ASSERT_OK( res.getStatus() );
                 loc1 = res.getValue();
 
@@ -202,15 +202,15 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        DiskLoc loc1;
-        DiskLoc loc2;
+        RecordId loc1;
+        RecordId loc2;
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
                 ASSERT_OK( res.getStatus() );
                 loc1 = res.getValue();
 
@@ -268,7 +268,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 for ( int i = 0; i < N; i++ ) {
-                    StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                    StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
                     ASSERT_OK( res.getStatus() );
                 }
                 uow.commit();
@@ -333,7 +333,7 @@ namespace mongo {
         rs.reset( NULL ); // this has to be deleted before ss
     }
 
-    StatusWith<DiskLoc> insertBSON(scoped_ptr<OperationContext>& opCtx,
+    StatusWith<RecordId> insertBSON(scoped_ptr<OperationContext>& opCtx,
                                    scoped_ptr<RecordStore>& rs,
                                    const OpTime& opTime) {
         BSONObj obj = BSON( "ts" << opTime );
@@ -342,8 +342,8 @@ namespace mongo {
         invariant( wrs );
         Status status = wrs->oplogDiskLocRegister( opCtx.get(), opTime );
         if (!status.isOK())
-            return StatusWith<DiskLoc>( status );
-        StatusWith<DiskLoc> res = rs->insertRecord(opCtx.get(),
+            return StatusWith<RecordId>( status );
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
                                                    obj.objdata(),
                                                    obj.objsize(),
                                                    false);
@@ -381,52 +381,52 @@ namespace mongo {
 
             // success cases
             ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
-                      DiskLoc(1,1));
+                      RecordId(1,1));
 
             ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
-                      DiskLoc(1,2));
+                      RecordId(1,2));
 
             ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
-                      DiskLoc(2,2));
+                      RecordId(2,2));
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
             // find start
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(0,1)), DiskLoc()); // nothing <=
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,1)), DiskLoc(1,2)); // between
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,2)), DiskLoc(2,2)); // ==
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2)); // > highest
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), RecordId()); // nothing <=
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,1)), RecordId(1,2)); // between
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,2)), RecordId(2,2)); // ==
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(2,2)); // > highest
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(2,2),  false); // no-op
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(2,2),  false); // no-op
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(2,2));
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(2,2));
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  false); // deletes 2,2
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1,2),  false); // deletes 2,2
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,2));
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(1,2));
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            rs->temp_cappedTruncateAfter(opCtx.get(), DiskLoc(1,2),  true); // deletes 1,2
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1,2),  true); // deletes 1,2
         }
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc(1,1));
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(1,1));
         }
 
         {
@@ -438,7 +438,7 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
-            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(2,3)), DiskLoc());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId());
         }
     }
 
@@ -455,20 +455,20 @@ namespace mongo {
                                        obj.objsize(), false ).getStatus());
             wuow.commit();
         }
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), DiskLoc(0,1)), DiskLoc().setInvalid());
+        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), RecordId().setInvalid());
     }
 
     TEST(WiredTigerRecordStoreTest, CappedOrder) {
         scoped_ptr<WiredTigerHarnessHelper> harnessHelper( new WiredTigerHarnessHelper() );
         scoped_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("a.b", 100000,10000));
 
-        DiskLoc loc1;
+        RecordId loc1;
 
         { // first insert a document
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
                 ASSERT_OK( res.getStatus() );
                 loc1 = res.getValue();
                 uow.commit();
@@ -524,7 +524,7 @@ namespace mongo {
         }
     }
 
-    DiskLoc _oplogOrderInsertOplog( OperationContext* txn,
+    RecordId _oplogOrderInsertOplog( OperationContext* txn,
                                     scoped_ptr<RecordStore>& rs,
                                     int inc ) {
         OpTime opTime = OpTime(5,inc);
@@ -532,7 +532,7 @@ namespace mongo {
         Status status = wrs->oplogDiskLocRegister( txn, opTime );
         ASSERT_OK( status );
         BSONObj obj = BSON( "ts" << opTime );
-        StatusWith<DiskLoc> res = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
+        StatusWith<RecordId> res = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
         ASSERT_OK( res.getStatus() );
         return res.getValue();
     }
@@ -549,7 +549,7 @@ namespace mongo {
             ASSERT( wrs->usingOplogHack() );
         }
 
-        DiskLoc loc1;
+        RecordId loc1;
 
         { // first insert a document
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );

@@ -410,7 +410,7 @@ namespace mongo {
         params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
     }
 
-    void UpdateStage::transformAndUpdate(BSONObj& oldObj, DiskLoc& loc) {
+    void UpdateStage::transformAndUpdate(BSONObj& oldObj, RecordId& loc) {
         const UpdateRequest* request = _params.request;
         UpdateDriver* driver = _params.driver;
         CanonicalQuery* cq = _params.canonicalQuery;
@@ -520,13 +520,13 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
-                    StatusWith<DiskLoc> res = _collection->updateDocument(_txn,
+                    StatusWith<RecordId> res = _collection->updateDocument(_txn,
                                                                           loc,
                                                                           newObj,
                                                                           true,
                                                                           _params.opDebug);
                     uassertStatusOK(res.getStatus());
-                    DiskLoc newLoc = res.getValue();
+                    RecordId newLoc = res.getValue();
 
                     // If the document moved, we might see it again in a collection scan (maybe it's
                     // a document after our current document).
@@ -641,7 +641,7 @@ namespace mongo {
 
         WriteUnitOfWork wunit(_txn);
         invariant(_collection);
-        StatusWith<DiskLoc> newLoc = _collection->insertDocument(_txn,
+        StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
                                                                  newObj,
                                                                  !request->isGod()/*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
@@ -707,7 +707,7 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == status) {
             // Need to get these things from the result returned by the child.
-            DiskLoc loc;
+            RecordId loc;
             BSONObj oldObj;
 
             WorkingSetMember* member = _ws->get(id);
@@ -726,7 +726,7 @@ namespace mongo {
             invariant(member->hasObj());
             oldObj = member->obj;
 
-            // If we're here, then we have retrieved both a DiskLoc and the corresponding
+            // If we're here, then we have retrieved both a RecordId and the corresponding
             // unowned object from the child stage. Since we have the object and the diskloc,
             // we can free the WSM.
             _ws->free(id);
@@ -858,7 +858,7 @@ namespace mongo {
         uassertStatusOK(restoreUpdateState(opCtx));
     }
 
-    void UpdateStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void UpdateStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);
     }

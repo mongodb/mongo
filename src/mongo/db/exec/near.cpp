@@ -228,7 +228,7 @@ namespace mongo {
 
         StatusWith<double> distanceStatus = computeDistance(nextMember);
 
-        // Store the member's DiskLoc, if available, for quick invalidation
+        // Store the member's RecordId, if available, for quick invalidation
         if (nextMember->hasLoc()) {
             _nextIntervalSeen.insert(make_pair(nextMember->loc, nextMemberID));
         }
@@ -319,15 +319,15 @@ namespace mongo {
         }
     }
 
-    void NearStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void NearStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_stats->common.invalidates;
         for (size_t i = 0; i < _childrenIntervals.size(); i++) {
             _childrenIntervals[i]->covering->invalidate(txn, dl, type);
         }
 
-        // If a result is in _resultBuffer and has a DiskLoc it will be in _nextIntervalSeen as
-        // well. It's safe to return the result w/o the DiskLoc, so just fetch the result.
-        unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher>::iterator seenIt = _nextIntervalSeen
+        // If a result is in _resultBuffer and has a RecordId it will be in _nextIntervalSeen as
+        // well. It's safe to return the result w/o the RecordId, so just fetch the result.
+        unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt = _nextIntervalSeen
             .find(dl);
 
         if (seenIt != _nextIntervalSeen.end()) {
@@ -337,7 +337,7 @@ namespace mongo {
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
             verify(!member->hasLoc());
 
-            // Don't keep it around in the seen map since there's no valid DiskLoc anymore
+            // Don't keep it around in the seen map since there's no valid RecordId anymore
             _nextIntervalSeen.erase(seenIt);
         }
     }

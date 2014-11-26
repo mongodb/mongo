@@ -60,10 +60,10 @@ namespace mongo {
                 return;
             }
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }
@@ -81,7 +81,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -90,7 +90,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -105,7 +105,7 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        set<DiskLoc> remain( locs, locs + nToInsert );
+        set<RecordId> remain( locs, locs + nToInsert );
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
@@ -115,15 +115,15 @@ namespace mongo {
             }
 
             while ( !it->isEOF() ) {
-                DiskLoc loc = it->getNext();
+                RecordId loc = it->getNext();
                 remain.erase( loc ); // can happen more than once per doc
             }
             ASSERT( remain.empty() );
 
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }

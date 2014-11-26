@@ -41,37 +41,37 @@
 namespace mongo {
 namespace oploghack {
 
-    StatusWith<DiskLoc> keyForOptime(const OpTime& opTime) {
+    StatusWith<RecordId> keyForOptime(const OpTime& opTime) {
         // Make sure secs and inc wouldn't be negative if treated as signed. This ensures that they
-        // don't sort differently when put in a DiskLoc. It also avoids issues with Null/Invalid
-        // DiskLocs
+        // don't sort differently when put in a RecordId. It also avoids issues with Null/Invalid
+        // RecordIds
         if (opTime.getSecs() > uint32_t(std::numeric_limits<int32_t>::max()))
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts secs too high");
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "ts secs too high");
 
         if (opTime.getInc() > uint32_t(std::numeric_limits<int32_t>::max()))
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts inc too high");
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "ts inc too high");
 
-        const DiskLoc out = DiskLoc(opTime.getSecs(), opTime.getInc());
-        if (out <= minDiskLoc)
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts too low");
-        if (out >= maxDiskLoc)
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts too high");
+        const RecordId out = RecordId(opTime.getSecs(), opTime.getInc());
+        if (out <= RecordId::min())
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "ts too low");
+        if (out >= RecordId::max())
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "ts too high");
 
-        return StatusWith<DiskLoc>(out);
+        return StatusWith<RecordId>(out);
     }
 
     /**
      * data and len must be the arguments from RecordStore::insert() on an oplog collection.
      */
-    StatusWith<DiskLoc> extractKey(const char* data, int len) {
+    StatusWith<RecordId> extractKey(const char* data, int len) {
         DEV invariant(validateBSON(data, len).isOK());
 
         const BSONObj obj(data);
         const BSONElement elem = obj["ts"];
         if (elem.eoo())
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "no ts field");
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "no ts field");
         if (elem.type() != Timestamp)
-            return StatusWith<DiskLoc>(ErrorCodes::BadValue, "ts must be a Timestamp");
+            return StatusWith<RecordId>(ErrorCodes::BadValue, "ts must be a Timestamp");
 
         return keyForOptime(elem._opTime());
     }

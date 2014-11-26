@@ -50,16 +50,16 @@ namespace mongo {
 
     class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
     public:
-        virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
     };
 
     /**
      * Rocks implementation of the SortedDataInterface. Each index is stored as a single column
-     * family. Each mapping from a BSONObj to a DiskLoc is stored as the key of a key-value pair
+     * family. Each mapping from a BSONObj to a RecordId is stored as the key of a key-value pair
      * in the column family. Consequently, each value in the database is simply an empty string.
      * This is done because RocksDB only supports unique keys, and because RocksDB can take a custom
      * comparator to use when ordering keys. We use a custom comparator which orders keys based
-     * first upon the BSONObj in the key, and uses the DiskLoc as a tiebreaker.
+     * first upon the BSONObj in the key, and uses the RecordId as a tiebreaker.
      */
     class RocksSortedDataImpl : public SortedDataInterface {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
@@ -71,13 +71,13 @@ namespace mongo {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               bool dupsAllowed);
 
-        virtual void unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc,
+        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                              bool dupsAllowed);
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
 
         virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
                                   BSONObjBuilder* output) const;
@@ -101,7 +101,7 @@ namespace mongo {
         static rocksdb::Comparator* newRocksComparator( const Ordering& order );
 
     private:
-        typedef DiskLoc RecordId;
+        typedef RecordId RecordId;
 
         rocksdb::DB* _db; // not owned
 

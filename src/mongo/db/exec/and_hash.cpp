@@ -220,7 +220,7 @@ namespace mongo {
         // We know that we've ADVANCED.  See if the WSM is in our table.
         WorkingSetMember* member = _ws->get(*out);
 
-        // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+        // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
         // with this WSM.
         if (!member->hasLoc()) {
             _ws->flagForReview(*out);
@@ -279,7 +279,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -347,7 +347,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == childStatus) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -457,7 +457,7 @@ namespace mongo {
         }
     }
 
-    void AndHashStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void AndHashStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
@@ -479,8 +479,8 @@ namespace mongo {
             }
         }
 
-        // If it's a deletion, we have to forget about the DiskLoc, and since the AND-ing is by
-        // DiskLoc we can't continue processing it even with the object.
+        // If it's a deletion, we have to forget about the RecordId, and since the AND-ing is by
+        // RecordId we can't continue processing it even with the object.
         //
         // If it's a mutation the predicates implied by the AND-ing may no longer be true.
         //

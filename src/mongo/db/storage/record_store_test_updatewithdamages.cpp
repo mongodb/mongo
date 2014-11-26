@@ -50,13 +50,13 @@ namespace mongo {
         }
 
         string data = "00010111";
-        DiskLoc loc;
+        RecordId loc;
         const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             rec.data(),
                                                             rec.size(),
                                                             false );
@@ -113,13 +113,13 @@ namespace mongo {
         }
 
         string data = "00010111";
-        DiskLoc loc;
+        RecordId loc;
         const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             rec.data(),
                                                             rec.size(),
                                                             false );
@@ -174,13 +174,13 @@ namespace mongo {
         }
 
         string data = "00010111";
-        DiskLoc loc;
+        RecordId loc;
         const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             rec.data(),
                                                             rec.size(),
                                                             false );
@@ -233,13 +233,13 @@ namespace mongo {
         }
 
         string data = "my record";
-        DiskLoc loc;
+        RecordId loc;
         const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             rec.data(),
                                                             rec.size(),
                                                             false );

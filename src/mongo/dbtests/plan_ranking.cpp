@@ -403,7 +403,7 @@ namespace PlanRankingTests {
      * equality predicate on "a".  The presence of the range predicate has an impact on the
      * intersection plan that is raced against the single-index plans: since "a" no longer generates
      * point interval bounds, the results of the index scan aren't guaranteed to be returned in
-     * DiskLoc order, and so the intersection plan uses the AND_HASHED stage instead of the
+     * RecordId order, and so the intersection plan uses the AND_HASHED stage instead of the
      * AND_SORTED stage.  It is still the case that the query should pick the plan that uses index
      * "b", instead of the plan that uses index "a" or the (hashed) intersection plan.
      */

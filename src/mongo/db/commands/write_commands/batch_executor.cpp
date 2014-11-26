@@ -1106,7 +1106,7 @@ namespace mongo {
         txn->lockState()->assertWriteLocked( insertNS );
 
         WriteUnitOfWork wunit(txn);
-        StatusWith<DiskLoc> status = collection->insertDocument( txn, docToInsert, true );
+        StatusWith<RecordId> status = collection->insertDocument( txn, docToInsert, true );
 
         if ( !status.isOK() ) {
             result->setError(toWriteError(status.getStatus()));

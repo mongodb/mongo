@@ -95,7 +95,7 @@ namespace mongo {
 
         BSONObj _findEntry( OperationContext* opCtx,
                             const StringData& ns,
-                            DiskLoc* out=NULL ) const;
+                            RecordId* out=NULL ) const;
 
         std::string _newUniqueIdent(const char* kind);
 
@@ -112,10 +112,10 @@ namespace mongo {
 
         struct Entry {
             Entry(){}
-            Entry( std::string i, DiskLoc l )
+            Entry( std::string i, RecordId l )
                 : ident(i), storedLoc( l ) {}
             std::string ident;
-            DiskLoc storedLoc;
+            RecordId storedLoc;
         };
         typedef std::map<std::string,Entry> NSToIdentMap;
         NSToIdentMap _idents;

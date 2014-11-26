@@ -54,7 +54,7 @@ namespace mongo {
      * inserted before documents in a subsequent extent.  As such we can skip through entire extents
      * looking only at the first document.
      *
-     * Why is this a stage?  Because we want to yield, and we want to be notified of DiskLoc
+     * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
      * invalidations.  :(
      */
     class OplogStart : public PlanStage {
@@ -69,7 +69,7 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 

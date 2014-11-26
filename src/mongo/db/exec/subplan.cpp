@@ -518,7 +518,7 @@ namespace mongo {
         }
     }
 
-    void SubplanStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void SubplanStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         if (_killed) {
             return;

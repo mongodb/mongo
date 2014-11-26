@@ -41,7 +41,7 @@ namespace mongo {
         };
 
         CollectionScanParams() : collection(NULL),
-                                 start(DiskLoc()),
+                                 start(RecordId()),
                                  direction(FORWARD),
                                  tailable(false),
                                  maxScan(0) { }
@@ -50,9 +50,9 @@ namespace mongo {
         // not owned
         const Collection* collection;
 
-        // isNull by default.  If you specify any value for this, you're responsible for the DiskLoc
+        // isNull by default.  If you specify any value for this, you're responsible for the RecordId
         // not being invalidated before the first call to work(...).
-        DiskLoc start;
+        RecordId start;
 
         Direction direction;
 

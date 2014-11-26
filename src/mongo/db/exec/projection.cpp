@@ -189,7 +189,7 @@ namespace mongo {
 
         member->state = WorkingSetMember::OWNED_OBJ;
         member->keyData.clear();
-        member->loc = DiskLoc();
+        member->loc = RecordId();
         member->obj = bob.obj();
         return Status::OK();
     }
@@ -257,7 +257,7 @@ namespace mongo {
     }
 
     void ProjectionStage::invalidate(OperationContext* txn,
-                                     const DiskLoc& dl,
+                                     const RecordId& dl,
                                      InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);

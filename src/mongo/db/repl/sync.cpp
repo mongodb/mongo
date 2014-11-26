@@ -133,7 +133,7 @@ namespace repl {
             Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
             invariant(collection != NULL); // should never happen
 
-            StatusWith<DiskLoc> result = collection->insertDocument(txn, missingObj, true);
+            StatusWith<RecordId> result = collection->insertDocument(txn, missingObj, true);
             uassert(15917,
                     str::stream() << "failed to insert missing doc: " << result.toString(),
                     result.isOK() );

@@ -164,7 +164,7 @@ namespace mongo {
         size_t flaggedInProgress;
 
         // How many entries are in the map after each child?
-        // child 'i' produced children[i].common.advanced DiskLocs, of which mapAfterChild[i] were
+        // child 'i' produced children[i].common.advanced RecordIds, of which mapAfterChild[i] were
         // intersections.
         std::vector<size_t> mapAfterChild;
 
@@ -446,7 +446,7 @@ namespace mongo {
         size_t dupsTested;
         size_t dupsDropped;
 
-        // How many calls to invalidate(...) actually removed a DiskLoc from our deduping map?
+        // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
         size_t locsForgotten;
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.

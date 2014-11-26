@@ -97,7 +97,7 @@ namespace repl {
     }
 
     // so we can fail the same way
-    void checkOplogInsert( StatusWith<DiskLoc> result ) {
+    void checkOplogInsert( StatusWith<RecordId> result ) {
         massert( 17322,
                  str::stream() << "write to oplog failed: " << result.getStatus().toString(),
                  result.isOK() );

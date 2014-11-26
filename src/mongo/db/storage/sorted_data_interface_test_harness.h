@@ -55,14 +55,14 @@ namespace mongo {
     const BSONObj compoundKey3b = BSON( "" << 3 << "" << "b" );
     const BSONObj compoundKey3c = BSON( "" << 3 << "" << "c" );
 
-    const DiskLoc loc1( 10, 42 );
-    const DiskLoc loc2( 10, 44 );
-    const DiskLoc loc3( 10, 46 );
-    const DiskLoc loc4( 10, 48 );
-    const DiskLoc loc5( 10, 50 );
-    const DiskLoc loc6( 10, 52 );
-    const DiskLoc loc7( 10, 54 );
-    const DiskLoc loc8( 10, 56 );
+    const RecordId loc1( 10, 42 );
+    const RecordId loc2( 10, 44 );
+    const RecordId loc3( 10, 46 );
+    const RecordId loc4( 10, 48 );
+    const RecordId loc5( 10, 50 );
+    const RecordId loc6( 10, 52 );
+    const RecordId loc7( 10, 54 );
+    const RecordId loc8( 10, 56 );
 
     class RecoveryUnit;
     class SortedDataInterface;

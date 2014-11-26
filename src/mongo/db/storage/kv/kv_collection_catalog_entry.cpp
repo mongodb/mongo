@@ -108,7 +108,7 @@ namespace mongo {
 
     void KVCollectionCatalogEntry::setIndexHead( OperationContext* txn,
                                                  const StringData& indexName,
-                                                 const DiskLoc& newHead ) {
+                                                 const RecordId& newHead ) {
         MetaData md = _getMetaData( txn );
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
@@ -132,7 +132,7 @@ namespace mongo {
     Status KVCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
                                                            const IndexDescriptor* spec ) {
         MetaData md = _getMetaData( txn );
-        md.indexes.push_back( IndexMetaData( spec->infoObj(), false, DiskLoc(), false ) );
+        md.indexes.push_back( IndexMetaData( spec->infoObj(), false, RecordId(), false ) );
         _catalog->putMetaData( txn, ns().toString(), md );
 
         string ident = _catalog->getIndexIdent( txn, ns().ns(), spec->indexName() );

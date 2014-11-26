@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    class DiskLoc;
+    class RecordId;
 
     /**
      * MockStage is a data-producing stage that is used for testing.  Unlike the other two leaf
@@ -60,7 +60,7 @@ namespace mongo {
         // have correct yielding behavior.
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 

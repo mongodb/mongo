@@ -125,7 +125,7 @@ namespace mongo {
     }
 
     void KeepMutationsStage::invalidate(OperationContext* txn,
-                                        const DiskLoc& dl,
+                                        const RecordId& dl,
                                         InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);

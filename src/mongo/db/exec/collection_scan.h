@@ -40,10 +40,10 @@ namespace mongo {
     class OperationContext;
 
     /**
-     * Scans over a collection, starting at the DiskLoc provided in params and continuing until
+     * Scans over a collection, starting at the RecordId provided in params and continuing until
      * there are no more records in the collection.
      *
-     * Preconditions: Valid DiskLoc.
+     * Preconditions: Valid RecordId.
      */
     class CollectionScan : public PlanStage {
     public:
@@ -55,7 +55,7 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 
@@ -95,10 +95,10 @@ namespace mongo {
 
         bool _isDead;
 
-        DiskLoc _lastSeenLoc;
+        RecordId _lastSeenLoc;
 
         // We allocate a working set member with this id on construction of the stage. It gets
-        // used for all fetch requests, changing the DiskLoc as appropriate.
+        // used for all fetch requests, changing the RecordId as appropriate.
         const WorkingSetID _wsidForFetch;
 
         // Stats

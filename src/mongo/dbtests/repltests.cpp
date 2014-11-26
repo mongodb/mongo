@@ -183,7 +183,7 @@ namespace ReplTests {
 
                 RecordIterator* it = coll->getIterator(&_txn);
                 while ( !it->isEOF() ) {
-                    DiskLoc currLoc = it->getNext();
+                    RecordId currLoc = it->getNext();
                     ops.push_back(coll->docFor(&_txn, currLoc));
                 }
                 delete it;
@@ -220,7 +220,7 @@ namespace ReplTests {
             RecordIterator* it = coll->getIterator(&_txn);
             ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
-                DiskLoc currLoc = it->getNext();
+                RecordId currLoc = it->getNext();
                 ::mongo::log() << coll->docFor(&_txn, currLoc).toString() << endl;
             }
             delete it;
@@ -237,13 +237,13 @@ namespace ReplTests {
                 coll = db->createCollection( &_txn, ns );
             }
 
-            vector< DiskLoc > toDelete;
+            vector< RecordId > toDelete;
             RecordIterator* it = coll->getIterator(&_txn);
             while ( !it->isEOF() ) {
                 toDelete.push_back( it->getNext() );
             }
             delete it;
-            for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
+            for( vector< RecordId >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
                 coll->deleteDocument( &_txn, *i, true );
             }
             wunit.commit();

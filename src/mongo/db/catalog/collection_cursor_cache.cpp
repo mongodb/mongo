@@ -347,7 +347,7 @@ namespace mongo {
     }
 
     void CollectionCursorCache::invalidateDocument( OperationContext* txn,
-                                                    const DiskLoc& dl,
+                                                    const RecordId& dl,
                                                     InvalidationType type ) {
         if ( supportsDocLocking() ) {
             // If a storage engine supports doc locking, then we do not need to invalidate.

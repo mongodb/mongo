@@ -165,7 +165,7 @@ namespace mongo {
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
             int keyPatternLength = keyPattern.nFields();
 
-            DiskLoc loc;
+            RecordId loc;
             BSONObj currKey;
             while (PlanExecutor::ADVANCED == exec->getNext(&currKey, &loc)) {
                 //check that current key contains non missing elements for all fields in keyPattern

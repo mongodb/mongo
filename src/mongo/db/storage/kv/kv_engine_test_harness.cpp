@@ -64,11 +64,11 @@ namespace mongo {
         }
 
 
-        DiskLoc loc;
+        RecordId loc;
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
+            StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
             ASSERT_OK( res.getStatus() );
             loc = res.getValue();
             uow.commit();
@@ -96,7 +96,7 @@ namespace mongo {
         string ns = "a.b";
 
         // 'loc' holds location of "abc" and is referenced after restarting engine.
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<RecordStore> rs;
             {
@@ -109,7 +109,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( engine );
                 WriteUnitOfWork uow( &opCtx );
-                StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
+                StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -151,7 +151,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( sorted->insert( &opCtx, BSON( "" << 5 ), DiskLoc( 6, 4 ), true ) );
+            ASSERT_OK( sorted->insert( &opCtx, BSON( "" << 5 ), RecordId( 6, 4 ), true ) );
             uow.commit();
         }
 
@@ -237,7 +237,7 @@ namespace mongo {
             md.ns ="a.b";
             md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
                                                                              false,
-                                                                             DiskLoc(),
+                                                                             RecordId(),
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             uow.commit();
@@ -263,7 +263,7 @@ namespace mongo {
             catalog->putMetaData( &opCtx, "a.b", md ); // remove index
             md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
                                                                              false,
-                                                                             DiskLoc(),
+                                                                             RecordId(),
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             uow.commit();

@@ -39,7 +39,7 @@ namespace mongo {
     // using a forward cursor by specifying their exact key. When
     // advanceTo() is called on a duplicate key, the cursor is
     // positioned at the next occurrence of that key in ascending
-    // order by DiskLoc.
+    // order by RecordId.
     TEST( SortedDataInterface, AdvanceTo ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -73,7 +73,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -83,7 +83,7 @@ namespace mongo {
                 // SERVER-15489 forward cursor is positioned at first occurrence of key in index
                 //              when advanceTo() called on duplicate key
                 // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -92,7 +92,7 @@ namespace mongo {
 
                 cursor->advanceTo( key2, 1, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc4, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc4, cursor->getRecordId() );
             }
 
             {
@@ -101,7 +101,7 @@ namespace mongo {
 
                 cursor->advanceTo( key3, 1, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc5, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc5, cursor->getRecordId() );
             }
 
             {
@@ -118,7 +118,7 @@ namespace mongo {
     // using a reverse cursor by specifying their exact key. When
     // advanceTo() is called on a duplicate key, the cursor is
     // positioned at the next occurrence of that key in descending
-    // order by DiskLoc.
+    // order by RecordId.
     TEST( SortedDataInterface, AdvanceToReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -152,7 +152,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key3, loc5 ) );
             ASSERT_EQUALS( key3, cursor->getKey() );
-            ASSERT_EQUALS( loc5, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc5, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -162,7 +162,7 @@ namespace mongo {
                 // SERVER-15490 reverse cursor is positioned at last occurrence of key in index
                 //              when advanceTo() called on duplicate key
                 // ASSERT_EQUALS( key3, cursor->getKey() );
-                // ASSERT_EQUALS( loc4, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc4, cursor->getRecordId() );
             }
 
             {
@@ -171,7 +171,7 @@ namespace mongo {
 
                 cursor->advanceTo( key2, 1, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -180,7 +180,7 @@ namespace mongo {
 
                 cursor->advanceTo( key1, 1, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
 
             {
@@ -226,7 +226,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -236,7 +236,7 @@ namespace mongo {
                 // SERVER-15489 forward cursor is positioned at first key in index
                 //              when advanceTo() called with key smaller than any entry
                 // ASSERT_EQUALS( key2, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
         }
 
@@ -246,7 +246,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -256,7 +256,7 @@ namespace mongo {
                 // SERVER-15489 forward cursor is positioned at first key in index
                 //              when advanceTo() called with key smaller than any entry
                 // ASSERT_EQUALS( key2, cursor->getKey() );
-                // ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
         }
     }
@@ -294,7 +294,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key2, loc2 ) );
             ASSERT_EQUALS( key2, cursor->getKey() );
-            ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc2, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -304,7 +304,7 @@ namespace mongo {
                 // SERVER-15490 reverse cursor is positioned at last key in index
                 //              when advanceTo() called with key larger than any entry
                 // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
         }
 
@@ -314,7 +314,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key2, loc2 ) );
             ASSERT_EQUALS( key2, cursor->getKey() );
-            ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc2, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -324,7 +324,7 @@ namespace mongo {
                 // SERVER-15490 reverse cursor is positioned at last key in index
                 //              when advanceTo() called with key larger than any entry
                 // ASSERT_EQUALS( key1, cursor->getKey() );
-                // ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                // ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
         }
     }
@@ -363,7 +363,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -382,7 +382,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -428,7 +428,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -447,7 +447,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -496,7 +496,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -504,7 +504,7 @@ namespace mongo {
 
                 cursor->advanceTo( key1, 1, true, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc4, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc4, cursor->getRecordId() );
             }
 
             {
@@ -513,7 +513,7 @@ namespace mongo {
 
                 cursor->advanceTo( key2, 1, true, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc5, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc5, cursor->getRecordId() );
             }
 
             {
@@ -573,7 +573,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key3, loc5 ) );
             ASSERT_EQUALS( key3, cursor->getKey() );
-            ASSERT_EQUALS( loc5, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc5, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -581,7 +581,7 @@ namespace mongo {
 
                 cursor->advanceTo( key3, 1, true, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key2, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -590,7 +590,7 @@ namespace mongo {
 
                 cursor->advanceTo( key2, 1, true, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
 
             {
@@ -649,7 +649,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -661,7 +661,7 @@ namespace mongo {
 
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -674,7 +674,7 @@ namespace mongo {
 
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc3, cursor->getRecordId() );
             }
         }
     }
@@ -715,7 +715,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key5, loc3 ) );
             ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc3, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -727,7 +727,7 @@ namespace mongo {
 
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -740,7 +740,7 @@ namespace mongo {
 
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
         }
     }
@@ -783,7 +783,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -796,7 +796,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -810,7 +810,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc3, cursor->getRecordId() );
             }
         }
 
@@ -820,7 +820,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key1, loc1 ) );
             ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc1, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -833,7 +833,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key5, cursor->getKey() );
-                ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc3, cursor->getRecordId() );
             }
         }
     }
@@ -876,7 +876,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key5, loc3 ) );
             ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc3, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -889,7 +889,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key3, cursor->getKey() );
-                ASSERT_EQUALS( loc2, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc2, cursor->getRecordId() );
             }
 
             {
@@ -903,7 +903,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
         }
 
@@ -913,7 +913,7 @@ namespace mongo {
 
             ASSERT( cursor->locate( key5, loc3 ) );
             ASSERT_EQUALS( key5, cursor->getKey() );
-            ASSERT_EQUALS( loc3, cursor->getDiskLoc() );
+            ASSERT_EQUALS( loc3, cursor->getRecordId() );
 
             {
                 vector<const BSONElement*> keyEnd( 1 );
@@ -926,7 +926,7 @@ namespace mongo {
                 cursor->advanceTo( unusedKey, 0, false, keyEnd, keyEndInclusive );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
+                ASSERT_EQUALS( loc1, cursor->getRecordId() );
             }
         }
     }

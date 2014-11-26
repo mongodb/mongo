@@ -36,7 +36,7 @@
 namespace mongo {
 
     // Insert a key and verify that dupKeyCheck() returns a non-OK status for
-    // the same key. When dupKeyCheck() is called with the exact (key, DiskLoc)
+    // the same key. When dupKeyCheck() is called with the exact (key, RecordId)
     // pair that was inserted, it should still return an OK status.
     TEST( SortedDataInterface, DupKeyCheckAfterInsert ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
@@ -66,7 +66,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 ASSERT_OK( sorted->dupKeyCheck( opCtx.get(), key1, loc1 ) );
-                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, minDiskLoc ) );
+                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, RecordId::min() ) );
                 uow.commit();
             }
         }
@@ -94,7 +94,7 @@ namespace mongo {
     }
 
     // Insert a key and verify that dupKeyCheck() acknowledges the duplicate key, even
-    // when the insert key is located at a DiskLoc that comes after the one specified.
+    // when the insert key is located at a RecordId that comes after the one specified.
     TEST( SortedDataInterface, DupKeyCheckWhenDiskLocBefore ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -122,14 +122,14 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, minDiskLoc ) );
+                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, RecordId::min() ) );
                 uow.commit();
             }
         }
     }
 
     // Insert a key and verify that dupKeyCheck() acknowledges the duplicate key, even
-    // when the insert key is located at a DiskLoc that comes before the one specified.
+    // when the insert key is located at a RecordId that comes before the one specified.
     TEST( SortedDataInterface, DupKeyCheckWhenDiskLocAfter ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -157,7 +157,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, maxDiskLoc ) );
+                ASSERT_NOT_OK( sorted->dupKeyCheck( opCtx.get(), key1, RecordId::max() ) );
                 uow.commit();
             }
         }

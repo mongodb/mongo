@@ -112,7 +112,7 @@ namespace mongo {
         if (isEOF())
             return PlanStage::IS_EOF;
 
-        const DiskLoc curr = _iter->curr();
+        const RecordId curr = _iter->curr();
         if (curr.isNull()) {
             // We just hit EOF
             if (_params.tailable)
@@ -180,7 +180,7 @@ namespace mongo {
     }
 
     void CollectionScan::invalidate(OperationContext* txn,
-                                    const DiskLoc& dl,
+                                    const RecordId& dl,
                                     InvalidationType type) {
         ++_commonStats.invalidates;
 

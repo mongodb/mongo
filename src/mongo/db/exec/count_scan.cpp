@@ -117,7 +117,7 @@ namespace mongo {
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
-        DiskLoc loc = _btreeCursor->getValue();
+        RecordId loc = _btreeCursor->getValue();
         _btreeCursor->next();
         checkEnd();
 
@@ -203,18 +203,18 @@ namespace mongo {
         checkEnd();
     }
 
-    void CountScan::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void CountScan::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        // The only state we're responsible for holding is what DiskLocs to drop.  If a document
+        // The only state we're responsible for holding is what RecordIds to drop.  If a document
         // mutates the underlying index cursor will deal with it.
         if (INVALIDATION_MUTATION == type) {
             return;
         }
 
-        // If we see this DiskLoc again, it may not be the same document it was before, so we want
+        // If we see this RecordId again, it may not be the same document it was before, so we want
         // to return it if we see it again.
-        unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _returned.find(dl);
+        unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
         if (it != _returned.end()) {
             _returned.erase(it);
         }

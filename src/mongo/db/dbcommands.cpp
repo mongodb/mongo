@@ -852,7 +852,7 @@ namespace mongo {
             long long size = 0;
             long long numObjects = 0;
 
-            DiskLoc loc;
+            RecordId loc;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                 if ( estimate )

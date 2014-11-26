@@ -89,7 +89,7 @@ namespace mongo {
                                                                           errmsg));
                 return PlanStage::FAILURE;
             }
-            DiskLoc rloc = member->loc;
+            RecordId rloc = member->loc;
             _ws->free(id);
 
             BSONObj deletedDoc;
@@ -177,7 +177,7 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
     }
 
-    void DeleteStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void DeleteStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);
     }

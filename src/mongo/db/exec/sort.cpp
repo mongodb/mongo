@@ -276,7 +276,7 @@ namespace mongo {
         if (0 != result) {
             return result < 0;
         }
-        // Indices use DiskLoc as an additional sort key so we must as well.
+        // Indices use RecordId as an additional sort key so we must as well.
         return lhs.loc < rhs.loc;
     }
 
@@ -340,8 +340,8 @@ namespace mongo {
             StageState code = _child->work(&id);
 
             if (PlanStage::ADVANCED == code) {
-                // Add it into the map for quick invalidation if it has a valid DiskLoc.
-                // A DiskLoc may be invalidated at any time (during a yield).  We need to get into
+                // Add it into the map for quick invalidation if it has a valid RecordId.
+                // A RecordId may be invalidated at any time (during a yield).  We need to get into
                 // the WorkingSet as quickly as possible to handle it.
                 WorkingSetMember* member = _ws->get(id);
 
@@ -362,7 +362,7 @@ namespace mongo {
                 }
                 item.wsid = id;
                 if (member->hasLoc()) {
-                    // The DiskLoc breaks ties when sorting two WSMs with the same sort key.
+                    // The RecordId breaks ties when sorting two WSMs with the same sort key.
                     item.loc = member->loc;
                 }
 
@@ -431,7 +431,7 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void SortStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void SortStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);
 
@@ -440,11 +440,11 @@ namespace mongo {
         // So, no matter what, fetch and keep the doc in play.
 
         // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
-        // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
+        // the WorkingSet needs to change state as a result of a RecordId invalidation, it will still
         // be at the same spot in the WorkingSet.  As such, we don't need to modify _data.
         DataMap::iterator it = _wsidByDiskLoc.find(dl);
 
-        // If we're holding on to data that's got the DiskLoc we're invalidating...
+        // If we're holding on to data that's got the RecordId we're invalidating...
         if (_wsidByDiskLoc.end() != it) {
             // Grab the WSM that we're nuking.
             WorkingSetMember* member = _ws->get(it->second);
@@ -452,7 +452,7 @@ namespace mongo {
 
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
 
-            // Remove the DiskLoc from our set of active DLs.
+            // Remove the RecordId from our set of active DLs.
             _wsidByDiskLoc.erase(it);
             ++_specificStats.forcedFetches;
         }
@@ -559,7 +559,7 @@ namespace mongo {
         }
 
         // If the working set ID is valid, remove from
-        // DiskLoc invalidation map and free from working set.
+        // RecordId invalidation map and free from working set.
         if (wsidToFree != WorkingSet::INVALID_ID) {
             WorkingSetMember* member = _ws->get(wsidToFree);
             if (member->hasLoc()) {

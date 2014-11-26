@@ -80,11 +80,11 @@ namespace mongo {
         iter->SeekToLast();
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
-            DiskLoc lastLoc = _makeDiskLoc( lastSlice );
+            RecordId lastLoc = _makeDiskLoc( lastSlice );
             _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
         }
         else {
-            // Need to start at 1 so we are always higher than minDiskLoc
+            // Need to start at 1 so we are always higher than RecordId::min()
             _nextIdNum.store( 1 );
         }
 
@@ -117,16 +117,16 @@ namespace mongo {
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
         uint64_t storageSize;
-        rocksdb::Range wholeRange( _makeKey( minDiskLoc ), _makeKey( maxDiskLoc ) );
+        rocksdb::Range wholeRange( _makeKey( RecordId::min() ), _makeKey( RecordId::max() ) );
         _db->GetApproximateSizes(_columnFamily.get(), &wholeRange, 1, &storageSize);
         return static_cast<int64_t>( storageSize );
     }
 
-    RecordData RocksRecordStore::dataFor( OperationContext* txn, const DiskLoc& loc) const {
+    RecordData RocksRecordStore::dataFor( OperationContext* txn, const RecordId& loc) const {
         return _getDataFor(_db, _columnFamily.get(), txn, loc);
     }
 
-    void RocksRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
+    void RocksRecordStore::deleteRecord( OperationContext* txn, const RecordId& dl ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
 
         std::string oldValue;
@@ -177,7 +177,7 @@ namespace mongo {
             invariant(numRecords(txn) > 0);
 
             rocksdb::Slice slice = iter->key();
-            DiskLoc oldest = _makeDiskLoc( slice );
+            RecordId oldest = _makeDiskLoc( slice );
 
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -187,18 +187,18 @@ namespace mongo {
         }
     }
 
-    StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
+    StatusWith<RecordId> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota ) {
         if ( _isCapped && len > _cappedMaxSize ) {
-            return StatusWith<DiskLoc>( ErrorCodes::BadValue,
+            return StatusWith<RecordId>( ErrorCodes::BadValue,
                                        "object to insert exceeds cappedMaxSize" );
         }
 
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
 
-        DiskLoc loc = _nextId();
+        RecordId loc = _nextId();
 
         ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
 
@@ -207,10 +207,10 @@ namespace mongo {
 
         cappedDeleteAsNeeded(txn);
 
-        return StatusWith<DiskLoc>( loc );
+        return StatusWith<RecordId>( loc );
     }
 
-    StatusWith<DiskLoc> RocksRecordStore::insertRecord( OperationContext* txn,
+    StatusWith<RecordId> RocksRecordStore::insertRecord( OperationContext* txn,
                                                         const DocWriter* doc,
                                                         bool enforceQuota ) {
         const int len = doc->documentSize();
@@ -220,8 +220,8 @@ namespace mongo {
         return insertRecord( txn, buf.get(), len, enforceQuota );
     }
 
-    StatusWith<DiskLoc> RocksRecordStore::updateRecord( OperationContext* txn,
-                                                        const DiskLoc& loc,
+    StatusWith<RecordId> RocksRecordStore::updateRecord( OperationContext* txn,
+                                                        const RecordId& loc,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota,
@@ -232,7 +232,7 @@ namespace mongo {
         auto status = ru->Get(_columnFamily.get(), _makeKey(loc), &old_value);
 
         if ( !status.ok() ) {
-            return StatusWith<DiskLoc>( ErrorCodes::InternalError, status.ToString() );
+            return StatusWith<RecordId>( ErrorCodes::InternalError, status.ToString() );
         }
 
         int old_length = old_value.size();
@@ -243,11 +243,11 @@ namespace mongo {
 
         cappedDeleteAsNeeded(txn);
 
-        return StatusWith<DiskLoc>( loc );
+        return StatusWith<RecordId>( loc );
     }
 
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
-                                                const DiskLoc& loc,
+                                                const RecordId& loc,
                                                 const RecordData& oldRec,
                                                 const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
@@ -284,7 +284,7 @@ namespace mongo {
     }
 
     RecordIterator* RocksRecordStore::getIterator( OperationContext* txn,
-                                                   const DiskLoc& start,
+                                                   const RecordId& start,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
         return new Iterator(txn, _db, _columnFamily, dir, start);
@@ -308,7 +308,7 @@ namespace mongo {
         //AFB add Clear(ColumnFamilyHandle*)
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
-            DiskLoc loc = iter->getNext();
+            RecordId loc = iter->getNext();
             deleteRecord( txn, loc );
         }
 
@@ -412,8 +412,8 @@ namespace mongo {
                 virtual ~RocksCollectionComparator() { }
 
                 virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
-                    DiskLoc lhs = reinterpret_cast<const DiskLoc*>( a.data() )[0];
-                    DiskLoc rhs = reinterpret_cast<const DiskLoc*>( b.data() )[0];
+                    RecordId lhs = reinterpret_cast<const RecordId*>( a.data() )[0];
+                    RecordId rhs = reinterpret_cast<const RecordId*>( b.data() )[0];
                     return lhs.compare( rhs );
                 }
 
@@ -441,14 +441,14 @@ namespace mongo {
     }
 
     void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
-                                                     DiskLoc end,
+                                                     RecordId end,
                                                      bool inclusive ) {
         boost::scoped_ptr<RecordIterator> iter(
-                getIterator( txn, maxDiskLoc, CollectionScanParams::BACKWARD ) );
+                getIterator( txn, RecordId::max(), CollectionScanParams::BACKWARD ) );
 
         while( !iter->isEOF() ) {
             WriteUnitOfWork wu( txn );
-            DiskLoc loc = iter->getNext();
+            RecordId loc = iter->getNext();
             if ( loc < end || ( !inclusive && loc == end))
                 return;
 
@@ -476,25 +476,25 @@ namespace mongo {
         return options;
     }
 
-    DiskLoc RocksRecordStore::_nextId() {
+    RecordId RocksRecordStore::_nextId() {
         const uint64_t myId = _nextIdNum.fetchAndAdd(1);
         int a = myId >> 32;
         // This masks the lowest 4 bytes of myId
         int ofs = myId & 0x00000000FFFFFFFF;
-        DiskLoc loc( a, ofs );
+        RecordId loc( a, ofs );
         return loc;
     }
 
-    rocksdb::Slice RocksRecordStore::_makeKey(const DiskLoc& loc) {
+    rocksdb::Slice RocksRecordStore::_makeKey(const RecordId& loc) {
         return rocksdb::Slice(reinterpret_cast<const char*>(&loc), sizeof(loc));
     }
 
-    DiskLoc RocksRecordStore::_makeDiskLoc( const rocksdb::Slice& slice ) {
-        return reinterpret_cast<const DiskLoc*>( slice.data() )[0];
+    RecordId RocksRecordStore::_makeDiskLoc( const rocksdb::Slice& slice ) {
+        return reinterpret_cast<const RecordId*>( slice.data() )[0];
     }
 
     bool RocksRecordStore::findRecord( OperationContext* txn,
-                                       const DiskLoc& loc, RecordData* out ) const {
+                                       const RecordId& loc, RecordData* out ) const {
         RecordData rd = _getDataFor(_db, _columnFamily.get(), txn, loc);
         if ( rd.data() == NULL )
             return false;
@@ -503,7 +503,7 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::_getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
-                                             OperationContext* txn, const DiskLoc& loc) {
+                                             OperationContext* txn, const RecordId& loc) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
 
         std::string value_storage;
@@ -549,7 +549,7 @@ namespace mongo {
     RocksRecordStore::Iterator::Iterator(
         OperationContext* txn, rocksdb::DB* db,
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
-        const CollectionScanParams::Direction& dir, const DiskLoc& start)
+        const CollectionScanParams::Direction& dir, const RecordId& start)
         : _txn(txn),
           _db(db),
           _cf(columnFamily),
@@ -570,20 +570,20 @@ namespace mongo {
         return _eof;
     }
 
-    DiskLoc RocksRecordStore::Iterator::curr() {
+    RecordId RocksRecordStore::Iterator::curr() {
         if (_eof) {
-            return DiskLoc();
+            return RecordId();
         }
 
         return _curr;
     }
 
-    DiskLoc RocksRecordStore::Iterator::getNext() {
+    RecordId RocksRecordStore::Iterator::getNext() {
         if (_eof) {
-            return DiskLoc();
+            return RecordId();
         }
 
-        DiskLoc toReturn = _curr;
+        RecordId toReturn = _curr;
 
         if ( _forward() )
             _iterator->Next();
@@ -599,7 +599,7 @@ namespace mongo {
         return toReturn;
     }
 
-    void RocksRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
+    void RocksRecordStore::Iterator::invalidate( const RecordId& dl ) {
         _iterator.reset( NULL );
     }
 
@@ -619,7 +619,7 @@ namespace mongo {
         return true;
     }
 
-    RecordData RocksRecordStore::Iterator::dataFor(const DiskLoc& loc) const {
+    RecordData RocksRecordStore::Iterator::dataFor(const RecordId& loc) const {
         if (!_eof && loc == _curr && _iterator->Valid() && _iterator->status().ok()) {
             SharedBuffer data = SharedBuffer::allocate(_iterator->value().size());
             memcpy(data.get(), _iterator->value().data(), _iterator->value().size());
@@ -628,7 +628,7 @@ namespace mongo {
         return RocksRecordStore::_getDataFor(_db, _cf.get(), _txn, loc);
     }
 
-    void RocksRecordStore::Iterator::_locate(const DiskLoc& loc) {
+    void RocksRecordStore::Iterator::_locate(const RecordId& loc) {
         if (_forward()) {
             if (loc.isNull()) {
                 _iterator->SeekToFirst();
@@ -659,7 +659,7 @@ namespace mongo {
         }
     }
 
-    DiskLoc RocksRecordStore::Iterator::_decodeCurr() const {
+    RecordId RocksRecordStore::Iterator::_decodeCurr() const {
         invariant(_iterator && _iterator->Valid());
         return _makeDiskLoc(_iterator->key());
     }

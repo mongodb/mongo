@@ -251,11 +251,11 @@ namespace mongo {
         return !_killed;
     }
 
-    void PlanExecutor::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void PlanExecutor::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         if (!_killed) { _root->invalidate(txn, dl, type); }
     }
 
-    PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+    PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) {
         if (_killed) { return PlanExecutor::DEAD; }
 
         // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*

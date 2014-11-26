@@ -68,7 +68,7 @@ namespace mongo {
 
     /**
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
-     * filter.  Internally dedups on DiskLoc.
+     * filter.  Internally dedups on RecordId.
      *
      * TODO: we probably should split this into 2 stages: one btree-only "fast" ixscan and one that
      * strictly talks through the index API.  Need to figure out what we really want to ship down
@@ -110,7 +110,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -154,11 +154,11 @@ namespace mongo {
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         bool _shouldDedup;
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
+        unordered_set<RecordId, RecordId::Hasher> _returned;
 
         // For yielding.
         BSONObj _savedKey;
-        DiskLoc _savedLoc;
+        RecordId _savedLoc;
 
         IndexScanParams _params;
 

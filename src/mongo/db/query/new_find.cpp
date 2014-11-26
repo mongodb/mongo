@@ -457,12 +457,12 @@ namespace mongo {
                           "$gt or $gte over the 'ts' field.");
         }
 
-        DiskLoc startLoc = DiskLoc().setInvalid();
+        RecordId startLoc = RecordId().setInvalid();
 
         // See if the RecordStore supports the oplogStartHack
         const BSONElement tsElem = extractOplogTsOptime(tsExpr);
         if (tsElem.type() == Timestamp) {
-            StatusWith<DiskLoc> goal = oploghack::keyForOptime(tsElem._opTime());
+            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem._opTime());
             if (goal.isOK()) {
                 startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
             }
@@ -485,7 +485,7 @@ namespace mongo {
             invariant(execStatus.isOK());
             scoped_ptr<PlanExecutor> exec(rawExec);
 
-            // The stage returns a DiskLoc of where to start.
+            // The stage returns a RecordId of where to start.
             PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
 
             // This is normal.  The start of the oplog is the beginning of the collection.

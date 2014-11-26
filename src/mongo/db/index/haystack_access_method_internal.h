@@ -43,7 +43,7 @@ namespace mongo {
          * @param n  The centroid that we're searching
          * @param maxDistance  The maximum distance to consider from that point
          * @param limit  The maximum number of results to return
-         * @param geoField  Which field in the provided DiskLoc has the point to test.
+         * @param geoField  Which field in the provided RecordId has the point to test.
          */
         GeoHaystackSearchHopper(OperationContext* txn,
                                 const BSONObj& nearObj, 
@@ -60,7 +60,7 @@ namespace mongo {
 
         // Consider the point in loc, and keep it if it's within _maxDistance (and we have space for
         // it)
-        void consider(const DiskLoc& loc) {
+        void consider(const RecordId& loc) {
             if (limitReached()) return;
             Point p(_collection->docFor(_txn, loc).getFieldDotted(_geoField));
             if (distance(_near, p) > _maxDistance)
@@ -86,7 +86,7 @@ namespace mongo {
         double _maxDistance;
         unsigned _limit;
         const std::string _geoField;
-        std::vector<DiskLoc> _locs;
+        std::vector<RecordId> _locs;
     };
 
 }  // namespace mongo

@@ -134,7 +134,7 @@ namespace {
         set<string> collectionsToResync;
 
         OpTime commonPoint;
-        DiskLoc commonPointOurDiskloc;
+        RecordId commonPointOurDiskloc;
 
         int rbid; // remote server's current rollback sequence #
     };
@@ -256,7 +256,7 @@ namespace {
                                                 InternalPlanner::BACKWARD));
 
         BSONObj ourObj;
-        DiskLoc ourLoc;
+        RecordId ourLoc;
 
         if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
             throw RSFatalException("our oplog empty or unreadable");
@@ -589,12 +589,12 @@ namespace {
                                 // TODO: IIRC cappedTruncateAfter does not handle completely empty.
                                 // this will crazy slow if no _id index.
                                 long long start = Listener::getElapsedTimeMillis();
-                                DiskLoc loc = Helpers::findOne(txn, collection, pattern, false);
+                                RecordId loc = Helpers::findOne(txn, collection, pattern, false);
                                 if (Listener::getElapsedTimeMillis() - start > 200)
                                     log() << "replSet warning roll back slow no _id index for "
                                           << doc.ns << " perhaps?";
                                 // would be faster but requires index:
-                                // DiskLoc loc = Helpers::findById(nsd, pattern);
+                                // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
                                     try {
                                         collection->temp_cappedTruncateAfter(txn, loc, true);

@@ -68,7 +68,7 @@ namespace mongo {
          */
         virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted) = 0;
 
@@ -78,7 +78,7 @@ namespace mongo {
          */
         virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted) = 0;
 
@@ -95,7 +95,7 @@ namespace mongo {
         virtual Status validateUpdate(OperationContext* txn,
                                       const BSONObj& from,
                                       const BSONObj& to,
-                                      const DiskLoc& loc,
+                                      const RecordId& loc,
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket) = 0;
 
@@ -191,12 +191,12 @@ namespace mongo {
          * @param mayInterrupt - is this commit interruptable (will cancel)
          * @param dupsAllowed - if false, error or fill 'dups' if any duplicate values are found
          * @param dups - if NULL, error out on dups if not allowed
-         *               if not NULL, put the bad DiskLocs there
+         *               if not NULL, put the bad RecordIds there
          */
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
                                    bool dupsAllowed,
-                                   std::set<DiskLoc>* dups ) = 0;
+                                   std::set<RecordId>* dups ) = 0;
     };
 
     /**

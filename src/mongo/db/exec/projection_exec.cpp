@@ -247,7 +247,7 @@ namespace mongo {
             member->state = WorkingSetMember::OWNED_OBJ;
             member->obj = keyObj;
             member->keyData.clear();
-            member->loc = DiskLoc();
+            member->loc = RecordId();
             return Status::OK();
         }
 
@@ -344,7 +344,7 @@ namespace mongo {
         member->state = WorkingSetMember::OWNED_OBJ;
         member->obj = newObj;
         member->keyData.clear();
-        member->loc = DiskLoc();
+        member->loc = RecordId();
 
         return Status::OK();
     }

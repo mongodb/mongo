@@ -85,7 +85,7 @@ namespace mongo {
                 return recData.toBson().objsize();
             }
 
-            virtual void inserted( const RecordData& recData, const DiskLoc& newLocation ) {
+            virtual void inserted( const RecordData& recData, const RecordId& newLocation ) {
                 _multiIndexBlock->insert( recData.toBson(), newLocation );
             }
 

@@ -62,7 +62,7 @@ namespace mongo {
         virtual bool isIndexMultikey( OperationContext* txn,
                                       const StringData& indexName) const;
 
-        virtual DiskLoc getIndexHead( OperationContext* txn,
+        virtual RecordId getIndexHead( OperationContext* txn,
                                       const StringData& indexName ) const;
 
         virtual bool isIndexReady( OperationContext* txn,
@@ -72,7 +72,7 @@ namespace mongo {
 
         struct IndexMetaData {
             IndexMetaData() {}
-            IndexMetaData( BSONObj s, bool r, DiskLoc h, bool m )
+            IndexMetaData( BSONObj s, bool r, RecordId h, bool m )
                 : spec( s ), ready( r ), head( h ), multikey( m ) {}
 
             void updateTTLSetting( long long newExpireSeconds );
@@ -81,7 +81,7 @@ namespace mongo {
 
             BSONObj spec;
             bool ready;
-            DiskLoc head;
+            RecordId head;
             bool multikey;
         };
 

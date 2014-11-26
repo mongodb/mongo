@@ -59,24 +59,24 @@ namespace mongo {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               bool dupsAllowed);
 
         virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
-                             const DiskLoc& loc,
+                             const RecordId& loc,
                              bool dupsAllowed);
 
         virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
                                   BSONObjBuilder* output) const;
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
 
         virtual bool isEmpty(OperationContext* txn);
 
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-        bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc );
+        bool isDup(WT_CURSOR *c, const BSONObj& key, const RecordId& loc );
 
         virtual SortedDataInterface::Cursor* newCursor(
                                                        OperationContext* txn, int direction) const;
@@ -93,12 +93,12 @@ namespace mongo {
 
         virtual Status _insert( WT_CURSOR* c,
                                 const BSONObj& key,
-                                const DiskLoc& loc,
+                                const RecordId& loc,
                                 bool dupsAllowed ) = 0;
 
         virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
-                               const DiskLoc& loc,
+                               const RecordId& loc,
                                bool dupsAllowed ) = 0;
 
         class BulkBuilder;
@@ -119,9 +119,9 @@ namespace mongo {
 
             virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
 
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+            virtual void aboutToDeleteBucket(const RecordId& bucket);
 
-            virtual bool locate(const BSONObj &key, const DiskLoc& loc);
+            virtual bool locate(const BSONObj &key, const RecordId& loc);
 
             virtual void customLocate(const BSONObj& keyBegin,
                                       int keyBeginLen,
@@ -137,7 +137,7 @@ namespace mongo {
 
             virtual BSONObj getKey() const;
 
-            virtual DiskLoc getDiskLoc() const;
+            virtual RecordId getRecordId() const;
 
             virtual void advance();
 
@@ -146,7 +146,7 @@ namespace mongo {
             virtual void restorePosition( OperationContext *txn );
 
         private:
-            bool _locate(const BSONObj &key, const DiskLoc& loc);
+            bool _locate(const BSONObj &key, const RecordId& loc);
 
             OperationContext *_txn;
             WiredTigerCursor _cursor;
@@ -160,7 +160,7 @@ namespace mongo {
             // For save/restorePosition check
             RecoveryUnit* _savedForCheck;
             BSONObj _savedKey;
-            DiskLoc _savedLoc;
+            RecordId _savedLoc;
         };
 
         const Ordering _ordering;
@@ -177,12 +177,12 @@ namespace mongo {
 
         virtual Status _insert( WT_CURSOR* c,
                                 const BSONObj& key,
-                                const DiskLoc& loc,
+                                const RecordId& loc,
                                 bool dupsAllowed );
 
         virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
-                               const DiskLoc& loc,
+                               const RecordId& loc,
                                bool dupsAllowed );
     };
 
@@ -194,12 +194,12 @@ namespace mongo {
 
         virtual Status _insert( WT_CURSOR* c,
                                 const BSONObj& key,
-                                const DiskLoc& loc,
+                                const RecordId& loc,
                                 bool dupsAllowed );
 
         virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
-                               const DiskLoc& loc,
+                               const RecordId& loc,
                                bool dupsAllowed );
 
     };

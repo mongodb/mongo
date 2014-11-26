@@ -85,7 +85,7 @@ namespace mongo {
         virtual BSONObj getKey() const = 0;
 
         // Current value we point at.  Assumes !isEOF().
-        virtual DiskLoc getValue() const = 0;
+        virtual RecordId getValue() const = 0;
 
         //
         // Yielding support

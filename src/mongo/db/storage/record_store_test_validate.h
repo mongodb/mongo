@@ -97,7 +97,7 @@ namespace {
                     ASSERT( _remain.insert( data ).second );
 
                     WriteUnitOfWork uow( opCtx.get() );
-                    StatusWith<DiskLoc> res = _rs->insertRecord( opCtx.get(),
+                    StatusWith<RecordId> res = _rs->insertRecord( opCtx.get(),
                                                                  data.c_str(),
                                                                  data.size() + 1,
                                                                  false );

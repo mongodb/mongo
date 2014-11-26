@@ -41,7 +41,7 @@ using std::stringstream;
 namespace mongo {
 
     // Insert a record and verify its contents by calling dataFor()
-    // on the returned DiskLoc.
+    // on the returned RecordId.
     TEST( RecordStoreTestHarness, DataFor ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
@@ -52,12 +52,12 @@ namespace mongo {
         }
 
         string data = "record-";
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -83,7 +83,7 @@ namespace mongo {
     }
 
     // Insert multiple records and verify their contents by calling dataFor()
-    // on each of the returned DiskLocs.
+    // on each of the returned RecordIds.
     TEST( RecordStoreTestHarness, DataForMultiple ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
@@ -94,7 +94,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -103,7 +103,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );

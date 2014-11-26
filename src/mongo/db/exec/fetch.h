@@ -36,12 +36,12 @@
 namespace mongo {
 
     /**
-     * This stage turns a DiskLoc into a BSONObj.
+     * This stage turns a RecordId into a BSONObj.
      *
      * In WorkingSetMember terms, it transitions from LOC_AND_IDX to LOC_AND_UNOWNED_OBJ by reading
      * the record at the provided loc.  Returns verbatim any data that already has an object.
      *
-     * Preconditions: Valid DiskLoc.
+     * Preconditions: Valid RecordId.
      */
     class FetchStage : public PlanStage {
     public:
@@ -58,7 +58,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -94,7 +94,7 @@ namespace mongo {
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
-        // If we want to return a DiskLoc and it points to something that's not in memory,
+        // If we want to return a RecordId and it points to something that's not in memory,
         // we return a "please page this in" result. We add a RecordFetcher given back to us by the
         // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
         // the fetch request.

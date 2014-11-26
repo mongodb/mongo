@@ -44,7 +44,7 @@ namespace mongo {
      * This stage outputs its mainChild, and possibly it's backup child
      * and also updates the cache.
      *
-     * Preconditions: Valid DiskLoc.
+     * Preconditions: Valid RecordId.
      *
      * Owns the query solutions and PlanStage roots for all candidate plans.
      */
@@ -63,7 +63,7 @@ namespace mongo {
 
         virtual void restoreState(OperationContext* opCtx);
 
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 

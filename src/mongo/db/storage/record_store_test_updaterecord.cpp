@@ -52,12 +52,12 @@ namespace mongo {
         }
 
         string data = "my record";
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -77,7 +77,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->updateRecord( opCtx.get(),
                                                             loc,
                                                             data.c_str(),
                                                             data.size() + 1,
@@ -110,7 +110,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -119,7 +119,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -142,7 +142,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->updateRecord( opCtx.get(),
                                                             locs[i],
                                                             data.c_str(),
                                                             data.size() + 1,
@@ -179,12 +179,12 @@ namespace mongo {
         }
 
         string oldData = "my record";
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             oldData.c_str(),
                                                             oldData.size() + 1,
                                                             false );
@@ -206,7 +206,7 @@ namespace mongo {
                 UpdateMoveNotifierSpy umn( opCtx.get(), loc, oldData.c_str(), oldData.size() );
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->updateRecord( opCtx.get(),
                                                             loc,
                                                             newData.c_str(),
                                                             newData.size() + 1,
@@ -214,7 +214,7 @@ namespace mongo {
                                                             &umn );
                 ASSERT_OK( res.getStatus() );
                 // UpdateMoveNotifier::recordStoreGoingToMove() called only if
-                // the DiskLoc for the record changes
+                // the RecordId for the record changes
                 if ( loc == res.getValue() ) {
                     ASSERT_EQUALS( 0, umn.getNumCalls() );
                 } else {

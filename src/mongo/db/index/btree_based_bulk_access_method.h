@@ -55,11 +55,11 @@ namespace mongo {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
-        Status commit(std::set<DiskLoc>* dupsToDrop, bool mayInterrupt, bool dupsAllowed);
+        Status commit(std::set<RecordId>* dupsToDrop, bool mayInterrupt, bool dupsAllowed);
 
         // Exposed for testing.
         static ExternalSortComparison* getComparison(int version, const BSONObj& keyPattern);
@@ -71,7 +71,7 @@ namespace mongo {
         virtual Status commitBulk(IndexAccessMethod* bulk,
                                   bool mayInterrupt,
                                   bool dupsAllowed,
-                                  std::set<DiskLoc>* dups) {
+                                  std::set<RecordId>* dups) {
             invariant(this == bulk);
             return Status::OK();
         }
@@ -90,7 +90,7 @@ namespace mongo {
 
         virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted) {
             return _notAllowed();
@@ -99,7 +99,7 @@ namespace mongo {
         virtual Status validateUpdate(OperationContext* txn,
                                       const BSONObj& from,
                                       const BSONObj& to,
-                                      const DiskLoc& loc,
+                                      const RecordId& loc,
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket) {
             return _notAllowed();
@@ -132,7 +132,7 @@ namespace mongo {
         OperationContext* getOperationContext() { return _txn; }
 
     private:
-        typedef Sorter<BSONObj, DiskLoc> BSONObjExternalSorter;
+        typedef Sorter<BSONObj, RecordId> BSONObjExternalSorter;
 
         Status _notAllowed() const {
             return Status(ErrorCodes::InternalError, "cannot use bulk for this yet");

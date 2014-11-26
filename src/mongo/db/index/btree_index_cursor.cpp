@@ -58,7 +58,7 @@ namespace mongo {
 
     bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }
 
-    void BtreeIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
+    void BtreeIndexCursor::aboutToDeleteBucket(const RecordId& bucket) {
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
         for (unordered_set<BtreeIndexCursor*>::iterator i = _activeCursors.begin();
              i != _activeCursors.end(); ++i) {
@@ -69,7 +69,7 @@ namespace mongo {
 
     Status BtreeIndexCursor::seek(const BSONObj& position) {
         _cursor->locate(position, 
-                        1 == _cursor->getDirection() ? minDiskLoc : maxDiskLoc);
+                        1 == _cursor->getDirection() ? RecordId::min() : RecordId::max());
         return Status::OK();
     }
 
@@ -77,7 +77,7 @@ namespace mongo {
         // XXX This used a hard-coded direction of 1 and is only correct in the forward direction.
         invariant(_cursor->getDirection() == 1);
         _cursor->locate(position, 
-                        afterKey ? maxDiskLoc : minDiskLoc);
+                        afterKey ? RecordId::max() : RecordId::min());
     }
 
     bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
@@ -115,8 +115,8 @@ namespace mongo {
         return _cursor->getKey();
     }
 
-    DiskLoc BtreeIndexCursor::getValue() const {
-        return _cursor->getDiskLoc();
+    RecordId BtreeIndexCursor::getValue() const {
+        return _cursor->getRecordId();
     }
 
     void BtreeIndexCursor::next() {

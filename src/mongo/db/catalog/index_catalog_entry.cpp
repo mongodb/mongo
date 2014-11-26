@@ -52,11 +52,11 @@ namespace mongo {
         HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
         virtual ~HeadManagerImpl() { }
 
-        const DiskLoc getHead(OperationContext* txn) const {
+        const RecordId getHead(OperationContext* txn) const {
             return _catalogEntry->head(txn);
         }
 
-        void setHead(OperationContext* txn, const DiskLoc newHead) {
+        void setHead(OperationContext* txn, const RecordId newHead) {
             _catalogEntry->setHead(txn, newHead);
         }
 
@@ -99,7 +99,7 @@ namespace mongo {
         _isMultikey = _catalogIsMultikey( txn );
     }
 
-    const DiskLoc& IndexCatalogEntry::head( OperationContext* txn ) const {
+    const RecordId& IndexCatalogEntry::head( OperationContext* txn ) const {
         DEV invariant( _head == _catalogHead( txn ) );
         return _head;
     }
@@ -121,17 +121,17 @@ namespace mongo {
 
     class IndexCatalogEntry::SetHeadChange : public RecoveryUnit::Change {
     public:
-        SetHeadChange(IndexCatalogEntry* ice, DiskLoc oldHead) :_ice(ice), _oldHead(oldHead) {
+        SetHeadChange(IndexCatalogEntry* ice, RecordId oldHead) :_ice(ice), _oldHead(oldHead) {
         }
 
         virtual void commit() {}
         virtual void rollback() { _ice->_head = _oldHead; }
 
         IndexCatalogEntry* _ice;
-        const DiskLoc _oldHead;
+        const RecordId _oldHead;
     };
 
-    void IndexCatalogEntry::setHead( OperationContext* txn, DiskLoc newHead ) {
+    void IndexCatalogEntry::setHead( OperationContext* txn, RecordId newHead ) {
         _collection->setIndexHead( txn,
                                    _descriptor->indexName(),
                                    newHead );
@@ -207,7 +207,7 @@ namespace mongo {
         return _collection->isIndexReady( txn, _descriptor->indexName() );
     }
 
-    DiskLoc IndexCatalogEntry::_catalogHead( OperationContext* txn ) const {
+    RecordId IndexCatalogEntry::_catalogHead( OperationContext* txn ) const {
         return _collection->getIndexHead( txn, _descriptor->indexName() );
     }
 

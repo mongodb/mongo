@@ -87,7 +87,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -103,10 +103,10 @@ namespace mongo {
 
     private:
         /**
-         * Computes the result of applying mods to the document 'oldObj' at DiskLoc 'loc' in
+         * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
          * memory, then commits these changes to the database.
          */
-        void transformAndUpdate(BSONObj& oldObj, DiskLoc& loc);
+        void transformAndUpdate(BSONObj& oldObj, RecordId& loc);
 
         /**
          * Computes the document to insert and inserts it into the collection. Used if the
@@ -161,7 +161,7 @@ namespace mongo {
         // document and we wouldn't want to update that.
         //
         // So, no matter what, we keep track of where the doc wound up.
-        typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
+        typedef unordered_set<RecordId, RecordId::Hasher> DiskLocSet;
         const boost::scoped_ptr<DiskLocSet> _updatedLocs;
 
         // These get reused for each update.

@@ -49,7 +49,7 @@ namespace mongo {
     public:
         SortStageParams() : collection(NULL), limit(0) { }
 
-        // Used for resolving DiskLocs to BSON
+        // Used for resolving RecordIds to BSON
         const Collection* collection;
 
         // How we're sorting.
@@ -153,7 +153,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -209,15 +209,15 @@ namespace mongo {
             WorkingSetID wsid;
             BSONObj sortKey;
             // Since we must replicate the behavior of a covered sort as much as possible we use the
-            // DiskLoc to break sortKey ties.
+            // RecordId to break sortKey ties.
             // See sorta.js.
-            DiskLoc loc;
+            RecordId loc;
         };
 
         // Comparison object for data buffers (vector and set).
         // Items are compared on (sortKey, loc). This is also how the items are
         // ordered in the indices.
-        // Keys are compared using BSONObj::woCompare() with DiskLoc as a tie-breaker.
+        // Keys are compared using BSONObj::woCompare() with RecordId as a tie-breaker.
         struct WorkingSetComparator {
             explicit WorkingSetComparator(BSONObj p);
 
@@ -258,8 +258,8 @@ namespace mongo {
         // Iterates through _data post-sort returning it.
         std::vector<SortableDataItem>::iterator _resultIterator;
 
-        // We buffer a lot of data and we want to look it up by DiskLoc quickly upon invalidation.
-        typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
+        // We buffer a lot of data and we want to look it up by RecordId quickly upon invalidation.
+        typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
         DataMap _wsidByDiskLoc;
 
         //

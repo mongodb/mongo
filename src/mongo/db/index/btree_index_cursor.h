@@ -48,7 +48,7 @@ namespace mongo {
         /**
          * Called from btree_logic.cpp when we're about to delete a Btree bucket.
          */
-        static void aboutToDeleteBucket(const DiskLoc& bucket);
+        static void aboutToDeleteBucket(const RecordId& bucket);
 
         virtual Status seek(const BSONObj& position);
 
@@ -71,7 +71,7 @@ namespace mongo {
                     const std::vector<bool>& keyEndInclusive);
 
         virtual BSONObj getKey() const;
-        virtual DiskLoc getValue() const;
+        virtual RecordId getValue() const;
         virtual void next();
 
         /**

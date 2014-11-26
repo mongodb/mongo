@@ -426,7 +426,7 @@ namespace mongo {
 
         void invalidateHelper(OperationContext* txn,
                               WorkingSet* ws, // may flag for review
-                              const DiskLoc& dl,
+                              const RecordId& dl,
                               list<WorkingSetID>* idsToInvalidate,
                               const Collection* collection) {
             for (list<WorkingSetID>::iterator it = idsToInvalidate->begin();
@@ -448,7 +448,7 @@ namespace mongo {
     }
 
     void MultiPlanStage::invalidate(OperationContext* txn,
-                                    const DiskLoc& dl,
+                                    const RecordId& dl,
                                     InvalidationType type) {
         if (_failure) { return; }
 

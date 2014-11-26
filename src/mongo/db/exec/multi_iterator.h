@@ -62,7 +62,7 @@ namespace mongo {
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         //
         // These should not be used.
@@ -81,7 +81,7 @@ namespace mongo {
         /**
          * @return if more data
          */
-        DiskLoc _advance();
+        RecordId _advance();
 
         OperationContext* _txn;
         Collection* _collection;
@@ -91,7 +91,7 @@ namespace mongo {
         WorkingSet* _ws;
 
         // We allocate a working set member with this id on construction of the stage. It gets
-        // used for all fetch requests, changing the DiskLoc as appropriate.
+        // used for all fetch requests, changing the RecordId as appropriate.
         const WorkingSetID _wsidForFetch;
     };
 

@@ -32,21 +32,21 @@
 #include "mongo/base/status_with.h"
 
 namespace mongo {
-    class DiskLoc;
+    class RecordId;
     class OpTime;
 
 namespace oploghack {
 
     /**
-     * Converts OpTime to a DiskLoc in an unspecified manor that is safe to use as the key to in a
+     * Converts OpTime to a RecordId in an unspecified manor that is safe to use as the key to in a
      * RecordStore.
      */
-    StatusWith<DiskLoc> keyForOptime(const OpTime& opTime);
+    StatusWith<RecordId> keyForOptime(const OpTime& opTime);
 
     /**
      * data and len must be the arguments from RecordStore::insert() on an oplog collection.
      */
-    StatusWith<DiskLoc> extractKey(const char* data, int len);
+    StatusWith<RecordId> extractKey(const char* data, int len);
 
 }  // namespace oploghack
 }  // namespace mongo

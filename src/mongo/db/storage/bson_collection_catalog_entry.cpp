@@ -86,7 +86,7 @@ namespace mongo {
         return md.indexes[offset].multikey;
     }
 
-    DiskLoc BSONCollectionCatalogEntry::getIndexHead( OperationContext* txn,
+    RecordId BSONCollectionCatalogEntry::getIndexHead( OperationContext* txn,
                                                       const StringData& indexName ) const {
         MetaData md = _getMetaData( txn );
 
@@ -186,7 +186,7 @@ namespace mongo {
                 IndexMetaData imd;
                 imd.spec = idx["spec"].Obj().getOwned();
                 imd.ready = idx["ready"].trueValue();
-                imd.head = DiskLoc( idx["head_a"].Int(),
+                imd.head = RecordId( idx["head_a"].Int(),
                                     idx["head_b"].Int() );
                 imd.multikey = idx["multikey"].trueValue();
                 indexes.push_back( imd );

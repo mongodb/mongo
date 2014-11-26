@@ -188,7 +188,7 @@ namespace mongo {
         }
     }
 
-    void WiredTigerRecoveryUnit::setOplogReadTill( const DiskLoc& loc ) {
+    void WiredTigerRecoveryUnit::setOplogReadTill( const RecordId& loc ) {
         _oplogReadTill = loc;
     }
 

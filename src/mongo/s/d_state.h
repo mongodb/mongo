@@ -38,7 +38,7 @@
 namespace mongo {
 
     class Database;
-    class DiskLoc;
+    class RecordId;
     class OperationContext;
 
     // --------------

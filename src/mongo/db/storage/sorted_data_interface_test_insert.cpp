@@ -85,7 +85,7 @@ namespace mongo {
         }
     }
 
-    // Insert multiple, distinct keys at the same DiskLoc and verify that the
+    // Insert multiple, distinct keys at the same RecordId and verify that the
     // number of entries in the index equals the number that were inserted, even
     // when duplicates are not allowed.
     TEST( SortedDataInterface, InsertSameDiskLoc ) {
@@ -127,7 +127,7 @@ namespace mongo {
         }
     }
 
-    // Insert multiple, distinct keys at the same DiskLoc and verify that the
+    // Insert multiple, distinct keys at the same RecordId and verify that the
     // number of entries in the index equals the number that were inserted, even
     // when duplicates are allowed.
     TEST( SortedDataInterface, InsertSameDiskLocWithDupsAllowed ) {

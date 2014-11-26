@@ -71,14 +71,14 @@ namespace mongo {
             _specificStats.failedAnd.resize(_children.size());
         }
 
-        // If we don't have any nodes that we're work()-ing until they hit a certain DiskLoc...
+        // If we don't have any nodes that we're work()-ing until they hit a certain RecordId...
         if (0 == _workingTowardRep.size()) {
-            // Get a target DiskLoc.
+            // Get a target RecordId.
             return getTargetLoc(out);
         }
 
-        // Move nodes toward the target DiskLoc.
-        // If all nodes reach the target DiskLoc, return it.  The next call to work() will set a new
+        // Move nodes toward the target RecordId.
+        // If all nodes reach the target RecordId, return it.  The next call to work() will set a new
         // target.
         return moveTowardTargetLoc(out);
     }
@@ -86,7 +86,7 @@ namespace mongo {
     PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         verify(numeric_limits<size_t>::max() == _targetNode);
         verify(WorkingSet::INVALID_ID == _targetId);
-        verify(DiskLoc() == _targetLoc);
+        verify(RecordId() == _targetLoc);
 
         // Pick one, and get a loc to work toward.
         WorkingSetID id = WorkingSet::INVALID_ID;
@@ -95,7 +95,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -162,7 +162,7 @@ namespace mongo {
         if (PlanStage::ADVANCED == state) {
             WorkingSetMember* member = _ws->get(id);
 
-            // Maybe the child had an invalidation.  We intersect DiskLoc(s) so we can't do anything
+            // Maybe the child had an invalidation.  We intersect RecordId(s) so we can't do anything
             // with this WSM.
             if (!member->hasLoc()) {
                 _ws->flagForReview(id);
@@ -184,7 +184,7 @@ namespace mongo {
 
                     _targetNode = numeric_limits<size_t>::max();
                     _targetId = WorkingSet::INVALID_ID;
-                    _targetLoc = DiskLoc();
+                    _targetLoc = RecordId();
 
                     // Everyone hit it, hooray.  Return it, if it matches.
                     if (Filter::passes(toMatchTest, _filter)) {
@@ -284,7 +284,7 @@ namespace mongo {
     }
 
     void AndSortedStage::invalidate(OperationContext* txn,
-                                    const DiskLoc& dl,
+                                    const RecordId& dl,
                                     InvalidationType type) {
         ++_commonStats.invalidates;
 
@@ -301,13 +301,13 @@ namespace mongo {
             // fetch it, flag for review, and find another _targetLoc.
             ++_specificStats.flagged;
 
-            // The DiskLoc could still be a valid result so flag it and save it for later.
+            // The RecordId could still be a valid result so flag it and save it for later.
             WorkingSetCommon::fetchAndInvalidateLoc(txn, _ws->get(_targetId), _collection);
             _ws->flagForReview(_targetId);
 
             _targetId = WorkingSet::INVALID_ID;
             _targetNode = numeric_limits<size_t>::max();
-            _targetLoc = DiskLoc();
+            _targetLoc = RecordId();
             _workingTowardRep = std::queue<size_t>();
         }
     }

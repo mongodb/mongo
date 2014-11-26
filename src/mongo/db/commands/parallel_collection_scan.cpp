@@ -43,10 +43,10 @@ namespace mongo {
     public:
 
         struct ExtentInfo {
-            ExtentInfo( DiskLoc dl, size_t s )
+            ExtentInfo( RecordId dl, size_t s )
                 : diskLoc(dl), size(s) {
             }
-            DiskLoc diskLoc;
+            RecordId diskLoc;
             size_t size;
         };
 

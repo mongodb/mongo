@@ -37,11 +37,11 @@
 namespace mongo {
 
     /**
-     * This stage outputs the union of its children.  It optionally deduplicates on DiskLoc.
+     * This stage outputs the union of its children.  It optionally deduplicates on RecordId.
      *
-     * Preconditions: Valid DiskLoc.
+     * Preconditions: Valid RecordId.
      *
-     * If we're deduping, we may fail to dedup any invalidated DiskLoc properly.
+     * If we're deduping, we may fail to dedup any invalidated RecordId properly.
      */
     class OrStage : public PlanStage {
     public:
@@ -56,7 +56,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -83,11 +83,11 @@ namespace mongo {
         // Which of _children are we calling work(...) on now?
         size_t _currentChild;
 
-        // True if we dedup on DiskLoc, false otherwise.
+        // True if we dedup on RecordId, false otherwise.
         bool _dedup;
 
-        // Which DiskLocs have we returned?
-        unordered_set<DiskLoc, DiskLoc::Hasher> _seen;
+        // Which RecordIds have we returned?
+        unordered_set<RecordId, RecordId::Hasher> _seen;
 
         // Stats
         CommonStats _commonStats;

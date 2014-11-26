@@ -40,15 +40,15 @@
 namespace mongo {
 
     /**
-     * Reads from N children, each of which must have a valid DiskLoc.  Assumes each child produces
-     * DiskLocs in sorted order.  Outputs the intersection of the DiskLocs outputted by the
+     * Reads from N children, each of which must have a valid RecordId.  Assumes each child produces
+     * RecordIds in sorted order.  Outputs the intersection of the RecordIds outputted by the
      * children.
      *
-     * Preconditions: Valid DiskLoc.  More than one child.
+     * Preconditions: Valid RecordId.  More than one child.
      *
-     * Any DiskLoc that we keep a reference to that is invalidated before we are able to return it
+     * Any RecordId that we keep a reference to that is invalidated before we are able to return it
      * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
-     * operates with DiskLocs, we are unable to evaluate the AND for the invalidated DiskLoc, and it
+     * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
      * must be fully matched later.
      */
     class AndSortedStage : public PlanStage {
@@ -63,7 +63,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -99,7 +99,7 @@ namespace mongo {
 
         // The current node we're AND-ing against.
         size_t _targetNode;
-        DiskLoc _targetLoc;
+        RecordId _targetLoc;
         WorkingSetID _targetId;
 
         // Nodes we're moving forward until they hit the element we're AND-ing.

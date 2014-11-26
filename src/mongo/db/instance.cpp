@@ -830,7 +830,7 @@ namespace {
                         BSON("create" << nsToCollectionSubstring(ns)));
         }
 
-        StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
+        StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
         repl::logOp(txn, "i", ns, js);
         wunit.commit();

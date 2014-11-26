@@ -104,7 +104,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -145,7 +145,7 @@ namespace mongo {
 
         // For yielding.
         BSONObj _savedKey;
-        DiskLoc _savedLoc;
+        RecordId _savedLoc;
 
         DistinctParams _params;
 

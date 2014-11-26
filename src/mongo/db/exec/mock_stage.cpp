@@ -72,7 +72,7 @@ namespace mongo {
         ++_commonStats.unyields;
     }
 
-    void MockStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void MockStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
     }
 

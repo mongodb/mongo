@@ -42,10 +42,10 @@ namespace mongo {
      * and a disk location.
      */
     struct IndexKeyEntry {
-        IndexKeyEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
+        IndexKeyEntry(const BSONObj& key, RecordId loc) :key(key), loc(loc) {}
 
         BSONObj key;
-        DiskLoc loc;
+        RecordId loc;
     };
 
     /**
@@ -66,7 +66,7 @@ namespace mongo {
          * otherwise.
          *
          * IndexKeyEntries are compared lexicographically field by field in the BSONObj, followed by
-         * the DiskLoc. Either lhs or rhs (but not both) can be a query object returned by
+         * the RecordId. Either lhs or rhs (but not both) can be a query object returned by
          * makeQueryObject(). See makeQueryObject() for a description of how its arguments affect
          * the outcome of the comparison.
          */

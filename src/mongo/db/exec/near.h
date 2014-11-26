@@ -85,7 +85,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual vector<PlanStage*> getChildren() const;
 
@@ -176,7 +176,7 @@ namespace mongo {
 
         // May need to track disklocs from the child stage to do our own deduping, also to do
         // invalidation of buffered results.
-        unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> _nextIntervalSeen;
+        unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _nextIntervalSeen;
 
         // Stats for the stage covering this interval
         scoped_ptr<IntervalStats> _nextIntervalStats;

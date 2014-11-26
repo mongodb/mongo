@@ -73,7 +73,7 @@ namespace mongo {
     public:
         virtual ~UpdateMoveNotifier(){}
         virtual Status recordStoreGoingToMove( OperationContext* txn,
-                                               const DiskLoc& oldLocation,
+                                               const RecordId& oldLocation,
                                                const char* oldBuffer,
                                                size_t oldSize ) = 0;
     };
@@ -89,17 +89,17 @@ namespace mongo {
         // True if getNext will produce no more data, false otherwise.
         virtual bool isEOF() = 0;
 
-        // Return the DiskLoc that the iterator points at.  Returns DiskLoc() if isEOF.
-        virtual DiskLoc curr() = 0;
+        // Return the RecordId that the iterator points at.  Returns RecordId() if isEOF.
+        virtual RecordId curr() = 0;
 
-        // Return the DiskLoc that the iterator points at and move the iterator to the next item
-        // from the collection.  Returns DiskLoc() if isEOF.
-        virtual DiskLoc getNext() = 0;
+        // Return the RecordId that the iterator points at and move the iterator to the next item
+        // from the collection.  Returns RecordId() if isEOF.
+        virtual RecordId getNext() = 0;
 
         // Can only be called after saveState and before restoreState.
-        virtual void invalidate(const DiskLoc& dl) = 0;
+        virtual void invalidate(const RecordId& dl) = 0;
 
-        // Save any state required to resume operation (without crashing) after DiskLoc deletion or
+        // Save any state required to resume operation (without crashing) after RecordId deletion or
         // a collection drop.
         virtual void saveState() = 0;
 
@@ -110,7 +110,7 @@ namespace mongo {
 
         // normally this will just go back to the RecordStore and convert
         // but this gives the iterator an oppurtnity to optimize
-        virtual RecordData dataFor( const DiskLoc& loc ) const = 0;
+        virtual RecordData dataFor( const RecordId& loc ) const = 0;
     };
 
 
@@ -146,24 +146,24 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc) const = 0;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc) const = 0;
 
         /**
          * @param out - If the record exists, the contents of this are set.
          * @return true iff there is a Record for loc
          */
         virtual bool findRecord( OperationContext* txn,
-                                 const DiskLoc& loc,
+                                 const RecordId& loc,
                                  RecordData* out ) const = 0;
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) = 0;
+        virtual void deleteRecord( OperationContext* txn, const RecordId& dl ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota ) = 0;
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota ) = 0;
 
@@ -171,17 +171,17 @@ namespace mongo {
          * @param notifier - this is called if the document is moved
          *                   it is to be called after the document has been written to new
          *                   location, before deleted from old.
-         * @return Status or DiskLoc, DiskLoc might be different
+         * @return Status or RecordId, RecordId might be different
          */
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                  const RecordId& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier ) = 0;
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages ) = 0;
@@ -202,14 +202,14 @@ namespace mongo {
          * Storage engines which support document-level locking need not implement this.
          */
         virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
-                                                 const DiskLoc& loc ) const { return NULL; }
+                                                 const RecordId& loc ) const { return NULL; }
 
         /**
          * returned iterator owned by caller
          * Default arguments return all items in record store.
          */
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start = DiskLoc(),
+                                             const RecordId& start = RecordId(),
                                              const CollectionScanParams::Direction& dir =
                                                      CollectionScanParams::FORWARD
                                              ) const = 0;
@@ -245,7 +245,7 @@ namespace mongo {
          * XXX: this will go away soon, just needed to move for now
          */
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              DiskLoc end,
+                                              RecordId end,
                                               bool inclusive) = 0;
 
         // does this RecordStore support the compact operation
@@ -299,15 +299,15 @@ namespace mongo {
                                         BSONObjBuilder* info = NULL ) = 0;
 
         /**
-         * Return the DiskLoc of an oplog entry as close to startingPosition as possible without
-         * being higher. If there are no entries <= startingPosition, return DiskLoc().
+         * Return the RecordId of an oplog entry as close to startingPosition as possible without
+         * being higher. If there are no entries <= startingPosition, return RecordId().
          *
          * If you don't implement the oplogStartHack, just use the default implementation which
-         * returns an Invalid DiskLoc.
+         * returns an Invalid RecordId.
          */
-        virtual DiskLoc oplogStartHack(OperationContext* txn,
-                                       const DiskLoc& startingPosition) const {
-            return DiskLoc().setInvalid();
+        virtual RecordId oplogStartHack(OperationContext* txn,
+                                       const RecordId& startingPosition) const {
+            return RecordId().setInvalid();
         }
 
         /**
@@ -330,7 +330,7 @@ namespace mongo {
         virtual ~RecordStoreCompactAdaptor(){}
         virtual bool isDataValid( const RecordData& recData ) = 0;
         virtual size_t dataSize( const RecordData& recData ) = 0;
-        virtual void inserted( const RecordData& recData, const DiskLoc& newLocation ) = 0;
+        virtual void inserted( const RecordData& recData, const RecordId& newLocation ) = 0;
     };
 
     struct ValidateResults {

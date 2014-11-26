@@ -36,7 +36,7 @@ namespace mongo {
     public:
         /**
          * Get an owned copy of the BSONObj the WSM refers to.
-         * Requires either a valid BSONObj or valid DiskLoc.
+         * Requires either a valid BSONObj or valid RecordId.
          * Returns true if the fetch and invalidate succeeded, false otherwise.
          */
         static bool fetchAndInvalidateLoc(OperationContext* txn,

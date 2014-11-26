@@ -118,7 +118,7 @@ namespace {
         // No locking needed since called single threaded.
         scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
         while ( !it->isEOF()  ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
 
@@ -177,7 +177,7 @@ namespace {
             obj = b.obj();
         }
 
-        StatusWith<DiskLoc> res = _rs->insertRecord( opCtx, obj.objdata(), obj.objsize(), false );
+        StatusWith<RecordId> res = _rs->insertRecord( opCtx, obj.objdata(), obj.objsize(), false );
         if ( !res.isOK() )
             return res.getStatus();
 
@@ -203,7 +203,7 @@ namespace {
 
     BSONObj KVCatalog::_findEntry( OperationContext* opCtx,
                                    const StringData& ns,
-                                   DiskLoc* out ) const {
+                                   RecordId* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
@@ -212,7 +212,7 @@ namespace {
                                              MODE_S));
         }
 
-        DiskLoc dl;
+        RecordId dl;
         {
             boost::mutex::scoped_lock lk( _identsLock );
             NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
@@ -256,7 +256,7 @@ namespace {
                                              MODE_X));
         }
 
-        DiskLoc loc;
+        RecordId loc;
         BSONObj obj = _findEntry( opCtx, ns, &loc );
 
         {
@@ -287,7 +287,7 @@ namespace {
             obj = b.obj();
         }
 
-        StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
+        StatusWith<RecordId> status = _rs->updateRecord( opCtx,
                                                         loc,
                                                         obj.objdata(),
                                                         obj.objsize(),
@@ -309,7 +309,7 @@ namespace {
                                              MODE_X));
         }
 
-        DiskLoc loc;
+        RecordId loc;
         BSONObj old = _findEntry( opCtx, fromNS, &loc ).getOwned();
         {
             BSONObjBuilder b;
@@ -326,7 +326,7 @@ namespace {
             b.appendElementsUnique( old );
 
             BSONObj obj = b.obj();
-            StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
+            StatusWith<RecordId> status = _rs->updateRecord( opCtx,
                                                             loc,
                                                             obj.objdata(),
                                                             obj.objsize(),
@@ -396,7 +396,7 @@ namespace {
 
         scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
         while ( !it->isEOF()  ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
             v.push_back( obj["ident"].String() );

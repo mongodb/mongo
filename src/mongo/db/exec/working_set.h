@@ -84,7 +84,7 @@ namespace mongo {
         void free(const WorkingSetID& i);
 
         /**
-         * The DiskLoc in WSM 'i' was invalidated while being processed.  Any predicates over the
+         * The RecordId in WSM 'i' was invalidated while being processed.  Any predicates over the
          * WSM could not be fully evaluated, so the WSM may or may not satisfy them.  As such, if we
          * wish to output the WSM, we must do some clean-up work later.  Adds the WSM with id 'i' to
          * the list of flagged WSIDs.
@@ -217,7 +217,7 @@ namespace mongo {
             // Data is from a collection scan, or data is from an index scan and was fetched.
             LOC_AND_UNOWNED_OBJ,
 
-            // DiskLoc has been invalidated, or the obj doesn't correspond to an on-disk document
+            // RecordId has been invalidated, or the obj doesn't correspond to an on-disk document
             // anymore (e.g. is a computed expression).
             OWNED_OBJ,
         };
@@ -226,7 +226,7 @@ namespace mongo {
         // Core attributes
         //
 
-        DiskLoc loc;
+        RecordId loc;
         BSONObj obj;
         std::vector<IndexKeyDatum> keyData;
         MemberState state;

@@ -64,20 +64,20 @@ namespace mongo {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numInserted);
 
         virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               const InsertDeleteOptions& options,
                               int64_t* numDeleted);
 
         virtual Status validateUpdate(OperationContext* txn,
                                       const BSONObj& from,
                                       const BSONObj& to,
-                                      const DiskLoc& loc,
+                                      const RecordId& loc,
                                       const InsertDeleteOptions& options,
                                       UpdateTicket* ticket);
 
@@ -96,7 +96,7 @@ namespace mongo {
         virtual Status commitBulk( IndexAccessMethod* bulk,
                                    bool mayInterrupt,
                                    bool dupsAllowed,
-                                   std::set<DiskLoc>* dups );
+                                   std::set<RecordId>* dups );
 
         virtual Status touch(OperationContext* txn, const BSONObj& obj);
 
@@ -108,7 +108,7 @@ namespace mongo {
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
         // XXX: consider migrating callers to use IndexCursor instead
-        virtual DiskLoc findSingle( OperationContext* txn, const BSONObj& key ) const;
+        virtual RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
         /**
          * Invalidates all active cursors, which point at the bucket being deleted.
@@ -116,7 +116,7 @@ namespace mongo {
          */
         class InvalidateCursorsNotification : public BucketDeletionNotification {
         public:
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket);
+            virtual void aboutToDeleteBucket(const RecordId& bucket);
         };
         static InvalidateCursorsNotification invalidateCursors;
 
@@ -135,7 +135,7 @@ namespace mongo {
     private:
         void removeOneKey(OperationContext* txn,
                           const BSONObj& key,
-                          const DiskLoc& loc,
+                          const RecordId& loc,
                           bool dupsAllowed);
 
         scoped_ptr<SortedDataInterface> _newInterface;
@@ -154,7 +154,7 @@ namespace mongo {
         // These point into the sets oldKeys and newKeys.
         std::vector<BSONObj*> removed, added;
 
-        DiskLoc loc;
+        RecordId loc;
         bool dupsAllowed;
     };
 

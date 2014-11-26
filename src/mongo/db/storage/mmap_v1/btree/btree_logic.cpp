@@ -1089,7 +1089,7 @@ namespace mongo {
         // Find the DiskLoc 
         bool found;
 
-        DiskLoc bucket = _locate(txn, getRootLoc(txn), key, &position, &found, minDiskLoc, 1);
+        DiskLoc bucket = _locate(txn, getRootLoc(txn), key, &position, &found, DiskLoc::min(), 1);
 
         while (!bucket.isNull()) {
             FullKey fullKey = getFullKey(getBucket(txn, bucket), position);
@@ -1121,7 +1121,7 @@ namespace mongo {
         int position;
         bool found;
 
-        DiskLoc posLoc = _locate(txn, getRootLoc(txn), key, &position, &found, minDiskLoc, 1);
+        DiskLoc posLoc = _locate(txn, getRootLoc(txn), key, &position, &found, DiskLoc::min(), 1);
 
         while (!posLoc.isNull()) {
             FullKey fullKey = getFullKey(getBucket(txn, posLoc), position);

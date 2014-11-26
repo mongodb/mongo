@@ -216,9 +216,9 @@ namespace mongo {
     }
 
     void DataFileHeader::checkUpgrade(OperationContext* txn) {
-        if ( freeListStart == minDiskLoc ) {
+        if ( freeListStart == DiskLoc(0, 0) ) {
             // we are upgrading from 2.4 to 2.6
-            invariant( freeListEnd == minDiskLoc ); // both start and end should be (0,0) or real
+            invariant(freeListEnd == DiskLoc(0, 0)); // both start and end should be (0,0) or real
             WriteUnitOfWork wunit(txn);
             *txn->recoveryUnit()->writing( &freeListStart ) = DiskLoc();
             *txn->recoveryUnit()->writing( &freeListEnd ) = DiskLoc();

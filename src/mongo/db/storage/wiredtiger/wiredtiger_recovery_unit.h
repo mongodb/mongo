@@ -85,8 +85,8 @@ namespace mongo {
         bool everStartedWrite() const { return _everStartedWrite; }
         int depth() const { return _depth; }
 
-        void setOplogReadTill( const DiskLoc& loc );
-        DiskLoc getOplogReadTill() const { return _oplogReadTill; }
+        void setOplogReadTill( const RecordId& loc );
+        RecordId getOplogReadTill() const { return _oplogReadTill; }
 
         static WiredTigerRecoveryUnit* get(OperationContext *txn);
 
@@ -107,7 +107,7 @@ namespace mongo {
         Timer _timer;
         bool _currentlySquirreled;
         bool _syncing;
-        DiskLoc _oplogReadTill;
+        RecordId _oplogReadTill;
 
         typedef OwnedPointerVector<Change> Changes;
         Changes _changes;

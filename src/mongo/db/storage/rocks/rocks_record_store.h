@@ -77,38 +77,38 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
 
         virtual bool findRecord( OperationContext* txn,
-                                 const DiskLoc& loc,
+                                 const RecordId& loc,
                                  RecordData* out ) const;
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
+        virtual void deleteRecord( OperationContext* txn, const RecordId& dl );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                  const RecordId& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start = DiskLoc(),
+                                             const RecordId& start = RecordId(),
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD ) const;
 
@@ -141,7 +141,7 @@ namespace mongo {
                                         BSONObjBuilder* info = NULL );
 
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              DiskLoc end,
+                                              RecordId end,
                                               bool inclusive);
 
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
@@ -163,19 +163,19 @@ namespace mongo {
         public:
             Iterator(OperationContext* txn, rocksdb::DB* db,
                      boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
-                     const CollectionScanParams::Direction& dir, const DiskLoc& start);
+                     const CollectionScanParams::Direction& dir, const RecordId& start);
 
             virtual bool isEOF();
-            virtual DiskLoc curr();
-            virtual DiskLoc getNext();
-            virtual void invalidate(const DiskLoc& dl);
+            virtual RecordId curr();
+            virtual RecordId getNext();
+            virtual void invalidate(const RecordId& dl);
             virtual void saveState();
             virtual bool restoreState(OperationContext* txn);
-            virtual RecordData dataFor( const DiskLoc& loc ) const;
+            virtual RecordData dataFor( const RecordId& loc ) const;
 
         private:
-            void _locate(const DiskLoc& loc);
-            DiskLoc _decodeCurr() const;
+            void _locate(const RecordId& loc);
+            RecordId _decodeCurr() const;
             bool _forward() const;
             void _checkStatus();
 
@@ -184,7 +184,7 @@ namespace mongo {
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
             CollectionScanParams::Direction _dir;
             bool _eof;
-            DiskLoc _curr;
+            RecordId _curr;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
@@ -194,18 +194,18 @@ namespace mongo {
          */
         static rocksdb::ReadOptions _readOptions(OperationContext* opCtx = NULL);
 
-        static DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
+        static RecordId _makeDiskLoc( const rocksdb::Slice& slice );
 
         static RecordData _getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
-                                      OperationContext* txn, const DiskLoc& loc);
+                                      OperationContext* txn, const RecordId& loc);
 
-        DiskLoc _nextId();
+        RecordId _nextId();
         bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
 
-        // The use of this function requires that the passed in DiskLoc outlives the returned Slice
+        // The use of this function requires that the passed in RecordId outlives the returned Slice
         // TODO possibly make this safer in the future
-        static rocksdb::Slice _makeKey( const DiskLoc& loc );
+        static rocksdb::Slice _makeKey( const RecordId& loc );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
 

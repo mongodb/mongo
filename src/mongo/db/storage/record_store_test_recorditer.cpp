@@ -45,7 +45,7 @@ namespace mongo {
 
     // Insert multiple records and iterate through them in the forward direction.
     // When curr() or getNext() is called on an iterator positioned at EOF,
-    // the iterator returns DiskLoc() and stays at EOF.
+    // the iterator returns RecordId() and stays at EOF.
     TEST( RecordStoreTestHarness, IterateOverMultipleRecords ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
@@ -56,7 +56,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -65,7 +65,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -80,12 +80,12 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in DiskLoc order
+        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             RecordIterator *it = rs->getIterator( opCtx.get(),
-                                                  DiskLoc(),
+                                                  RecordId(),
                                                   CollectionScanParams::FORWARD );
 
             for ( int i = 0; i < nToInsert; i++ ) {
@@ -95,10 +95,10 @@ namespace mongo {
             }
             ASSERT( it->isEOF() );
 
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }
@@ -106,7 +106,7 @@ namespace mongo {
 
     // Insert multiple records and iterate through them in the reverse direction.
     // When curr() or getNext() is called on an iterator positioned at EOF,
-    // the iterator returns DiskLoc() and stays at EOF.
+    // the iterator returns RecordId() and stays at EOF.
     TEST( RecordStoreTestHarness, IterateOverMultipleRecordsReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
@@ -117,7 +117,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -126,7 +126,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -141,12 +141,12 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in DiskLoc order
+        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             RecordIterator *it = rs->getIterator( opCtx.get(),
-                                                  DiskLoc(),
+                                                  RecordId(),
                                                   CollectionScanParams::BACKWARD );
 
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
@@ -156,10 +156,10 @@ namespace mongo {
             }
             ASSERT( it->isEOF() );
 
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }
@@ -177,7 +177,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -186,7 +186,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -201,7 +201,7 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in DiskLoc order
+        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
@@ -217,10 +217,10 @@ namespace mongo {
             }
             ASSERT( it->isEOF() );
 
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }
@@ -238,7 +238,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -247,7 +247,7 @@ namespace mongo {
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -262,7 +262,7 @@ namespace mongo {
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
-        std::sort( locs, locs + nToInsert ); // inserted records may not be in DiskLoc order
+        std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
@@ -278,10 +278,10 @@ namespace mongo {
             }
             ASSERT( it->isEOF() );
 
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
-            ASSERT_EQUALS( DiskLoc(), it->getNext() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->getNext() );
             ASSERT( it->isEOF() );
-            ASSERT_EQUALS( DiskLoc(), it->curr() );
+            ASSERT_EQUALS( RecordId(), it->curr() );
 
             delete it;
         }
@@ -300,7 +300,7 @@ namespace mongo {
         }
 
         const int nToInsert = 10;
-        DiskLoc locs[nToInsert];
+        RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -309,7 +309,7 @@ namespace mongo {
                 string data = sb.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false );
@@ -333,7 +333,7 @@ namespace mongo {
             // Iterate, checking EOF along the way.
             for ( int i = 0; i < nToInsert; i++ ) {
                 ASSERT( !it->isEOF() );
-                DiskLoc nextLoc = it->getNext();
+                RecordId nextLoc = it->getNext();
                 ASSERT( !nextLoc.isNull() );
             }
             ASSERT( it->isEOF() );
@@ -347,7 +347,7 @@ namespace mongo {
             string data = sb.str();
 
             WriteUnitOfWork uow( opCtx.get() );
-            StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+            StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                         data.c_str(),
                                                         data.size() + 1,
                                                         false );

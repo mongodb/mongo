@@ -75,7 +75,7 @@ namespace PdfileTests {
                 BSONObj x = BSON( "x" << 1 );
                 ASSERT( x["_id"].type() == 0 );
                 Collection* collection = _context.db()->getOrCreateCollection( &_txn, ns() );
-                StatusWith<DiskLoc> dl = collection->insertDocument( &_txn, x, true );
+                StatusWith<RecordId> dl = collection->insertDocument( &_txn, x, true );
                 ASSERT( !dl.isOK() );
 
                 StatusWith<BSONObj> fixed = fixDocumentForInsert( x );

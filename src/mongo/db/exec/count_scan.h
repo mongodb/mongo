@@ -75,7 +75,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -117,7 +117,7 @@ namespace mongo {
         boost::scoped_ptr<BtreeIndexCursor> _endCursor;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
+        unordered_set<RecordId, RecordId::Hasher> _returned;
 
         CountScanParams _params;
 

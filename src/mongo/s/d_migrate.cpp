@@ -516,7 +516,7 @@ namespace mongo {
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
             unsigned long long recCount = 0;;
-            DiskLoc dl;
+            RecordId dl;
             while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
                     scoped_spinlock lk( _trackerLocks );
@@ -577,14 +577,14 @@ namespace mongo {
                 Collection* collection = ctx.getCollection();
 
                 scoped_spinlock lk( _trackerLocks );
-                set<DiskLoc>::iterator i = _cloneLocs.begin();
+                set<RecordId>::iterator i = _cloneLocs.begin();
                 for ( ; i!=_cloneLocs.end(); ++i ) {
                     if (tracker.intervalHasElapsed()) // should I yield?
                         break;
                     
                     invariant( collection );
 
-                    DiskLoc dl = *i;
+                    RecordId dl = *i;
                     BSONObj o;
                     if ( !collection->findDoc( txn, dl, &o ) ) {
                         // doc was deleted
@@ -612,7 +612,7 @@ namespace mongo {
             return true;
         }
 
-        void aboutToDelete( const DiskLoc& dl ) {
+        void aboutToDelete( const RecordId& dl ) {
             // Even though above we call findDoc to check for existance
             // that check only works for non-mmapv1 engines, and this is needed
             // for mmapv1.
@@ -680,7 +680,7 @@ namespace mongo {
         // no locking needed because built initially by 1 thread in a read lock
         // emptied by 1 thread in a read lock
         // updates applied by 1 thread in a write lock
-        set<DiskLoc> _cloneLocs;
+        set<RecordId> _cloneLocs;
 
         list<BSONObj> _reload; // objects that were modified that must be recloned
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
@@ -697,7 +697,7 @@ namespace mongo {
         class DeleteNotificationStage : public PlanStage {
         public:
             virtual void invalidate(OperationContext* txn,
-                                    const DiskLoc& dl,
+                                    const RecordId& dl,
                                     InvalidationType type);
 
             virtual StageState work(WorkingSetID* out) {
@@ -741,7 +741,7 @@ namespace mongo {
     } migrateFromStatus;
 
     void MigrateFromStatus::DeleteNotificationStage::invalidate(OperationContext *txn,
-                                                                const DiskLoc& dl,
+                                                                const RecordId& dl,
                                                                 InvalidationType type) {
         if ( type == INVALIDATION_DELETION ) {
             migrateFromStatus.aboutToDelete( dl );
@@ -875,10 +875,10 @@ namespace mongo {
             // 2. Make sure my view is complete and lock the distributed lock to ensure shard
             //    metadata stability.
             // 3. Migration
-            //    Retrieve all DiskLocs, which need to be migrated in order to do as little seeking
-            //    as possible during transfer. Retrieval of the DiskLocs happens under a collection
+            //    Retrieve all RecordIds, which need to be migrated in order to do as little seeking
+            //    as possible during transfer. Retrieval of the RecordIds happens under a collection
             //    lock, but then the collection lock is dropped. This opens up an opportunity for
-            //    repair or compact to invalidate these DiskLocs, because these commands do not
+            //    repair or compact to invalidate these RecordIds, because these commands do not
             //    synchronized with migration. Note that data modifications are not a problem,
             //    because we are registered for change notifications.
             //

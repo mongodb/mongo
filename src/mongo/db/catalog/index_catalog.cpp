@@ -1030,7 +1030,7 @@ namespace {
     Status IndexCatalog::_indexRecord(OperationContext* txn,
                                       IndexCatalogEntry* index,
                                       const BSONObj& obj,
-                                      const DiskLoc &loc ) {
+                                      const RecordId &loc ) {
         InsertDeleteOptions options;
         options.logIfError = false;
         options.dupsAllowed = isDupsAllowed( index->descriptor() );
@@ -1042,7 +1042,7 @@ namespace {
     Status IndexCatalog::_unindexRecord(OperationContext* txn,
                                         IndexCatalogEntry* index,
                                         const BSONObj& obj,
-                                        const DiskLoc &loc,
+                                        const RecordId &loc,
                                         bool logIfError) {
         InsertDeleteOptions options;
         options.logIfError = logIfError;
@@ -1063,7 +1063,7 @@ namespace {
 
     Status IndexCatalog::indexRecord(OperationContext* txn,
                                    const BSONObj& obj,
-                                   const DiskLoc &loc ) {
+                                   const RecordId &loc ) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
@@ -1078,7 +1078,7 @@ namespace {
 
     void IndexCatalog::unindexRecord(OperationContext* txn,
                                      const BSONObj& obj,
-                                     const DiskLoc& loc,
+                                     const RecordId& loc,
                                      bool noWarn) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();

@@ -203,7 +203,7 @@ namespace mongo {
         _collection->getIndexCatalog()->unregisterIndexBuild(descriptor);
     }
 
-    Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<DiskLoc>* dupsOut) {
+    Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
         ProgressMeter* progress = _txn->setMessage(curopMessage,
                                                    curopMessage,
@@ -222,7 +222,7 @@ namespace mongo {
         }
 
         BSONObj objToIndex;
-        DiskLoc loc;
+        RecordId loc;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc))) {
             {
@@ -271,7 +271,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status MultiIndexBlock::insert(const BSONObj& doc, const DiskLoc& loc) {
+    Status MultiIndexBlock::insert(const BSONObj& doc, const RecordId& loc) {
         for ( size_t i = 0; i < _indexes.size(); i++ ) {
             int64_t unused;
             Status idxStatus = _indexes[i].forInsert()->insert( _txn,
@@ -285,7 +285,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status MultiIndexBlock::doneInserting(std::set<DiskLoc>* dupsOut) {
+    Status MultiIndexBlock::doneInserting(std::set<RecordId>* dupsOut) {
         for ( size_t i = 0; i < _indexes.size(); i++ ) {
             if ( _indexes[i].bulk == NULL )
                 continue;

@@ -120,7 +120,7 @@ namespace mongo {
             static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
 
         // Look up the key by going directly to the Btree.
-        DiskLoc loc = accessMethod->findSingle(_txn, _key);
+        RecordId loc = accessMethod->findSingle(_txn, _key);
 
         // Key not found.
         if (loc.isNull()) {
@@ -183,7 +183,7 @@ namespace mongo {
         ++_commonStats.unyields;
     }
 
-    void IDHackStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         // It's possible that the loc getting invalidated is the one we're about to

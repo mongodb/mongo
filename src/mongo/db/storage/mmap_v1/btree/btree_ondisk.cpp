@@ -40,8 +40,8 @@ namespace mongo {
     void DiskLoc56Bit::operator=(const DiskLoc& loc) {
         ofs = loc.getOfs();
         int la = loc.a();
-        if (la == maxDiskLoc.a()) {
-            invariant(ofs == maxDiskLoc.getOfs());
+        if (la == DiskLoc::max().a()) {
+            invariant(ofs == DiskLoc::max().getOfs());
             la = OurMaxA;
         }
         invariant( la <= OurMaxA ); // must fit in 3 bytes

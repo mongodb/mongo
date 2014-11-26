@@ -82,7 +82,7 @@ namespace mongo {
                                                            bool dupsAllowed) = 0;
 
         /**
-         * Insert an entry into the index with the specified key and DiskLoc.
+         * Insert an entry into the index with the specified key and RecordId.
          *
          * @param txn the transaction under which the insert takes place
          * @param dupsAllowed true if duplicate keys are allowed, and false
@@ -91,15 +91,15 @@ namespace mongo {
          * @return Status::OK() if the insert succeeded,
          *
          *         ErrorCodes::DuplicateKey if 'key' already exists in 'this' index
-         *         at a DiskLoc other than 'loc' and duplicates were not allowed
+         *         at a RecordId other than 'loc' and duplicates were not allowed
          */
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               bool dupsAllowed) = 0;
 
         /**
-         * Remove the entry from the index with the specified key and DiskLoc.
+         * Remove the entry from the index with the specified key and RecordId.
          *
          * @param txn the transaction under which the remove takes place
          * @param dupsAllowed true if duplicate keys are allowed, and false
@@ -107,12 +107,12 @@ namespace mongo {
          */
         virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
-                             const DiskLoc& loc,
+                             const RecordId& loc,
                              bool dupsAllowed) = 0;
 
         /**
          * Return ErrorCodes::DuplicateKey if 'key' already exists in 'this'
-         * index at a DiskLoc other than 'loc', and Status::OK() otherwise.
+         * index at a RecordId other than 'loc', and Status::OK() otherwise.
          *
          * @param txn the transaction under which this operation takes place
          *
@@ -120,7 +120,7 @@ namespace mongo {
          */
         virtual Status dupKeyCheck(OperationContext* txn,
                                    const BSONObj& key,
-                                   const DiskLoc& loc) = 0;
+                                   const RecordId& loc) = 0;
 
         //
         // Information about the tree
@@ -201,7 +201,7 @@ namespace mongo {
 
             /**
              * Return true if 'this' cursor and the 'other' cursor are positioned at
-             * the same key and DiskLoc, or if both cursors are at EOF. Otherwise,
+             * the same key and RecordId, or if both cursors are at EOF. Otherwise,
              * this function returns false.
              *
              * Implementations should prohibit the comparison of cursors associated
@@ -214,17 +214,17 @@ namespace mongo {
              * be forwarded to all Cursors over that SortedData.
              * TODO something better.
              */
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket) = 0;
+            virtual void aboutToDeleteBucket(const RecordId& bucket) = 0;
 
             /**
              * Position 'this' forward (reverse) cursor either at the entry or
-             * immediately after (or immediately before) the specified key and DiskLoc.
+             * immediately after (or immediately before) the specified key and RecordId.
              * The cursor should be positioned at EOF if no such entry exists.
              *
-             * @return true if the entry (key, DiskLoc) exists within the index,
+             * @return true if the entry (key, RecordId) exists within the index,
              *         and false otherwise
              */
-            virtual bool locate(const BSONObj& key, const DiskLoc& loc) = 0;
+            virtual bool locate(const BSONObj& key, const RecordId& loc) = 0;
 
             /**
              * Position 'this' forward (reverse) cursor either at the next
@@ -298,9 +298,9 @@ namespace mongo {
             virtual BSONObj getKey() const = 0;
 
             /**
-             * Return the DiskLoc associated with the current position of 'this' cursor.
+             * Return the RecordId associated with the current position of 'this' cursor.
              */
-            virtual DiskLoc getDiskLoc() const = 0;
+            virtual RecordId getRecordId() const = 0;
 
             /**
              * Position 'this' forward (reverse) cursor at the next (preceding) entry
@@ -313,7 +313,7 @@ namespace mongo {
             //
 
             /**
-             * Save the entry in the index (i.e. its key and DiskLoc) of where
+             * Save the entry in the index (i.e. its key and RecordId) of where
              * 'this' cursor is currently positioned.
              *
              * Implementations can assume that no operations other than delete
@@ -326,7 +326,7 @@ namespace mongo {
              * Restore 'this' cursor to the previously saved entry in the index.
              *
              * Implementations should have the same behavior as calling locate()
-             * with the saved key and DiskLoc.
+             * with the saved key and RecordId.
              */
             virtual void restorePosition(OperationContext* txn) = 0;
         };
@@ -369,7 +369,7 @@ namespace mongo {
          * 'key' must be > or >= the last key passed to this function (depends on _dupsAllowed).  If
          * this is violated an error Status (ErrorCodes::InternalError) will be returned.
          */
-        virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
+        virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
 
         /**
          * Do any necessary work to finish building the tree.
