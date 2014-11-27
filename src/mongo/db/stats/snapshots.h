@@ -49,8 +49,6 @@ namespace mongo {
         void takeSnapshot();
 
         unsigned long long _created;
-        Top::CollectionData _globalUsage;
-        unsigned long long _totalWriteLockedTime; // micros of total time locked
         Top::UsageMap _usage;
 
         friend class SnapshotThread;
@@ -73,16 +71,6 @@ namespace mongo {
             return _elapsed;
         }
 
-        unsigned long long timeInWriteLock() const {
-            return _newer._totalWriteLockedTime - _older._totalWriteLockedTime;
-        }
-        double percentWriteLocked() const {
-            double e = (double) elapsed();
-            double w = (double) timeInWriteLock();
-            return w/e;
-        }
-
-        Top::CollectionData globalUsageDiff();
         Top::UsageMap collectionUsageDiff();
 
     private:
@@ -103,8 +91,6 @@ namespace mongo {
         const SnapshotData& getPrev( int numBack = 0 );
         std::auto_ptr<SnapshotDelta> computeDelta( int numBack = 0 );
 
-
-        void outputLockInfoHTML( std::stringstream& ss );
     private:
         mongo::mutex _lock;
         int _n;

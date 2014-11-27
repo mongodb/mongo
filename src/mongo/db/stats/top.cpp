@@ -76,7 +76,6 @@ namespace mongo {
 
         CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
-        _record( _global , op , lockType , micros , command );
     }
 
     void Top::_record( CollectionData& c , int op , int lockType , long long micros , bool command ) {

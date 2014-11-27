@@ -82,7 +82,6 @@ namespace mongo {
         void record( const StringData& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out) const;
-        CollectionData getGlobalData() const { return _global; }
         void collectionDropped( const StringData& ns );
 
     public: // static stuff
@@ -94,7 +93,6 @@ namespace mongo {
         void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
         mutable SimpleMutex _lock;
-        CollectionData _global;
         UsageMap _usage;
         std::string _lastDropped;
     };
