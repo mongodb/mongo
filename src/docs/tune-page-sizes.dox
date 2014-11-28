@@ -1,18 +1,19 @@
 /*! @page tune_page_sizes  Page and overflow item sizes
 
 There are four page and item size configuration values: \c internal_page_max,
-\c internal_item_max, \c leaf_page_max and \c leaf_item_max.  All four should
-be specified to the WT_SESSION::create method, that is, they are configurable
+\c internal_item_max, \c leaf_page_max and \c leaf_item_max.  All four are
+specified to the WT_SESSION::create method, that is, they are configurable
 on a per-file basis.
 
 The \c internal_page_max and \c leaf_page_max configuration values specify
 the maximum size for Btree internal and leaf pages.  That is, when an
-internal or leaf page reaches the specified size, it splits into two pages.
-Generally, internal pages should be sized to fit into the system's L1 or L2
-caches in order to minimize cache misses when searching the tree, while leaf
-pages should be sized to maximize I/O performance (if reading from disk is
-necessary, it is usually desirable to read a large amount of data, assuming
-some locality of reference in the application's access pattern).
+internal or leaf page grows past the specified size, it splits into
+multiple pages.  Generally, internal pages should be sized to fit into
+the system's on-chip caches in order to minimize cache misses when
+searching the tree, while leaf pages should be sized to maximize I/O
+performance (if reading from disk is necessary, it is usually desirable
+to read a large amount of data, assuming some locality of reference in
+the application's access pattern).
 
 The \c internal_item_max and \c leaf_item_max configuration values specify
 the maximum size at which an object will be stored on-page.  Larger items
@@ -35,28 +36,18 @@ single page.  In other words, page and overflow sizes are based on in-memory
 sizes, not disk sizes.
 
 There are two other, related configuration values, also settable by the
-WT_SESSION::create method.  They are \c allocation_size, and \c
-split_pct.
+WT_SESSION::create method.  They are \c allocation_size and \c split_pct.
 
-The \c allocation_size configuration value is the underlying unit
-of allocation for the file.  As the unit of file allocation, it has two
-effects: first, it limits the ultimate size of the file, and second, it
-determines how much space is wasted when storing overflow items.
+The \c allocation_size configuration value is the underlying unit of
+allocation for the file.  As the unit of file allocation, it sets the
+minimum page size and how much space is wasted when storing small
+amounts of data and overflow items.  For example, if the allocation size
+is set to 4KB, an overflow item of 18,000 bytes requires 5 allocation
+units and wastes about 2KB of space.  If the allocation size is 16KB,
+the same overflow item would waste more than 10KB.
 
-By limiting the size of the file, the allocation size limits the amount
-of data that can be stored in a file.  For example, if the allocation
-size is set to the minimum possible (512B), the maximum file size is
-2TB, that is, attempts to allocate new file blocks will fail when the
-file reaches 2TB in size.  If the allocation size is set to the maximum
-possible (512MB), the maximum file size is 2EB.
-
-The unit of allocation also determines how much space is wasted when
-storing overflow items.  For example, if the allocation size were set
-to the minimum value of 512B, an overflow item of 1100 bytes would
-require 3 allocation sized file units, or 1536 bytes, wasting almost 500
-bytes.  For this reason, as the allocation size increases, page sizes
-and overflow item sizes will likely increase as well, to ensure that
-significant space isn't wasted by overflow items.
+The default allocation size is 4KB, chosen for compatibility with virtual
+memory page sizes and direct I/O requirements on common server platforms.
 
 The last configuration value is \c split_pct, which configures the size
 of a split page.  When a page grows sufficiently large that it must be
