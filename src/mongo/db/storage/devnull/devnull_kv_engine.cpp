@@ -30,6 +30,7 @@
 
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
+#include "mongo/db/storage/in_memory/in_memory_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
@@ -171,17 +172,56 @@ namespace mongo {
         BSONObj _dummy;
     };
 
+    class DevNullSortedDataInterface : public SortedDataInterface {
+    public:
+        virtual ~DevNullSortedDataInterface() { }
+
+        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
+                                                           bool dupsAllowed) { return NULL; }
+
+        virtual Status insert(OperationContext* txn,
+                              const BSONObj& key,
+                              const RecordId& loc,
+                              bool dupsAllowed) { return Status::OK(); }
+
+        virtual void unindex(OperationContext* txn,
+                             const BSONObj& key,
+                             const RecordId& loc,
+                             bool dupsAllowed) { }
+
+        virtual Status dupKeyCheck(OperationContext* txn,
+                                   const BSONObj& key,
+                                   const RecordId& loc) { return Status::OK(); }
+
+        virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
+                                  BSONObjBuilder* output) const { }
+
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const { return 0; }
+
+        virtual bool isEmpty(OperationContext* txn) { return true; }
+
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {
+            return NULL;
+        }
+
+        virtual Status initAsEmpty(OperationContext* txn) { return Status::OK(); }
+    };
+
+
     RecordStore* DevNullKVEngine::getRecordStore( OperationContext* opCtx,
                                                   const StringData& ns,
                                                   const StringData& ident,
                                                   const CollectionOptions& options ) {
+        if ( ident == "_mdb_catalog" ) {
+            return new InMemoryRecordStore( ns, &_catalogInfo );
+        }
         return new DevNullRecordStore( ns, options );
     }
 
     SortedDataInterface* DevNullKVEngine::getSortedDataInterface( OperationContext* opCtx,
                                                                   const StringData& ident,
                                                                   const IndexDescriptor* desc ) {
-        return NULL;
+        return new DevNullSortedDataInterface();
     }
 
 }

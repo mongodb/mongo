@@ -93,5 +93,8 @@ namespace mongo {
         }
 
         virtual void cleanShutdown(OperationContext* txn) {};
+
+    private:
+        boost::shared_ptr<void> _catalogInfo;
     };
 }
