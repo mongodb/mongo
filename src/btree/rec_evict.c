@@ -14,11 +14,11 @@ static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *);
 
 /*
- * __wt_rec_evict --
- *	Reconciliation plus eviction.
+ * __wt_evict --
+ *	Eviction.
  */
 int
-__wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
