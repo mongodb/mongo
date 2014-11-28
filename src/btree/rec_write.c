@@ -331,11 +331,11 @@ static int  __rec_dictionary_lookup(
 static void __rec_dictionary_reset(WT_RECONCILE *);
 
 /*
- * __wt_rec_write --
+ * __wt_reconcile --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
 int
-__wt_rec_write(WT_SESSION_IMPL *session,
+__wt_reconcile(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -523,7 +523,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * Fake up a reference structure, and write the next root page.
 	 */
 	__wt_root_ref_init(&fake_ref, next, page->type == WT_PAGE_COL_INT);
-	return (__wt_rec_write(session, &fake_ref, NULL, flags));
+	return (__wt_reconcile(session, &fake_ref, NULL, flags));
 
 err:	__wt_page_out(session, &next);
 	return (ret);
