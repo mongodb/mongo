@@ -1,0 +1,12 @@
+# wtperf options file: Test performance with a log file enabled.
+# Set the log file reasonably small to catch log-swtich bottle
+# necks.
+conn_config="cache_size=1G,log=(enabled=true,file_max=20MB)"
+table_config="type=file"
+icount=50000
+report_interval=5
+run_time=40
+populate_threads=1
+random_range=50000000
+threads=((count=8,inserts=1))
+
