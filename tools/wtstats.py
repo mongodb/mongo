@@ -26,8 +26,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import fileinput, glob, os, re, shutil, sys, textwrap
+import fileinput, os, re, shutil, sys, textwrap
 from collections import defaultdict
+from glob import glob
 from time import mktime
 from subprocess import call
 
@@ -151,20 +152,20 @@ if args.include and args.right:
     args.include += args.right
 
 # Read the input file(s) into a dictionary of lists.
+def getfiles(l):
+    for f in l:
+        if os.path.isfile(f):
+            yield f
+        elif os.path.isdir(f):
+            for s in glob(os.path.join(f, 'WiredTigerStat*')):
+                print 'Processing ' + s
+                yield s
+
 d = defaultdict(list)
-for f in args.files:
-    if os.path.isfile(f):
-        for line in open(f, 'rU'):
-            month, day, time, v, title = line.strip('\n').split(" ", 4)
-            d[title].append((month + " " + day + " " + time, v))
-    elif os.path.isdir(f):
-        stat_regex = f + '/WiredTigerStat*'
-        statfiles = glob.glob(stat_regex)
-        for s in statfiles:
-            print 'Processing ' + s
-            for line in open(s, 'rU'):
-                month, day, time, v, title = line.strip('\n').split(" ", 4)
-                d[title].append((month + " " + day + " " + time, v))
+for f in getfiles(args.files):
+    for line in open(f, 'rU'):
+        month, day, time, v, title = line.strip('\n').split(" ", 4)
+        d[title].append((month + " " + day + " " + time, v))
 
 # Process the series, eliminate constants
 for title, values in sorted(d.iteritems()):
