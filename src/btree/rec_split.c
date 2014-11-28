@@ -804,11 +804,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __split_evict_multi --
+ * __split_parent --
  *	Resolve a multi-page split, inserting new information into the parent.
  */
 static int
-__split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__split_parent(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1060,11 +1060,11 @@ err:	if (locked)
 }
 
 /*
- * __split_evict_single --
+ * __split_self --
  *	Resolve a single page split, replacing a page with a new version.
  */
 static int
-__split_evict_single(WT_SESSION_IMPL *session, WT_REF *ref)
+__split_self(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
@@ -1116,6 +1116,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 */
 	split_entries = ref->page->modify->mod_multi_entries;
 	return (split_entries == 1 ?
-	    __split_evict_single(session, ref) :
-	    __split_evict_multi(session, ref, exclusive));
+	    __split_self(session, ref) :
+	    __split_parent(session, ref, exclusive));
 }
