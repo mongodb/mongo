@@ -5,7 +5,7 @@ import re, string, sys, textwrap
 from dist import compare_srcfile
 
 # Read the source files.
-from stat_data import dsrc_stats, connection_stats
+from stat_data import groups, dsrc_stats, connection_stats
 
 def print_struct(title, name, base, stats):
 	'''Print the structures for the stat.h file.'''
@@ -161,23 +161,34 @@ compare_srcfile(tmp_file, '../src/support/stat.c')
 # Update the statlog file with the entries we can scale per second.
 scale_info = 'no_scale_per_second_list = [\n'
 clear_info = 'no_clear_list = [\n'
+prefix_list = []
 for l in sorted(connection_stats):
+        prefix_list.append(l.prefix)
 	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
 	if 'no_clear' in l.flags:
 		clear_info += '    \'' + l.desc + '\',\n'
 for l in sorted(dsrc_stats):
+        prefix_list.append(l.prefix)
 	if 'no_scale' in l.flags:
 		scale_info += '    \'' + l.desc + '\',\n'
 	if 'no_clear' in l.flags:
 		clear_info += '    \'' + l.desc + '\',\n'
 scale_info += ']\n'
 clear_info += ']\n'
+prefix_info = 'prefix_list = [\n'
+# Remove the duplicates and print out the list
+for l in list(set(prefix_list)):
+	prefix_info += '    \'' + l + '\',\n'
+prefix_info += ']\n'
+group_info = 'groups = ' + str(groups)
 
 tmp_file = '__tmp'
 f = open(tmp_file, 'w')
 f.write('# DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write(scale_info)
 f.write(clear_info)
+f.write(prefix_info)
+f.write(group_info)
 f.close()
 compare_srcfile(tmp_file, '../tools/stat_data.py')
