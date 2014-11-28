@@ -480,7 +480,7 @@ namespace mongo {
 
     bool GeoParser::parseMultiLine(const BSONObj &obj, MultiLineWithCRS *out) {
         vector<BSONElement> coordElt = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
-        out->lines.mutableVector().clear();
+        out->lines.clear();
         out->lines.mutableVector().resize(coordElt.size());
 
         for (size_t i = 0; i < coordElt.size(); ++i) {
@@ -518,7 +518,7 @@ namespace mongo {
 
     bool GeoParser::parseMultiPolygon(const BSONObj &obj, MultiPolygonWithCRS *out) {
         vector<BSONElement> coordElt = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
-        out->polygons.mutableVector().clear();
+        out->polygons.clear();
         out->polygons.mutableVector().resize(coordElt.size());
 
         for (size_t i = 0; i < coordElt.size(); ++i) {
