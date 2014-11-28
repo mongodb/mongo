@@ -295,15 +295,10 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			    !__wt_txn_visible_all(session,
 			    page->modify->rec_max_txn))
 				WT_ERR(EBUSY);
+
 			if (syncop == WT_SYNC_DISCARD_FORCE)
 				F_SET(session, WT_SESSION_DISCARD_FORCE);
-			__wt_ref_out(session, ref);
-			/*
-			 * In case we don't discard the whole tree, make sure
-			 * that future readers know that the page is no longer
-			 * in cache.
-			 */
-			ref->state = WT_REF_DISK;
+			__wt_rec_page_clean_update(session, ref);
 			F_CLR(session, WT_SESSION_DISCARD_FORCE);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
