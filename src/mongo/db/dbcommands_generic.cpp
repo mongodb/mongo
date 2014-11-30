@@ -263,7 +263,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(OperationContext* txn, const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
-            for ( map<string,Command*>::iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
+            for ( CommandMap::const_iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
                 Command * c = i->second;
 
                 // don't show oldnames
