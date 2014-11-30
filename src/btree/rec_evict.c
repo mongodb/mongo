@@ -26,6 +26,13 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_TXN_STATE *txn_state;
 	int istree;
 
+	/*
+	 * Check for an append-only workload needing an in-memory split. Note
+	 * this happens first, because the WT_REF we're evicting may change.
+	 */
+	if (!exclusive)
+		WT_RET(__wt_split_insert(session, &ref));
+
 	page = ref->page;
 	istree = 0;
 

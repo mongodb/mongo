@@ -549,7 +549,8 @@ struct __wt_page {
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
-#define	WT_PAGE_SPLITTING	0x20	/* An internal page is growing. */
+#define	WT_PAGE_SPLITTING	0x20	/* An internal page is growing */
+#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
