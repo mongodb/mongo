@@ -1109,10 +1109,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	__wt_page_only_modify_set(session, right);
 
 	/*
-	 * Calculate how much memory we're moving.
-	 *
-	 * Figure out how deep the skip list stack is for the element we are
-	 * moving, and the memory used by the list of updates.
+	 * Calculate how much memory we're moving: figure out how deep the skip
+	 * list stack is for the element we are moving, and the memory used by
+	 * the item's list of updates
 	 */
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
 		;
@@ -1196,6 +1195,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 			ins_head->tail[i] = prev_ins;
 		}
 	}
+
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * Verify the moved insert item appears nowhere on the insert list.
