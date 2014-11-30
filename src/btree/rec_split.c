@@ -809,21 +809,20 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
  */
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
-    uint32_t new_entries, size_t parent_incr, int exclusive, int page_discard)
+    uint32_t new_entries, size_t parent_decr, size_t parent_incr,
+    int exclusive, int ref_discard)
 {
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc_refp, *parent_ref;
-	size_t parent_decr, size;
+	size_t size;
 	uint32_t i, j, parent_entries, result_entries;
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
 	alloc_index = NULL;
 	parent_ref = NULL;
-	parent_decr = 0;
 	complete = hazard = locked = 0;
 
 	/*
@@ -942,17 +941,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * split (if we failed, we'd leak the underlying blocks, but the parent
 	 * page would be unaffected).
 	 */
-	if (page_discard && parent->type == WT_PAGE_ROW_INT) {
+	if (ref_discard && parent->type == WT_PAGE_ROW_INT)
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
-
-		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL) {
-			size = sizeof(WT_IKEY) + ikey->size;
-			WT_TRET(
-			    __split_safe_free(session, exclusive, ikey, size));
-			WT_MEMSIZE_ADD(parent_decr, size);
-		}
-	}
-	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
 
 	/*
 	 * Adjust the parent's memory footprint.  This may look odd, but we
@@ -1093,7 +1083,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 0, &right));
 	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins));
 	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins[0]));
-	right_incr += sizeof(WT_INSERT_HEAD) + sizeof(WT_INSERT_HEAD *);
+	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD));
+	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD *));
 
 	WT_ERR(__wt_calloc_def(session, 1, &split_ref[1]));
 	split_ref[1]->page = right;
@@ -1101,8 +1092,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	WT_ERR(__wt_row_ikey(session, 0,
 	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins),
 	    &split_ref[1]->key.ikey));
-	parent_incr =
-	    sizeof(WT_REF) + sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(ins);
+	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
+	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
+	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(ins));
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
@@ -1111,7 +1103,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
 	 * list stack is for the element we are moving, and the memory used by
-	 * the item's list of updates
+	 * the item's list of updates.
 	 */
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
 		;
@@ -1119,8 +1111,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	size += sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(ins);
 	for (upd = ins->upd; upd != NULL; upd = upd->next)
 		size += sizeof(WT_UPDATE) + upd->size;
-	right_incr += size;
-	page_decr -= size;
+	WT_MEMSIZE_ADD(right_incr, size);
+	WT_MEMSIZE_ADD(page_decr, size);
 	__wt_cache_page_inmem_decr(session, page, page_decr);
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
@@ -1225,8 +1217,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	 * And: we've marked the newly created page dirty, make sure we don't
 	 * mess up the dirty page count on error.
 	 */
-	if ((ret =
-	    __split_parent(session, ref, split_ref, 2, parent_incr, 0, 0)) != 0)
+	if ((ret = __split_parent(
+	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0)
 		WT_PANIC_RET(
 		    session, ret, "split of a page's insert list failed");
 
@@ -1310,17 +1302,20 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 int
 __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
+	WT_IKEY *ikey;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **ref_new;
-	size_t parent_incr;
+	size_t ikey_size, parent_decr, parent_incr;
 	uint32_t i, new_entries;
 
 	page = ref->page;
 	mod = page->modify;
 	new_entries = mod->mod_multi_entries;
-	parent_incr = 0;
+
+	ikey = NULL;
+	ikey_size = parent_decr = parent_incr = 0;
 
 	/*
 	 * Convert the split page's multiblock reconciliation information into
@@ -1331,9 +1326,19 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_ERR(__wt_multi_to_ref(session,
 		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
 
+	/*
+	 * After the split, we're going to discard the WT_REF, account for the
+	 * change in memory footprint.
+	 */
+	if ((ikey = __wt_ref_key_instantiated(ref)) != NULL) {
+		ikey_size = sizeof(WT_IKEY) + ikey->size;
+		WT_MEMSIZE_ADD(parent_decr, ikey_size);
+	}
+	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+
 	/* Split into the parent. */
-	WT_ERR(__split_parent(
-	    session, ref, ref_new, new_entries, parent_incr, exclusive, 1));
+	WT_ERR(__split_parent(session,
+	    ref, ref_new, new_entries, parent_decr, parent_incr, exclusive, 1));
 
 	__wt_free(session, ref_new);
 
@@ -1355,6 +1360,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * Add them to the session discard list, to be freed once we know it's
 	 * safe.
 	 */
+	if (ikey != NULL)
+		WT_TRET(__split_safe_free(session, exclusive, ikey, ikey_size));
 	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
 
 	/*
