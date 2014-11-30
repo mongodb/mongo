@@ -892,7 +892,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 			}
 		else
 			*alloc_refp++ = pindex->index[i];
-	__wt_free(session, ref_new);
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -1336,6 +1335,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	/* Split into the parent. */
 	WT_ERR(__split_parent(
 	    session, ref, ref_new, new_entries, parent_incr, exclusive, 1));
+
+	__wt_free(session, ref_new);
 
 	/*
 	 * The split succeeded, discard the page.
