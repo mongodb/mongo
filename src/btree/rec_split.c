@@ -911,7 +911,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * those threads and causing them to re-calculate their position based
 	 * on the updated parent page's index.
 	 */
-	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 	WT_PUBLISH(ref->state, WT_REF_SPLIT);
 
 	/*
