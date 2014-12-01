@@ -67,9 +67,13 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 // Connect to the database and periodically run a command to collect stats,
 // writing the results to standard out in the specified format.
 func (mt *MongoTop) Run() error {
-	connUrl := mt.Options.Host
+
+	connURL := mt.Options.Host
+	if connURL == "" {
+		connURL = "127.0.0.1"
+	}
 	if mt.Options.Port != "" {
-		connUrl = connUrl + ":" + mt.Options.Port
+		connURL = connURL + ":" + mt.Options.Port
 	}
 
 	hasData := false
@@ -90,6 +94,12 @@ func (mt *MongoTop) Run() error {
 				return err
 			}
 			time.Sleep(mt.Sleeptime)
+		}
+
+		// if this is the first time and the connection is successful, print
+		// the connection message
+		if !hasData && !mt.OutputOptions.Json {
+			log.Logf(log.Always, "connected to: %v\n", connURL)
 		}
 
 		hasData = true
