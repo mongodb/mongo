@@ -50,9 +50,9 @@ var host = getHostName();
 
 var nodes = replTest.startSet();
 replTest.initiate({_id : name, members : [
-    {_id : 0, host : host+":"+replTest.ports[0]},
+    {_id : 0, host : host+":"+replTest.ports[0], priority: 2},
     {_id : 1, host : host+":"+replTest.ports[1], arbiterOnly : true},
-    {_id : 2, host : host+":"+replTest.ports[2]}
+    {_id : 2, host : host+":"+replTest.ports[2], priority: 0}
 ]});
 var master = replTest.getMaster();
 var mdb = master.getDB("foo");
@@ -120,11 +120,5 @@ assert.soon(function() {
     return status.members && status.members[2].state == 3;
 });
 
-
-print("make sure s2 doesn't become primary");
 replTest.stop(0);
-sleep(20000);
-printjson(replTest.nodes[2].getDB("admin").runCommand({isMaster : 1}));
-printjson(replTest.nodes[2].getDB("admin").runCommand({replSetGetStatus : 1}));
 
-//replTest.stopSet(15);
