@@ -165,7 +165,7 @@ namespace mongo {
                     continue;
                 }
 
-                DiskLoc fr = theCapExtent()->firstRecord;
+                const RecordId fr = theCapExtent()->firstRecord.toRecordId();
                 Status status = _deleteCallback->aboutToDeleteCapped( txn, fr );
                 if ( !status.isOK() )
                     return StatusWith<DiskLoc>( status );
@@ -252,9 +252,9 @@ namespace mongo {
     }
 
     void CappedRecordStoreV1::temp_cappedTruncateAfter( OperationContext* txn,
-                                                        DiskLoc end,
+                                                        RecordId end,
                                                         bool inclusive ) {
-        cappedTruncateAfter( txn, _ns.c_str(), end, inclusive );
+        cappedTruncateAfter( txn, _ns.c_str(), DiskLoc::fromRecordId(end), inclusive );
     }
 
     /* combine adjacent deleted records *for the current extent* of the capped collection
@@ -460,7 +460,8 @@ namespace mongo {
                 break;
             }
             // 'curr' will point to the newest document in the collection.
-            DiskLoc curr = theCapExtent()->lastRecord;
+            const DiskLoc curr = theCapExtent()->lastRecord;
+            const RecordId currId = curr.toRecordId();
             invariant( !curr.isNull() );
             if ( curr == end ) {
                 if ( inclusive ) {
@@ -481,9 +482,9 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            Status status = _deleteCallback->aboutToDeleteCapped( txn, curr );
+            Status status = _deleteCallback->aboutToDeleteCapped( txn, currId );
             uassertStatusOK( status );
-            deleteRecord( txn, curr );
+            deleteRecord( txn, currId );
             compact(txn);
 
             // This is the case where we have not yet had to remove any
@@ -595,7 +596,7 @@ namespace mongo {
     }
 
     RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const DiskLoc& start,
+                                                      const RecordId& start,
                                                       const CollectionScanParams::Direction& dir) const {
         return new CappedRecordStoreV1Iterator( txn, this, start, false, dir );
     }

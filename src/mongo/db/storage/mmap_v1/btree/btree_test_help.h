@@ -54,16 +54,16 @@ namespace mongo {
      */
     class TestHeadManager : public HeadManager {
     public:
-        virtual const DiskLoc getHead( OperationContext* txn ) const {
+        virtual const RecordId getHead( OperationContext* txn ) const {
             return _head;
         }
 
-        virtual void setHead(OperationContext* txn, const DiskLoc newHead) {
+        virtual void setHead(OperationContext* txn, const RecordId newHead) {
             _head = newHead;
         }
 
     private:
-        DiskLoc _head;
+        RecordId _head;
     };
 
 

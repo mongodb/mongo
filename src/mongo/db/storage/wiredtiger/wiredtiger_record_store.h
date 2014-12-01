@@ -157,8 +157,8 @@ namespace mongo {
                                               RecordId end,
                                               bool inclusive);
 
-        virtual RecordId oplogStartHack(OperationContext* txn,
-                                       const RecordId& startingPosition) const;
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const;
 
         virtual Status oplogDiskLocRegister( OperationContext* txn,
                                              const OpTime& opTime );
@@ -223,8 +223,8 @@ namespace mongo {
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
 
-        static uint64_t _makeKey(const RecordId &loc);
-        static RecordId _fromKey(uint64_t k);
+        static int64_t _makeKey(const RecordId &loc);
+        static RecordId _fromKey(int64_t k);
 
         void _addUncommitedDiskLoc_inlock( OperationContext* txn, const RecordId& loc );
 
@@ -257,7 +257,7 @@ namespace mongo {
         RecordId _oplog_highestSeen;
         mutable boost::mutex _uncommittedDiskLocsMutex;
 
-        AtomicUInt64 _nextIdNum;
+        AtomicInt64 _nextIdNum;
         AtomicInt64 _dataSize;
         AtomicInt64 _numRecords;
 

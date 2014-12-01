@@ -469,7 +469,7 @@ namespace mongo {
                                        obj.objsize(), false ).getStatus());
             wuow.commit();
         }
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), RecordId().setInvalid());
+        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), boost::none);
     }
 
     TEST(WiredTigerRecordStoreTest, CappedOrder) {

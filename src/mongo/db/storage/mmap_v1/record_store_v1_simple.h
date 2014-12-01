@@ -50,14 +50,14 @@ namespace mongo {
 
         const char* name() const { return "SimpleRecordStoreV1"; }
 
-        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start,
+        virtual RecordIterator* getIterator( OperationContext* txn, const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;
 
         virtual Status truncate(OperationContext* txn);
 
-        virtual void temp_cappedTruncateAfter(OperationContext* txn, DiskLoc end, bool inclusive) {
+        virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
             invariant(!"cappedTruncateAfter not supported");
         }
 

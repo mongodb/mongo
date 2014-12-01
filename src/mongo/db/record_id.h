@@ -28,6 +28,110 @@
 
 #pragma once
 
-// TODO Remove once RecordId is more than just a typedef
-#include "mongo/db/storage/mmap_v1/diskloc.h"
+#include <boost/functional/hash.hpp>
+#include <climits>
+#include <ostream>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/logger/logstream_builder.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/platform/cstdint.h"
+
+namespace mongo {
+
+    /**
+     * The key that uniquely identifies a Record in a Collection or RecordStore.
+     */
+    class RecordId {
+    public:
+
+        /**
+         * Constructs a Null RecordId.
+         */
+        RecordId() : _repr(kNullRepr) {}
+
+        explicit RecordId(int64_t repr) : _repr(repr) {}
+
+        /**
+         * Construct a RecordId from two halves.
+         * TODO consider removing.
+         */
+        RecordId(int high, int low) : _repr((uint64_t(high) << 32) | uint32_t(low)) {}
+
+        /**
+         * A RecordId that compares less than all ids that represent documents in a collection.
+         */
+        static RecordId min() { return RecordId(kMinRepr); }
+
+        /**
+         * A RecordId that compares greater than all ids that represent documents in a collection.
+         */
+        static RecordId max() { return RecordId(kMaxRepr); }
+
+        bool isNull() const { return _repr == 0; }
+
+        int64_t repr() const { return _repr; }
+
+        /**
+         * Normal RecordIds are the only ones valid for representing Records. All RecordIds outside
+         * of this range are sentinel values.
+         */
+        bool isNormal() const { return _repr > 0 && _repr < kMaxRepr; }
+
+        int compare(RecordId rhs) const {
+            return _repr == rhs._repr ? 0 :
+                   _repr < rhs._repr ? -1 : 1;
+        }
+
+        /**
+         * Hash value for this RecordId. The hash implementation may be modified, and its behavior
+         * may differ across platforms. Hash values should not be persisted.
+         */
+        struct Hasher {
+            size_t operator()(RecordId rid) const {
+                size_t hash = 0;
+                // TODO consider better hashes
+                boost::hash_combine(hash, rid.repr());
+                return hash;
+            }
+        };
+
+        /// members for Sorter
+        struct SorterDeserializeSettings {}; // unused
+        void serializeForSorter(BufBuilder& buf) const { buf.appendStruct(_repr); }
+        static RecordId deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+            return RecordId(buf.read<int64_t>());
+        }
+        int memUsageForSorter() const { return sizeof(RecordId); }
+        RecordId getOwned() const { return *this; }
+
+    private:
+        static const int64_t kMaxRepr = LLONG_MAX;
+        static const int64_t kNullRepr = 0;
+        static const int64_t kMinRepr = LLONG_MIN;
+
+        int64_t _repr;
+    };
+
+    inline bool operator==(RecordId rhs, RecordId lhs) { return rhs.repr() == lhs.repr(); }
+    inline bool operator!=(RecordId rhs, RecordId lhs) { return rhs.repr() != lhs.repr(); }
+    inline bool operator< (RecordId rhs, RecordId lhs) { return rhs.repr() <  lhs.repr(); }
+    inline bool operator<=(RecordId rhs, RecordId lhs) { return rhs.repr() <= lhs.repr(); }
+    inline bool operator> (RecordId rhs, RecordId lhs) { return rhs.repr() >  lhs.repr(); }
+    inline bool operator>=(RecordId rhs, RecordId lhs) { return rhs.repr() >= lhs.repr(); }
+
+    inline StringBuilder& operator<<( StringBuilder& stream, const RecordId& id ) {
+        return stream << "RecordId(" << id.repr() << ')';
+    }
+
+    inline std::ostream& operator<<( std::ostream& stream, const RecordId& id ) {
+        return stream << "RecordId(" << id.repr() << ')';
+    }
+
+    inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,
+                                                const RecordId& id) {
+        stream.stream() << id;
+        return stream;
+    }
+} // namespace mongo
 

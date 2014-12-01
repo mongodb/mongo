@@ -206,11 +206,9 @@ namespace mongo {
         if ( !_namespaceRecordStore )
             return;
 
-        scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator( txn,
-                                                                                 DiskLoc(),
-                                                                                 CollectionScanParams::FORWARD ) );
+        scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator(txn) );
         while ( !iterator->isEOF() ) {
-            DiskLoc loc = iterator->getNext();
+            RecordId loc = iterator->getNext();
 
             BSONObj oldEntry = iterator->dataFor( loc ).toBson();
             BSONElement e = oldEntry["name"];
@@ -223,12 +221,12 @@ namespace mongo {
             BSONObj newEntry = applyUpdateOperators( oldEntry,
                                                      BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
 
-            StatusWith<DiskLoc> result = _namespaceRecordStore->updateRecord( txn,
+            StatusWith<RecordId> result = _namespaceRecordStore->updateRecord(txn,
                                                                               loc,
                                                                               newEntry.objdata(),
                                                                               newEntry.objsize(),
                                                                               false,
-                                                                              NULL );
+                                                                              NULL);
             fassert( 17486, result.isOK() );
             return;
         }

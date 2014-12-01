@@ -237,7 +237,7 @@ namespace mongo {
     }
 
     RecordIterator* SimpleRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const DiskLoc& start,
+                                                      const RecordId& start,
                                                       const CollectionScanParams::Direction& dir) const {
         return new SimpleRecordStoreV1Iterator( txn, this, start, dir );
     }
@@ -374,9 +374,9 @@ namespace mongo {
                     // start of the compact, this insert will allocate a record in a new extent.
                     // See the comment in compact() for more details.
                     CompactDocWriter writer( recOld, rawDataSize, allocationSize );
-                    StatusWith<DiskLoc> status = insertRecord( txn, &writer, false );
+                    StatusWith<RecordId> status = insertRecord( txn, &writer, false );
                     uassertStatusOK( status.getStatus() );
-                    const Record* newRec = recordFor(status.getValue());
+                    const Record* newRec = recordFor(DiskLoc::fromRecordId(status.getValue()));
                     invariant(unsigned(newRec->netLength()) >= rawDataSize);
                     totalNetSize += newRec->netLength();
 

@@ -457,7 +457,7 @@ namespace mongo {
                           "$gt or $gte over the 'ts' field.");
         }
 
-        RecordId startLoc = RecordId().setInvalid();
+        boost::optional<RecordId> startLoc = boost::none;
 
         // See if the RecordStore supports the oplogStartHack
         const BSONElement tsElem = extractOplogTsOptime(tsExpr);
@@ -468,7 +468,7 @@ namespace mongo {
             }
         }
 
-        if (startLoc.isValid()) {
+        if (startLoc) {
             LOG(3) << "Using direct oplog seek";
         }
         else {
@@ -486,7 +486,8 @@ namespace mongo {
             scoped_ptr<PlanExecutor> exec(rawExec);
 
             // The stage returns a RecordId of where to start.
-            PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
+            startLoc = RecordId();
+            PlanExecutor::ExecState state = exec->getNext(NULL, startLoc.get_ptr());
 
             // This is normal.  The start of the oplog is the beginning of the collection.
             if (PlanExecutor::IS_EOF == state) {
@@ -506,7 +507,7 @@ namespace mongo {
         // Build our collection scan...
         CollectionScanParams params;
         params.collection = collection;
-        params.start = startLoc;
+        params.start = *startLoc;
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = cq->getParsed().getOptions().tailable;
 

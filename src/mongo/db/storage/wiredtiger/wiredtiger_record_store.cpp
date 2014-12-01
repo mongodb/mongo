@@ -211,7 +211,7 @@ namespace {
         }
         else {
             RecordId maxLoc = iterator->curr();
-            uint64_t max = _makeKey( maxLoc );
+            int64_t max = _makeKey( maxLoc );
             _oplog_highestSeen = maxLoc;
             _nextIdNum.store( 1 + max );
 
@@ -410,7 +410,7 @@ namespace {
 
                 invariant(_numRecords.load() > 0);
 
-                uint64_t key;
+                int64_t key;
                 ret = c->get_key(c, &key);
                 invariantWTOK(ret);
                 oldest = _fromKey(key);
@@ -688,7 +688,7 @@ namespace {
                 Status status = adaptor->validate( data, &dataSize );
                 if ( !status.isOK() ) {
                     results->valid = false;
-                    results->errors.push_back( loc.toString() + " is corrupted" );
+                    results->errors.push_back( str::stream() << loc << " is corrupted" );
                 }
             }
             iter->getNext();
@@ -778,10 +778,12 @@ namespace {
         _oplog_highestSeen = loc;
     }
 
-    RecordId WiredTigerRecordStore::oplogStartHack(OperationContext* txn,
-                                                  const RecordId& startingPosition) const {
+    boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
+            OperationContext* txn,
+            const RecordId& startingPosition) const {
+
         if (!_useOplogHack)
-            return RecordId().setInvalid();
+            return boost::none;
 
         {
             WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
@@ -798,7 +800,7 @@ namespace {
         if (ret == WT_NOTFOUND) return RecordId(); // nothing <= startingPosition
         invariantWTOK(ret);
 
-        uint64_t key;
+        int64_t key;
         ret = c->get_key(c, &key);
         invariantWTOK(ret);
         return _fromKey(key);
@@ -806,12 +808,9 @@ namespace {
 
     RecordId WiredTigerRecordStore::_nextId() {
         invariant(!_useOplogHack);
-        const uint64_t myId = _nextIdNum.fetchAndAdd(1);
-        int a = myId >> 32;
-        // This masks the lowest 4 bytes of myId
-        int ofs = myId & 0x00000000FFFFFFFF;
-        RecordId loc( a, ofs );
-        return loc;
+        RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
+        invariant(out.isNormal());
+        return out;
     }
 
     WiredTigerRecoveryUnit* WiredTigerRecordStore::_getRecoveryUnit( OperationContext* txn ) {
@@ -872,13 +871,11 @@ namespace {
         }
     }
 
-    uint64_t WiredTigerRecordStore::_makeKey( const RecordId& loc ) {
-        return ((uint64_t)loc.a() << 32 | loc.getOfs());
+    int64_t WiredTigerRecordStore::_makeKey( const RecordId& loc ) {
+        return loc.repr();
     }
-    RecordId WiredTigerRecordStore::_fromKey( uint64_t key ) {
-        uint32_t a = key >> 32;
-        uint32_t ofs = (uint32_t)key;
-        return RecordId(a, ofs);
+    RecordId WiredTigerRecordStore::_fromKey( int64_t key ) {
+        return RecordId(key);
     }
 
     // --------
@@ -964,7 +961,7 @@ namespace {
 
         WT_CURSOR *c = _cursor->get();
         dassert( c );
-        uint64_t key;
+        int64_t key;
         int ret = c->get_key(c, &key);
         invariantWTOK(ret);
         return _fromKey(key);

@@ -100,8 +100,7 @@ namespace {
                 return Status(ErrorCodes::KeyTooLong, "key too big");
             }
 
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
+            invariant(loc.isNormal());
             invariant(!hasFieldNames(key));
 
             if (!_data->empty()) {
@@ -149,8 +148,7 @@ namespace {
                               const RecordId& loc,
                               bool dupsAllowed) {
 
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
+            invariant(loc.isNormal());
             invariant(!hasFieldNames(key));
 
             if ( key.objsize() >= TempKeyMaxSize ) {
@@ -176,8 +174,7 @@ namespace {
                              const BSONObj& key,
                              const RecordId& loc,
                              bool dupsAllowed) {
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
+            invariant(loc.isNormal());
             invariant(!hasFieldNames(key));
 
             IndexKeyEntry entry(key.getOwned(), loc);

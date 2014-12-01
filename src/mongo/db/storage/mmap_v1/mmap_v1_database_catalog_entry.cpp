@@ -270,7 +270,7 @@ namespace mongo {
         scoped_ptr<RecordIterator> it( systemIndexRecordStore->getIterator(txn) );
 
         while ( !it->isEOF() ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             BSONObj oldIndexSpec = it->dataFor( loc ).toBson();
             if ( fromNS != oldIndexSpec["ns"].valuestrsafe() )
                 continue;
@@ -289,7 +289,7 @@ namespace mongo {
                 newIndexSpec = b.obj();
             }
 
-            StatusWith<DiskLoc> newIndexSpecLoc =
+            StatusWith<RecordId> newIndexSpecLoc =
                 systemIndexRecordStore->insertRecord( txn,
                                                       newIndexSpec.objdata(),
                                                       newIndexSpec.objsize(),
@@ -308,7 +308,8 @@ namespace mongo {
                 int indexI = ce._findIndexNumber( txn, indexName );
 
                 IndexDetails& indexDetails = details->idx(indexI);
-                *txn->recoveryUnit()->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur
+                *txn->recoveryUnit()->writing(&indexDetails.info) =
+                    DiskLoc::fromRecordId(newIndexSpecLoc.getValue());
             }
 
             {
@@ -370,7 +371,7 @@ namespace mongo {
 
         // fix system.namespaces
         BSONObj newSpec;
-        DiskLoc oldSpecLocation;
+        RecordId oldSpecLocation;
         {
 
             BSONObj oldSpec;
@@ -378,7 +379,7 @@ namespace mongo {
                 RecordStoreV1Base* rs = _getNamespaceRecordStore();
                 scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
                 while ( !it->isEOF() ) {
-                    DiskLoc loc = it->getNext();
+                    RecordId loc = it->getNext();
                     BSONObj entry = it->dataFor( loc ).toBson();
                     if ( fromNS == entry["name"].String() ) {
                         oldSpecLocation = loc;
@@ -842,7 +843,7 @@ namespace mongo {
 
         RecordStoreV1Base* rs = _getNamespaceRecordStore_inlock();
         invariant( rs );
-        StatusWith<DiskLoc> loc = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
+        StatusWith<RecordId> loc = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
         massertStatusOK( loc.getStatus() );
     }
 
@@ -858,7 +859,7 @@ namespace mongo {
 
         scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
         while ( !it->isEOF() ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             BSONObj entry = it->dataFor( loc ).toBson();
             BSONElement name = entry["name"];
             if ( name.type() == String && name.String() == ns ) {
@@ -879,7 +880,7 @@ namespace mongo {
 
         scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
         while ( !it->isEOF() ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             BSONObj entry = it->dataFor( loc ).toBson();
             BSONElement name = entry["name"];
             if ( name.type() == String && name.String() == ns ) {

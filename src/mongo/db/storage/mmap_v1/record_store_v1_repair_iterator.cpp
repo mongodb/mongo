@@ -51,9 +51,9 @@ namespace mongo {
         return _currRecord.isNull();
     }
 
-    DiskLoc RecordStoreV1RepairIterator::curr() { return _currRecord; }
+    RecordId RecordStoreV1RepairIterator::curr() { return _currRecord.toRecordId(); }
 
-    DiskLoc RecordStoreV1RepairIterator::getNext() {
+    RecordId RecordStoreV1RepairIterator::getNext() {
         const DiskLoc retVal = _currRecord;
 
         const ExtentManager* em = _recordStore->_extentManager;
@@ -62,7 +62,7 @@ namespace mongo {
             if (_currRecord.isNull()) {
 
                 if (!_advanceToNextValidExtent()) {
-                    return retVal;
+                    return retVal.toRecordId();
                 }
 
                 _seenInCurrentExtent.clear();
@@ -106,7 +106,7 @@ namespace mongo {
                 continue;
             }
 
-            return retVal;
+            return retVal.toRecordId();
         }
     }
 
@@ -184,10 +184,11 @@ namespace mongo {
         return true;
     }
 
-    void RecordStoreV1RepairIterator::invalidate(const DiskLoc& dl) {
+    void RecordStoreV1RepairIterator::invalidate(const RecordId& id) {
         // If we see this record again it probably means it was reinserted rather than an infinite
         // loop. If we do loop, we should quickly hit another seen record that hasn't been
         // invalidated.
+        DiskLoc dl = DiskLoc::fromRecordId(id);
         _seenInCurrentExtent.erase(dl);
 
         if (_currRecord == dl) {
@@ -196,7 +197,7 @@ namespace mongo {
         }
     }
 
-    RecordData RecordStoreV1RepairIterator::dataFor(const DiskLoc& loc) const {
+    RecordData RecordStoreV1RepairIterator::dataFor(const RecordId& loc) const {
         return _recordStore->dataFor( _txn, loc );
     }
 

@@ -76,10 +76,10 @@ namespace mongo {
         // The normal bulk building path calls initAsEmpty, so we already have an empty root bucket.
         // This isn't the case in some unit tests that use the Builder directly rather than going
         // through an IndexAccessMethod.
-        _rightLeafLoc = _logic->_headManager->getHead(txn);
+        _rightLeafLoc = DiskLoc::fromRecordId(_logic->_headManager->getHead(txn));
         if (_rightLeafLoc.isNull()) {
             _rightLeafLoc = _logic->_addBucket(txn);
-            _logic->_headManager->setHead(_txn, _rightLeafLoc);
+            _logic->_headManager->setHead(_txn, _rightLeafLoc.toRecordId());
         }
 
         // must be empty when starting
@@ -152,10 +152,10 @@ namespace mongo {
 
         if (leftSib->parent.isNull()) {
             // Making a new root
-            invariant(leftSibLoc == _logic->_headManager->getHead(_txn));
+            invariant(leftSibLoc.toRecordId() == _logic->_headManager->getHead(_txn));
             const DiskLoc newRootLoc = _logic->_addBucket(_txn);
             leftSib->parent = newRootLoc;
-            _logic->_headManager->setHead(_txn, newRootLoc);
+            _logic->_headManager->setHead(_txn, newRootLoc.toRecordId());
 
             // Set the newRoot's nextChild to point to leftSib for the invariant below.
             BucketType* newRoot = _getBucket(newRootLoc);
@@ -1276,7 +1276,7 @@ namespace mongo {
                                             const DiskLoc bucketLoc) {
         invariant(bucketLoc != getRootLoc(txn));
 
-        _bucketDeletion->aboutToDeleteBucket(bucketLoc);
+        _bucketDeletion->aboutToDeleteBucket(bucketLoc.toRecordId());
 
         BucketType* p = getBucket(txn, bucket->parent);
         int parentIdx = indexInParent(txn, bucket, bucketLoc);
@@ -1290,7 +1290,7 @@ namespace mongo {
                                                 const DiskLoc bucketLoc) {
         bucket->n = BtreeLayout::INVALID_N_SENTINEL;
         bucket->parent.Null();
-        _recordStore->deleteRecord(txn, bucketLoc);
+        _recordStore->deleteRecord(txn, bucketLoc.toRecordId());
     }
 
     template <class BtreeLayout>
@@ -1451,7 +1451,7 @@ namespace mongo {
         invariant(bucket->n == 0 && !bucket->nextChild.isNull() );
         if (bucket->parent.isNull()) {
             invariant(getRootLoc(txn) == bucketLoc);
-            _headManager->setHead(txn, bucket->nextChild);
+            _headManager->setHead(txn, bucket->nextChild.toRecordId());
         }
         else {
             BucketType* parentBucket = getBucket(txn, bucket->parent);
@@ -1461,7 +1461,7 @@ namespace mongo {
         }
 
         *txn->recoveryUnit()->writing(&getBucket(txn, bucket->nextChild)->parent) = bucket->parent;
-        _bucketDeletion->aboutToDeleteBucket(bucketLoc);
+        _bucketDeletion->aboutToDeleteBucket(bucketLoc.toRecordId());
         deallocBucket(txn, bucket, bucketLoc);
     }
 
@@ -1967,7 +1967,7 @@ namespace mongo {
             p->nextChild = rLoc;
             assertValid(_indexName, p, _ordering);
             bucket->parent = L;
-            _headManager->setHead(txn, L);
+            _headManager->setHead(txn, L.toRecordId());
             *txn->recoveryUnit()->writing(&getBucket(txn, rLoc)->parent) = bucket->parent;
         }
         else {
@@ -2014,21 +2014,21 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "index already initialized");
         }
 
-        _headManager->setHead(txn, _addBucket(txn));
+        _headManager->setHead(txn, _addBucket(txn).toRecordId());
         return Status::OK();
     }
 
     template <class BtreeLayout>
     DiskLoc BtreeLogic<BtreeLayout>::_addBucket(OperationContext* txn) {
         DummyDocWriter docWriter(BtreeLayout::BucketSize);
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord(txn, &docWriter, false);
+        StatusWith<RecordId> loc = _recordStore->insertRecord(txn, &docWriter, false);
         // XXX: remove this(?) or turn into massert or sanely bubble it back up.
         uassertStatusOK(loc.getStatus());
 
         // this is a new bucket, not referenced by anyone, probably don't need this lock
         BucketType* b = btreemod(txn, getBucket(txn, loc.getValue()));
         init(b);
-        return loc.getValue();
+        return DiskLoc::fromRecordId(loc.getValue());
     }
 
     // static
@@ -2474,12 +2474,12 @@ namespace mongo {
 
     template <class BtreeLayout>
     typename BtreeLogic<BtreeLayout>::BucketType*
-    BtreeLogic<BtreeLayout>::getBucket(OperationContext* txn, const DiskLoc dl) const {
-        if (dl.isNull()) {
+    BtreeLogic<BtreeLayout>::getBucket(OperationContext* txn, const RecordId id) const {
+        if (id.isNull()) {
             return NULL;
         }
 
-        RecordData recordData = _recordStore->dataFor(txn, dl);
+        RecordData recordData = _recordStore->dataFor(txn, id);
 
         // we need to be working on the raw bytes, not a transient copy
         invariant(!recordData.isOwned());
@@ -2496,7 +2496,7 @@ namespace mongo {
     template <class BtreeLayout>
     DiskLoc
     BtreeLogic<BtreeLayout>::getRootLoc(OperationContext* txn) const {
-        return _headManager->getHead(txn);
+        return DiskLoc::fromRecordId(_headManager->getHead(txn));
     }
 
     template <class BtreeLayout>

@@ -41,10 +41,10 @@ namespace mongo {
     //
     CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( OperationContext* txn,
                                                               const CappedRecordStoreV1* collection,
-                                                              const DiskLoc& start, bool tailable,
+                                                              const RecordId& start, bool tailable,
                                                               const CollectionScanParams::Direction& dir)
-        : _txn(txn), _recordStore(collection), _curr(start), _tailable(tailable),
-          _direction(dir), _killedByInvalidate(false) {
+        : _txn(txn), _recordStore(collection), _curr(DiskLoc::fromRecordId(start))
+        , _tailable(tailable), _direction(dir), _killedByInvalidate(false) {
 
         if (_curr.isNull()) {
 
@@ -84,9 +84,9 @@ namespace mongo {
 
     bool CappedRecordStoreV1Iterator::isEOF() { return _curr.isNull(); }
 
-    DiskLoc CappedRecordStoreV1Iterator::curr() { return _curr; }
+    RecordId CappedRecordStoreV1Iterator::curr() { return _curr.toRecordId(); }
 
-    DiskLoc CappedRecordStoreV1Iterator::getNext() {
+    RecordId CappedRecordStoreV1Iterator::getNext() {
         DiskLoc ret = _curr;
 
         // Move to the next thing.
@@ -107,10 +107,11 @@ namespace mongo {
             }
         }
 
-        return ret;
+        return ret.toRecordId();
     }
 
-    void CappedRecordStoreV1Iterator::invalidate(const DiskLoc& dl) {
+    void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
+        const DiskLoc dl = DiskLoc::fromRecordId(id);
         if ((_tailable && _curr.isNull() && dl == _prev) || (dl == _curr)) {
             // In the _tailable case, we're about to kill the DiskLoc that we're tailing.  Nothing
             // that we can possibly do to survive that.
@@ -219,7 +220,7 @@ namespace mongo {
         return _recordStore->lastRecord(_txn);
     }
 
-    RecordData CappedRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
+    RecordData CappedRecordStoreV1Iterator::dataFor( const RecordId& loc ) const {
         return _recordStore->dataFor( _txn, loc );
     }
 

@@ -158,7 +158,7 @@ namespace mongo {
         }
 
         for (int i = _changes.size() - 1; i >= changesRollbackTo; i--) {
-            const type_info& type = typeid(*_changes[i]);
+            const std::type_info& type = typeid(*_changes[i]);
             log() << "CUSTOM ROLLBACK " << demangleName(type);
             _changes[i]->rollback();
         }
@@ -189,7 +189,7 @@ namespace mongo {
         invariant(inAUnitOfWork());
 
         if (len == 0) return data; // Don't need to do anything for empty ranges.
-        invariant(len < size_t(numeric_limits<int>::max()));
+        invariant(len < size_t(std::numeric_limits<int>::max()));
 
         // Windows requires us to adjust the address space *before* we write to anything.
         privateViews.makeWritable(data, len);

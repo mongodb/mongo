@@ -336,7 +336,11 @@ namespace mongo {
                 }
             }
             else if (META_DISKLOC == it->second) {
-                bob.append(it->first, member->loc.toBSONObj());
+                // For compatibility with old versions, we output as a split DiskLoc.
+                const int64_t repr = member->loc.repr();
+                BSONObjBuilder sub(bob.subobjStart(it->first));
+                sub.append("file", int(repr >> 32));
+                sub.append("offset", int(uint32_t(repr)));
             }
         }
 

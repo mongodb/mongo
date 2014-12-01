@@ -38,6 +38,7 @@
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
+#include <utility>
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage_options.h"
@@ -51,6 +52,7 @@
 using namespace mongoutils;
 
 namespace mongo {
+    using std::pair;
 
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);
@@ -238,21 +240,21 @@ namespace mongo {
     }
 
     bool DurableMappedFile::open(const std::string& fname, bool sequentialHint) {
-        LOG(3) << "mmf open " << fname << endl;
+        LOG(3) << "mmf open " << fname;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool DurableMappedFile::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
-        LOG(3) << "mmf create " << fname << endl;
+        LOG(3) << "mmf create " << fname;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool DurableMappedFile::finishOpening() {
-        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
+        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length();
         if( _view_write ) {
             if (storageGlobalParams.dur) {
                 scoped_lock lk2(privateViews._mutex());
@@ -281,7 +283,7 @@ namespace mongo {
 
     DurableMappedFile::~DurableMappedFile() {
         try { 
-            LOG(3) << "mmf close " << filename() << endl;
+            LOG(3) << "mmf close " << filename();
 
             // Only notifiy the durability system if the file was actually opened
             if (view_write()) {
@@ -293,6 +295,6 @@ namespace mongo {
             _view_write = _view_private = 0;
             MemoryMappedFile::close();
         }
-        catch(...) { error() << "exception in ~DurableMappedFile" << endl; }
+        catch(...) { error() << "exception in ~DurableMappedFile"; }
     }
 }

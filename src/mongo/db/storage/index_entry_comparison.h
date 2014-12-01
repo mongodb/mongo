@@ -103,8 +103,8 @@ namespace mongo {
         static BSONObj makeQueryObject(const BSONObj& keyPrefix,
                                        int prefixLen,
                                        bool prefixExclusive,
-                                       const vector<const BSONElement*>& keySuffix,
-                                       const vector<bool>& suffixInclusive,
+                                       const std::vector<const BSONElement*>& keySuffix,
+                                       const std::vector<bool>& suffixInclusive,
                                        const int cursorDirection);
 
     private:

@@ -134,9 +134,9 @@ namespace mongo {
         } catch (AssertionException& e) {
             log() << "Assertion failure: _unindex failed "
                   << _descriptor->indexNamespace() << endl;
-            log() << "Assertion failure: _unindex failed: " << e.what() << '\n';
-            log() << "  key:" << key.toString() << '\n';
-            log() << "  dl:" << loc.toString() << endl;
+            log() << "Assertion failure: _unindex failed: " << e.what()
+                  << "  key:" << key.toString()
+                  << "  dl:" << loc;
             logContext();
         }
     }

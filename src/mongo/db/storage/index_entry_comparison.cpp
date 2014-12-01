@@ -27,6 +27,7 @@
  */
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 
 namespace mongo {
@@ -104,11 +105,11 @@ namespace mongo {
     // reading the comment in the .h file is highly recommended if you need to understand what this
     // function is doing
     BSONObj IndexEntryComparison::makeQueryObject(const BSONObj& keyPrefix,
-                                                        int prefixLen,
-                                                        bool prefixExclusive,
-                                                        const vector<const BSONElement*>& keySuffix,
-                                                        const vector<bool>& suffixInclusive,
-                                                        const int cursorDirection) {
+                                                  int prefixLen,
+                                                  bool prefixExclusive,
+                                                  const std::vector<const BSONElement*>& keySuffix,
+                                                  const std::vector<bool>& suffixInclusive,
+                                                  const int cursorDirection) {
 
         // Please read the comments in the header file to see why this is done.
         // The basic idea is that we use the field name to store a byte which indicates whether

@@ -132,34 +132,34 @@ namespace mongo {
                                      BSONObjBuilder* extraInfo = NULL,
                                      int level = 0 ) const;
 
-        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
 
-        virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* rd ) const;
+        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* rd ) const;
 
         void deleteRecord( OperationContext* txn,
-                           const DiskLoc& dl );
+                           const RecordId& dl );
 
         virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
-                                                 const DiskLoc& loc ) const;
+                                                 const RecordId& loc ) const;
 
-        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
-                                          const char* data,
-                                          int len,
-                                          bool enforceQuota );
+        StatusWith<RecordId> insertRecord( OperationContext* txn,
+                                           const char* data,
+                                           int len,
+                                           bool enforceQuota );
 
-        StatusWith<DiskLoc> insertRecord( OperationContext* txn,
-                                          const DocWriter* doc,
-                                          bool enforceQuota );
+        StatusWith<RecordId> insertRecord( OperationContext* txn,
+                                           const DocWriter* doc,
+                                           bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
-                                                  const char* data,
-                                                  int len,
-                                                  bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier );
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                   const RecordId& oldLocation,
+                                                   const char* data,
+                                                   int len,
+                                                   bool enforceQuota,
+                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
@@ -248,10 +248,10 @@ namespace mongo {
          * internal
          * doesn't check inputs or change padding
          */
-        StatusWith<DiskLoc> _insertRecord( OperationContext* txn,
-                                           const char* data,
-                                           int len,
-                                           bool enforceQuota );
+        StatusWith<RecordId> _insertRecord( OperationContext* txn,
+                                            const char* data,
+                                            int len,
+                                            bool enforceQuota );
 
         scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;
@@ -275,17 +275,17 @@ namespace mongo {
 
         virtual bool isEOF() { return _curr.isNull(); }
 
-        virtual DiskLoc curr() { return _curr; }
+        virtual RecordId curr() { return _curr.toRecordId(); }
 
-        virtual DiskLoc getNext( );
+        virtual RecordId getNext( );
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
 
         virtual void saveState() {}
 
         virtual bool restoreState(OperationContext* txn) { return true; }
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(_txn, loc); }
+        virtual RecordData dataFor( const RecordId& loc ) const { return _rs->dataFor(_txn, loc); }
 
     private:
         virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }

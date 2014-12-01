@@ -508,7 +508,7 @@ namespace mongo {
                                             const BSONObj& key,
                                             const RecordId& loc) {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
-        cursor->locate(key, RecordId(0, 0));
+        cursor->locate(key, RecordId::min());
 
         if (cursor->isEOF() || cursor->getKey() != key || cursor->getRecordId() == loc) {
             return Status::OK();

@@ -48,8 +48,8 @@ namespace {
 
     class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
     public:
-        Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
-            deleted.push_back( loc );
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) {
+            deleted.push_back( DiskLoc::fromRecordId(loc) );
             return Status::OK();
         }
         vector<DiskLoc> deleted;
@@ -625,7 +625,7 @@ namespace {
         void walkAndCount (int expectedCount) {
             // Walk the collection going forward.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
                                                CollectionScanParams::FORWARD);
 
                 int resultCount = 0;
@@ -639,7 +639,7 @@ namespace {
 
             // Walk the collection going backwards.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, DiskLoc(), false,
+                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
                                                CollectionScanParams::BACKWARD);
 
                 int resultCount = expectedCount;

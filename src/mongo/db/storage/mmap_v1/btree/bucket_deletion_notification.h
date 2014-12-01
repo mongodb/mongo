@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/storage/mmap_v1/diskloc.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -46,7 +46,7 @@ namespace mongo {
          * notification may be invoked on multiple threads, so it is up to the implementor
          * to ensure thread-safety.
          */
-        virtual void aboutToDeleteBucket(const DiskLoc& bucket) { }
+        virtual void aboutToDeleteBucket(const RecordId& bucket) { }
 
         virtual ~BucketDeletionNotification() { }
     };

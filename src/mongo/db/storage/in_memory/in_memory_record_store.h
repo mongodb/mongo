@@ -131,8 +131,8 @@ namespace mongo {
             return _data->records.size();
         }
 
-        virtual RecordId oplogStartHack(OperationContext* txn,
-                                       const RecordId& startingPosition) const;
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const;
 
     protected:
         struct InMemoryRecord {
