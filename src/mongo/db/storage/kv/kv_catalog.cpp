@@ -88,11 +88,11 @@ namespace {
     KVCatalog::KVCatalog( RecordStore* rs,
                           bool isRsThreadSafe,
                           bool directoryPerDb,
-                          bool splitCollectionAndIndexes )
+                          bool directoryForIndexes )
         : _rs( rs )
         , _isRsThreadSafe(isRsThreadSafe)
         , _directoryPerDb(directoryPerDb)
-        , _splitCollectionAndIndexes(splitCollectionAndIndexes)
+        , _directoryForIndexes(directoryForIndexes)
         , _rand(_newRand())
     {}
 
@@ -121,7 +121,7 @@ namespace {
             buf << nsToDatabaseSubstring( ns ) << '/';
         }
         buf << kind;
-        buf << ( _splitCollectionAndIndexes ? '/' : '_' );
+        buf << ( _directoryForIndexes ? '/' : '-' );
         buf << _next.fetchAndAdd(1) << '-' << _rand;
         return buf.str();
     }
@@ -429,7 +429,11 @@ namespace {
     }
 
     bool KVCatalog::isUserDataIdent( const StringData& ident ) const {
-        return ident.startsWith( "index-" ) || ident.startsWith( "collection-" );
+        return
+            ident.find( "index-" ) != std::string::npos ||
+            ident.find( "index/" ) != std::string::npos ||
+            ident.find( "collection-" ) != std::string::npos ||
+            ident.find( "collection/" ) != std::string::npos;
     }
 
 }

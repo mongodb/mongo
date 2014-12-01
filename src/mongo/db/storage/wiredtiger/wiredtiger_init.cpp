@@ -63,6 +63,8 @@ namespace mongo {
 
                 KVStorageEngineOptions options;
                 options.directoryPerDB = params.directoryperdb;
+                options.directoryForIndexes =
+                    wiredTigerGlobalOptions.directoryForIndexes;
                 return new KVStorageEngine( kv, options );
             }
 

@@ -93,7 +93,7 @@ namespace mongo {
             _catalog.reset( new KVCatalog( _catalogRecordStore.get(),
                                            _supportsDocLocking,
                                            _options.directoryPerDB,
-                                           _options.splitCollectionAndIndexes) );
+                                           _options.directoryForIndexes) );
             _catalog->init( &opCtx );
 
             std::vector<std::string> collections;

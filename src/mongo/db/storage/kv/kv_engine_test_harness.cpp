@@ -226,6 +226,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
             ASSERT_NOT_EQUALS( "a.b", catalog->getCollectionIdent( "a.b" ) );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
             uow.commit();
         }
 
@@ -252,6 +253,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             ASSERT_EQUALS( idxIndent, catalog->getIndexIdent( &opCtx, "a.b", "foo" ) );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
         }
 
         {
@@ -296,6 +298,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
             ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
             uow.commit();
         }
 
@@ -311,6 +314,7 @@ namespace mongo {
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
             uow.commit();
         }
 
@@ -336,6 +340,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
             ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "collection/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
             uow.commit();
         }
 
@@ -351,6 +356,7 @@ namespace mongo {
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "index/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
             uow.commit();
         }
 
@@ -376,6 +382,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
             ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/collection/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
             uow.commit();
         }
 
@@ -391,6 +398,7 @@ namespace mongo {
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/index/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
             uow.commit();
         }
 

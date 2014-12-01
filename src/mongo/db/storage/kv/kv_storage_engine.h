@@ -49,10 +49,10 @@ namespace mongo {
     struct KVStorageEngineOptions {
         KVStorageEngineOptions() :
             directoryPerDB(false),
-            splitCollectionAndIndexes(false) {}
+            directoryForIndexes(false) {}
 
         bool directoryPerDB;
-        bool splitCollectionAndIndexes;
+        bool directoryForIndexes;
     };
 
     class KVStorageEngine : public StorageEngine {
