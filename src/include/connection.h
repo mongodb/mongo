@@ -249,10 +249,10 @@ struct __wt_connection_impl {
 
 	int		 logging;	/* Global logging configuration */
 	int		 archive;	/* Global archive configuration */
-	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
-	WT_SESSION_IMPL *arch_session;	/* Log archive session */
-	wt_thread_t	 arch_tid;	/* Log archive thread */
-	int		 arch_tid_set;	/* Log archive thread set */
+	WT_CONDVAR	*log_cond;	/* Log archive wait mutex */
+	WT_SESSION_IMPL *log_session;	/* Log archive session */
+	wt_thread_t	 log_tid;	/* Log archive thread */
+	int		 log_tid_set;	/* Log archive thread set */
 	WT_LOG		*log;		/* Logging structure */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */

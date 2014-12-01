@@ -533,8 +533,8 @@ common_wiredtiger_open = [
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
 	    Config('prealloc', '2', r'''
-	        number of pre-allocated log files after archiving.
-                Requires archiving to be enabled.''',
+	        number of pre-allocated log files.
+                May increase if actual usage does not keep up.''',
 	        min='0'),
 	    ]),
 	Config('mmap', 'true', r'''

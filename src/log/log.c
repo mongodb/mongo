@@ -21,8 +21,8 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 	conn = S2C(session);
 	log = conn->log;
 	log->ckpt_lsn = *ckp_lsn;
-	if (conn->arch_cond != NULL)
-		WT_RET(__wt_cond_signal(session, conn->arch_cond));
+	if (conn->log_cond != NULL)
+		WT_RET(__wt_cond_signal(session, conn->log_cond));
 	return (0);
 }
 
