@@ -1075,18 +1075,14 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	/*
 	 * The first page in the split is the current page, but we still need to
-	 * create a replacement WT_REF (the original is set to split-status and
-	 * eventually freed).
+	 * create a replacement WT_REF and make a copy of the key (the original
+	 * WT_REF is set to split-status and eventually freed).
+	 *
+	 * The new reference is visible to readers once the split completes.
 	 */
 	WT_ERR(__wt_calloc_def(session, 1, &split_ref[0]));
 	child = split_ref[0];
 	*child = *ref;
-
-	/*
-	 * The new reference will be visible to readers once the split
-	 * completes.  Make a copy of the key: the old reference will
-	 * eventually be freed.
-	 */
 	child->state = WT_REF_MEM;
 	__wt_ref_key(page, ref, &key, &size);
 	WT_ERR(__wt_row_ikey(session, 0, key, size, &child->key.ikey));
@@ -1105,8 +1101,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	child->page = right;
 	child->state = WT_REF_MEM;
 	WT_ERR(__wt_row_ikey(session, 0,
-	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins),
-	    &child->key.ikey));
+	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &child->key.ikey));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
 	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(ins));
@@ -1170,7 +1165,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 *   4) If the tail is the item being moved, remove it.
 	 *   5) Drop down a level, and go to step 3 until at level 0.
 	 */
-	prev_ins = NULL;
+	prev_ins = NULL;		/* -Wconditional-uninitialized */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
 	    i >= 0;
 	    i--, insp--) {
@@ -1205,7 +1200,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
-	 * Verify the moved insert item appears nowhere on the insert list.
+	 * Verify the moved insert item appears nowhere on the skip list.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
 	    i >= 0;
