@@ -81,6 +81,7 @@ namespace mongo {
         WiredTigerSession* getSession();
         WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
         bool inActiveTxn() const { return _active; }
+        void assertInActiveTxn() const;
 
         bool everStartedWrite() const { return _everStartedWrite; }
         int depth() const { return _depth; }
@@ -134,6 +135,8 @@ namespace mongo {
         WT_SESSION* getWTSession();
 
         void reset();
+
+        void assertInActiveTxn() const { _ru->assertInActiveTxn(); }
 
     private:
         void _init( const std::string& uri, uint64_t uriID, WiredTigerRecoveryUnit* ru );

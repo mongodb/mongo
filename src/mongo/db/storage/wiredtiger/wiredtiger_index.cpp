@@ -234,6 +234,7 @@ namespace {
             return s;
 
         WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
 
         return _insert( c, key, loc, dupsAllowed );
@@ -248,6 +249,7 @@ namespace {
         dassert(!hasFieldNames(key));
 
         WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
 

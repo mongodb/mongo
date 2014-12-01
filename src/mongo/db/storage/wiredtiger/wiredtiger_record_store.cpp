@@ -344,6 +344,7 @@ namespace {
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const RecordId& loc ) {
         WiredTigerCursor cursor( _uri, _instanceId, txn );
+        cursor.assertInActiveTxn();
         WT_CURSOR *c = cursor.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -496,6 +497,7 @@ namespace {
         }
 
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
 
@@ -551,6 +553,7 @@ namespace {
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
@@ -599,6 +602,7 @@ namespace {
         WiredTigerItem value(data);
 
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         c->set_value(c, value.Get());
