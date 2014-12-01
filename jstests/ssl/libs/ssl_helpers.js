@@ -1,46 +1,49 @@
 //=== Shared SSL testing library functions and constants ===
 
-var KEYFILE = "jstests/libs/key1"
-var SERVER_CERT = "jstests/libs/server.pem"
-var CA_CERT = "jstests/libs/ca.pem"
-var CLIENT_CERT = "jstests/libs/client.pem"
+var KEYFILE = "jstests/libs/key1";
+var SERVER_CERT = "jstests/libs/server.pem";
+var CA_CERT = "jstests/libs/ca.pem";
+var CLIENT_CERT = "jstests/libs/client.pem";
 
 // Note: "sslAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
-disabled = {sslMode: "disabled"};
-allowSSL = {sslMode : "allowSSL",
+var disabled = {sslMode: "disabled"};
+var allowSSL = {sslMode : "allowSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile : SERVER_CERT,
     sslCAFile: CA_CERT};
-preferSSL = {sslMode : "preferSSL",
+var preferSSL = {sslMode : "preferSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile :  SERVER_CERT,
     sslCAFile: CA_CERT};
-requireSSL = {sslMode : "requireSSL",
+var requireSSL = {sslMode : "requireSSL",
     sslAllowInvalidCertificates: "",
     sslPEMKeyFile : SERVER_CERT,
     sslCAFile: CA_CERT};
 
 // Test if ssl replset  configs work
+
+var replSetTestFile = "jstests/replsets/replset1.js";
+
 var replShouldSucceed = function(opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
     // try running this file using the given config
-    load("jstests/replsets/replset1.js");
-}
+    load(replSetTestFile);
+};
 
 // Test if ssl replset configs fail
 var replShouldFail = function(opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
     replTest = null;
-    assert.throws(load,["jstests/replsets/replset1.js"],
+    assert.throws(load,[replSetTestFile],
                   "This setup should have failed");
     // clean up to continue running...
     if (replTest) {
         replTest.stopSet(15);
     }
-}
+};
 
 /**
  * Takes in two mongod/mongos configuration options and runs a basic
@@ -61,7 +64,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 
         r = st.adminCommand({ movePrimary: 'test', to: 'shard0001' });
 
-        db1 = st.getDB("test");
+        var db1 = st.getDB("test");
         r = st.adminCommand({ shardCollection : "test.col" , key : { _id : 1 } });
         assert.eq(r, true, "error sharding collection for this configuration");
 
@@ -103,25 +106,25 @@ function mixedShardTest(options1, options2, shouldSucceed) {
 //
 
 ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
-    options = options || {}
+    options = options || {};
 
-    var nodes = this.nodes
-    var primary = this.getPrimary()
+    var nodes = this.nodes;
+    var primary = this.getPrimary();
 
     // Upgrade secondaries first
-    var nodesToUpgrade = this.getSecondaries()
+    var nodesToUpgrade = this.getSecondaries();
 
     // Then upgrade primaries
-    nodesToUpgrade.push( primary )
+    nodesToUpgrade.push( primary );
 
     // We can upgrade with no primary downtime if we have enough nodes
-    var noDowntimePossible = nodes.length > 2
+    var noDowntimePossible = nodes.length > 2;
 
     for( var i = 0; i < nodesToUpgrade.length; i++ ){
-        var node = nodesToUpgrade[ i ]
+        var node = nodesToUpgrade[ i ];
         if( node == primary ){
-            node = this.stepdown( node )
-            primary = this.getPrimary()
+            node = this.stepdown( node );
+            primary = this.getPrimary();
         }
 
         var prevPrimaryId = this.getNodeId( primary );
@@ -130,50 +133,50 @@ ReplSetTest.prototype.upgradeSet = function( options, user, pwd ){
             this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
         }
         printjson(this.nodeOptions);
-        this.upgradeNode( node, options, true, user, pwd )
+        this.upgradeNode( node, options, true, user, pwd );
 
         if( noDowntimePossible )
-            assert.eq( this.getNodeId( primary ), prevPrimaryId )
+            assert.eq( this.getNodeId( primary ), prevPrimaryId );
     }
-}
+};
 
 ReplSetTest.prototype.upgradeNode = function( node, opts, waitForState, user, pwd ){
-    var node = this.restart( node, opts )
+    var newNode = this.restart( node, opts );
     if (user != undefined) {
-        node.getDB("admin").auth(user, pwd);
+        newNode.getDB("admin").auth(user, pwd);
     }
     // By default, wait for primary or secondary state
-    if( waitForState == undefined ) waitForState = true
+    if( waitForState == undefined ) waitForState = true;
     if( waitForState == true ) waitForState = [ ReplSetTest.State.PRIMARY,
                                                 ReplSetTest.State.SECONDARY,
-                                                ReplSetTest.State.ARBITER ]
+                                                ReplSetTest.State.ARBITER ];
     if( waitForState )
-        this.waitForState( node, waitForState )
+        this.waitForState( newNode, waitForState );
 
-    return node
-}
+    return newNode;
+};
 
 ReplSetTest.prototype.stepdown = function( nodeId ){
-    nodeId = this.getNodeId( nodeId )
-    assert.eq( this.getNodeId( this.getPrimary() ), nodeId )
-    var node = this.nodes[ nodeId ]
+    nodeId = this.getNodeId( nodeId );
+    assert.eq( this.getNodeId( this.getPrimary() ), nodeId );
+    var node = this.nodes[ nodeId ];
     try {
-        node.getDB("admin").runCommand({ replSetStepDown: 50, force : true })
-        assert( false )
+        node.getDB("admin").runCommand({ replSetStepDown: 50, force : true });
+        assert( false );
     }
     catch( e ){
         printjson( e );
     }
-    return this.reconnect( node )
-}
+    return this.reconnect( node );
+};
 
 ReplSetTest.prototype.reconnect = function( node ){
-    var nodeId = this.getNodeId( node )
-    this.nodes[ nodeId ] = new Mongo( node.host )
-    var except = {}
+    var nodeId = this.getNodeId( node );
+    this.nodes[ nodeId ] = new Mongo( node.host );
+    var except = {};
     for( var i in node ){
-        if( typeof( node[i] ) == "function" ) continue
-        this.nodes[ nodeId ][ i ] = node[ i ]
+        if( typeof( node[i] ) == "function" ) continue;
+        this.nodes[ nodeId ][ i ] = node[ i ];
     }
-    return this.nodes[ nodeId ]
-}
+    return this.nodes[ nodeId ];
+};

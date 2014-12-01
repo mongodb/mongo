@@ -40,7 +40,7 @@ doTest = function( signal ) {
     replTest.awaitReplication();
 
 
-    cppconn = new Mongo( replTest.getURL() ).getDB( "foo" );
+    var cppconn = new Mongo( replTest.getURL() ).getDB( "foo" );
     assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 1" );
 
     {
@@ -75,7 +75,7 @@ doTest = function( signal ) {
     bulk.execute();
 
     // Here's how to restart the old master node:
-    slave = replTest.restart(master_id);
+    var slave = replTest.restart(master_id);
 
 
     // Now, let's make sure that the old master comes up as a slave
@@ -94,10 +94,10 @@ doTest = function( signal ) {
 
     // And that both slave nodes have all the updates
     new_master = replTest.getMaster();
-    assert.eq( 1000 , new_master.getDB( "bar" ).runCommand( { count:"bar"} ).n , "assumption 2")
+    assert.eq( 1000 , new_master.getDB( "bar" ).runCommand( { count:"bar"} ).n , "assumption 2");
     replTest.awaitReplication();
 
-    slaves = replTest.liveNodes.slaves;
+    var slaves = replTest.liveNodes.slaves;
     assert( slaves.length == 2, "Expected 2 slaves but length was " + slaves.length );
     slaves.forEach(function(slave) {
         slave.setSlaveOk();
@@ -111,30 +111,30 @@ doTest = function( signal ) {
     slaves = replTest.liveNodes.slaves;
     printjson(replTest.liveNodes);
 
-    db = master.getDB("foo")
-    t = db.foo
+    var db = master.getDB("foo");
+    var t = db.foo;
 
-    ts = slaves.map( function(z){ z.setSlaveOk(); return z.getDB( "foo" ).foo; } )
+    var ts = slaves.map( function(z){ z.setSlaveOk(); return z.getDB( "foo" ).foo; } );
 
     t.save({a: 1000});
-    t.ensureIndex( { a : 1 } )
+    t.ensureIndex( { a : 1 } );
 
-    result = db.runCommand({getLastError : 1, w: 3 , wtimeout :30000 })
+    var result = db.runCommand({getLastError : 1, w: 3 , wtimeout :30000 });
     printjson(result);
-    lastOp = result.lastOp;
-    lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
+    var lastOp = result.lastOp;
+    var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
     assert.eq(lastOplogOp['ts'], lastOp);
 
-    ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } )
+    ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } );
 
-    t.reIndex()
+    t.reIndex();
 
-    db.getLastError( 3 , 30000 )
-    ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } )
+    db.getLastError( 3 , 30000 );
+    ts.forEach( function(z){ assert.eq( 2 , z.getIndexKeys().length , "A " + z.getMongo() ); } );
 
     // Shut down the set and finish the test.
     replTest.stopSet( signal );
-}
+};
 
 doTest( 15 );
 print("replset1.js SUCCESS");

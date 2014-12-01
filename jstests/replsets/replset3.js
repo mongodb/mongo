@@ -1,6 +1,5 @@
-
-doTest = function (signal) {
-
+var doTest = function (signal) {
+    "use strict";
     // Test replica set step down
 
     // Replica set testing API
@@ -54,10 +53,10 @@ doTest = function (signal) {
 
     print(phase++);
 
-    slaves = replTest.liveNodes.slaves;
+    var slaves = replTest.liveNodes.slaves;
     assert.soon(function () {
         try {
-            res = slaves[0].getDB("admin").runCommand({ replSetGetStatus: 1 })
+            var res = slaves[0].getDB("admin").runCommand({ replSetGetStatus: 1 });
         } catch (err) { }
         return res.myState == 2;
     }, "Slave 0 state not ready.");
@@ -66,7 +65,7 @@ doTest = function (signal) {
 
     assert.soon(function () {
         try {
-            res = slaves[1].getDB("admin").runCommand({ replSetGetStatus: 1 })
+            var res = slaves[1].getDB("admin").runCommand({ replSetGetStatus: 1 });
         } catch (err) { }
         return res.myState == 2;
     }, "Slave 1 state not ready.");
@@ -74,6 +73,6 @@ doTest = function (signal) {
     print("replset3.js SUCCESS");
 
     replTest.stopSet(15);
-}
+};
 
 doTest( 15 );
