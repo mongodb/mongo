@@ -3,6 +3,7 @@ if (typeof getToolTest === 'undefined') {
 }
 
 (function() {
+  resetDbpath('dump');
   var toolTest = getToolTest('dbFlagTest');
   var commonToolArgs = getCommonToolArguments();
   var db = toolTest.db.getSiblingDB('foo');

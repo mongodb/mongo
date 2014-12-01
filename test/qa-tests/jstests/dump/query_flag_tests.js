@@ -3,6 +3,7 @@ if (typeof getToolTest === 'undefined') {
 }
 
 (function() {
+  resetDbpath('dump');
   var toolTest = getToolTest('outFlagTest');
   var commonToolArgs = getCommonToolArguments();
   var db = toolTest.db.getSiblingDB('foo');
@@ -19,24 +20,23 @@ if (typeof getToolTest === 'undefined') {
   db.getSiblingDB('baz').bar.insert({ x: 2 });
 
     // Running mongodump with '--query' specified but no '--db' should fail
-  var dumpArgs = ['dump', '--collection', 'bar', '--query', '{ x:{ $gt:0 } }'].
-    concat(commonToolArgs);
+  var dumpArgs = ['dump', '--collection', 'bar',
+    '--query', '"{ x: { $gt:0 } }"'].concat(commonToolArgs);
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump should exit with a non-zero status when --query is ' +
     'specified but --db isn\'t');
 
   // Running mongodump with '--query' specified but no '--collection' should
   // fail
-  var dumpArgs = ['dump', '--db', 'foo', '--query', '{ x:{ $gt:0 } }'].
+  var dumpArgs = ['dump', '--db', 'foo', '--query', '"{ x: { $gt:0 } }"'].
     concat(commonToolArgs);
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump should exit with a non-zero status when --query is ' +
     'specified but --collection isn\'t');
 
-  // Running mongodump with `--query` specified but no `--db` or `--collection`
-  // should scan all dbs and collections
+  // Running mongodump with '--query' should only get matching documents
   resetDbpath('dump');
-  var dumpArgs = ['dump', '--query', '{ x:{ $gt:0 } }', '--db', 'foo',
+  var dumpArgs = ['dump', '--query', '{ x: { $gt:0 } }', '--db', 'foo',
     '--collection', 'bar'].concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
     'mongodump should return exit status 0 when --db, --collection, and ' +
