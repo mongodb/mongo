@@ -992,6 +992,9 @@ err:	if (locked)
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during parent page split");
 	return (ret == WT_PANIC || !complete ? ret : 0);
 }
 
@@ -1246,6 +1249,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during insert page split");
 	return (ret == WT_PANIC ? WT_PANIC : 0);
 
 err:	if (split_ref[0] != NULL)
@@ -1379,6 +1385,9 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during multi- page split");
 	return (ret == WT_PANIC ? WT_PANIC : 0);
 
 err:	/*
