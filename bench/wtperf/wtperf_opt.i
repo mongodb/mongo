@@ -105,7 +105,7 @@ DEF_OPT_AS_UINT32(database_count, 1,
     " threads")
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
-    "configured, each table has this many items inserted.")
+    "configured the count is spread evenly across all tables.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
