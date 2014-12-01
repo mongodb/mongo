@@ -50,7 +50,7 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual ReplSettings& getSettings();
+        virtual const ReplSettings& getSettings() const;
 
         virtual bool isReplEnabled() const;
 
@@ -188,7 +188,7 @@ namespace repl {
 
     private:
 
-        ReplSettings _settings;
+        const ReplSettings _settings;
     };
 
 } // namespace repl

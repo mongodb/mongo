@@ -352,7 +352,7 @@ namespace {
         _externalState->shutdown();
     }
 
-    ReplSettings& ReplicationCoordinatorImpl::getSettings() {
+    const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
         return _settings;
     }
 

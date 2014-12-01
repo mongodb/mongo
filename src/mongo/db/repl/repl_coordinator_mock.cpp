@@ -48,7 +48,7 @@ namespace repl {
         // TODO
     }
 
-    ReplSettings& ReplicationCoordinatorMock::getSettings() {
+    const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
         return _settings;
     }
 

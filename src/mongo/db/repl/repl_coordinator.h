@@ -106,10 +106,8 @@ namespace repl {
 
         /**
          * Returns a reference to the parsed command line arguments that are related to replication.
-         * TODO(spencer): Change this to a const ref once we are no longer using it for mutable
-         * global state.
          */
-        virtual ReplSettings& getSettings() = 0;
+        virtual const ReplSettings& getSettings() const = 0;
 
         enum Mode {
             modeNone = 0,

@@ -79,11 +79,6 @@ namespace repl {
 
         std::string rsIndexPrefetch;// --indexPrefetch
 
-        std::set<std::string> discoveredSeeds;
-        mutex discoveredSeeds_mx;
-
-        BSONObj reconfig;
-
         ReplSettings()
             : slave(NotSlave),
             master(false),
@@ -91,9 +86,7 @@ namespace repl {
             autoresync(false),
             slavedelay(),
             oplogSize(0),
-            pretouch(0),
-            discoveredSeeds(),
-            discoveredSeeds_mx("ReplSettings::discoveredSeeds") {
+            pretouch(0) {
         }
 
         // TODO(spencer): Remove explicit copy constructor after we no longer have mutable state
@@ -109,10 +102,7 @@ namespace repl {
             only(other.only),
             pretouch(other.pretouch),
             replSet(other.replSet),
-            rsIndexPrefetch(other.rsIndexPrefetch),
-            discoveredSeeds(other.discoveredSeeds),
-            discoveredSeeds_mx("ReplSettings::discoveredSeeds"),
-            reconfig(other.reconfig.getOwned()) {}
+            rsIndexPrefetch(other.rsIndexPrefetch) {}
 
         ReplSettings& operator=(const ReplSettings& other) {
             if (this == &other) return *this;
@@ -128,8 +118,6 @@ namespace repl {
             pretouch = other.pretouch;
             replSet = other.replSet;
             rsIndexPrefetch = other.rsIndexPrefetch;
-            discoveredSeeds = other.discoveredSeeds;
-            reconfig = other.reconfig.getOwned();
             return *this;
         }
 

@@ -82,7 +82,7 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual ReplSettings& getSettings();
+        virtual const ReplSettings& getSettings() const;
 
         virtual Mode getReplicationMode() const;
 
@@ -763,10 +763,7 @@ namespace repl {
         unordered_set<HostAndPort> _seedList;                                             // (X)
 
         // Parsed command line arguments related to replication.
-        // TODO(spencer): Currently there is global mutable state
-        // in ReplSettings, but we should be able to get rid of that after the legacy repl
-        // coordinator is gone. At that point we can make this const.
-        ReplSettings _settings;                                                           // (R)
+        const ReplSettings _settings;                                                     // (R)
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;                                 // (X)
