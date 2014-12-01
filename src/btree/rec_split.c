@@ -1035,8 +1035,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * Ignore small pages.
 	 *
 	 * XXX KEITH
-	 * Need a better test for append-only workloads. Maybe set the page
-	 * WT_PAGE_SPLIT_INSERT flag when we insert and it's not an append?
+	 * Need a better test for append-only workloads.
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF)
 		return (0);
