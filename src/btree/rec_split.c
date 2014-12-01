@@ -1088,7 +1088,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	child->state = WT_REF_MEM;
 	__wt_ref_key(page, ref, &key, &size);
-	WT_RET(__wt_row_ikey(session, 0, key, size, &child->key.ikey));
+	WT_ERR(__wt_row_ikey(session, 0, key, size, &child->key.ikey));
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
