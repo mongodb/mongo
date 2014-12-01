@@ -13,6 +13,10 @@ doTest = function( signal ) {
     // This will wait for initiation
     replTest.initiate();
 
+    // Wait for at least one heartbeat to reach everyone, so that we will properly mark nodes as
+    // DOWN, later.
+    replTest.awaitSecondaryNodes();
+
     // Call getMaster to return a reference to the node that's been
     // elected master.
     var master = replTest.getMaster();
