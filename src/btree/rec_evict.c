@@ -284,6 +284,24 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		 * valid memory.
 		 */
 		__wt_evict_list_clear_page(session, ref);
+
+		/*
+		 * Check for an append-only workload needing an in-memory split.
+		 *
+		 * We can't do this earlier because in-memory splits require
+		 * exclusive access.  If an in-memory split completes, the page
+		 * stays in memory and the tree is left in the desired state:
+		 * avoid the usual cleanup.
+		 *
+		 * Attempt the split before checking whether a checkpoint is
+		 * running - that's not a problem here because we aren't
+		 * evicting any dirty pages.
+		 */
+		if (top) {
+			WT_RET(__wt_split_insert(session, ref, inmem_splitp));
+			if (*inmem_splitp)
+				return (0);
+		}
 	}
 
 	/*
@@ -372,19 +390,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
 		return (EBUSY);
-
-	/*
-	 * Check for an append-only workload needing an in-memory split.
-	 *
-	 * We can't do this earlier because in-memory splits require exclusive
-	 * access.  If an in-memory split completes, the page stays in memory
-	 * and the tree is left in the desired state: avoid the usual cleanup.
-	 */
-	if (top && !exclusive) {
-		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
-		if (*inmem_splitp)
-			return (0);
-	}
 
 	/*
 	 * If the page is dirty and can possibly change state, write it so we
