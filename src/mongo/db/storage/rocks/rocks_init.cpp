@@ -46,7 +46,7 @@ namespace mongo {
                 KVStorageEngineOptions options;
                 options.directoryPerDB = params.directoryperdb;
                 options.forRepair = params.repair;
-                return new KVStorageEngine(new RocksEngine(params.dbpath), options);
+                return new KVStorageEngine(new RocksEngine(params.dbpath, params.dur), options);
             }
 
             virtual StringData getCanonicalName() const {

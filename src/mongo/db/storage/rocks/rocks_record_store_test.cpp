@@ -73,7 +73,7 @@ namespace mongo {
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new RocksRecoveryUnit(&_transactionEngine, _db.get());
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), true);
         }
 
     private:

@@ -65,7 +65,7 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize( OperationContext* txn ) const { return _dataSize; }
+        virtual long long dataSize(OperationContext* txn) const { return _dataSize.load(); }
 
         virtual long long numRecords( OperationContext* txn ) const;
 
@@ -150,16 +150,9 @@ namespace mongo {
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
-        /**
-         * Drops metadata held by the record store
-         */
-        void dropRsMetaData( OperationContext* opCtx );
-
         static rocksdb::Comparator* newRocksCollectionComparator();
 
     private:
-        static uint64_t _hash(uint64_t identHash, const RecordId& loc);
-
         // NOTE: RecordIterator might outlive the RecordStore
         class Iterator : public RecordIterator {
         public:
@@ -202,14 +195,16 @@ namespace mongo {
                                       OperationContext* txn, const RecordId& loc);
 
         RecordId _nextId();
-        bool cappedAndNeedDelete(OperationContext* txn) const;
-        void cappedDeleteAsNeeded(OperationContext* txn);
+        bool cappedAndNeedDelete(long long dataSizeDelta, long long numRecordsDelta) const;
+        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
 
         // The use of this function requires that the passed in RecordId outlives the returned Slice
         // TODO possibly make this safer in the future
         static rocksdb::Slice _makeKey( const RecordId& loc );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
+
+        std::string _getTransactionID(const RecordId& rid) const;
 
         rocksdb::DB* _db; // not owned
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
@@ -218,16 +213,17 @@ namespace mongo {
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
+        boost::mutex _cappedDeleterMutex; // see commend in ::cappedDeleteAsNeeded
 
-        uint64_t _identHash;
+        const bool _isOplog;
+        int _oplogCounter;
+
+        std::string _ident;
         AtomicUInt64 _nextIdNum;
-        long long _dataSize;
+        std::atomic<long long> _dataSize;
         std::atomic<long long> _numRecords;
 
         const string _dataSizeKey;
         const string _numRecordsKey;
-
-        // locks
-        boost::mutex _dataSizeLock;
     };
 }

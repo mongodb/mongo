@@ -35,12 +35,17 @@
 
 #include <memory>
 
+#include <boost/scoped_array.hpp>
+
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/util/log.h"
@@ -60,7 +65,9 @@ namespace mongo {
           _cappedMaxSize(cappedMaxSize),
           _cappedMaxDocs(cappedMaxDocs),
           _cappedDeleteCallback(cappedDeleteCallback),
-          _identHash(StringData::Hasher()(id)),
+          _isOplog(NamespaceString::oplog(ns)),
+          _oplogCounter(0),
+          _ident(id.toString()),
           _dataSizeKey("datasize-" + id.toString()),
           _numRecordsKey("numrecords-" + id.toString()) {
         invariant( _db );
@@ -81,8 +88,8 @@ namespace mongo {
         iter->SeekToLast();
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
-            RecordId lastLoc = _makeRecordId( lastSlice );
-            _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
+            RecordId lastId = _makeRecordId(lastSlice);
+            _nextIdNum.store(lastId.repr() + 1);
         }
         else {
             // Need to start at 1 so we are always higher than RecordId::min()
@@ -105,12 +112,15 @@ namespace mongo {
 
         // XXX not using a Snapshot here
         if (!_db->Get(_readOptions(), rocksdb::Slice(_dataSizeKey), &value).ok()) {
-            _dataSize = 0;
+            _dataSize.store(0);
             invariant(!metadataPresent);
         }
         else {
-            memcpy( &_dataSize, value.data(), sizeof( _dataSize ));
-            invariant( _dataSize >= 0 );
+            invariant(value.size() == sizeof(long long));
+            long long ds;
+            memcpy(&ds, value.data(), sizeof(long long));
+            invariant(ds >= 0);
+            _dataSize.store(ds);
         }
     }
 
@@ -129,7 +139,9 @@ namespace mongo {
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const RecordId& dl ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        ru->registerWrite(_hash(_identHash, dl));
+        if (!ru->transaction()->registerWrite(_getTransactionID(dl))) {
+            throw WriteConflictException();
+        }
 
         std::string oldValue;
         ru->Get(_columnFamily.get(), _makeKey(dl), &oldValue);
@@ -147,46 +159,99 @@ namespace mongo {
             ru->getDeltaCounter(_numRecordsKey);
     }
 
-    bool RocksRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
+    bool RocksRecordStore::cappedAndNeedDelete(long long dataSizeDelta,
+                                               long long numRecordsDelta) const {
         if (!_isCapped)
             return false;
 
-        if (_dataSize > _cappedMaxSize)
+        if (_dataSize.load() + dataSizeDelta > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (_numRecords.load() + numRecordsDelta > _cappedMaxDocs))
             return true;
 
         return false;
     }
 
-    void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-        if (!cappedAndNeedDelete(txn))
-            return;
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_columnFamily.get()));
-        iter->SeekToFirst();
-
-        // XXX TODO there is a bug here where if the size of the write batch exceeds the cap size
-        // then iter will not be valid and it will crash. To fix this we need the ability to
-        // query the write batch, and delete the oldest record in the write batch until the
-        // size of the write batch is less than the cap
-
-        // XXX PROBLEMS
-        // 2 threads could delete the same document
-        // multiple inserts using the same snapshot will delete the same document
-        while ( cappedAndNeedDelete(txn) && iter->Valid() ) {
-            invariant(numRecords(txn) > 0);
-
-            rocksdb::Slice slice = iter->key();
-            RecordId oldest = _makeRecordId( slice );
-
-            if ( _cappedDeleteCallback )
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
-
-            deleteRecord(txn, oldest);
-            iter->Next();
+    void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
+                                                const RecordId& justInserted) {
+        if (_isOplog) {
+            if (_oplogCounter++ % 100 > 0) {
+                return;
+            }
         }
+
+        long long dataSizeDelta = 0, numRecordsDelta = 0;
+        if (!_isOplog) {
+            auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+            dataSizeDelta = ru->getDeltaCounter(_dataSizeKey);
+            numRecordsDelta = ru->getDeltaCounter(_numRecordsKey);
+        }
+
+        if (!cappedAndNeedDelete(dataSizeDelta, numRecordsDelta)) {
+            return;
+        }
+
+        // ensure only one thread at a time can do deletes, otherwise they'll conflict.
+        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::try_to_lock);
+        if (!lock) {
+            return;
+        }
+
+        // we do this is a sub transaction in case it aborts
+        RocksRecoveryUnit* realRecoveryUnit =
+            dynamic_cast<RocksRecoveryUnit*>(txn->releaseRecoveryUnit());
+        invariant(realRecoveryUnit);
+        txn->setRecoveryUnit(realRecoveryUnit->newRocksRecoveryUnit());
+
+        try {
+            auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+            boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_columnFamily.get()));
+            iter->SeekToFirst();
+
+            while (cappedAndNeedDelete(dataSizeDelta, numRecordsDelta) && iter->Valid()) {
+                WriteUnitOfWork wuow(txn);
+
+                invariant(_numRecords.load() > 0);
+
+                rocksdb::Slice slice = iter->key();
+                RecordId oldest = _makeRecordId(slice);
+
+                if (oldest >= justInserted) {
+                    break;
+                }
+
+                if (_cappedDeleteCallback) {
+                    uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+                }
+
+                deleteRecord(txn, oldest);
+
+                iter->Next();
+
+                // We need to commit here to reflect updates on _numRecords and _dataSize.
+                // TODO: investigate if we should reflect changes to _numRecords and _dataSize
+                // immediately (read uncommitted).
+                wuow.commit();
+            }
+        }
+        catch (const WriteConflictException& wce) {
+            delete txn->releaseRecoveryUnit();
+            txn->setRecoveryUnit(realRecoveryUnit);
+            if (_isOplog) {
+                log() << "got conflict purging oplog, ignoring";
+                return;
+            }
+            throw;
+        }
+        catch (...) {
+            delete txn->releaseRecoveryUnit();
+            txn->setRecoveryUnit(realRecoveryUnit);
+            throw;
+        }
+
+        delete txn->releaseRecoveryUnit();
+        txn->setRecoveryUnit(realRecoveryUnit);
     }
 
     StatusWith<RecordId> RocksRecordStore::insertRecord( OperationContext* txn,
@@ -202,13 +267,18 @@ namespace mongo {
 
         RecordId loc = _nextId();
 
-        ru->registerWrite(_hash(_identHash, loc));
+        // XXX it might be safe to remove this, since we just allocated new unique RecordId.
+        // However, we need to check if any other transaction can start modifying this RecordId
+        // before our transaction is committed
+        if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
+            throw WriteConflictException();
+        }
         ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded(txn, loc);
 
         return StatusWith<RecordId>( loc );
     }
@@ -230,7 +300,9 @@ namespace mongo {
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        ru->registerWrite(_hash(_identHash, loc));
+        if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
+            throw WriteConflictException();
+        }
 
         std::string old_value;
         auto status = ru->Get(_columnFamily.get(), _makeKey(loc), &old_value);
@@ -245,7 +317,7 @@ namespace mongo {
 
         _increaseDataSize(txn, len - old_length);
 
-        cappedDeleteAsNeeded(txn);
+        cappedDeleteAsNeeded(txn, loc);
 
         return StatusWith<RecordId>( loc );
     }
@@ -256,7 +328,9 @@ namespace mongo {
                                                 const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        ru->registerWrite(_hash(_identHash, loc));
+        if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
+            throw WriteConflictException();
+        }
 
         rocksdb::Slice key = _makeKey( loc );
 
@@ -448,29 +522,16 @@ namespace mongo {
     void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
                                                      RecordId end,
                                                      bool inclusive ) {
-        boost::scoped_ptr<RecordIterator> iter(
-                getIterator( txn, RecordId::max(), CollectionScanParams::BACKWARD ) );
-
+        // copied from WiredTigerRecordStore::temp_cappedTruncateAfter()
+        WriteUnitOfWork wuow(txn);
+        boost::scoped_ptr<RecordIterator> iter( getIterator( txn, end ) );
         while( !iter->isEOF() ) {
-            WriteUnitOfWork wu( txn );
             RecordId loc = iter->getNext();
-            if ( loc < end || ( !inclusive && loc == end))
-                return;
-
-            deleteRecord( txn, loc );
-            wu.commit();
+            if ( end < loc || ( inclusive && end == loc ) ) {
+                deleteRecord( txn, loc );
+            }
         }
-    }
-
-    void RocksRecordStore::dropRsMetaData( OperationContext* opCtx ) {
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( opCtx );
-
-        boost::mutex::scoped_lock dataSizeLk( _dataSizeLock );
-        ru->writeBatch()->Delete(_dataSizeKey);
-
-        ru->writeBatch()->Delete(_numRecordsKey);
-        ru->incrementCounter(_numRecordsKey, &_numRecords,
-                             -ru->getDeltaCounter(_numRecordsKey));
+        wuow.commit();
     }
 
     rocksdb::ReadOptions RocksRecordStore::_readOptions(OperationContext* opCtx) {
@@ -538,19 +599,14 @@ namespace mongo {
         }
     }
 
-    uint64_t RocksRecordStore::_hash(uint64_t identHash, const RecordId& loc) {
-        return identHash + RecordId::Hasher()(loc);
+    void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
+        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
+        ru->incrementCounter(_dataSizeKey, &_dataSize, amount);
     }
 
-    void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
-        boost::mutex::scoped_lock lk( _dataSizeLock );
-
-        _dataSize += amount;
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        const char* ds_ptr = reinterpret_cast<char*>( &_dataSize );
-
-        ru->writeBatch()->Put(rocksdb::Slice(_dataSizeKey),
-                              rocksdb::Slice(ds_ptr, sizeof(long long)));
+    std::string RocksRecordStore::_getTransactionID(const RecordId& rid) const {
+        // TODO -- optimize in the future
+        return _ident + std::string(reinterpret_cast<const char*>(&rid), sizeof(rid));
     }
 
     // --------

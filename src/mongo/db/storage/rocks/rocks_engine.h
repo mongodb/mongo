@@ -67,7 +67,7 @@ namespace mongo {
     class RocksEngine : public KVEngine {
         MONGO_DISALLOW_COPYING( RocksEngine );
     public:
-        RocksEngine( const std::string& path );
+        RocksEngine(const std::string& path, bool durable);
         virtual ~RocksEngine();
 
         virtual RecoveryUnit* newRecoveryUnit() override;
@@ -99,7 +99,7 @@ namespace mongo {
             return true;
         }
 
-        virtual bool isDurable() const { return true; }
+        virtual bool isDurable() const override { return _durable; }
 
         virtual int64_t getIdentSize(OperationContext* opCtx,
                                       const StringData& ident) {
@@ -124,8 +124,6 @@ namespace mongo {
          */
         static rocksdb::ReadOptions readOptionsWithSnapshot( OperationContext* opCtx );
 
-        static rocksdb::Options dbOptions();
-
     private:
         bool _existsColumnFamily(const StringData& ident);
         Status _createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
@@ -140,11 +138,15 @@ namespace mongo {
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions(const Ordering& order) const;
 
+        rocksdb::Options _dbOptions() const;
+
         static rocksdb::ColumnFamilyOptions _defaultCFOptions();
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
+
+        const bool _durable;
 
         // Default column family is owned by the rocksdb::DB instance.
         rocksdb::ColumnFamilyHandle* _defaultHandle;

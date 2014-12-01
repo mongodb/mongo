@@ -32,6 +32,7 @@
 
 #include <atomic>
 #include <set>
+#include <unordered_map>
 #include <memory>
 #include <string>
 
@@ -59,10 +60,9 @@ namespace mongo {
         // Lock when mutating state here
         boost::mutex _commitLock;
 
-        static const size_t kNumSeqIdShards = 1 << 20;
         // Slots to store latest update SeqID for documents.
-        uint64_t _seqId[kNumSeqIdShards];
-        uint64_t _uncommittedTransactionId[kNumSeqIdShards];
+        std::unordered_map<std::string, uint64_t> _seqId;
+        std::unordered_map<std::string, uint64_t> _uncommittedTransactionId;
     };
 
     class RocksTransaction {
@@ -76,7 +76,7 @@ namespace mongo {
 
         // returns true if OK
         // returns false on conflict
-        bool registerWrite(uint64_t hash) ;
+        bool registerWrite(const std::string& id);
 
         void commit();
 
@@ -89,6 +89,6 @@ namespace mongo {
         uint64_t _snapshotSeqId;
         uint64_t _transactionId;
         RocksTransactionEngine* _transactionEngine;
-        std::set<uint64_t> _writeShards;
+        std::set<std::string> _writeShards;
     };
 }

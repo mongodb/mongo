@@ -40,6 +40,8 @@
 #include <rocksdb/iterator.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
@@ -72,14 +74,9 @@ namespace mongo {
 
         /**
          * Constructs a string containing the bytes of key followed by the bytes of loc.
-         *
-         * @param removeFieldNames true if the field names in key should be replaced with empty
-         * strings, and false otherwise. Useful because field names are not necessary in an index
-         * key, because the ordering of the fields is already known.
          */
-        string makeString( const BSONObj& key, const RecordId loc, bool removeFieldNames = true ) {
-            const BSONObj& finalKey = removeFieldNames ? stripFieldNames( key ) : key;
-            string s( finalKey.objdata(), finalKey.objsize() );
+        string makeString(const BSONObj& key, const RecordId loc) {
+            string s(key.objdata(), key.objsize());
             s.append( reinterpret_cast<const char*>( &loc ), sizeof( RecordId ) );
 
             return s;
@@ -90,7 +87,7 @@ namespace mongo {
          * by the bytes of a RecordId
          */
         IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice ) {
-            BSONObj key = BSONObj( slice.data() ).getOwned();
+            BSONObj key(slice.data());
             RecordId loc = *reinterpret_cast<const RecordId*>( slice.data() + key.objsize() );
             return IndexKeyEntry( key, loc );
         }
@@ -260,7 +257,7 @@ namespace mongo {
 
                 _isCached = false;
                 // assumes fieldNames already stripped if necessary
-                const string keyData = makeString( key, loc, false );
+                const string keyData = makeString(key, loc);
                 _iterator->Seek( keyData );
                 _checkStatus();
 
@@ -295,7 +292,7 @@ namespace mongo {
 
                 _isCached = false;
                 // assumes fieldNames already stripped if necessary
-                const string keyData = makeString( key, loc, false );
+                const string keyData = makeString(key, loc);
                 _iterator->Seek( keyData );
                 _checkStatus();
                 if ( !_iterator->Valid() )
@@ -382,48 +379,29 @@ namespace mongo {
                 const IndexEntryComparison _indexComparator;
         };
 
-    class WriteBufferCopyIntoHandler : public rocksdb::WriteBatch::Handler {
-    public:
-        WriteBufferCopyIntoHandler(rocksdb::WriteBatch* outWriteBatch,
-                                   rocksdb::ColumnFamilyHandle* columnFamily) :
-                _OutWriteBatch(outWriteBatch),
-                _columnFamily(columnFamily) { }
+        class RocksBulkSortedBuilderImpl : public SortedDataBuilderInterface {
+        public:
+            RocksBulkSortedBuilderImpl(RocksSortedDataImpl* index, OperationContext* txn,
+                                       bool dupsAllowed)
+                : _index(index), _txn(txn), _dupsAllowed(dupsAllowed) {
+                invariant(index->isEmpty(txn));
+            }
 
-        rocksdb::Status PutCF(uint32_t columnFamilyId, const rocksdb::Slice& key,
-                              const rocksdb::Slice& value) {
-            invariant(_OutWriteBatch);
-            _OutWriteBatch->Put(_columnFamily, key, value);
-            return rocksdb::Status::OK();
-        }
+            Status addKey(const BSONObj& key, const RecordId& loc) {
+                // TODO maybe optimize based on a fact that index is empty?
+                return _index->insert(_txn, key, loc, _dupsAllowed);
+            }
 
-    private:
-        rocksdb::WriteBatch* _OutWriteBatch;
-        rocksdb::ColumnFamilyHandle* _columnFamily;
-    };
+            void commit(bool mayInterrupt) {
+                WriteUnitOfWork uow(_txn);
+                uow.commit();
+            }
 
-    class RocksBulkSortedBuilderImpl : public SortedDataBuilderInterface {
-    public:
-        RocksBulkSortedBuilderImpl(RocksSortedDataImpl* index, OperationContext* txn,
-                                   bool dupsAllowed)
-            : _index(index), _txn(txn), _dupsAllowed(dupsAllowed) {
-            invariant(index->isEmpty(txn));
-        }
-
-        Status addKey(const BSONObj& key, const RecordId& loc) {
-            // TODO maybe optimize based on a fact that index is empty?
-            return _index->insert(_txn, key, loc, _dupsAllowed);
-        }
-
-        void commit(bool mayInterrupt) {
-            WriteUnitOfWork uow(_txn);
-            uow.commit();
-        }
-
-    private:
-        RocksSortedDataImpl* _index;
-        OperationContext* _txn;
-        bool _dupsAllowed;
-    };
+        private:
+            RocksSortedDataImpl* _index;
+            OperationContext* _txn;
+            bool _dupsAllowed;
+        };
 
     } // namespace
 
@@ -435,7 +413,6 @@ namespace mongo {
         : _db(db),
           _columnFamily(cf),
           _ident(std::move(ident)),
-          _identHash(StringData::Hasher()(StringData(_ident))),
           _order(order),
           _numEntriesKey("numentries-" + _ident) {
         invariant(_db);
@@ -468,18 +445,19 @@ namespace mongo {
                 return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        ru->registerWrite(_hash(_identHash, key));
+        auto strippedKey = stripFieldNames(key);
+
         if ( !dupsAllowed ) {
-            Status status = dupKeyCheck( txn, key, loc );
+            Status status = dupKeyCheck(txn, strippedKey, loc);
             if ( !status.isOK() ) {
                 return status;
             }
         }
 
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         ru->incrementCounter(_numEntriesKey, &_numEntries, 1);
 
-        ru->writeBatch()->Put(_columnFamily.get(), makeString(key, loc), emptyByteSlice);
+        ru->writeBatch()->Put(_columnFamily.get(), makeString(strippedKey, loc), emptyByteSlice);
 
         return Status::OK();
     }
@@ -488,13 +466,14 @@ namespace mongo {
                                       const BSONObj& key,
                                       const RecordId& loc,
                                       bool dupsAllowed) {
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        ru->registerWrite(_hash(_identHash, key));
+        // If we're unindexing an index element, this means we already "locked" the RecordId of the
+        // document. No need to register write here
 
-        const string keyData = makeString( key, loc );
+        const string keyData = makeString(stripFieldNames(key), loc);
 
         string dummy;
 
+        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         if (ru->Get(_columnFamily.get(), keyData, &dummy).IsNotFound()) {
             return;
         }
@@ -504,9 +483,21 @@ namespace mongo {
         ru->writeBatch()->Delete(_columnFamily.get(), keyData);
     }
 
-    Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
-                                            const BSONObj& key,
+    Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn, const BSONObj& key,
                                             const RecordId& loc) {
+        // To check if we're writing a duplicate key, we need to check two things:
+        // 1. Has there been any writes to this key since our snapshot (committed or uncommitted)
+        // 2. Is the key present in the snapshot
+        // Note that this doesn't catch the situation where the key is present in the snapshot, but
+        // deleted after the snapshot. This should be fine
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        // This will check if there is any write to the key  after our snapshot (committed or
+        // uncommitted). If the answer is yes, we will return dupkey.
+        if (!ru->transaction()->registerWrite(_getTransactionID(key))) {
+            return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
+        }
+
+        // This checks if the key is present in the snapshot (2)
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
         cursor->locate(key, RecordId::min());
 
@@ -588,7 +579,8 @@ namespace mongo {
         return new RocksIndexEntryComparator( order );
     }
 
-    uint64_t RocksSortedDataImpl::_hash(uint64_t identHash, const BSONObj& key) {
-        return identHash + key.hash();
+    std::string RocksSortedDataImpl::_getTransactionID(const BSONObj& key) const {
+        // TODO optimize in the future
+        return _ident + std::string(key.objdata(), key.objsize());
     }
 }
