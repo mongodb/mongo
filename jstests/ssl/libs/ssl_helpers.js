@@ -25,17 +25,19 @@ var requireSSL = {sslMode : "requireSSL",
 
 var replSetTestFile = "jstests/replsets/replset1.js";
 
-var replShouldSucceed = function(opt1, opt2) {
+var replShouldSucceed = function(name, opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
+    ssl_name = name;
     // try running this file using the given config
     load(replSetTestFile);
 };
 
 // Test if ssl replset configs fail
-var replShouldFail = function(opt1, opt2) {
+var replShouldFail = function(name, opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
+    ssl_name = name;
     replTest = null;
     assert.throws(load,[replSetTestFile],
                   "This setup should have failed");

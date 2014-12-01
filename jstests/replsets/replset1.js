@@ -1,16 +1,20 @@
-load("jstests/replsets/rslib.js");
 var ssl_options1;
 var ssl_options2;
-doTest = function( signal ) {
+var ssl_name;
+load("jstests/replsets/rslib.js");
+var doTest = function( signal ) {
 
     // Test basic replica set functionality.
     // -- Replication
     // -- Failover
 
-    // Replica set testing API
-    // Create a new replica set test. Specify set name and the number of nodes you want.
+
+
+    // Choose a name that is unique to the options specified.
+    // This is important because we are depending on a fresh replicaSetMonitor for each run;
+    // each differently-named replica set gets its own monitor. 
     // n0 and n1 get the same SSL config since there are 3 nodes but only 2 different configs
-    var replTest = new ReplSetTest( {name: 'testSet', nodes:
+    var replTest = new ReplSetTest( {name: 'testSet' + ssl_name, nodes:
                                     {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2}});
 
     // call startSet() to start each mongod in the replica set
