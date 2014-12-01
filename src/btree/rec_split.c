@@ -1042,26 +1042,28 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	if (page->memory_footprint < 10 * btree->maxleafpage)
 		return (0);
 
-	/* Find the last insert list on the page. */
+	/*
+	 * There is no point splitting if the list is small, no deep items is
+	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
+	 * level means there will be a new 6th level for roughly each 4KB of
+	 * entries in the list. If we have at least two 6th level entries, the
+	 * list is at least large enough to work with.)
+	 *
+	 * The following code requires at least two items on the insert list,
+	 * this test serves the additional purpose of confirming that.
+	 */
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	if (ins_head == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
+	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		return (0);
+
+	/* Find the last item in the insert list. */
 	ins = WT_SKIP_LAST(ins_head);
-
-	/*
-	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that.
-	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
-	if (ins == NULL || ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL)
-		return (0);
-
-	/*
-	 * The following code requires at least two items on the insert list,
-	 * confirm that.
-	 */
-	if (ins_head->head[0] == ins_head->tail[0])
-		return (0);
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the middle
