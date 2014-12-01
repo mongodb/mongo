@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongotop"
 	"github.com/mongodb/mongo-tools/mongotop/options"
 	"os"
@@ -56,6 +57,10 @@ func main() {
 		log.Logf(log.Always, "invalid value for row count: %v", outputOpts.RowCount)
 		os.Exit(1)
 	}
+
+	// connect directly, unless a replica set name is explicitly specified
+	_, setName := util.ParseConnectionString(opts.Host)
+	opts.Direct = (setName == "")
 
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)

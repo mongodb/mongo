@@ -12,6 +12,24 @@ const (
 	DefaultPort            = "27017"
 )
 
+// Extract the replica set name and the list of hosts from the connection string
+func ParseConnectionString(connString string) ([]string, string) {
+
+	// strip off the replica set name from the beginning
+	slashIndex := strings.Index(connString, "/")
+	setName := ""
+	if slashIndex != -1 {
+		setName = connString[:slashIndex]
+		if slashIndex == len(connString)-1 {
+			return []string{""}, setName
+		}
+		connString = connString[slashIndex+1:]
+	}
+
+	// split the hosts, and return them and the set name
+	return strings.Split(connString, ","), setName
+}
+
 // Split the host string into the individual nodes to connect to, appending the
 // port if necessary.
 func CreateConnectionAddrs(host, port string) []string {
@@ -25,7 +43,7 @@ func CreateConnectionAddrs(host, port string) []string {
 	}
 
 	// parse the host string into the individual hosts
-	addrs := parseHost(host)
+	addrs, _ := ParseConnectionString(host)
 
 	// if a port is specified, append it to all the hosts
 	if port != "" {
@@ -35,23 +53,6 @@ func CreateConnectionAddrs(host, port string) []string {
 	}
 
 	return addrs
-}
-
-// Helper function for parsing the host string into addresses.  Returns a slice
-// of the individual addresses to use to connect.
-func parseHost(host string) []string {
-
-	// strip off the replica set name from the beginning
-	slashIndex := strings.Index(host, "/")
-	if slashIndex != -1 {
-		if slashIndex == len(host)-1 {
-			return []string{""}
-		}
-		host = host[slashIndex+1:]
-	}
-
-	// split into the individual hosts
-	return strings.Split(host, ",")
 }
 
 // SplitNamespace splits a namespace path into a database and collection,

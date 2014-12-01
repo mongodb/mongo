@@ -6,6 +6,38 @@ import (
 	"testing"
 )
 
+func TestParseConnectionString(t *testing.T) {
+
+	testutil.VerifyTestType(t, "unit")
+
+	Convey("When extracting the replica set and hosts from a connection"+
+		" url", t, func() {
+
+		Convey("an empty url should lead to an empty replica set name"+
+			" and hosts slice", func() {
+			hosts, setName := ParseConnectionString("")
+			So(hosts, ShouldResemble, []string{""})
+			So(setName, ShouldEqual, "")
+		})
+
+		Convey("a url not specifying a replica set name should lead to"+
+			" an empty replica set name", func() {
+			hosts, setName := ParseConnectionString("host1,host2")
+			So(hosts, ShouldResemble, []string{"host1", "host2"})
+			So(setName, ShouldEqual, "")
+		})
+
+		Convey("a url specifying a replica set name should lead to that name"+
+			" being returned", func() {
+			hosts, setName := ParseConnectionString("foo/host1,host2")
+			So(hosts, ShouldResemble, []string{"host1", "host2"})
+			So(setName, ShouldEqual, "foo")
+		})
+
+	})
+
+}
+
 func TestCreateConnectionAddrs(t *testing.T) {
 
 	testutil.VerifyTestType(t, "unit")
@@ -30,40 +62,6 @@ func TestCreateConnectionAddrs(t *testing.T) {
 
 	})
 
-}
-
-func TestParseHost(t *testing.T) {
-
-	testutil.VerifyTestType(t, "unit")
-
-	Convey("When parsing a host string into the contained"+
-		" addresses", t, func() {
-
-		Convey("a string with a single hostname should return a slice of just"+
-			" the hostname", func() {
-
-			addrs := parseHost("localhost")
-			So(addrs, ShouldResemble, []string{"localhost"})
-
-		})
-
-		Convey("a string with multiple hostnames should return a slice of"+
-			" all of them", func() {
-
-			addrs := parseHost("host1,host2,host3")
-			So(addrs, ShouldResemble, []string{"host1", "host2", "host3"})
-
-		})
-
-		Convey("a string with multiple hostnames and a replica set should"+
-			" return a slice of all the host names", func() {
-
-			addrs := parseHost("foo/host1,host2,host3")
-			So(addrs, ShouldResemble, []string{"host1", "host2", "host3"})
-
-		})
-
-	})
 }
 
 func TestInvalidNames(t *testing.T) {

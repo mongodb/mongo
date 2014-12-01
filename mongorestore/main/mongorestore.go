@@ -43,7 +43,9 @@ func main() {
 	}
 	targetDir = util.ToUniversalPath(targetDir)
 
-	opts.Direct = true
+	// connect directly, unless a replica set name is explicitly specified
+	_, setName := util.ParseConnectionString(opts.Host)
+	opts.Direct = (setName == "")
 
 	restore := mongorestore.MongoRestore{
 		ToolOptions:     opts,

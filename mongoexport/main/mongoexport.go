@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport"
 	"github.com/mongodb/mongo-tools/mongoexport/options"
 	"os"
@@ -41,6 +42,10 @@ func main() {
 	if opts.PrintVersion() {
 		return
 	}
+
+	// connect directly, unless a replica set name is explicitly specified
+	_, setName := util.ParseConnectionString(opts.Host)
+	opts.Direct = (setName == "")
 
 	exporter := mongoexport.MongoExport{
 		ToolOptions:     *opts,

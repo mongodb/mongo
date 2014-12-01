@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"os"
@@ -51,6 +52,10 @@ func main() {
 
 	// add the specified database to the namespace options struct
 	opts.Namespace.DB = storageOpts.DB
+
+	// connect directly, unless a replica set name is explicitly specified
+	_, setName := util.ParseConnectionString(opts.Host)
+	opts.Direct = (setName == "")
 
 	// create a session provider to connect to the db
 	mf := mongofiles.MongoFiles{
