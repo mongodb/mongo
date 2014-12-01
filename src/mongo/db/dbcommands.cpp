@@ -1046,7 +1046,8 @@ namespace mongo {
                         continue;
                     }
 
-                    IndexDescriptor* idx = coll->getIndexCatalog()->findIndexByKeyPattern( txn, keyPattern );
+                    const IndexDescriptor* idx = coll->getIndexCatalog()
+                                                     ->findIndexByKeyPattern( txn, keyPattern );
                     if ( idx == NULL ) {
                         errmsg = str::stream() << "cannot find index " << keyPattern
                                                << " for ns " << ns;
@@ -1066,11 +1067,13 @@ namespace mongo {
                     }
 
                     if ( oldExpireSecs != newExpireSecs ) {
-                        // change expireAfterSeconds
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
+                        // Change the value of "expireAfterSeconds" on disk.
                         coll->getCatalogEntry()->updateTTLSetting( txn,
                                                                    idx->indexName(),
                                                                    newExpireSecs.numberLong() );
+                        // Notify the index catalog that the definition of this index changed.
+                        idx = coll->getIndexCatalog()->refreshEntry( txn, idx );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }

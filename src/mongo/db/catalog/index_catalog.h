@@ -110,6 +110,21 @@ namespace mongo {
                               std::vector<IndexDescriptor*>& matches,
                               bool includeUnfinishedIndexes = false ) const;
 
+
+        /**
+         * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
+         * must be a ready index that is already registered with the index catalog.  Returns an
+         * unowned pointer to the descriptor for the new index definition.
+         *
+         * Use this method to notify the IndexCatalog that the spec for this index has changed.
+         *
+         * It is invalid to dereference 'oldDesc' after calling this method.  This method broadcasts
+         * an invalidateAll() on the cursor cache to notify other users of the IndexCatalog that
+         * this descriptor is now invalid.
+         */
+        const IndexDescriptor* refreshEntry( OperationContext* txn,
+                                             const IndexDescriptor* oldDesc );
+
         // never returns NULL
         const IndexCatalogEntry* getEntry( const IndexDescriptor* desc ) const;
 

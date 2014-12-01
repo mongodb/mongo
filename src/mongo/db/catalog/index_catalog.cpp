@@ -1014,6 +1014,38 @@ namespace {
         return entry;
     }
 
+
+    const IndexDescriptor* IndexCatalog::refreshEntry( OperationContext* txn,
+                                                       const IndexDescriptor* oldDesc ) {
+        txn->lockState()->assertWriteLocked( _collection->_database->name() );
+
+        std::string indexName = oldDesc->indexName();
+        invariant( _collection->getCatalogEntry()->isIndexReady( txn, indexName ) );
+
+        // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.
+        const bool collectionGoingAway = false;
+        _collection->cursorCache()->invalidateAll( collectionGoingAway );
+
+        // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
+        // invalid and should not be dereferenced.
+        const bool removed = _entries.remove( oldDesc );
+        invariant( removed );
+
+        // Ask the CollectionCatalogEntry for the new index spec.
+        BSONObj spec = _collection->getCatalogEntry()->getIndexSpec( txn, indexName ).getOwned();
+        BSONObj keyPattern = spec.getObjectField( "key" );
+
+        // Re-register this index in the index catalog with the new spec.
+        IndexDescriptor* newDesc = new IndexDescriptor( _collection,
+                                                        _getAccessMethodName( txn, keyPattern ),
+                                                        spec );
+        const IndexCatalogEntry* entry = _setupInMemoryStructures( txn, newDesc );
+        invariant( entry->isReady( txn ) );
+
+        // Return the new descriptor.
+        return entry->descriptor();
+    }
+
     // ---------------------------
 
     namespace {
