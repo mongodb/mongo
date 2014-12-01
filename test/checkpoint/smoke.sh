@@ -8,8 +8,8 @@ echo "checkpoint: 3 mixed tables"
 echo "checkpoint: 6 column-store tables"
 ./t -T 6 -t c || exit 1
 
-#echo "checkpoint: 6 LSM tables"
-#./t -T 6 -t l || exit 1
+echo "checkpoint: 6 LSM tables"
+./t -T 6 -t l || exit 1
 
 echo "checkpoint: 6 mixed tables"
 ./t -T 6 -t m || exit 1
