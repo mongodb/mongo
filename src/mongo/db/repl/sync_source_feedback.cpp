@@ -136,7 +136,7 @@ namespace mongo {
                     if (!_connection->runCommand("admin", slaveCmd.obj(), slaveRes)) {
                         if (slaveRes["errmsg"].str().find("node could not be found ")
                                     != std::string::npos) {
-                            if (theReplSet->getMutableMember(itr->second->id())) {
+                            if (!theReplSet->getMutableMember(itr->second->id())) {
                                 log() << "sync source does not have member " << itr->second->id()
                                       << " in its config and neither do we, removing member from"
                                          " tracking";
@@ -344,6 +344,9 @@ namespace mongo {
                 }
                 if (_positionChanged) {
                     if (!updateUpstream()) {
+                        // no need to set _handshakeNeeded to true as a failed updateUpstream() call
+                        // will call resetConnection() and when the new connection is established
+                        // the handshake process will be run
                         _positionChanged = true;
                         continue;
                     }
