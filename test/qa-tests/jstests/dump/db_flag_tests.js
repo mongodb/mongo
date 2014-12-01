@@ -19,6 +19,7 @@ if (typeof getToolTest === 'undefined') {
 
   // Running mongodump with `--db foo` should only dump the
   // 'foo' database, ignoring the 'baz' database
+  resetDbpath('dump');
   var dumpArgs = ['dump', '--db', 'foo'].concat(commonToolArgs);
   toolTest.runTool.apply(toolTest, dumpArgs);
   db.dropDatabase();
