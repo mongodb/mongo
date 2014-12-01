@@ -369,6 +369,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: pages currently held in the cache";
 	stats->cache_eviction_force.desc =
 	    "cache: pages evicted because they exceeded the in-memory maximum";
+	stats->cache_eviction_app.desc =
+	    "cache: pages evicted by application threads";
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
@@ -515,6 +517,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_force.v = 0;
+	stats->cache_eviction_app.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_split.v = 0;

@@ -1266,6 +1266,9 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_PAGE *page;
 	WT_REF *ref;
 
+	if (is_app)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
+
 	WT_RET(__evict_get_ref(session, is_app, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 

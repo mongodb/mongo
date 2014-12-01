@@ -148,6 +148,7 @@ connection_stats = [
         'maximum bytes configured', 'no_clear,no_scale'),
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
+    CacheStat('cache_eviction_app', 'pages evicted by application threads'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
     CacheStat('cache_eviction_deepen',
         'page split during eviction deepened the tree'),
