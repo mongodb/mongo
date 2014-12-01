@@ -10,19 +10,20 @@
 # build_posix/bench/wtperf).
 #
 # This script should be invoked with the pathname of the wtperf test
-# config to run.
+# config to run and the number of runs.
 #
-if test "$#" -ne "1"; then
-	echo "Must specify wtperf test to run"
+if test "$#" -ne "2"; then
+	echo "Must specify wtperf test to run and number of runs"
 	exit 1
 fi
 wttest=$1
+runmax=$2
+
 home=./WT_TEST
 outfile=./wtperf.out
 rm -f $outfile
-runmax=5
-run=1
 
+# Each of these has an entry for each op in ops below.
 avg=(0 0 0)
 max=(0 0 0)
 min=(0 0 0)
@@ -72,6 +73,7 @@ isstable()
 
 getmin=0
 getmax=1
+run=1
 while test "$run" -le "$runmax"; do
 	rm -rf $home
 	mkdir $home
@@ -144,10 +146,17 @@ while test "$run" -le "$runmax"; do
 	run=`expr $run + 1`
 done
 
-if test "$run" -le "$runmax"; then
+skipminmax=0
+if test "$runmax" -le "2"; then
+	numruns=$(getval $getmin $run $runmax)
+	skipminmax=1
+elif test "$run" -le "$runmax"; then
 	numruns=`expr $run - 2`
 else
 	numruns=`expr $runmax - 2`
+fi
+if test "$numruns" -eq "0"; then
+	$numruns=1
 fi
 #
 # The sum contains all runs.  Subtract out the min/max values.
@@ -155,10 +164,18 @@ fi
 #
 for i in ${!min[*]}; do
 	if test "$i" -eq "$loadindex"; then
-		s=`echo "scale=3; ${sum[$i]} - ${min[$i]} - ${max[$i]}" | bc`
+		if test "$skipminmax" -eq "0"; then
+			s=`echo "scale=3; ${sum[$i]} - ${min[$i]} - ${max[$i]}" | bc`
+		else
+			s=${sum[$i]}
+		fi
 		avg[$i]=`echo "scale=3; $s / $numruns" | bc`
 	else
-		s=`expr ${sum[$i]} - ${min[$i]} - ${max[$i]}`
+		if test "$skipminmax" -eq "0"; then
+			s=`expr ${sum[$i]} - ${min[$i]} - ${max[$i]}`
+		else
+			s=${sum[$i]}
+		fi
 		avg[$i]=`expr $s / $numruns`
 	fi
 done

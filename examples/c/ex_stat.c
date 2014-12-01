@@ -28,6 +28,7 @@
  *	This is an example demonstrating how to query database statistics.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

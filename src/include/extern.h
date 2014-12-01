@@ -164,6 +164,7 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flag
 extern int __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno, WT_ITEM *value, WT_UPDATE *upd, int is_remove);
 extern int __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern void __wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp);

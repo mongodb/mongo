@@ -120,7 +120,7 @@ new_page:
  *	Return the next variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
@@ -141,8 +141,10 @@ new_page:	if (cbt->ins == NULL)
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
-		    WT_UPDATE_DELETED_ISSET(upd))
+		    WT_UPDATE_DELETED_ISSET(upd)) {
+			*skipped = 1;
 			continue;
+		}
 		val->data = WT_UPDATE_DATA(upd);
 		val->size = upd->size;
 		break;
@@ -155,7 +157,7 @@ new_page:	if (cbt->ins == NULL)
  *	Move to the next, variable-length column-store item.
  */
 static inline int
-__cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
@@ -195,8 +197,10 @@ new_page:	/* Find the matching WT_COL slot. */
 		upd = cbt->ins == NULL ?
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				*skipped = 1;
 				continue;
+			}
 
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
@@ -233,7 +237,7 @@ new_page:	/* Find the matching WT_COL slot. */
  *	Move to the next row-store item.
  */
 static inline int
-__cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
@@ -277,8 +281,10 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
-			    WT_UPDATE_DELETED_ISSET(upd))
+			    WT_UPDATE_DELETED_ISSET(upd)) {
+				*skipped = 1;
 				continue;
+			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
@@ -307,8 +313,10 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
-		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
+			*skipped = 1;
 			continue;
+		}
 
 		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
@@ -385,7 +393,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int newpage;
+	int skipped, newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -410,15 +418,18 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	page = cbt->ref == NULL ? NULL : cbt->ref->page;
-	for (newpage = 0;; newpage = 1) {
+	for (skipped = newpage = 0;; skipped = 0, newpage = 1) {
+		page = cbt->ref == NULL ? NULL : cbt->ref->page;
+		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
+
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_append_next(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_append_next(cbt, newpage);
+				ret = __cursor_var_append_next(
+				    cbt, newpage, &skipped);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -433,10 +444,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 				ret = __cursor_fix_next(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_next(cbt, newpage);
+				ret = __cursor_var_next(cbt, newpage, &skipped);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __cursor_row_next(cbt, newpage);
+				ret = __cursor_row_next(cbt, newpage, &skipped);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -455,11 +466,17 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 			}
 		}
 
+		/*
+		 * If we scanned all the way through a page and only saw
+		 * deleted records, try to evict the page as we release it.
+		 * Otherwise repeatedly deleting from the beginning of a tree
+		 * can have quadratic performance.
+		 */
+		if (newpage && skipped)
+			page->read_gen = WT_READGEN_OLDEST;
+
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
-
-		page = cbt->ref->page;
-		WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page));
 	}
 
 err:	if (ret != 0)

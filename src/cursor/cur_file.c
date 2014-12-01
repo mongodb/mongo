@@ -465,8 +465,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		if (bulk)
 			__wt_spin_lock(
 			    session, &S2C(session)->checkpoint_lock);
-		ret = __wt_session_get_btree_ckpt(
-		    session, uri, cfg, flags);
+		ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags);
 		if (bulk)
 			__wt_spin_unlock(
 			    session, &S2C(session)->checkpoint_lock);
