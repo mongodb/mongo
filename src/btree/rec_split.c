@@ -992,7 +992,7 @@ err:	if (locked)
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
-	if (ret != 0)
+	if (ret != 0 && ret != WT_PANIC)
 		__wt_err(session, ret,
 		    "ignoring not-fatal error during parent page split");
 	return (ret == WT_PANIC || !complete ? ret : 0);
@@ -1008,7 +1008,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
+	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
@@ -1017,11 +1017,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	size_t page_decr, parent_incr, right_incr, size;
 	int i;
 
+	*splitp = 0;
+
 	btree = S2BT(session);
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
-	*splitp = 0;
 
 	/*
 	 * Check for pages with append-only workloads. A common application
@@ -1063,7 +1064,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 		return (0);
 
 	/* Find the last item in the insert list. */
-	ins = WT_SKIP_LAST(ins_head);
+	moved_ins = WT_SKIP_LAST(ins_head);
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the middle
@@ -1101,10 +1102,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	child->page = right;
 	child->state = WT_REF_MEM;
 	WT_ERR(__wt_row_ikey(session, 0,
-	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &child->key.ikey));
+	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
+	    &child->key.ikey));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
-	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(ins));
+	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(moved_ins));
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
@@ -1115,11 +1117,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * list stack is for the element we are moving, and the memory used by
 	 * the item's list of updates.
 	 */
-	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
+	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
 		;
 	size = ((size_t)i - 1) * sizeof(WT_INSERT *);
-	size += sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(ins);
-	for (upd = ins->upd; upd != NULL; upd = upd->next)
+	size += sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(moved_ins);
+	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
 		size += sizeof(WT_UPDATE) + upd->size;
 	WT_MEMSIZE_ADD(right_incr, size);
 	WT_MEMSIZE_ADD(page_decr, size);
@@ -1130,9 +1132,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * Allocation operations completed, move the last insert list item from
 	 * the original page to the new page.
 	 *
-	 * First, update the item to the new child page.
+	 * First, update the item to the new child page. (Just append the entry
+	 * for simplicity, the previous skip list pointers originally allocated
+	 * can be ignored.)
 	 */
-	right->pg_row_ins[0]->head[0] = right->pg_row_ins[0]->tail[0] = ins;
+	right->pg_row_ins[0]->head[0] =
+	    right->pg_row_ins[0]->tail[0] = moved_ins;
 
 	/*
 	 * Remove the entry from the orig page (i.e truncate the skip list).
@@ -1173,15 +1178,13 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 		if (ins_head->head[i] == NULL ||
 		     ins_head->head[i] == ins_head->tail[i]) {
 			/* Remove if it is the element being moved. */
-			if (ins_head->head[i] == ins)
+			if (ins_head->head[i] == moved_ins)
 				ins_head->head[i] = ins_head->tail[i] = NULL;
 			continue;
 		}
 
-		for (current_ins = *insp;
-		    current_ins != ins_head->tail[i];
-		    current_ins = current_ins->next[i])
-			prev_ins = current_ins;
+		for (ins = *insp; ins != ins_head->tail[i]; ins = ins->next[i])
+			prev_ins = ins;
 
 		/*
 		 * Update the stack head so that we step down as far to the
@@ -1189,10 +1192,10 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 		 * levels must contain at least two items to be here.
 		 */
 		insp = &prev_ins->next[i];
-		if (current_ins == ins) {
+		if (ins == moved_ins) {
 			/* Remove the item being moved. */
-			WT_ASSERT(session, ins_head->head[i] != ins);
-			WT_ASSERT(session, prev_ins->next[i] == ins);
+			WT_ASSERT(session, ins_head->head[i] != moved_ins);
+			WT_ASSERT(session, prev_ins->next[i] == moved_ins);
 			*insp = NULL;
 			ins_head->tail[i] = prev_ins;
 		}
@@ -1205,29 +1208,42 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
 	    i >= 0;
 	    i--, insp--)
-		for (current_ins = *insp;
-		    current_ins != NULL; current_ins = current_ins->next[i])
-			WT_ASSERT(session, current_ins != ins);
+		for (ins = *insp; ins != NULL; ins = ins->next[i])
+			WT_ASSERT(session, ins != moved_ins);
 #endif
+
+	/*
+	 * Split into the parent.
+	 */
+	if ((ret = __split_parent(
+	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0) {
+		/*
+		 * Move the insert list element back to the original page list.
+		 * For simplicity, the previous skip list pointers originally
+		 * allocated can be ignored, just append the entry to the end of
+		 * the level 0 list. As before, we depend on the list having
+		 * multiple elements and ignore the edge cases small lists have.
+		 */
+		right->pg_row_ins[0]->head[0] =
+		    right->pg_row_ins[0]->tail[0] = NULL;
+		ins_head->tail[0]->next[0] = moved_ins;
+		ins_head->tail[0] = moved_ins;
+
+		/*
+		 * We marked the new page dirty; we're going to discard it, but
+		 * first mark it clean and fix up the cache statistics.
+		 */
+		 right->modify->write_gen = 0;
+		 __wt_cache_dirty_decr(session, right);
+
+		WT_ERR(ret);
+	}
 
 	/* Let our caller know that we split. */
 	*splitp = 1;
 
-	/*
-	 * Split into the parent.
-	 *
-	 * A note on error handling: there's no code to put back the insert list
-	 * item we removed from the original page, so we're dead.
-	 *
-	 * XXX KEITH
-	 * Add code to put the updates back, we still have an exclusive lock.
-	 * And: we've marked the newly created page dirty, make sure we don't
-	 * mess up the dirty page count on error.
-	 */
-	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0)
-		WT_PANIC_RET(
-		    session, ret, "split of a page's insert list failed");
+	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
+	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
 
 	/*
 	 * We may not be able to immediately free the page's original WT_REF
@@ -1237,21 +1253,20 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	WT_TRET(__split_safe_free(session, 0, ref, sizeof(WT_REF)));
 
-	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
-	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
-
 	/*
 	 * A note on error handling: if we completed the split, return success,
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
-	if (ret != 0)
+	if (ret != 0 && ret != WT_PANIC)
 		__wt_err(session, ret,
 		    "ignoring not-fatal error during insert page split");
 	return (ret == WT_PANIC ? WT_PANIC : 0);
 
-err:	if (split_ref[0] != NULL)
+err:	if (split_ref[0] != NULL) {
+		__wt_free(session, split_ref[0]->key.ikey);
 		__wt_free(session, split_ref[0]);
+	}
 	if (split_ref[1] != NULL) {
 		__wt_free(session, split_ref[1]->key.ikey);
 		__wt_free(session, split_ref[1]);
@@ -1381,9 +1396,9 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * nothing really bad can have happened, and our caller has to proceed
 	 * with the split.
 	 */
-	if (ret != 0)
+	if (ret != 0 && ret != WT_PANIC)
 		__wt_err(session, ret,
-		    "ignoring not-fatal error during multi- page split");
+		    "ignoring not-fatal error during multi-page split");
 	return (ret == WT_PANIC ? WT_PANIC : 0);
 
 err:	/*
