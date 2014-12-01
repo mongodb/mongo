@@ -929,8 +929,9 @@ namespace mongo {
         return toReturn;
     }
 
-    void IndexCatalog::updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds ) {
-        IndexDetails* indexDetails = _getIndexDetails( idx );
+    const IndexDescriptor* IndexCatalog::updateTTLSetting( const IndexDescriptor* oldDesc,
+                                                           long long newExpireSeconds ) {
+        IndexDetails* indexDetails = _getIndexDetails( oldDesc );
 
         BSONElement oldExpireSecs = indexDetails->info.obj().getField("expireAfterSeconds");
 
@@ -954,6 +955,31 @@ namespace mongo {
         default:
             massert( 16632, "current 'expireAfterSeconds' is not a number", false );
         }
+
+        // The value has now been updated on disk.  We're now going to invalidate the index
+        // catalog's old IndexDescriptor, and register a new one with the updated spec object.
+
+        BSONObj ownedInfoObj = indexDetails->info.obj().getOwned();
+        BSONObj keyPattern = ownedInfoObj.getObjectField("key");
+
+        // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.
+        const bool collectionGoingAway = false;
+        _collection->cursorCache()->invalidateAll( collectionGoingAway );
+
+        // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
+        // invalid and should not be dereferenced.
+        const bool removed = _entries.remove( oldDesc );
+        invariant( removed );
+
+        // Re-register this index in the index catalog with the new spec.
+        IndexDescriptor* newDesc = new IndexDescriptor( _collection,
+                                                        _getAccessMethodName( keyPattern ),
+                                                        ownedInfoObj );
+        const IndexCatalogEntry* entry = _setupInMemoryStructures( newDesc );
+        invariant( entry->isReady() );
+
+        // Return the new descriptor.
+        return entry->descriptor();
     }
 
     bool IndexCatalog::isMultikey( const IndexDescriptor* idx ) {

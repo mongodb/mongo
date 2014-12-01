@@ -16,10 +16,10 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/catalog/collection.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -86,12 +86,56 @@ namespace IndexCatalogTests {
         Database* _db;
     };
 
+    /**
+     * Test for IndexCatalog::updateTTLSetting().
+     */
+    class UpdateTTLSetting {
+    public:
+        UpdateTTLSetting() {
+            Client::WriteContext ctx(_ns);
+            _db = ctx.ctx().db();
+            _coll = _db->createCollection(_ns);
+            _catalog = _coll->getIndexCatalog();
+        }
+
+        ~UpdateTTLSetting () {
+            Client::WriteContext ctx(_ns);
+            _db->dropCollection(_ns);
+        }
+
+        void run() {
+            Client::WriteContext ctx(_ns);
+            const std::string indexName = "x_1";
+
+            BSONObjBuilder indexSpecBuilder;
+            indexSpecBuilder.append("key", BSON("x" << 1));
+            indexSpecBuilder.append("ns", _ns);
+            indexSpecBuilder.append("name", indexName);
+            indexSpecBuilder.append("expireAfterSeconds", 5);
+            _catalog->createIndex(indexSpecBuilder.obj(), true);
+
+            const IndexDescriptor* desc = _catalog->findIndexByName(indexName);
+            ASSERT(desc);
+            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+            desc = _catalog->updateTTLSetting(desc, 10);
+
+            ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
+        }
+
+    private:
+        IndexCatalog* _catalog;
+        Collection* _coll;
+        Database* _db;
+    };
+
     class IndexCatalogTests : public Suite {
     public:
         IndexCatalogTests() : Suite( "indexcatalogtests" ) {
         }
         void setupTests() {
             add<IndexIteratorTests>();
+            add<UpdateTTLSetting>();
         }
     } indexCatalogTests;
 }

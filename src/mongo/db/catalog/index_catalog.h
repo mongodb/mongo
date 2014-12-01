@@ -178,11 +178,18 @@ namespace mongo {
 
         // ---- modify single index
 
-        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
+        /**
+         * Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
          * The specified index must already contain an expireAfterSeconds field, and the value in
-         * that field and newExpireSecs must both be numeric.
+         * that field and newExpireSecs must both be numeric.  Returns an unowned pointer to the
+         * descriptor for the new index definition.
+         *
+         * It is invalid to dereference 'oldDesc' after calling this method.  This method broadcasts
+         * an invalidateAll() on the cursor cache to notify other users of the IndexCatalog that
+         * this descriptor is now invalid.
          */
-        void updateTTLSetting( const IndexDescriptor* idx, long long newExpireSeconds );
+        const IndexDescriptor* updateTTLSetting( const IndexDescriptor* oldDesc,
+                                                 long long newExpireSeconds );
 
         bool isMultikey( const IndexDescriptor* idex );
 
