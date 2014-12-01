@@ -60,7 +60,10 @@ namespace mongo {
                 // Intentionally leaked.
                 new WiredTigerServerStatusSection(kv);
                 new WiredTigerEngineRuntimeConfigSetting(kv);
-                return new KVStorageEngine( kv );
+
+                KVStorageEngineOptions options;
+                options.directoryPerDB = params.directoryperdb;
+                return new KVStorageEngine( kv, options );
             }
 
             virtual StringData getCanonicalName() const {

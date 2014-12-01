@@ -65,8 +65,10 @@ namespace mongo {
         KVDatabaseCatalogEntry* const _entry;
     };
 
-    KVStorageEngine::KVStorageEngine( KVEngine* engine )
-        : _engine( engine )
+    KVStorageEngine::KVStorageEngine( KVEngine* engine,
+                                      const KVStorageEngineOptions& options )
+        : _options( options )
+        , _engine( engine )
         , _supportsDocLocking(_engine->supportsDocLocking()) {
 
         OperationContextNoop opCtx( _engine->newRecoveryUnit() );
@@ -88,7 +90,10 @@ namespace mongo {
                                                                 catalogInfo,
                                                                 catalogInfo,
                                                                 CollectionOptions() ) );
-            _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
+            _catalog.reset( new KVCatalog( _catalogRecordStore.get(),
+                                           _supportsDocLocking,
+                                           _options.directoryPerDB,
+                                           _options.splitCollectionAndIndexes) );
             _catalog->init( &opCtx );
 
             std::vector<std::string> collections;

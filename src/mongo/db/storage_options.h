@@ -92,6 +92,12 @@ namespace mongo {
         // --notablescan
         // no table scans allowed
         bool noTableScan;
+
+        // --directoryperdb
+        // Stores each database’s files in its own folder in the data directory.
+        // When applied to an existing system, the directoryPerDB option alters
+        // the storage pattern of the data directory.
+        bool directoryperdb;
     };
 
     extern StorageGlobalParams storageGlobalParams;

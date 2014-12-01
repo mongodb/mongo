@@ -95,7 +95,8 @@ namespace mongo {
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
                                             const std::string& extraOpenOptions,
                                             bool durable )
-        : _durable( durable ),
+        : _path( path ),
+          _durable( durable ),
           _epoch( 0 ),
           _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
 
@@ -256,6 +257,7 @@ namespace mongo {
                                                   const StringData& ns,
                                                   const StringData& ident,
                                                   const CollectionOptions& options ) {
+        _checkIdentPath( ident );
         WiredTigerSession session( _conn, -1 );
 
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
@@ -295,6 +297,7 @@ namespace mongo {
     Status WiredTigerKVEngine::createSortedDataInterface( OperationContext* opCtx,
                                                           const StringData& ident,
                                                           const IndexDescriptor* desc ) {
+        _checkIdentPath( ident );
         return wtRCToStatus( WiredTigerIndex::Create( opCtx, _uri( ident ), _indexOptions, desc ) );
     }
 
@@ -424,5 +427,28 @@ namespace mongo {
 
     int WiredTigerKVEngine::reconfigure(const char* str) {
         return _conn->reconfigure(_conn, str);
+    }
+
+    void WiredTigerKVEngine::_checkIdentPath( const StringData& ident ) {
+        size_t start = 0;
+        size_t idx;
+        while ( ( idx = ident.find( '/', start ) ) != string::npos ) {
+            StringData dir = ident.substr( 0, idx );
+            log() << "need to created: " << dir;
+
+            boost::filesystem::path subdir = _path;
+            subdir /= dir.toString();
+            if ( !boost::filesystem::exists( subdir ) ) {
+                try {
+                    boost::filesystem::create_directory( subdir );
+                }
+                catch( std::exception& e) {
+                    log() << "error creating path " << subdir.string() << ' ' << e.what();
+                    throw;
+                }
+            }
+
+            start = idx + 1;
+        }
     }
 }

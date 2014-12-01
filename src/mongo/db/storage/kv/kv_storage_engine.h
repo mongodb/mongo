@@ -46,12 +46,22 @@ namespace mongo {
     class KVEngine;
     class KVDatabaseCatalogEntry;
 
+    struct KVStorageEngineOptions {
+        KVStorageEngineOptions() :
+            directoryPerDB(false),
+            splitCollectionAndIndexes(false) {}
+
+        bool directoryPerDB;
+        bool splitCollectionAndIndexes;
+    };
+
     class KVStorageEngine : public StorageEngine {
     public:
         /**
          * @param engine - owneership passes to me
          */
-        KVStorageEngine( KVEngine* engine );
+        KVStorageEngine( KVEngine* engine,
+                         const KVStorageEngineOptions& options = KVStorageEngineOptions() );
         virtual ~KVStorageEngine();
 
         virtual void finishInit();
@@ -90,6 +100,8 @@ namespace mongo {
 
     private:
         class RemoveDBChange;
+
+        KVStorageEngineOptions _options;
 
         // This must be the first member so it is destroyed last.
         boost::scoped_ptr<KVEngine> _engine;

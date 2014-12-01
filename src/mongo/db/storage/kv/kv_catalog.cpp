@@ -85,9 +85,14 @@ namespace {
         const Entry _entry;
     };
 
-    KVCatalog::KVCatalog( RecordStore* rs, bool isRsThreadSafe )
+    KVCatalog::KVCatalog( RecordStore* rs,
+                          bool isRsThreadSafe,
+                          bool directoryPerDb,
+                          bool splitCollectionAndIndexes )
         : _rs( rs )
         , _isRsThreadSafe(isRsThreadSafe)
+        , _directoryPerDb(directoryPerDb)
+        , _splitCollectionAndIndexes(splitCollectionAndIndexes)
         , _rand(_newRand())
     {}
 
@@ -109,9 +114,16 @@ namespace {
         return false;
     }
 
-    std::string KVCatalog::_newUniqueIdent(const char* kind) {
+    std::string KVCatalog::_newUniqueIdent(const StringData& ns, const char* kind) {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-        return str::stream() << kind << '-' << _next.fetchAndAdd(1) << '-' << _rand;
+        StringBuilder buf;
+        if ( _directoryPerDb ) {
+            buf << nsToDatabaseSubstring( ns ) << '/';
+        }
+        buf << kind;
+        buf << ( _splitCollectionAndIndexes ? '/' : '_' );
+        buf << _next.fetchAndAdd(1) << '-' << _rand;
+        return buf.str();
     }
 
     void KVCatalog::init( OperationContext* opCtx ) {
@@ -155,7 +167,7 @@ namespace {
                                              MODE_X));
         }
 
-        const string ident = _newUniqueIdent("collection");
+        const string ident = _newUniqueIdent(ns, "collection");
 
         boost::mutex::scoped_lock lk( _identsLock );
         Entry& old = _idents[ns.toString()];
@@ -278,7 +290,7 @@ namespace {
                     continue;
                 }
                 // missing, create new
-                newIdentMap.append( name, _newUniqueIdent("index") );
+                newIdentMap.append( name, _newUniqueIdent(ns, "index") );
             }
             b.append( "idxIdent", newIdentMap.obj() );
 

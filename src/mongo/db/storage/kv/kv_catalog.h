@@ -51,7 +51,10 @@ namespace mongo {
         /**
          * @param rs - does NOT take ownership
          */
-        KVCatalog( RecordStore* rs, bool isRsThreadSafe );
+        KVCatalog( RecordStore* rs,
+                   bool isRsThreadSafe,
+                   bool directoryPerDb,
+                   bool splitCollectionAndIndexes );
         ~KVCatalog();
 
         void init( OperationContext* opCtx );
@@ -97,7 +100,7 @@ namespace mongo {
                             const StringData& ns,
                             RecordId* out=NULL ) const;
 
-        std::string _newUniqueIdent(const char* kind);
+        std::string _newUniqueIdent(const StringData& ns, const char* kind);
 
         // Helpers only used by constructor and init(). Don't call from elsewhere.
         static std::string _newRand();
@@ -105,6 +108,8 @@ namespace mongo {
 
         RecordStore* _rs; // not owned
         const bool _isRsThreadSafe;
+        const bool _directoryPerDb;
+        const bool _splitCollectionAndIndexes;
 
         // These two are only used for ident generation inside _newUniqueIdent.
         std::string _rand; // effectively const after init() returns

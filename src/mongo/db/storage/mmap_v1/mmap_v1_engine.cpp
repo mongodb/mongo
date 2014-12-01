@@ -340,7 +340,7 @@ namespace {
             new MMAPV1DatabaseCatalogEntry(opCtx,
                                            db,
                                            storageGlobalParams.dbpath,
-                                           mmapv1GlobalOptions.directoryperdb,
+                                           storageGlobalParams.directoryperdb,
                                            false);
 
         boost::mutex::scoped_lock lk(_entryMapMutex);
@@ -380,7 +380,7 @@ namespace {
         for ( boost::filesystem::directory_iterator i( path );
               i != boost::filesystem::directory_iterator();
               ++i ) {
-            if (mmapv1GlobalOptions.directoryperdb) {
+            if (storageGlobalParams.directoryperdb) {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );

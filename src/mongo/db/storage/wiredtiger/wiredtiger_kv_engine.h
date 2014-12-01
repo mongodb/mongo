@@ -120,12 +120,15 @@ namespace mongo {
 
     private:
 
+        void _checkIdentPath( const StringData& ident );
+
         string _uri( const StringData& ident ) const;
         bool _drop( const StringData& ident );
 
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;
         boost::scoped_ptr<WiredTigerSessionCache> _sessionCache;
+        std::string _path;
         bool _durable;
 
         string _rsOptions;

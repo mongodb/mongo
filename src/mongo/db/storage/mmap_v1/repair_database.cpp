@@ -70,7 +70,7 @@ namespace mongo {
                              const string& path = storageGlobalParams.dbpath);
 
     void _deleteDataFiles(const std::string& database) {
-        if (mmapv1GlobalOptions.directoryperdb) {
+        if (storageGlobalParams.directoryperdb) {
             FileAllocator::get()->waitUntilFinished();
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
                     boost::filesystem::remove_all(
@@ -103,7 +103,7 @@ namespace mongo {
     // back up original database files to 'temp' dir
     void _renameForBackup( const std::string& database, const Path &reservedPath ) {
         Path newPath( reservedPath );
-        if (mmapv1GlobalOptions.directoryperdb)
+        if (storageGlobalParams.directoryperdb)
             newPath /= database;
         class Renamer : public FileOp {
         public:
@@ -150,7 +150,7 @@ namespace mongo {
     // move temp files to standard data dir
     void _replaceWithRecovered( const string& database, const char *reservedPathString ) {
         Path newPath(storageGlobalParams.dbpath);
-        if (mmapv1GlobalOptions.directoryperdb)
+        if (storageGlobalParams.directoryperdb)
             newPath /= database;
         class Replacer : public FileOp {
         public:
@@ -192,7 +192,7 @@ namespace mongo {
         string c = database;
         c += '.';
         boost::filesystem::path p(path);
-        if (mmapv1GlobalOptions.directoryperdb)
+        if (storageGlobalParams.directoryperdb)
             p /= database;
         boost::filesystem::path q;
         q = p / (c+"ns");
@@ -325,7 +325,7 @@ namespace mongo {
                 dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
                                                              dbName,
                                                              reservedPathString,
-                                                             mmapv1GlobalOptions.directoryperdb,
+                                                             storageGlobalParams.directoryperdb,
                                                              true));
                 invariant(!dbEntry->exists());
                 tempDatabase.reset( new Database(dbName, dbEntry.get()));
