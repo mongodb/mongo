@@ -168,7 +168,7 @@ extern void __wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp);
-extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp);
+extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp);
 extern int __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell);

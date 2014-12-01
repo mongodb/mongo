@@ -11,7 +11,7 @@ static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static void __rec_discard_tree(WT_SESSION_IMPL *, WT_REF *, int, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *, int *);
 
 /*
  * __wt_evict --
@@ -24,17 +24,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_STATE *txn_state;
-	int istree;
-
-	/*
-	 * Check for an append-only workload needing an in-memory split. Note
-	 * this happens first, because the WT_REF we're evicting may change.
-	 */
-	if (!exclusive)
-		WT_RET(__wt_split_insert(session, &ref));
+	int inmem_split, istree;
 
 	page = ref->page;
-	istree = 0;
+	inmem_split = istree = 0;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
@@ -57,7 +50,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * unlikely eviction would choose an internal page with children, it's
 	 * not disallowed anywhere.
 	 */
-	WT_ERR(__rec_review(session, ref, exclusive, 1, &istree));
+	WT_ERR(__rec_review(session, ref, exclusive, 1, &inmem_split, &istree));
+
+	/*
+	 * If there was an in-memory split, the tree has been left in the state
+	 * we want: there is nothing more to do.
+	 */
+	if (inmem_split)
+		goto done;
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -109,7 +109,7 @@ err:		/*
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
-	session->excl_next = 0;
+done:	session->excl_next = 0;
 
 	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
@@ -258,7 +258,8 @@ __rec_discard_tree(
  */
 static int
 __rec_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int top, int *istree)
+    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive,
+    int top, int *inmem_splitp, int *istreep)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -303,9 +304,9 @@ __rec_review(
 				 * know to do a full walk when discarding the
 				 * page.
 				 */
-				*istree = 1;
-				WT_RET(__rec_review(
-				    session, child, exclusive, 0, istree));
+				*istreep = 1;
+				WT_RET(__rec_review(session, child, exclusive,
+				    0, inmem_splitp, istreep));
 				break;
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
@@ -372,6 +373,19 @@ __rec_review(
 	 */
 	if (!top && (mod == NULL || !F_ISSET(mod, WT_PM_REC_EMPTY)))
 		return (EBUSY);
+
+	/*
+	 * Check for an append-only workload needing an in-memory split.
+	 *
+	 * We can't do this earlier because in-memory splits require exclusive
+	 * access.  If an in-memory split completes, the page stays in memory
+	 * and the tree is left in the desired state: avoid the usual cleanup.
+	 */
+	if (top && !exclusive) {
+		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
+		if (*inmem_splitp)
+			return (0);
+	}
 
 	/*
 	 * If the page is dirty and can possibly change state, write it so we

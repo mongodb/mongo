@@ -1001,23 +1001,24 @@ err:	if (locked)
  * list into a separate page.
  */
 int
-__wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
+__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page, *right;
-	WT_REF *ref, *split_ref[2];
+	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	WT_UPDATE *upd;
+	void *key;
 	size_t page_decr, parent_incr, right_incr, size;
 	int i;
 
 	btree = S2BT(session);
-	ref = *refp;
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
+	*splitp = 0;
 
 	/*
 	 * Check for pages with append-only workloads. A common application
@@ -1071,11 +1072,20 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	/*
 	 * The first page in the split is the current page, but we still need to
 	 * create a replacement WT_REF (the original is set to split-status and
-	 * eventually freed). Note we're leaving the WT_REF in the exclusively
-	 * locked state, we're going to proceed with eviction after this split.
+	 * eventually freed).
 	 */
 	WT_ERR(__wt_calloc_def(session, 1, &split_ref[0]));
-	*split_ref[0] = *ref;
+	child = split_ref[0];
+	*child = *ref;
+
+	/*
+	 * The new reference will be visible to readers once the split
+	 * completes.  Make a copy of the key: the old reference will
+	 * eventually be freed.
+	 */
+	child->state = WT_REF_MEM;
+	__wt_ref_key(page, ref, &key, &size);
+	WT_RET(__wt_row_ikey(session, 0, key, size, &child->key.ikey));
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
@@ -1087,11 +1097,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD *));
 
 	WT_ERR(__wt_calloc_def(session, 1, &split_ref[1]));
-	split_ref[1]->page = right;
-	split_ref[1]->state = WT_REF_MEM;
+	child = split_ref[1];
+	child->page = right;
+	child->state = WT_REF_MEM;
 	WT_ERR(__wt_row_ikey(session, 0,
 	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins),
-	    &split_ref[1]->key.ikey));
+	    &child->key.ikey));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
 	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(ins));
@@ -1200,11 +1211,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF **refp)
 			WT_ASSERT(session, current_ins != ins);
 #endif
 
-	/*
-	 * The parent split function clears the array of new WT_REFs to ensure
-	 * they aren't in two places on error, reset eviction's WT_REF handle.
-	 */
-	*refp = split_ref[0];
+	/* Let our caller know that we split. */
+	*splitp = 1;
 
 	/*
 	 * Split into the parent.
@@ -1328,9 +1336,11 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/*
 	 * After the split, we're going to discard the WT_REF, account for the
-	 * change in memory footprint.
+	 * change in memory footprint.  Row store pages have keys that may be
+	 * instantiated, check for that.
 	 */
-	if ((ikey = __wt_ref_key_instantiated(ref)) != NULL) {
+	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
 		ikey_size = sizeof(WT_IKEY) + ikey->size;
 		WT_MEMSIZE_ADD(parent_decr, ikey_size);
 	}
