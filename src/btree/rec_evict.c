@@ -257,9 +257,8 @@ __rec_discard_tree(
  *	for conditions that would block its eviction.
  */
 static int
-__rec_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive,
-    int top, int *inmem_splitp, int *istreep)
+__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
+    int exclusive, int top, int *inmem_splitp, int *istreep)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
