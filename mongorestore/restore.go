@@ -40,7 +40,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 					}
 					err := restore.RestoreIntent(intent)
 					if err != nil {
-						resultChan <- err
+						resultChan <- fmt.Errorf("%v: %v", intent.Key(), err)
 						return
 					}
 					restore.manager.Finish(intent)
@@ -66,7 +66,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 	for intent := restore.manager.Pop(); intent != nil; intent = restore.manager.Pop() {
 		err := restore.RestoreIntent(intent)
 		if err != nil {
-			return err
+			return fmt.Errorf("%v: %v", intent.Key(), err)
 		}
 		restore.manager.Finish(intent)
 	}
@@ -121,7 +121,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		log.Logf(log.Always, "no metadata file; reading indexes from %v", systemIndexesFile)
 		indexes, err = restore.IndexesFromBSON(intent, systemIndexesFile)
 		if err != nil {
-			return fmt.Errorf("error reading indexes: %v", err)
+			return fmt.Errorf("error reading indexes from %v: %v", systemIndexesFile, err)
 		}
 	}
 
@@ -130,11 +130,11 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		log.Logf(log.Always, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
-			return fmt.Errorf("error reading metadata file: %v", err) //TODO better errors here
+			return fmt.Errorf("error reading metadata file %v: %v", intent.MetadataPath, err)
 		}
 		options, indexes, err = restore.MetadataFromJSON(jsonBytes)
 		if err != nil {
-			return fmt.Errorf("error parsing metadata file (%v): %v", string(jsonBytes), err)
+			return fmt.Errorf("error parsing metadata file %v: %v", intent.MetadataPath, err)
 		}
 		if !restore.OutputOptions.NoOptionsRestore {
 			if options != nil {
@@ -167,14 +167,14 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		} else {
 			fileInfo, err := os.Lstat(intent.BSONPath)
 			if err != nil {
-				return fmt.Errorf("error reading bson file: %v", err)
+				return fmt.Errorf("error reading BSON file %v: %v", intent.BSONPath, err)
 			}
 			size = fileInfo.Size()
 			log.Logf(log.Info, "\tfile %v is %v bytes", intent.BSONPath, size)
 
 			rawBSONSource, err = os.Open(intent.BSONPath)
 			if err != nil {
-				return fmt.Errorf("error reading bson file: %v", err)
+				return fmt.Errorf("error reading BSON file %v: %v", intent.BSONPath, err)
 			}
 		}
 
@@ -183,17 +183,16 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 		err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, size)
 		if err != nil {
-			return err
+			return fmt.Errorf("error restoring from %v: %v", intent.BSONPath, err)
 		}
 	}
 
 	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logf(log.Always, "restoring indexes for collection %v from metadata", intent.Key())
-		//TODO better logging
 		err = restore.CreateIndexes(intent, indexes)
 		if err != nil {
-			return fmt.Errorf("error creating indexes: %v", err)
+			return fmt.Errorf("error creating indexes for %v: %v", intent.Key(), err)
 		}
 	} else {
 		log.Log(log.Always, "no indexes to restore")
