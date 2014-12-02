@@ -176,7 +176,6 @@ namespace mongo {
         bool _ended;
     };
 
-    class Database;
 
     /**
      * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.

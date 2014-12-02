@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/currentop_command.h"
 #include "mongo/db/db.h"
@@ -1024,10 +1025,7 @@ namespace {
         return shutdownInProgress.loadRelaxed() != 0;
     }
 
-    static void shutdownServer(OperationContext* txn) {
-        // Must hold global lock to get to here
-        invariant(txn->lockState()->isW());
-
+    static void shutdownServer() {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
@@ -1039,7 +1037,7 @@ namespace {
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->cleanShutdown(txn);
+        storageEngine->cleanShutdown();
     }
 
     void exitCleanly(ExitCode code) {
@@ -1055,20 +1053,30 @@ namespace {
             invariant(false);
         }
 
-        OperationContextImpl txn;
-
         getGlobalEnvironment()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
 
-        ScopedTransaction transaction(&txn, MODE_X);
-        Lock::GlobalWrite lk(txn.lockState());
+        // We should always be able to acquire the global lock at shutdown.
+        //
+        // TODO: This call chain uses the locker directly, because we do not want to start an
+        // operation context, which also instantiates a recovery unit. Also, using the
+        // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
+        // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
+        DefaultLockerImpl globalLocker(0);
+        LockResult result = globalLocker.lockGlobalBegin(MODE_X);
+        if (result == LOCK_WAITING) {
+            result = globalLocker.lockGlobalComplete(UINT_MAX);
+        }
+
+        invariant(LOCK_OK == result);
+
         log() << "now exiting" << endl;
 
         // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
         // and data files, close sockets, etc.
         try {
-            shutdownServer(&txn);
+            shutdownServer();
         }
         catch (const DBException& ex) {
             severe() << "shutdown failed with DBException " << ex;
@@ -1082,6 +1090,7 @@ namespace {
             severe() << "shutdown failed with exception";
             std::terminate();
         }
+
         dbexit( code );
     }
 

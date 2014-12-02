@@ -109,7 +109,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual void cleanShutdown(OperationContext* txn) {}
+        virtual void cleanShutdown() {}
 
         // rocks specific api
 

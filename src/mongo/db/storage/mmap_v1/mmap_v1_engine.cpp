@@ -403,7 +403,7 @@ namespace {
         return getDur().isDurable();
     }
 
-    void MMAPV1Engine::cleanShutdown(OperationContext* txn) {
+    void MMAPV1Engine::cleanShutdown() {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
@@ -413,8 +413,7 @@ namespace {
         if (storageGlobalParams.dur) {
             log() << "shutdown: final commit..." << endl;
 
-            getDur().commitAndStopDurThread(txn);
-
+            getDur().commitAndStopDurThread();
             flushAllFiles(true);
         }
 

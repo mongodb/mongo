@@ -166,7 +166,7 @@ namespace mongo {
          *
          * There is intentionally no uncleanShutdown().
          */
-        virtual void cleanShutdown(OperationContext* txn) {}
+        virtual void cleanShutdown() = 0;
 
     protected:
         /**

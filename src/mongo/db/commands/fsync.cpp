@@ -152,7 +152,7 @@ namespace mongo {
     void FSyncLockThread::doRealWork() {
         SimpleMutex::scoped_lock lkf(filesLockedFsync);
 
-        OperationContextImpl txn;   // XXX?
+        OperationContextImpl txn;
         ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
 

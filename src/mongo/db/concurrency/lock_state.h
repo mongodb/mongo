@@ -255,6 +255,7 @@ namespace mongo {
         Lock::ScopedLock* _scopedLk;
     };
 
+    typedef LockerImpl<false> DefaultLockerImpl;
     typedef LockerImpl<true> MMAPV1LockerImpl;
 
 

@@ -142,7 +142,7 @@ namespace mongo {
              *
              * Must be called under the global X lock.
              */
-            virtual void commitAndStopDurThread(OperationContext* txn) = 0;
+            virtual void commitAndStopDurThread() = 0;
 
             /** Declare write intent for an int */
             inline int& writingInt(int& d) { return *static_cast<int*>(writingPtr( &d, sizeof(d))); }
@@ -204,7 +204,7 @@ namespace mongo {
             bool commitIfNeeded(OperationContext* txn);
             void syncDataAndTruncateJournal(OperationContext* txn) {}
             bool isDurable() const { return false; }
-            void commitAndStopDurThread(OperationContext* txn) { }
+            void commitAndStopDurThread() { }
         };
 
         class DurableImpl : public DurableInterface {
@@ -219,7 +219,7 @@ namespace mongo {
             bool commitIfNeeded(OperationContext* txn);
             void syncDataAndTruncateJournal(OperationContext* txn);
             bool isDurable() const { return true; }
-            void commitAndStopDurThread(OperationContext* txn);
+            void commitAndStopDurThread();
         };
 
     } // namespace dur

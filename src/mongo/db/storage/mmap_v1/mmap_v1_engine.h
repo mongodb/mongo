@@ -64,11 +64,11 @@ namespace mongo {
 
         virtual bool isDurable() const;
 
-        Status closeDatabase(OperationContext* txn, const StringData& db );
+        virtual Status closeDatabase(OperationContext* txn, const StringData& db);
 
-        Status dropDatabase(OperationContext* txn, const StringData& db );
+        virtual Status dropDatabase(OperationContext* txn, const StringData& db);
 
-        void cleanShutdown(OperationContext* txn);
+        virtual void cleanShutdown();
 
     private:
         static void _listDatabases( const std::string& directory,

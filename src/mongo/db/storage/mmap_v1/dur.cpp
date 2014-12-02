@@ -288,12 +288,13 @@ namespace mongo {
             return true;
         }
 
-        void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
-            // This is only called by clean shutdown and the global lock must be held to ensure
-            // there will not be any more writes.
-            invariant(txn->lockState()->isW());
+        void DurableImpl::commitAndStopDurThread() {
+            NotifyAll::When when = commitJob._notify.now();
 
-            commitNow(txn);
+            // There is always just one waiting anyways
+            flushRequested.notify_one();
+            commitJob._notify.waitFor(when);
+
             shutdownRequested.store(1);
         }
 

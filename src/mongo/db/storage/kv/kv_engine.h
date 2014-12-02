@@ -119,7 +119,7 @@ namespace mongo {
          *
          * There is intentionally no uncleanShutdown().
          */
-        virtual void cleanShutdown(OperationContext* txn) = 0;
+        virtual void cleanShutdown() = 0;
 
         /**
          * The destructor will never be called from mongod, but may be called from tests.
