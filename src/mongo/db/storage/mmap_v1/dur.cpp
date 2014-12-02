@@ -138,7 +138,6 @@ namespace mongo {
         Stats::S * Stats::other() {
             return curr == &_a ? &_b : &_a;
         }
-        string _CSVHeader();
 
         string Stats::S::_CSVHeader() { 
             return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
@@ -151,8 +150,8 @@ namespace mongo {
                 _commits << '\t' << fixed << 
                 _journaledBytes / 1000000.0 << '\t' << 
                 _writeToDataFilesBytes / 1000000.0 << '\t' << 
-                _commitsInWriteLock << '\t' << 
-                _earlyCommits <<  '\t' << 
+                0 << '\t' <<
+                0 <<  '\t' <<
                 (unsigned) (_prepLogBufferMicros/1000) << '\t' << 
                 (unsigned) (_writeToJournalMicros/1000) << '\t' << 
                 (unsigned) (_writeToDataFilesMicros/1000) << '\t' << 
@@ -167,8 +166,8 @@ namespace mongo {
                        "journaledMB" << _journaledBytes / 1000000.0 <<
                        "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0 <<
                        "compression" << _journaledBytes / (_uncompressedBytes+1.0) <<
-                       "commitsInWriteLock" << _commitsInWriteLock <<
-                       "earlyCommits" << _earlyCommits << 
+                       "commitsInWriteLock" << 0 <<
+                       "earlyCommits" << 0 <<
                        "timeMs" <<
                        BSON( "dt" << _dtMillis <<
                              "prepLogBuffer" << (unsigned) (_prepLogBufferMicros/1000) <<
@@ -226,8 +225,6 @@ namespace mongo {
 
 
         bool DurableImpl::commitNow(OperationContext* txn) {
-            stats.curr->_earlyCommits++;
-
             NotifyAll::When when = commitJob._notify.now();
 
             AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
@@ -542,14 +539,9 @@ namespace mongo {
 
         static void remapPrivateView() {
             try {
-                // REMAPPRIVATEVIEW
-                //
-                // remapping private views must occur after WRITETODATAFILES otherwise
-                // we wouldn't see newly written data on reads.
-                //
+                // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't
+                // see newly written data on reads.
                 invariant(!commitJob.hasWritten());
-
-                stats.curr->_commitsInWriteLock++;
 
                 REMAPPRIVATEVIEW();
             }
