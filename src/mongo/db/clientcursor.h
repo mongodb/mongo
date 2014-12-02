@@ -64,14 +64,13 @@ namespace mongo {
         ClientCursor(const Collection* collection,
                      PlanExecutor* exec,
                      int qopts = 0,
-                     const BSONObj query = BSONObj());
+                     const BSONObj query = BSONObj(),
+                     bool isAggCursor = false);
 
         /**
          * This ClientCursor is used to track sharding state.
          */
         ClientCursor(const Collection* collection);
-
-        ~ClientCursor();
 
         //
         // Basic accessors
@@ -80,6 +79,24 @@ namespace mongo {
         CursorId cursorid() const { return _cursorid; }
         std::string ns() const { return _ns; }
         const Collection* collection() const { return _collection; }
+        bool isAggCursor() const { return _isAggCursor; }
+
+        //
+        // Pinning functionality.
+        //
+
+        /**
+         * Marks this ClientCursor as in use.  unsetPinned() must be called before the destructor of
+         * this ClientCursor is invoked.
+         */
+        void setPinned() { _isPinned = true; }
+
+        /**
+         * Marks this ClientCursor as no longer in use.
+         */
+        void unsetPinned() { _isPinned = false; }
+
+        bool isPinned() const { return _isPinned; }
 
         /**
          * This is called when someone is dropping a collection or something else that
@@ -135,18 +152,6 @@ namespace mongo {
         void incPos(int n) { _pos += n; }
         void setPos(int n) { _pos = n; }
 
-        /**
-         * Is this ClientCursor backed by an aggregation pipeline. Defaults to false.
-         *
-         * Agg executors differ from others in that they manage their own locking internally and
-         * should not be killed or destroyed when the underlying collection is deleted.
-         *
-         * Note: This should *not* be set for the internal cursor used as input to an aggregation.
-         */
-        bool isAggCursor;
-
-        unsigned pinValue() const { return _pinValue; }
-
         static long long totalOpen();
 
         //
@@ -191,9 +196,13 @@ namespace mongo {
         RecoveryUnit* releaseOwnedRecoveryUnit();
 
     private:
-        friend class ClientCursorMonitor;
-        friend class CmdCursorInfo;
         friend class CollectionCursorCache;
+        friend class ClientCursorPin;
+
+        /**
+         * Only friends are allowed to destroy ClientCursor objects.
+         */
+        ~ClientCursor();
 
         /**
          * Initialization common between both constructors for the ClientCursor. The database must
@@ -207,12 +216,6 @@ namespace mongo {
 
         // The ID of the ClientCursor.
         CursorId _cursorid;
-
-        // A variable indicating the state of the ClientCursor.  Possible values:
-        //   0: Normal behavior.  May time out.
-        //   1: No timing out of this ClientCursor.
-        // 100: Currently in use (via ClientCursorPin).
-        unsigned _pinValue;
 
         // The namespace we're operating on.
         std::string _ns;
@@ -230,6 +233,21 @@ namespace mongo {
 
         // See the QueryOptions enum in dbclient.h
         int _queryOptions;
+
+        // Is this ClientCursor backed by an aggregation pipeline?  Defaults to false.
+        //
+        // Agg executors differ from others in that they manage their own locking internally and
+        // should not be killed or destroyed when the underlying collection is deleted.
+        //
+        // Note: This should *not* be set for the internal cursor used as input to an aggregation.
+        bool _isAggCursor;
+
+        // Is this cursor in use?  Defaults to false.
+        bool _isPinned;
+
+        // Is the "no timeout" flag set on this cursor?  If false, this cursor may be targeted for
+        // deletion after an interval of inactivity.  Defaults to false.
+        bool _isNoTimeout;
 
         // TODO: document better.
         OpTime _slaveReadTill;

@@ -275,7 +275,7 @@ namespace mongo {
                 cc->updateSlaveLocation(txn, curop); 
             }
 
-            if (cc->isAggCursor) {
+            if (cc->isAggCursor()) {
                 // Agg cursors handle their own locking internally.
                 ctx.reset(); // unlocks
             }

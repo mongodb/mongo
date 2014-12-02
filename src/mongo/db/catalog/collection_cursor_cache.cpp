@@ -300,13 +300,13 @@ namespace mongo {
 
                 invariant( cc->getExecutor() == NULL || cc->getExecutor()->collection() == NULL );
 
-                // If there is a pinValue >= 100, somebody is actively using the CC and we do
-                // not delete it.  Instead we notify the holder that we killed it.  The holder
-                // will then delete the CC.
-                // pinvalue is <100, so there is nobody actively holding the CC.  We can
-                // safely delete it as nobody is holding the CC.
-
-                if (cc->pinValue() < 100) {
+                // If the CC is pinned, somebody is actively using it and we do not delete it.
+                // Instead we notify the holder that we killed it.  The holder will then delete the
+                // CC.
+                //
+                // If the CC is not pinned, there is nobody actively holding it.  We can safely
+                // delete it.
+                if (!cc->isPinned()) {
                     delete cc;
                 }
             }
@@ -326,7 +326,7 @@ namespace mongo {
                     continue;
                 }
 
-                if (cc->pinValue() >= 100 || cc->isAggCursor) {
+                if (cc->isPinned() || cc->isAggCursor()) {
                     // Pinned cursors need to stay alive, so we leave them around.  Aggregation
                     // cursors also can stay alive (since they don't have their lifetime bound to
                     // the underlying collection).  However, if they have an associated executor, we
@@ -416,8 +416,8 @@ namespace mongo {
         if ( pin ) {
             uassert( 12051,
                      "clientcursor already in use? driver problem?",
-                     cursor->_pinValue < 100 );
-            cursor->_pinValue += 100;
+                     !cursor->isPinned() );
+            cursor->setPinned();
         }
 
         return cursor;
@@ -426,8 +426,8 @@ namespace mongo {
     void CollectionCursorCache::unpin( ClientCursor* cursor ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
-        invariant( cursor->_pinValue >= 100 );
-        cursor->_pinValue -= 100;
+        invariant( cursor->isPinned() );
+        cursor->unsetPinned();
     }
 
     void CollectionCursorCache::getCursorIds( std::set<CursorId>* openCursors ) {
@@ -490,7 +490,7 @@ namespace mongo {
 
         massert( 16089,
                  str::stream() << "Cannot kill active cursor " << id,
-                 cursor->pinValue() < 100 );
+                 !cursor->isPinned() );
 
         cursor->kill();
         _deregisterCursor_inlock( cursor );

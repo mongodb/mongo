@@ -69,18 +69,22 @@ namespace mongo {
         return cursorStatsOpen.get();
     }
 
-    ClientCursor::ClientCursor(const Collection* collection, PlanExecutor* exec,
-                               int qopts, const BSONObj query)
-        : _collection( collection ),
-          _countedYet( false ),
+    ClientCursor::ClientCursor(const Collection* collection,
+                               PlanExecutor* exec,
+                               int qopts,
+                               const BSONObj query,
+                               bool isAggCursor)
+        : _collection(collection),
+          _countedYet(false),
+          _isAggCursor(isAggCursor),
           _unownedRU(NULL) {
 
         _exec.reset(exec);
         _ns = exec->ns();
         _query = query;
         _queryOptions = qopts;
-        if ( exec->collection() ) {
-            invariant( collection == exec->collection() );
+        if (exec->collection()) {
+            invariant(collection == exec->collection());
         }
         init();
     }
@@ -88,8 +92,9 @@ namespace mongo {
     ClientCursor::ClientCursor(const Collection* collection)
         : _ns(collection->ns().ns()),
           _collection(collection),
-          _countedYet( false ),
+          _countedYet(false),
           _queryOptions(QueryOption_NoCursorTimeout),
+          _isAggCursor(false),
           _unownedRU(NULL) {
         init();
     }
@@ -97,17 +102,17 @@ namespace mongo {
     void ClientCursor::init() {
         invariant( _collection );
 
-        isAggCursor = false;
+        _isPinned = false;
+        _isNoTimeout = false;
 
         _idleAgeMillis = 0;
         _leftoverMaxTimeMicros = 0;
-        _pinValue = 0;
         _pos = 0;
 
         if (_queryOptions & QueryOption_NoCursorTimeout) {
             // cursors normally timeout after an inactivity period to prevent excess memory use
             // setting this prevents timeout of the cursor in question.
-            ++_pinValue;
+            _isNoTimeout = true;
             cursorStatsOpenNoTimeout.increment();
         }
 
@@ -124,10 +129,12 @@ namespace mongo {
             return;
         }
 
+        invariant( !_isPinned ); // Must call unsetPinned() before invoking destructor.
+
         if ( _countedYet ) {
             _countedYet = false;
             cursorStatsOpen.decrement();
-            if ( _pinValue == 1 || _pinValue == 101 )
+            if ( _isNoTimeout )
                 cursorStatsOpenNoTimeout.decrement();
         }
 
@@ -140,7 +147,7 @@ namespace mongo {
         _collection = NULL;
         _cursorid = INVALID_CURSOR_ID;
         _pos = -2;
-        _pinValue = 0;
+        _isNoTimeout = false;
     }
 
     void ClientCursor::kill() {
@@ -156,7 +163,10 @@ namespace mongo {
 
     bool ClientCursor::shouldTimeout(int millis) {
         _idleAgeMillis += millis;
-        return _idleAgeMillis > 600000 && _pinValue == 0;
+        if (_isNoTimeout || _isPinned) {
+            return false;
+        }
+        return _idleAgeMillis > 600000;
     }
 
     void ClientCursor::setIdleTime( int millis ) {
@@ -223,20 +233,22 @@ namespace mongo {
         if ( !_cursor )
             return;
 
-        invariant( _cursor->pinValue() >= 100 );
+        invariant( _cursor->isPinned() );
 
         if ( _cursor->collection() == NULL ) {
-            // the ClientCursor was killed while we had it
-            // therefore its our responsibility to kill it
-            delete _cursor;
-            _cursor = NULL; // defensive
+            // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
+            // kill it.
+            deleteUnderlying();
         }
         else {
+            // Unpin the cursor under the collection cursor cache lock.
             _cursor->collection()->cursorCache()->unpin( _cursor );
         }
     }
 
     void ClientCursorPin::deleteUnderlying() {
+        invariant( _cursor->isPinned() );
+        _cursor->unsetPinned(); // ClientCursor objects must be unpinned before destruction.
         delete _cursor;
         _cursor = NULL;
     }
