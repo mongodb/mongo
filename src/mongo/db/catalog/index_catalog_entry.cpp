@@ -141,13 +141,19 @@ namespace mongo {
     }
 
 
+    /**
+     * RAII class, which associates a new RecoveryUnit with an OperationContext for the purposes
+     * of simulating a sub-transaction. Takes ownership of the new recovery unit and frees it at
+     * destruction time.
+     */
     class RecoveryUnitSwap {
     public:
         RecoveryUnitSwap(OperationContext* txn, RecoveryUnit* newRecoveryUnit)
             : _txn(txn),
-              _oldRecoveryUnit(_txn->releaseRecoveryUnit()) {
+              _oldRecoveryUnit(_txn->releaseRecoveryUnit()),
+              _newRecoveryUnit(newRecoveryUnit) {
 
-            _txn->setRecoveryUnit(newRecoveryUnit);
+            _txn->setRecoveryUnit(_newRecoveryUnit.get());
         }
 
         ~RecoveryUnitSwap() {
@@ -156,9 +162,14 @@ namespace mongo {
         }
 
     private:
-        // Neither of these are owned
+        // Not owned
         OperationContext* const _txn;
+
+        // Owned, but life-time is not controlled
         RecoveryUnit* const _oldRecoveryUnit;
+
+        // Owned and life-time is controlled
+        const boost::scoped_ptr<RecoveryUnit> _newRecoveryUnit;
     };
 
     void IndexCatalogEntry::setMultikey(OperationContext* txn) {
