@@ -38,7 +38,7 @@ __wt_log_written_reset(WT_SESSION_IMPL *session)
 	WT_LOG *log;
 
 	conn = S2C(session);
-	if (!conn->logging)
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return;
 	log = conn->log;
 	log->log_written = 0;
@@ -1498,7 +1498,7 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	conn = S2C(session);
 
-	if (!conn->logging)
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
 
 	va_copy(ap_copy, ap);

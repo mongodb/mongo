@@ -532,10 +532,9 @@ common_wiredtiger_open = [
 	        the path to a directory into which the log files are written.
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
-	    Config('prealloc', '2', r'''
-	        number of pre-allocated log files.
-                May increase if actual usage does not keep up.''',
-	        min='0'),
+	    Config('prealloc', 'true', r'''
+	        pre-allocate log files.''',
+	        type='boolean'),
 	    ]),
 	Config('mmap', 'true', r'''
 	    Use memory mapping to access files when possible''',

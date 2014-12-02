@@ -247,8 +247,10 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
-	int		 logging;	/* Global logging configuration */
-	int		 archive;	/* Global archive configuration */
+#define	WT_CONN_LOG_ARCHIVE	0x01	/* Archive is enabled */
+#define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
+#define	WT_CONN_LOG_PREALLOC	0x04	/* Pre-allocation is enabled */
+	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log archive wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log archive session */
 	wt_thread_t	 log_tid;	/* Log archive thread */

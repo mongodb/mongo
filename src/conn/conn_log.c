@@ -57,7 +57,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		return (0);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
-	conn->archive = cval.val != 0;
+	if (cval.val != 0)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (wt_off_t)cval.val;
@@ -67,7 +68,14 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
-	conn->log_prealloc = (uint32_t)cval.val;
+	/*
+	 * If pre-allocation is configured, set the initial number to one.
+	 * We'll adapt as load dictates.
+	 */
+	if (cval.val != 0) {
+		FLD_SET(conn->log_flags, WT_CONN_LOG_PREALLOC);
+		conn->log_prealloc = 1;
+	}
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
@@ -159,7 +167,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	u_int i, prepared, reccount;
+	u_int i, reccount;
 	char **recfiles;
 
 	conn = S2C(session);
@@ -174,10 +182,8 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_dirlist(session, conn->log_path,
 	    WT_LOG_PREPNAME, WT_DIRLIST_INCLUDE,
 	    &recfiles, &reccount));
-	prepared = reccount;
 	__wt_log_files_free(session, recfiles, reccount);
 	recfiles = NULL;
-	reccount = 0;
 	/*
 	 * Adjust the number of files to pre-allocate if we find that
 	 * the critical path had to allocate them since we last ran.
@@ -194,7 +200,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	/*
 	 * Allocate up to the maximum number that we just computed and detected.
 	 */
-	for (i = prepared; i < (u_int)conn->log_prealloc; i++)
+	for (i = reccount; i < (u_int)conn->log_prealloc; i++)
 		WT_ERR(__wt_log_prealloc(session, ++log->prep_fileid));
 
 	if (0)
@@ -221,7 +227,8 @@ __wt_log_truncate_files(
 	WT_UNUSED(cfg);
 	conn = S2C(session);
 	log = conn->log;
-	if (F_ISSET(conn, WT_CONN_SERVER_RUN) && conn->archive)
+	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE))
 		WT_RET_MSG(session, EINVAL,
 		    "Attempt to archive manually while a server is running");
 
@@ -270,7 +277,7 @@ __log_server(void *arg)
 		/*
 		 * Perform the archive.
 		 */
-		if (conn->archive) {
+		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
 			if (__wt_try_writelock(
 			    session, log->log_archive_lock) == 0) {
 				locked = 1;
@@ -315,7 +322,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!run)
 		return (0);
 
-	conn->logging = 1;
+	FLD_SET(conn->log_flags, WT_CONN_LOG_ENABLED);
 	/*
 	 * Logging is on, allocate the WT_LOG structure and open the log file.
 	 */
@@ -348,7 +355,8 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_log_slot_init(session));
 
 	/* If no log thread services are configured, we're done. */ 
-	if (!conn->archive && conn->log_prealloc == 0)
+	if (!FLD_ISSET(conn->log_flags,
+	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
 		return (0);
 
 	/*
@@ -392,7 +400,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	if (!conn->logging)
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
 	if (conn->log_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_cond));
