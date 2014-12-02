@@ -113,10 +113,6 @@ namespace repl {
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpApplied(
-                const OperationContext* txn,
-                const WriteConcernOptions& writeConcern);
-
         virtual Status stepDown(OperationContext* txn,
                                 bool force,
                                 const Milliseconds& waitTime,

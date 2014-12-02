@@ -173,14 +173,6 @@ namespace repl {
                 const WriteConcernOptions& writeConcern) = 0;
 
         /**
-         * Like awaitReplication(), above, but waits for the replication of the last operation
-         * applied to this node.
-         */
-        virtual StatusAndDuration awaitReplicationOfLastOpApplied(
-                const OperationContext* txn,
-                const WriteConcernOptions& writeConcern) = 0;
-
-        /**
          * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
          * false, before doing so it will wait for 'waitTime' for one other node to be within 10
          * seconds of this node's optime before stepping down. Returns a Status with the code

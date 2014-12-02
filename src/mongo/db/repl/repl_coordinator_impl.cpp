@@ -910,16 +910,6 @@ namespace {
                 &timer, &lock, txn, txn->getClient()->getLastOp(), writeConcern);
     }
 
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorImpl::awaitReplicationOfLastOpApplied(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        Timer timer;
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        return _awaitReplication_inlock(
-                &timer, &lock, txn, _getMyLastOptime_inlock(), writeConcern);
-    }
-
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitReplication_inlock(
             const Timer* timer,
             boost::unique_lock<boost::mutex>* lock,
@@ -1017,6 +1007,13 @@ namespace {
         const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
         const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
+        if (!getCurrentMemberState().primary()) {
+            // Note this check is inherently racy - it's always possible for the node to
+            // stepdown from some other path before we acquire the global shared lock, but
+            // that's okay because we are resiliant to that happening in _stepDownContinue.
+            return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        }
+
         LockResult lockState = txn->lockState()->lockGlobalBegin(MODE_S);
         // We've requested the global shared lock which will stop new writes from coming in,
         // but existing writes could take a long time to finish, so kill all user operations
@@ -1034,11 +1031,6 @@ namespace {
         invariant(lockState == LOCK_OK);
         ON_BLOCK_EXIT(&Locker::unlockAll, txn->lockState());
         // From this point onward we are guaranteed to be holding the global shared lock.
-
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        if (!_getCurrentMemberState_inlock().primary()) {
-            return Status(ErrorCodes::NotMaster, "not primary so can't step down");
-        }
 
         StatusWith<ReplicationExecutor::EventHandle> finishedEvent = _replExecutor.makeEvent();
         if (finishedEvent.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -1069,7 +1061,6 @@ namespace {
             return cbh.getStatus();
         }
         fassert(26001, cbh.getStatus());
-        lock.unlock();
         _replExecutor.waitForEvent(finishedEvent.getValue());
         return result;
     }

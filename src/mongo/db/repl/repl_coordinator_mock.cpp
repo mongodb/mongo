@@ -87,13 +87,6 @@ namespace repl {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
 
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorMock::awaitReplicationOfLastOpApplied(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        return StatusAndDuration(Status::OK(), Milliseconds(0));
-    }
-
     Status ReplicationCoordinatorMock::stepDown(OperationContext* txn,
                                                 bool force,
                                                 const Milliseconds& waitTime,
