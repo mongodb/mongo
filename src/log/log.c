@@ -7,6 +7,18 @@
 
 #include "wt_internal.h"
 
+static int
+__log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
+    uint32_t flags);
+static int
+__log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
+    uint32_t flags);
+static int
+__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out);
+
+#define	WT_LOG_COMPRESS_SKIP (offsetof(WT_LOG_RECORD, record))
+#define LOG_UNCOMPRESSED_SIZE_FIELD(logrec) *((uint32_t *)&(logrec)->unused[2])
+
 /*
  * __wt_log_ckpt --
  *	Record the given LSN as the checkpoint LSN and signal the archive
@@ -293,6 +305,49 @@ __wt_log_close(WT_SESSION_IMPL *session)
 		log->log_dir_fh = NULL;
 	}
 	return (0);
+}
+
+/*
+ * __log_decompress --
+ *	Decompress a log record.
+ */
+static int
+__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+{
+	WT_COMPRESSOR *compressor;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG_RECORD *logrec;
+	size_t skip;
+	uint32_t uncompressed_size;
+	size_t result_len;
+
+	conn = S2C(session);
+	logrec = (WT_LOG_RECORD *)in->mem;
+	skip = WT_LOG_COMPRESS_SKIP;
+	compressor = conn->log_compressor;
+	if (compressor == NULL || compressor->decompress == NULL)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "log_read: Compressed record with "
+		    "no configured compressor");
+	uncompressed_size = LOG_UNCOMPRESSED_SIZE_FIELD(logrec);
+	WT_RET(__wt_scr_alloc(session, 0, out));
+	WT_ERR(__wt_buf_initsize(session, *out, uncompressed_size));
+	memcpy((*out)->mem, in->mem, skip);
+	WT_ERR(compressor->decompress(compressor, &session->iface,
+	    (uint8_t *)in->mem + skip, in->size - skip,
+	    (uint8_t *)(*out)->mem + skip,
+	    uncompressed_size - skip, &result_len));
+
+	/*
+	 * If checksums were turned off because we're depending on the
+	 * decompression to fail on any corrupted data, we'll end up
+	 * here after corruption happens.  If we're salvaging the file,
+	 * it's OK, otherwise it's really, really bad.
+	 */
+	if (ret != 0 || result_len != uncompressed_size - WT_LOG_COMPRESS_SKIP)
+		WT_ERR(WT_ERROR);
+err:	return (ret);
 }
 
 /*
@@ -776,6 +831,35 @@ int
 __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
+	WT_DECL_ITEM(uncitem);
+	WT_DECL_RET;
+	WT_LOG_RECORD *logrec;
+	WT_ITEM swap;
+
+	WT_ERR(__log_read_internal(session, record, lsnp, flags));
+	/*TODO: check that mem is large enough */
+	logrec = (WT_LOG_RECORD *)record->mem;
+	if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
+		WT_ERR(__log_decompress(session, record, &uncitem));
+
+		swap = *record;
+		*record = *uncitem;
+		*uncitem = swap;
+	}
+
+err:	__wt_scr_free(&uncitem);
+	return (ret);
+}
+
+/*
+ * __wt_log_read --
+ *	Read the log record at the given LSN.  Return the record (including
+ *	the log header) in the WT_ITEM.  Caller is responsible for freeing it.
+ */
+static int
+__log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
+    uint32_t flags)
+{
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *log_fh;
@@ -848,6 +932,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(uncitem);
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_ITEM buf;
@@ -1041,7 +1126,15 @@ advance:
 		 */
 		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		if (rd_lsn.offset != 0) {
-			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
+			if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
+				WT_ERR(__log_decompress(session, &buf,
+				    &uncitem));
+				WT_ERR((*func)(session, uncitem, &rd_lsn,
+				    cookie));
+				__wt_scr_free(&uncitem);
+			} else {
+				WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
+			}
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
 		}
@@ -1057,6 +1150,7 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	__wt_buf_free(session, &buf);
+	__wt_scr_free(&uncitem);
 	/*
 	 * If the caller wants one record and it is at the end of log,
 	 * return WT_NOTFOUND.
@@ -1112,10 +1206,107 @@ err:	if (locked)
 
 /*
  * __wt_log_write --
- *	Write a record into the log.
+ *	Write a record into the log, compressing as necessary.
  */
 int
 __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
+    uint32_t flags)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(citem);
+	WT_ITEM *ip;
+	WT_COMPRESSOR *compressor;
+	WT_LOG *log;
+	WT_LOG_RECORD *complrp;
+	size_t len, src_len, dst_len, result_len, size;
+	int compression_failed;
+	uint8_t *src, *dst;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	ip = record;
+	if ((compressor = conn->log_compressor) != NULL) {
+		/* Skip the log header */
+		log = conn->log;
+		src = (uint8_t *)record->mem + WT_LOG_COMPRESS_SKIP;
+		src_len = record->size - WT_LOG_COMPRESS_SKIP;
+
+		/*
+		 * Compute the size needed for the destination buffer.  We only
+		 * allocate enough memory for a copy of the original by default,
+		 * if any compressed version is bigger than the original, we
+		 * won't use it.  However, some compression engines (snappy is
+		 * one example), may need more memory because they don't stop
+		 * just because there's no more memory into which to compress.
+		 */
+		if (compressor->pre_size == NULL)
+			len = src_len;
+		else {
+			WT_ERR(compressor->pre_size(compressor,
+			    &session->iface, src, src_len, &len));
+		}
+
+		size = len + WT_LOG_COMPRESS_SKIP;
+		WT_ERR(__wt_scr_alloc(session, size, &citem));
+
+		/* Skip the header bytes of the destination data. */
+		dst = (uint8_t *)citem->mem + WT_LOG_COMPRESS_SKIP;
+		dst_len = len;
+
+		compression_failed = 0;
+		WT_ERR(compressor->compress(compressor, &session->iface,
+		    src, src_len, dst, dst_len, &result_len,
+		    &compression_failed));
+		result_len += WT_LOG_COMPRESS_SKIP;
+
+		/*
+		 * If compression fails, or doesn't gain us at least one unit of
+		 * allocation, fallback to the original version.  This isn't
+		 * unexpected: if compression doesn't work for some chunk of
+		 * data for some reason (noting likely additional format/header
+		 * information which compressed output requires), it just means
+		 * the uncompressed version is as good as it gets, and that's
+		 * what we use.
+		 */
+		if (compression_failed ||
+		    result_len / log->allocsize >=
+		    record->size / log->allocsize)
+			WT_STAT_FAST_DATA_INCR(session,
+			    log_compress_write_fail);
+		else {
+			WT_STAT_FAST_DATA_INCR(session, log_compress_write);
+			WT_STAT_FAST_DATA_INCRV(session, log_compress_mem,
+			    record->size);
+			WT_STAT_FAST_DATA_INCRV(session, log_compress_len,
+			    result_len);
+
+			/*
+			 * Copy in the skipped header bytes, set the final data
+			 * size.
+			 */
+			memcpy(citem->mem, record->mem, WT_LOG_COMPRESS_SKIP);
+			/*TODO: is this okay to mod the size here? */
+			citem->size = result_len;
+			ip = citem;
+			complrp = (WT_LOG_RECORD *)citem->mem;
+			F_SET(complrp, WT_LOG_RECORD_COMPRESSED);
+			complrp->len = result_len;
+			LOG_UNCOMPRESSED_SIZE_FIELD(complrp) = record->size;
+			/*TODO: chksum?  or handled elsewhere? */
+		}
+	}
+	ret = __log_write_internal(session, ip, lsnp, flags);
+
+err:	__wt_scr_free(&citem);
+	return (ret);
+}
+
+/*
+ * __log_write_internal --
+ *	Write a record into the log.
+ */
+static int
+__log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;

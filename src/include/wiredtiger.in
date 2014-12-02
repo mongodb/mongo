@@ -1878,15 +1878,18 @@ struct __wt_connection {
  * defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
  * archive unneeded log files., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
- * flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
- * maximum size of log files., an integer between 100KB and 2GB; default \c
- * 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
- * which the log files are written.  If the value is not an absolute path name\,
- * the files are created relative to the database home., a string; default \c
- * "".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log
+ * records.  Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
+ * custom compression engine \c "name" created with
+ * WT_CONNECTION::add_compressor.  See @ref compression for more information., a
+ * string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
+ * logging subsystem., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
+ * integer between 100KB and 2GB; default \c 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
+ * log files are written.  If the value is not an absolute path name\, the files
+ * are created relative to the database home., a string; default \c "".}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}

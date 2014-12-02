@@ -412,7 +412,7 @@ __wt_txn_truncate_end(WT_SESSION_IMPL *session)
  */
 static int
 __txn_printlog(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
+    WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie)
 {
 	FILE *out;
 	WT_LSN ckpt_lsn;
@@ -421,17 +421,26 @@ __txn_printlog(
 	int32_t start;
 	const uint8_t *end, *p;
 	const char *msg;
+	WT_LOG_RECORD *logrec;
+	int compressed;
 
 	out = cookie;
 
-	p = LOG_SKIP_HEADER(logrec->data);
-	end = (const uint8_t *)logrec->data + logrec->size;
+	p = LOG_SKIP_HEADER(rawrec->data);
+	end = (const uint8_t *)rawrec->data + rawrec->size;
+	logrec = (WT_LOG_RECORD *)rawrec->data;
+	compressed = F_ISSET(rawrec, WT_LOG_RECORD_COMPRESSED);
 
 	/* First, peek at the log record type. */
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
 	if (fprintf(out, "  { \"lsn\" : [%" PRIu32 ",%" PRId64 "],\n",
-	    lsnp->file, lsnp->offset) < 0)
+	    lsnp->file, lsnp->offset) < 0 ||
+	    fprintf(out, "    \"hdr_flags\" : \"%s\",\n",
+	    compressed ? "compressed" : "") < 0 ||
+	    fprintf(out, "    \"rec_len\" : %" PRIu32 ",\n", logrec->len) < 0 ||
+	    fprintf(out, "    \"mem_len\" : %" PRIu32 ",\n",
+	    compressed ? logrec->mem_len : logrec->len) < 0)
 		return (errno);
 
 	switch (rectype) {
