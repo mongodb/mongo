@@ -1008,12 +1008,13 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
+	WT_IKEY *ikey;
+	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	WT_UPDATE *upd;
-	void *key;
 	size_t page_decr, parent_incr, right_incr, size;
 	int i;
 
@@ -1085,8 +1086,28 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	child = split_ref[0];
 	*child = *ref;
 	child->state = WT_REF_MEM;
-	__wt_ref_key(page, ref, &key, &size);
-	WT_ERR(__wt_row_ikey(session, 0, key, size, &child->key.ikey));
+
+	/*
+	 * Copy the first key from the original page into first ref in the new
+	 * parent.  Pages created in memory always have a "smallest" insert
+	 * list, so look there first.  If we don't find one, get the first key
+	 * from the disk image.
+	 *
+	 * We can't just use the key from the original ref: it may have been
+	 * suffix-compressed, and after the split the truncated key may not be
+	 * valid.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &key));
+	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
+		key->data = WT_INSERT_KEY(ins);
+		key->size = WT_INSERT_KEY_SIZE(ins);
+	} else
+		WT_ERR(__wt_row_leaf_key(
+		    session, page, &page->pg_row_d[0], key, 1));
+
+	WT_ERR(__wt_row_ikey(
+	    session, 0, key->data, key->size, &child->key.ikey));
+	__wt_scr_free(&key);
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
@@ -1265,7 +1286,15 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * structure and instantiated key, there may be threads using them.
 	 * Add them to the session discard list, to be freed once we know it's
 	 * safe.
+	 *
+	 * After the split, we're going to discard the WT_REF, account for the
+	 * change in memory footprint.  Row store pages have keys that may be
+	 * instantiated, check for that.
 	 */
+	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL)
+		WT_TRET(__split_safe_free(
+		    session, 0, ikey, sizeof(WT_IKEY) + ikey->size));
 	WT_TRET(__split_safe_free(session, 0, ref, sizeof(WT_REF)));
 
 	/*
@@ -1288,6 +1317,7 @@ err:	if (split_ref[0] != NULL) {
 	}
 	if (right != NULL)
 		__wt_page_out(session, &right);
+	__wt_scr_free(&key);
 	return (ret);
 }
 
