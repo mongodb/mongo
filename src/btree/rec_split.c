@@ -1245,8 +1245,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	if ((ret = __split_parent(
 	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0) {
-		WT_ASSERT(session, ret == 0);
-
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
