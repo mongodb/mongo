@@ -251,7 +251,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 
 	case Search:
 
-		regex := bson.M{"$regex": regexp.QuoteMeta(self.FileName)}
+		regex := bson.M{"$regex": self.FileName}
 		query := bson.M{"filename": regex}
 
 		output, err = self.findAndDisplay(gfs, query)
