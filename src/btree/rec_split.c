@@ -1115,11 +1115,10 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we are moving may be older than that.  Take the oldest
-	 * active transaction ID to make sure these updates are not skipped by
-	 * a checkpoint.
+	 * updates we are moving may be older than that: inherit the original
+	 * page's transaction ID.
 	 */
-	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
+	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
