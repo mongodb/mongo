@@ -166,7 +166,7 @@ namespace mongo {
 
     WiredTigerKVEngine::~WiredTigerKVEngine() {
         if (_conn) {
-            cleanShutdown(NULL); // our impl doesn't use the OperationContext
+            cleanShutdown();
         }
 
         _sizeStorer.reset( NULL );
@@ -175,7 +175,7 @@ namespace mongo {
 
     }
 
-    void WiredTigerKVEngine::cleanShutdown(OperationContext* txn) {
+    void WiredTigerKVEngine::cleanShutdown() {
         log() << "WiredTigerKVEngine shutting down";
         syncSizeInfo(true);
         if (_conn) {
@@ -236,7 +236,7 @@ namespace mongo {
             _sizeStorer->storeInto( &session, _sizeStorerUri );
             invariantWTOK( s->commit_transaction( s, NULL ) );
         }
-        catch ( const WriteConflictException& de ) {
+        catch (const WriteConflictException&) {
             // ignore, it means someone else is doing it
         }
     }

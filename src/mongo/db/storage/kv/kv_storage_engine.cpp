@@ -151,7 +151,7 @@ namespace mongo {
 
     }
 
-    void KVStorageEngine::cleanShutdown(OperationContext* txn) {
+    void KVStorageEngine::cleanShutdown() {
 
         for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
             delete it->second;
@@ -161,7 +161,7 @@ namespace mongo {
         _catalog.reset( NULL );
         _catalogRecordStore.reset( NULL );
 
-        _engine->cleanShutdown(txn);
+        _engine->cleanShutdown();
         // intentionally not deleting _engine
     }
 
