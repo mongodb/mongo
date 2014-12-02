@@ -257,7 +257,7 @@ new_page:
  *	Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
@@ -278,8 +278,10 @@ new_page:	if (cbt->ins == NULL)
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
-		    WT_UPDATE_DELETED_ISSET(upd))
+		    WT_UPDATE_DELETED_ISSET(upd)) {
+			*skipped = 1;
 			continue;
+		}
 		val->data = WT_UPDATE_DATA(upd);
 		val->size = upd->size;
 		break;
@@ -292,7 +294,7 @@ new_page:	if (cbt->ins == NULL)
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
@@ -333,8 +335,10 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 		upd = cbt->ins == NULL ?
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				*skipped = 1;
 				continue;
+			}
 
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
@@ -352,8 +356,10 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			if (unpack.type == WT_CELL_DEL)
+			if (unpack.type == WT_CELL_DEL) {
+				*skipped = 1;
 				continue;
+			}
 			WT_RET(__wt_page_cell_data_ref(
 			    session, page, &unpack, &cbt->tmp));
 
@@ -371,7 +377,7 @@ new_page:	if (cbt->recno < page->pg_var_recno)
  *	Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
@@ -426,8 +432,10 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
-			    WT_UPDATE_DELETED_ISSET(upd))
+			    WT_UPDATE_DELETED_ISSET(upd)) {
+				*skipped = 1;
 				continue;
+			}
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
@@ -458,8 +466,10 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
-		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
+		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
+			*skipped = 1;
 			continue;
+		}
 
 		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
@@ -477,7 +487,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int newpage;
+	int skipped, newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -502,15 +512,27 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	page = cbt->ref == NULL ? NULL : cbt->ref->page;
-	for (newpage = 0;; newpage = 1) {
+	for (skipped = newpage = 0;; skipped = 0, newpage = 1) {
+		page = cbt->ref == NULL ? NULL : cbt->ref->page;
+		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
+
+		/*
+		 * The last page in a column-store has appended entries.
+		 * We handle it separately from the usual cursor code:
+		 * it's only that one page and it's in a simple format.
+		 */
+		if (newpage && page != NULL && page->type != WT_PAGE_ROW_LEAF &&
+		    (cbt->ins_head = WT_COL_APPEND(page)) != NULL)
+			F_SET(cbt, WT_CBT_ITERATE_APPEND);
+
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_append_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_append_prev(cbt, newpage);
+				ret = __cursor_var_append_prev(
+				    cbt, newpage, &skipped);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -527,10 +549,10 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				ret = __cursor_fix_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_prev(cbt, newpage);
+				ret = __cursor_var_prev(cbt, newpage, &skipped);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __cursor_row_prev(cbt, newpage);
+				ret = __cursor_row_prev(cbt, newpage, &skipped);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -538,20 +560,11 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				break;
 		}
 
+		if (newpage && skipped)
+			page->read_gen = WT_READGEN_OLDEST;
+
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
-
-		page = cbt->ref->page;
-		WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page));
-
-		/*
-		 * The last page in a column-store has appended entries.
-		 * We handle it separately from the usual cursor code:
-		 * it's only that one page and it's in a simple format.
-		 */
-		if (page->type != WT_PAGE_ROW_LEAF &&
-		    (cbt->ins_head = WT_COL_APPEND(page)) != NULL)
-			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 
 err:	if (ret != 0)

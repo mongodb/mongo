@@ -615,7 +615,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_ASSERT(session,
 	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
 
-	ret = __wt_rec_evict(session, ref, 0);
+	ret = __wt_evict(session, ref, 0);
 	txn->isolation = saved_iso;
 
 	return (ret);
@@ -1265,6 +1265,9 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *ref;
+
+	if (is_app)
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
 
 	WT_RET(__evict_get_ref(session, is_app, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);

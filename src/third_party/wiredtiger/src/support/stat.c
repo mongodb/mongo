@@ -50,6 +50,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "cache: data source pages selected for eviction unable to be evicted";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
+	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_read_overflow.desc =
@@ -168,6 +169,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_checkpoint.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -253,6 +255,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cache_eviction_checkpoint.v += c->cache_eviction_checkpoint.v;
 	p->cache_eviction_fail.v += c->cache_eviction_fail.v;
 	p->cache_eviction_hazard.v += c->cache_eviction_hazard.v;
+	p->cache_inmem_split.v += c->cache_inmem_split.v;
 	p->cache_eviction_internal.v += c->cache_eviction_internal.v;
 	p->cache_eviction_dirty.v += c->cache_eviction_dirty.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
@@ -341,15 +344,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->block_byte_write.desc = "block-manager: bytes written";
 	stats->block_map_read.desc = "block-manager: mapped blocks read";
 	stats->block_byte_map_read.desc = "block-manager: mapped bytes read";
-	stats->cursor_create.desc = "btree: cursor create calls";
-	stats->cursor_insert.desc = "btree: cursor insert calls";
-	stats->cursor_next.desc = "btree: cursor next calls";
-	stats->cursor_prev.desc = "btree: cursor prev calls";
-	stats->cursor_remove.desc = "btree: cursor remove calls";
-	stats->cursor_reset.desc = "btree: cursor reset calls";
-	stats->cursor_search.desc = "btree: cursor search calls";
-	stats->cursor_search_near.desc = "btree: cursor search near calls";
-	stats->cursor_update.desc = "btree: cursor update calls";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
 	stats->cache_bytes_read.desc = "cache: bytes read into cache";
 	stats->cache_bytes_write.desc = "cache: bytes written from cache";
@@ -369,6 +363,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: failed eviction of pages that exceeded the in-memory maximum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
+	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
@@ -378,6 +373,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: pages currently held in the cache";
 	stats->cache_eviction_force.desc =
 	    "cache: pages evicted because they exceeded the in-memory maximum";
+	stats->cache_eviction_app.desc =
+	    "cache: pages evicted by application threads";
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
@@ -402,6 +399,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "connection: pthread mutex shared lock write-lock calls";
 	stats->read_io.desc = "connection: total read I/Os";
 	stats->write_io.desc = "connection: total write I/Os";
+	stats->cursor_create.desc = "cursor: cursor create calls";
+	stats->cursor_insert.desc = "cursor: cursor insert calls";
+	stats->cursor_next.desc = "cursor: cursor next calls";
+	stats->cursor_prev.desc = "cursor: cursor prev calls";
+	stats->cursor_remove.desc = "cursor: cursor remove calls";
+	stats->cursor_reset.desc = "cursor: cursor reset calls";
+	stats->cursor_search.desc = "cursor: cursor search calls";
+	stats->cursor_search_near.desc = "cursor: cursor search near calls";
+	stats->cursor_update.desc = "cursor: cursor update calls";
 	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
 	stats->log_slot_closes.desc = "log: consolidated slot closures";
@@ -501,15 +507,6 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->block_byte_write.v = 0;
 	stats->block_map_read.v = 0;
 	stats->block_byte_map_read.v = 0;
-	stats->cursor_create.v = 0;
-	stats->cursor_insert.v = 0;
-	stats->cursor_next.v = 0;
-	stats->cursor_prev.v = 0;
-	stats->cursor_remove.v = 0;
-	stats->cursor_reset.v = 0;
-	stats->cursor_search.v = 0;
-	stats->cursor_search_near.v = 0;
-	stats->cursor_update.v = 0;
 	stats->cache_bytes_read.v = 0;
 	stats->cache_bytes_write.v = 0;
 	stats->cache_eviction_checkpoint.v = 0;
@@ -520,10 +517,12 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_force.v = 0;
+	stats->cache_eviction_app.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_split.v = 0;
@@ -540,6 +539,15 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->rwlock_write.v = 0;
 	stats->read_io.v = 0;
 	stats->write_io.v = 0;
+	stats->cursor_create.v = 0;
+	stats->cursor_insert.v = 0;
+	stats->cursor_next.v = 0;
+	stats->cursor_prev.v = 0;
+	stats->cursor_remove.v = 0;
+	stats->cursor_reset.v = 0;
+	stats->cursor_search.v = 0;
+	stats->cursor_search_near.v = 0;
+	stats->cursor_update.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_session_sweeps.v = 0;
 	stats->log_slot_closes.v = 0;
