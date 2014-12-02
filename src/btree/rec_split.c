@@ -1088,21 +1088,22 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	child->state = WT_REF_MEM;
 
 	/*
-	 * Build a key to appear in the parent for the original page.
+	 * Copy the first key from the original page into first ref in the new
+	 * parent.  Pages created in memory always have a "smallest" insert
+	 * list, so look there first.  If we don't find one, get the first key
+	 * from the disk image.
 	 *
 	 * We can't just use the key from the original ref: it may have been
 	 * suffix-compressed, and after the split the truncated key may not be
 	 * valid.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
-	if (page->pg_row_entries > 0)
-		WT_ERR(__wt_row_leaf_key(
-		    session, page, &page->pg_row_d[0], key, 0));
-	else {
-		ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page));
+	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
 		key->data = WT_INSERT_KEY(ins);
 		key->size = WT_INSERT_KEY_SIZE(ins);
-	}
+	} else
+		WT_ERR(__wt_row_leaf_key(
+		    session, page, &page->pg_row_d[0], key, 1));
 
 	WT_ERR(__wt_row_ikey(
 	    session, 0, key->data, key->size, &child->key.ikey));
@@ -1285,8 +1286,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * structure and instantiated key, there may be threads using them.
 	 * Add them to the session discard list, to be freed once we know it's
 	 * safe.
-	 */
-	/*
+	 *
 	 * After the split, we're going to discard the WT_REF, account for the
 	 * change in memory footprint.  Row store pages have keys that may be
 	 * instantiated, check for that.
