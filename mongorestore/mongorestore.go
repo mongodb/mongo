@@ -34,6 +34,7 @@ type MongoRestore struct {
 	objCheck   bool
 	oplogLimit bson.MongoTimestamp
 	useStdin   bool
+	isMongos   bool
 
 	// a map of database names to a list of collection names
 	knownCollections      map[string][]string
@@ -71,11 +72,22 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		}
 	}
 
+	var err error
+	restore.isMongos, err = restore.SessionProvider.IsMongos()
+	if err != nil {
+		return fmt.Errorf("error determining if connected to a mongos: %v", err)
+	}
+	if restore.isMongos {
+		log.Log(log.DebugLow, "restoring to a sharded system")
+		if restore.ToolOptions.DB == "" {
+			return fmt.Errorf("cannot do a full restore on a sharded system")
+		}
+	}
+
 	if restore.InputOptions.OplogLimit != "" {
 		if !restore.InputOptions.OplogReplay {
 			return fmt.Errorf("cannot use --oplogLimit without --oplogReplay enabled")
 		}
-		var err error
 		restore.oplogLimit, err = ParseTimestampFlag(restore.InputOptions.OplogLimit)
 		if err != nil {
 			return fmt.Errorf("error parsing timestamp argument to --oplogLimit: %v", err)
