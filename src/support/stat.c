@@ -50,6 +50,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "cache: data source pages selected for eviction unable to be evicted";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
+	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_read_overflow.desc =
@@ -168,6 +169,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_checkpoint.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -253,6 +255,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cache_eviction_checkpoint.v += c->cache_eviction_checkpoint.v;
 	p->cache_eviction_fail.v += c->cache_eviction_fail.v;
 	p->cache_eviction_hazard.v += c->cache_eviction_hazard.v;
+	p->cache_inmem_split.v += c->cache_inmem_split.v;
 	p->cache_eviction_internal.v += c->cache_eviction_internal.v;
 	p->cache_eviction_dirty.v += c->cache_eviction_dirty.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
@@ -360,6 +363,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "cache: failed eviction of pages that exceeded the in-memory maximum";
 	stats->cache_eviction_hazard.desc =
 	    "cache: hazard pointer blocked page eviction";
+	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
@@ -513,6 +517,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_eviction_force_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
