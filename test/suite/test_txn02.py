@@ -29,7 +29,7 @@
 #   Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil
+import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
@@ -163,7 +163,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             finally:
                 # Yield so that the archive thread gets a chance to run
                 # before we close the connection.
-                yield
+                time.sleep(0)
                 backup_conn.close()
             count += 1
         #

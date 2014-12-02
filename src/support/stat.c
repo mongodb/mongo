@@ -106,6 +106,14 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "LSM: sleep for LSM checkpoint throttle";
 	stats->lsm_merge_throttle.desc = "LSM: sleep for LSM merge throttle";
 	stats->bloom_size.desc = "LSM: total size of bloom filters";
+	stats->log_compress_len.desc =
+	    "logging: total size of compressed records";
+	stats->log_compress_mem.desc =
+	    "logging: total in-memory size of compressed records";
+	stats->log_compress_write.desc =
+	    "logging: records compressed";
+	stats->log_compress_write_fail.desc =
+	    "logging: records not compressed";
 	stats->rec_dictionary.desc = "reconciliation: dictionary matches";
 	stats->rec_suffix_compression.desc =
 	    "reconciliation: internal page key bytes discarded using suffix compression";

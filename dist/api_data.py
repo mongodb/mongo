@@ -522,6 +522,11 @@ common_wiredtiger_open = [
 	    Config('archive', 'true', r'''
 	        automatically archive unneeded log files''',
 	        type='boolean'),
+	    Config('compressor', '', r'''
+		configure a compressor for log records.  Permitted values are
+		empty (off) or \c "bzip2", \c "snappy" or custom compression
+		engine \c "name" created with WT_CONNECTION::add_compressor.
+		See @ref compression for more information'''),
 	    Config('enabled', 'false', r'''
 	        enable logging subsystem''',
 	        type='boolean'),

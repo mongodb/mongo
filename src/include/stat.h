@@ -320,6 +320,10 @@ struct __wt_dsrc_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS cursor_update_bytes;
+	WT_STATS log_compress_len;
+	WT_STATS log_compress_mem;
+	WT_STATS log_compress_write;
+	WT_STATS log_compress_write_fail;
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_chunk_count;
 	WT_STATS lsm_generation_max;
