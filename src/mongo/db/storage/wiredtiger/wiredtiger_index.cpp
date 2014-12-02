@@ -283,7 +283,7 @@ namespace {
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        ss << "type=file,leaf_page_max=16k,";
+        ss << "type=file,leaf_page_max=16k,prefix_compression,";
 
         ss << extraConfig;
 
