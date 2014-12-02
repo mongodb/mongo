@@ -25,7 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_log.c
- * 	demonstrates how to logging and log cursors.
+ * 	demonstrates how to use logging and log cursors.
  */
 #include <inttypes.h>
 #include <stdio.h>
@@ -45,13 +45,8 @@ static const char *home2 = "WT_HOME_LOG_2";
 
 static const char * const uri = "table:logtest";
 
-#if 0
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	10
-#else
-#define	CONN_CONFIG "create,cache_size=100MB,log=(archive=true,enabled=true,file_max=100K),verbose=(log),checkpoint=(log_size=300K),statistics=(fast,clear),statistics_log=(wait=5)"
-#define	MAX_KEYS	10000
-#endif
 
 static int
 setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
@@ -306,8 +301,6 @@ main(void)
 	for (record_count = 0, i = 0; i < MAX_KEYS; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
-		if (i % 3000 == 0)
-			sleep(1);
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
@@ -344,25 +337,8 @@ main(void)
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-#if 0
 	ret = simple_walk_log(session);
 	ret = walk_log(session);
-#else
-	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
-	/*
-	 * Perform some operations with individual auto-commit transactions.
-	 */
-	for (record_count = 0, i = MAX_KEYS+100; record_count < MAX_KEYS; i++, record_count++) {
-		snprintf(k, sizeof(k), "key%d", i);
-		snprintf(v, sizeof(v), "value%d", i);
-		if (i % 3000 == 0)
-			sleep(1);
-		cursor->set_key(cursor, k);
-		cursor->set_value(cursor, v);
-		ret = cursor->insert(cursor);
-	}
-#endif
-	sleep(1);
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);
 }
