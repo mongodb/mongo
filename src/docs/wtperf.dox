@@ -161,7 +161,7 @@ workload using a separate home directory and complete set of worker
 threads
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are
-configured, each table has this many items inserted.
+configured the count is spread evenly across all tables.
 @par insert_rmw (boolean, default=false)
 execute a read prior to each insert in workload phase
 @par key_sz (unsigned int, default=20)

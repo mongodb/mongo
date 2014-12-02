@@ -631,12 +631,12 @@ err:		__wt_free_ref_index(session, parent, alloc_index, 1);
 }
 
 /*
- * __split_inmem_build --
+ * __split_multi_inmem --
  *	Instantiate a page in a multi-block set, when an update couldn't be
  * written.
  */
 static int
-__split_inmem_build(
+__split_multi_inmem(
     WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref, WT_MULTI *multi)
 {
 	WT_CURSOR_BTREE cbt;
@@ -722,9 +722,10 @@ __split_inmem_build(
 	 */
 	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
 
-err:	__wt_scr_free(&key);
-	/* Free any resources that may have been cached in the cursor. */
+err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
+
+	__wt_scr_free(&key);
 	return (ret);
 }
 
@@ -774,10 +775,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		addr->type = multi->addr.type;
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		/* Need a cast to avoid an implicit conversion warning. */
 		WT_MEMSIZE_ADD(incr, addr->size);
 	} else
-		WT_RET(__split_inmem_build(session, page, ref, multi));
+		WT_RET(__split_multi_inmem(session, page, ref, multi));
 
 	switch (page->type) {
 	case WT_PAGE_ROW_INT:
@@ -804,41 +804,26 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __split_evict_multi --
+ * __split_parent --
  *	Resolve a multi-page split, inserting new information into the parent.
  */
 static int
-__split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
+    uint32_t new_entries, size_t parent_decr, size_t parent_incr,
+    int exclusive, int ref_discard)
 {
 	WT_DECL_RET;
-	WT_IKEY *ikey;
-	WT_PAGE *parent, *child;
+	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_PAGE_MODIFY *mod;
-	WT_REF **alloc_refp, *parent_ref, ref_copy, **ref_tmp;
-	size_t parent_decr, parent_incr, size;
-	uint32_t i, j, parent_entries, result_entries, split_entries;
+	WT_REF **alloc_refp, *parent_ref;
+	size_t size;
+	uint32_t i, j, parent_entries, result_entries;
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
 	alloc_index = NULL;
 	parent_ref = NULL;
-	ref_tmp = NULL;
-	parent_decr = parent_incr = 0;
 	complete = hazard = locked = 0;
-
-	child = ref->page;
-	mod = child->modify;
-
-	/*
-	 * Convert the split page's multiblock reconciliation information into
-	 * an array of page reference structures.
-	 */
-	split_entries = mod->mod_multi_entries;
-	WT_RET(__wt_calloc_def(session, split_entries, &ref_tmp));
-	for (i = 0; i < split_entries; ++i)
-		WT_ERR(__wt_multi_to_ref(session,
-		    child, &mod->mod_multi[i], &ref_tmp[i], &parent_incr));
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -879,7 +864,7 @@ __split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
-	result_entries = (parent_entries - 1) + split_entries;
+	result_entries = (parent_entries - 1) + new_entries;
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -893,20 +878,19 @@ __split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
 		if (pindex->index[i] == ref)
-			for (j = 0; j < split_entries; ++j) {
-				ref_tmp[j]->home = parent;
-				*alloc_refp++ = ref_tmp[j];
+			for (j = 0; j < new_entries; ++j) {
+				ref_new[j]->home = parent;
+				*alloc_refp++ = ref_new[j];
 
 				/*
 				 * Clear the split reference as it moves to the
 				 * allocated page index, so it never appears on
 				 * both after an error.
 				 */
-				ref_tmp[j] = NULL;
+				ref_new[j] = NULL;
 			}
 		else
 			*alloc_refp++ = pindex->index[i];
-	__wt_free(session, ref_tmp);
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -930,19 +914,26 @@ __split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/*
 	 * A note on error handling: failures before we swapped the new page
-	 * index into the parent can be resolved by simply freeing allocated
-	 * memory because the original page is unchanged, we can continue to
-	 * use it and we have not yet modified the parent.  (See below for an
-	 * exception, we cannot discard pages referencing unresolved changes.)
-	 * Failures after we swap the new page index into the parent are also
-	 * relatively benign because the split is OK and complete and the page
-	 * is reset so it will be discarded by eviction.  For that reason, we
-	 * mostly ignore further errors unless there's a panic.
+	 * index into the parent can be resolved by freeing allocated memory
+	 * because the original page is unchanged, we can continue to use it
+	 * and we have not yet modified the parent.  Failures after we swap
+	 * the new page index into the parent are also relatively benign, the
+	 * split is OK and complete. For those reasons, we ignore errors past
+	 * this point unless there's a panic.
 	 */
 	complete = 1;
 
 	/*
-	 * The previous parent page's key for this child page may have been an
+	 * We can't free the previous page index, there may be threads using it.
+	 * Add it to the session discard list, to be freed when it's safe.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
+	WT_TRET(__split_safe_free(session, exclusive, pindex, size));
+	WT_MEMSIZE_ADD(parent_decr, size);
+
+	/*
+	 * Row-store trees where the old version of the page is being discarded:
+	 * the previous parent page's key for this child page may have been an
 	 * on-page overflow key.  In that case, if the key hasn't been deleted,
 	 * delete it now, including its backing blocks.  We are exchanging the
 	 * WT_REF that referenced it for the split page WT_REFs and their keys,
@@ -950,30 +941,8 @@ __split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * split (if we failed, we'd leak the underlying blocks, but the parent
 	 * page would be unaffected).
 	 */
-	if (parent->type == WT_PAGE_ROW_INT)
+	if (ref_discard && parent->type == WT_PAGE_ROW_INT)
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
-
-	/*
-	 * We can't free the previous page index, or the page's original WT_REF
-	 * structure and instantiated key, there may be threads using them. Add
-	 * them to the session discard list, to be freed once we know it's safe.
-	 */
-	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__split_safe_free(session, exclusive, pindex, size));
-	WT_MEMSIZE_ADD(parent_decr, size);
-	if (parent->type == WT_PAGE_ROW_INT &&
-	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
-		size = sizeof(WT_IKEY) + ikey->size;
-		WT_TRET(__split_safe_free(session, exclusive, ikey, size));
-		WT_MEMSIZE_ADD(parent_decr, size);
-	}
-	/*
-	 * Take a copy of the ref in case we can free it immediately: we still
-	 * need to discard the page.
-	 */
-	ref_copy = *ref;
-	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
-	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
 
 	/*
 	 * Adjust the parent's memory footprint.  This may look odd, but we
@@ -986,9 +955,9 @@ __split_evict_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %s split into parent %p %" PRIu32 " -> %" PRIu32
+	    "%s split into parent %" PRIu32 " -> %" PRIu32
 	    " (%" PRIu32 ")",
-	    child, __wt_page_type_string(child->type), parent, parent_entries,
+	    __wt_page_type_string(ref->page->type), parent_entries,
 	    result_entries, result_entries - parent_entries));
 
 	/*
@@ -1016,24 +985,468 @@ err:	if (locked)
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));
 
+	__wt_free_ref_index(session, NULL, alloc_index, 0);
+
 	/*
-	 * Discard the child; test for split completion instead of errors, there
-	 * might be a relatively innocuous error, and if we split the parent, we
-	 * want to discard the child.
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
 	 */
-	if (complete) {
-		/*
-		 * Pages with unresolved changes are not marked clean during
-		 * reconciliation, do it now.
-		 */
-		if (__wt_page_is_modified(child)) {
-			 mod->write_gen = 0;
-			 __wt_cache_dirty_decr(session, child);
+	if (ret != 0 && ret != WT_PANIC)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during parent page split");
+	return (ret == WT_PANIC || !complete ? ret : 0);
+}
+
+/*
+ * __wt_split_insert --
+ *	Check for pages with append-only workloads and split their last insert
+ * list into a separate page.
+ */
+int
+__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_IKEY *ikey;
+	WT_DECL_ITEM(key);
+	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
+	WT_INSERT_HEAD *ins_head;
+	WT_PAGE *page, *right;
+	WT_REF *child, *split_ref[2] = { NULL, NULL };
+	WT_UPDATE *upd;
+	size_t page_decr, parent_incr, right_incr, size;
+	int i;
+
+	*splitp = 0;
+
+	btree = S2BT(session);
+	page = ref->page;
+	right = NULL;
+	page_decr = parent_incr = right_incr = 0;
+
+	/*
+	 * Check for pages with append-only workloads. A common application
+	 * pattern is to have multiple threads frantically appending to the
+	 * tree. We want to reconcile and evict this page, but we'd like to
+	 * do it without making the appending threads wait. If we're not
+	 * discarding the tree, check and see if it's worth doing a split to
+	 * let the threads continue before doing eviction.
+	 *
+	 * Ignore anything other than row-store leaf pages.
+	 * Ignore small pages.
+	 *
+	 * XXX KEITH
+	 * Need a better test for append-only workloads.
+	 */
+	if (page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+	if (page->memory_footprint < 10 * btree->maxleafpage)
+		return (0);
+
+	/*
+	 * There is no point splitting if the list is small, no deep items is
+	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
+	 * level means there will be a new 6th level for roughly each 4KB of
+	 * entries in the list. If we have at least two 6th level entries, the
+	 * list is at least large enough to work with.)
+	 *
+	 * The following code requires at least two items on the insert list,
+	 * this test serves the additional purpose of confirming that.
+	 */
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+	ins_head = page->pg_row_entries == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) :
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	if (ins_head == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
+	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		return (0);
+
+	/* Find the last item in the insert list. */
+	moved_ins = WT_SKIP_LAST(ins_head);
+
+	/*
+	 * Only split a page once, otherwise workloads that update in the middle
+	 * of the page could continually split without benefit.
+	 */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+		return (0);
+	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
+
+	/*
+	 * The first page in the split is the current page, but we still need to
+	 * create a replacement WT_REF and make a copy of the key (the original
+	 * WT_REF is set to split-status and eventually freed).
+	 *
+	 * The new reference is visible to readers once the split completes.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &split_ref[0]));
+	child = split_ref[0];
+	*child = *ref;
+	child->state = WT_REF_MEM;
+
+	/*
+	 * Copy the first key from the original page into first ref in the new
+	 * parent.  Pages created in memory always have a "smallest" insert
+	 * list, so look there first.  If we don't find one, get the first key
+	 * from the disk image.
+	 *
+	 * We can't just use the key from the original ref: it may have been
+	 * suffix-compressed, and after the split the truncated key may not be
+	 * valid.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &key));
+	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL) {
+		key->data = WT_INSERT_KEY(ins);
+		key->size = WT_INSERT_KEY_SIZE(ins);
+	} else
+		WT_ERR(__wt_row_leaf_key(
+		    session, page, &page->pg_row_d[0], key, 1));
+
+	WT_ERR(__wt_row_ikey(
+	    session, 0, key->data, key->size, &child->key.ikey));
+	__wt_scr_free(&key);
+
+	/*
+	 * The second page in the split is a new WT_REF/page pair.
+	 */
+	WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 0, &right));
+	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins));
+	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins[0]));
+	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD));
+	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD *));
+
+	WT_ERR(__wt_calloc_def(session, 1, &split_ref[1]));
+	child = split_ref[1];
+	child->page = right;
+	child->state = WT_REF_MEM;
+	WT_ERR(__wt_row_ikey(session, 0,
+	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
+	    &child->key.ikey));
+	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
+	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
+	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(moved_ins));
+
+	/* The new page is dirty by definition. */
+	WT_ERR(__wt_page_modify_init(session, right));
+	__wt_page_only_modify_set(session, right);
+
+	/*
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we are moving may be older than that: inherit the original
+	 * page's transaction ID.
+	 */
+	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
+
+	/*
+	 * Calculate how much memory we're moving: figure out how deep the skip
+	 * list stack is for the element we are moving, and the memory used by
+	 * the item's list of updates.
+	 */
+	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
+		;
+	size = ((size_t)i - 1) * sizeof(WT_INSERT *);
+	size += sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(moved_ins);
+	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
+		size += sizeof(WT_UPDATE) + upd->size;
+	WT_MEMSIZE_ADD(right_incr, size);
+	WT_MEMSIZE_ADD(page_decr, size);
+	__wt_cache_page_inmem_decr(session, page, page_decr);
+	__wt_cache_page_inmem_incr(session, right, right_incr);
+
+	/*
+	 * Allocation operations completed, move the last insert list item from
+	 * the original page to the new page.
+	 *
+	 * First, update the item to the new child page. (Just append the entry
+	 * for simplicity, the previous skip list pointers originally allocated
+	 * can be ignored.)
+	 */
+	right->pg_row_ins[0]->head[0] =
+	    right->pg_row_ins[0]->tail[0] = moved_ins;
+
+	/*
+	 * Remove the entry from the orig page (i.e truncate the skip list).
+	 * Following is an example skip list that might help.
+	 *
+	 *               __
+	 *              |c3|
+	 *               |
+	 *   __		 __    __
+	 *  |a2|--------|c2|--|d2|
+	 *   |		 |	|
+	 *   __		 __    __	   __
+	 *  |a1|--------|c1|--|d1|--------|f1|
+	 *   |		 |	|	   |
+	 *   __    __    __    __    __    __
+	 *  |a0|--|b0|--|c0|--|d0|--|e0|--|f0|
+	 *
+	 *   From the above picture.
+	 *   The head array will be: a0, a1, a2, c3, NULL
+	 *   The tail array will be: f0, f1, d2, c3, NULL
+	 *   We are looking for: e1, d2, NULL
+	 *   If there were no f1, we'd be looking for: e0, NULL
+	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
+	 *
+	 *   The algorithm does:
+	 *   1) Start at the top of the head list.
+	 *   2) Step down until we find a level that contains more than one
+	 *      element.
+	 *   3) Step across until we reach the tail of the level.
+	 *   4) If the tail is the item being moved, remove it.
+	 *   5) Drop down a level, and go to step 3 until at level 0.
+	 */
+	prev_ins = NULL;		/* -Wconditional-uninitialized */
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
+	    i >= 0;
+	    i--, insp--) {
+		/* Level empty, or a single element. */
+		if (ins_head->head[i] == NULL ||
+		     ins_head->head[i] == ins_head->tail[i]) {
+			/* Remove if it is the element being moved. */
+			if (ins_head->head[i] == moved_ins)
+				ins_head->head[i] = ins_head->tail[i] = NULL;
+			continue;
 		}
-		__wt_ref_out(session, &ref_copy);
+
+		for (ins = *insp; ins != ins_head->tail[i]; ins = ins->next[i])
+			prev_ins = ins;
+
+		/*
+		 * Update the stack head so that we step down as far to the
+		 * right as possible. We know that prev_ins is valid since
+		 * levels must contain at least two items to be here.
+		 */
+		insp = &prev_ins->next[i];
+		if (ins == moved_ins) {
+			/* Remove the item being moved. */
+			WT_ASSERT(session, ins_head->head[i] != moved_ins);
+			WT_ASSERT(session, prev_ins->next[i] == moved_ins);
+			*insp = NULL;
+			ins_head->tail[i] = prev_ins;
+		}
+	}
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * Verify the moved insert item appears nowhere on the skip list.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
+	    i >= 0;
+	    i--, insp--)
+		for (ins = *insp; ins != NULL; ins = ins->next[i])
+			WT_ASSERT(session, ins != moved_ins);
+#endif
+
+	/*
+	 * Split into the parent.
+	 */
+	if ((ret = __split_parent(
+	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0) {
+		/*
+		 * Move the insert list element back to the original page list.
+		 * For simplicity, the previous skip list pointers originally
+		 * allocated can be ignored, just append the entry to the end of
+		 * the level 0 list. As before, we depend on the list having
+		 * multiple elements and ignore the edge cases small lists have.
+		 */
+		right->pg_row_ins[0]->head[0] =
+		    right->pg_row_ins[0]->tail[0] = NULL;
+		ins_head->tail[0]->next[0] = moved_ins;
+		ins_head->tail[0] = moved_ins;
+
+		/*
+		 * We marked the new page dirty; we're going to discard it, but
+		 * first mark it clean and fix up the cache statistics.
+		 */
+		 right->modify->write_gen = 0;
+		 __wt_cache_dirty_decr(session, right);
+
+		WT_ERR(ret);
 	}
 
 	/*
+	 * Save the transaction ID when the split happened.  Application
+	 * threads will not try to forcibly evict the page again until
+	 * all concurrent transactions commit.
+	 */
+	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+
+	/* Let our caller know that we split. */
+	*splitp = 1;
+
+	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
+	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
+
+	/*
+	 * We may not be able to immediately free the page's original WT_REF
+	 * structure and instantiated key, there may be threads using them.
+	 * Add them to the session discard list, to be freed once we know it's
+	 * safe.
+	 *
+	 * After the split, we're going to discard the WT_REF, account for the
+	 * change in memory footprint.  Row store pages have keys that may be
+	 * instantiated, check for that.
+	 */
+	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL)
+		WT_TRET(__split_safe_free(
+		    session, 0, ikey, sizeof(WT_IKEY) + ikey->size));
+	WT_TRET(__split_safe_free(session, 0, ref, sizeof(WT_REF)));
+
+	/*
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
+	 */
+	if (ret != 0 && ret != WT_PANIC)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during insert page split");
+	return (ret == WT_PANIC ? WT_PANIC : 0);
+
+err:	if (split_ref[0] != NULL) {
+		__wt_free(session, split_ref[0]->key.ikey);
+		__wt_free(session, split_ref[0]);
+	}
+	if (split_ref[1] != NULL) {
+		__wt_free(session, split_ref[1]->key.ikey);
+		__wt_free(session, split_ref[1]);
+	}
+	if (right != NULL)
+		__wt_page_out(session, &right);
+	__wt_scr_free(&key);
+	return (ret);
+}
+
+/*
+ * __wt_split_rewrite --
+ *	Resolve a failed reconciliation by replacing a page with a new version.
+ */
+int
+__wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
+	WT_REF new;
+
+	page = ref->page;
+	mod = page->modify;
+
+	/*
+	 * This isn't a split: a reconciliation failed because we couldn't write
+	 * something, and in the case of forced eviction, we need to stop this
+	 * page from being such a problem. We have exclusive access, rewrite the
+	 * page in memory. The code lives here because the split code knows how
+	 * to re-create a page in memory after it's been reconciled, and that's
+	 * exactly what we want to do.
+	 *
+	 * Build the new page.
+	 */
+	memset(&new, 0, sizeof(new));
+	WT_RET(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
+
+	/*
+	 * Discard the original page.
+	 *
+	 * Pages with unresolved changes are not marked clean during
+	 * reconciliation, do it now.
+	 */
+	mod->write_gen = 0;
+	__wt_cache_dirty_decr(session, page);
+	__wt_ref_out(session, ref);
+
+	/* Swap the new page into place. */
+	ref->page = new.page;
+	WT_PUBLISH(ref->state, WT_REF_MEM);
+
+	return (0);
+}
+
+/*
+ * __wt_split_multi --
+ *	Resolve a page split.
+ */
+int
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+{
+	WT_IKEY *ikey;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
+	WT_REF **ref_new;
+	size_t ikey_size, parent_decr, parent_incr;
+	uint32_t i, new_entries;
+
+	page = ref->page;
+	mod = page->modify;
+	new_entries = mod->mod_multi_entries;
+
+	ikey = NULL;
+	ikey_size = parent_decr = parent_incr = 0;
+
+	/*
+	 * Convert the split page's multiblock reconciliation information into
+	 * an array of page reference structures.
+	 */
+	WT_RET(__wt_calloc_def(session, new_entries, &ref_new));
+	for (i = 0; i < new_entries; ++i)
+		WT_ERR(__wt_multi_to_ref(session,
+		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
+
+	/*
+	 * After the split, we're going to discard the WT_REF, account for the
+	 * change in memory footprint.  Row store pages have keys that may be
+	 * instantiated, check for that.
+	 */
+	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
+		ikey_size = sizeof(WT_IKEY) + ikey->size;
+		WT_MEMSIZE_ADD(parent_decr, ikey_size);
+	}
+	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+
+	/* Split into the parent. */
+	WT_ERR(__split_parent(session,
+	    ref, ref_new, new_entries, parent_decr, parent_incr, exclusive, 1));
+
+	__wt_free(session, ref_new);
+
+	/*
+	 * The split succeeded, discard the page.
+	 *
+	 * Pages with unresolved changes are not marked clean during
+	 * reconciliation, do it now.
+	 */
+	if (__wt_page_is_modified(page)) {
+		 mod->write_gen = 0;
+		 __wt_cache_dirty_decr(session, page);
+	}
+	__wt_ref_out(session, ref);
+
+	/*
+	 * We may not be able to immediately free the page's original WT_REF
+	 * structure and instantiated key, there may be threads using them.
+	 * Add them to the session discard list, to be freed once we know it's
+	 * safe.
+	 */
+	if (ikey != NULL)
+		WT_TRET(__split_safe_free(session, exclusive, ikey, ikey_size));
+	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
+
+	/*
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
+	 */
+	if (ret != 0 && ret != WT_PANIC)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during multi-page split");
+	return (ret == WT_PANIC ? WT_PANIC : 0);
+
+err:	/*
 	 * A note on error handling: in the case of evicting a page that has
 	 * unresolved changes, we just instantiated some in-memory pages that
 	 * reflect those unresolved changes.  The problem is those pages
@@ -1045,77 +1458,8 @@ err:	if (locked)
 	 * common code paths, and unwinding those changes will be difficult.
 	 * For now, leak the memory by not discarding the instantiated pages.
 	 */
-	__wt_free_ref_index(session, NULL, alloc_index, 0);
-	if (ref_tmp != NULL) {
-		for (i = 0; i < split_entries; ++i)
-			__wt_free_ref(session, child, ref_tmp[i], 0);
-		__wt_free(session, ref_tmp);
-	}
-
-	/*
-	 * A note on error handling: if we completed the split, return success,
-	 * nothing really bad can have happened.
-	 */
-	return (ret == WT_PANIC || !complete ? ret : 0);
-}
-
-/*
- * __split_evict_single --
- *	Resolve a single page split, replacing a page with a new version.
- */
-static int
-__split_evict_single(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
-	WT_REF new;
-
-	page = ref->page;
-	mod = page->modify;
-
-	/* Build the new page. */
-	memset(&new, 0, sizeof(new));
-	WT_RET(__split_inmem_build(session, page, &new, &mod->mod_multi[0]));
-
-	/*
-	 * Discard the original page. Pages with unresolved changes are not
-	 * marked clean during reconciliation, do it now.
-	 */
-	mod->write_gen = 0;
-	__wt_cache_dirty_decr(session, page);
-	__wt_page_out(session, &page);
-
-	/* Swap the new page into place. */
-	ref->page = new.page;
-	WT_PUBLISH(ref->state, WT_REF_MEM);
-
-	return (0);
-}
-
-/*
- * __wt_split_evict --
- *	Resolve a page split.
- */
-int
-__wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
-{
-	uint32_t split_entries;
-
-	/*
-	 * There are two cases entering this code. First, an in-memory page that
-	 * got too large, we forcibly evicted it, and there wasn't anything to
-	 * write. (Imagine two threads updating a small set keys on a leaf page.
-	 * The page is too large so we try to evict it, but after reconciliation
-	 * there's only a small amount of data (so it's a single page we can't
-	 * split), and because there are two threads, there's some data we can't
-	 * write (so we can't evict it). In that case, we take advantage of the
-	 * fact we have exclusive access to the page and rewrite it in memory.)
-	 *
-	 * Second, a real split where we reconciled a page and it turned into a
-	 * lot of pages.
-	 */
-	split_entries = ref->page->modify->mod_multi_entries;
-	return (split_entries == 1 ?
-	    __split_evict_single(session, ref) :
-	    __split_evict_multi(session, ref, exclusive));
+	for (i = 0; i < new_entries; ++i)
+		__wt_free_ref(session, page, ref_new[i], 0);
+	__wt_free(session, ref_new);
+	return (ret);
 }

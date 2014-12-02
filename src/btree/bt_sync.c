@@ -66,7 +66,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 					__wt_txn_refresh(session, 1);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
-				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
+				WT_ERR(__wt_reconcile(session, walk, NULL, 0));
 			}
 		}
 		break;
@@ -132,7 +132,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 					leaf_bytes += page->memory_footprint;
 					++leaf_pages;
 				}
-				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
+				WT_ERR(__wt_reconcile(session, walk, NULL, 0));
 			}
 		}
 		break;
@@ -244,7 +244,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * error, retrying later.
 		 */
 		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
-			WT_ERR(__wt_rec_write(session, ref, NULL, WT_EVICTING));
+			WT_ERR(__wt_reconcile(session, ref, NULL, WT_EVICTING));
 
 		/*
 		 * We can't evict the page just returned to us (it marks our
@@ -269,7 +269,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			if (__wt_ref_is_root(ref) ||
 			    page->modify == NULL ||
 			    !F_ISSET(page->modify, WT_PM_REC_EMPTY))
-				WT_ERR(__wt_rec_evict(session, ref, 1));
+				WT_ERR(__wt_evict(session, ref, 1));
 			break;
 		case WT_SYNC_DISCARD:
 		case WT_SYNC_DISCARD_FORCE:
