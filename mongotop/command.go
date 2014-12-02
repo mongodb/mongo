@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/text"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -85,21 +84,12 @@ type sortableTotals []sortableTotal
 
 func (a sortableTotals) Less(i, j int) bool {
 	if a[i].Total == a[j].Total {
-		return a[i].Name < a[j].Name
+		return a[i].Name > a[j].Name
 	}
 	return a[i].Total < a[j].Total
 }
 func (a sortableTotals) Len() int      { return len(a) }
 func (a sortableTotals) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// Determines whether or not a namespace should be skipped for the purposes
-// of printing the top results.
-func shouldSkipNamespace(ns string) bool {
-	return ns == "" ||
-		!strings.Contains(ns, ".") ||
-		strings.HasSuffix(ns, "namespaces") ||
-		strings.HasPrefix(ns, "local")
-}
 
 // Diff takes an older Top sample, and produces a TopDiff representing the
 // deltas of each metric between the two samples.
@@ -115,9 +105,6 @@ func (top Top) Diff(previous Top) TopDiff {
 	prevTotals := previous.Totals
 	curTotals := top.Totals
 	for ns, prevNSInfo := range prevTotals {
-		if shouldSkipNamespace(ns) {
-			continue
-		}
 		if curNSInfo, ok := curTotals[ns]; ok {
 			diff.Totals[ns] = NSTopInfo{
 				Total: TopField{
@@ -151,7 +138,7 @@ func (td TopDiff) Grid() string {
 	}
 
 	sort.Sort(sort.Reverse(totals))
-	for _, st := range totals {
+	for i, st := range totals {
 		diff := td.Totals[st.Name]
 		out.WriteCells(st.Name,
 			fmt.Sprintf("%vms", diff.Total.Time),
@@ -159,6 +146,9 @@ func (td TopDiff) Grid() string {
 			fmt.Sprintf("%vms", diff.Write.Time),
 			"")
 		out.EndRow()
+		if i >= 9 {
+			break
+		}
 	}
 	out.Flush(buf)
 	return buf.String()
@@ -193,7 +183,7 @@ func (ssd ServerStatusDiff) Grid() string {
 	}
 
 	sort.Sort(sort.Reverse(totals))
-	for _, st := range totals {
+	for i, st := range totals {
 		diff := ssd.Totals[st.Name]
 		out.WriteCells(st.Name,
 			fmt.Sprintf("%vms", diff.Read+diff.Write),
@@ -201,6 +191,9 @@ func (ssd ServerStatusDiff) Grid() string {
 			fmt.Sprintf("%vms", diff.Write),
 			"")
 		out.EndRow()
+		if i >= 9 {
+			break
+		}
 	}
 
 	out.Flush(buf)
