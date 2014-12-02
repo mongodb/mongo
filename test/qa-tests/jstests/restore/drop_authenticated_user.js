@@ -12,22 +12,22 @@
     // where we'll put the dump
     var dumpTarget = 'drop_authenticated_user_dump';
 
-    // the db we'll be using, and the admin db
-    var testDB = toolTest.db.getSiblingDB('test');
+    // we'll use the admin db so that the user we are restoring as 
+    // is part of the db we are restoring
     var adminDB = toolTest.db.getSiblingDB('admin');
 
-    // create the users we'll need
+    // create the users we'll need for the dump
     adminDB.createUser(
         {
-            user: 'userAdmin',
+            user: 'admin',
             pwd: 'password',
             roles: [
-                { role: 'userAdminAnyDatabase', db: 'admin' },
-                { role: 'readWriteAnyDatabase', db: 'admin' },
+                { role: 'userAdmin', db: 'admin' },
+                { role: 'readWrite', db: 'admin' },
             ],
         }
     );
-    adminDB.auth('userAdmin', 'password');
+    adminDB.auth('admin', 'password');
 
     adminDB.createUser(
         {
@@ -38,24 +38,14 @@
             ],
         }       
     );
-    testDB.createUser(
-        {
-            user: 'restore',
-            pwd: 'password',
-            roles: [
-                { role: 'dbAdmin', db: 'test' },
-                { role: 'readWrite', db: 'test' },
-            ],
-        }   
-    );
 
     // create a role
-    testDB.createRole(
+    adminDB.createRole(
         {
             role: 'extraRole',
             privileges: [
                 { 
-                    resource: { db: 'test', collection: '' }, 
+                    resource: { db: 'admin', collection: '' }, 
                     actions: ['find'],
                 },
             ],
@@ -65,45 +55,57 @@
 
     // insert some data
     for (var i = 0; i < 10; i++) {
-        testDB.data.insert({ _id: i });
+        adminDB.data.insert({ _id: i });
     }
     // sanity check the insertion worked 
-    assert.eq(10, testDB.data.count());
+    assert.eq(10, adminDB.data.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget, '--db', 'test',
-            '--dumpDbUsersAndRoles', '--username', 'backup', '--password', 'password',
-            '--authenticationDatabase', 'admin');
+    var ret = toolTest.runTool('dump', '--out', dumpTarget, 
+            '--username', 'backup', '--password', 'password');
     assert.eq(0, ret);
 
     // drop all the data, but not the users or roles
-    testDB.data.remove({});
+    adminDB.data.remove({});
     // sanity check the removal worked
-    assert.eq(0, testDB.data.count());
+    assert.eq(0, adminDB.data.count());
+
+    // now create the restore user, so that we can use it for the restore but it is
+    // not part of the dump
+    adminDB.createUser(
+        {
+            user: 'restore',
+            pwd: 'password',
+            roles: [
+                { role: 'restore', db: 'admin' },
+            ],
+        }   
+    );
 
     // insert some data to be removed when --drop is run
     for (var i = 10; i < 20; i++) {
-        testDB.data.insert({ _id: i });
+        adminDB.data.insert({ _id: i });
     }
     // sanity check the insertion worked
-    assert.eq(10, testDB.data.count());
+    assert.eq(10, adminDB.data.count());
 
     // restore the data, specifying --drop
-    ret = toolTest.runTool('restore', '--db', 'test', '--restoreDbUsersAndRoles',
-            '--drop', '--username', 'restore', '--password', 'password', 
-            dumpTarget+'/test');   
+    ret = toolTest.runTool('restore', '--drop', '--username', 
+            'restore', '--password', 'password', dumpTarget);   
     assert.eq(0, ret);
 
     // make sure the existing data was removed, and replaced with the dumped data
-    assert.eq(10, testDB.data.count());
+    assert.eq(10, adminDB.data.count());
     for (var i = 0; i < 10; i++) {
-        assert.eq(1, testDB.data.count({ _id: i }));
+        assert.eq(1, adminDB.data.count({ _id: i }));
     }
 
-    // make sure the correct roles and users exist
-    assert.eq(2, adminDB.getUsers().length);
-    assert.eq(1, testDB.getUsers().length);
-    assert.eq(1, testDB.getRoles().length);
+    // make sure the correct roles and users exist - that the restore user was dropped
+    var users = adminDB.getUsers();
+    assert.eq(2, users.length);
+    assert(users[0].user === 'backup' || users[1].user === 'backup');
+    assert(users[0].user === 'admin' || users[1].user === 'admin');
+    assert.eq(1, adminDB.getRoles().length);
 
     // success
     toolTest.stop();
