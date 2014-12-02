@@ -320,11 +320,10 @@ namespace mongo {
         if (!status.isOK()) {
             log(LogComponent::kAccessControl) << status << std::endl;
         }
-        mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
-        c->redactForLogging(&cmdToLog);
         audit::logCommandAuthzCheck(client,
                                     NamespaceString(c->parseNs(dbname, cmdObj)),
-                                    cmdToLog,
+                                    cmdObj,
+                                    c,
                                     status.code());
         return status;
     }
