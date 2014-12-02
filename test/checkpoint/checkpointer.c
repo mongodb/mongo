@@ -168,6 +168,12 @@ verify_checkpoint(WT_SESSION *session)
 		}
 	}
 
+	/* There's no way to verify LSM-only runs. */
+	if (cursors[0] == NULL) {
+		printf("LSM-only, skipping checkpoint verification\n");
+		goto err;
+	}
+
 	while (ret == 0) {
 		ret = cursors[0]->next(cursors[0]);
 		if (ret == 0)

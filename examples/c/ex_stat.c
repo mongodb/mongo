@@ -28,6 +28,7 @@
  *	This is an example demonstrating how to query database statistics.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,12 +150,14 @@ print_derived_stats(WT_SESSION *session)
 
 	{
 	/*! [statistics calculate table fragmentation] */
-	uint64_t ckpt_size, file_size;
+	uint64_t ckpt_size, file_size, percent;
 	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE, &ckpt_size);
 	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
 
-	printf("File is %d%% fragmented\n",
-	    (int)(100 * (file_size - ckpt_size) / file_size));
+	percent = 0;
+	if (file_size != 0)
+		percent = 100 * ((file_size - ckpt_size) / file_size);
+	printf("Table is %" PRIu64 "%% fragmented\n", percent);
 	/*! [statistics calculate table fragmentation] */
 	}
 

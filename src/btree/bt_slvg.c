@@ -324,7 +324,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 */
 	if (ss->root_ref.page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_rec_evict(session, &ss->root_ref, 1);
+		ret = __wt_evict(session, &ss->root_ref, 1);
 		ss->root_ref.page = NULL;
 		btree->ckpt = NULL;
 	}
@@ -1302,7 +1302,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_rec_write(session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	WT_ERR(__wt_reconcile(session, ref, cookie, WT_SKIP_UPDATE_ERR));
 
 	/* Reset the page. */
 	page->pg_var_d = save_col_var;
@@ -1310,7 +1310,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_rec_evict(session, ref, 1);
+		ret = __wt_evict(session, ref, 1);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
@@ -2009,7 +2009,7 @@ __slvg_row_build_leaf(
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_rec_write(session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	WT_ERR(__wt_reconcile(session, ref, cookie, WT_SKIP_UPDATE_ERR));
 
 	/* Reset the page. */
 	page->pg_row_entries += skip_stop;
@@ -2020,7 +2020,7 @@ __slvg_row_build_leaf(
 	 */
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_rec_evict(session, ref, 1);
+		ret = __wt_evict(session, ref, 1);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));

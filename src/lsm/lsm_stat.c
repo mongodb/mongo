@@ -8,11 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __lsm_stat_init --
- *	Initialize a LSM statistics structure.
+ * __curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
  */
 static int
-__lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
+__curstat_lsm_init(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
@@ -30,7 +31,9 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;
-	WT_RET(__wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
 	/* Propagate all, fast and/or clear to the cursors we open. */
@@ -55,6 +58,9 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
 	locked = 1;
 
+	/* Initialize the statistics. */
+	__wt_stat_init_dsrc_stats(stats);
+
 	/*
 	 * For each chunk, aggregate its statistics, as well as any associated
 	 * bloom filter statistics, into the total statistics.
@@ -74,8 +80,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		ret = __wt_curstat_open(session, uribuf->data,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor);
-		if (ret == WT_NOTFOUND &&
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			ret = __wt_curstat_open(
 			    session, uribuf->data, cfg, &stat_cursor);
 		WT_ERR(ret);
@@ -88,15 +93,8 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(new, lsm_generation_max, chunk->generation);
 
-		/*
-		 * We want to aggregate the table's statistics.  Get a base set
-		 * of statistics from the first chunk, then aggregate statistics
-		 * from each new chunk.
-		 */
-		if (i == 0)
-			*stats = *new;
-		else
-			__wt_stat_aggregate_dsrc_stats(new, stats);
+		/* Aggregate statistics from each new chunk. */
+		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
@@ -156,7 +154,12 @@ __wt_curstat_lsm_init(
 {
 	WT_DECL_RET;
 
-	WT_WITH_SCHEMA_LOCK(session, ret = __lsm_stat_init(session, uri, cst));
+	/*
+	 * Grab the schema lock because we will be locking the LSM tree and we
+	 * may need to open some files.
+	 */
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __curstat_lsm_init(session, uri, cst));
 
 	return (ret);
 }

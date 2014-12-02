@@ -63,11 +63,13 @@ struct __wt_cursor_backup {
 
 	size_t next;			/* Cursor position */
 	FILE *bfp;			/* Backup file */
+	uint32_t maxid;			/* Maximum log file ID seen */
 
 	WT_CURSOR_BACKUP_ENTRY *list;	/* List of files to be copied. */
 	size_t list_allocated;
 	size_t list_next;
 };
+#define	WT_CURSOR_BACKUP_ID(cursor)	(((WT_CURSOR_BACKUP *)cursor)->maxid)
 
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
@@ -316,6 +318,10 @@ struct __wt_cursor_table {
 	const char **cfg;		/* Saved configuration string */
 
 	WT_CURSOR **cg_cursors;
+	WT_ITEM *cg_valcopy;		/*
+					 * Copies of column group values, for
+					 * overlapping set_value calls.
+					 */
 	WT_CURSOR **idx_cursors;
 };
 

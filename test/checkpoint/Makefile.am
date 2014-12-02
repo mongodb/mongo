@@ -5,7 +5,7 @@ t_LDADD = $(top_builddir)/libwiredtiger.la
 t_SOURCES = checkpointer.c workers.c test_checkpoint.c
 t_LDFLAGS = -static
 
-TESTS = $(noinst_PROGRAMS)
+TESTS = smoke.sh
 
 clean-local:
-	rm -rf WiredTiger* __* *.core
+	rm -rf WT_TEST *.core

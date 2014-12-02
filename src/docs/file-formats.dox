@@ -34,8 +34,8 @@ responsible for creating unique key/value pairs.
 
 WiredTiger allocates space from the underlying files in block units.
 The minimum file allocation unit WiredTiger supports is 512B and the
-maximum file allocation unit is 512MB.  File block offsets are 64-bit
-(meaning the maximum file size is very, very large).
+maximum is 512MB.  File offsets are signed 8B values, making the maximum
+file size very, very large.
 
 @section file_formats_choice Choosing a file format
 

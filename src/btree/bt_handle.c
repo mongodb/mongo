@@ -511,7 +511,7 @@ err:	if (leaf != NULL)
 
 /*
  * __wt_btree_new_leaf_page --
- *	Create an empty leaf page and link it into a reference in its parent.
+ *	Create an empty leaf page.
  */
 int
 __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
@@ -523,15 +523,15 @@ __wt_btree_new_leaf_page(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 		WT_RET(
-		    __wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, 1, pagep));
+		    __wt_page_alloc(session, WT_PAGE_COL_FIX, 1, 0, 0, pagep));
 		break;
 	case BTREE_COL_VAR:
 		WT_RET(
-		    __wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, 1, pagep));
+		    __wt_page_alloc(session, WT_PAGE_COL_VAR, 1, 0, 0, pagep));
 		break;
 	case BTREE_ROW:
 		WT_RET(
-		    __wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 1, pagep));
+		    __wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 0, pagep));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

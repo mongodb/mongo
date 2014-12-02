@@ -1,0 +1,8 @@
+# wtperf options file: Test a log file with a multi-threaded
+# append workload.
+conn_config="cache_size=1G,log=(enabled=true,file_max=20MB),checkpoint=(log_size=1G)"
+table_config="type=file"
+icount=50000000
+report_interval=5
+run_time=0
+populate_threads=8

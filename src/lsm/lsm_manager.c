@@ -406,23 +406,28 @@ static int
 __lsm_manager_run_server(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	struct timespec now;
 	uint64_t fillms, pushms;
+	int dhandle_locked;
 
 	conn = S2C(session);
+	dhandle_locked = 0;
+
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-		if (TAILQ_EMPTY(&conn->lsmqh)) {
-			__wt_sleep(0, 10000);
-			continue;
-		}
 		__wt_sleep(0, 10000);
+		if (TAILQ_EMPTY(&conn->lsmqh))
+			continue;
+		__wt_spin_lock(session, &conn->dhandle_lock);
+		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		dhandle_locked = 1;
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 				continue;
-			WT_RET(__lsm_manager_aggressive_update(
+			WT_ERR(__lsm_manager_aggressive_update(
 			    session, lsm_tree));
-			WT_RET(__wt_epoch(session, &now));
+			WT_ERR(__wt_epoch(session, &now));
 			pushms = lsm_tree->work_push_ts.tv_sec == 0 ? 0 :
 			    WT_TIMEDIFF(
 			    now, lsm_tree->work_push_ts) / WT_MILLION;
@@ -453,15 +458,15 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			    (lsm_tree->merge_aggressiveness > 3 &&
 			     !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) ||
 			    pushms > fillms) {
-				WT_RET(__wt_lsm_manager_push_entry(
+				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
-				WT_RET(__wt_lsm_manager_push_entry(
+				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_DROP, 0, lsm_tree));
-				WT_RET(__wt_lsm_manager_push_entry(
+				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
-				WT_RET(__wt_lsm_manager_push_entry(
+				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
-				WT_RET(__wt_verbose(session, WT_VERB_LSM,
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "MGR %s: queue %d mod %d nchunks %d"
 				    " flags 0x%x aggressive %d pushms %" PRIu64
 				    " fillms %" PRIu64,
@@ -470,13 +475,20 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    lsm_tree->flags,
 				    lsm_tree->merge_aggressiveness,
 				    pushms, fillms));
-				WT_RET(__wt_lsm_manager_push_entry(
+				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
 		}
+		__wt_spin_unlock(session, &conn->dhandle_lock);
+		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		dhandle_locked = 0;
 	}
 
-	return (0);
+err:	if (dhandle_locked) {
+		__wt_spin_unlock(session, &conn->dhandle_lock);
+		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+	}
+	return (ret);
 }
 
 /*

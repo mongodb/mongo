@@ -17,15 +17,20 @@ static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
  *	Free an LSM tree structure.
  */
 static int
-__lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 
+	WT_UNUSED(final);	/* Only used in diagnostic builds */
+
 	/* We may be destroying an lsm_tree before it was added. */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+		WT_ASSERT(session, final ||
+		    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
+	}
 
 	if (lsm_tree->collator_owned &&
 	    lsm_tree->collator->terminate != NULL)
@@ -88,16 +93,17 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * Remove any work units from the manager queues. Do this step
 		 * repeatedly in case a work unit was in the process of being
 		 * created when we cleared the active flag.
-		 * !! Drop the schema lock whilst completing this step so that
-		 * we don't block any operations that require the schema
-		 * lock to complete. This is safe because any operation that
-		 * is closing the tree should first have gotten exclusive
-		 * access to the LSM tree via __wt_lsm_tree_get, so other
-		 * schema level operations will return EBUSY, even though
+		 *
+		 * !!! Drop the schema and handle list locks whilst completing
+		 * this step so that we don't block any operations that require
+		 * the schema lock to complete. This is safe because any
+		 * operation that is closing the tree should first have gotten
+		 * exclusive access to the LSM tree via __wt_lsm_tree_get, so
+		 * other schema level operations will return EBUSY, even though
 		 * we're dropping the schema lock here.
 		 */
 		if (i % 1000 == 0) {
-			WT_WITHOUT_SCHEMA_LOCK(session, ret =
+			WT_WITHOUT_LOCKS(session, ret =
 			    __wt_lsm_manager_clear_tree(session, lsm_tree));
 			WT_RET(ret);
 		}
@@ -116,17 +122,19 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	/* We are shutting down: the handle list lock isn't required. */
+
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
 		/*
 		 * Tree close assumes that we have a reference to the tree
 		 * so it can tell when it's safe to do the close. We could
-		 * got through tree get here, but short circuit instead. There
-		 * is no need to decrement the reference count since destroy
+		 * get the tree here, but we short circuit instead. There
+		 * is no need to decrement the reference count since discard
 		 * is unconditional.
 		 */
 		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
-		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+		WT_TRET(__lsm_tree_discard(session, lsm_tree, 1));
 	}
 
 	return (ret);
@@ -270,7 +278,6 @@ __wt_lsm_tree_setup_bloom(
 {
 	WT_DECL_RET;
 
-	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 	/*
 	 * The Bloom URI can be populated when the chunk is created, but
 	 * it isn't set yet on open or merge.
@@ -299,7 +306,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
-	if ((ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree)) == 0) {
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	if (ret == 0) {
 		__wt_lsm_tree_release(session, lsm_tree);
 		return (exclusive ? EEXIST : 0);
 	}
@@ -402,7 +411,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Discard our partially populated handle. */
-	ret = __lsm_tree_discard(session, lsm_tree);
+	ret = __lsm_tree_discard(session, lsm_tree, 0);
 	lsm_tree = NULL;
 
 	/*
@@ -411,15 +420,78 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * tracking macros handle cleaning up on failure.
 	 */
 	if (ret == 0)
-		ret = __lsm_tree_open(session, uri, &lsm_tree);
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __lsm_tree_open(session, uri, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
-err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 	}
 	__wt_scr_free(&buf);
 	return (ret);
+}
+
+/*
+ * __lsm_tree_find --
+ *	Find an LSM tree structure for the given name. Optionally get exclusive
+ *	access to the handle. Exclusive access works separately to the LSM tree
+ *	lock - since operations that need exclusive access may also need to
+ *	take the LSM tree lock for example outstanding work unit operations.
+ */
+static int
+__lsm_tree_find(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, WT_LSM_TREE **treep)
+{
+	WT_LSM_TREE *lsm_tree;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+
+	/* See if the tree is already open. */
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+		if (strcmp(uri, lsm_tree->name) == 0) {
+			/*
+			 * Short circuit if the handle is already held
+			 * exclusively or exclusive access is requested and
+			 * there are references held.
+			 */
+			if ((exclusive && lsm_tree->refcnt > 0) ||
+			    lsm_tree->exclusive)
+				return (EBUSY);
+
+			if (exclusive) {
+				/*
+				 * Make sure we win the race to switch on the
+				 * exclusive flag.
+				 */
+				if (!WT_ATOMIC_CAS1(lsm_tree->exclusive, 0, 1))
+					return (EBUSY);
+				/* Make sure there are no readers */
+				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
+					lsm_tree->exclusive = 0;
+					return (EBUSY);
+				}
+			} else {
+				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
+
+				/*
+				 * We got a reference, check if an exclusive
+				 * lock beat us to it.
+				 */
+				if (lsm_tree->exclusive) {
+					WT_ASSERT(session,
+					    lsm_tree->refcnt > 0);
+					(void)WT_ATOMIC_SUB4(
+					    lsm_tree->refcnt, 1);
+					return (EBUSY);
+				}
+			}
+
+			*treep = lsm_tree;
+			return (0);
+		}
+
+	return (WT_NOTFOUND);
 }
 
 /*
@@ -468,18 +540,15 @@ __lsm_tree_open(
 	conn = S2C(session);
 	lsm_tree = NULL;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	/* Start the LSM manager thread if it isn't running. */
 	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
-	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
-		if (strcmp(uri, lsm_tree->name) == 0) {
-			*treep = lsm_tree;
-			return (0);
-		}
+	if ((ret = __lsm_tree_find(session, uri, 0, treep)) != WT_NOTFOUND)
+		return (ret);
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
@@ -494,11 +563,6 @@ __lsm_tree_open(
 	 * time we have the LSM tree configuration.
 	 */
 	WT_ERR(__lsm_tree_open_check(session, lsm_tree));
-
-	if (lsm_tree->nchunks == 0) {
-		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
-	}
 
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
@@ -521,60 +585,28 @@ __lsm_tree_open(
 	*treep = lsm_tree;
 
 	if (0) {
-err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 	}
 	return (ret);
 }
 
 /*
  * __wt_lsm_tree_get --
- *	Get an LSM tree structure for the given name. Optionally get exclusive
- *	access to the handle. Exclusive access works separately to the LSM
- *	tree lock - since operations that need exclusive access may also need
- *	to take the LSM tree lock for example outstanding work unit operations.
+ *	Find an LSM tree handle or open a new one.
  */
 int
 __wt_lsm_tree_get(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, WT_LSM_TREE **treep)
 {
-	WT_LSM_TREE *lsm_tree;
+	WT_DECL_RET;
 
-	/* See if the tree is already open. */
-	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
-		if (strcmp(uri, lsm_tree->name) == 0) {
-			/*
-			 * Short circuit if the handle is already held
-			 * exclusively or exclusive access is requested and
-			 * there are references held.
-			 */
-			if ((exclusive && lsm_tree->refcnt > 0) ||
-			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE))
-			    return (EBUSY);
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-			if (exclusive) {
-				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
-				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
-					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
-					return (EBUSY);
-				}
-			} else
-				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
+	ret = __lsm_tree_find(session, uri, exclusive, treep);
+	if (ret == WT_NOTFOUND)
+		ret = __lsm_tree_open(session, uri, treep);
 
-			/*
-			 * If we got a reference, but an exclusive reference
-			 * beat us to it, give our reference up.
-			 */
-			if (!exclusive &&
-			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
-				(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
-				return (EBUSY);
-			}
-			*treep = lsm_tree;
-			return (0);
-		}
-
-	/* Open a new tree. */
-	return (__lsm_tree_open(session, uri, treep));
+	return (ret);
 }
 
 /*
@@ -585,8 +617,9 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
+	if (lsm_tree->exclusive)
+		lsm_tree->exclusive = 0;
 	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
-	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
@@ -753,7 +786,7 @@ int
 __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
+	WT_LSM_CHUNK *chunk, *last_chunk;
 	uint32_t nchunks, new_id;
 	int first_switch;
 
@@ -762,20 +795,17 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	nchunks = lsm_tree->nchunks;
 
 	first_switch = nchunks == 0 ? 1 : 0;
+
 	/*
 	 * Check if a switch is still needed: we may have raced while waiting
 	 * for a lock.
 	 */
-	chunk = NULL;
+	last_chunk = NULL;
 	if (!first_switch &&
-	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
-	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+	    (last_chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
+	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
-
-	/* Set the switch transaction in the previous chunk, if necessary. */
-	if (chunk != NULL && chunk->switch_txn == WT_TXN_NONE)
-		chunk->switch_txn = __wt_txn_new_id(session);
 
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
@@ -801,6 +831,10 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	++lsm_tree->dsk_gen;
 
 	lsm_tree->modified = 1;
+
+	/* Set the switch transaction in the previous chunk, if necessary. */
+	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE)
+		last_chunk->switch_txn = __wt_txn_new_id(session);
 
 err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	/*
@@ -832,7 +866,9 @@ __wt_lsm_tree_drop(
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, name, 1, &lsm_tree));
+	WT_RET(ret);
 
 	/* Shut down the LSM worker. */
 	WT_ERR(__lsm_tree_close(session, lsm_tree));
@@ -866,7 +902,8 @@ __wt_lsm_tree_drop(
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
 
@@ -889,7 +926,9 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, olduri, 1, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, olduri, 1, &lsm_tree));
+	WT_RET(ret);
 
 	/* Shut down the LSM worker. */
 	WT_ERR(__lsm_tree_close(session, lsm_tree));
@@ -937,7 +976,8 @@ err:	if (locked)
 	 * Discard this LSM tree structure. The first operation on the renamed
 	 * tree will create a new one.
 	 */
-	WT_TRET(__lsm_tree_discard(session, lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
 
@@ -959,7 +999,9 @@ __wt_lsm_tree_truncate(
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, name, 1, &lsm_tree));
+	WT_RET(ret);
 
 	/* Shut down the LSM worker. */
 	WT_ERR(__lsm_tree_close(session, lsm_tree));
@@ -996,7 +1038,8 @@ err:	if (locked)
 		 * the last good version of the metadata will be used, resulting
 		 * in a valid (not truncated) tree.
 		 */
-		WT_TRET(__lsm_tree_discard(session, lsm_tree));
+		WT_WITH_DHANDLE_LOCK(session,
+		    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	}
 	return (ret);
 }
@@ -1093,7 +1136,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Tell __wt_schema_worker not to look inside the LSM tree. */
 	*skip = 1;
 
-	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, name, 0, &lsm_tree));
+	WT_RET(ret);
 
 	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 		WT_ERR_MSG(session, EINVAL,
@@ -1277,7 +1322,9 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 
 	locked = 0;
 	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
-	WT_RET(__wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
+	WT_WITH_DHANDLE_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
+	WT_RET(ret);
 
 	/*
 	 * We mark that we're busy using the tree to coordinate

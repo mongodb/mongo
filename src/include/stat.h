@@ -156,6 +156,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_bytes_read;
 	WT_STATS cache_bytes_write;
+	WT_STATS cache_eviction_app;
 	WT_STATS cache_eviction_checkpoint;
 	WT_STATS cache_eviction_clean;
 	WT_STATS cache_eviction_deepen;
@@ -172,6 +173,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_slow;
 	WT_STATS cache_eviction_split;
 	WT_STATS cache_eviction_walk;
+	WT_STATS cache_inmem_split;
 	WT_STATS cache_pages_dirty;
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_read;
@@ -290,6 +292,7 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_eviction_fail;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
+	WT_STATS cache_inmem_split;
 	WT_STATS cache_overflow_value;
 	WT_STATS cache_read;
 	WT_STATS cache_read_overflow;
