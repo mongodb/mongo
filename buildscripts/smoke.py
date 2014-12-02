@@ -514,7 +514,7 @@ def runTest(test, result):
         if os.path.basename(path) in ('python', 'python.exe'):
             path = argv[1]
     elif ext == ".js":
-        argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
+        argv = [shell_executable, "--port", mongod_port]
         
         setShellWriteModeForTest(path, argv)
         
