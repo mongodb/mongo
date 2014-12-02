@@ -618,6 +618,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/commands/rename_collection.cpp",
                     "db/commands/repair_cursor.cpp",
                     "db/commands/test_commands.cpp",
+                    "db/commands/touch.cpp",
                     "db/commands/validate.cpp",
                     "db/commands/write_commands/batch_executor.cpp",
                     "db/commands/write_commands/write_commands.cpp",
@@ -983,7 +984,7 @@ env.Library("mongodwebserver",
              ],
             LIBDEPS=["coredb", "mongodandmongos"])
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 
 # ----- TARGETS ------
 

@@ -203,8 +203,7 @@ namespace {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string collName = cmdObj.firstElement().valuestrsafe();
-            std::string ns = db->name() + "." + collName;
+            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;

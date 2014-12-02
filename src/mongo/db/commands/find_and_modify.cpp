@@ -77,13 +77,7 @@ namespace mongo {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            const std::string coll = cmdObj.firstElement().valuestrsafe();
-            if (coll.empty()) {
-                errmsg = "no collection name specified";
-                return false;
-            }
-
-            const std::string ns = dbname + '.' + coll;
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj fields = cmdObj.getObjectField("fields");

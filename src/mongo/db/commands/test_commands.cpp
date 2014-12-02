@@ -190,8 +190,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
-            std::string ns = db->name() + '.' + coll;
+            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
@@ -199,17 +198,14 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
-            uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
-
-            const NamespaceString nss( dbname, coll );
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
             AutoGetDb autoDb(txn, dbname, MODE_X);
 
             Database* db = autoDb.getDb();
             massert(13429, "no such database", db);
 
-            Collection* collection = db->getCollection(nss.ns());
+            Collection* collection = db->getCollection(ns);
             massert(28584, "no such collection", collection);
 
             std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);

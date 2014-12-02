@@ -76,8 +76,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string coll = cmdObj.firstElement().valuestrsafe();
-            std::string ns = db->name() + "." + coll;
+            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
@@ -85,11 +84,7 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const std::string coll = cmdObj.firstElement().valuestrsafe();
-            if (coll.empty()) {
-                errmsg = "no collection name specified";
-                return false;
-            }
+            const std::string nsToCompact = parseNsCollectionRequired(db, cmdObj);
 
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             if (replCoord->getCurrentMemberState().primary() && !cmdObj["force"].trueValue()) {
@@ -97,7 +92,7 @@ namespace mongo {
                 return false;
             }
 
-            NamespaceString ns(db, coll);
+            NamespaceString ns(nsToCompact);
             if ( !ns.isNormal() ) {
                 errmsg = "bad namespace name";
                 return false;

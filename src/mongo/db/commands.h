@@ -63,6 +63,11 @@ namespace mutablebson {
         // The type of the first field in 'cmdObj' must be mongo::String. The first field is
         // interpreted as a collection name.
         std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) const;
+
+        // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
+        // The first field is interpreted as a collection name.
+        std::string parseNsCollectionRequired(const std::string& dbname,
+                                              const BSONObj& cmdObj) const;
     public:
 
         typedef StringMap<Command*> CommandMap;

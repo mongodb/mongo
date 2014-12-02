@@ -69,13 +69,8 @@ namespace mongo {
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int,
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const std::string coll = cmdObj.firstElement().valuestrsafe();
-            if (coll.empty()) {
-                errmsg = "no collection name specified";
-                return false;
-            }
+            const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
-            const std::string ns = dbname + "." + coll;
             AutoGetCollectionForRead ctx(txn, ns);
 
             Collection* collection = ctx.getCollection();

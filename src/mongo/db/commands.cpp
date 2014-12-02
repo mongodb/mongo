@@ -86,6 +86,18 @@ namespace mongo {
         return first.String();
     }
 
+    string Command::parseNsCollectionRequired(const string& dbname, const BSONObj& cmdObj) const {
+        // Accepts both BSON String and Symbol for collection name per SERVER-16260
+        // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
+        BSONElement first = cmdObj.firstElement();
+        uassert(17009,
+                "no collection name specified",
+                first.canonicalType() == canonicalizeBSONType(mongo::String)
+                && first.valuestrsize() > 0);
+        std::string coll = first.valuestr();
+        return dbname + '.' + coll;
+    }
+
     /*virtual*/ string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
         BSONElement first = cmdObj.firstElement();
         if (first.type() != mongo::String)

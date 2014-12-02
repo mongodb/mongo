@@ -74,7 +74,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db, 
                                                      const BSONObj& cmdObj) {
-            std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestrsafe();
+            const std::string toDeleteNs = parseNsCollectionRequired(db->name(), cmdObj);
             Collection* collection = db->getCollection(toDeleteNs);
             IndexCatalog::IndexKillCriteria criteria;
 
@@ -122,13 +122,7 @@ namespace mongo {
                         BSONObj& jsobj,
                         string& errmsg,
                         BSONObjBuilder& anObjBuilder) {
-            const std::string collName = jsobj.firstElement().valuestrsafe();
-            if (collName.empty()) {
-                errmsg = "no collection name specified";
-                return false;
-            }
-
-            const std::string toDeleteNs = dbname + '.' + collName;
+            const std::string toDeleteNs = parseNsCollectionRequired(dbname, jsobj);
             if (!serverGlobalParams.quiet) {
                 LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
@@ -233,7 +227,7 @@ namespace mongo {
         virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
                                                      Database* db,
                                                      const BSONObj& cmdObj) {
-            std::string ns = db->name() + '.' + cmdObj["reIndex"].valuestrsafe();
+            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
             return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
@@ -242,8 +236,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             DBDirectClient db(txn);
 
-            BSONElement e = jsobj.firstElement();
-            string toDeleteNs = dbname + '.' + e.valuestr();
+            const std::string toDeleteNs = parseNsCollectionRequired(dbname, jsobj);
 
             LOG(0) << "CMD: reIndex " << toDeleteNs << endl;
 
