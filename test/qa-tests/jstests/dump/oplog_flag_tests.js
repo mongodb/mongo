@@ -18,7 +18,7 @@ if (typeof getToolTest === 'undefined') {
   }
 
   // Run parallel shell that inserts every millisecond
-  var inserts = startParallelShell(
+  var insertsShell = startParallelShell(
     'print(\'starting insert\'); ' +
     'for (var i = 1001; i < 2000; ++i) { ' +
     '  db.getSiblingDB(\'foo\').bar.insert({ x: i }); ' +
@@ -33,15 +33,17 @@ if (typeof getToolTest === 'undefined') {
   assert.gt(countBeforeMongodump, 1000);
 
   var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, dumpArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
+    'mongodump --oplog should succeed');
 
   // Wait for inserts to finish so we can then drop the database
-  inserts();
+  insertsShell();
   db.dropDatabase();
   assert.eq(0, db.bar.count());
 
   var restoreArgs = ['restore'].concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, restoreArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
+    'mongorestore should succeed');
   assert.gte(db.bar.count(), countBeforeMongodump);
   assert.lt(db.bar.count(), 2000);
 
