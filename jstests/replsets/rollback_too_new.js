@@ -10,7 +10,7 @@
     replTest.initiate({"_id": name,
                        "members": [
                            { "_id": 0, "host": nodes[0] },
-                           { "_id": 1, "host": nodes[1] },
+                           { "_id": 1, "host": nodes[1], arbiterOnly: true },
                            { "_id": 2, "host": nodes[2], priority: 0 }],
                        "settings": {
                            "chainingAllowed": false
@@ -21,7 +21,7 @@
 
     // get master and do an initial write
     var master = replTest.getMaster();
-    var options = {writeConcern: {w: 3, wtimeout: 60000}};
+    var options = {writeConcern: {w: 2, wtimeout: 60000}};
     assert.writeOK(master.getDB(name).foo.insert({x: 1}, options));
 
     // add an oplog entry from the distant future as the most recent entry on node C
