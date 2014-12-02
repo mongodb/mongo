@@ -153,6 +153,8 @@ namespace {
             // force file for oplog
             ss << "type=file,";
             ss << "app_metadata=(oplogKeyExtractionVersion=1),";
+            // Tune down to 10m.  See SERVER-16247
+            ss << "memory_page_max=10m,";
         }
         else {
             // Force this to be empty since users shouldn't be allowed to change it.
