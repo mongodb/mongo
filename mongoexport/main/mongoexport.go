@@ -47,11 +47,16 @@ func main() {
 	_, setName := util.ParseConnectionString(opts.Host)
 	opts.Direct = (setName == "")
 
+	provider, err := db.NewSessionProvider(*opts)
+	if err != nil {
+		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		os.Exit(-1)
+	}
 	exporter := mongoexport.MongoExport{
 		ToolOptions:     *opts,
 		OutputOpts:      outputOpts,
 		InputOpts:       inputOpts,
-		SessionProvider: db.NewSessionProvider(*opts),
+		SessionProvider: provider,
 	}
 
 	err = exporter.ValidateSettings()

@@ -18,7 +18,7 @@ func TestKerberos(t *testing.T) {
 
 		So(err, ShouldBeNil)
 
-		sessionProvider, err := db.InitSessionProvider(*opts)
+		sessionProvider, err := db.NewSessionProvider(*opts)
 		So(err, ShouldBeNil)
 
 		export := MongoExport{

@@ -245,12 +245,15 @@ func (cluster *AsyncClusterMonitor) Monitor(maxRows int, done chan error, sleep 
 
 //Utility constructor for NodeMonitor that copies the same connection settings
 //from an instance of ToolOptions, but for a different host name.
-func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) *NodeMonitor {
+func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) (*NodeMonitor, error) {
 	optsCopy := opts
 	host, port := parseHostPort(fullHost)
 	optsCopy.Connection = &commonopts.Connection{Host: host, Port: port}
 	optsCopy.Direct = true
-	sessionProvider := db.NewSessionProvider(optsCopy)
+	sessionProvider, err := db.NewSessionProvider(optsCopy)
+	if err != nil {
+		return nil, err
+	}
 	return &NodeMonitor{
 		host:            fullHost,
 		sessionProvider: sessionProvider,
@@ -258,7 +261,7 @@ func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) *Nod
 		LastUpdate:      time.Now(),
 		All:             all,
 		Err:             nil,
-	}
+	}, nil
 }
 
 //Report collects the stat info for a single node, and sends the result on
@@ -355,17 +358,21 @@ func parseHostPort(fullHostName string) (string, string) {
 
 //AddNewNode adds a new host name to be monitored and spawns
 //the necessary goroutines to collect data from it.
-func (mstat *MongoStat) AddNewNode(fullhost string) {
+func (mstat *MongoStat) AddNewNode(fullhost string) error {
 	mstat.nodesLock.Lock()
 	defer mstat.nodesLock.Unlock()
 
 	if _, hasKey := mstat.Nodes[fullhost]; !hasKey {
 		log.Logf(log.DebugLow, "adding new host to monitoring: %v", fullhost)
 		//Create a new node monitor for this host.
-		node := NewNodeMonitor(*mstat.Options, fullhost, mstat.StatOptions.All)
+		node, err := NewNodeMonitor(*mstat.Options, fullhost, mstat.StatOptions.All)
+		if err != nil {
+			return err
+		}
 		mstat.Nodes[fullhost] = node
 		node.Watch(mstat.SleepInterval, mstat.Discovered, mstat.Cluster)
 	}
+	return nil
 }
 
 //Run is the top-level function that starts the monitoring
@@ -376,7 +383,10 @@ func (mstat *MongoStat) Run() error {
 		go func() {
 			for {
 				newHost := <-mstat.Discovered
-				mstat.AddNewNode(newHost)
+				err := mstat.AddNewNode(newHost)
+				if err != nil {
+					log.Logf(log.Always, "can't add discovered node %v: %v", newHost, err)
+				}
 			}
 		}()
 	}

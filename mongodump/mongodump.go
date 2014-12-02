@@ -84,7 +84,10 @@ func (dump *MongoDump) Init() error {
 	if dump.OutputOptions.Out == "-" {
 		dump.useStdout = true
 	}
-	dump.sessionProvider = db.NewSessionProvider(*dump.ToolOptions)
+	dump.sessionProvider, err = db.NewSessionProvider(*dump.ToolOptions)
+	if err != nil {
+		return fmt.Errorf("Can't create session: %v", err)
+	}
 	// ensure we allow secondary reads
 	dump.sessionProvider.SetFlags(db.Monotonic)
 

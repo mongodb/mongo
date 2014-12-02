@@ -45,11 +45,11 @@ func TestBasicOps(t *testing.T) {
 			sourceOpts.OplogNS = "mongooplog_test.oplog"
 
 			// initialize a session provider for the source
-			sourceSP, err := db.InitSessionProvider(*opts)
+			sourceSP, err := db.NewSessionProvider(*opts)
 			So(err, ShouldBeNil)
 
 			// initialize a session provider for the destination
-			destSP, err := db.InitSessionProvider(*opts)
+			destSP, err := db.NewSessionProvider(*opts)
 			So(err, ShouldBeNil)
 
 			// clear out the oplog

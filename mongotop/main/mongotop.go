@@ -63,7 +63,11 @@ func main() {
 	opts.Direct = (setName == "")
 
 	// create a session provider to connect to the db
-	sessionProvider := db.NewSessionProvider(*opts)
+	sessionProvider, err := db.NewSessionProvider(*opts)
+	if err != nil {
+		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		os.Exit(-1)
+	}
 
 	// instantiate a mongotop instance
 	top := &mongotop.MongoTop{

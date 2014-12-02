@@ -58,10 +58,15 @@ func main() {
 	opts.Direct = (setName == "")
 
 	// create a session provider to connect to the db
+	provider, err := db.NewSessionProvider(*opts)
+	if err != nil {
+		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		os.Exit(-1)
+	}
 	mf := mongofiles.MongoFiles{
 		ToolOptions:     opts,
 		StorageOptions:  storageOpts,
-		SessionProvider: db.NewSessionProvider(*opts),
+		SessionProvider: provider,
 	}
 
 	if err := mf.ValidateCommand(args); err != nil {

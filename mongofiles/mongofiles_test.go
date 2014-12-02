@@ -38,7 +38,7 @@ var (
 
 // put in some test data into GridFS
 func setUpGridFSTestData() ([]interface{}, error) {
-	sessionProvider, err := db.InitSessionProvider(*toolOptions)
+	sessionProvider, err := db.NewSessionProvider(*toolOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func setUpGridFSTestData() ([]interface{}, error) {
 
 // remove test data from GridFS
 func tearDownGridFSTestData() error {
-	sessionProvider, err := db.InitSessionProvider(*toolOptions)
+	sessionProvider, err := db.NewSessionProvider(*toolOptions)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func tearDownGridFSTestData() error {
 }
 
 func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
-	sessionProvider, err := db.InitSessionProvider(*toolOptions)
+	sessionProvider, err := db.NewSessionProvider(*toolOptions)
 	if err != nil {
 		return nil, err
 	}

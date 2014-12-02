@@ -91,7 +91,7 @@ func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 
 //NewSessionProvider constructs a session provider but does not attempt to
 //create the initial session.
-func NewSessionProvider(opts options.ToolOptions) *SessionProvider {
+func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	// create the provider
 	provider := &SessionProvider{}
 
@@ -99,9 +99,12 @@ func NewSessionProvider(opts options.ToolOptions) *SessionProvider {
 	provider.connector = getConnector(opts)
 
 	// configure the connector
-	provider.connector.Configure(opts)
+	err := provider.connector.Configure(opts)
+	if err != nil {
+		return nil, fmt.Errorf("error configuring the connector: %v", err)
+	}
 
-	return provider
+	return provider, nil
 
 }
 
@@ -119,33 +122,6 @@ func IsConnectionError(err error) bool {
 		return true
 	}
 	return false
-}
-
-// Initialize a session provider to connect to the database server, based on
-// the options passed in.  Connects to the db and returns a fully initialized
-// provider.
-func InitSessionProvider(opts options.ToolOptions) (*SessionProvider,
-	error) {
-
-	// create the provider
-	provider := &SessionProvider{}
-
-	// create the connector for dialing the database
-	provider.connector = getConnector(opts)
-
-	// configure the connector
-	err := provider.connector.Configure(opts)
-	if err != nil {
-		return nil, fmt.Errorf("error configuring the connector: %v", err)
-	}
-
-	// initialize the provider's master session
-	provider.masterSession, err = provider.connector.GetNewSession()
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to db server: %v", err)
-	}
-
-	return provider, nil
 }
 
 // Get the right type of connector, based on the options

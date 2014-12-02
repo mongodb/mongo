@@ -19,7 +19,7 @@ func TestBufferedBulkInserterInserts(t *testing.T) {
 			SSL:        &options.SSL{},
 			Auth:       &options.Auth{},
 		}
-		provider, err := InitSessionProvider(opts)
+		provider, err := NewSessionProvider(opts)
 		session, err := provider.GetSession()
 		So(session, ShouldNotBeNil)
 		So(err, ShouldBeNil)

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestInitSessionProvider(t *testing.T) {
+func TestNewSessionProvider(t *testing.T) {
 
 	testutil.VerifyTestType(t, "db")
 
@@ -21,7 +21,7 @@ func TestInitSessionProvider(t *testing.T) {
 				SSL:        &options.SSL{},
 				Auth:       &options.Auth{},
 			}
-			provider, err := InitSessionProvider(opts)
+			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)
 			So(reflect.TypeOf(provider.connector), ShouldEqual,
 				reflect.TypeOf(&VanillaDBConnector{}))
@@ -35,8 +35,12 @@ func TestInitSessionProvider(t *testing.T) {
 				SSL:        &options.SSL{},
 				Auth:       &options.Auth{},
 			}
-			provider, err := InitSessionProvider(opts)
+			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)
+			So(provider.masterSession, ShouldBeNil)
+			session, err := provider.GetSession()
+			So(err, ShouldBeNil)
+			So(session, ShouldNotBeNil)
 			So(provider.masterSession, ShouldNotBeNil)
 
 		})

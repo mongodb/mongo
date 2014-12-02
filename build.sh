@@ -7,7 +7,7 @@ if [ ! -z "$1" ]
 fi
 
 . ./set_gopath.sh
-mkdir bin || true
+mkdir -p bin
 export GOBIN=bin
 
 for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do

@@ -35,7 +35,7 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 	var err error
 	self.ctx, err = setupCtx(opts)
 	if err != nil {
-		return fmt.Errorf("setupCtx: %v", err)
+		return fmt.Errorf("openssl configuration: %v", err)
 	}
 
 	var flags openssl.DialFlags

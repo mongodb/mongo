@@ -19,7 +19,7 @@ func TestCollectionExists(t *testing.T) {
 	Convey("With a test mongorestore", t, func() {
 		ssl := testutil.GetSSLOptions()
 		auth := testutil.GetAuthOptions()
-		sessionProvider, err := db.InitSessionProvider(commonOpts.ToolOptions{
+		sessionProvider, err := db.NewSessionProvider(commonOpts.ToolOptions{
 			Connection: &commonOpts.Connection{
 				Host: "localhost",
 				Port: "27017",

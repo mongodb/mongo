@@ -70,16 +70,20 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 	}
 }
 
-func NewMongoImport() *MongoImport {
+func NewMongoImport() (*MongoImport, error) {
 	toolOptions := getBasicToolOptions()
 	inputOptions := &options.InputOptions{}
 	ingestOptions := &options.IngestOptions{}
+	provider, err := db.NewSessionProvider(*toolOptions)
+	if err != nil {
+		return nil, err
+	}
 	return &MongoImport{
 		ToolOptions:     toolOptions,
 		InputOptions:    inputOptions,
 		IngestOptions:   ingestOptions,
-		SessionProvider: db.NewSessionProvider(*toolOptions),
-	}
+		SessionProvider: provider,
+	}, nil
 }
 
 func TestMongoImportValidateSettings(t *testing.T) {
@@ -87,49 +91,56 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.ToolOptions.Namespace.DB = ""
 			mongoImport.ToolOptions.Namespace.Collection = ""
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if an invalid type is given", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = "invalid"
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if neither --headerline is supplied "+
 			"nor --fields/--fieldFile", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fields is supplied", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Fields = "a,b,c"
 			mongoImport.InputOptions.Type = CSV
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if no input type is supplied", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Fields = "a,b,c"
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fieldFile is supplied", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.FieldFile = "test.csv"
 			mongoImport.InputOptions.Type = CSV
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if no collection and no file is supplied", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.FieldFile = "test.csv"
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.ToolOptions.Namespace.Collection = ""
@@ -138,7 +149,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("no error should be thrown if no collection but a file is "+
 			"supplied and the file name should be used as the collection name", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "input"
 			mongoImport.InputOptions.FieldFile = "test.csv"
 			mongoImport.InputOptions.Type = CSV
@@ -150,7 +162,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 
 		Convey("with no collection name and a file name the base name of the "+
 			"file (without the extension) should be used as the collection name", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			mongoImport.InputOptions.FieldFile = "test.csv"
 			mongoImport.InputOptions.Type = CSV
@@ -167,26 +180,29 @@ func TestGetSourceReader(t *testing.T) {
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
 				"the reader does not exist", func() {
-				mongoImport := NewMongoImport()
+				mongoImport, err := NewMongoImport()
+				So(err, ShouldBeNil)
 				mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
 				mongoImport.InputOptions.Type = CSV
 				mongoImport.ToolOptions.Namespace.Collection = ""
-				_, err := mongoImport.getSourceReader()
+				_, err = mongoImport.getSourceReader()
 				So(err, ShouldNotBeNil)
 			})
 
 			Convey("no error should be thrown if the file exists", func() {
-				mongoImport := NewMongoImport()
+				mongoImport, err := NewMongoImport()
+				So(err, ShouldBeNil)
 				mongoImport.InputOptions.File = "testdata/test_array.json"
 				mongoImport.InputOptions.Type = JSON
-				_, err := mongoImport.getSourceReader()
+				_, err = mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 
 			Convey("no error should be thrown if stdin is used", func() {
-				mongoImport := NewMongoImport()
+				mongoImport, err := NewMongoImport()
+				So(err, ShouldBeNil)
 				mongoImport.InputOptions.File = ""
-				_, err := mongoImport.getSourceReader()
+				_, err = mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 		})
@@ -197,48 +213,55 @@ func TestGetInputReader(t *testing.T) {
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fields is used", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Fields = "a,b,c"
 			mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fieldFile is used and it "+
 			"references a valid file", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.FieldFile = "testdata/test_array.json"
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("an error should be thrown if --fieldFile is used and it "+
 			"references an invalid file", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.FieldFile = "/path/to/input/file/dot/input.txt"
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown for CSV import inputs", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for TSV import inputs", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = TSV
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for JSON import inputs", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = JSON
-			_, err := mongoImport.getInputReader(&os.File{})
+			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 	})
@@ -248,7 +271,10 @@ func TestImportDocuments(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 	Convey("With a mongoimport instance", t, func() {
 		Reset(func() {
-			sessionProvider := db.NewSessionProvider(*getBasicToolOptions())
+			sessionProvider, err := db.NewSessionProvider(*getBasicToolOptions())
+			if err != nil {
+				t.Fatalf("error getting session provider session: %v", err)
+			}
 			session, err := sessionProvider.GetSession()
 			if err != nil {
 				t.Fatalf("error getting session: %v", err)
@@ -259,7 +285,8 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			mongoImport.InputOptions.Fields = "a,b,c"
@@ -270,7 +297,8 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("TOOLS-247: no error should be thrown for JSON import on test "+
 			"data and all documents should be imported correctly", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "testdata/test_plain2.json"
 			mongoImport.IngestOptions.WriteConcern = "majority"
 			numImported, err := mongoImport.ImportDocuments()
@@ -278,7 +306,8 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 10)
 		})
 		Convey("CSV import with --ignoreBlanks should import only non-blank fields", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_blanks.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -295,7 +324,8 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import without --ignoreBlanks should include blanks", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_blanks.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -310,7 +340,8 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("no error should be thrown for CSV import on test data with --upsert", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -328,7 +359,8 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("no error should be thrown for CSV import on test data with "+
 			"--stopOnError. Only documents before error should be imported", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -346,7 +378,8 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import with duplicate _id's should not error if --stopOnError is not set", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
@@ -366,7 +399,8 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("no error should be thrown for CSV import on test data with --drop", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -384,7 +418,8 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("CSV import on test data with --headerLine should succeed", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -398,7 +433,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			csvFile.Close()
 
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = csvFile.Name()
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -408,7 +444,8 @@ func TestImportDocuments(t *testing.T) {
 			So(numImported, ShouldEqual, 0)
 		})
 		Convey("CSV import with --upsert and --upsertFields should succeed", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
@@ -428,7 +465,8 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("CSV import with --upsert/--upsertFields with duplicate id should succeed"+
 			" if stopOnError is not set", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
@@ -448,14 +486,15 @@ func TestImportDocuments(t *testing.T) {
 		Convey("an error should be thrown for CSV import on test data with "+
 			"duplicate _id if --stopOnError is set", func() {
 
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
 			mongoImport.IngestOptions.StopOnError = true
 			mongoImport.IngestOptions.WriteConcern = "1"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
-			_, err := mongoImport.ImportDocuments()
+			_, err = mongoImport.ImportDocuments()
 			So(err, ShouldNotBeNil)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
@@ -465,14 +504,15 @@ func TestImportDocuments(t *testing.T) {
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 		Convey("an error should be thrown for invalid CSV import on test data", func() {
-			mongoImport := NewMongoImport()
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_bad.csv"
 			mongoImport.InputOptions.Fields = "_id,b,c"
 			mongoImport.IngestOptions.StopOnError = true
 			mongoImport.IngestOptions.WriteConcern = "1"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
-			_, err := mongoImport.ImportDocuments()
+			_, err = mongoImport.ImportDocuments()
 			So(err, ShouldNotBeNil)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
