@@ -369,10 +369,15 @@ func TestUnknownFlagHandler(t *testing.T) {
 
 	var unknownFlag1 string
 	var unknownFlag2 bool
+	var unknownFlag3 string
 
 	// Set up a callback to intercept unknown options during parsing
-	p.UnknownOptionHandler = func(option string, args []string) ([]string, error) {
+	p.UnknownOptionHandler = func(option string, arg SplitArgument, args []string) ([]string, error) {
 		if option == "unknownFlag1" {
+			if argValue, ok := arg.Value(); ok {
+				unknownFlag1 = argValue
+				return args, nil
+			}
 			// consume a value from remaining args list
 			unknownFlag1 = args[0]
 			return args[1:], nil
@@ -380,6 +385,14 @@ func TestUnknownFlagHandler(t *testing.T) {
 			// treat this one as a bool switch, don't consume any args
 			unknownFlag2 = true
 			return args, nil
+		} else if option == "unknownFlag3" {
+			if argValue, ok := arg.Value(); ok {
+				unknownFlag3 = argValue
+				return args, nil
+			}
+			// consume a value from remaining args list
+			unknownFlag3 = args[0]
+			return args[1:], nil
 		}
 
 		return args, fmt.Errorf("Unknown flag: %v", option)
@@ -387,7 +400,7 @@ func TestUnknownFlagHandler(t *testing.T) {
 
 	// Parse args containing some unknown flags, verify that
 	// our callback can handle all of them
-	_, err := p.ParseArgs([]string{"--flag1=stuff", "--unknownFlag1", "blah", "--unknownFlag2", "--flag2=foo"})
+	_, err := p.ParseArgs([]string{"--flag1=stuff", "--unknownFlag1", "blah", "--unknownFlag2", "--unknownFlag3=baz", "--flag2=foo"})
 
 	if err != nil {
 		assertErrorf(t, "Parser returned unexpected error %v", err)
@@ -396,6 +409,7 @@ func TestUnknownFlagHandler(t *testing.T) {
 	assertString(t, opts.Flag1, "stuff")
 	assertString(t, opts.Flag2, "foo")
 	assertString(t, unknownFlag1, "blah")
+	assertString(t, unknownFlag3, "baz")
 
 	if !unknownFlag2 {
 		assertErrorf(t, "Flag should have been set by unknown handler, but had value: %v", unknownFlag2)

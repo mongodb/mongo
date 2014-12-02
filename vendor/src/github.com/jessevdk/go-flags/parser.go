@@ -26,12 +26,33 @@ type Parser struct {
 
 	// UnknownOptionsHandler is a function which gets called when the parser
 	// encounters an unknown option. The function receives the unknown option
-	// name and the remaining command line arguments.
+	// name, a SplitArgument which specifies its value if set with an argument
+	// separator, and the remaining command line arguments.
 	// It should return a new list of remaining arguments to continue parsing,
 	// or an error to indicate a parse failure.
-	UnknownOptionHandler func(option string, args []string) ([]string, error)
+	UnknownOptionHandler func(option string, arg SplitArgument, args []string) ([]string, error)
 
 	internalError error
+}
+
+// SplitArgument represents the argument value of an option that was passed using
+// an argument separator.
+type SplitArgument interface {
+	// String returns the option's value as a string, and a boolean indicating
+	// if the option was present.
+	Value() (string, bool)
+}
+
+type strArgument struct {
+	value *string
+}
+
+func (s strArgument) Value() (string, bool) {
+	if s.value == nil {
+		return "", false
+	}
+
+	return *s.value, true
 }
 
 // Options provides parser options that change the behavior of the option
@@ -219,7 +240,7 @@ func (p *Parser) ParseArgs(args []string) ([]string, error) {
 			if ignoreUnknown {
 				s.addArgs(arg)
 			} else if p.UnknownOptionHandler != nil {
-				modifiedArgs, err := p.UnknownOptionHandler(optname, s.args)
+				modifiedArgs, err := p.UnknownOptionHandler(optname, strArgument{argument}, s.args)
 
 				if err != nil {
 					s.err = err

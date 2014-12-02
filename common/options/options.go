@@ -149,8 +149,8 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 		parser:        flags.NewNamedParser(appName, flags.None),
 	}
 
-	opts.parser.UnknownOptionHandler = func(option string, args []string) ([]string, error) {
-		return parseHiddenOption(hiddenOpts, option, args)
+	opts.parser.UnknownOptionHandler = func(option string, arg flags.SplitArgument, args []string) ([]string, error) {
+		return parseHiddenOption(hiddenOpts, option, arg, args)
 	}
 
 	if _, err := opts.parser.AddGroup("general options", "", opts.General); err != nil {
@@ -244,13 +244,13 @@ func (self *ToolOptions) Parse() ([]string, error) {
 	return self.parser.Parse()
 }
 
-func parseHiddenOption(opts *HiddenOptions, option string, args []string) ([]string, error) {
+func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgument, args []string) ([]string, error) {
 	if option == "dbpath" || option == "directoryperdb" || option == "journal" {
 		return args, fmt.Errorf(`--dbpath and related flags are not supported in 2.8 tools.
 See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
 	var err error
-	optionValue, err := getInt(args)
+	optionValue, consumeVal, err := getInt(arg, args)
 	switch option {
 	case "numThreads":
 		opts.MaxProcs = optionValue
@@ -268,16 +268,29 @@ See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`
 	if err != nil {
 		return args, fmt.Errorf(`error parsing value for "%v": %v`, option, err)
 	}
-	return args[1:], nil
+	if consumeVal {
+		return args[1:], nil
+	}
+	return args, nil
 }
 
-func getInt(args []string) (int, error) {
-	if len(args) == 0 {
-		return 0, fmt.Errorf("no value specified")
+//getInt returns 3 args: the parsed int value, a bool set to true if a value
+//was consumed from the incoming args array during parsing, and an error
+//value if parsing failed
+func getInt(arg flags.SplitArgument, args []string) (int, bool, error) {
+	var rawVal string
+	consumeValue := false
+	rawVal, hasVal := arg.Value()
+	if !hasVal {
+		if len(args) == 0 {
+			return 0, false, fmt.Errorf("no value specified")
+		}
+		rawVal = args[0]
+		consumeValue = true
 	}
-	val, err := strconv.Atoi(args[0])
+	val, err := strconv.Atoi(rawVal)
 	if err != nil {
-		return 0, fmt.Errorf("expected an integer value but got '%v'")
+		return val, consumeValue, fmt.Errorf("expected an integer value but got '%v'", rawVal)
 	}
-	return val, nil
+	return val, consumeValue, nil
 }
