@@ -846,6 +846,52 @@ namespace IndexUpdateTests {
         }
     };
 
+    class StorageEngineOptions : public IndexBuildBase {
+    public:
+        void run() {
+            // "storageEngine" field has to be an object if present.
+            ASSERT_NOT_OK(createIndex("unittest", _createSpec(12345)));
+
+            // 'storageEngine' must not be empty.
+            ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSONObj())));
+
+            // Every field under "storageEngine" must match a registered storage engine.
+            ASSERT_NOT_OK(createIndex("unittest",
+                                      _createSpec(BSON("unknownEngine" << BSONObj()))));
+
+            // Testing with 'wiredTiger' because the registered storage engine factory
+            // supports custom index options under 'storageEngine'.
+            const std::string storageEngineName = "wiredTiger";
+
+            // Run 'wiredTiger' tests if the storage engine is supported.
+            if (getGlobalEnvironment()->isRegisteredStorageEngine(storageEngineName)) {
+                // Every field under "storageEngine" has to be an object.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSON(storageEngineName << 1))));
+
+                // Storage engine options must pass validation by the storage engine factory.
+                // For 'wiredTiger', embedded document must contain 'configString'.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("unknown" << 1)))));
+
+                // Configuration string for 'wiredTiger' must be a string.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("configString" << 1)))));
+
+                // Valid 'wiredTiger' configuration.
+                ASSERT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("configString" << "block_compressor=zlib")))));
+            }
+        }
+    protected:
+        template <typename T>
+        BSONObj _createSpec(T storageEngineValue) {
+            return BSON("name" << "super2"
+                        << "ns" << _ns
+                        << "key" << BSON("a" << 1)
+                        << "storageEngine" << storageEngineValue);
+        }
+    };
+
     class IndexCatatalogFixIndexKey {
     public:
         void run() {
@@ -893,6 +939,7 @@ namespace IndexUpdateTests {
             add<SameSpecDifferentUnique>();
             add<SameSpecDifferentSparse>();
             add<SameSpecDifferentTTL>();
+            add<StorageEngineOptions>();
 
             add<IndexCatatalogFixIndexKey>();
         }

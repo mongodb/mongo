@@ -60,6 +60,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -577,6 +578,26 @@ namespace {
                 // this is not exactly the right error code, but I think will make the most sense
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
+        }
+
+        BSONElement storageEngineElement = spec.getField("storageEngine");
+        if (storageEngineElement.eoo()) {
+            return Status::OK();
+        }
+        if (storageEngineElement.type() != mongo::Object) {
+            return Status(ErrorCodes::BadValue, "'storageEngine' has to be a document.");
+        }
+        BSONObj storageEngineOptions = storageEngineElement.Obj();
+        if (storageEngineOptions.isEmpty()) {
+            return Status(ErrorCodes::BadValue,
+                          "Empty 'storageEngine' options are invalid. "
+                          "Please remove, or include valid options.");
+
+        }
+        Status storageEngineStatus = validateStorageOptions(storageEngineOptions,
+            &StorageEngine::Factory::validateIndexStorageOptions);
+        if (!storageEngineStatus.isOK()) {
+            return storageEngineStatus;
         }
 
         return Status::OK();
