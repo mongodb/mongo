@@ -29,7 +29,7 @@
 # Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil
+import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
@@ -142,8 +142,8 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
                  self.check(backup_conn.open_session(), None, committed)
             finally:
                  # Let other threads like archive run before closing.
-                 yield
-                 backup_conn.close()
+                time.sleep(0)
+                backup_conn.close()
             count += 1
         #
         # Check logs after repeated openings. The first log should
