@@ -333,7 +333,7 @@ namespace mongo {
             {
                 boost::mutex::scoped_lock lk( _identToDropMutex );
                 _identToDrop.insert( uri );
-                _epoch.fetchAndAdd(1);
+                _epoch++;
             }
             _sessionCache->closeAll();
             return false;
@@ -343,14 +343,11 @@ namespace mongo {
         return false;
     }
 
-    void WiredTigerKVEngine::syncSizeInfoOccasionally() const {
+    bool WiredTigerKVEngine::haveDropsQueued() const {
         if ( _sizeStorerSyncTracker.intervalHasElapsed() ) {
             _sizeStorerSyncTracker.resetLastTime();
             syncSizeInfo(false);
         }
-    }
-
-    bool WiredTigerKVEngine::haveDropsQueued() const {
         boost::mutex::scoped_lock lk( _identToDropMutex );
         return !_identToDrop.empty();
     }
