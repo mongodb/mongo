@@ -1113,6 +1113,15 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	__wt_page_only_modify_set(session, right);
 
 	/*
+	 * We modified the page above, which will have set the first dirty
+	 * transaction to the last transaction current running.  However, the
+	 * updates we are moving may be older than that.  Take the oldest
+	 * active transaction ID to make sure these updates are not skipped by
+	 * a checkpoint.
+	 */
+	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
+
+	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
 	 * list stack is for the element we are moving, and the memory used by
 	 * the item's list of updates.
@@ -1238,6 +1247,13 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 		WT_ERR(ret);
 	}
+
+	/*
+	 * Save the transaction ID when the split happened.  Application
+	 * threads will not try to forcibly evict the page again until
+	 * all concurrent transactions commit.
+	 */
+	page->modify->inmem_split_txn = __wt_txn_new_id(session);
 
 	/* Let our caller know that we split. */
 	*splitp = 1;

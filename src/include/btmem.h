@@ -187,6 +187,9 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
+	/* In-memory split transaction ID. */
+	uint64_t inmem_split_txn;
+
 	/* Dirty bytes added to the cache. */
 	uint64_t bytes_dirty;
 
