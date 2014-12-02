@@ -53,6 +53,12 @@ namespace {
 
     static const WiredTigerItem emptyItem(NULL, 0);
 
+    static const int kMinimumIndexVersion = 0;
+    static const int kCurrentIndexVersion = 0; // New indexes use this by default.
+    static const int kMaximumIndexVersion = 0;
+    BOOST_STATIC_ASSERT(kCurrentIndexVersion >= kMinimumIndexVersion);
+    BOOST_STATIC_ASSERT(kCurrentIndexVersion <= kMaximumIndexVersion);
+
     bool hasFieldNames(const BSONObj& obj) {
         BSONForEach(e, obj) {
             if (e.fieldName()[0])
@@ -163,7 +169,39 @@ namespace {
                                  WT_CONFIG_ITEM *metadata,
                                  WT_COLLATOR **collp) {
         try {
-            IndexDescriptor desc(0, "unknown", fromjson(std::string(metadata->str, metadata->len)));
+            invariant(metadata->type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
+            WiredTigerConfigParser config(*metadata);
+
+            WT_CONFIG_ITEM version;
+            if (config.get("formatVersion", &version) != 0) {
+                fassertFailedWithStatusNoTrace(28580,
+                    Status(ErrorCodes::UnsupportedFormat, str::stream()
+                           << "Found an index from an unsupported RC version."
+                           << " Please restart with --repair to fix."));
+
+            }
+
+            WT_CONFIG_ITEM infoObj;
+            const int infoObjRet = config.get("infoObj", &infoObj);
+            if (infoObjRet != 0) {
+                // This must be from a future version from when we removed infoObj. Print something
+                // reasonable.
+                infoObj.str = "(unknown)";
+                infoObj.len = strlen(infoObj.str);
+            }
+
+            if (version.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM
+                    || version.val < kMinimumIndexVersion || version.val > kMaximumIndexVersion) {
+                fassertFailedWithStatusNoTrace(28579,
+                    Status(ErrorCodes::UnsupportedFormat, str::stream()
+                           << "Index " << infoObj.str
+                           << " has unsupported formatVersion " << version.str
+                           << ". Please restart with --repair to fix."));
+            }
+
+            invariant(infoObjRet == 0);
+
+            IndexDescriptor desc(0, "unknown", fromjson(std::string(infoObj.str, infoObj.len)));
             *collp = new WiredTigerIndexCollator(Ordering::make(desc.keyPattern()));
             return 0;
         }
@@ -209,8 +247,7 @@ namespace {
                         << "Not adding 'configString' value "
                         << elem << " to index configuration");
                 }
-                std::string configString = elem.String();
-                if (configString.empty()) {
+                if (elem.valueStringData().empty()) {
                     return StatusWith<std::string>(ErrorCodes::InvalidOptions,
                         "configString must be not be an empty string.");
                 }
@@ -238,12 +275,6 @@ namespace {
 
         ss << extraConfig;
 
-        // Indexes need to store the metadata for collation to work as expected.
-        ss << ",key_format=u,value_format=u,collator=mongo_index";
-
-        // Index metadata
-        ss << ",app_metadata=" << desc.infoObj().jsonString();
-
         // Validate configuration object.
         // Raise an error about unrecognized fields that may be introduced in newer versions of
         // this storage engine.
@@ -260,6 +291,19 @@ namespace {
                 ss << "," << parseStatus.getValue();
             }
         }
+
+        // WARNING: No user-specified config can appear below this line. These options are required
+        // for correct behavior of the server.
+
+        // Indexes need to store the metadata for collation to work as expected.
+        ss << ",key_format=u,value_format=u,collator=mongo_index";
+
+        // Index metadata
+        ss << ",app_metadata=("
+                << "formatVersion=" << kCurrentIndexVersion << ','
+                << "infoObj=" << desc.infoObj().jsonString()
+            << "),";
+
 
         return StatusWith<std::string>(ss);
     }
