@@ -127,7 +127,7 @@ namespace mongo {
         if ( _countedYet ) {
             _countedYet = false;
             cursorStatsOpen.decrement();
-            if ( _pinValue == 1 )
+            if ( _pinValue == 1 || _pinValue == 101 )
                 cursorStatsOpenNoTimeout.decrement();
         }
 
