@@ -24,6 +24,9 @@
      replSet.bridge();
      replSet.partition(1,0);
      replSet.partition(1,2);
+
+    replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+
      var primary = replSet.getPrimary();
      assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
 

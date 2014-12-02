@@ -17,7 +17,7 @@ var config = { "_id": testName,
                             {"_id": 2, "host": nodes[2]}]
               };
 var r = replTest.initiate(config);
-
+replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
 // Make sure we have a master
 var master = replTest.getMaster();
 var a_conn = conns[0];
@@ -28,6 +28,7 @@ var A = a_conn.getDB("test");
 var B = b_conn.getDB("test");
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
+
 assert(master == conns[0], "conns[0] assumed to be master");
 assert(a_conn.host == master.host);
 

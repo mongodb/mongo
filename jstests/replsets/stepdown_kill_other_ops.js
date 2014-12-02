@@ -12,6 +12,8 @@
                            {"_id" : 1, "host" : nodes[1]},
                            {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
+     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+
      var primary = replSet.getPrimary();
      assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
      assert.writeOK(primary.getDB(name).foo.insert({x: 1}, {w: 2, wtimeout:10000}));

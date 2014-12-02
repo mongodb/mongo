@@ -14,6 +14,7 @@ var r = replTest.initiate({ "_id": "unicomplex",
                                       { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                           }, 'replSetInitiate', 600000);
 
+replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
 // Make sure we have a master
 var master = replTest.getMaster();
 var b_conn = conns[1];

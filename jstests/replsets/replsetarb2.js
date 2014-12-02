@@ -9,14 +9,13 @@
     var conns = replTest.startSet();
     var r = replTest.initiate({"_id" : "unicomplex",
                                "members" : [
-                                   {"_id" : 0, "host" : nodes[0], "priority" : 2},
+                                   {"_id" : 0, "host" : nodes[0]},
                                    {"_id" : 1, "host" : nodes[1], "arbiterOnly" : true, "votes": 1},
                                    {"_id" : 2, "host" : nodes[2]}
                                 ]});
 
     // Make sure we have a master
     var master = replTest.getMaster();
-    assert.eq(master, conns[0], "wrong node became master");
 
     // Make sure we have an arbiter
     assert.soon(function() {
@@ -41,7 +40,7 @@
     var new_master = replTest.getMaster();
 
     var newMasterId = replTest.getNodeId(new_master);
-    assert.eq(newMasterId, 2, "Secondary wasn't promoted to new primary");
+    assert.neq(newMasterId, mId, "Secondary wasn't promoted to new primary");
 
     replTest.stopSet(15);
 }());

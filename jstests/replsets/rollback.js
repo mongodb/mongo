@@ -30,11 +30,10 @@ load("jstests/replsets/rslib.js");
         assert.eq(3, x[2].q);
         assert.eq(7, x[3].q);
         assert.eq(8, x[4].q);
-    }
+    };
 
     var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
     var nodes = replTest.nodeList();
-    //jsTest.log(tojson(nodes));
 
     var conns = replTest.startSet();
     var r = replTest.initiate({ "_id": "unicomplex",
@@ -46,6 +45,7 @@ load("jstests/replsets/rslib.js");
     replTest.bridge();
 
     // Make sure we have a master
+    replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
     var master = replTest.getMaster();
     var a_conn = conns[0];
     var A = a_conn.getDB("admin");
@@ -71,7 +71,8 @@ load("jstests/replsets/rslib.js");
             for (var i = 0; i < 1000; i++) {
                 bulk.find({}).update({ $inc: { x: 1 }});
             }
-            // unlikely secondary isn't keeping up, but let's avoid possible intermittent issues with that.
+            // unlikely secondary isn't keeping up, but let's avoid possible intermittent 
+            // issues with that.
             bulk.execute({ w: 2 });
 
             var op = a.getSisterDB("local").oplog.rs.find().sort({ $natural: 1 }).limit(1)[0];

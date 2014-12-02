@@ -12,10 +12,10 @@
     replTest.initiate({_id: name, members:
             [
                 {_id: 0, host: nodes[0].host, priority: 3},
-                {_id: 1, host: nodes[1].host},
-                {_id: 2, host: nodes[2].host},
-                {_id: 3, host: nodes[3].host},
-                {_id: 4, host: nodes[4].host},
+                {_id: 1, host: nodes[1].host, priority: 0},
+                {_id: 2, host: nodes[2].host, priority: 0},
+                {_id: 3, host: nodes[3].host, priority: 0},
+                {_id: 4, host: nodes[4].host, priority: 0},
             ],
             });
     var primary = replTest.getPrimary();

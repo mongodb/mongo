@@ -31,8 +31,8 @@ var hostnames = rs.nodeList();
 rs.initiate({ "_id" : name,
                     "members" : [
                         {"_id" : 0, "host" : hostnames[0], "priority" : 2},
-                        {"_id" : 1, "host" : hostnames[1]},
-                        {"_id" : 2, "host" : hostnames[2]}
+                        {"_id" : 1, "host" : hostnames[1], priority: 0},
+                        {"_id" : 2, "host" : hostnames[2], priority: 0}
                     ]});
 
 var master = rs.getMaster();
