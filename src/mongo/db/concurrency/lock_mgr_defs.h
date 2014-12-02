@@ -39,8 +39,9 @@
 namespace mongo {
 
     class Locker;
-    struct LockHead;
 
+    struct LockHead;
+    struct PartitionedLockHead;
 
     /**
      * Lock modes.
@@ -247,7 +248,8 @@ namespace mongo {
 
     /**
      * There is one of those entries per each request for a lock. They hang on a linked list off
-     * the LockHead and also are in a map for each Locker. This structure is not thread-safe.
+     * the LockHead or off a PartitionedLockHead and also are in a map for each Locker. This
+     * structure is not thread-safe.
      *
      * LockRequest are owned by the Locker class and it controls their lifetime. They should not
      * be deleted while on the LockManager though (see the contract for the lock/unlock methods).
@@ -296,19 +298,30 @@ namespace mongo {
         // granted immediately. This effectively turns off fairness.
         bool compatibleFirst;
 
+        // When set, an attempt is made to execute this request using partitioned lockheads.
+        // This speeds up the common case where all requested locking modes are compatible with
+        // each other, at the cost of extra overhead for conflicting modes.
+        bool partitioned;
+
         // How many times has LockManager::lock been called for this request. Locks are released
         // when their recursive count drops to zero.
         unsigned recursiveCount;
-
 
         //
         // These fields are owned and maintained by the LockManager class exclusively
         //
 
+
         // Pointer to the lock to which this request belongs, or null if this request has not yet
-        // been assigned to a lock. The LockHead should be alive as long as there are LockRequests
-        // on it, so it is safe to have this pointer hanging around.
+        // been assigned to a lock or if it belongs to the PartitionedLockHead for locker. The
+        // LockHead should be alive as long as there are LockRequests on it, so it is safe to have
+        // this pointer hanging around.
         LockHead* lock;
+
+        // Pointer to the partitioned lock to which this request belongs, or null if it is not
+        // partitioned. Only one of 'lock' and 'partitionedLock' is non-NULL, and a request can
+        // only transition from 'partitionedLock' to 'lock', never the other way around.
+        PartitionedLockHead* partitionedLock;
 
         // The reason intrusive linked list is used instead of the std::list class is to allow
         // for entries to be removed from the middle of the list in O(1) time, if they are known
