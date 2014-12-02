@@ -92,7 +92,7 @@ namespace mongo {
             return std::vector<std::string>();
         }
 
-        virtual void cleanShutdown() {};
+        virtual void cleanShutdown(OperationContext* txn) {};
 
     private:
         boost::shared_ptr<void> _catalogInfo;

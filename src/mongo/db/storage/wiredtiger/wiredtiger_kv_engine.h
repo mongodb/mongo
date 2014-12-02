@@ -101,7 +101,7 @@ namespace mongo {
 
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
-        virtual void cleanShutdown();
+        virtual void cleanShutdown(OperationContext* txn);
 
         // wiredtiger specific
         // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION

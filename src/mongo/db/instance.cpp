@@ -1024,7 +1024,10 @@ namespace {
         return shutdownInProgress.loadRelaxed() != 0;
     }
 
-    static void shutdownServer() {
+    static void shutdownServer(OperationContext* txn) {
+        // Must hold global lock to get to here
+        invariant(txn->lockState()->isW());
+
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
@@ -1036,7 +1039,7 @@ namespace {
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->cleanShutdown();
+        storageEngine->cleanShutdown(txn);
     }
 
     void exitCleanly(ExitCode code) {
@@ -1052,19 +1055,20 @@ namespace {
             invariant(false);
         }
 
+        OperationContextImpl txn;
+
         getGlobalEnvironment()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
 
-        OperationContextImpl txn;
+        ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite lk(txn.lockState());
-
         log() << "now exiting" << endl;
 
         // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
         // and data files, close sockets, etc.
         try {
-            shutdownServer();
+            shutdownServer(&txn);
         }
         catch (const DBException& ex) {
             severe() << "shutdown failed with DBException " << ex;

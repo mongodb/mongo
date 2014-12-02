@@ -88,7 +88,7 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false );
 
-        virtual void cleanShutdown();
+        virtual void cleanShutdown(OperationContext* txn);
 
         // ------ kv ------
 

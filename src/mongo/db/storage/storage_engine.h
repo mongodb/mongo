@@ -160,7 +160,7 @@ namespace mongo {
          *
          * There is intentionally no uncleanShutdown().
          */
-        virtual void cleanShutdown() {}
+        virtual void cleanShutdown(OperationContext* txn) {}
 
     protected:
         /**
