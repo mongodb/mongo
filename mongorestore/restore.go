@@ -14,8 +14,12 @@ import (
 	"time"
 )
 
-const ProgressBarLength = 24
-const ProgressBarWaitTime = time.Second * 3
+const (
+	ProgressBarLength   = 24
+	ProgressBarWaitTime = time.Second * 3
+
+	InsertBufferFactor = 16
+)
 
 // RestoreIntents iterates through all of the normal intents
 // stored in the IntentManager, and restores them.
@@ -237,14 +241,14 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	if restore.OutputOptions.MaintainInsertionOrder {
 		MaxInsertThreads = 1
 	}
-	docChan := make(chan bson.Raw, restore.ToolOptions.BulkBufferSize*MaxInsertThreads)
+	docChan := make(chan bson.Raw, InsertBufferFactor)
 	resultChan := make(chan error, MaxInsertThreads)
 	killChan := make(chan struct{})
 	// make sure goroutines clean up on error
 	defer close(killChan)
 
 	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int64, restore.ToolOptions.BulkBufferSize*MaxInsertThreads)
+	bytesReadChan := make(chan int64, InsertBufferFactor)
 	go func() {
 		for {
 			select {
