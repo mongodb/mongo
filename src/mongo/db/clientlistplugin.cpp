@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread/locks.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -43,64 +45,8 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
-
-    class OperationsDataBuilder : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-        OperationsDataBuilder(std::stringstream& stringStream)
-            : _stringStream(stringStream) {
-
-        }
-
-        virtual void processOpContext(OperationContext* txn) {
-            using namespace html;
-
-            CurOp& co = *(txn->getCurOp());
-
-            _stringStream << "<tr><td>" << txn->getClient()->desc() << "</td>";
-
-            tablecell(_stringStream, co.opNum());
-            tablecell(_stringStream, co.active());
-
-            // LockState
-            {
-                Locker::LockerInfo lockerInfo;
-                txn->lockState()->getLockerInfo(&lockerInfo);
-
-                BSONObjBuilder lockerInfoBuilder;
-                fillLockerInfo(lockerInfo, lockerInfoBuilder);
-
-                tablecell(_stringStream, lockerInfoBuilder.obj());
-            }
-
-            if (co.active()) {
-                tablecell(_stringStream, co.elapsedSeconds());
-            }
-            else {
-                tablecell(_stringStream, "");
-            }
-
-            tablecell(_stringStream, co.getOp());
-            tablecell(_stringStream, html::escape(co.getNS()));
-            if (co.haveQuery()) {
-                tablecell(_stringStream, html::escape(co.query().toString()));
-            }
-            else {
-                tablecell(_stringStream, "");
-            }
-
-            tablecell(_stringStream, co.getRemoteString());
-
-            tablecell(_stringStream, co.getMessage());
-            tablecell(_stringStream, co.getProgressMeter().toString());
-
-            _stringStream << "</tr>\n";
-        }
-
-    private:
-        std::stringstream& _stringStream;
-    };
-
 namespace {
+
     class ClientListPlugin : public WebStatusPlugin {
     public:
         ClientListPlugin() : WebStatusPlugin( "clients" , 20 ) {}
@@ -125,31 +71,35 @@ namespace {
 
                << "</tr>\n";
             
-            OperationsDataBuilder opCtxDataBuilder(ss);
-            getGlobalEnvironment()->forEachOperationContext(&opCtxDataBuilder);
+            _processAllClients(ss);
             
             ss << "</table>\n";
-
         }
 
-    } clientListPlugin;
+    private:
 
-    class CommandHelper : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-        CommandHelper( MatchExpression* me )
-            : matcher( me ) {
-        }
+        static void _processAllClients(std::stringstream& ss) {
+            using namespace html;
 
-        virtual void processOpContext(OperationContext* txn) {
-            BSONObjBuilder b;
-            if ( txn->getClient() )
-                txn->getClient()->reportState( b );
-            if ( txn->getCurOp() )
-                txn->getCurOp()->reportState( &b );
-            if ( txn->lockState() ) {
-                StringBuilder ss;
-                ss << txn->lockState();
-                b.append("lockStatePointer", ss.str());
+            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+
+            ClientSet::const_iterator it = Client::clients.begin();
+            for (; it != Client::clients.end(); it++) {
+                Client* client = *it;
+                invariant(client);
+
+                // Make the client stable
+                boost::unique_lock<Client> clientLock(*client);
+                const OperationContext* txn = client->getOperationContext();
+                if (!txn) continue;
+
+                CurOp* curOp = txn->getCurOp();
+                if (!curOp) continue;
+
+                ss << "<tr><td>" << client->desc() << "</td>";
+
+                tablecell(ss, curOp->opNum());
+                tablecell(ss, curOp->active());
 
                 // LockState
                 {
@@ -159,24 +109,37 @@ namespace {
                     BSONObjBuilder lockerInfoBuilder;
                     fillLockerInfo(lockerInfo, lockerInfoBuilder);
 
-                    b.append("lockState", lockerInfoBuilder.obj());
+                    tablecell(ss, lockerInfoBuilder.obj());
                 }
+
+                if (curOp->active()) {
+                    tablecell(ss, curOp->elapsedSeconds());
+                }
+                else {
+                    tablecell(ss, "");
+                }
+
+                tablecell(ss, curOp->getOp());
+                tablecell(ss, html::escape(curOp->getNS()));
+
+                if (curOp->haveQuery()) {
+                    tablecell(ss, html::escape(curOp->query().toString()));
+                }
+                else {
+                    tablecell(ss, "");
+                }
+
+                tablecell(ss, curOp->getRemoteString());
+
+                tablecell(ss, curOp->getMessage());
+                tablecell(ss, curOp->getProgressMeter().toString());
+
+                ss << "</tr>\n";
             }
-            if ( txn->recoveryUnit() )
-                txn->recoveryUnit()->reportState( &b );
-
-            BSONObj obj = b.obj();
-
-            if ( matcher && !matcher->matchesBSON( obj ) ) {
-                return;
-            }
-
-            array.append( obj );
         }
 
-        BSONArrayBuilder array;
-        MatchExpression* matcher;
-    };
+    } clientListPlugin;
+
 
     class CurrentOpContexts : public Command {
     public:
@@ -219,12 +182,68 @@ namespace {
                 filter.reset( res.getValue() );
             }
 
-            CommandHelper helper( filter.get() );
-            getGlobalEnvironment()->forEachOperationContext(&helper);
-
-            result.appendArray( "operations", helper.array.arr() );
+            result.appendArray("operations", _processAllClients(filter.get()));
 
             return true;
+        }
+
+
+    private:
+
+        static BSONArray _processAllClients(MatchExpression* matcher) {
+            BSONArrayBuilder array;
+
+            boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+
+            ClientSet::const_iterator it = Client::clients.begin();
+            for (; it != Client::clients.end(); it++) {
+                Client* client = *it;
+                invariant(client);
+
+                BSONObjBuilder b;
+
+                // Make the client stable
+                boost::unique_lock<Client> clientLock(*client);
+
+                client->reportState(b);
+
+                const OperationContext* txn = client->getOperationContext();
+                if (txn) {
+
+                    // CurOp
+                    if (txn->getCurOp()) {
+                        txn->getCurOp()->reportState(&b);
+                    }
+
+                    // LockState
+                    if (txn->lockState()) {
+                        StringBuilder ss;
+                        ss << txn->lockState();
+                        b.append("lockStatePointer", ss.str());
+
+                        Locker::LockerInfo lockerInfo;
+                        txn->lockState()->getLockerInfo(&lockerInfo);
+
+                        BSONObjBuilder lockerInfoBuilder;
+                        fillLockerInfo(lockerInfo, lockerInfoBuilder);
+
+                        b.append("lockState", lockerInfoBuilder.obj());
+                    }
+
+                    // RecoveryUnit
+                    if (txn->recoveryUnit()) {
+                        txn->recoveryUnit()->reportState(&b);
+                    }
+                }
+
+                const BSONObj obj = b.obj();
+
+                if (!matcher || matcher->matchesBSON(obj)) {
+                    array.append(obj);
+                }
+            }
+
+            return array.arr();
         }
 
     } currentOpContexts;

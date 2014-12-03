@@ -55,12 +55,6 @@ namespace mongo {
 
         void registerKillOpListener(KillOpListenerInterface* listener);
 
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
         OperationContext* newOpCtx();
     };
 

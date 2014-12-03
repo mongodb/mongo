@@ -40,58 +40,17 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
     // Until we are able to resolve resource ids to db/collection names, report local db specially
     const ResourceId resourceIdLocalDb = ResourceId(RESOURCE_DATABASE, std::string("local"));
-}
 
-    /**
-     * Populates the BSON array with information about all active clients on the server. A client
-     * is active if it has an OperationContext.
-     */
-    class OperationInfoPopulator : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-
-        OperationInfoPopulator(const Matcher& matcher, BSONArrayBuilder& builder)
-            : _matcher(matcher),
-              _builder(builder) { 
-
-        }
-
-        virtual void processOpContext(OperationContext* txn) {
-            if (!txn->getCurOp() || !txn->getCurOp()->active()) {
-                return;
-            }
-
-            BSONObjBuilder infoBuilder;
-
-            // Client-specific data
-            txn->getClient()->reportState(infoBuilder);
-
-            // Locking data
-            Locker::LockerInfo lockerInfo;
-            txn->lockState()->getLockerInfo(&lockerInfo);
-            fillLockerInfo(lockerInfo, infoBuilder);
-
-            infoBuilder.done();
-
-            const BSONObj info = infoBuilder.obj();
-
-            if (_matcher.matches(info)) {
-                _builder.append(info);
-            }
-        }
-
-    private:
-        const Matcher& _matcher;
-        BSONArrayBuilder& _builder;
-    };
+} // namespace
 
 
     void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
@@ -114,60 +73,72 @@ namespace {
             return;
         }
 
-        BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
+        const bool includeAll = q.query["$all"].trueValue();
 
-        // This lock is acquired for both cases (whether we iterate through the clients list or
-        // through the OperationContexts), because we want the CurOp to not be destroyed from
-        // underneath and ~CurOp synchronizes on the clients mutex.
-        //
-        // TODO: This is a legacy from 2.6, which needs to be fixed.
-        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
-
-        const bool all = q.query["$all"].trueValue();
-        if (all) {
-            for (ClientSet::const_iterator i = Client::clients.begin();
-                 i != Client::clients.end();
-                 i++) {
-
-                Client* client = *i;
-                invariant(client);
-
-                CurOp* curop = client->curop();
-                if ((client == txn->getClient()) && !curop) {
+        // Filter the output
+        BSONObj filter;
+        {
+            BSONObjBuilder b;
+            BSONObjIterator i(q.query);
+            while (i.more()) {
+                BSONElement e = i.next();
+                if (str::equals("$all", e.fieldName())) {
                     continue;
                 }
 
-                BSONObjBuilder infoBuilder;
-                client->reportState(infoBuilder);
-                infoBuilder.done();
-
-                inprogBuilder.append(infoBuilder.obj());
+                b.append(e);
             }
+            filter = b.obj();
         }
-        else {
 
-            // Filter the output
-            BSONObj filter;
-            {
-                BSONObjBuilder b;
-                BSONObjIterator i(q.query);
-                while (i.more()) {
-                    BSONElement e = i.next();
-                    if (str::equals("$all", e.fieldName())) {
-                        continue;
-                    }
+        const NamespaceString nss(d.getns());
+        const WhereCallbackReal whereCallback(txn, nss.db());
+        const Matcher matcher(filter, whereCallback);
 
-                    b.append(e);
+        BSONArrayBuilder inprogBuilder(retVal.subarrayStart("inprog"));
+
+        boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
+
+        ClientSet::const_iterator it = Client::clients.begin();
+        for ( ; it != Client::clients.end(); it++) {
+            Client* client = *it;
+            invariant(client);
+
+            boost::unique_lock<Client> uniqueLock(*client);
+            const OperationContext* opCtx = client->getOperationContext();
+
+            if (!includeAll) {
+                // Skip over inactive connections.
+                if (!opCtx || !opCtx->getCurOp() || !opCtx->getCurOp()->active()) {
+                    continue;
                 }
-                filter = b.obj();
             }
 
-            const NamespaceString nss(d.getns());
-            const WhereCallbackReal whereCallback(txn, nss.db());
-            const Matcher matcher(filter, whereCallback);
+            BSONObjBuilder infoBuilder;
 
-            OperationInfoPopulator allOps(matcher, inprogBuilder);
-            getGlobalEnvironment()->forEachOperationContext(&allOps);
+            // The client information
+            client->reportState(infoBuilder);
+
+            // Operation context specific information
+            if (opCtx) {
+                // CurOp
+                if (opCtx->getCurOp()) {
+                    opCtx->getCurOp()->reportState(&infoBuilder);
+                }
+
+                // LockState
+                Locker::LockerInfo lockerInfo;
+                client->getOperationContext()->lockState()->getLockerInfo(&lockerInfo);
+                fillLockerInfo(lockerInfo, infoBuilder);
+            }
+
+            infoBuilder.done();
+
+            const BSONObj info = infoBuilder.obj();
+
+            if (includeAll || matcher.matches(info)) {
+                inprogBuilder.append(info);
+            }
         }
 
         inprogBuilder.done();

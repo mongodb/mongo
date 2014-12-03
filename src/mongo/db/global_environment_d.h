@@ -34,7 +34,6 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 
-
 namespace mongo {
 
     class Client;
@@ -70,12 +69,6 @@ namespace mongo {
 
         void registerKillOpListener(KillOpListenerInterface* listener);
 
-        void registerOperationContext(OperationContext* txn);
-
-        void unregisterOperationContext(OperationContext* txn);
-
-        void forEachOperationContext(ProcessOperationContext* procOpCtx);
-
         OperationContext* newOpCtx();
 
 
@@ -84,11 +77,6 @@ namespace mongo {
         bool _killOperationsAssociatedWithClientAndOpId_inlock(Client* client, unsigned int opId);
 
         bool _globalKill;
-
-        typedef unordered_set<OperationContext*> OperationContextSet;
-
-        mongo::mutex _registeredOpContextsMutex;
-        OperationContextSet _registeredOpContexts;
 
         // protected by Client::clientsMutex
         std::vector<KillOpListenerInterface*> _killOpListeners;

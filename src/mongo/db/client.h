@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 
@@ -205,6 +206,16 @@ namespace mongo {
         void appendLastOp( BSONObjBuilder& b ) const;
         void reportState(BSONObjBuilder& builder);
 
+        // Ensures stability of the client. When the client is locked, it is safe to access its
+        // contents. For example, the OperationContext will not disappear.
+        void lock() { _lock.lock(); }
+        void unlock() { _lock.unlock(); }
+
+        // Changes the currently active operation context on this client. There can only be one
+        // active OperationContext at a time.
+        void setOperationContext(OperationContext* txn);
+        const OperationContext* getOperationContext() const { return _txn; }
+
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
@@ -227,8 +238,14 @@ namespace mongo {
         // > 0 for things "conn", 0 otherwise
         const ConnectionId _connectionId;
 
+        // Protects the contents of the Client (such as changing the OperationContext, etc)
+        mutable SpinLock _lock;
+
         // Whether this client is running as DBDirectClient
         bool _god;
+
+        // If != NULL, then contains the currently active OperationContext
+        OperationContext* _txn;
 
         // Changes, based on what operation is running. Some of this should be in OperationContext.
         CurOp* _curOp;

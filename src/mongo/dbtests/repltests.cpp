@@ -31,7 +31,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
@@ -151,21 +151,20 @@ namespace ReplTests {
             return count;
         }
         int opCount() {
-            OperationContextImpl txn;
-            ScopedTransaction transaction(&txn, MODE_X);
-            Lock::GlobalWrite lk(txn.lockState());
-            Client::Context ctx(&txn,  cllNS() );
+            ScopedTransaction transaction(&_txn, MODE_X);
+            Lock::GlobalWrite lk(_txn.lockState());
+            Client::Context ctx(&_txn,  cllNS() );
 
             Database* db = ctx.db();
-            Collection* coll = db->getCollection( &txn, cllNS() );
+            Collection* coll = db->getCollection( &_txn, cllNS() );
             if ( !coll ) {
-                WriteUnitOfWork wunit(&txn);
-                coll = db->createCollection( &txn, cllNS() );
+                WriteUnitOfWork wunit(&_txn);
+                coll = db->createCollection( &_txn, cllNS() );
                 wunit.commit();
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator(&txn);
+            RecordIterator* it = coll->getIterator(&_txn);
             for ( ; !it->isEOF(); it->getNext() ) {
                 ++count;
             }
