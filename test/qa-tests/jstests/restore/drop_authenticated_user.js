@@ -11,6 +11,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'drop_authenticated_user_dump';
+    resetDbpath(dumpTarget);
 
     // we'll use the admin db so that the user we are restoring as 
     // is part of the db we are restoring

@@ -14,6 +14,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'drop_with_data_dump';
+    resetDbpath(dumpTarget);
 
     // the db we will use 
     var testDB = toolTest.db.getSiblingDB('test');

@@ -16,6 +16,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'drop_one_collection_dump';
+    resetDbpath(dumpTarget);
 
     // the db we will take the dump from 
     var sourceDB = toolTest.db.getSiblingDB('source');

@@ -14,6 +14,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'partial_restore_dump';
+    resetDbpath(dumpTarget);
 
     // we'll insert data into three collections spread across two dbs
     var dbOne = toolTest.db.getSiblingDB('dbOne');

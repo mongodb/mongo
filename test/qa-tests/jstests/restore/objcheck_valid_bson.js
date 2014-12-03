@@ -10,6 +10,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'objcheck_valid_bson_dump';
+    resetDbpath(dumpTarget);
 
     // the db and collection we will use
     var testDB = toolTest.db.getSiblingDB('test');

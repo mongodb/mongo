@@ -20,6 +20,7 @@
 
         // where we'll put the dump
         var dumpTarget = 'conflicting_auth_schema_version_dump';
+        resetDbpath(dumpTarget);
 
         // the admin db, and the non-admin db we'll be using
         var adminDB = toolTest.db.getSiblingDB('admin');

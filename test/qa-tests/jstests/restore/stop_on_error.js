@@ -15,6 +15,7 @@
 
     // dump it
     var dumpTarget = 'stop_on_error_dump';
+    resetDbpath(dumpTarget);
     var ret = toolTest.runTool.apply(
         toolTest,
         ['dump', '--out', dumpTarget].

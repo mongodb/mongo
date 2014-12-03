@@ -15,6 +15,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'no_options_restore_dump';
+    resetDbpath(dumpTarget);
 
     // the db we'll use
     var testDB = toolTest.db.getSiblingDB('test');

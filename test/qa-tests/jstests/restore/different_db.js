@@ -14,6 +14,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'different_db_dump';
+    resetDbpath(dumpTarget);
 
     // the db we will dump from 
     var sourceDB = toolTest.db.getSiblingDB('source');

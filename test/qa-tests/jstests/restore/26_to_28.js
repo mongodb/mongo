@@ -10,6 +10,7 @@
 
     // where we'll put the dump
     var dumpTarget = '26_to_28_dump';
+    resetDbpath(dumpTarget);
 
     // the db and collection we'll be using
     var testDB = toolTest.db.getSiblingDB('test');

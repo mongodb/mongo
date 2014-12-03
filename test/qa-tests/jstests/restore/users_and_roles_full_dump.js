@@ -19,6 +19,7 @@
 
         // where we'll put the dump
         var dumpTarget = 'users_and_roles_full_dump_dump';
+        resetDbpath(dumpTarget);
 
         // the db we'll be using, and the admin db
         var adminDB = toolTest.db.getSiblingDB('admin');

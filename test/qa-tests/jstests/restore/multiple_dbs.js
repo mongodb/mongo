@@ -13,6 +13,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'multiple_dbs_dump';
+    resetDbpath(dumpTarget);
 
     // the dbs we will be using
     var dbOne = toolTest.db.getSiblingDB('dbOne');

@@ -12,6 +12,7 @@
 
     // where we'll put the dump
     var dumpTarget = 'users_and_roles_26_to_28_to_26_dump';
+    resetDbpath(dumpTarget);
 
     // the db we'll be using 
     var testDB = toolTest.db.getSiblingDB('test');
