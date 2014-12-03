@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -229,5 +230,18 @@ namespace mongo {
      * Returns true if the storage engine in use is MMAPV1.
      */
     bool isMMAPV1();
+
+    /*
+     * Extracts the storageEngine bson from the CollectionOptions provided.  Loops through each
+     * provided storageEngine and asks the matching registered storage engine if the
+     * collection/index options are valid.  Returns an error if the collection/index options are
+     * invalid.
+     * If no matching registered storage engine is found, return an error.
+     * Validation function 'func' must be either:
+     * - &StorageEngine::Factory::validateCollectionStorageOptions; or
+     * - &StorageEngine::Factory::validateIndexStorageOptions
+     */
+    Status validateStorageOptions(const BSONObj& storageEngineOptions,
+        stdx::function<Status (const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
 
 }  // namespace mongo

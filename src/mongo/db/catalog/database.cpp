@@ -569,45 +569,6 @@ namespace mongo {
         getGlobalEnvironment()->getGlobalStorageEngine()->dropDatabase( txn, name );
     }
 
-namespace {
-    /*
-     * Extracts the storageEngine bson from the CollectionOptions provided.  Loops through each
-     * provided storageEngine and asks the matching registered storage engine if the collection
-     * options are valid.  Returns an error if the collection options are invalid.
-     * If no matching registered storage engine is found, return an error.
-     */
-    Status validateStorageOptions(const CollectionOptions& options) {
-        BSONObjIterator storageIt(options.storageEngine);
-
-        while (storageIt.more()) {
-            BSONElement storageElement = storageIt.next();
-            StringData storageEngineName = storageElement.fieldNameStringData();
-            invariant(storageElement.type() == mongo::Object);
-
-            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalEnvironment()->
-                                                            makeStorageFactoriesIterator());
-            invariant(sfi);
-            bool found = false;
-            while (sfi->more()) {
-                const StorageEngine::Factory* const& factory = sfi->next();
-                if (storageEngineName != factory->getCanonicalName()) {
-                    continue;
-                }
-                Status status = factory->validateCollectionStorageOptions(storageElement.Obj());
-                if ( !status.isOK() ) {
-                    return status;
-                }
-                found = true;
-            }
-            if (!found) {
-                return Status(ErrorCodes::InvalidOptions, str::stream() << storageEngineName <<
-                              " is not a registered storage engine for this server");
-            }
-        }
-        return Status::OK();
-    }
-}
-
     /** { ..., capped: true, size: ..., max: ... }
      * @param createDefaultIndexes - if false, defers id (and other) index creation.
      * @return true if successful
@@ -638,7 +599,8 @@ namespace {
         if ( !status.isOK() )
             return status;
 
-        status = validateStorageOptions(collectionOptions);
+        status = validateStorageOptions(collectionOptions.storageEngine,
+                                        &StorageEngine::Factory::validateCollectionStorageOptions);
         if ( !status.isOK() )
             return status;
 
