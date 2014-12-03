@@ -72,13 +72,48 @@ namespace mongo {
         return Status(ErrorCodes::UnknownError, s);
     }
 
+    // static
+    StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
+                                                            const std::string& uri,
+                                                            const std::string& config,
+                                                            int statisticsKey) {
+        invariant(session);
+        WT_CURSOR* cursor = NULL;
+        const char* cursorConfig = config.empty() ? NULL : config.c_str();
+        int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &cursor);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::CursorNotFound, str::stream()
+                << "unable to open cursor at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+        invariant(cursor);
+        ON_BLOCK_EXIT(cursor->close, cursor);
+
+        cursor->set_key(cursor, statisticsKey);
+        ret = cursor->search(cursor);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::NoSuchKey, str::stream()
+                << "unable to find key " << statisticsKey << " at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+
+        uint64_t value;
+        ret = cursor->get_value(cursor, NULL, NULL, &value);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::BadValue, str::stream()
+                << "unable to get value for key " << statisticsKey << " at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+
+        return StatusWith<uint64_t>(value);
+    }
+
     int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s,
                                          const std::string& uri ) {
-        BSONObjBuilder b;
-        Status status = WiredTigerUtil::exportTableToBSON(s,
-                                                          "statistics:" + uri,
-                                                          "statistics=(fast)",
-                                                          &b);
+        StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+            s,
+            "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+        const Status& status = result.getStatus();
         if ( !status.isOK() ) {
             if ( status.code() == ErrorCodes::CursorNotFound ) {
                 // ident gone, so its 0
@@ -86,16 +121,7 @@ namespace mongo {
             }
             uassertStatusOK( status );
         }
-
-        BSONObj obj = b.obj();
-        BSONObj sub = obj["block-manager"].Obj();
-        BSONElement e = sub["file size in bytes"];
-        invariant( e.type() );
-
-        if ( e.isNumber() )
-            return e.safeNumberLong();
-
-        return strtoull( e.valuestrsafe(), NULL, 10 );
+        return result.getValue();
     }
 
 
@@ -105,7 +131,7 @@ namespace mongo {
         invariant(session);
         invariant(bob);
         WT_CURSOR* c = NULL;
-        const char *cursorConfig = config.empty() ? NULL : config.c_str();
+        const char* cursorConfig = config.empty() ? NULL : config.c_str();
         int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &c);
         if (ret != 0) {
             return Status(ErrorCodes::CursorNotFound, str::stream()
@@ -117,9 +143,9 @@ namespace mongo {
         ON_BLOCK_EXIT(c->close, c);
 
         std::map<string,BSONObjBuilder*> subs;
-        const char *desc, *pvalue;
+        const char* desc;
         uint64_t value;
-        while (c->next(c) == 0 && c->get_value(c, &desc, &pvalue, &value) == 0) {
+        while (c->next(c) == 0 && c->get_value(c, &desc, NULL, &value) == 0) {
             StringData key( desc );
 
             StringData prefix;
@@ -143,11 +169,7 @@ namespace mongo {
                 suffix = "num";
             }
 
-            // Convert unsigned 64-bit integral value of statistic to BSON-friendly long long.
-            // If there is an overflow, set statistic value to max(long long).
-            const long long maxLL = std::numeric_limits<long long>::max();
-            long long v =  value > static_cast<uint64_t>(maxLL) ?
-                maxLL : static_cast<long long>(value);
+            long long v = _castStatisticsValue<long long>(value);
 
             if ( prefix.size() == 0 ) {
                 bob->appendNumber(desc, v);

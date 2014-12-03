@@ -31,13 +31,16 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+
 #include <wiredtiger.h>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
@@ -280,26 +283,16 @@ namespace {
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                                 BSONObjBuilder* extraInfo,
                                                 int infoLevel ) const {
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+            session->getSession(),
+            "statistics:" + GetURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+        uassertStatusOK(result.getStatus());
 
-        BSONObjBuilder b;
-        appendCustomStats( txn, &b, 1 );
-        BSONObj obj = b.obj();
-
-        BSONObj blockManager = obj[kWiredTigerEngineName].Obj()["block-manager"].Obj();
-        BSONElement fileSize = blockManager["file size in bytes"];
-        invariant( fileSize.type() );
-
-        int64_t size = 0;
-        if ( fileSize.isNumber() ) {
-            size = fileSize.safeNumberLong();
-        }
-        else {
-            invariant( fileSize.type() == String );
-            size = strtoll( fileSize.valuestrsafe(), NULL, 10 );
-        }
+        int64_t size = result.getValue();
 
         if ( size == 0 && _isCapped ) {
-            // Many things assume anempty capped collection still takes up space.
+            // Many things assume an empty capped collection still takes up space.
             return 1;
         }
         return size;

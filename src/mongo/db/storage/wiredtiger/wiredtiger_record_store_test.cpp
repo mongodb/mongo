@@ -33,6 +33,7 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
@@ -52,17 +53,30 @@ namespace mongo {
 
     class WiredTigerHarnessHelper : public HarnessHelper {
     public:
-        WiredTigerHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
+        static WT_CONNECTION* createConnection(StringData dbpath, StringData extraStrings) {
+            WT_CONNECTION* conn = NULL;
 
             std::stringstream ss;
             ss << "create,";
             ss << "statistics=(all),";
+            ss << extraStrings;
             string config = ss.str();
-            int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config.c_str(), &_conn);
-            invariantWTOK( ret );
+            int ret = wiredtiger_open(dbpath.toString().c_str(), NULL, config.c_str(), &conn);
+            ASSERT_OK(wtRCToStatus(ret));
+            ASSERT(conn);
 
-            _sessionCache = new WiredTigerSessionCache( _conn );
+            return conn;
         }
+
+        WiredTigerHarnessHelper()
+            : _dbpath("wt_test"),
+              _conn(createConnection(_dbpath.path(), "")),
+              _sessionCache(new WiredTigerSessionCache(_conn)) { }
+
+        WiredTigerHarnessHelper(StringData extraStrings)
+            : _dbpath("wt_test"),
+              _conn(createConnection(_dbpath.path(), extraStrings)),
+              _sessionCache(new WiredTigerSessionCache(_conn)) { }
 
         ~WiredTigerHarnessHelper() {
             delete _sessionCache;
@@ -609,5 +623,12 @@ namespace mongo {
         }
     }
 
+    TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
+        WiredTigerHarnessHelper harnessHelper("statistics=(none)");
+        scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("a.b"));
 
-}
+        scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+        ASSERT_THROWS(rs->storageSize(opCtx.get()), UserException);
+    }
+
+}  // namespace mongo

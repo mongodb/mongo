@@ -77,3 +77,12 @@ if wiredtiger:
             ],
         )
 
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_util_test',
+        source=['wiredtiger_util_test.cpp',
+                ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            ],
+        )
+
