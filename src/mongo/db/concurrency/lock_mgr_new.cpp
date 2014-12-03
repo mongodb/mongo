@@ -427,6 +427,7 @@ namespace {
         }
 
         delete[] _lockBuckets;
+        delete[] _partitions;
     }
 
     LockResult LockManager::lock(ResourceId resId, LockRequest* request, LockMode mode) {
