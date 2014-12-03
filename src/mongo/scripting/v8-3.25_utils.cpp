@@ -102,7 +102,7 @@ namespace mongo {
                        bool newScope = false) :
             _started(),
             _done(),
-            _newScope(newScope) {
+            _sharedData(new SharedData()) {
             jsassert(args.Length() > 0, "need at least one argument");
             jsassert(args[0]->IsFunction(), "first argument must be a function");
 
@@ -111,7 +111,7 @@ namespace mongo {
             for(int i = 0; i < args.Length(); ++i) {
                 scope->v8ToMongoElement(b, "arg" + BSONObjBuilder::numStr(i), args[i]);
             }
-            _args = b.obj();
+            _sharedData->_args = b.obj();
         }
 
         ~JSThreadConfig() {
@@ -129,29 +129,63 @@ namespace mongo {
             _done = true;
         }
 
+        /**
+         * Returns true if the JSThread terminated as a result of an error
+         * during its execution, and false otherwise. This operation does
+         * not block, nor does it require join() to have been called.
+         */
+        bool hasFailed() const {
+            jsassert(_started, "Thread not started");
+            return _sharedData->getErrored();
+        }
+
         BSONObj returnData() {
             if (!_done)
                 join();
-            return _returnData;
+            return _sharedData->_returnData;
         }
 
     private:
+        /*
+         * JSThreadConfig doesn't always outlive its JSThread (for example, if the parent thread
+         * garbage collects the JSThreadConfig before the JSThread has finished running), so any
+         * data shared between them has to go in a shared_ptr.
+         */
+        class SharedData {
+        public:
+            SharedData() : _errored(false) {}
+            BSONObj _args;
+            BSONObj _returnData;
+            void setErrored(bool value) {
+                boost::mutex::scoped_lock lck(_erroredMutex);
+                _errored = value;
+            }
+            bool getErrored() {
+                boost::mutex::scoped_lock lck(_erroredMutex);
+                return _errored;
+            }
+        private:
+            boost::mutex _erroredMutex;
+            bool _errored;
+        };
+
         class JSThread {
         public:
-            JSThread(JSThreadConfig& config) : _config(config) {}
+            JSThread(JSThreadConfig& config) : _sharedData(config._sharedData) {}
 
             void operator()() {
                 try {
-                    _config._scope.reset(static_cast<V8Scope*>(globalScriptEngine->newScope()));
-                    v8::Locker v8lock(_config._scope->getIsolate());
-                    v8::Isolate::Scope iscope(_config._scope->getIsolate());
-                    v8::HandleScope handle_scope(_config._scope->getIsolate());
-                    v8::Context::Scope context_scope(_config._scope->getContext());
+                    scoped_ptr<V8Scope> scope(
+                        static_cast<V8Scope*>(globalScriptEngine->newScope()));
+                    v8::Locker v8lock(scope->getIsolate());
+                    v8::Isolate::Scope iscope(scope->getIsolate());
+                    v8::HandleScope handle_scope(scope->getIsolate());
+                    v8::Context::Scope context_scope(scope->getContext());
 
-                    BSONObj args = _config._args;
+                    BSONObj args = _sharedData->_args;
                     v8::Local<v8::Function> f =
                         v8::Local<v8::Function>::Cast( v8::Local<v8::Value>(
-                            _config._scope->mongoToV8Element(args.firstElement(), true)));
+                            scope->mongoToV8Element(args.firstElement(), true)));
                     int argc = args.nFields() - 1;
 
                     // TODO SERVER-8016: properly allocate handles on the stack
@@ -160,83 +194,77 @@ namespace mongo {
                     it.next();
                     for(int i = 0; i < argc && i < 24; ++i) {
                         argv[i] = v8::Local<v8::Value>::New(
-                                _config._scope->getIsolate(),
-                                _config._scope->mongoToV8Element(*it, true));
+                                scope->getIsolate(),
+                                scope->mongoToV8Element(*it, true));
                         it.next();
                     }
                     v8::TryCatch try_catch;
                     v8::Local<v8::Value> ret =
-                            f->Call(_config._scope->getGlobal(), argc, argv);
+                            f->Call(scope->getGlobal(), argc, argv);
                     if (ret.IsEmpty() || try_catch.HasCaught()) {
-                        string e = _config._scope->v8ExceptionToSTLString(&try_catch);
+                        string e = scope->v8ExceptionToSTLString(&try_catch);
                         log() << "js thread raised js exception: " << e << endl;
-                        ret = v8::Undefined(_config._scope->getIsolate());
-                        // TODO propagate exceptions (or at least the fact that an exception was
-                        // thrown) to the calling js on either join() or returnData().
+                        ret = v8::Undefined(scope->getIsolate());
+                        _sharedData->setErrored(true);
                     }
                     // ret is translated to BSON to switch isolate
                     BSONObjBuilder b;
-                    _config._scope->v8ToMongoElement(b, "ret", ret);
-                    _config._returnData = b.obj();
+                    scope->v8ToMongoElement(b, "ret", ret);
+                    _sharedData->_returnData = b.obj();
                 }
                 catch (const DBException& e) {
                     // Keeping behavior the same as for js exceptions.
                     log() << "js thread threw c++ exception: " << e.toString();
-                    _config._returnData = BSON("ret" << BSONUndefined);
+                    _sharedData->setErrored(true);
+                    _sharedData->_returnData = BSON("ret" << BSONUndefined);
                 }
                 catch (const std::exception& e) {
                     log() << "js thread threw c++ exception: " << e.what();
-                    _config._returnData = BSON("ret" << BSONUndefined);
+                    _sharedData->setErrored(true);
+                    _sharedData->_returnData = BSON("ret" << BSONUndefined);
                 }
                 catch (...) {
                     log() << "js thread threw c++ non-exception";
-                    _config._returnData = BSON("ret" << BSONUndefined);
+                    _sharedData->setErrored(true);
+                    _sharedData->_returnData = BSON("ret" << BSONUndefined);
                 }
             }
 
         private:
-            JSThreadConfig& _config;
+            shared_ptr<SharedData> _sharedData;
         };
 
         bool _started;
         bool _done;
-        bool _newScope;
-        BSONObj _args;
         scoped_ptr<boost::thread> _thread;
-        scoped_ptr<V8Scope> _scope;
-        BSONObj _returnData;
+        shared_ptr<SharedData> _sharedData;
     };
-
-    v8::Local<v8::Value> ThreadInit(V8Scope* scope,
-                                    const v8::FunctionCallbackInfo<v8::Value>& args) {
-        v8::Local<v8::Object> it = args.This();
-        // NOTE I believe the passed JSThreadConfig will never be freed.  If this
-        // policy is changed, JSThread may no longer be able to store JSThreadConfig
-        // by reference.
-        it->SetHiddenValue(v8::String::NewFromUtf8(scope->getIsolate(), "_JSThreadConfig"),
-                           v8::External::New(scope->getIsolate(),
-                                             new JSThreadConfig(scope, args)));
-        return v8::Undefined(scope->getIsolate());
-    }
-
-    v8::Local<v8::Value> ScopedThreadInit(V8Scope* scope,
-                                          const v8::FunctionCallbackInfo<v8::Value>& args) {
-        v8::Local<v8::Object> it = args.This();
-        // NOTE I believe the passed JSThreadConfig will never be freed.  If this
-        // policy is changed, JSThread may no longer be able to store JSThreadConfig
-        // by reference.
-        it->SetHiddenValue(v8::String::NewFromUtf8(scope->getIsolate(), "_JSThreadConfig"),
-                           v8::External::New(scope->getIsolate(),
-                                             new JSThreadConfig(scope, args, true)));
-        return v8::Undefined(scope->getIsolate());
-    }
 
     JSThreadConfig *thisConfig(V8Scope* scope, const v8::FunctionCallbackInfo<v8::Value>& args) {
         v8::Local<v8::External> c = v8::Local<v8::External>::Cast(
                 args.This()->GetHiddenValue(v8::String::NewFromUtf8(scope->getIsolate(),
                                                                     "_JSThreadConfig")));
-        JSThreadConfig *config = (JSThreadConfig *)(c->Value());
+        JSThreadConfig *config = static_cast<boost::shared_ptr<JSThreadConfig>*>(c->Value())->get();
         return config;
+    }
+
+    v8::Local<v8::Value> ThreadInit(V8Scope* scope,
+                                     const v8::FunctionCallbackInfo<v8::Value>& args) {
+        JSThreadConfig* config = new JSThreadConfig(scope, args);
+        v8::Local<v8::External> handle =
+                scope->jsThreadConfigTracker.track(scope->getIsolate(), args.This(), config);
+        args.This()->SetHiddenValue(v8::String::NewFromUtf8(scope->getIsolate(), "_JSThreadConfig"),
+                                    handle);
+
+        invariant(thisConfig(scope, args) == config);
+        return v8::Undefined(scope->getIsolate());
+    }
+
+    v8::Local<v8::Value> ScopedThreadInit(V8Scope* scope,
+                                           const v8::FunctionCallbackInfo<v8::Value>& args) {
+        // NOTE: ScopedThread and Thread behave identically because a new V8 Isolate is always
+        // created.
+        return ThreadInit(scope, args);
     }
 
     v8::Local<v8::Value> ThreadStart(V8Scope* scope,
@@ -249,6 +277,13 @@ namespace mongo {
                                     const v8::FunctionCallbackInfo<v8::Value>& args) {
         thisConfig(scope, args)->join();
         return v8::Undefined(scope->getIsolate());
+    }
+
+    // Indicates to the caller that the thread terminated as a result of an error.
+    v8::Local<v8::Value> ThreadHasFailed(V8Scope* scope,
+                                         const v8::FunctionCallbackInfo<v8::Value>& args) {
+        bool hasFailed = thisConfig(scope, args)->hasFailed();
+        return v8::Boolean::New(scope->getIsolate(), hasFailed);
     }
 
     v8::Local<v8::Value> ThreadReturnData(V8Scope* scope,
@@ -268,6 +303,7 @@ namespace mongo {
         scope->injectV8Function("init", ThreadInit, o);
         scope->injectV8Function("start", ThreadStart, o);
         scope->injectV8Function("join", ThreadJoin, o);
+        scope->injectV8Function("hasFailed", ThreadHasFailed, o);
         scope->injectV8Function("returnData", ThreadReturnData, o);
         return handle_scope.Escape(v8::Local<v8::Value>());
     }
