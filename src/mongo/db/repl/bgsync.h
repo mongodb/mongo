@@ -77,7 +77,6 @@ namespace repl {
 
         // stop syncing (when this node becomes a primary, e.g.)
         void stop();
-        bool isAssumingPrimary_inlock();
 
 
         void shutdown();
@@ -101,10 +100,6 @@ namespace repl {
 
         // For monitoring
         BSONObj getCounters();
-
-        // Wait for replication to finish and buffer to be applied so that the member can become
-        // primary.
-        void stopReplicationAndFlushBuffer();
 
         long long getLastAppliedHash() const;
         void setLastAppliedHash(long long oldH);
@@ -144,7 +139,6 @@ namespace repl {
         // if produce thread should be running
         bool _pause;
         bool _appliedBuffer;
-        bool _assumingPrimary;
         boost::condition _condvar;
 
         HostAndPort _syncSourceHost;
@@ -162,8 +156,7 @@ namespace repl {
 
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncSource();
-        // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
-        bool isStale(OpTime lastOpTimeFetched, OplogReader& r, BSONObj& remoteOldestOp);
+
         // restart syncing
         void start(OperationContext* txn);
 
