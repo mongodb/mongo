@@ -151,6 +151,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "set_param1.js", // changes global state
                                    "geo_update_btree2.js", // SERVER-11132 test disables table scans
                                    "update_setOnInsert.js", // SERVER-9982
+                                   "max_time_ms.js", // Sensitive to query execution time, by design
                                ] );
         
         var parallelFilesDir = "jstests/core";
