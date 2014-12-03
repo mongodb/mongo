@@ -42,6 +42,13 @@ if (typeof getToolTest === 'undefined') {
     roles: [{ role: 'bacon', db: 'baz' }]
   });
 
+  // mongodump should fail when --dumpDbUsersAndRoles is specified but
+  // --db isn't
+  var dumpArgs = ['dump', '--dumpDbUsersAndRoles'].concat(commonToolArgs);
+  assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
+    'mongodump should fail when --dumpDbUsersAndRoles is specified without ' +
+    '--db');
+
   // Running mongodump with `--db foo --dumpDbUsersAndRoles` should dump the
   // associated users
   resetDbpath('dump');
