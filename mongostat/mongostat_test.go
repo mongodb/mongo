@@ -113,7 +113,7 @@ func TestStatLine(t *testing.T) {
 		Process:        "mongod",
 		Pid:            10,
 		Uptime:         1000,
-		UptimeMillis:   1000,
+		UptimeMillis:   2000,
 		UptimeEstimate: 1000,
 		LocalTime:      time.Now(),
 		Asserts:        map[string]int64{},
