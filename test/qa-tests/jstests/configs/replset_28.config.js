@@ -20,6 +20,8 @@ var getToolTest;
       oldStop.apply(toolTest, arguments);
     };
 
+    toolTest.isReplicaSet = true;
+
     return toolTest;
   };
 })();

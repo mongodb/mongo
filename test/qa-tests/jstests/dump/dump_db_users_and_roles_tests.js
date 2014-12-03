@@ -32,8 +32,8 @@ if (typeof getToolTest === 'undefined') {
 
   // And users with those roles
   db.createUser({
-    user: 'passwordIsTaco',
-    pwd: 'Taco',
+    user: 'baconator',
+    pwd: 'bacon',
     roles: [{ role: 'taco', db: 'foo' }]
   });
   db.getSiblingDB('baz').createUser({
@@ -50,7 +50,10 @@ if (typeof getToolTest === 'undefined') {
   toolTest.runTool.apply(toolTest, dumpArgs);
   db.dropDatabase();
   db.getSiblingDB('baz').dropDatabase();
-  db.getSiblingDB('admin').dropDatabase();
+  db.getSiblingDB('admin').system.users.remove({ user: 'baconator' });
+  db.getSiblingDB('admin').system.users.remove({ user: 'eggs' });
+  db.getSiblingDB('admin').system.roles.remove({ role: 'taco' });
+  db.getSiblingDB('admin').system.roles.remove({ role: 'bacon' });
 
   var restoreArgs = ['restore', '--restoreDbUsersAndRoles'].
     concat(commonToolArgs);
@@ -58,12 +61,13 @@ if (typeof getToolTest === 'undefined') {
   var c = db.getSiblingDB('admin').system.roles.find();
 
   // Should have restored only the user that was in the 'foo' db
-  assert.eq(1, db.getSiblingDB('admin').system.users.count());
-  assert.eq('passwordIsTaco',
-    db.getSiblingDB('admin').system.users.findOne().user);
+  assert.eq(1,
+    db.getSiblingDB('admin').system.users.count({ user: 'baconator' }));
+  assert.eq(0,
+    db.getSiblingDB('admin').system.users.count({ user: 'eggs' }));
   // And only the role that was defined on the 'foo' db
-  assert.eq(1, db.getSiblingDB('admin').system.roles.count());
-  assert.eq('taco', db.getSiblingDB('admin').system.roles.findOne().role);
+  assert.eq(1, db.getSiblingDB('admin').system.roles.count({ role: 'taco' }));
+  assert.eq(0, db.getSiblingDB('admin').system.roles.count({ role: 'bacon' }));
 
   toolTest.stop();
 })();

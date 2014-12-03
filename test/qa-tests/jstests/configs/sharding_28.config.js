@@ -17,6 +17,8 @@ var getToolTest;
       oldStop.apply(toolTest, arguments);
     };
 
+    toolTest.isSharded = true;
+
     return toolTest;
   };
 })();

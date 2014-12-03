@@ -38,6 +38,8 @@ var AUTH_PASSWORD = 'Taco';
       oldStop.apply(toolTest, arguments);
     };
 
+    toolTest.isReplicaSet = true;
+
     return toolTest;
   };
 })();
