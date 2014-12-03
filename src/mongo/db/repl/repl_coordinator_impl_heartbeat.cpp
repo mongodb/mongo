@@ -134,7 +134,7 @@ namespace {
             networkTime = cbData.response.getValue().elapsedMillis;
         }
         else {
-            LOG(1) << "Error in heartbeat request to " << target << "; " << responseStatus;
+            log() << "Error in heartbeat request to " << target << "; " << responseStatus;
             if (!resp.isEmpty()) {
                 LOG(3) << "heartbeat response: " << resp;
             }
