@@ -1628,7 +1628,8 @@ namespace mongo {
                 log() << "forking for cleanup of chunk data" << migrateLog;
 
                 string errMsg;
-                if (!deleter->queueDelete(deleterOptions,
+                if (!deleter->queueDelete(txn,
+                                          deleterOptions,
                                           NULL, // Don't want to be notified.
                                           &errMsg)) {
                     log() << "could not queue migration cleanup: " << errMsg << endl;
@@ -1911,7 +1912,7 @@ namespace mongo {
                 deleterOptions.fromMigrate = true;
                 deleterOptions.onlyRemoveOrphanedDocs = true;
 
-                if (!getDeleter()->queueDelete(deleterOptions, NULL /* notifier */, &errMsg)) {
+                if (!getDeleter()->queueDelete(txn, deleterOptions, NULL /* notifier */, &errMsg)) {
                     warning() << "Failed to queue delete for migrate abort: " << errMsg << endl;
                 }
             }

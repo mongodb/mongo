@@ -75,7 +75,8 @@ namespace {
         deleter.stopWorkers();
 
         string errMsg;
-        ASSERT_FALSE(deleter.queueDelete(RangeDeleterOptions(KeyRange("test.user",
+        ASSERT_FALSE(deleter.queueDelete(noTxn,
+                                         RangeDeleterOptions(KeyRange("test.user",
                                                                       BSON("x" << 120),
                                                                       BSON("x" << 200),
                                                                       BSON("x" << 1))),
@@ -111,7 +112,8 @@ namespace {
                                                     BSON("x" << 1)));
         deleterOptions.waitForOpenCursors = true;
 
-        ASSERT_TRUE(deleter.queueDelete(deleterOptions,
+        ASSERT_TRUE(deleter.queueDelete(noTxn,
+                                        deleterOptions,
                                         &notifyDone,
                                         NULL /* errMsg not needed */));
 
@@ -160,7 +162,8 @@ namespace {
                                                     BSON("x" << 10),
                                                     BSON("x" << 1)));
         deleterOptions.waitForOpenCursors = true;
-        ASSERT_TRUE(deleter.queueDelete(deleterOptions,
+        ASSERT_TRUE(deleter.queueDelete(noTxn,
+                                        deleterOptions,
                                         &notifyDone,
                                         NULL /* errMsg not needed */));
 
@@ -313,7 +316,8 @@ namespace {
                                                     BSON("x" << 20),
                                                     BSON("x" << 1)));
         deleterOption1.waitForOpenCursors = true;
-        ASSERT_TRUE(deleter.queueDelete(deleterOption1,
+        ASSERT_TRUE(deleter.queueDelete(noTxn,
+                                        deleterOption1,
                                         &notifyDone1,
                                         NULL /* don't care errMsg */));
 
@@ -328,7 +332,8 @@ namespace {
                                                     BSON("x" << 30),
                                                     BSON("x" << 1)));
         deleterOption2.waitForOpenCursors = true;
-        ASSERT_TRUE(deleter.queueDelete(deleterOption2,
+        ASSERT_TRUE(deleter.queueDelete(noTxn,
+                                        deleterOption2,
                                         &notifyDone2,
                                         NULL /* don't care errMsg */));
 
@@ -338,7 +343,8 @@ namespace {
                                                     BSON("x" << 40),
                                                     BSON("x" << 1)));
         deleterOption3.waitForOpenCursors = true;
-        ASSERT_TRUE(deleter.queueDelete(deleterOption3,
+        ASSERT_TRUE(deleter.queueDelete(noTxn,
+                                        deleterOption3,
                                         &notifyDone3,
                                         NULL /* don't care errMsg */));
 
