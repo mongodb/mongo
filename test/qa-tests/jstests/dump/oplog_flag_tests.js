@@ -33,19 +33,36 @@ if (typeof getToolTest === 'undefined') {
   assert.gt(countBeforeMongodump, 1000);
 
   var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
-  assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
-    'mongodump --oplog should succeed');
 
-  // Wait for inserts to finish so we can then drop the database
-  insertsShell();
-  db.dropDatabase();
-  assert.eq(0, db.bar.count());
+  if (toolTest.isReplicaSet) {
+    assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
+      'mongodump --oplog should succeed');
 
-  var restoreArgs = ['restore'].concat(commonToolArgs);
-  assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
-    'mongorestore should succeed');
-  assert.gte(db.bar.count(), countBeforeMongodump);
-  assert.lt(db.bar.count(), 2000);
+    // Wait for inserts to finish so we can then drop the database
+    insertsShell();
+    db.dropDatabase();
+    assert.eq(0, db.bar.count());
+
+    var restoreArgs = ['restore'].concat(commonToolArgs);
+    assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
+      'mongorestore should succeed');
+    assert.gte(db.bar.count(), countBeforeMongodump);
+    assert.lt(db.bar.count(), 2000);
+  } else {
+    assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
+      'mongodump --oplog should fail fast on sharded and standalone');
+
+    // Wait for inserts to finish so we can then drop the database
+    insertsShell();
+    db.dropDatabase();
+    assert.eq(0, db.bar.count());
+
+    var restoreArgs = ['restore'].concat(commonToolArgs);
+    assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
+      'mongorestore should succeed');
+    // Shouldn't have dumped any documents
+    assert.eq(db.bar.count(), 0);
+  }
 
   toolTest.stop();
 })();
