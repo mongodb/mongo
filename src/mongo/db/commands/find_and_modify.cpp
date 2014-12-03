@@ -1,32 +1,30 @@
-// find_and_modify.cpp
-
 /**
-*    Copyright (C) 2012-2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2012-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
@@ -34,18 +32,14 @@
 
 #include "mongo/db/commands/find_and_modify.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -69,9 +63,14 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
-        /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            verify( cmdObj["sort"].eoo() );
+
+        virtual bool run(OperationContext* txn,
+                         const string& dbname,
+                         BSONObj& cmdObj,
+                         int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
 
             const std::string coll = cmdObj.firstElement().valuestrsafe();
             if (coll.empty()) {
@@ -81,9 +80,10 @@ namespace mongo {
 
             const std::string ns = dbname + '.' + coll;
 
-            BSONObj query = cmdObj.getObjectField("query");
-            BSONObj fields = cmdObj.getObjectField("fields");
-            BSONObj update = cmdObj.getObjectField("update");
+            const BSONObj query = cmdObj.getObjectField("query");
+            const BSONObj fields = cmdObj.getObjectField("fields");
+            const BSONObj update = cmdObj.getObjectField("update");
+            const BSONObj sort = cmdObj.getObjectField("sort");
             
             bool upsert = cmdObj["upsert"].trueValue();
             bool returnNew = cmdObj["new"].trueValue();
@@ -109,14 +109,22 @@ namespace mongo {
             while ( 1 ) {
                 try {
                     errmsg = "";
-                    // we can always retry because we only ever modify one document
-                    ok = runNoDirectClient( txn, ns,
-                                            query, fields, update,
-                                            upsert, returnNew, remove,
-                                            result, errmsg );
+
+                    // We can always retry because we only ever modify one document
+                    ok = runImpl(txn,
+                                 ns,
+                                 query,
+                                 fields,
+                                 update,
+                                 sort,
+                                 upsert,
+                                 returnNew,
+                                 remove,
+                                 result,
+                                 errmsg);
                     break;
                 }
-                catch ( const WriteConflictException& ex ) {
+                catch (const WriteConflictException&) {
                     if ( attempt++ > 1 ) {
                         log() << "got WriteConflictException on findAndModify for " << ns
                               <<  " retrying attempt: " << attempt;
@@ -142,12 +150,21 @@ namespace mongo {
                                                    !fromRepl ) );
                     wuow.commit();
                 }
+
                 errmsg = "";
-                ok = runNoDirectClient( txn, ns,
-                                        query, fields, update,
-                                        upsert, returnNew, remove,
-                                        result, errmsg );
+                ok = runImpl(txn,
+                             ns,
+                             query,
+                             fields,
+                             update,
+                             sort,
+                             upsert,
+                             returnNew,
+                             remove,
+                             result,
+                             errmsg);
             }
+
             return ok;
         }
 
@@ -171,16 +188,17 @@ namespace mongo {
             result.append( "value" , p.transform( doc ) );
         }
 
-        static bool runNoDirectClient(OperationContext* txn,
-                                      const string& ns, 
-                                      const BSONObj& queryOriginal,
-                                      const BSONObj& fields,
-                                      const BSONObj& update,
-                                      bool upsert,
-                                      bool returnNew,
-                                      bool remove ,
-                                      BSONObjBuilder& result,
-                                      string& errmsg) {
+        static bool runImpl(OperationContext* txn,
+                            const string& ns,
+                            const BSONObj& query,
+                            const BSONObj& fields,
+                            const BSONObj& update,
+                            const BSONObj& sort,
+                            bool upsert,
+                            bool returnNew,
+                            bool remove ,
+                            BSONObjBuilder& result,
+                            string& errmsg) {
 
             Client::WriteContext cx(txn, ns);
             Collection* collection = cx.getCollection();
@@ -200,34 +218,34 @@ namespace mongo {
                 return false;
             }
 
-
-
             BSONObj doc;
             bool found = false;
             {
                 CanonicalQuery* cq;
-                massert(17383, "Could not canonicalize " + queryOriginal.toString(),
-                    CanonicalQuery::canonicalize(ns, queryOriginal, &cq, whereCallback).isOK());
+                uassertStatusOK(CanonicalQuery::canonicalize(ns,
+                                                             query,
+                                                             sort,
+                                                             BSONObj(),  // projection
+                                                             &cq,
+                                                             whereCallback));
 
                 PlanExecutor* rawExec;
-                massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
-                        getExecutor(txn,
-                                    collection,
-                                    cq,
-                                    PlanExecutor::YIELD_AUTO,
-                                    &rawExec,
-                                    QueryPlannerParams::DEFAULT).isOK());
+                uassertStatusOK(getExecutor(txn,
+                                            collection,
+                                            cq,
+                                            PlanExecutor::YIELD_AUTO,
+                                            &rawExec,
+                                            QueryPlannerParams::DEFAULT));
 
                 scoped_ptr<PlanExecutor> exec(rawExec);
 
-                PlanExecutor::ExecState state;
-                if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {
+                if (PlanExecutor::ADVANCED == exec->getNext(&doc, NULL)) {
                     found = true;
                 }
             }
 
-            BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
+            BSONObj queryModified = query;
+            if (found && !doc["_id"].eoo() && !CanonicalQuery::isSimpleIdQuery(query)) {
                 // we're going to re-write the query to be more efficient
                 // we have to be a little careful because of positional operators
                 // maybe we can pass this all through eventually, but right now isn't an easy way
@@ -255,12 +273,12 @@ namespace mongo {
                     }
                 }
 
-                BSONObjBuilder b( queryOriginal.objsize() + 10 );
+                BSONObjBuilder b(query.objsize() + 10);
                 b.append( doc["_id"] );
                 
                 bool addedAtomic = false;
 
-                BSONObjIterator i( queryOriginal );
+                BSONObjIterator i(query);
                 while ( i.more() ) {
                     const BSONElement& elem = i.next();
 
@@ -281,6 +299,7 @@ namespace mongo {
 
                     b.append( elem );
                 }
+
                 queryModified = b.obj();
             }
 
@@ -349,7 +368,7 @@ namespace mongo {
                             errmsg = str::stream() << "can't find object after modification  " 
                                                    << " ns: " << ns 
                                                    << " queryModified: " << queryModified 
-                                                   << " queryOriginal: " << queryOriginal;
+                                                   << " queryOriginal: " << query;
                             log() << errmsg << endl;
                             return false;
                         }
@@ -366,140 +385,10 @@ namespace mongo {
                     
                 }
             }
-            return true;
-        }
-        
-        virtual bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
-            DBDirectClient db(txn);
-
-            if (cmdObj["sort"].eoo()) {
-                return runNoDirectClient(txn, dbname, cmdObj, x, errmsg, result, y);
-            }
-
-            const std::string coll = cmdObj.firstElement().valuestrsafe();
-            if (coll.empty()) {
-                errmsg = "no collection name specified";
-                return false;
-            }
-
-            const std::string ns = dbname + '.' + coll;
-
-            BSONObj origQuery = cmdObj.getObjectField("query"); // defaults to {}
-            Query q (origQuery);
-            BSONElement sort = cmdObj["sort"];
-            if (!sort.eoo())
-                q.sort(sort.embeddedObjectUserCheck());
-
-            bool upsert = cmdObj["upsert"].trueValue();
-
-            BSONObj fieldsHolder (cmdObj.getObjectField("fields"));
-            const BSONObj* fields = (fieldsHolder.isEmpty() ? NULL : &fieldsHolder);
-
-            Projection projection;
-            if (fields) {
-                projection.init(fieldsHolder, WhereCallbackReal(txn, StringData(dbname)));
-                if (!projection.includeID()) {
-                    fields = NULL; // do projection in post-processing
-                }
-            }
-
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, ns);
-
-            BSONObj out = db.findOne(ns, q, fields);
-            if (out.isEmpty()) {
-                if (!upsert) {
-                    result.appendNull("value");
-                    return true;
-                }
-
-                BSONElement update = cmdObj["update"];
-                uassert(13329, "upsert mode requires update field", !update.eoo());
-                uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
-                db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
-
-                BSONObj gle = db.getLastErrorDetailed(dbname);
-                result.append("lastErrorObject", gle);
-                if (gle["err"].type() == String) {
-                    errmsg = gle["err"].String();
-                    return false;
-                }
-
-                if (!cmdObj["new"].trueValue()) {
-                    result.appendNull("value");
-                    return true;
-                }
-
-                BSONObjBuilder bob;
-                BSONElement _id = gle[kUpsertedFieldName];
-                if (!_id.eoo())
-                    bob.appendAs(_id, "_id");
-                else
-                    bob.appendAs(origQuery["_id"], "_id");
-
-                out = db.findOne(ns, bob.done(), fields);
-
-            }
-            else {
-
-                if (cmdObj["remove"].trueValue()) {
-                    uassert(12515, "can't remove and update", cmdObj["update"].eoo());
-                    db.remove(ns, QUERY("_id" << out["_id"]), 1);
-
-                    BSONObj gle = db.getLastErrorDetailed(dbname);
-                    result.append("lastErrorObject", gle);
-                    if (gle["err"].type() == String) {
-                        errmsg = gle["err"].String();
-                        return false;
-                    }
-
-                }
-                else {   // update
-
-                    BSONElement queryId = origQuery["_id"];
-                    if (queryId.eoo() || getGtLtOp(queryId) != BSONObj::Equality) {
-                        // need to include original query for $ positional operator
-
-                        BSONObjBuilder b;
-                        b.append(out["_id"]);
-                        BSONObjIterator it(origQuery);
-                        while (it.more()) {
-                            BSONElement e = it.next();
-                            if (strcmp(e.fieldName(), "_id"))
-                                b.append(e);
-                        }
-                        q = Query(b.obj());
-                    }
-
-                    if (q.isComplex()) // update doesn't work with complex queries
-                        q = Query(q.getFilter().getOwned());
-
-                    BSONElement update = cmdObj["update"];
-                    uassert(12516, "must specify remove or update", !update.eoo());
-                    db.update(ns, q, update.embeddedObjectUserCheck());
-
-                    BSONObj gle = db.getLastErrorDetailed(dbname);
-                    result.append("lastErrorObject", gle);
-                    if (gle["err"].type() == String) {
-                        errmsg = gle["err"].String();
-                        return false;
-                    }
-
-                    if (cmdObj["new"].trueValue())
-                        out = db.findOne(ns, QUERY("_id" << out["_id"]), fields);
-                }
-            }
-
-            if (!fieldsHolder.isEmpty() && !fields){
-                // we need to run projection but haven't yet
-                out = projection.transform(out);
-            }
-
-            result.append("value", out);
 
             return true;
         }
+
     } cmdFindAndModify;
 
 }
