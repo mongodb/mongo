@@ -35,7 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
 

@@ -71,7 +71,7 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
@@ -218,7 +218,7 @@ namespace {
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
-            dbresponse.exhaustNS = newRunQuery(txn, m, q, op, *resp, fromDBDirectClient);
+            dbresponse.exhaustNS = runQuery(txn, m, q, op, *resp, fromDBDirectClient);
             verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
@@ -728,15 +728,15 @@ namespace {
                     }
                 }
 
-                msgdata = newGetMore(txn,
-                                     ns,
-                                     ntoreturn,
-                                     cursorid,
-                                     curop,
-                                     pass,
-                                     exhaust,
-                                     &isCursorAuthorized,
-                                     fromDBDirectClient);
+                msgdata = getMore(txn,
+                                  ns,
+                                  ntoreturn,
+                                  cursorid,
+                                  curop,
+                                  pass,
+                                  exhaust,
+                                  &isCursorAuthorized,
+                                  fromDBDirectClient);
             }
             catch ( AssertionException& e ) {
                 if ( isCursorAuthorized ) {

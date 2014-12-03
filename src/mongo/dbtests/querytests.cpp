@@ -39,7 +39,7 @@
 #include "mongo/db/global_optime.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
@@ -1469,7 +1469,7 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = newRunQuery( &_txn, message, queryMessage, *cc().curop(), result, false );
+            string exhaust = runQuery( &_txn, message, queryMessage, *cc().curop(), result, false );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }

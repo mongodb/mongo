@@ -311,7 +311,7 @@ namespace mongo {
          * Everybody who sets the policy to YIELD_AUTO really wants to call registerExec()
          * immediately after EXCEPT commands that create cursors...so we expose the ability to
          * register (or not) here, rather than require all users to have yet another RAII object.
-         * Only cursor-creating things like new_find.cpp set registerExecutor to false.
+         * Only cursor-creating things like find.cpp set registerExecutor to false.
          */
         void setYieldPolicy(YieldPolicy policy, bool registerExecutor = true);
 
@@ -319,7 +319,7 @@ namespace mongo {
         /**
          * RAII approach to ensuring that plan executors are deregistered.
          *
-         * While retrieving the first batch of results, newRunQuery manually registers the executor
+         * While retrieving the first batch of results, runQuery manually registers the executor
          * with ClientCursor.  Certain query execution paths, namely $where, can throw an exception.
          * If we fail to deregister the executor, we will call invalidate/kill on the
          * still-registered-yet-deleted executor.

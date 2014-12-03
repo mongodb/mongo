@@ -114,7 +114,7 @@ namespace mongo {
                 // We have to deregister it, as it will be registered with ClientCursor.
                 curExec->deregisterExec();
 
-                // Need to save state while yielding locks between now and newGetMore.
+                // Need to save state while yielding locks between now and getMore().
                 curExec->saveState();
 
                 execs.push_back(curExec.release());

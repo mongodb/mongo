@@ -151,7 +151,7 @@ namespace mongo {
             txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
-            // will be restored in newGetMore().
+            // will be restored in getMore().
             exec->saveState();
         }
 

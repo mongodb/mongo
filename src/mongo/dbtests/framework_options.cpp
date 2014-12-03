@@ -34,7 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
