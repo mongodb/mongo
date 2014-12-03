@@ -847,6 +847,36 @@ namespace {
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
 
+    TEST_F(TopoCoordTest, ReplSetGetStatusFails) {
+        // This test starts by configuring a TopologyCoordinator to NOT be a member of a 3 node
+        // replica set. Then running prepareStatusResponse should fail.
+        Date_t startupTime(100);
+        Date_t heartbeatTime = 5000;
+        Seconds uptimeSecs(10);
+        Date_t curTime = heartbeatTime + uptimeSecs.total_milliseconds();
+        OpTime oplogProgress(3, 4);
+        std::string setName = "mySet";
+
+        updateConfig(BSON("_id" << setName <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234") <<
+                                                  BSON("_id" << 1 << "host" << "test1:1234") <<
+                                                  BSON("_id" << 2 << "host" << "test2:1234"))),
+                     -1,  // This one is not part of the replica set.
+                     startupTime + 1);
+
+        BSONObjBuilder statusBuilder;
+        Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+        getTopoCoord().prepareStatusResponse(cbData(),
+                                             curTime,
+                                             uptimeSecs.total_seconds(),
+                                             oplogProgress,
+                                             &statusBuilder,
+                                             &resultStatus);
+        ASSERT_NOT_OK(resultStatus);
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, resultStatus);
+    }
+
     TEST_F(TopoCoordTest, PrepareFreshResponse) {
         ReplicationCoordinator::ReplSetFreshArgs args;
         OpTime freshestOpTime(15, 10);

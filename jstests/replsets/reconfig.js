@@ -1,69 +1,45 @@
+/*
+ * Simple test to ensure that an invalid reconfig fails, a valid one succeeds, and a reconfig won't
+ * succeed without force if force is needed.
+ */
+(function () {
+    "use strict";
+    var numNodes = 5;
+    var replTest = new ReplSetTest({ name: 'testSet', nodes: numNodes });
+    var nodes = replTest.startSet();
+    replTest.initiate();
 
-// try reconfiguring with servers down
+    var primary = replTest.getPrimary();
 
-var replTest = new ReplSetTest({ name: 'testSet', nodes: 5 });
-var nodes = replTest.startSet();
-replTest.initiate();
+    replTest.awaitSecondaryNodes();
 
-var master = replTest.getMaster();
+    jsTestLog("Valid reconfig");
+    var config = primary.getDB("local").system.replset.findOne();
+    printjson(config);
+    config.version++;
+    config.members[nodes.indexOf(primary)].priority = 2;
+    assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}));
+    replTest.awaitReplication();
 
-print("initial sync");
-master.getDB("foo").bar.insert({X:1});
-replTest.awaitReplication();
+    jsTestLog("Invalid reconfig");
+    config.version++;
+    var badMember = {_id: numNodes, host: "localhost:12345", priority: "High"};
+    config.members.push(badMember);
+    var invalidConfigCode = 93;
+    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig : config}),
+                                 invalidConfigCode);
 
-print("invalid reconfig");
-var config = master.getDB("local").system.replset.findOne();
-config.version++;
-config.members.push({_id : 5, host : "localhost:12345, votes:0"});
-var result = master.adminCommand({replSetReconfig : config});
-printjson(result);
-assert.eq(result.ok, 0);
+    jsTestLog("No force when needed.");
+    config.members = config.members.slice(0, numNodes - 1);
+    var secondary = replTest.getSecondary();
+    config.members[nodes.indexOf(secondary)].priority = 5;
+    var admin = secondary.getDB("admin");
+    var forceRequiredCode = 10107;
+    assert.commandFailedWithCode(admin.runCommand({replSetReconfig: config}),
+                                 forceRequiredCode);
 
-print("stopping 3 & 4");
-replTest.stop(3);
-replTest.stop(4);
+    jsTestLog("Force when appropriate");
+    assert.commandWorked(admin.runCommand({replSetReconfig: config, force: true}));
 
-print("reconfiguring");
-master = replTest.getMaster();
-config = master.getDB("local").system.replset.findOne();
-var oldVersion = config.version++;
-config.members[0].priority = 5;
-try {
-    assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
-}
-catch(e) {
-    print(e);
-}
-
-assert.soon(function() {
-    try {
-        var config = master.getDB("local").system.replset.findOne();
-        return oldVersion+1 == config.version;
-    }
-    catch (e) {
-        print("Query failed: "+e);
-        return false;
-    }
-});
-
-replTest.stopSet();
-
-replTest2 = new ReplSetTest({name : 'testSet2', nodes : 1});
-nodes = replTest2.startSet();
-
-assert.soon(function() {
-    try {
-        result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2", members : [
-            {_id : 0, tags : ["member0"]}
-        ]}});
-        printjson(result);
-        return (result.errmsg.match(/bad or missing host field/) ||
-                result.errmsg.match(/Missing expected field \"host\"/));
-    }
-    catch (e) {
-        print(e);
-    }
-    return false;
-});
-
-replTest2.stopSet();
+    replTest.stopSet();
+}());
