@@ -34,6 +34,7 @@
 namespace mongo {
 
     class OperationContext;
+    class PlanExecutor;
 
     struct DeleteStageParams {
         DeleteStageParams() :
@@ -92,6 +93,13 @@ namespace mongo {
         virtual const SpecificStats* getSpecificStats();
 
         static const char* kStageType;
+
+        /**
+         * Extracts the number of documents deleted by the update plan 'exec'.
+         *
+         * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
+         */
+        static long long getNumDeleted(PlanExecutor* exec);
 
     private:
         // Transactional context.  Not owned by us.

@@ -64,10 +64,11 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
@@ -681,8 +682,8 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                DeleteExecutor executor(txn, &request);
-                uassertStatusOK(executor.prepare());
+                ParsedDelete parsedDelete(txn, &request);
+                uassertStatusOK(parsedDelete.parseRequest());
 
                 AutoGetDb autoDb(txn, ns.db(), MODE_IX);
                 if (!autoDb.getDb()) break;
@@ -690,8 +691,17 @@ namespace {
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
 
-                long long n = executor.execute(ctx.db());
-                lastError.getSafe()->recordDelete( n );
+                PlanExecutor* rawExec;
+                uassertStatusOK(getExecutorDelete(txn,
+                                                  ctx.db()->getCollection(txn, ns),
+                                                  &parsedDelete,
+                                                  &rawExec));
+                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                // Run the plan and get the number of docs deleted.
+                uassertStatusOK(exec->executePlan());
+                long long n = DeleteStage::getNumDeleted(exec.get());
+                lastError.getSafe()->recordDelete(n);
                 op.debug().ndeleted = n;
 
                 break;

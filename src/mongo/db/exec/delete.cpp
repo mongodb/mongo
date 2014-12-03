@@ -204,4 +204,14 @@ namespace mongo {
         return &_specificStats;
     }
 
+    // static
+    long long DeleteStage::getNumDeleted(PlanExecutor* exec) {
+        invariant(exec->getRootStage()->isEOF());
+        invariant(exec->getRootStage()->stageType() == STAGE_DELETE);
+        DeleteStage* deleteStage = static_cast<DeleteStage*>(exec->getRootStage());
+        const DeleteStats* deleteStats =
+            static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
+        return deleteStats->docsDeleted;
+    }
+
 }  // namespace mongo

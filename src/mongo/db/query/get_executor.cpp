@@ -460,87 +460,101 @@ namespace mongo {
 
     Status getExecutorDelete(OperationContext* txn,
                              Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             bool isMulti,
-                             bool shouldCallLogOp,
-                             bool fromMigrate,
-                             bool isExplain,
-                             PlanExecutor::YieldPolicy yieldPolicy,
-                             PlanExecutor** out) {
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+                             ParsedDelete* parsedDelete,
+                             PlanExecutor** execOut) {
+        const DeleteRequest* request = parsedDelete->getRequest();
+
+        const NamespaceString& nss(request->getNamespaceString());
+        if (!request->isGod()) {
+            if (nss.isSystem()) {
+                uassert(12050,
+                        "cannot delete from system namespace",
+                        legalClientSystemNS(nss.ns(), true));
+            }
+            if (nss.ns().find('$') != string::npos) {
+                log() << "cannot delete from collection with reserved $ in name: " << nss << endl;
+                uasserted(10100, "cannot delete from collection with reserved $ in name");
+            }
+        }
+
+        if (collection && collection->isCapped()) {
+            return Status(ErrorCodes::IllegalOperation,
+                          str::stream() << "cannot remove from a capped collection: " <<  nss.ns());
+        }
+
+        if (request->shouldCallLogOp() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db())) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while removing from " << nss.ns());
+        }
+
+        DeleteStageParams deleteStageParams;
+        deleteStageParams.isMulti = request->isMulti();
+        deleteStageParams.shouldCallLogOp = request->shouldCallLogOp();
+        deleteStageParams.fromMigrate = request->isFromMigrate();
+        deleteStageParams.isExplain = request->isExplain();
+
         auto_ptr<WorkingSet> ws(new WorkingSet());
+        PlanExecutor::YieldPolicy policy = parsedDelete->canYield() ? PlanExecutor::YIELD_AUTO :
+                                                                      PlanExecutor::YIELD_MANUAL;
+
+        if (!parsedDelete->hasParsedQuery()) {
+            // This is the idhack fast-path for getting a PlanExecutor without doing the work
+            // to create a CanonicalQuery.
+            const BSONObj& unparsedQuery = request->getQuery();
+
+            if (!collection) {
+                // Treat collections that do not exist as empty collections.  Note that the explain
+                // reporting machinery always assumes that the root stage for a delete operation is
+                // a DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
+                LOG(2) << "Collection " << nss.ns() << " does not exist."
+                       << " Using EOF stage: " << unparsedQuery.toString();
+                DeleteStage* deleteStage = new DeleteStage(txn, deleteStageParams, ws.get(), NULL,
+                                                           new EOFStage());
+                return PlanExecutor::make(txn, ws.release(), deleteStage, nss.ns(), policy,
+                                          execOut);
+
+            }
+
+            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+                collection->getIndexCatalog()->findIdIndex(txn)) {
+                LOG(2) << "Using idhack: " << unparsedQuery.toString();
+
+                PlanStage* idHackStage = new IDHackStage(txn,
+                                                         collection,
+                                                         unparsedQuery["_id"].wrap(),
+                                                         ws.get());
+                DeleteStage* root = new DeleteStage(txn, deleteStageParams, ws.get(), collection,
+                                                    idHackStage);
+                return PlanExecutor::make(txn, ws.release(), root, collection, policy, execOut);
+            }
+
+            // If we're here then we don't have a parsed query, but we're also not eligible for
+            // the idhack fast path. We need to force canonicalization now.
+            Status cqStatus = parsedDelete->parseQueryToCQ();
+            if (!cqStatus.isOK()) {
+                return cqStatus;
+            }
+        }
+
+        // This is the regular path for when we have a CanonicalQuery.
+        std::auto_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
+
         PlanStage* root;
         QuerySolution* querySolution;
         const size_t defaultPlannerOptions = 0;
-        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
+        Status status = prepareExecution(txn, collection, ws.get(), cq.get(),
                                          defaultPlannerOptions, &root, &querySolution);
         if (!status.isOK()) {
             return status;
         }
         invariant(root);
-        DeleteStageParams deleteStageParams;
-        deleteStageParams.isMulti = isMulti;
-        deleteStageParams.shouldCallLogOp = shouldCallLogOp;
-        deleteStageParams.fromMigrate = fromMigrate;
-        deleteStageParams.isExplain = isExplain;
+
         root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
-        return PlanExecutor::make(txn, ws.release(), root, querySolution, canonicalQuery.release(),
-                                  collection, yieldPolicy, out);
-    }
-
-    Status getExecutorDelete(OperationContext* txn,
-                             Collection* collection,
-                             const std::string& ns,
-                             const BSONObj& unparsedQuery,
-                             bool isMulti,
-                             bool shouldCallLogOp,
-                             bool fromMigrate,
-                             bool isExplain,
-                             PlanExecutor::YieldPolicy yieldPolicy,
-                             PlanExecutor** out) {
-        auto_ptr<WorkingSet> ws(new WorkingSet());
-        DeleteStageParams deleteStageParams;
-        deleteStageParams.isMulti = isMulti;
-        deleteStageParams.shouldCallLogOp = shouldCallLogOp;
-        deleteStageParams.fromMigrate = fromMigrate;
-        deleteStageParams.isExplain = isExplain;
-        if (!collection) {
-            // Treat collections that do not exist as empty collections.  Note that the explain
-            // reporting machinery always assumes that the root stage for a delete operation is a
-            // DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
-            LOG(2) << "Collection " << ns << " does not exist."
-                   << " Using EOF stage: " << unparsedQuery.toString();
-            DeleteStage* deleteStage = new DeleteStage(txn, deleteStageParams, ws.get(), NULL,
-                                                       new EOFStage());
-            return PlanExecutor::make(txn, ws.release(), deleteStage, ns, yieldPolicy, out);
-        }
-
-        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex(txn)) {
-            LOG(2) << "Using idhack: " << unparsedQuery.toString();
-
-            PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
-                                                     ws.get());
-            DeleteStage* root = new DeleteStage(txn, deleteStageParams, ws.get(), collection,
-                                                idHackStage);
-            return PlanExecutor::make(txn, ws.release(), root, collection, yieldPolicy, out);
-        }
-
-        const WhereCallbackReal whereCallback(txn, collection->ns().db());
-        CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(collection->ns(),
-                                                     unparsedQuery,
-                                                     deleteStageParams.isExplain,
-                                                     &cq,
-                                                     whereCallback);
-        if (!status.isOK())
-            return status;
-
-        // Takes ownership of 'cq'.
-        return getExecutorDelete(txn, collection, cq, isMulti, shouldCallLogOp,
-                                 fromMigrate, isExplain, yieldPolicy, out);
+        return PlanExecutor::make(txn, ws.release(), root, querySolution, cq.release(),
+                                  collection, policy, execOut);
     }
 
     //

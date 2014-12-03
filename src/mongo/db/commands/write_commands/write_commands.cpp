@@ -38,8 +38,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/explain.h"
@@ -252,12 +252,10 @@ namespace mongo {
             // Explained deletes can yield.
             deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-            // Use the request to create a DeleteExecutor, and from it extract the
-            // plan tree which will be used to execute this update.
-            DeleteExecutor deleteExecutor( txn, &deleteRequest );
-            Status prepStatus = deleteExecutor.prepare();
-            if ( !prepStatus.isOK() ) {
-                return prepStatus;
+            ParsedDelete parsedDelete(txn, &deleteRequest);
+            Status parseStatus = parsedDelete.parseRequest();
+            if (!parseStatus.isOK()) {
+                return parseStatus;
             }
 
             // Explains of write commands are read-only, but we take write locks so that timing
@@ -271,16 +269,18 @@ namespace mongo {
             // or collections.
             ensureShardVersionOKOrThrow( nsString.ns() );
 
-            Status prepInLockStatus = deleteExecutor.prepareInLock( autoDb.getDb() );
-            if ( !prepInLockStatus.isOK()) {
-                return prepInLockStatus;
+            // Get a pointer to the (possibly NULL) collection.
+            Collection* collection = NULL;
+            if (autoDb.getDb()) {
+                collection = autoDb.getDb()->getCollection(txn, nsString.ns());
             }
 
-            // Executor registration and yield policy is handled internally by the delete executor.
-            PlanExecutor* exec = deleteExecutor.getPlanExecutor();
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Explain the plan tree.
-            Explain::explainStages( exec, verbosity, out );
+            Explain::explainStages(exec.get(), verbosity, out);
             return Status::OK();
         }
     }

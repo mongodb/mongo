@@ -46,9 +46,10 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -1345,9 +1346,9 @@ namespace mongo {
         while ( 1 ) {
             try {
 
-                DeleteExecutor executor( txn, &request );
-                Status status = executor.prepare();
-                if ( !status.isOK() ) {
+                ParsedDelete parsedDelete(txn, &request);
+                Status status = parsedDelete.parseRequest();
+                if (!status.isOK()) {
                     result->setError(toWriteError(status));
                     return;
                 }
@@ -1368,7 +1369,16 @@ namespace mongo {
                 // TODO: better constructor?
                 Client::Context ctx(txn, nss.ns(), false /* don't check version */);
 
-                result->getStats().n = executor.execute(autoDb.getDb());
+                PlanExecutor* rawExec;
+                uassertStatusOK(getExecutorDelete(txn,
+                                                  ctx.db()->getCollection(txn, nss),
+                                                  &parsedDelete,
+                                                  &rawExec));
+                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                // Execute the delete and retrieve the number deleted.
+                uassertStatusOK(exec->executePlan());
+                result->getStats().n = DeleteStage::getNumDeleted(exec.get());
 
                 break;
             }
