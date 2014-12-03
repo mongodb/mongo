@@ -1,12 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --drop drops existing data
     // before restoring.
     
     jsTest.log('Testing restoration with --drop on existing data');
 
-    var toolTest = new ToolTest('drop_with_data');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('drop_with_data');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'drop_with_data_dump';
@@ -28,7 +32,11 @@
     });
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop all the data, and replace it with different data
@@ -46,7 +54,11 @@
 
     // restore with --drop. the current data in all collections should
     // be removed and replaced with the dumped data
-    ret = toolTest.runTool('restore', '--drop', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--drop', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the dumped data was restored, and the old data 

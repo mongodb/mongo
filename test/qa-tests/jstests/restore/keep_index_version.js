@@ -1,13 +1,17 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --keepIndexVersion does not 
     // update the index version, and that running it without 
     // --keepIndexVersion does.
 
     jsTest.log('Testing mongorestore with --keepIndexVersion');
 
-    var toolTest = new ToolTest('keep_index_version');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('keep_index_version');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'keep_index_version_dump';
@@ -27,14 +31,22 @@
     assert.eq(10, testColl.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the db
     testDB.dropDatabase();
 
     // restore the data
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored correctly
@@ -49,7 +61,11 @@
     testDB.dropDatabase();
 
     // restore the data with --keepIndexVersion specified
-    ret = toolTest.runTool('restore', '--keepIndexVersion', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--keepIndexVersion', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored correctly

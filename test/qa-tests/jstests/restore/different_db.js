@@ -1,12 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests using mongorestore to restore data to a different db than
     // it was dumped from.
 
     jsTest.log('Testing restoration to a different db');
 
-    var toolTest = new ToolTest('different_db');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('different_db');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'different_db_dump';
@@ -29,11 +33,19 @@
     });
 
     // dump the data 
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // restore the data to a different db
-    ret = toolTest.runTool('restore', '--db', 'dest', dumpTarget+'/source');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--db', 'dest', dumpTarget+'/source'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored

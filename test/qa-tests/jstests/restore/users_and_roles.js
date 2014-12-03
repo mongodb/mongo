@@ -1,11 +1,15 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests running mongorestore with --restoreDbUsersAndRoles
 
     jsTest.log('Testing running mongorestore with --restoreDbUsersAndRoles');
 
-    var toolTest = new ToolTest('users_and_roles');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('users_and_roles');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'users_and_roles_dump';
@@ -53,8 +57,11 @@
     assert.eq(10, testDB.data.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget, '--db', 'test',
-                '--dumpDbUsersAndRoles');
+    var ret = toolTest.runTool.apply(
+        toolTest,    
+        ['dump', '--out', dumpTarget, '--db', 'test', '--dumpDbUsersAndRoles'].
+            concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the database, users, and roles
@@ -63,8 +70,11 @@
     testDB.dropAllRoles();
 
     // restore the data, specifying --restoreDBUsersAndRoles
-    ret = toolTest.runTool('restore', '--db', 'test', '--restoreDbUsersAndRoles',
-                dumpTarget+'/test');
+    ret = toolTest.runTool.apply(
+        toolTest,
+        ['restore', '--db', 'test', '--restoreDbUsersAndRoles', dumpTarget+'/test'].
+            concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored

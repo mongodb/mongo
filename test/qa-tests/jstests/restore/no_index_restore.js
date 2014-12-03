@@ -1,12 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --noIndexRestore does not
     // restore indexes.
     
     jsTest.log('Testing restoration with --noIndexRestore');
 
-    var toolTest = new ToolTest('no_index_restore');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('no_index_restore');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'no_index_restore_dump';
@@ -34,7 +38,11 @@
     assert.eq(3, testDB.coll2.getIndexes().length);
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the collections
@@ -46,7 +54,11 @@
     });
 
     // restore the data, with --noIndexRestore
-    ret = toolTest.runTool('restore', '--noIndexRestore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--noIndexRestore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored fully, and only the _id

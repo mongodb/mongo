@@ -1,12 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests using mongorestore to restore data to a different collection
     // then it was dumped from.
     
     jsTest.log('Testing restoration to a different collection');
 
-    var toolTest = new ToolTest('different_collection');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('different_collection');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'different_collection_dump';
@@ -30,8 +34,12 @@
     // restore just the collection into a different collection 
     // in the same database
     var destCollName = 'destColl';
-    ret = toolTest.runTool('restore', '--db', 'source', '--collection',
-            destCollName, dumpTarget+'/source/sourceColl.bson');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--db', 'source', '--collection',
+            destCollName, dumpTarget+'/source/sourceColl.bson'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret)
 
     // make sure the data was restored correctly
@@ -43,8 +51,12 @@
     // restore just the collection into a similarly-named collection
     // in a different database
     var destDB = toolTest.db.getSiblingDB('dest');
-    ret = toolTest.runTool('restore', '--db', 'dest', '--collection',
-            sourceCollName, dumpTarget+'/source/sourceColl.bson');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--db', 'dest', '--collection',
+            sourceCollName, dumpTarget+'/source/sourceColl.bson'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret)
     
     // make sure the data was restored correctly
@@ -55,8 +67,12 @@
 
     // restore just the collection into a different collection
     // in a different database
-    ret = toolTest.runTool('restore', '--db', 'dest', '--collection',
-            destCollName, dumpTarget+'/source/sourceColl.bson');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--db', 'dest', '--collection',
+            destCollName, dumpTarget+'/source/sourceColl.bson'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret)
 
     // make sure the data was restored correctly

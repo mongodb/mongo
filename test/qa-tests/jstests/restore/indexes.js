@@ -1,12 +1,16 @@
 (function() {
+
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
     
     // Tests that mongorestore handles restoring different types of 
     // indexes correctly.
     
     jsTest.log('Testing restoration of different types of indexes'); 
 
-    var toolTest = new ToolTest('indexes');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('indexes');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'indexes_dump';
@@ -37,7 +41,11 @@
     assert.eq(15, testColl.count());
     
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest, 
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
     
     // drop the collection
@@ -47,7 +55,11 @@
     assert.eq(0, testColl.getIndexes().length);
 
     // restore the data
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored correctly

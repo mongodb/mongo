@@ -1,12 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests using mongorestore to restore only a subset of a dump (either a 
     // single db or a single collection) from a larger dump.
      
     jsTest.log('Testing restoration of a subset of a dump');
 
-    var toolTest = new ToolTest('partial_restore');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('partial_restore');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'partial_restore_dump';
@@ -30,7 +34,11 @@
     assert.eq(50, collThree.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the databases
@@ -38,7 +46,11 @@
     dbTwo.dropDatabase();
 
     // restore a single db
-    ret = toolTest.runTool('restore', '--db', 'dbOne', dumpTarget+'/dbOne');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--db', 'dbOne', dumpTarget+'/dbOne'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the restore worked, and nothing else but that db was restored
@@ -50,8 +62,12 @@
     dbOne.dropDatabase();
 
     // restore a single collection
-    ret = toolTest.runTool('restore', '--collection', 'collTwo', 
-            '--db', 'dbOne', dumpTarget+'/dbOne/collTwo.bson');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--collection', 'collTwo', 
+            '--db', 'dbOne', dumpTarget+'/dbOne/collTwo.bson'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the restore worked, and nothing else but that collection was restored

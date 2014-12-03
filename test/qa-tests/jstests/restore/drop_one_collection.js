@@ -1,5 +1,9 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --drop and --collection leaves data
     // in other collections untouched (that --drop only applies to the 
     // specified collection).
@@ -7,8 +11,8 @@
     jsTest.log('Testing restoration with --drop and --collection, with data in'+
             ' other collections');
 
-    var toolTest = new ToolTest('drop_one_collection');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('drop_one_collection');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'drop_one_collection_dump';
@@ -28,7 +32,11 @@
     });
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop and replace the data
@@ -56,8 +64,12 @@
     });
 
     // restore with --drop and --collection
-    ret = toolTest.runTool('restore', '--drop', '--db', 'source', 
-                '--collection', 'coll1', dumpTarget+'/source/coll1.bson');
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--drop', '--db', 'source', 
+            '--collection', 'coll1', dumpTarget+'/source/coll1.bson'].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure that the dumped data replaced the old data in only

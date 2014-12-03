@@ -1,13 +1,17 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --noOptionsRestore does 
     // not restore collection options, and that running it without
     // --noOptionsRestore does restore collection options.
     
     jsTest.log('Testing restoration with --noOptionsRestore');
 
-    var toolTest = new ToolTest('no_options_restore');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('no_options_restore');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'no_options_restore_dump';
@@ -45,14 +49,22 @@
     assert.eq(1, cmdRet.ok);
     
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget); 
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    ); 
     assert.eq(0, ret);
 
     // drop the data
     testDB.dropDatabase();
 
     // restore the data
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored correctly
@@ -72,7 +84,11 @@
     testDB.dropDatabase();
 
     // restore the data, without the options
-    ret = toolTest.runTool('restore', '--noOptionsRestore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--noOptionsRestore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored correctly

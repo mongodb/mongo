@@ -1,11 +1,15 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests using mongorestore to restore data to multiple dbs.
     
     jsTest.log('Testing restoration to multiple dbs'); 
 
-    var toolTest = new ToolTest('multiple_dbs');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('multiple_dbs');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'multiple_dbs_dump';
@@ -34,7 +38,11 @@
     assert.eq(50, dbTwo[sharedCollName].count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the databases
@@ -42,7 +50,11 @@
     dbTwo.dropDatabase();
 
     // restore the data
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored properly

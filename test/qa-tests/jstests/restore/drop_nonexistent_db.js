@@ -1,13 +1,17 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests that running mongorestore with --drop on a database with
     // nothing to drop does not error out, and completes the 
     // restore successfully.
     
     jsTest.log('Testing restoration with --drop on a nonexistent db'); 
 
-    var toolTest = new ToolTest('drop_nonexistent_db');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('drop_nonexistent_db');
+    var commonToolArgs = getCommonToolArguments();
 
     // where we'll put the dump
     var dumpTarget = 'drop_nonexistent_db_dump';
@@ -23,7 +27,11 @@
     assert.eq(500, testDB.coll.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['dump', '--out', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // drop the database we are using
@@ -32,7 +40,11 @@
     assert.eq(0, testDB.coll.count());
 
     // restore the data with --drop
-    var ret = toolTest.runTool('restore', '--drop', dumpTarget);
+    var ret = toolTest.runTool.apply(
+            toolTest,
+            ['restore', '--drop', dumpTarget].
+                concat(commonToolArgs)
+    );
     assert.eq(0, ret);
 
     // make sure the data was restored
