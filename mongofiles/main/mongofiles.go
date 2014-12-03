@@ -36,7 +36,7 @@ func main() {
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help, if specified
@@ -61,7 +61,7 @@ func main() {
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 	mf := mongofiles.MongoFiles{
 		ToolOptions:     opts,
@@ -72,13 +72,13 @@ func main() {
 	if err := mf.ValidateCommand(args); err != nil {
 		log.Logf(log.Always, "error: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	output, err := mf.Run(true)
 	if err != nil {
 		log.Logf(log.Always, "%v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 	fmt.Printf("%s", output)
 }

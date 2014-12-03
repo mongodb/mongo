@@ -25,7 +25,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("error parsing command line: %v\n\n", err)
 		fmt.Printf("try 'mongooplog --help' for more information\n")
-		os.Exit(2)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help, if specified
@@ -48,14 +48,14 @@ func main() {
 	// validate the mongooplog options
 	if err := sourceOpts.Validate(); err != nil {
 		fmt.Printf("command line error: %v\n", err)
-		os.Exit(2)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// create a session provider for the destination server
 	sessionProviderTo, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		fmt.Printf("error connecting to destination host: %v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	// create a session provider for the source server
@@ -64,7 +64,7 @@ func main() {
 	sessionProviderFrom, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		fmt.Printf("error connecting to source host: %v\n", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	// initialize mongooplog
@@ -78,7 +78,7 @@ func main() {
 	// kick it off
 	if err := oplog.Run(); err != nil {
 		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 }

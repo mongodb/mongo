@@ -26,7 +26,7 @@ func main() {
 	extra, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help, if specified
@@ -42,7 +42,7 @@ func main() {
 	if len(extra) > 1 {
 		log.Logf(log.Always, "too many positional arguments")
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	sleeptime := 1 // default to 1 second sleep time
@@ -50,12 +50,12 @@ func main() {
 		sleeptime, err = strconv.Atoi(extra[0])
 		if err != nil || sleeptime <= 0 {
 			log.Logf(log.Always, "bad sleep time: %v", extra[0])
-			os.Exit(1)
+			os.Exit(util.ExitBadOptions)
 		}
 	}
 	if outputOpts.RowCount < 0 {
 		log.Logf(log.Always, "invalid value for row count: %v", outputOpts.RowCount)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// connect directly, unless a replica set name is explicitly specified
@@ -66,7 +66,7 @@ func main() {
 	sessionProvider, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 
 	// instantiate a mongotop instance
@@ -80,6 +80,6 @@ func main() {
 	// kick it off
 	if err := top.Run(); err != nil {
 		log.Logf(log.Always, "error running mongotop: %v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 }

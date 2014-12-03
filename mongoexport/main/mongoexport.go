@@ -24,11 +24,11 @@ func main() {
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 	if len(args) != 0 {
 		log.Logf(log.Always, "error parsing command line: too many positional options: %v", args)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	log.SetVerbosity(opts.Verbosity)
@@ -50,7 +50,7 @@ func main() {
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 	exporter := mongoexport.MongoExport{
 		ToolOptions:     *opts,
@@ -63,13 +63,13 @@ func main() {
 	if err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	numDocs, err := exporter.Export()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	if !opts.Quiet {

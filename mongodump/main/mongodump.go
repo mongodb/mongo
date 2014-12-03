@@ -31,7 +31,7 @@ func main() {
 			"error: mongodump does not accept positional arguments (%v) see help text",
 			strings.Join(extraArgs, ", "))
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help, if specified
@@ -60,13 +60,13 @@ func main() {
 	err = dump.Init()
 	if err != nil {
 		log.Logf(log.Always, "%v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	err = dump.Dump()
 	if err != nil {
 		log.Logf(log.Always, "%v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 }

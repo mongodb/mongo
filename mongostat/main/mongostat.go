@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
 	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
@@ -27,7 +28,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid options: %v\n", err)
 		opts.PrintHelp(true)
-		os.Exit(-1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	log.SetVerbosity(opts.Verbosity)
@@ -37,16 +38,16 @@ func main() {
 		if len(extra) != 1 {
 			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
 			opts.PrintHelp(true)
-			os.Exit(-1)
+			os.Exit(util.ExitBadOptions)
 		}
 		sleepInterval, err = strconv.Atoi(extra[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Bad sleep interval: %v\n", extra[0])
-			os.Exit(-1)
+			os.Exit(util.ExitBadOptions)
 		}
 		if sleepInterval < 1 {
 			fmt.Fprintf(os.Stderr, "Sleep interval must be at least 1 second\n")
-			os.Exit(-1)
+			os.Exit(util.ExitBadOptions)
 		}
 	}
 
@@ -112,6 +113,6 @@ func main() {
 	err = stat.Run()
 	if err != nil {
 		log.Logf(log.Always, "Error: %v", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 }

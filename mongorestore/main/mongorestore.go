@@ -23,7 +23,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("error parsing command line options: %v\n\n", err)
 		fmt.Printf("try 'mongorestore --help' for more information\n")
-		os.Exit(-1)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help or version info, if specified
@@ -39,7 +39,7 @@ func main() {
 	targetDir, err := getTargetDirFromArgs(extraArgs, os.Args, inputOpts.Directory)
 	if err != nil {
 		fmt.Printf("error parsing command line options: %v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitBadOptions)
 	}
 	targetDir = util.ToUniversalPath(targetDir)
 
@@ -50,7 +50,7 @@ func main() {
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 	restore := mongorestore.MongoRestore{
 		ToolOptions:     opts,
@@ -63,7 +63,7 @@ func main() {
 	err = restore.Restore()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(-1)
+		os.Exit(util.ExitError)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/bsondump/options"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 )
 
@@ -18,7 +19,7 @@ func main() {
 	extra, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 
 	// print help, if specified
@@ -41,13 +42,13 @@ func main() {
 	} else if len(extra) > 1 {
 		log.Log(log.Always, "Too many positional operators.")
 		opts.PrintHelp(true)
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	} else {
 		filename = extra[0]
 		if filename == "" {
 			log.Log(log.Always, "Filename must not be blank.")
 			opts.PrintHelp(true)
-			os.Exit(1)
+			os.Exit(util.ExitError)
 		}
 	}
 
@@ -72,6 +73,6 @@ func main() {
 	log.Logf(log.Always, "%v objects found", numFound)
 	if err != nil {
 		log.Log(log.Always, err.Error())
-		os.Exit(1)
+		os.Exit(util.ExitError)
 	}
 }
