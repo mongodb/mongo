@@ -546,9 +546,9 @@ namespace {
     }
 
     ReplicationCoordinatorImpl::SlaveInfo*
-    ReplicationCoordinatorImpl::_findSlaveInfoByMemberID_inlock(int memberID) {
+    ReplicationCoordinatorImpl::_findSlaveInfoByMemberID_inlock(int memberId) {
         for (SlaveInfoVector::iterator it = _slaveInfo.begin(); it != _slaveInfo.end(); ++it) {
-            if (it->memberID == memberID) {
+            if (it->memberId == memberId) {
                 return &(*it);
             }
         }
@@ -596,7 +596,7 @@ namespace {
                     it != oldSlaveInfos.end(); ++it) {
                 if (it->self) {
                     SlaveInfo slaveInfo = *it;
-                    slaveInfo.memberID = -1;
+                    slaveInfo.memberId = -1;
                     _slaveInfo.push_back(slaveInfo);
                     return;
                 }
@@ -606,7 +606,7 @@ namespace {
 
         for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
             const MemberConfig& memberConfig = _rsConfig.getMemberAt(i);
-            int memberID = memberConfig.getId();
+            int memberId = memberConfig.getId();
             const HostAndPort& memberHostAndPort = memberConfig.getHostAndPort();
 
             SlaveInfo slaveInfo;
@@ -614,14 +614,14 @@ namespace {
             // Check if the node existed with the same member ID and hostname in the old data
             for (SlaveInfoVector::const_iterator it = oldSlaveInfos.begin();
                     it != oldSlaveInfos.end(); ++it) {
-                if ((it->memberID == memberID && it->hostAndPort == memberHostAndPort)
+                if ((it->memberId == memberId && it->hostAndPort == memberHostAndPort)
                         || (i == _thisMembersConfigIndex && it->self)) {
                     slaveInfo = *it;
                 }
             }
 
             // Make sure you have the most up-to-date info for member ID and hostAndPort.
-            slaveInfo.memberID = memberID;
+            slaveInfo.memberId = memberId;
             slaveInfo.hostAndPort = memberHostAndPort;
             _slaveInfo.push_back(slaveInfo);
         }
@@ -728,7 +728,7 @@ namespace {
         invariant(_getReplicationMode_inlock() == modeReplSet);
 
         if (args.rid == _getMyRID_inlock() ||
-                args.memberID == _rsConfig.getMemberAt(_thisMembersConfigIndex).getId()) {
+                args.memberId == _rsConfig.getMemberAt(_thisMembersConfigIndex).getId()) {
             // Do not let remote nodes tell us what our optime is.
             return Status::OK();
         }
@@ -737,30 +737,30 @@ namespace {
                 " has reached optime: " << args.ts;
 
         SlaveInfo* slaveInfo = NULL;
-        if (args.memberID >= 0) {
+        if (args.memberId >= 0) {
             if (args.cfgver != _rsConfig.getConfigVersion()) {
                 std::string errmsg = str::stream()
-                          << "Received replSetUpdatePosition for node with member ID "
-                          << args.memberID << " whose config version of " << args.cfgver
+                          << "Received replSetUpdatePosition for node with memberId "
+                          << args.memberId << " whose config version of " << args.cfgver
                           << " doesn't match our config version of "
                           << _rsConfig.getConfigVersion();
                 LOG(1) << errmsg;
                 return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
             }
 
-            slaveInfo = _findSlaveInfoByMemberID_inlock(args.memberID);
+            slaveInfo = _findSlaveInfoByMemberID_inlock(args.memberId);
             if (!slaveInfo) {
-                invariant(!_rsConfig.findMemberByID(args.memberID));
+                invariant(!_rsConfig.findMemberByID(args.memberId));
 
                 std::string errmsg = str::stream()
-                          << "Received replSetUpdatePosition for node with member ID "
-                          << args.memberID << " which doesn't exist in our config";
+                          << "Received replSetUpdatePosition for node with memberId "
+                          << args.memberId << " which doesn't exist in our config";
                 LOG(1) << errmsg;
                 return Status(ErrorCodes::NodeNotFound, errmsg);
             }
         }
         else {
-            // The command we received didn't contain a memberID, most likely this is because it
+            // The command we received didn't contain a memberId, most likely this is because it
             // came from a member running something prior to 2.8.
             // Fall back to finding the node by RID.
             slaveInfo = _findSlaveInfoByRID_inlock(args.rid);
@@ -771,12 +771,12 @@ namespace {
                 LOG(1) << errmsg;
                 return Status(ErrorCodes::NodeNotFound, errmsg);
             }
-            invariant(slaveInfo->memberID >= 0);
+            invariant(slaveInfo->memberId >= 0);
         }
         invariant(slaveInfo);
-        invariant(args.memberID < 0 || args.memberID == slaveInfo->memberID);
+        invariant(args.memberId < 0 || args.memberId == slaveInfo->memberId);
 
-        LOG(3) << "Node with RID " << args.rid << " and memberID " << slaveInfo->memberID
+        LOG(3) << "Node with RID " << args.rid << " and memberId " << slaveInfo->memberId
                << " currently has optime " << slaveInfo->opTime << "; updating to " << args.ts;
 
         // Only update remote optimes if they increase.
@@ -878,7 +878,7 @@ namespace {
             if (slaveTime >= opTime) {
                 // This node has reached the desired optime, now we need to check if it is a part
                 // of the tagPattern.
-                const MemberConfig* memberConfig = _rsConfig.findMemberByID(it->memberID);
+                const MemberConfig* memberConfig = _rsConfig.findMemberByID(it->memberId);
                 invariant(memberConfig);
                 for (MemberConfig::TagIterator it = memberConfig->tagsBegin();
                         it != memberConfig->tagsEnd(); ++it) {
@@ -1332,12 +1332,12 @@ namespace {
                 BSONObjBuilder entry(arrayBuilder.subobjStart());
                 entry.append("_id", itr->rid);
                 entry.append("optime", itr->opTime);
-                entry.append("memberID", itr->memberID);
+                entry.append("memberId", itr->memberId);
                 entry.append("cfgver", _rsConfig.getConfigVersion());
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
                 // we need to keep sending it for 2.6 compatibility.
                 // TODO(spencer): Remove this after 2.8 is released.
-                const MemberConfig* member = _rsConfig.findMemberByID(itr->memberID);
+                const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18651, member); // We ensured the member existed in processHandshake.
                 entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
             }
@@ -1361,11 +1361,11 @@ namespace {
             {
                 BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
                 subCmd.append("handshake", itr->rid);
-                subCmd.append("member", itr->memberID);
+                subCmd.append("member", itr->memberId);
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
                 // we need to keep sending it for 2.6 compatibility.
                 // TODO(spencer): Remove this after 2.8 is released.
-                const MemberConfig* member = _rsConfig.findMemberByID(itr->memberID);
+                const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18650, member); // We ensured the member existed in processHandshake.
                 subCmd.append("config", member->toBSON(_rsConfig.getTagConfig()));
             }
@@ -1435,8 +1435,8 @@ namespace {
                     if (_thisMembersConfigIndex == -1) {
                         continue;
                     }
-                    invariant(itr->memberID >= 0);
-                    entry.append("memberID", itr->memberID);
+                    invariant(itr->memberId >= 0);
+                    entry.append("memberId", itr->memberId);
                 }
             }
         }
@@ -2110,11 +2110,11 @@ namespace {
                               "Received replSetUpdatePosition command but we are in state REMOVED");
             }
 
-            int memberID = handshake.getMemberId();
-            const MemberConfig* member = _rsConfig.findMemberByID(memberID);
+            int memberId = handshake.getMemberId();
+            const MemberConfig* member = _rsConfig.findMemberByID(memberId);
             if (!member) {
                 return Status(ErrorCodes::NodeNotFound,
-                              str::stream() << "Node with replica set member ID " << memberID <<
+                              str::stream() << "Node with replica set memberId " << memberId <<
                                       " could not be found in replica set config while attempting"
                                       " to associate it with RID " << handshake.getRid() <<
                                       " in replication handshake.  ReplSet Config: " <<
@@ -2140,7 +2140,7 @@ namespace {
 
         SlaveInfo newSlaveInfo;
         newSlaveInfo.rid = handshake.getRid();
-        newSlaveInfo.memberID = -1;
+        newSlaveInfo.memberId = -1;
         newSlaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
         // Don't call _addSlaveInfo_inlock as that would wake sleepers unnecessarily.
         _slaveInfo.push_back(newSlaveInfo);

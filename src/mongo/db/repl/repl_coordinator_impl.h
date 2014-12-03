@@ -294,10 +294,10 @@ namespace repl {
         struct SlaveInfo {
             OpTime opTime; // Our last known OpTime that this slave has replicated to.
             HostAndPort hostAndPort; // Client address of the slave.
-            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
+            int memberId; // Id of the node in the replica set config, or -1 if we're not a replSet.
             OID rid; // RID of the node.
             bool self; // Whether this SlaveInfo stores the information about ourself
-            SlaveInfo() : memberID(-1), self(false) {}
+            SlaveInfo() : memberId(-1), self(false) {}
         };
 
         typedef std::vector<SlaveInfo> SlaveInfoVector;
