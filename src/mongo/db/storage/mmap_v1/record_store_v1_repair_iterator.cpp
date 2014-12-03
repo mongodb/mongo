@@ -192,7 +192,18 @@ namespace mongo {
         _seenInCurrentExtent.erase(dl);
 
         if (_currRecord == dl) {
+            // The DiskLoc being invalidated is also the one pointed at by this iterator. We
+            // advance the iterator so it's not pointing at invalid data.
             getNext();
+
+            if (_currRecord == dl) {
+                // Even after advancing the iterator, we're still pointing at the DiskLoc being
+                // invalidated. This is expected when 'dl' is the last DiskLoc in the FORWARD scan,
+                // and the initial call to getNext() moves the iterator to the first loc in the
+                // BACKWARDS scan.
+                getNext();
+            }
+
             invariant(_currRecord != dl);
         }
     }
