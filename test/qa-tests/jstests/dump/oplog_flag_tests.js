@@ -35,6 +35,8 @@ if (typeof getToolTest === 'undefined') {
   var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
 
   if (toolTest.isReplicaSet) {
+    // If we're running in a replica set, --oplog should give a snapshot by
+    // applying ops from the oplog
     assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
       'mongodump --oplog should succeed');
 
@@ -49,6 +51,8 @@ if (typeof getToolTest === 'undefined') {
     assert.gte(db.bar.count(), countBeforeMongodump);
     assert.lt(db.bar.count(), 2000);
   } else {
+    // If we're running against a standalone or sharded cluster, mongodump
+    // --oplog should fail immediately, without dumping any data
     assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
       'mongodump --oplog should fail fast on sharded and standalone');
 

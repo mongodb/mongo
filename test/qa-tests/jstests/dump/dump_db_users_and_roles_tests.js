@@ -54,7 +54,8 @@ if (typeof getToolTest === 'undefined') {
   resetDbpath('dump');
   var dumpArgs = ['dump', '--db', 'foo', '--dumpDbUsersAndRoles'].
     concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, dumpArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
+    'mongodump should succeed with `--db foo --dumpDbUsersAndRoles`');
   db.dropDatabase();
   db.getSiblingDB('baz').dropDatabase();
   db.getSiblingDB('admin').system.users.remove({ user: 'baconator' });
@@ -64,7 +65,8 @@ if (typeof getToolTest === 'undefined') {
 
   var restoreArgs = ['restore', '--restoreDbUsersAndRoles'].
     concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, restoreArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
+    'mongorestore should succeed');
   var c = db.getSiblingDB('admin').system.roles.find();
 
   // Should have restored only the user that was in the 'foo' db

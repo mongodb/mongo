@@ -30,7 +30,8 @@ if (typeof getToolTest === 'undefined') {
   resetDbpath('dump');
   var dumpArgs = ['dump', '--collection', 'bar', '--db', 'foo'].
     concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, dumpArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
+    'mongodump should succeed when both --collection and --db are specified');
   db.dropDatabase();
   db.getSiblingDB('baz').dropDatabase();
   assert.eq(0, db.bar.count());

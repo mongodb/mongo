@@ -37,14 +37,16 @@ if (typeof getToolTest === 'undefined') {
   resetDbpath('dump2');
   var dumpArgs = ['dump', '--collection', 'bar', '--db', 'foo',
     '--out', 'dump2'].concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, dumpArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
+    'mongodump with --collection, --db, --out should succeed');
   db.dropDatabase();
   db.getSiblingDB('baz').dropDatabase();
   assert.eq(0, db.bar.count());
   assert.eq(0, db.getSiblingDB('baz').bar.count());
 
   var restoreArgs = ['restore', '--dir', 'dump2'].concat(commonToolArgs);
-  toolTest.runTool.apply(toolTest, restoreArgs);
+  assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
+    'mongorestore should succeed');
   assert.eq(1, db.bar.count());
   assert.eq(0, db.getSiblingDB('baz').bar.count());
 
