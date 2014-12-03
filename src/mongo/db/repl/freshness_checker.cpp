@@ -182,9 +182,9 @@ namespace repl {
 
         if (res["veto"].trueValue()) {
             BSONElement msg = res["errmsg"];
-            if (!msg.eoo()) {
+            if (msg.type() == String) {
                 log() << "not electing self, " << request.target.toString() <<
-                    " would veto with '" << msg << "'";
+                    " would veto with '" << msg.String() << "'";
             }
             else {
                 log() << "not electing self, " << request.target.toString() <<
