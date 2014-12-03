@@ -163,7 +163,7 @@ namespace {
                                 ));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(&txn, OpTime (100, 1));
+        getReplCoord()->setMyLastOptime(OpTime (100, 1));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         startCapturingLogMessages();
         simulateSuccessfulElection();
@@ -185,7 +185,7 @@ namespace {
 
         OperationContextNoop txn;
         OpTime time1(100, 1);
-        getReplCoord()->setMyLastOptime(&txn, time1);
+        getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();
@@ -232,7 +232,7 @@ namespace {
 
         OperationContextNoop txn;
         OpTime time1(100, 1);
-        getReplCoord()->setMyLastOptime(&txn, time1);
+        getReplCoord()->setMyLastOptime(time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();

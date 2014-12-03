@@ -112,7 +112,7 @@ namespace repl {
         }
         // construct a vector of handshake obj for us as well as all chained members
         std::vector<BSONObj> handshakeObjs;
-        replCoord->prepareReplSetUpdatePositionCommandHandshakes(txn, &handshakeObjs);
+        replCoord->prepareReplSetUpdatePositionCommandHandshakes(&handshakeObjs);
         LOG(1) << "handshaking upstream updater";
         for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();
                 it != handshakeObjs.end();
@@ -205,7 +205,7 @@ namespace repl {
                 return Status(ErrorCodes::NodeNotFound,
                               "Need to send handshake before updating position upstream");
             }
-            replCoord->prepareReplSetUpdatePositionCommand(txn, &cmd);
+            replCoord->prepareReplSetUpdatePositionCommand(&cmd);
         }
         BSONObj res;
 

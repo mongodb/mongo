@@ -116,9 +116,7 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::setLastOptimeForSlave(OperationContext* txn,
-                                                             const OID& rid,
-                                                             const OpTime& ts) {
+    Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const OpTime& ts) {
         return Status::OK();
     }
     
@@ -126,9 +124,7 @@ namespace repl {
         // TODO
     }
 
-    Status ReplicationCoordinatorMock::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
-        return Status::OK();
-    }
+    void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& ts) {}
 
     OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
         // TODO
@@ -162,11 +158,9 @@ namespace repl {
     void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
-            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {}
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
-            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {}
 
     void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result) {
@@ -181,7 +175,7 @@ namespace repl {
 
     void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
-    Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
+    Status ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
         return Status::OK();
     }
 
@@ -235,13 +229,12 @@ namespace repl {
     }
 
     Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
-            OperationContext* txn,
             const UpdatePositionArgs& updates) {
         // TODO
         return Status::OK();
     }
 
-    Status ReplicationCoordinatorMock::processHandshake(const OperationContext* txn,
+    Status ReplicationCoordinatorMock::processHandshake(OperationContext* txn,
                                                         const HandshakeArgs& handshake) {
         return Status::OK();
     }

@@ -645,8 +645,7 @@ namespace {
         }
     }
 
-    Status ReplicationCoordinatorImpl::setLastOptimeForSlave(OperationContext* txn,
-                                                             const OID& rid,
+    Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid,
                                                              const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         massert(28576,
@@ -683,10 +682,9 @@ namespace {
         _replExecutor.wait(cbh.getValue());
     }
 
-    Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+    void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         _setMyLastOptime_inlock(&lock, ts);
-        return Status::OK();
     }
 
     void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
@@ -1318,7 +1316,6 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
-            OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
         boost::lock_guard<boost::mutex> lock(_mutex);
         invariant(_rsConfig.isInitialized());
@@ -1349,7 +1346,6 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommandHandshakes(
-            OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         boost::lock_guard<boost::mutex> lock(_mutex);
         // handshake objs for ourself and all chained members
@@ -1475,7 +1471,7 @@ namespace {
         *maintenanceMode = _topCoord->getMaintenanceCount() > 0;
     }
 
-    Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
+    Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
         Status result(ErrorCodes::InternalError, "didn't set status in _setMaintenanceMode_helper");
         CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_setMaintenanceMode_helper,
@@ -2079,7 +2075,6 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
-            OperationContext* txn,
             const UpdatePositionArgs& updates) {
 
         boost::unique_lock<boost::mutex> lock(_mutex);
@@ -2102,7 +2097,7 @@ namespace {
         return status;
     }
 
-    Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,
+    Status ReplicationCoordinatorImpl::processHandshake(OperationContext* txn,
                                                         const HandshakeArgs& handshake) {
         LOG(2) << "Received handshake " << handshake.toBSON();
 
@@ -2304,7 +2299,7 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        setMyLastOptime(txn, lastOpTime);
+        setMyLastOptime(lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(

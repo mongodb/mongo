@@ -1254,18 +1254,15 @@ namespace mongo {
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
-        MaintenanceModeSetter(OperationContext* txn) :
-            _txn(txn),
+        MaintenanceModeSetter() :
             maintenanceModeSet(
-                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(txn, true).isOK())
+                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(true).isOK())
             {}
         ~MaintenanceModeSetter() {
             if (maintenanceModeSet)
-                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(_txn, false);
+                repl::getGlobalReplicationCoordinator()->setMaintenanceMode(false);
         } 
     private:
-        // Not owned.
-        OperationContext* _txn;
         bool maintenanceModeSet;
     };
 
@@ -1404,7 +1401,7 @@ namespace mongo {
         if (c->maintenanceMode() &&
                 repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet) {
-            mmSetter.reset(new MaintenanceModeSetter(txn));
+            mmSetter.reset(new MaintenanceModeSetter);
         }
 
         if (c->shouldAffectCommandCounter()) {

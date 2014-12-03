@@ -72,7 +72,7 @@ namespace {
         // via stop().
         // We must clear the sync source blacklist after calling stop()
         // because the bgsync thread, while running, may update the blacklist.
-        replCoord->setMyLastOptime(txn, OpTime());
+        replCoord->setMyLastOptime(OpTime());
         bgsync->stop();
         replCoord->clearSyncSourceBlacklist();
 
@@ -184,7 +184,7 @@ namespace {
         catch (const DBException&) {
             log() << "replSet initial sync failed during oplog application phase, and will retry";
 
-            getGlobalReplicationCoordinator()->setMyLastOptime(ctx, OpTime());
+            getGlobalReplicationCoordinator()->setMyLastOptime(OpTime());
             BackgroundSync::get()->setLastAppliedHash(0);
 
             sleepsecs(5);

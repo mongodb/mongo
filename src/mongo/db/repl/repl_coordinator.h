@@ -234,15 +234,13 @@ namespace repl {
         /**
          * Updates our internal tracking of the last OpTime applied for the given slave
          * identified by "rid".  Only valid to call in master/slave mode
-         * TODO(spencer): Remove txn argument and make into a void function when legacy is gone.
          */
-        virtual Status setLastOptimeForSlave(
-                OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts) = 0;
 
         /**
          * Updates our internal tracking of the last OpTime applied to this node.
          */
-        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
+        virtual void setMyLastOptime(const OpTime& ts) = 0;
 
         /**
          * Updates our the message we include in heartbeat responses.
@@ -315,8 +313,7 @@ namespace repl {
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */
-        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
-                                                         BSONObjBuilder* cmdBuilder) = 0;
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) = 0;
 
         /**
          * For ourself and each secondary chaining off of us, adds a BSONObj to "handshakes"
@@ -325,7 +322,6 @@ namespace repl {
          * we are replicating off of it.
          */
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                OperationContext* txn,
                 std::vector<BSONObj>* handshakes) = 0;
 
         /**
@@ -355,7 +351,7 @@ namespace repl {
          * return Status::OK if the change worked, NotSecondary if it failed because we are
          * PRIMARY, and OperationFailed if we are not currently in maintenance mode
          */
-        virtual Status setMaintenanceMode(OperationContext* txn, bool activate) = 0;
+        virtual Status setMaintenanceMode(bool activate) = 0;
 
         /**
          * Retrieves the current count of maintenanceMode and returns 'true' if greater than 0.
@@ -465,8 +461,7 @@ namespace repl {
          * If a non-OK status is returned, it is unspecified whether none or some of the updates
          * were applied.
          */
-        virtual Status processReplSetUpdatePosition(OperationContext* txn,
-                                                    const UpdatePositionArgs& updates) = 0;
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) = 0;
 
         /**
          * Handles an incoming Handshake command (or a handshake from replSetUpdatePosition).
@@ -478,8 +473,7 @@ namespace repl {
          * and ErrorCodes::NotMasterOrSecondaryCode if we're in state REMOVED or otherwise don't
          * have a valid config.
          */
-        virtual Status processHandshake(const OperationContext* txn,
-                                        const HandshakeArgs& handshake) = 0;
+        virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake) = 0;
 
         /**
          * Returns a bool indicating whether or not this node builds indexes.

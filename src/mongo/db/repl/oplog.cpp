@@ -187,7 +187,7 @@ namespace repl {
 
             ctx.getClient()->setLastOp( ts );
             
-            replCoord->setMyLastOptime(txn, ts);
+            replCoord->setMyLastOptime(ts);
         }
 
         setNewOptime(ts);
@@ -317,7 +317,7 @@ namespace repl {
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
         ctx.getClient()->setLastOp( slot.first );
-        replCoord->setMyLastOptime(txn, slot.first);
+        replCoord->setMyLastOptime(slot.first);
 
         wunit.commit();
 
@@ -385,7 +385,7 @@ namespace repl {
         ctx.getClient()->setLastOp( slot.first );
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        replCoord->setMyLastOptime(txn, slot.first);
+        replCoord->setMyLastOptime(slot.first);
         wunit.commit();
     }
 
