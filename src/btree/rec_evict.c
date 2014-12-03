@@ -369,7 +369,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * that's not a problem here because we aren't evicting any dirty
 	 * pages.
 	 */
-	if (top) {
+	if (top && !exclusive) {
 		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
 		if (*inmem_splitp)
 			return (0);
