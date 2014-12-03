@@ -649,7 +649,11 @@ namespace {
                                                              const OID& rid,
                                                              const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        invariant(_getReplicationMode_inlock() == modeMasterSlave);
+        massert(28576,
+                "Received an old style replication progress update, which is only used for Master/"
+                    "Slave replication now, but this node is not using Master/Slave replication. "
+                    "This is likely caused by an old (pre-2.6) member syncing from this node.",
+                _getReplicationMode_inlock() == modeMasterSlave);
 
         SlaveInfo* slaveInfo = _findSlaveInfoByRID_inlock(rid);
         if (slaveInfo) {
