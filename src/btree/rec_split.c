@@ -1033,15 +1033,14 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * discarding the tree, check and see if it's worth doing a split to
 	 * let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than row-store leaf pages.
-	 * Ignore small pages.
+	 * Ignore anything other than large, dirty row-store leaf pages.
 	 *
 	 * XXX KEITH
 	 * Need a better test for append-only workloads.
 	 */
-	if (page->type != WT_PAGE_ROW_LEAF)
-		return (0);
-	if (page->memory_footprint < 10 * btree->maxleafpage)
+	if (page->type != WT_PAGE_ROW_LEAF ||
+	    page->memory_footprint < btree->maxmempage ||
+	    !__wt_page_is_modified(page))
 		return (0);
 
 	/*
