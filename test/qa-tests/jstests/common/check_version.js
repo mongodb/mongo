@@ -1,3 +1,12 @@
+/**
+ *  Given a MongoDB version, parses it into its major/minor/patch components,
+ *  discounting '-pre' and '-rcX'. Useful for parsing the output of
+ *  `db.version()` into an appropriate form for comparisons.
+ *
+ *  Examples:
+ *    getVersionComponents('2.7.8'); // { major: 2, minor: 7, patch: 8 }
+ *    getVersionComponents('2.8.0-rc0'); // { major: 2, minor: 8, patch: 0 }
+ */
 var getVersionComponents = function(version) {
   var splitVersion = version.split('.');
   assert.eq(3, splitVersion.length);
@@ -15,6 +24,15 @@ var getVersionComponents = function(version) {
   };
 };
 
+/**
+ *  Given two versions, returns true if the first version is >= the second.
+ *
+ *  Examples:
+ *    isAtLeastVersion('2.7.8', '2.7.8'); // true
+ *    isAtLeastVersion('2.8.0-rc0', '2.7.8'); // true
+ *    isAtLeastVersion('2.6.6', '2.7.8'); // false
+ *    isAtLeastVersion('1.8.5', '2.7.8'); // false
+ */
 var isAtLeastVersion = function(serverVersion, checkVersion) {
   serverVersion = getVersionComponents(serverVersion);
   checkVersion = getVersionComponents(checkVersion);

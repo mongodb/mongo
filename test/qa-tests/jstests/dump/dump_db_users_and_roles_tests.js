@@ -70,13 +70,11 @@ if (typeof getToolTest === 'undefined') {
   var c = db.getSiblingDB('admin').system.roles.find();
 
   // Should have restored only the user that was in the 'foo' db
-  assert.eq(1,
-    db.getSiblingDB('admin').system.users.count({ user: 'baconator' }));
-  assert.eq(0,
-    db.getSiblingDB('admin').system.users.count({ user: 'eggs' }));
+  assert(!!db.getUser('baconator'));
+  assert(!db.getSiblingDB('baz').getUser('eggs'));
   // And only the role that was defined on the 'foo' db
-  assert.eq(1, db.getSiblingDB('admin').system.roles.count({ role: 'taco' }));
-  assert.eq(0, db.getSiblingDB('admin').system.roles.count({ role: 'bacon' }));
+  assert(!!db.getRole('taco'));
+  assert(!db.getSiblingDB('baz').getRole('bacon'));
 
   toolTest.stop();
 })();
