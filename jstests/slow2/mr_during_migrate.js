@@ -32,12 +32,6 @@ jsTest.log( "Inserted " + sh._dataFormat( dataSize * numDocs ) + " of data." )
 // Shard collection
 st.shardColl( coll, { _id : 1 }, false )
 
-// Split up collection
-var numSplits = 10
-for( var i = 0; i < numSplits; i++ ){
-    printjson( admin.runCommand({ split : coll + "", middle : { _id : Math.floor( i * ( numDocs / numSplits) ) } }) )
-}
-
 st.printShardingStatus()
 
 jsTest.log( "Sharded collection now initialized, starting migrations..." )
@@ -46,14 +40,19 @@ var checkMigrate = function(){ print( "Result of migrate : " ); printjson( this 
 
 // Creates a number of migrations of random chunks to diff shard servers
 var ops = []
-for( var i = 0; i < st._shardServers.length; i++ ){
-    // for( var j = 0; j < 2; j++ ){
-        ops.push({ op : "command", ns : "admin", 
-                   command : { moveChunk : "" + coll, 
-                                    find : { _id : { "#RAND_INT" : [ 0 , numDocs ] } },
-                                      to : st._shardServers[i].shardName }, showResult : true }) // , check : checkMigrate }
-        // TODO:  Deadlock due to global V8Lock between scopes if we stop with a js check
-    // }
+for(var i = 0; i < st._shardServers.length; i++) {
+    ops.push({
+        op: "command",
+        ns: "admin",
+        command: {
+            moveChunk: "" + coll,
+            find: { _id: { "#RAND_INT" : [ 0, numDocs ] }},
+            to: st._shardServers[i].shardName,
+            _waitForDelete: true
+        },
+        showResult: true
+    });
+    // TODO:  Deadlock due to global V8Lock between scopes if we stop with a js check
 }
 
 // TODO: Also migrate output collection
