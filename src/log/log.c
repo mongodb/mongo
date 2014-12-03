@@ -529,6 +529,7 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 
 	conn = S2C(session);
 	log = conn->log;
+	log_fh = NULL;
 	/*
 	 * Preparing a log file entails creating a temporary file:
 	 * - Writing the header.
@@ -543,7 +544,6 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 	/*
 	 * Set up the temporary file.
 	 */
-	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
