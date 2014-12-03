@@ -498,15 +498,24 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	if (value->len == 0)
 		return (0);
 
-	if (value->type == WT_CONFIG_ITEM_ID) {
-		if (strncasecmp(value->str, "true", value->len) == 0) {
+	switch (value->type) {
+	case WT_CONFIG_ITEM_BOOL:
+		break;
+	case WT_CONFIG_ITEM_ID:
+		if (WT_STRING_CASE_MATCH("true", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 1;
-		} else if (strncasecmp(value->str, "false", value->len) == 0) {
+			break;
+		}
+		if (WT_STRING_CASE_MATCH("false", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
+			break;
 		}
-	} else if (value->type == WT_CONFIG_ITEM_NUM) {
+		if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+			value->len = 0;
+		break;
+	case WT_CONFIG_ITEM_NUM:
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
 
@@ -555,6 +564,13 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 */
 		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
 			goto range;
+		break;
+	case WT_CONFIG_ITEM_STRING:
+		if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+			value->len = 0;
+		break;
+	case WT_CONFIG_ITEM_STRUCT:
+		break;
 	}
 
 	return (0);

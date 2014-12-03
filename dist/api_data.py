@@ -157,7 +157,7 @@ file_config = format_meta + [
 	    min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
 	    configure a compressor for file blocks.  Permitted values are
-	    empty (off) or \c "bzip2", \c "snappy" or custom compression
+	    \c "none", \c "bzip2", \c "snappy" or custom compression
 	    engine \c "name" created with WT_CONNECTION::add_compressor.
 	    See @ref compression for more information'''),
 	Config('cache_resident', 'false', r'''
@@ -184,13 +184,13 @@ file_config = format_meta + [
 	    the file format''',
 	    choices=['btree']),
 	Config('huffman_key', '', r'''
-	    configure Huffman encoding for keys.  Permitted values
-	    are empty (off), \c "english", \c "utf8<file>" or \c
-	    "utf16<file>".  See @ref huffman for more information'''),
+	    configure Huffman encoding for keys.  Permitted values are
+	    \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
+	    See @ref huffman for more information'''),
 	Config('huffman_value', '', r'''
-	    configure Huffman encoding for values.  Permitted values
-	    are empty (off), \c "english", \c "utf8<file>" or \c
-	    "utf16<file>".  See @ref huffman for more information'''),
+	    configure Huffman encoding for values.  Permitted values are
+	    \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
+	    See @ref huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
 	    configure internal key truncation, discarding unnecessary
 	    trailing bytes on internal keys (ignored for custom
@@ -750,8 +750,8 @@ methods = {
 	    has not been modified, this option forces the checkpoint''',
 	    type='boolean'),
 	Config('name', '', r'''
-	    if non-empty, specify a name for the checkpoint (note that
-	    checkpoints including LSM trees may not be named)'''),
+	    if set, specify a name for the checkpoint (note that checkpoints
+	    including LSM trees may not be named)'''),
 	Config('target', '', r'''
 	    if non-empty, checkpoint the list of objects''', type='list'),
 ]),

@@ -178,6 +178,9 @@
 #define	WT_STRING_MATCH(str, bytes, len)				\
 	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
 	    strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+#define	WT_STRING_CASE_MATCH(str, bytes, len)				\
+	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
+	    strncasecmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid
