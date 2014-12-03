@@ -1398,6 +1398,10 @@ def doConfigure(myenv):
         # GCC >= 4.6. Error explained in https://svn.boost.org/trac/boost/ticket/6136 .
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-but-set-variable")
 
+        # This has been suppressed in gcc 4.8, due to false positives, but not in clang.  So
+        # we explicitly disable it here.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-missing-braces")
+
     # Check if we need to disable null-conversion warnings
     if using_clang():
         def CheckNullConversion(context):
