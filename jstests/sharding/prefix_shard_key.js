@@ -138,8 +138,10 @@ for( i=0; i < 3; i++ ){
     // setup new collection on shard0
     var coll2 = db.foo2;
     coll2.drop();
-    var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
-    assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
+    if ( s.getServerName( coll2.getDB() ) != shards[0]._id ) {
+        var moveRes = admin.runCommand( { movePrimary : coll2.getDB() + "", to : shards[0]._id } );
+        assert.eq( moveRes.ok , 1 , "primary not moved correctly" );
+    }
 
     // declare a longer index
     if ( i == 0 ) {
