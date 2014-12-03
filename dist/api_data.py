@@ -1,36 +1,5 @@
 # This file is a python script that describes the WiredTiger API.
 
-class Error:
-	def __init__(self, name, desc, long_desc=None, **flags):
-		self.name = name
-		self.desc = desc
-		self.long_desc = long_desc
-		self.flags = flags
-
-errors = [
-	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
-	    This error is generated when the application attempts to insert
-	    a record with the same key as an existing record without the
-	    'overwrite' configuration to WT_SESSION::open_cursor.'''),
-	Error('WT_ERROR', 'non-specific WiredTiger error', '''
-	    This error is returned when an error is not covered by a
-	    specific error return.'''),
-	Error('WT_NOTFOUND', 'item not found', '''
-	    This error indicates an operation did not find a value to
-	    return.  This includes cursor search and other operations
-	    where no record matched the cursor's search key such as
-	    WT_CURSOR::update or WT_CURSOR::remove.'''),
-	Error('WT_PANIC', 'WiredTiger library panic', '''
-	    This error indicates an underlying problem that requires the
-	    application exit and restart.'''),
-	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
-	Error('WT_ROLLBACK', 'conflict between concurrent operations', '''
-	    This error is generated when an operation cannot be completed
-	    due to a conflict with concurrent operations.  The operation
-	    may be retried; if a transaction is in progress, it should be
-	    rolled back and the operation retried in a new transaction.'''),
-]
-
 class Method:
 	def __init__(self, config, **flags):
 		self.config = config

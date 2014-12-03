@@ -16,6 +16,8 @@ wiredtiger_strerror(int error)
 		return ("Successful return: 0");
 
 	switch (error) {
+	case WT_ROLLBACK:
+		return ("WT_ROLLBACK: conflict between concurrent operations");
 	case WT_DUPLICATE_KEY:
 		return ("WT_DUPLICATE_KEY: attempt to insert an existing key");
 	case WT_ERROR:
@@ -26,8 +28,6 @@ wiredtiger_strerror(int error)
 		return ("WT_PANIC: WiredTiger library panic");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
-	case WT_ROLLBACK:
-		return ("WT_ROLLBACK: conflict between concurrent operations");
 	default:
 		if (error > 0 && (p = strerror(error)) != NULL)
 			return (p);

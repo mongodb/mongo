@@ -34,6 +34,9 @@ The following is a list of possible WiredTiger-specific errors:
 @if IGNORE_BUILT_BY_API_ERR_BEGIN
 @endif
 
+@par <code>WT_ROLLBACK</code>
+This error is generated when an operation cannot be completed due to a conflict with concurrent operations. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
+
 @par <code>WT_DUPLICATE_KEY</code>
 This error is generated when the application attempts to insert a record with the same key as an existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
 
@@ -45,9 +48,6 @@ This error indicates an operation did not find a value to return. This includes 
 
 @par <code>WT_PANIC</code>
 This error indicates an underlying problem that requires the application exit and restart.
-
-@par <code>WT_ROLLBACK</code>
-This error is generated when an operation cannot be completed due to a conflict with concurrent operations. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
