@@ -179,7 +179,8 @@
 	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
 	    strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 #define	WT_STRING_CASE_MATCH(str, bytes, len)				\
-	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
+	(tolower(((const char *)str)[0]) ==				\
+	    tolower(((const char *)bytes)[0]) &&			\
 	    strncasecmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
