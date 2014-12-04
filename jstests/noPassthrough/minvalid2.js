@@ -35,16 +35,17 @@ replTest.awaitReplication();
 print("2: shut down slave");
 replTest.stop(slaveId);
 
-print("3: do writes to master");
-mdb.foo.save({a: 1001});
+print("3: write to master");
+assert.writeOK(mdb.foo.insert({a: 1001}, { writeConcern: { w: 1 } }));
 
 print("4: modify master's minvalid");
 var local = master.getDB("local");
 var lastOp = local.oplog.rs.find().sort({$natural:-1}).limit(1).next();
 printjson(lastOp);
 
-local.replset.minvalid.insert({ts:new Timestamp(lastOp.ts.t, lastOp.ts.i+1),
-                               h:new NumberLong("1234567890")});
+// Overwrite minvalid document to simulate an inconsistent state (as might result from a server
+// crash.
+local.replset.minvalid.update({},{ ts:new Timestamp(lastOp.ts.t, lastOp.ts.i+1) }, {upsert: true});
 printjson(local.replset.minvalid.findOne());
 
 print("5: shut down master");
