@@ -83,6 +83,7 @@ mongo_tools_variables:
       - name: integration-auth
       - name: json
       - name: legacy28
+      - name: legacy28-wt
       - name: legacy26
       - name: legacy24
       - name: lint
@@ -90,6 +91,7 @@ mongo_tools_variables:
       - name: pool
       - name: progress
       - name: qa-tests
+      - name: qa-tests-wt
       - name: text
       - name: unit
       - name: util
@@ -748,6 +750,50 @@ tasks:
           chmod +x mongo*
           python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 tool
 
+- name: legacy28-wt
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv test/legacy28/* .
+          chmod +x mongo*
+          python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 --storageEngine=wiredTiger tool
+
 - name: legacy26
   depends_on:
   - name: dist
@@ -949,6 +995,54 @@ tasks:
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.4" "2.6"
           chmod 400 jstests/libs/key*
           PATH=$PATH:/data/multiversion python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 files restore stat
+
+- name: qa-tests-wt
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv ./mongodb/mongos${extension} .
+          mv test/qa-tests/* .
+          chmod +x mongo*
+          rm -rf /data/install /data/multiversion
+          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.4" "2.6"
+          chmod 400 jstests/libs/key*
+          PATH=$PATH:/data/multiversion python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 --storageEngine=wiredTiger files restore stat
 
 - name: text
   commands:
