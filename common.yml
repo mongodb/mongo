@@ -51,9 +51,11 @@ mongo_tools_variables:
       - name: legacy28
       - name: legacy26
       - name: legacy24
+      - name: qa-tests
       - name: unit
     osx_108_ssl_task_list: &osx_108_ssl_tasks
       - name: dist
+      - name: qa-tests
     rhel55_32_task_list: &rhel55_32_tasks
       - name: db
       - name: dist
@@ -62,6 +64,7 @@ mongo_tools_variables:
       - name: legacy24
       - name: legacy28
       - name: legacy26
+      - name: qa-tests
       - name: unit
     solaris_task_list: &solaris_tasks
       - name: db
@@ -94,8 +97,9 @@ mongo_tools_variables:
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
       - name: dist
       - name: integration
-      - name: legacy28
       - name: integration-auth
+      - name: legacy28
+      - name: qa-tests
     ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
       - name: bsonutil
       - name: db
@@ -109,6 +113,7 @@ mongo_tools_variables:
       - name: log
       - name: pool
       - name: progress
+      - name: qa-tests
       - name: text
       - name: util
       - name: vet
@@ -143,12 +148,16 @@ mongo_tools_variables:
       - name: legacy24
         distros:
         - windows-64-vs2013-test
+      - name: qa-tests
+        distros:
+        - windows-64-vs2013-test
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
       - name: integration
-      - name: legacy28
       - name: integration-auth
+      - name: legacy28
+      - name: qa-tests
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
       - name: dist
@@ -156,6 +165,9 @@ mongo_tools_variables:
       - name: integration-auth
       - name: kerberos
       - name: legacy28
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-tests
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -935,7 +947,8 @@ tasks:
           chmod +x mongo*
           rm -rf /data/install /data/multiversion
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "2.4" "2.6"
-          PATH=$PATH:/data/multiversion python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 restore stat
+          chmod 400 jstests/libs/key*
+          python buildscripts/smoke.py ${smoke_use_ssl} --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --authMechanism SCRAM-SHA-1 files restore stat
 
 - name: text
   commands:
@@ -1057,6 +1070,7 @@ buildvariants:
   expansions:
     <<: *mongo_url_osx108
     <<: *mongodb_default_startup_args
+    build_tags: -tags "ssl"
   tasks: *osx_108_tasks
 
 - name: osx-108-ssl
@@ -1064,6 +1078,8 @@ buildvariants:
   run_on:
   - osx-108
   expansions:
+    <<: *mongo_url_osx108
+    <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
   tasks: *osx_108_ssl_tasks
@@ -1079,6 +1095,7 @@ buildvariants:
   expansions:
     <<: *mongo_url_rhell55_32
     <<: *mongodb_default_startup_args
+    build_tags: -tags "ssl"
   tasks: *rhel55_32_tasks
 
 #######################################
@@ -1092,6 +1109,7 @@ buildvariants:
   expansions:
     <<: *mongo_url_ubuntu1204
     <<: *mongodb_default_startup_args
+    build_tags: -tags "ssl"
     integration_test_args: integration
   tasks: *ubuntu1204_tasks
 
@@ -1116,6 +1134,7 @@ buildvariants:
     <<: *mongo_url_ubuntu1204_enterprise
     <<: *mongodb_default_startup_args
     build_tags: -tags "ssl sasl"
+    smoke_use_ssl: --use-ssl
     edition: enterprise
     run_kinit: true
     integration_test_args: integration
@@ -1183,6 +1202,7 @@ buildvariants:
   expansions:
     <<: *mongo_url_windows64_enterprise
     build_tags: -tags "sasl ssl"
+    smoke_use_ssl: --use-ssl
     edition: enterprise
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"

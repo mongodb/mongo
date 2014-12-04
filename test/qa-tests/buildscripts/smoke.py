@@ -850,33 +850,9 @@ def report():
 
 # Keys are the suite names (passed on the command line to smoke.py)
 # Values are pairs: (filenames, <start mongod before running tests>)
-suiteGlobalConfig = {"js": ("core/*.js", True),
-                     "quota": ("quota/*.js", True),
-                     "jsPerf": ("perf/*.js", True),
-                     "disk": ("disk/*.js", True),
-                     "noPassthroughWithMongod": ("noPassthroughWithMongod/*.js", True),
-                     "noPassthrough": ("noPassthrough/*.js", False),
-                     "parallel": ("parallel/*.js", True),
-                     "clone": ("clone/*.js", False),
-                     "repl": ("repl/*.js", False),
-                     "replSets": ("replsets/*.js", False),
-                     "dur": ("dur/*.js", False),
-                     "auth": ("auth/*.js", False),
-                     "sharding": ("sharding/*.js", False),
-                     "tool": ("tool/*.js", False),
-                     "aggregation": ("aggregation/*.js", True),
-                     "multiVersion": ("multiVersion/*.js", True),
-                     "failPoint": ("fail_point/*.js", False),
-                     "ssl": ("ssl/*.js", True),
-                     "sslSpecial": ("sslSpecial/*.js", True),
-                     "jsCore": ("core/*.js", True),
-                     "mmap_v1": ("mmap_v1/*.js", True),
-                     "gle": ("gle/*.js", True),
-                     "rocksDB": ("rocksDB/*.js", True),
+suiteGlobalConfig = {"files": ("files/*.js", False),
                      "restore": ("restore/*.js", False),
                      "stat": ("stat/*.js", False),
-                     "slow1": ("slow1/*.js", True),
-                     "slow2": ("slow2/*.js", True),
                      }
 
 def get_module_suites():
