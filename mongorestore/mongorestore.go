@@ -71,6 +71,12 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 			return fmt.Errorf("invalid collection name: %v", err)
 		}
 	}
+	if restore.InputOptions.RestoreDBUsersAndRoles && restore.ToolOptions.DB == "" {
+		return fmt.Errorf("cannot use --restoreDbUsersAndRoles without a specified database")
+	}
+	if restore.InputOptions.RestoreDBUsersAndRoles && restore.ToolOptions.DB == "admin" {
+		return fmt.Errorf("cannot use --restoreDbUsersAndRoles with the admin database")
+	}
 
 	var err error
 	restore.isMongos, err = restore.SessionProvider.IsMongos()

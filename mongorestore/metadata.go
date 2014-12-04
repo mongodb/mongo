@@ -273,7 +273,6 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		session, err := restore.SessionProvider.GetSession()
 		if err != nil {
 			// logging errors here because this has no way of returning that doesn't mask other errors
-			// TODO(erf) make this a proper return value
 			log.Logf(log.Always, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
 			return
 		}
@@ -286,9 +285,13 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		}
 	}()
 
+	// If we are restoring a single database (--restoreDBUsersAndRoles), then the
+	// target database will be that database, and the _mergeAuthzCollections command
+	// will only restore users/roles of that database. If we are restoring the admin db or
+	// doing a full restore, we tell the command to merge users/roles of all databases.
 	userTargetDB := intent.DB
-	// use "admin" as the merge db unless we are restoring admin
-	if restore.ToolOptions.DB == "admin" {
+	if userTargetDB == "admin" {
+		// _mergeAuthzCollections uses an empty db string as a sentinel for "all databases"
 		userTargetDB = ""
 	}
 
