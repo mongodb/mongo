@@ -100,13 +100,13 @@ waitForAllMembers = function(master, timeout) {
     print( "All members are now in state PRIMARY, SECONDARY, or ARBITER" );
 };
 
-reconfig = function(rs, config) {
+reconfig = function(rs, config, force) {
     "use strict";
     var admin = rs.getMaster().getDB("admin");
     var e;
     var master;
     try {
-        assert.commandWorked(admin.runCommand({replSetReconfig : config}));
+        assert.commandWorked(admin.runCommand({replSetReconfig: config, force: force}));
     }
     catch (e) {
         if (tojson(e).indexOf( "error doing query: failed" ) < 0) {
