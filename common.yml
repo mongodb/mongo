@@ -340,7 +340,7 @@ functions:
         if [ "${create_mongod_users_command}" != "" ]; then
           export AUTH_USERNAME=${auth_username}
           export AUTH_PASSWORD=${auth_password}
-          if [ "${smoke_use_ssl}" != "" ]
+          if [ "${ssl_bv}" != "" ]
           then
             echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates admin
           else
@@ -428,7 +428,7 @@ functions:
         rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
-        ./mongodb/mongod${extension} ${mongodb_args} ${mongod_extra_options|} --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &
+        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &
 
   "upload tool":
     command: s3.put
@@ -1219,6 +1219,7 @@ buildvariants:
     <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
+    ssl_bv: true
     arch: "LINUX/x86_64"
     smoke_use_ssl: --use-ssl
     integration_test_args: "integration,ssl"
@@ -1289,6 +1290,7 @@ buildvariants:
     build_tags: -tags "ssl"
     edition: ssl
     smoke_use_ssl: --use-ssl
+    ssl_bv: true
     extension: .exe
     arch: "WIN32/x86_64"
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
