@@ -64,16 +64,15 @@ class MultiVersionDownloader :
         html = urllib2.urlopen(href).read()
         links = {}
         for line in html.split():
-            match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.tgz" \
-                % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
+            match = None
+            for ext in ["tgz", "zip"]:
+                match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.%s" \
+                    % (self.platform.lower(), self.platform.lower(), self.arch, ext)).search(line)
+                if match != None:
+                    break
 
             if match == None:
-                match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.zip" \
-                % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
-                if match == None:
-                    continue
-
-
+                continue
             link = match.group(0)
             version = match.group(1)
             links[version] = link
@@ -125,33 +124,28 @@ class MultiVersionDownloader :
             with open(temp_file, 'wb') as f:
                 f.write(data.read())
                 print "Uncompressing data for version %s (%s)..." % (version, full_version)
-                
-            tf = ""
+
             try:
                 tf = tarfile.open(temp_file, 'r:gz')
                 tf.extractall(path=temp_dir)
                 tf.close()
             except:
-                zfile = zipfile.ZipFile(temp_file)
+                tf.close()
+                # support for windows
                 try:
+                    if not os.path.exists(temp_dir):
+                        os.makedirs(temp_dir)
+                    zfile = zipfile.ZipFile(temp_file)
                     for name in zfile.namelist():
                         _, filename = os.path.split(name)
                         print "Decompressing " + filename + " on " + temp_dir
-                        if not os.path.exists(temp_dir):
-                            os.makedirs(temp_dir)
                         zfile.extract(name, temp_dir)
                     zfile.close()
                 except:
+                    zfile.close()
                     raise
-            
-
             temp_install_dir = os.path.join(temp_dir, extract_dir)
             shutil.move(temp_install_dir, self.install_dir)
-            # remove windows executables' '.exe' extension
-            installed_in = os.path.join(os.path.abspath(os.path.join(self.install_dir, extract_dir)), "bin")
-            for executable in os.listdir(installed_in):
-                if executable.endswith(".exe"):
-                    os.rename(os.path.join(installed_in, executable), os.path.join(installed_in, executable[:-4]))
             shutil.rmtree(temp_dir)
             os.remove(temp_file)
         self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
@@ -167,8 +161,10 @@ class MultiVersionDownloader :
             else: raise
 
         for executable in os.listdir(os.path.join(installed_dir, "bin")):
-
             link_name = "%s-%s" % (executable, version)
+            # support for windows
+            if executable.endswith(".exe") or executable.endswith(".pdb"):
+                link_name = "%s-%s.%s" % (executable[:-4], version, executable[len(executable)-3:])
 
             try:
                 os.symlink(os.path.join(installed_dir, "bin", executable),\
