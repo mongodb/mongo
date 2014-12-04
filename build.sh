@@ -6,6 +6,10 @@ if [ ! -z "$1" ]
   	tags="$@"
 fi
 
+# make sure we're in the directory where the script lives
+SCRIPT_DIR="$(cd "$(dirname ${BASH_SOURCE[0]})" && pwd)"
+cd $SCRIPT_DIR
+
 # remove stale packages
 rm -rf vendor/pkg
 
