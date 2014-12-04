@@ -31,6 +31,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
 
@@ -180,43 +181,24 @@ namespace mongo {
     //
 
     /**
-     * Get a PlanExecutor for an update operation.  'rawCanonicalQuery' describes the predicate for
-     * the documents to be deleted.  A write lock is required to execute the returned plan.
+     * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
+     * and update modifiers. The caller must hold the appropriate MODE_X or MODE_IX locks prior
+     * to calling this function, and must not release these locks until after the returned
+     * PlanExecutor is deleted.
      *
-     * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *out with the PlanExecutor.
-     *
-     * If the query cannot be executed, returns a Status indicating why.
-     */
-    Status getExecutorUpdate(OperationContext* txn,
-                             Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             const UpdateRequest* request,
-                             UpdateDriver* driver,
-                             OpDebug* opDebug,
-                             PlanExecutor::YieldPolicy yieldPolicy,
-                             PlanExecutor** execOut);
-
-    /**
-     * Overload of getExecutorUpdate() above, for when a canonicalQuery is not available.  Used to
-     * support idhack-powered updates.
-     *
-     * If the query is valid and an executor could be created, returns Status::OK() and populates
-     * *out with the PlanExecutor.
+     * The returned PlanExecutor will yield if and only if parsedUpdate->canYield().
      *
      * Does not take ownership of its arguments.
      *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor. The caller takes ownership of *execOut.
+     *
      * If the query cannot be executed, returns a Status indicating why.
      */
     Status getExecutorUpdate(OperationContext* txn,
                              Collection* collection,
-                             const std::string& ns,
-                             const UpdateRequest* request,
-                             UpdateDriver* driver,
+                             ParsedUpdate* parsedUpdate,
                              OpDebug* opDebug,
-                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut);
 
     //

@@ -48,6 +48,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/query_settings.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -545,28 +547,123 @@ namespace mongo {
     // Update
     //
 
+    namespace {
+
+        // TODO: Make this a function on NamespaceString, or make it cleaner.
+        inline void validateUpdate(const char* ns ,
+                                   const BSONObj& updateobj,
+                                   const BSONObj& patternOrig) {
+            uassert(10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0);
+            if (strstr(ns, ".system.")) {
+                /* dm: it's very important that system.indexes is never updated as IndexDetails
+                   has pointers into it */
+                uassert(10156,
+                         str::stream() << "cannot update system collection: "
+                         << ns << " q: " << patternOrig << " u: " << updateobj,
+                         legalClientSystemNS(ns , true));
+            }
+        }
+
+    } // namespace
+
     Status getExecutorUpdate(OperationContext* txn,
                              Collection* collection,
-                             CanonicalQuery* rawCanonicalQuery,
-                             const UpdateRequest* request,
-                             UpdateDriver* driver,
+                             ParsedUpdate* parsedUpdate,
                              OpDebug* opDebug,
-                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut) {
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        const UpdateRequest* request = parsedUpdate->getRequest();
+        UpdateDriver* driver = parsedUpdate->getDriver();
+
+        const NamespaceString& nsString = request->getNamespaceString();
+        UpdateLifecycle* lifecycle = request->getLifecycle();
+
+        validateUpdate(nsString.ns().c_str(), request->getUpdates(), request->getQuery());
+
+        // If there is no collection and this is an upsert, callers are supposed to create
+        // the collection prior to calling this method. Explain, however, will never do
+        // collection or database creation.
+        if (!collection && request->isUpsert()) {
+            invariant(request->isExplain());
+        }
+
+        // TODO: This seems a bit circuitious.
+        opDebug->updateobj = request->getUpdates();
+
+        // If this is a user-issued update, then we want to return an error: you cannot perform
+        // writes on a secondary. If this is an update to a secondary from the replication system,
+        // however, then we make an exception and let the write proceed. In this case,
+        // shouldCallLogOp() will be false.
+        if (request->shouldCallLogOp() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while performing update on "
+                                        << nsString.ns());
+        }
+
+        if (lifecycle) {
+            lifecycle->setCollection(collection);
+            driver->refreshIndexKeys(lifecycle->getIndexKeys(txn));
+        }
+
+        PlanExecutor::YieldPolicy policy = parsedUpdate->canYield() ? PlanExecutor::YIELD_AUTO :
+                                                                      PlanExecutor::YIELD_MANUAL;
+
         auto_ptr<WorkingSet> ws(new WorkingSet());
+        UpdateStageParams updateStageParams(request, driver, opDebug);
+
+        if (!parsedUpdate->hasParsedQuery()) {
+            // This is the idhack fast-path for getting a PlanExecutor without doing the work
+            // to create a CanonicalQuery.
+            const BSONObj& unparsedQuery = request->getQuery();
+
+            if (!collection) {
+                // Treat collections that do not exist as empty collections. Note that the explain
+                // reporting machinery always assumes that the root stage for an update operation is
+                // an UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
+                LOG(2) << "Collection " << nsString.ns() << " does not exist."
+                       << " Using EOF stage: " << unparsedQuery.toString();
+                UpdateStage* updateStage = new UpdateStage(txn, updateStageParams, ws.get(),
+                                                           collection, new EOFStage());
+                return PlanExecutor::make(txn, ws.release(), updateStage, nsString.ns(),
+                                          policy, execOut);
+            }
+
+            if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+                collection->getIndexCatalog()->findIdIndex(txn)) {
+
+                LOG(2) << "Using idhack: " << unparsedQuery.toString();
+
+                PlanStage* idHackStage = new IDHackStage(txn,
+                                                         collection,
+                                                         unparsedQuery["_id"].wrap(),
+                                                         ws.get());
+                UpdateStage* root = new UpdateStage(txn, updateStageParams, ws.get(), collection,
+                                                    idHackStage);
+                return PlanExecutor::make(txn, ws.release(), root, collection, policy, execOut);
+            }
+
+            // If we're here then we don't have a parsed query, but we're also not eligible for
+            // the idhack fast path. We need to force canonicalization now.
+            Status cqStatus = parsedUpdate->parseQueryToCQ();
+            if (!cqStatus.isOK()) {
+                return cqStatus;
+            }
+        }
+
+        // This is the regular path for when we have a CanonicalQuery.
+        std::auto_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
 
         PlanStage* root;
         QuerySolution* querySolution;
         const size_t defaultPlannerOptions = 0;
-        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
-                                         defaultPlannerOptions, &root, &querySolution);
+        Status status = prepareExecution(txn, collection, ws.get(), cq.get(), defaultPlannerOptions,
+                                         &root, &querySolution);
         if (!status.isOK()) {
             return status;
         }
         invariant(root);
-        UpdateStageParams updateStageParams(request, driver, opDebug);
-        updateStageParams.canonicalQuery = rawCanonicalQuery;
+        updateStageParams.canonicalQuery = cq.get();
+
         root = new UpdateStage(txn, updateStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
@@ -574,59 +671,10 @@ namespace mongo {
                                   ws.release(),
                                   root,
                                   querySolution,
-                                  canonicalQuery.release(),
+                                  cq.release(),
                                   collection,
-                                  yieldPolicy,
+                                  policy,
                                   execOut);
-    }
-
-    Status getExecutorUpdate(OperationContext* txn,
-                             Collection* collection,
-                             const std::string& ns,
-                             const UpdateRequest* request,
-                             UpdateDriver* driver,
-                             OpDebug* opDebug,
-                             PlanExecutor::YieldPolicy yieldPolicy,
-                             PlanExecutor** execOut) {
-        auto_ptr<WorkingSet> ws(new WorkingSet());
-        const BSONObj& unparsedQuery = request->getQuery();
-
-        UpdateStageParams updateStageParams(request, driver, opDebug);
-        if (!collection) {
-            // Treat collections that do not exist as empty collections.  Note that the explain
-            // reporting machinery always assumes that the root stage for an update operation is an
-            // UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
-            LOG(2) << "Collection " << ns << " does not exist."
-                   << " Using EOF stage: " << unparsedQuery.toString();
-            UpdateStage* updateStage = new UpdateStage(txn, updateStageParams, ws.get(), collection,
-                                                       new EOFStage());
-            return PlanExecutor::make(txn, ws.release(), updateStage, ns, yieldPolicy, execOut);
-        }
-
-        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex(txn)) {
-            LOG(2) << "Using idhack: " << unparsedQuery.toString();
-
-            PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
-                                                     ws.get());
-            UpdateStage* root = new UpdateStage(txn, updateStageParams, ws.get(), collection,
-                                                idHackStage);
-            return PlanExecutor::make(txn, ws.release(), root, collection, yieldPolicy, execOut);
-        }
-
-        const WhereCallbackReal whereCallback(txn, collection->ns().db());
-        CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(collection->ns(),
-                                                     unparsedQuery,
-                                                     request->isExplain(),
-                                                     &cq,
-                                                     whereCallback);
-        if (!status.isOK())
-            return status;
-
-        // Takes ownership of 'cq'.
-        return getExecutorUpdate(txn, collection, cq, request, driver, opDebug, yieldPolicy,
-                                 execOut);
     }
 
     //

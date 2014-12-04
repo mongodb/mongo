@@ -37,6 +37,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update_lifecycle.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
@@ -408,6 +409,10 @@ namespace mongo {
           _doc(params.driver->getDocument()) {
         // We are an update until we fall into the insert case.
         params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
+
+        // Before we even start executing, we know whether or not this is a replacement
+        // style or $mod style update.
+        _specificStats.isDocReplacement = params.driver->isDocReplacement();
     }
 
     void UpdateStage::transformAndUpdate(BSONObj& oldObj, RecordId& loc) {
@@ -884,5 +889,43 @@ namespace mongo {
     const SpecificStats* UpdateStage::getSpecificStats() {
         return &_specificStats;
     }
+
+    // static
+    UpdateResult UpdateStage::makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug) {
+        // Get stats from the root stage.
+        invariant(exec->getRootStage()->isEOF());
+        invariant(exec->getRootStage()->stageType() == STAGE_UPDATE);
+        UpdateStage* updateStage = static_cast<UpdateStage*>(exec->getRootStage());
+        const UpdateStats* updateStats =
+            static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+
+        // Use stats from the root stage to fill out opDebug.
+        opDebug->nMatched = updateStats->nMatched;
+        opDebug->nModified = updateStats->nModified;
+        opDebug->upsert = updateStats->inserted;
+        opDebug->fastmodinsert = updateStats->fastmodinsert;
+        opDebug->fastmod = updateStats->fastmod;
+
+        // Historically, 'opDebug' considers 'nMatched' and 'nModified' to be 1 (rather than 0)
+        // if there is an upsert that inserts a document. The UpdateStage does not participate
+        // in this madness in order to have saner stats reporting for explain. This means that
+        // we have to set these values "manually" in the case of an insert.
+        if (updateStats->inserted) {
+            opDebug->nMatched = 1;
+            opDebug->nModified = 1;
+        }
+
+        // Get summary information about the plan.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(exec, &stats);
+        opDebug->nscanned = stats.totalKeysExamined;
+        opDebug->nscannedObjects = stats.totalDocsExamined;
+
+        return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
+                            !updateStats->isDocReplacement /* $mod or obj replacement */,
+                            opDebug->nModified /* number of modified docs, no no-ops */,
+                            opDebug->nMatched /* # of docs matched/updated, even no-ops */,
+                            updateStats->objInserted);
+    };
 
 } // namespace mongo

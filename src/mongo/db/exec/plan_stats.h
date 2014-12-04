@@ -588,6 +588,7 @@ namespace mongo {
         UpdateStats()
             : nMatched(0),
               nModified(0),
+              isDocReplacement(false),
               fastmod(false),
               fastmodinsert(false),
               inserted(false) { }
@@ -601,6 +602,9 @@ namespace mongo {
 
         // The number of documents modified by this update.
         size_t nModified;
+
+        // True iff this is a doc-replacement style update, as opposed to a $mod update.
+        bool isDocReplacement;
 
         // A 'fastmod' update is an in-place update that does not have to modify
         // any indices. It's "fast" because the only work needed is changing the bits

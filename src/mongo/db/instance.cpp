@@ -64,14 +64,16 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
-#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/find.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
@@ -570,8 +572,8 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                UpdateExecutor executor(txn, &request, &op.debug());
-                uassertStatusOK(executor.prepare());
+                ParsedUpdate parsedUpdate(txn, &request);
+                uassertStatusOK(parsedUpdate.parseRequest());
 
                 //  Tentatively take an intent lock, fix up if we need to create the collection
                 ScopedTransaction transaction(txn, MODE_IX);
@@ -585,7 +587,17 @@ namespace {
 
                 //  The common case: no implicit collection creation
                 if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
-                    UpdateResult res = executor.execute(ctx.db());
+                    PlanExecutor* rawExec;
+                    uassertStatusOK(getExecutorUpdate(txn,
+                                                      ctx.db()->getCollection(txn, ns),
+                                                      &parsedUpdate,
+                                                      &op.debug(),
+                                                      &rawExec));
+                    boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                    // Run the plan and get stats out.
+                    uassertStatusOK(exec->executePlan());
+                    UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
 
                     // for getlasterror
                     lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -605,8 +617,8 @@ namespace {
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
         {
-            UpdateExecutor executor(txn, &request, &op.debug());
-            uassertStatusOK(executor.prepare());
+            ParsedUpdate parsedUpdate(txn, &request);
+            uassertStatusOK(parsedUpdate.parseRequest());
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
@@ -625,7 +637,18 @@ namespace {
                 wuow.commit();
             }
 
-            UpdateResult res = executor.execute(db);
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutorUpdate(txn,
+                                              ctx.db()->getCollection(txn, ns),
+                                              &parsedUpdate,
+                                              &op.debug(),
+                                              &rawExec));
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // Run the plan and get stats out.
+            uassertStatusOK(exec->executePlan());
+            UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
+
             lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
         }
     }

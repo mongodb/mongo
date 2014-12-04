@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
 
 namespace mongo {
 
@@ -100,6 +101,17 @@ namespace mongo {
         virtual const SpecificStats* getSpecificStats();
 
         static const char* kStageType;
+
+        /**
+         * Converts the execution stats (stored by the update stage as an UpdateStats) for the
+         * update plan represented by 'exec' into the UpdateResult format used to report the results
+         * of writes.
+         *
+         * Also responsible for filling out 'opDebug' with execution info.
+         *
+         * Should only be called once this stage is EOF.
+         */
+        static UpdateResult makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug);
 
     private:
         /**

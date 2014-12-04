@@ -46,11 +46,14 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -1191,8 +1194,8 @@ namespace mongo {
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
-            UpdateExecutor executor(txn, &request, &txn->getCurOp()->debug());
-            Status status = executor.prepare();
+            ParsedUpdate parsedUpdate(txn, &request);
+            Status status = parsedUpdate.parseRequest();
             if (!status.isOK()) {
                 result->setError(toWriteError(status));
                 return;
@@ -1251,8 +1254,9 @@ namespace mongo {
             }
 
             Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+            Collection* collection = db->getCollection(txn, nsString.ns());
 
-            if ( db->getCollection( txn, nsString.ns() ) == NULL ) {
+            if ( collection == NULL ) {
                 if ( createCollection ) {
                     // we raced with some, accept defeat
                     result->getStats().nModified = 0;
@@ -1274,7 +1278,14 @@ namespace mongo {
             }
 
             try {
-                UpdateResult res = executor.execute(ctx.db());
+                OpDebug* debug = &txn->getCurOp()->debug();
+                invariant(collection);
+                PlanExecutor* rawExec;
+                uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
+                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                uassertStatusOK(exec->executePlan());
+                UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), debug);
 
                 const long long numDocsModified = res.numDocsModified;
                 const long long numMatched = res.numMatched;
