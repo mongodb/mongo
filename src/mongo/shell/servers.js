@@ -909,7 +909,6 @@ runMongoProgram = function() {
         args.unshift( progName,
                       '-u', jsTestOptions().authUser,
                       '-p', jsTestOptions().authPassword,
-                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
     }
@@ -935,7 +934,6 @@ startMongoProgramNoConnect = function() {
         args.unshift(progName,
                      '-u', jsTestOptions().authUser,
                      '-p', jsTestOptions().authPassword,
-                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
 
