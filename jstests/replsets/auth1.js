@@ -46,9 +46,9 @@ var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
 print("restart 0 with keyFile");
 m = rs.restart(0, {"keyFile" : path+"key1"});
 print("restart 1 with keyFile");
-var slave = rs.start(1, {"keyFile" : path+"key1"});
+rs.start(1, {"keyFile" : path+"key1"});
 print("restart 2 with keyFile");
-var s2 = rs.start(2, {"keyFile" : path+"key1"});
+rs.start(2, {"keyFile" : path+"key1"});
 
 var result = m.getDB("admin").auth("foo", "bar");
 assert.eq(result, 1, "login failed");
@@ -57,10 +57,9 @@ result = m.getDB("admin").runCommand({replSetInitiate : rs.getReplSetConfig()});
 assert.eq(result.ok, 1, "couldn't initiate: "+tojson(result));
 
 var master = rs.getMaster();
-wait(function() {
-        var status = master.adminCommand({replSetGetStatus:1});
-        return status.members && status.members[1].state == 2 && status.members[2].state == 2;
-    });
+rs.awaitSecondaryNodes();
+var mId = rs.getNodeId(master);
+var slave = rs.liveNodes.slaves[0];
 
 master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
 
@@ -111,7 +110,7 @@ for (var i=0; i<1000; i++) {
 assert.writeOK(bulk.execute({ w: 3, wtimeout: 60000 }));
 
 print("fail over");
-rs.stop(0);
+rs.stop(mId);
 
 master = rs.getMaster();
 
@@ -124,7 +123,7 @@ for (var i=0; i<1000; i++) {
 assert.writeOK(bulk.execute({ w: 2 }));
 
 print("resync");
-rs.restart(0, {"keyFile" : path+"key1"});
+rs.restart(mId, {"keyFile" : path+"key1"});
 master = rs.getMaster();
 
 print("add some more data 2");
