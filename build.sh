@@ -6,6 +6,9 @@ if [ ! -z "$1" ]
   	tags="$@"
 fi
 
+# remove stale packages
+rm -rf vendor/pkg
+
 . ./set_gopath.sh
 mkdir -p bin
 export GOBIN=bin
