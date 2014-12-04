@@ -56,6 +56,7 @@ namespace mongo {
           _currentIndexScanner(0) {
         _scoreIterator = _scores.end();
         _specificStats.indexPrefix = _params.indexPrefix;
+        _specificStats.indexName = _params.index->indexName();
     }
 
     TextStage::~TextStage() { }

@@ -50,6 +50,7 @@ namespace mongo {
           _params(params),
           _commonStats(kStageType) {
         _specificStats.keyPattern = _params.descriptor->keyPattern();
+        _specificStats.indexName = _params.descriptor->indexName();
     }
 
     void DistinctScan::initIndexCursor() {

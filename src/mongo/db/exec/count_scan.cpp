@@ -50,6 +50,7 @@ namespace mongo {
           _shouldDedup(params.descriptor->isMultikey(txn)),
           _commonStats(kStageType) {
         _specificStats.keyPattern = _params.descriptor->keyPattern();
+        _specificStats.indexName = _params.descriptor->indexName();
         _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
     }
 

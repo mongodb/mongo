@@ -282,6 +282,7 @@ namespace mongo {
             }
 
             bob->append("keyPattern", spec->keyPattern);
+            bob->append("indexName", spec->indexName);
             bob->appendBool("isMultiKey", spec->isMultiKey);
         }
         else if (STAGE_DELETE == stats.stageType) {
@@ -301,6 +302,9 @@ namespace mongo {
         else if (STAGE_GEO_NEAR_2D == stats.stageType
                 || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
             NearStats* spec = static_cast<NearStats*>(stats.specific.get());
+
+            bob->append("keyPattern", spec->keyPattern);
+            bob->append("indexName", spec->indexName);
 
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 BSONArrayBuilder intervalsBob(bob->subarrayStart("searchIntervals"));
@@ -331,6 +335,7 @@ namespace mongo {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
 
             bob->append("keyPattern", spec->keyPattern);
+            bob->append("indexName", spec->indexName);
             bob->appendBool("isMultiKey", spec->isMultiKey);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
@@ -412,6 +417,7 @@ namespace mongo {
             }
 
             bob->append("indexPrefix", spec->indexPrefix);
+            bob->append("indexName", spec->indexName);
             bob->append("parsedTextQuery", spec->parsedTextQuery);
         }
         else if (STAGE_UPDATE == stats.stageType) {

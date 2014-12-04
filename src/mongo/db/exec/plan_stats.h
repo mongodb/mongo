@@ -255,6 +255,8 @@ namespace mongo {
             return specific;
         }
 
+        std::string indexName;
+
         BSONObj keyPattern;
 
         bool isMultiKey;
@@ -284,6 +286,8 @@ namespace mongo {
 
         // How many keys did we look at while distinct-ing?
         size_t keysExamined;
+
+        std::string indexName;
 
         BSONObj keyPattern;
     };
@@ -581,6 +585,7 @@ namespace mongo {
         }
 
         vector<IntervalStats> intervalStats;
+        std::string indexName;
         BSONObj keyPattern;
     };
 
@@ -630,6 +635,8 @@ namespace mongo {
             TextStats* specific = new TextStats(*this);
             return specific;
         }
+
+        std::string indexName;
 
         size_t keysExamined;
 
