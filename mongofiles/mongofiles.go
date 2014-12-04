@@ -195,7 +195,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	// get session
 	session, err := self.SessionProvider.GetSession()
 	if err != nil {
-		return "", fmt.Errorf("error connecting to db: %v", err)
+		return "", err
 	}
 	defer session.Close()
 

@@ -153,7 +153,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 
 	session, err := exp.SessionProvider.GetSession()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error getting database session: %v", err)
+		return nil, nil, err
 	}
 
 	skip := 0

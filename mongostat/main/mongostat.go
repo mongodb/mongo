@@ -112,7 +112,7 @@ func main() {
 	// kick it off
 	err = stat.Run()
 	if err != nil {
-		log.Logf(log.Always, "Error: %v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 }

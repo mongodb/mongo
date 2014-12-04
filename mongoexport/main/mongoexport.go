@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
@@ -68,15 +67,13 @@ func main() {
 
 	numDocs, err := exporter.Export()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		log.Logf(log.Always, "Failed: %v\n", err)
 		os.Exit(util.ExitError)
 	}
 
-	if !opts.Quiet {
-		if numDocs == 1 {
-			log.Logf(log.Always, "exported %v record", numDocs)
-		} else {
-			log.Logf(log.Always, "exported %v records", numDocs)
-		}
+	if numDocs == 1 {
+		log.Logf(log.Always, "exported %v record", numDocs)
+	} else {
+		log.Logf(log.Always, "exported %v records", numDocs)
 	}
 }

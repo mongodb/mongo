@@ -62,7 +62,7 @@ func main() {
 
 	err = restore.Restore()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 }

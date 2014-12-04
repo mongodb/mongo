@@ -59,13 +59,13 @@ func main() {
 
 	err = dump.Init()
 	if err != nil {
-		log.Logf(log.Always, "%v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 
 	err = dump.Dump()
 	if err != nil {
-		log.Logf(log.Always, "%v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 

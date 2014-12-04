@@ -79,7 +79,7 @@ func main() {
 
 	// kick it off
 	if err := top.Run(); err != nil {
-		log.Logf(log.Always, "error running mongotop: %v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 }

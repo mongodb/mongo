@@ -70,14 +70,14 @@ func main() {
 	}
 
 	if err := mf.ValidateCommand(args); err != nil {
-		log.Logf(log.Always, "error: %v", err)
+		log.Logf(log.Always, "Invalid command: %v", err)
 		opts.PrintHelp(true)
 		os.Exit(util.ExitError)
 	}
 
 	output, err := mf.Run(true)
 	if err != nil {
-		log.Logf(log.Always, "%v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 	fmt.Printf("%s", output)

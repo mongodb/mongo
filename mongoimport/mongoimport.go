@@ -244,7 +244,7 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImported uint64, retErr error) {
 	session, err := mongoImport.SessionProvider.GetSession()
 	if err != nil {
-		return 0, fmt.Errorf("error connecting to mongod: %v", err)
+		return 0, err
 	}
 	var readErr error
 	defer func() {

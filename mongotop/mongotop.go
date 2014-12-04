@@ -86,13 +86,13 @@ func (mt *MongoTop) Run() error {
 		numPrinted++
 		diff, err := mt.runDiff()
 		if err != nil {
-			log.Logf(log.Always, "Error: %v\n", err)
-
 			// If this is the first time trying to poll the server and it fails,
 			// just stop now instead of trying over and over.
 			if !hasData {
 				return err
 			}
+
+			log.Logf(log.Always, "Error: %v\n", err)
 			time.Sleep(mt.Sleeptime)
 		}
 

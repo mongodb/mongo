@@ -69,7 +69,7 @@ func main() {
 	numDocs, err := mongoImport.ImportDocuments()
 	if !opts.Quiet {
 		if err != nil {
-			log.Logf(log.Always, "error encountered while importing documents: %v", err)
+			log.Logf(log.Always, "Failed: %v", err)
 		}
 		message := fmt.Sprintf("imported 1 document")
 		if numDocs != 1 {

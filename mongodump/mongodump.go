@@ -93,11 +93,11 @@ func (dump *MongoDump) Init() error {
 
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
-		return fmt.Errorf("Error determining if server is mongos: %v", err)
+		return err
 	}
 	// return a helpful error message for mongos
 	if dump.OutputOptions.Repair && dump.isMongos {
-		return fmt.Errorf("Error: --repair flag cannot be used on a mongos")
+		return fmt.Errorf("--repair flag cannot be used on a mongos")
 	}
 	dump.manager = intents.NewIntentManager()
 	dump.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)

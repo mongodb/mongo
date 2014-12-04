@@ -81,7 +81,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	var err error
 	restore.isMongos, err = restore.SessionProvider.IsMongos()
 	if err != nil {
-		return fmt.Errorf("error determining if connected to a mongos: %v", err)
+		return err
 	}
 	if restore.isMongos {
 		log.Log(log.DebugLow, "restoring to a sharded system")
@@ -136,7 +136,8 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 func (restore *MongoRestore) Restore() error {
 	err := restore.ParseAndValidateOptions()
 	if err != nil {
-		return fmt.Errorf("options error: %v", err)
+		log.Logf(log.DebugLow, "got error from options parsing: %v", err)
+		return err
 	}
 
 	// 1. Build up all intents to be restored
