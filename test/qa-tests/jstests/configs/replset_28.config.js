@@ -4,7 +4,11 @@ var getToolTest;
   getToolTest = function(name) {
     var toolTest = new ToolTest(name, null);
 
-    var replTest = new ReplSetTest({ name: 'tool_replset', nodes: 3, oplogSize: 5 });
+    var replTest = new ReplSetTest({
+      name: 'tool_replset',
+      nodes: 3,
+      oplogSize: 5
+    });
 
     var nodes = replTest.startSet();
     replTest.initiate();

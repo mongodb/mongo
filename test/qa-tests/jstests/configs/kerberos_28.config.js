@@ -19,6 +19,10 @@ var getToolTest;
 
     db.getSiblingDB('$external').auth({ user: AUTH_USER, mechanism: 'GSSAPI', serviceName: 'mockservice', serviceHostname: 'kdc.10gen.me' });
 
+    toolTest.authCommand = 'db.getSiblingDB(\'$external\').auth({ user: ' +
+      '\'' + AUTH_USER + '\', mechanism: \'GSSAPI\', ' +
+      'serviceName: \'mockservice\', serviceHostname: \'kdc.10gen.me\' });';
+
     return toolTest;
   };
 })();

@@ -11,6 +11,7 @@ var getToolTest;
   getToolTest = function(name) {
     var toolTest = new ToolTest(name, TOOLS_TEST_CONFIG);
     toolTest.startDB();
+
     return toolTest;
   };
 })();

@@ -20,6 +20,9 @@ var AUTH_PASSWORD = 'Taco';
 
     db.getSiblingDB('admin').auth(AUTH_USER, AUTH_PASSWORD);
 
+    toolTest.authCommand = 'db.getSiblingDB(\'admin\').auth(\'' +
+      AUTH_USER + '\', \'' + AUTH_PASSWORD + '\');';
+
     return toolTest;
   };
 })();

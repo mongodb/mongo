@@ -38,6 +38,9 @@ var AUTH_PASSWORD = 'Taco';
       oldStop.apply(toolTest, arguments);
     };
 
+    toolTest.authCommand = 'db.getSiblingDB(\'admin\').auth(\'' +
+      AUTH_USER + '\', \'' + AUTH_PASSWORD + '\');';
+
     toolTest.isReplicaSet = true;
 
     return toolTest;
