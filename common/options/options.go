@@ -101,7 +101,7 @@ type SSL struct {
 	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
 	SSLCRLFile          string `long:"sslCRLFile" description:"Specify the .pem file containing the certificate revocation list"`
 	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"Bypass the validation for server certificates"`
-	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHosts" description:"Bypass the validation for server name"`
+	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" description:"Bypass the validation for server name"`
 	SSLFipsMode         bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
 }
 

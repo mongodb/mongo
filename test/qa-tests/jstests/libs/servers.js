@@ -910,7 +910,7 @@ runMongoProgram = function() {
     }
 
     if ( jsTestOptions().useSSL ) {
-        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHosts");
+        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHostnames");
     }
 
     if (progName == 'mongo' && !_useWriteCommandsDefault()) {
