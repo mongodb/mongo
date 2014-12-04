@@ -807,6 +807,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
 
+	F_SET(lsm_tree, WT_LSM_TREE_SWITCH_INPROGRESS);
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
 
@@ -835,6 +836,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Set the switch transaction in the previous chunk, if necessary. */
 	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE)
 		last_chunk->switch_txn = __wt_txn_new_id(session);
+	F_CLR(lsm_tree, WT_LSM_TREE_SWITCH_INPROGRESS);
 
 err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	/*

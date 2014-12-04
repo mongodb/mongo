@@ -27,18 +27,17 @@ cfunc_re = re.compile('\t.*? __F\(([a-z_]*)\)')
 curr_class = ""
 for line in open(f, 'r'):
 
-	m = cclass_re.match(line)
-	if m:
-		curr_class = m.group(1)
+    m = cclass_re.match(line)
+    if m:
+        curr_class = m.group(1)
 
-	if curr_class == "":
-		continue
+    if curr_class == "":
+        continue
 
-	m = cfunc_re.match(line)
-	if m:
-		tfile.write('COPYDOC(__' + curr_class.lower() + ', ' +
-                curr_class.upper() + ', ' + m.group(1) + ')\n')
+    m = cfunc_re.match(line)
+    if m:
+        tfile.write('COPYDOC(__' + curr_class.lower() + ', ' +
+        curr_class.upper() + ', ' + m.group(1) + ')\n')
 
 tfile.close()
 compare_srcfile(tmp_file, o)
-

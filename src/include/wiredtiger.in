@@ -2479,43 +2479,43 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * Error return section: BEGIN
  */
 /*!
- * Attempt to insert an existing key.
- * This error is generated when the application attempts to insert a record with
- * the same key as an existing record without the 'overwrite' configuration to
- * WT_SESSION::open_cursor.
- */
-#define	WT_DUPLICATE_KEY	-31800
-/*!
- * Non-specific WiredTiger error.
- * This error is returned when an error is not covered by a specific error
- * return.
- */
-#define	WT_ERROR	-31801
-/*!
- * Item not found.
- * This error indicates an operation did not find a value to return.  This
- * includes cursor search and other operations where no record matched the
- * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
- */
-#define	WT_NOTFOUND	-31802
-/*!
- * WiredTiger library panic.
- * This error indicates an underlying problem that requires the application exit
- * and restart.
- */
-#define	WT_PANIC	-31803
-/*! @cond internal */
-/*! Restart the operation (internal). */
-#define	WT_RESTART	-31804
-/*! @endcond */
-/*!
  * Conflict between concurrent operations.
  * This error is generated when an operation cannot be completed due to a
  * conflict with concurrent operations.  The operation may be retried; if a
  * transaction is in progress, it should be rolled back and the operation
  * retried in a new transaction.
  */
-#define	WT_ROLLBACK	-31805
+#define	WT_ROLLBACK	-31800
+/*!
+ * Attempt to insert an existing key.
+ * This error is generated when the application attempts to insert a record with
+ * the same key as an existing record without the 'overwrite' configuration to
+ * WT_SESSION::open_cursor.
+ */
+#define	WT_DUPLICATE_KEY	-31801
+/*!
+ * Non-specific WiredTiger error.
+ * This error is returned when an error is not covered by a specific error
+ * return.
+ */
+#define	WT_ERROR	-31802
+/*!
+ * Item not found.
+ * This error indicates an operation did not find a value to return.  This
+ * includes cursor search and other operations where no record matched the
+ * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
+ */
+#define	WT_NOTFOUND	-31803
+/*!
+ * WiredTiger library panic.
+ * This error indicates an underlying problem that requires the application exit
+ * and restart.
+ */
+#define	WT_PANIC	-31804
+/*! @cond internal */
+/*! Restart the operation (internal). */
+#define	WT_RESTART	-31805
+/*! @endcond */
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
