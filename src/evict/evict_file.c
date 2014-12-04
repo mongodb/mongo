@@ -134,4 +134,3 @@ err:		/* On error, clear any left-over tree walk. */
 
 	return (ret);
 }
-
