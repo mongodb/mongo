@@ -1,13 +1,25 @@
-doTest = function( signal ) {
+
+(function() {
+    var compare_configs = function(c1, c2) {
+        assert.eq(c1.version, c2.version, 'version same');
+        assert.eq(c1._id, c2._id, '_id same');
+
+        for (var i in c1.members) {
+            assert(c2.members[i] !== undefined, 'field '+i+' exists in both configs');
+            assert.eq(c1.members[i]._id, c2.members[i]._id, 'id is equal in both configs');
+            assert.eq(c1.members[i].host, c2.members[i].host, 'host is equal in both configs');
+        }
+    };
 
     // Make sure that we can restart a replica set completely
+    // Also, ensure config is saved properly between restarts.
 
     // Create a new replica set test. Specify set name and the number of nodes you want.
     var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
-    var nodes = replTest.startSet();
+    replTest.startSet();
 
     // Call initiate() to send the replSetInitiate command
     // This will wait for initiation
@@ -20,24 +32,19 @@ doTest = function( signal ) {
     // Call getMaster to return a reference to the node that's been
     // elected master.
     var master = replTest.getMaster();
+    var config1 = master.getDB("local").system.replset.findOne();
 
     // Now we're going to shut down all nodes
-    mId  = replTest.getNodeId( master );
-    s1Id = replTest.getNodeId( replTest.liveNodes.slaves[0] );
-    s2Id = replTest.getNodeId( replTest.liveNodes.slaves[1] );
+    var mId  = replTest.getNodeId( master );
+    var s1 = replTest.liveNodes.slaves[0];
+    var s1Id = replTest.getNodeId(s1);
+    var s2 = replTest.liveNodes.slaves[1];
+    var s2Id = replTest.getNodeId(s2);
 
     replTest.stop( s1Id );
     replTest.stop( s2Id );
-    
-    assert.soon(function() {
-        try {
-            var status = master.getDB("admin").runCommand({replSetGetStatus: 1});
-            return status.members[1].state == 8 && status.members[2].state == 8;
-        } catch (x) {
-            return false;
-        }
-    });
-
+    replTest.waitForState(s1, replTest.DOWN);
+    replTest.waitForState(s2, replTest.DOWN);
     
     replTest.stop( mId );
 
@@ -48,30 +55,7 @@ doTest = function( signal ) {
 
     // Make sure that a new master comes up
     master = replTest.getMaster();
-    slaves = replTest.liveNodes.slaves;
-
-    assert.soon(function() {
-            var status = master.getDB("admin").runCommand({replSetGetStatus: 1});
-            return status.members[1].state != 8 && status.members[2].state != 8;
-        });
-    
-    // Do a status check on each node
-    // Master should be set to 1 (primary)
-    assert.soon(function() {
-        stat = master.getDB("admin").runCommand({replSetGetStatus: 1});
-        return stat.myState == 1;
-    }, "checking master", 3 * 60 * 1000, 1000 );
-
-    // Slaves to be set to 2 (secondary)
-    assert.soon(function() {
-        stat = slaves[0].getDB("admin").runCommand({replSetGetStatus: 1});
-        return stat.myState == 2;
-    }, "checking slave 0", 3 * 60 * 1000, 1000 );
-
-    assert.soon(function() {
-        stat = slaves[1].getDB("admin").runCommand({replSetGetStatus: 1});
-        return stat.myState == 2;
-    }, "checking slave 1", 3 * 60 * 1000, 1000 );
-}
-
-doTest( 15 );
+    replTest.awaitSecondaryNodes();
+    var config2 = master.getDB("local").system.replset.findOne();
+    compare_configs(config1, config2);
+}());
