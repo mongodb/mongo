@@ -29,7 +29,7 @@
 from packing import pack, unpack
 
 def check(fmt, *v):
-	print fmt, repr(v), ''.join('%02x' % ord(c) for c in pack(fmt, *v))
+    print fmt, repr(v), ''.join('%02x' % ord(c) for c in pack(fmt, *v))
 
 check('iii', 0, 101, -99)
 check('3i', 0, 101, -99)

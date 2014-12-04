@@ -44,7 +44,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			return (0);
 		primary_chunk = clsm->primary_chunk;
 		have_primary = (primary_chunk != NULL &&
-		    primary_chunk->switch_txn == WT_TXN_NONE);
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_SWITCH_INPROGRESS));
 	}
 
 	/*
