@@ -5,7 +5,6 @@ package db
 import (
 	"errors"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db/command"
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"io"
@@ -45,18 +44,6 @@ type SessionProvider struct {
 
 	// flags for generating the master session
 	flags sessionFlag
-}
-
-func (self *SessionProvider) RunCommand(dbToUse string,
-	cmd command.Command) error {
-
-	session, err := self.GetSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	return session.DB(dbToUse).Run(cmd.AsRunnable(), cmd)
 }
 
 // Returns a session connected to the database server for which the
