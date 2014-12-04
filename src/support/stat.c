@@ -106,14 +106,6 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "LSM: sleep for LSM checkpoint throttle";
 	stats->lsm_merge_throttle.desc = "LSM: sleep for LSM merge throttle";
 	stats->bloom_size.desc = "LSM: total size of bloom filters";
-	stats->log_compress_len.desc =
-	    "logging: total size of compressed records";
-	stats->log_compress_mem.desc =
-	    "logging: total in-memory size of compressed records";
-	stats->log_compress_write.desc =
-	    "logging: records compressed";
-	stats->log_compress_write_fail.desc =
-	    "logging: records not compressed";
 	stats->rec_dictionary.desc = "reconciliation: dictionary matches";
 	stats->rec_suffix_compression.desc =
 	    "reconciliation: internal page key bytes discarded using suffix compression";
@@ -429,6 +421,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_bytes_payload.desc = "log: log bytes of payload data";
 	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_reads.desc = "log: log read operations";
+	stats->log_compress_writes.desc = "log: log records compressed";
+	stats->log_compress_write_fails.desc =
+	    "log: log records not compressed";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
@@ -445,7 +440,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_scan_records.desc = "log: records processed by log scan";
 	stats->log_slot_switch_fails.desc =
 	    "log: slots selected for switching that were unavailable";
+	stats->log_compress_mem.desc =
+	    "log: total in-memory size of compressed records";
 	stats->log_buffer_size.desc = "log: total log buffer size";
+	stats->log_compress_len.desc = "log: total size of compressed records";
 	stats->log_close_yields.desc =
 	    "log: yields waiting for previous log file close";
 	stats->lsm_work_queue_app.desc =
@@ -572,6 +570,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_bytes_payload.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;
+	stats->log_compress_writes.v = 0;
+	stats->log_compress_write_fails.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
 	stats->log_sync.v = 0;
@@ -583,6 +583,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_toobig.v = 0;
 	stats->log_scan_records.v = 0;
 	stats->log_slot_switch_fails.v = 0;
+	stats->log_compress_mem.v = 0;
+	stats->log_compress_len.v = 0;
 	stats->log_close_yields.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->lsm_checkpoint_throttle.v = 0;

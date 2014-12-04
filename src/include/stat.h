@@ -196,6 +196,10 @@ struct __wt_connection_stats {
 	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;
 	WT_STATS log_close_yields;
+	WT_STATS log_compress_len;
+	WT_STATS log_compress_mem;
+	WT_STATS log_compress_write_fails;
+	WT_STATS log_compress_writes;
 	WT_STATS log_max_filesize;
 	WT_STATS log_prealloc_files;
 	WT_STATS log_prealloc_max;
@@ -320,10 +324,6 @@ struct __wt_dsrc_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS cursor_update_bytes;
-	WT_STATS log_compress_len;
-	WT_STATS log_compress_mem;
-	WT_STATS log_compress_write;
-	WT_STATS log_compress_write_fail;
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_chunk_count;
 	WT_STATS lsm_generation_max;
