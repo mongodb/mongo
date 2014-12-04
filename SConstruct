@@ -226,8 +226,6 @@ add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , False )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , False )
 
-add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
-
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
@@ -2049,8 +2047,6 @@ env = doConfigure( env )
 
 env['PDB'] = '${TARGET.base}.pdb'
 
-enforce_glibc = linux and releaseBuild and not has_option("no-glibc-check")
-
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -2260,7 +2256,6 @@ Export("boostSuffix")
 Export("darwin windows solaris linux freebsd nix openbsd")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
-Export("enforce_glibc")
 Export("s3push")
 Export("use_clang")
 Export("wiredtiger")
