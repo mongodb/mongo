@@ -650,8 +650,11 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 
 	dhandle = session->dhandle;
 
-	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_ERR(__wt_conn_btree_sync_and_close(session, 0));
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+		ret = __wt_conn_btree_sync_and_close(session, 0);
+		if (!final)
+			WT_RET(ret);
+	}
 
 	/*
 	 * Kludge: interrupt the eviction server in case it is holding the
@@ -661,12 +664,12 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 
 	/* Try to remove the handle, protected by the data handle lock. */
 	WT_WITH_DHANDLE_LOCK(session,
-	    ret = __conn_dhandle_remove(session, final));
+	    WT_TRET(__conn_dhandle_remove(session, final)));
 
 	/*
 	 * After successfully removing the handle, clean it up.
 	 */
-	if (ret == 0) {
+	if (ret == 0 || final) {
 		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 		__wt_free(session, dhandle->name);
 		__wt_free(session, dhandle->checkpoint);
@@ -678,7 +681,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 
-err:	return (ret);
+	return (ret);
 }
 
 /*
