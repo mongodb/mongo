@@ -33,31 +33,34 @@ import re, sys
 
 def process(source):
     # Replace standard struct wrapper wording
-	source = re.sub(r'(\s+#.*)Proxy of C (\w+) struct',
-			lambda m: ('%sPython wrapper around C ::%s%s@copydoc ::%s' % (m.group(1), m.group(2).strip('_').upper(), m.group(1), m.group(2).strip('_').upper())), source)
+    source = re.sub(r'(\s+#.*)Proxy of C (\w+) struct',
+            lambda m: ('%sPython wrapper around C ::%s%s@copydoc ::%s' %
+                      (m.group(1), m.group(2).strip('_').upper(), m.group(1),
+                       m.group(2).strip('_').upper())), source)
 
     # Replace lowercase class names with upper case
-	source = re.sub(r'(\s+#.*)__(wt_\w+)::',
-		lambda m: ('%s%s::' % (m.group(1), m.group(2).upper())), source)
+    source = re.sub(r'(\s+#.*)__(wt_\w+)::',
+        lambda m: ('%s%s::' % (m.group(1), m.group(2).upper())), source)
 
     # Replace "char" with "string" in comments
-	source = re.sub(r'(\s+#.*)\bconst char \*', r'\1string', source)
-	source = re.sub(r'(\s+#.*)\bchar const \*', r'\1string', source)
-	source = re.sub(r'(\s+#.*)\bchar\b', r'\1string', source)
+    source = re.sub(r'(\s+#.*)\bconst char \*', r'\1string', source)
+    source = re.sub(r'(\s+#.*)\bchar const \*', r'\1string', source)
+    source = re.sub(r'(\s+#.*)\bchar\b', r'\1string', source)
 
     # Copy documentation -- methods, then global functions
-	source = re.sub(r'(\s+# )(\w+)\(self, (connection|cursor|session).*',
-		lambda m: ('%s%s%s@copydoc WT_%s::%s' %
-		  (m.group(0), m.group(1), m.group(1), m.group(3).upper(), m.group(2))),
-		source)
+    source = re.sub(r'(\s+# )(\w+)\(self, (connection|cursor|session).*',
+        lambda m: ('%s%s%s@copydoc WT_%s::%s' %
+          (m.group(0), m.group(1), m.group(1), m.group(3).upper(), m.group(2))),
+        source)
 
-	source = re.sub(r'(\s+# )(wiredtiger_\w+)\(.*',
-		lambda m: ('%s%s%s@copydoc ::%s' %
-		  (m.group(0), m.group(1), m.group(1), m.group(2))), source)
+    source = re.sub(r'(\s+# )(wiredtiger_\w+)\(.*',
+        lambda m: ('%s%s%s@copydoc ::%s' %
+          (m.group(0), m.group(1), m.group(1), m.group(2))), source)
 
     # Replace "self, handle" with "self" -- these are typedef'ed away
-	source = re.sub(r'(\s+#.*self), (?:connection|cursor|session)', r'\1', source)
-	return source
+    source = re.sub(r'(\s+#.*self),
+                    (?:connection|cursor|session)', r'\1', source)
+    return source
 
 if __name__ == '__main__':
-	sys.stdout.write(process(sys.stdin.read()))
+    sys.stdout.write(process(sys.stdin.read()))
