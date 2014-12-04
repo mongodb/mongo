@@ -1,7 +1,7 @@
 // rs test getlasterrordefaults
 
-doTest = function (signal) {
-
+(function () {
+    "use strict";
     // Test write concern defaults
     var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
 
@@ -12,6 +12,8 @@ doTest = function (signal) {
     config.settings = {};
     config.settings.getLastErrorDefaults = { 'w': 3, 'wtimeout': 20000 };
     config.settings.heartbeatTimeoutSecs = 15;
+    // Prevent node 2 from becoming primary, as we will attempt to set it to hidden later.
+    config.members[2].priority = 0;
 
     replTest.initiate(config);
 
@@ -43,15 +45,13 @@ doTest = function (signal) {
     if (wcError != null) {
         print("\WARNING getLastError timed out and should not have: " + result.toString());
         print("This machine seems extremely slow. Stopping test without failing it\n");
-        replTest.stopSet(signal);
+        replTest.stopSet();
         return;
     }
 
     var slaves = replTest.liveNodes.slaves;
     slaves[0].setSlaveOk();
     slaves[1].setSlaveOk();
-
-    print("replset5.js Testing slave counts");
 
     var slave0count = slaves[0].getDB(testDB).foo.count();
     assert(slave0count == docNum, "Slave 0 has " + slave0count + " of " + docNum + " documents!");
@@ -68,22 +68,12 @@ doTest = function (signal) {
     assert.eq(15, config.settings.heartbeatTimeoutSecs);
 
     config.version++;
-    config.members[2].priority = 0;
     config.members[2].hidden = 1;
 
-    try {
-        master.adminCommand({ replSetReconfig: config });
-    }
-    catch (e) {
-        print(e);
-    }
+    assert.commandWorked(master.adminCommand({ replSetReconfig: config }));
 
     config = master.getDB("local").system.replset.findOne();
-    printjson(config);
     assert.eq(config.members[2].hidden, true);
 
-    replTest.stopSet(signal);
-}
-
-doTest( 15 );
-print("replset5.js success");
+    replTest.stopSet();
+}());
