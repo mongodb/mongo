@@ -1,4 +1,5 @@
 // rs test getlasterrordefaults
+load("jstests/replsets/rslib.js");
 
 (function () {
     "use strict";
@@ -70,9 +71,9 @@
     config.version++;
     config.members[2].hidden = 1;
 
-    assert.commandWorked(master.adminCommand({ replSetReconfig: config }));
+    master = reconfig(replTest, config);
 
-    config = master.getDB("local").system.replset.findOne();
+    config = master.getSisterDB("local").system.replset.findOne();
     assert.eq(config.members[2].hidden, true);
 
     replTest.stopSet();
