@@ -51,11 +51,6 @@ namespace mongo {
         void listDatabases( std::vector<std::string>* out ) const;
         int flushAllFiles( bool sync );
 
-        Status repairDatabase( OperationContext* tnx,
-                               const std::string& dbName,
-                               bool preserveClonedFilesOnFailure,
-                               bool backupOriginalFiles );
-
         DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                        const StringData& db );
 
@@ -70,6 +65,16 @@ namespace mongo {
 
         virtual void cleanShutdown();
 
+        // Callers should use  repairDatabase instead.
+        virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) {
+            return Status(ErrorCodes::InternalError, "MMAPv1 doesn't support repairRecordStore");
+        }
+
+        // MMAPv1 specific (non-virtual)
+        Status repairDatabase( OperationContext* tnx,
+                               const std::string& dbName,
+                               bool preserveClonedFilesOnFailure,
+                               bool backupOriginalFiles );
     private:
         static void _listDatabases( const std::string& directory,
                                     std::vector<std::string>* out );

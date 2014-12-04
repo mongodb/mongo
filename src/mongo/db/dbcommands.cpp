@@ -68,6 +68,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/oplog.h"
@@ -285,8 +286,9 @@ namespace mongo {
             e = cmdObj.getField( "backupOriginalFiles" );
             bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
-            Status status = getGlobalEnvironment()->getGlobalStorageEngine()->repairDatabase(
-                txn, dbname, preserveClonedFilesOnFailure, backupOriginalFiles );
+            StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+            Status status = repairDatabase(txn, engine, dbname, preserveClonedFilesOnFailure,
+                                           backupOriginalFiles );
 
             IndexBuilder::restoreIndexes(indexesInProg);
 

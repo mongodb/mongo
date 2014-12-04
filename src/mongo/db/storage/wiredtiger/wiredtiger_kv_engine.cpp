@@ -46,6 +46,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -89,12 +90,12 @@ namespace mongo {
                               WT_CURSOR *cursor) {
             return 0;
         }
-
     }
 
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
                                             const std::string& extraOpenOptions,
-                                            bool durable )
+                                            bool durable,
+                                            bool repair )
         : _path( path ),
           _durable( durable ),
           _epoch( 0 ),
@@ -157,6 +158,10 @@ namespace mongo {
         _sizeStorerUri = "table:sizeStorer";
         {
             WiredTigerSession session( _conn, -1 );
+            if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
+                log() << "Repairing size cache";
+                fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
+            }
             WiredTigerSizeStorer* ss = new WiredTigerSizeStorer();
             ss->loadFrom( &session, _sizeStorerUri );
             _sizeStorer.reset( ss );
@@ -208,10 +213,26 @@ namespace mongo {
 
     Status WiredTigerKVEngine::repairIdent( OperationContext* opCtx,
                                             const StringData& ident ) {
-        WiredTigerSession session( _conn, -1 );
-        WT_SESSION* s = session.getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
+        session->closeAllCursors();
         string uri = _uri(ident);
-        return wtRCToStatus( s->compact(s, uri.c_str(), NULL ) );
+        return _salvageIfNeeded(uri.c_str());
+    }
+
+    Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
+        // Using a side session to avoid transactional issues
+        WiredTigerSession* sessionWrapper = _sessionCache->getSession();
+        ON_BLOCK_EXIT(&WiredTigerSessionCache::releaseSession, _sessionCache.get(), sessionWrapper);
+        WT_SESSION* session = sessionWrapper->getSession();
+
+        if ((session->verify)(session, uri, NULL) == 0) {
+            log() << "Verify succeeded on uri " << uri << ". Not salvaging.";
+            return Status::OK();
+        }
+
+        // TODO need to cleanup the sizeStorer cache after salvaging.
+        log() << "Verify failed on uri " << uri << ". Running a salvage operation.";
+        return wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
     }
 
     int WiredTigerKVEngine::flushAllFiles( bool sync ) {
@@ -398,6 +419,22 @@ namespace mongo {
 
     bool WiredTigerKVEngine::supportsDocLocking() const {
         return true;
+    }
+
+    bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, const StringData& ident) const {
+        return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession(), _uri(ident));
+    }
+
+    bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {
+        // can't use WiredTigerCursor since this is called from constructor.
+        WT_CURSOR* c = NULL;
+        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+        if (ret == ENOENT) return false;
+        invariantWTOK(ret);
+        ON_BLOCK_EXIT(c->close, c);
+
+        c->set_key(c, uri.c_str());
+        return c->search(c) == 0;
     }
 
     std::vector<std::string> WiredTigerKVEngine::getAllIdents( OperationContext* opCtx ) const {

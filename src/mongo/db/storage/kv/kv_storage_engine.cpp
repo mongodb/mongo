@@ -72,6 +72,13 @@ namespace mongo {
         , _supportsDocLocking(_engine->supportsDocLocking()) {
 
         OperationContextNoop opCtx( _engine->newRecoveryUnit() );
+
+        if (options.forRepair && engine->hasIdent(&opCtx, catalogInfo)) {
+            log() << "Repairing catalog metadata";
+            // TODO should also validate all BSON in the catalog.
+            engine->repairIdent(&opCtx, catalogInfo);
+        }
+
         {
             WriteUnitOfWork uow( &opCtx );
 
@@ -251,24 +258,7 @@ namespace mongo {
         return _engine->isDurable();
     }
 
-    Status KVStorageEngine::repairDatabase( OperationContext* txn,
-                                            const std::string& dbName,
-                                            bool preserveClonedFilesOnFailure,
-                                            bool backupOriginalFiles ) {
-        if ( preserveClonedFilesOnFailure ) {
-            return Status( ErrorCodes::BadValue, "preserveClonedFilesOnFailure not supported" );
-        }
-        if ( backupOriginalFiles ) {
-            return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
-        }
-
-        vector<string> idents = _catalog->getAllIdentsForDB( dbName );
-        for ( size_t i = 0; i < idents.size(); i++ ) {
-            Status status = _engine->repairIdent( txn, idents[i] );
-            if ( !status.isOK() )
-                return status;
-        }
-        return Status::OK();
+    Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::string& ns) {
+        return _engine->repairIdent(txn, _catalog->getCollectionIdent(ns));
     }
-
 }

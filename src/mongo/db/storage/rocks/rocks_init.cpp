@@ -43,7 +43,10 @@ namespace mongo {
         public:
             virtual ~RocksFactory(){}
             virtual StorageEngine* create( const StorageGlobalParams& params ) const {
-                return new KVStorageEngine(new RocksEngine(params.dbpath));
+                KVStorageEngineOptions options;
+                options.directoryPerDB = params.directoryperdb;
+                options.forRepair = params.repair;
+                return new KVStorageEngine(new RocksEngine(params.dbpath), options);
             }
 
             virtual StringData getCanonicalName() const {

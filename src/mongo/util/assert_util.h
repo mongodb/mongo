@@ -305,7 +305,7 @@ namespace mongo {
 
 #ifdef MONGO_EXPOSE_MACROS
 # define dassert MONGO_dassert
-# define verify MONGO_verify
+# define verify(expression) MONGO_verify(expression)
 # define invariant MONGO_invariant
 # define invariantOK MONGO_invariantOK
 # define uassert MONGO_uassert

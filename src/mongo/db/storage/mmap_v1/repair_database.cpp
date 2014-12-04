@@ -272,15 +272,7 @@ namespace mongo {
                                          const std::string& dbName,
                                          bool preserveClonedFilesOnFailure,
                                          bool backupOriginalFiles ) {
-        // We must hold some form of lock here
-        invariant(txn->lockState()->isLocked());
-        invariant( dbName.find( '.' ) == string::npos );
-
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
-
-        log() << "repairDatabase " << dbName << endl;
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
         // Must be done before and after repair
         getDur().syncDataAndTruncateJournal(txn);

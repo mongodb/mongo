@@ -49,10 +49,12 @@ namespace mongo {
     struct KVStorageEngineOptions {
         KVStorageEngineOptions() :
             directoryPerDB(false),
-            directoryForIndexes(false) {}
+            directoryForIndexes(false),
+            forRepair(false) {}
 
         bool directoryPerDB;
         bool directoryForIndexes;
+        bool forRepair;
     };
 
     class KVStorageEngine : public StorageEngine {
@@ -83,10 +85,7 @@ namespace mongo {
 
         virtual bool isDurable() const;
 
-        virtual Status repairDatabase( OperationContext* txn,
-                                       const std::string& dbName,
-                                       bool preserveClonedFilesOnFailure = false,
-                                       bool backupOriginalFiles = false );
+        virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
 
         virtual void cleanShutdown();
 

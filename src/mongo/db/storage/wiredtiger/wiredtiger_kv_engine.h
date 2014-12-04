@@ -52,7 +52,8 @@ namespace mongo {
     public:
         WiredTigerKVEngine( const std::string& path,
                             const std::string& extraOpenOptions = "",
-                            bool durable = true );
+                            bool durable = true,
+                            bool repair = false );
         virtual ~WiredTigerKVEngine();
 
         void setRecordStoreExtraOptions( const std::string& options );
@@ -99,6 +100,8 @@ namespace mongo {
         virtual Status repairIdent( OperationContext* opCtx,
                                     const StringData& ident );
 
+        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const;
+
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
         virtual void cleanShutdown();
@@ -118,7 +121,10 @@ namespace mongo {
 
     private:
 
+        Status _salvageIfNeeded(const char* uri);
         void _checkIdentPath( const StringData& ident );
+
+        bool _hasUri(WT_SESSION* session, const std::string& uri) const;
 
         string _uri( const StringData& ident ) const;
         bool _drop( const StringData& ident );
