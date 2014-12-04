@@ -55,18 +55,23 @@ class MultiVersionDownloader :
             self._links = self.download_links()
         return self._links
 
+
     def download_links(self):
         href = "http://dl.mongodb.org/dl/%s/%s" \
                % (self.platform.lower(), self.arch)
 
         html = urllib2.urlopen(href).read()
-
         links = {}
         for line in html.split():
             match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.tgz" \
                 % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
 
-            if match == None: continue
+            if match == None:
+                match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.zip" \
+                % (self.platform.lower(), self.platform.lower(), self.arch)).search(line)
+                if match == None:
+                    continue
+
 
             link = match.group(0)
             version = match.group(1)
