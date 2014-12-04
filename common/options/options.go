@@ -56,6 +56,9 @@ type HiddenOptions struct {
 
 	// Specifies the number of threads to use in sending processed data over to the server
 	NumInsertionWorkers int
+
+	TempUsersColl *string
+	TempRolesColl *string
 }
 
 type Namespace struct {
@@ -249,8 +252,34 @@ func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgume
 		return args, fmt.Errorf(`--dbpath and related flags are not supported in 2.8 tools.
 See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
+
+	if option == "tempUsersColl" {
+		opts.TempUsersColl = new(string)
+		value, consumeVal, err := getStringArg(arg, args)
+		if err != nil {
+			return args, fmt.Errorf("couldn't parse flag tempUsersColl: ", err)
+		}
+		*opts.TempUsersColl = value
+		if consumeVal {
+			return args[1:], nil
+		}
+		return args, nil
+	}
+	if option == "tempRolesColl" {
+		opts.TempRolesColl = new(string)
+		value, consumeVal, err := getStringArg(arg, args)
+		if err != nil {
+			return args, fmt.Errorf("couldn't parse flag tempRolesColl: ", err)
+		}
+		*opts.TempRolesColl = value
+		if consumeVal {
+			return args[1:], nil
+		}
+		return args, nil
+	}
+
 	var err error
-	optionValue, consumeVal, err := getInt(arg, args)
+	optionValue, consumeVal, err := getIntArg(arg, args)
 	switch option {
 	case "numThreads":
 		opts.MaxProcs = optionValue
@@ -277,7 +306,7 @@ See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`
 //getInt returns 3 args: the parsed int value, a bool set to true if a value
 //was consumed from the incoming args array during parsing, and an error
 //value if parsing failed
-func getInt(arg flags.SplitArgument, args []string) (int, bool, error) {
+func getIntArg(arg flags.SplitArgument, args []string) (int, bool, error) {
 	var rawVal string
 	consumeValue := false
 	rawVal, hasVal := arg.Value()
@@ -293,4 +322,18 @@ func getInt(arg flags.SplitArgument, args []string) (int, bool, error) {
 		return val, consumeValue, fmt.Errorf("expected an integer value but got '%v'", rawVal)
 	}
 	return val, consumeValue, nil
+}
+
+//getStringArg returns 3 args: the parsed string value, a bool set to true if a value
+//was consumed from the incoming args array during parsing, and an error
+//value if parsing failed
+func getStringArg(arg flags.SplitArgument, args []string) (string, bool, error) {
+	value, hasVal := arg.Value()
+	if hasVal {
+		return value, false, nil
+	}
+	if len(args) == 0 {
+		return "", false, fmt.Errorf("no value specified")
+	}
+	return args[0], true, nil
 }
