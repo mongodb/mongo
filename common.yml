@@ -986,6 +986,7 @@ tasks:
       params:
         working_dir: src
         script: |
+          set -e
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
           mv ./mongodb/mongos${extension} .
