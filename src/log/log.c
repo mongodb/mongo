@@ -7,17 +7,13 @@
 
 #include "wt_internal.h"
 
-static int
-__log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
-    uint32_t flags);
-static int
-__log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
-    uint32_t flags);
-static int
-__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out);
+static int __log_decompress(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM **);
+static int __log_read_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
+    uint32_t);
+static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
+    uint32_t);
 
 #define	WT_LOG_COMPRESS_SKIP (offsetof(WT_LOG_RECORD, record))
-#define LOG_UNCOMPRESSED_SIZE_FIELD(logrec) *((uint32_t *)&(logrec)->unused[2])
 
 /*
  * __wt_log_ckpt --
@@ -278,7 +274,8 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 
 /*
  * __log_decompress --
- *	Decompress a log record.
+ *	Decompress a log record.  The result is put into a scratch
+ *	buffer that the caller must free.
  */
 static int
 __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
@@ -287,9 +284,8 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG_RECORD *logrec;
-	size_t skip;
+	size_t result_len, skip;
 	uint32_t uncompressed_size;
-	size_t result_len;
 
 	conn = S2C(session);
 	logrec = (WT_LOG_RECORD *)in->mem;
@@ -299,8 +295,8 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		WT_ERR_MSG(session, WT_ERROR,
 		    "log_read: Compressed record with "
 		    "no configured compressor");
-	uncompressed_size = LOG_UNCOMPRESSED_SIZE_FIELD(logrec);
-	WT_RET(__wt_scr_alloc(session, 0, out));
+	uncompressed_size = logrec->mem_len;
+	WT_ERR(__wt_scr_alloc(session, 0, out));
 	WT_ERR(__wt_buf_initsize(session, *out, uncompressed_size));
 	memcpy((*out)->mem, in->mem, skip);
 	WT_ERR(compressor->decompress(compressor, &session->iface,
@@ -584,6 +580,7 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 
 	conn = S2C(session);
 	log = conn->log;
+	log_fh = NULL;
 	/*
 	 * Preparing a log file entails creating a temporary file:
 	 * - Writing the header.
@@ -598,7 +595,6 @@ __wt_log_prealloc(WT_SESSION_IMPL *session, uint32_t lognum)
 	/*
 	 * Set up the temporary file.
 	 */
-	log_fh = NULL;
 	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
@@ -1062,8 +1058,9 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 
 /*
  * __wt_log_read --
- *	Read the log record at the given LSN.  Return the record (including
- *	the log header) in the WT_ITEM.  Caller is responsible for freeing it.
+ *	Read the log record at the given LSN.  Return the potentially
+ *	compressed record (including the log header) in the WT_ITEM.  Caller
+ *	is responsible for freeing it.
  */
 int
 __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
@@ -1075,7 +1072,6 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_ITEM swap;
 
 	WT_ERR(__log_read_internal(session, record, lsnp, flags));
-	/*TODO: check that mem is large enough */
 	logrec = (WT_LOG_RECORD *)record->mem;
 	if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
 		WT_ERR(__log_decompress(session, record, &uncitem));
@@ -1090,9 +1086,10 @@ err:	__wt_scr_free(&uncitem);
 }
 
 /*
- * __wt_log_read --
- *	Read the log record at the given LSN.  Return the record (including
- *	the log header) in the WT_ITEM.  Caller is responsible for freeing it.
+ * __log_read_internal --
+ *	Read the log record at the given LSN.  Return the uncompressed record
+ *	(including the log header) in the WT_ITEM.  Caller is responsible for
+ *	freeing it.
  */
 static int
 __log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
@@ -1374,9 +1371,9 @@ advance:
 				WT_ERR((*func)(session, uncitem, &rd_lsn,
 				    cookie));
 				__wt_scr_free(&uncitem);
-			} else {
+			} else
 				WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
-			}
+
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
 		}
@@ -1455,16 +1452,16 @@ int
 __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
+	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(citem);
+	WT_DECL_RET;
 	WT_ITEM *ip;
-	WT_COMPRESSOR *compressor;
 	WT_LOG *log;
 	WT_LOG_RECORD *complrp;
-	size_t len, src_len, dst_len, result_len, size;
 	int compression_failed;
+	size_t len, src_len, dst_len, result_len, size;
 	uint8_t *src, *dst;
-	WT_DECL_RET;
 
 	conn = S2C(session);
 	ip = record;
@@ -1484,10 +1481,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 */
 		if (compressor->pre_size == NULL)
 			len = src_len;
-		else {
+		else
 			WT_ERR(compressor->pre_size(compressor,
 			    &session->iface, src, src_len, &len));
-		}
 
 		size = len + WT_LOG_COMPRESS_SKIP;
 		WT_ERR(__wt_scr_alloc(session, size, &citem));
@@ -1514,13 +1510,13 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		if (compression_failed ||
 		    result_len / log->allocsize >=
 		    record->size / log->allocsize)
-			WT_STAT_FAST_DATA_INCR(session,
-			    log_compress_write_fail);
+			WT_STAT_FAST_CONN_INCR(session,
+			    log_compress_write_fails);
 		else {
-			WT_STAT_FAST_DATA_INCR(session, log_compress_write);
-			WT_STAT_FAST_DATA_INCRV(session, log_compress_mem,
+			WT_STAT_FAST_CONN_INCR(session, log_compress_writes);
+			WT_STAT_FAST_CONN_INCRV(session, log_compress_mem,
 			    record->size);
-			WT_STAT_FAST_DATA_INCRV(session, log_compress_len,
+			WT_STAT_FAST_CONN_INCRV(session, log_compress_len,
 			    result_len);
 
 			/*
@@ -1528,14 +1524,12 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			 * size.
 			 */
 			memcpy(citem->mem, record->mem, WT_LOG_COMPRESS_SKIP);
-			/*TODO: is this okay to mod the size here? */
 			citem->size = result_len;
 			ip = citem;
 			complrp = (WT_LOG_RECORD *)citem->mem;
 			F_SET(complrp, WT_LOG_RECORD_COMPRESSED);
 			complrp->len = result_len;
-			LOG_UNCOMPRESSED_SIZE_FIELD(complrp) = record->size;
-			/*TODO: chksum?  or handled elsewhere? */
+			complrp->mem_len = record->size;
 		}
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);

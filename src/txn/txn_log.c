@@ -416,14 +416,14 @@ __txn_printlog(
     WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie)
 {
 	FILE *out;
+	WT_LOG_RECORD *logrec;
 	WT_LSN ckpt_lsn;
+	int compressed;
 	uint64_t txnid;
 	uint32_t fileid, rectype;
 	int32_t start;
 	const uint8_t *end, *p;
 	const char *msg;
-	WT_LOG_RECORD *logrec;
-	int compressed;
 
 	out = cookie;
 
