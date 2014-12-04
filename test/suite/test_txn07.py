@@ -56,10 +56,10 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
-        #('trunc-all', dict(op1=('all', 0))),
+        ('trunc-all', dict(op1=('all', 0))),
         ('trunc-both', dict(op1=('both', 2))),
-        #('trunc-start', dict(op1=('start', 2))),
-        #('trunc-stop', dict(op1=('stop', 2))),
+        ('trunc-start', dict(op1=('start', 2))),
+        ('trunc-stop', dict(op1=('stop', 2))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
     compress = [
@@ -216,15 +216,34 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
             op, k = ok
             
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
-            c2 = self.session.open_cursor(self.uri, None)
-            # For both, the key given is the start key.  Add 2
-            # for the stop key.
-            kstart = k
-            kstop = k + 2
-            c.set_key(kstart)
-            c2.set_key(kstop)
-            self.session.truncate(None, c, c2, None)
-            c2.close()
+            if op == 'stop':
+                c.set_key(k)
+                self.session.truncate(None, None, c, None)
+                kstart = 1
+                kstop = k
+            elif op == 'start':
+                c.set_key(k)
+                self.session.truncate(None, c, None, None)
+                kstart = k
+                kstop = len(current)
+            elif op == 'both':
+                c2 = self.session.open_cursor(self.uri, None)
+                # For both, the key given is the start key.  Add 2
+                # for the stop key.
+                kstart = k
+                kstop = k + 2
+                c.set_key(kstart)
+                c2.set_key(kstop)
+                self.session.truncate(None, c, c2, None)
+                c2.close()
+            elif op == 'all':
+                c2 = self.session.open_cursor(self.uri, None)
+                kstart = 1
+                kstop = len(current)
+                c.set_key(kstart)
+                c2.set_key(kstop)
+                self.session.truncate(None, c, c2, None)
+                c2.close()
 
             while (kstart <= kstop):
                 del current[kstart]
