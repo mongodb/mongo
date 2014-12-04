@@ -410,8 +410,8 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		 */
 		saved_dhandle = dhandle;
 		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __wt_conn_btree_apply(
-		    session, 1, __curstat_checkpoint, cfg_arg));
+		    ret = __wt_conn_btree_apply_uri(
+		    session, 1, dhandle->name, __curstat_checkpoint, cfg_arg));
 		session->dhandle = saved_dhandle;
 	}
 

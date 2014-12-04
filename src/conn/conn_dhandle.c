@@ -511,6 +511,54 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_conn_btree_apply_uri --
+ *	Apply a function to all open btree handles for a URI.
+ */
+int
+__wt_conn_btree_apply_uri(WT_SESSION_IMPL *session,
+    int apply_checkpoints, const char *uri,
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+
+	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+		    strcmp(dhandle->name, uri) == 0 &&
+		    (apply_checkpoints || dhandle->checkpoint == NULL)) {
+			/*
+			 * We need to pull the handle into the session handle
+			 * cache and make sure it's referenced to stop other
+			 * internal code dropping the handle (e.g in LSM when
+			 * cleaning up obsolete chunks). Holding the metadata
+			 * lock isn't enough.
+			 */
+			ret = __wt_session_get_btree(session,
+			    dhandle->name, dhandle->checkpoint, NULL, 0);
+			if (ret == 0) {
+				ret = func(session, cfg);
+				if (WT_META_TRACKING(session))
+					WT_TRET(__wt_meta_track_handle_lock(
+					    session, 0));
+				else
+					WT_TRET(__wt_session_release_btree(
+					    session));
+			} else if (ret == EBUSY)
+				ret = __wt_conn_btree_apply_single(
+				    session, dhandle->name,
+				    dhandle->checkpoint, func, cfg);
+			WT_RET(ret);
+		}
+
+	return (0);
+}
+
+/*
  * __wt_conn_btree_apply_single --
  *	Apply a function to a single btree handle that couldn't be locked
  * (attempting to get the handle returned EBUSY).
