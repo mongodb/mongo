@@ -105,7 +105,7 @@ namespace {
             case PlanExecutor::DEAD:
                 db->dropCollection( txn, toNs );
                 return Status( ErrorCodes::InternalError, "executor turned dead while iterating" );
-            case PlanExecutor::EXEC_ERROR:
+            case PlanExecutor::FAILURE:
                 return Status( ErrorCodes::InternalError, "executor error while iterating" );
             case PlanExecutor::ADVANCED:
                 if ( excessSize > 0 ) {

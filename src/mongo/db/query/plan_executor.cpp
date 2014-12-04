@@ -201,8 +201,8 @@ namespace mongo {
             return "DEAD";
         }
         else {
-            verify(PlanExecutor::EXEC_ERROR == s);
-            return "EXEC_ERROR";
+            verify(PlanExecutor::FAILURE == s);
+            return "FAILURE";
         }
     }
 
@@ -355,7 +355,7 @@ namespace mongo {
                 if (NULL != objOut) {
                     WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
                 }
-                return PlanExecutor::EXEC_ERROR;
+                return PlanExecutor::FAILURE;
             }
         }
     }
@@ -403,7 +403,7 @@ namespace mongo {
         if (PlanExecutor::DEAD == state) {
             return Status(ErrorCodes::OperationFailed, "Exec error: PlanExecutor killed");
         }
-        else if (PlanExecutor::EXEC_ERROR == state) {
+        else if (PlanExecutor::FAILURE == state) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Exec error: "
                                         << WorkingSetCommon::toStatusString(obj));

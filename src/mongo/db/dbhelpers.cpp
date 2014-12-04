@@ -403,7 +403,7 @@ namespace mongo {
                     break;
                 }
 
-                if (PlanExecutor::EXEC_ERROR == state) {
+                if (PlanExecutor::FAILURE == state) {
                     warning(LogComponent::kSharding) << "cursor error while trying to delete "
                               << min << " to " << max
                               << " in " << ns << ": "

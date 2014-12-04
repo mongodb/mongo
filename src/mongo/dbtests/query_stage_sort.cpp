@@ -389,7 +389,7 @@ namespace QueryStageSortTests {
             boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
-            ASSERT_EQUALS(PlanExecutor::EXEC_ERROR, runnerState);
+            ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);
         }
     };
 

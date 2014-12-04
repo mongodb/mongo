@@ -71,7 +71,7 @@ namespace mongo {
             // If the underlying PlanStage has any information on the error, it will be available in
             // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
             // details from the output BSON object.
-            EXEC_ERROR,
+            FAILURE,
         };
 
         /**

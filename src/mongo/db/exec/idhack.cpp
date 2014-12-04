@@ -50,7 +50,6 @@ namespace mongo {
           _collection(collection),
           _workingSet(ws),
           _key(query->getQueryObj()["_id"].wrap()),
-          _killed(false),
           _done(false),
           _idBeingPagedIn(WorkingSet::INVALID_ID),
           _commonStats(kStageType) {
@@ -68,7 +67,6 @@ namespace mongo {
           _collection(collection),
           _workingSet(ws),
           _key(key),
-          _killed(false),
           _done(false),
           _addKeyMetadata(false),
           _idBeingPagedIn(WorkingSet::INVALID_ID),
@@ -83,7 +81,7 @@ namespace mongo {
             return false;
         }
 
-        return _killed || _done;
+        return  _done;
     }
 
     PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
@@ -92,7 +90,6 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (_killed) { return PlanStage::DEAD; }
         if (_done) { return PlanStage::IS_EOF; }
 
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {

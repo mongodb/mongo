@@ -94,9 +94,6 @@ namespace mongo {
         // The value to match against the _id field.
         BSONObj _key;
 
-        // Did someone call kill() on us?
-        bool _killed;
-
         // Have we returned our one document?
         bool _done;
 

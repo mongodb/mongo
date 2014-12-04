@@ -329,9 +329,9 @@ namespace mongo {
             // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
-            if (PlanExecutor::DEAD == state || PlanExecutor::EXEC_ERROR == state) {
+            if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
                 // Propagate this error to caller.
-                if (PlanExecutor::EXEC_ERROR == state) {
+                if (PlanExecutor::FAILURE == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
                     error() << "Plan executor error, stats: "
                             << Explain::statsToBSON(*stats);
@@ -755,7 +755,7 @@ namespace mongo {
         exec->deregisterExec();
 
         // Caller expects exceptions thrown in certain cases.
-        if (PlanExecutor::EXEC_ERROR == state) {
+        if (PlanExecutor::FAILURE == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error, stats: "
                     << Explain::statsToBSON(*stats);
