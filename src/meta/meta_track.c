@@ -221,7 +221,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	 * durability, checkpoint the metadata.
 	 */
 	if (!unroll && ret == 0 && session->metafile != NULL &&
-	    !S2C(session)->logging)
+	    !FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 		WT_WITH_BTREE(session, session->metafile,
 		    ret = __wt_checkpoint(session, NULL));
 

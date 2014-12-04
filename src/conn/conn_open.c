@@ -124,7 +124,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * has completed then shut down the log manager (only after closing
 	 * data handles).
 	 */
-	if (conn->logging) {
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
 		WT_TRET(__wt_logmgr_destroy(session));

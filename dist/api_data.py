@@ -489,18 +489,21 @@ common_wiredtiger_open = [
         enable logging''',
         type='category', subconfig=[
         Config('archive', 'true', r'''
-        automatically archive unneeded log files''',
-        type='boolean'),
+            automatically archive unneeded log files''',
+            type='boolean'),
         Config('enabled', 'false', r'''
-        enable logging subsystem''',
-        type='boolean'),
+            enable logging subsystem''',
+            type='boolean'),
         Config('file_max', '100MB', r'''
-        the maximum size of log files''',
-        min='100KB', max='2GB'),
+            the maximum size of log files''',
+            min='100KB', max='2GB'),
         Config('path', '""', r'''
-        the path to a directory into which the log files are written.
-        If the value is not an absolute path name, the files are created
-        relative to the database home'''),
+            the path to a directory into which the log files are written.
+            If the value is not an absolute path name, the files are created
+            relative to the database home'''),
+        Config('prealloc', 'true', r'''
+            pre-allocate log files.''',
+            type='boolean'),
         ]),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
@@ -518,14 +521,14 @@ common_wiredtiger_open = [
         how to sync log records when the transaction commits''',
         type='category', subconfig=[
         Config('enabled', 'false', r'''
-        whether to sync the log on every commit by default, can
+            whether to sync the log on every commit by default, can
         be overridden by the \c sync setting to
         WT_SESSION::begin_transaction''',
-        type='boolean'),
+            type='boolean'),
         Config('method', 'fsync', r'''
-        the method used to ensure log records are stable on disk,
+            the method used to ensure log records are stable on disk,
         see @ref tune_durability for more information''',
-        choices=['dsync', 'fsync', 'none']),
+            choices=['dsync', 'fsync', 'none']),
         ]),
 ]
 

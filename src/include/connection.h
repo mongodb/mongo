@@ -247,16 +247,19 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
-	int		 logging;	/* Global logging configuration */
-	int		 archive;	/* Global archive configuration */
-	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
-	WT_SESSION_IMPL *arch_session;	/* Log archive session */
-	wt_thread_t	 arch_tid;	/* Log archive thread */
-	int		 arch_tid_set;	/* Log archive thread set */
+#define	WT_CONN_LOG_ARCHIVE	0x01	/* Archive is enabled */
+#define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
+#define	WT_CONN_LOG_PREALLOC	0x04	/* Pre-allocation is enabled */
+	uint32_t	 log_flags;	/* Global logging configuration */
+	WT_CONDVAR	*log_cond;	/* Log archive wait mutex */
+	WT_SESSION_IMPL *log_session;	/* Log archive session */
+	wt_thread_t	 log_tid;	/* Log archive thread */
+	int		 log_tid_set;	/* Log archive thread set */
 	WT_LOG		*log;		/* Logging structure */
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
-	uint32_t	txn_logsync;	/* Log sync configuration */
+	uint32_t	 log_prealloc;	/* Log file pre-allocation */
+	uint32_t	 txn_logsync;	/* Log sync configuration */
 
 	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */
 	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
