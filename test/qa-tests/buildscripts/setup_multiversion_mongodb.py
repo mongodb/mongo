@@ -7,6 +7,7 @@ import tempfile
 import urllib2
 import subprocess
 import tarfile
+import zipfile
 import shutil
 import errno
 # To ensure it exists on the system
@@ -124,25 +125,35 @@ class MultiVersionDownloader :
             with open(temp_file, 'wb') as f:
                 f.write(data.read())
                 print "Uncompressing data for version %s (%s)..." % (version, full_version)
-    
-            # Can't use cool with syntax b/c of python 2.6
-            tf = tarfile.open(temp_file, 'r:gz')
-    
+                
+            tf = ""
             try:
+                tf = tarfile.open(temp_file, 'r:gz')
                 tf.extractall(path=temp_dir)
-            except:
                 tf.close()
-                raise
-    
-            tf.close()
-    
+            except:
+                zfile = zipfile.ZipFile(temp_file)
+                try:
+                    for name in zfile.namelist():
+                        _, filename = os.path.split(name)
+                        print "Decompressing " + filename + " on " + temp_dir
+                        if not os.path.exists(temp_dir):
+                            os.makedirs(temp_dir)
+                        zfile.extract(name, temp_dir)
+                    zfile.close()
+                except:
+                    raise
+            
+
             temp_install_dir = os.path.join(temp_dir, extract_dir)
-    
             shutil.move(temp_install_dir, self.install_dir)
-    
+            # remove windows executables' '.exe' extension
+            installed_in = os.path.join(os.path.abspath(os.path.join(self.install_dir, extract_dir)), "bin")
+            for executable in os.listdir(installed_in):
+                if executable.endswith(".exe"):
+                    os.rename(os.path.join(installed_in, executable), os.path.join(installed_in, executable[:-4]))
             shutil.rmtree(temp_dir)
             os.remove(temp_file)
-
         self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
 
 
