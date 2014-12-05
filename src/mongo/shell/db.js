@@ -713,10 +713,11 @@ DB.prototype.getReplicationInfo = function() {
 
     var result = { };
     var oplog;
-    if (localdb.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
+    var localCollections = localdb.getCollectionNames();
+    if (localCollections.indexOf('oplog.rs') >= 0) {
         oplog = 'oplog.rs';
     }
-    else if (localdb.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
+    else if (localCollections.indexOf('oplog.$main') >= 0) {
         oplog = 'oplog.$main';
     }
     else {
@@ -724,16 +725,17 @@ DB.prototype.getReplicationInfo = function() {
         return result;
     }
 
-    var ol_entry = localdb.system.namespaces.findOne({name:"local."+oplog});
-    if( ol_entry && ol_entry.options ) {
-        result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
+    var ol = localdb.getCollection(oplog);
+    var ol_stats = ol.stats();
+    if( ol_stats && ol_stats.maxSize ) {
+        result.logSizeMB = ol_stats.maxSize / ( 1024 * 1024 );
     } else {
-        result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
+        result.errmsg  = "Could not get stats for local."+oplog+" collection. " +
+            "collstats returned: " + tojson(ol_stats);
         return result;
     }
-    ol = localdb.getCollection(oplog);
 
-    result.usedMB = ol.stats().size / ( 1024 * 1024 );
+    result.usedMB = ol_stats.size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
 
     var firstc = ol.find().sort({$natural:1}).limit(1);
