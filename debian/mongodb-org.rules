@@ -21,7 +21,6 @@ build-stamp: configure-stamp
 	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
 	# scons 
 	#docbook-to-man debian/mongodb.sgml > mongodb.1
-
 	echo -n > debian/mongodb-org-tools.manpages
 	for binary in ${TOOLS} ; \
 	do \
@@ -81,14 +80,13 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-tools/usr/bin
-
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
+	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-shell/usr/bin
+	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-server/usr/bin
+	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-mongos/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/BINARIES/usr/bin/$$binary $(CURDIR)/debian/mongodb-org-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-tools/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-server/etc

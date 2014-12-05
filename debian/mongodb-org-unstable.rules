@@ -81,13 +81,13 @@ install: build
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
-	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
+	cp -v $(CURDIR)/bin/mongo $(CURDIR)/debian/mongodb-org-unstable-shell/usr/bin
+	cp -v $(CURDIR)/bin/mongod $(CURDIR)/debian/mongodb-org-unstable-server/usr/bin
+	cp -v $(CURDIR)/bin/mongos $(CURDIR)/debian/mongodb-org-unstable-mongos/usr/bin
 
 	for binary in ${TOOLS} ; \
 	do \
-	  cp -v $(CURDIR)/BINARIES/usr/bin/$$binary $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin ; \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin ; \
 	done
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/etc
