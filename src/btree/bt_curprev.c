@@ -257,8 +257,9 @@ new_page:
  *	Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
+__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -276,9 +277,8 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 	for (;;) {
 		WT_RET(__cursor_skip_prev(cbt));
 new_page:	if (cbt->ins == NULL) {
-			*need_evict = (newpage && skipped) ||
-			    skipped > WT_BTREE_DELETE_THRESHOLD;
-			return (WT_NOTFOUND);
+			ret = WT_NOTFOUND;
+			break;
 		}
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
@@ -292,7 +292,16 @@ new_page:	if (cbt->ins == NULL) {
 		val->size = upd->size;
 		break;
 	}
-	return (0);
+
+	/*
+	 * If we saw a lot of deleted records, try to evict the page when we
+	 * release it.  Otherwise repeatedly deleting from the end of a tree
+	 * can have quadratic performance.
+	 */
+	if (cbt->ref != NULL &&
+	    ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD))
+		__wt_page_evict_soon(cbt->ref->page);
+	return (ret);
 }
 
 /*
@@ -300,11 +309,12 @@ new_page:	if (cbt->ins == NULL) {
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
+__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
@@ -330,14 +340,15 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
 new_page:	if (cbt->recno < page->pg_var_recno) {
-			*need_evict = (newpage && skipped) ||
-			    skipped > WT_BTREE_DELETE_THRESHOLD;
-			return (WT_NOTFOUND);
+			ret = WT_NOTFOUND;
+			break;
 		}
 
 		/* Find the matching WT_COL slot. */
-		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
-			return (WT_NOTFOUND);
+		if ((cip = __col_var_search(page, cbt->recno)) == NULL) {
+			ret = WT_NOTFOUND;
+			break;
+		}
 		cbt->slot = WT_COL_SLOT(page, cip);
 
 		/* Check any insert list for a matching record. */
@@ -353,7 +364,7 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
-			return (0);
+			break;
 		}
 
 		/*
@@ -376,9 +387,17 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 		}
 		val->data = cbt->tmp.data;
 		val->size = cbt->tmp.size;
-		return (0);
+		break;
 	}
-	/* NOTREACHED */
+
+	/*
+	 * If we saw a lot of deleted records, try to evict the page when we
+	 * release it.  Otherwise repeatedly deleting from the end of a tree
+	 * can have quadratic performance.
+	 */
+	if ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD)
+		__wt_page_evict_soon(page);
+	return (ret);
 }
 
 /*
@@ -386,8 +405,9 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
  *	Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
 	WT_PAGE *page;
@@ -452,14 +472,13 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
-			return (0);
+			break;
 		}
 
 		/* Check for the beginning of the page. */
 		if (cbt->row_iteration_slot == 1) {
-			*need_evict = (newpage && skipped) ||
-			    skipped > WT_BTREE_DELETE_THRESHOLD;
-			return (WT_NOTFOUND);
+			ret = WT_NOTFOUND;
+			break;
 		}
 		--cbt->row_iteration_slot;
 
@@ -486,9 +505,18 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			continue;
 		}
 
-		return (__cursor_row_slot_return(cbt, rip, upd));
+		ret = __cursor_row_slot_return(cbt, rip, upd);
+		break;
 	}
-	/* NOTREACHED */
+
+	/*
+	 * If we saw a lot of deleted records, try to evict the page when we
+	 * release it.  Otherwise repeatedly deleting from the end of a tree
+	 * can have quadratic performance.
+	 */
+	if ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD)
+		__wt_page_evict_soon(page);
+	return (ret);
 }
 
 /*
@@ -502,7 +530,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int need_evict, newpage;
+	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -527,7 +555,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	for (need_evict = newpage = 0;; need_evict = 0, newpage = 1) {
+	for (newpage = 0;; newpage = 1) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
@@ -546,8 +574,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				ret = __cursor_fix_append_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_append_prev(
-				    cbt, newpage, &need_evict);
+				ret = __cursor_var_append_prev(cbt, newpage);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -564,21 +591,16 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				ret = __cursor_fix_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_prev(
-				    cbt, newpage, &need_evict);
+				ret = __cursor_var_prev(cbt, newpage);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __cursor_row_prev(
-				    cbt, newpage, &need_evict);
+				ret = __cursor_row_prev(cbt, newpage);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			if (ret != WT_NOTFOUND)
 				break;
 		}
-
-		if (need_evict)
-			__wt_page_evict_soon(page);
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
