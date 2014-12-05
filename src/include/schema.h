@@ -50,6 +50,7 @@ struct __wt_index {
 struct __wt_table {
 	const char *name, *config, *plan;
 	const char *key_format, *value_format;
+	uint64_t name_hash;		/* Hash of name */
 
 	WT_CONFIG_ITEM cgconf, colconf;
 

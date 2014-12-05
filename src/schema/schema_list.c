@@ -42,9 +42,14 @@ __schema_find_table(WT_SESSION_IMPL *session,
 {
 	WT_TABLE *table;
 	const char *tablename;
+	uint64_t hash;
+
+	hash = __wt_hash_city64(name, namelen);
 
 restart:
 	TAILQ_FOREACH(table, &session->tables, q) {
+		if (table->name_hash != hash)
+			continue;
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
