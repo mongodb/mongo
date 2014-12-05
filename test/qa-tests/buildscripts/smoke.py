@@ -566,7 +566,8 @@ def runTest(test, result):
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
-        evalString = 'TestData = new Object();' + \
+        evalString = 'load("jstests/libs/servers.js");load("jstests/libs/servers_misc.js");' +\
+                     'TestData = new Object();' + \
                      'TestData.storageEngine = "' + ternary( storage_engine, storage_engine, "" ) + '";' + \
                      'TestData.wiredTigerEngineConfig = "' + ternary( wiredtiger_engine_config, wiredtiger_engine_config, "" ) + '";' + \
                      'TestData.wiredTigerCollectionConfig = "' + ternary( wiredtiger_collection_config, wiredtiger_collection_config, "" ) + '";' + \
@@ -598,6 +599,9 @@ def runTest(test, result):
 
         if auth and usedb:
             evalString += 'jsTest.authenticate(db.getMongo());'
+
+        if os.getenv('SMOKE_EVAL') is not None:
+            evalString += os.getenv('SMOKE_EVAL')
 
         argv = argv + [ '--eval', evalString]
 
