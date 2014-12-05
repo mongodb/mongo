@@ -257,14 +257,16 @@ new_page:
  *	Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
+__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
+	skipped = 0;
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
@@ -273,13 +275,15 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 
 	for (;;) {
 		WT_RET(__cursor_skip_prev(cbt));
-new_page:	if (cbt->ins == NULL)
+new_page:	if (cbt->ins == NULL) {
+			*need_evict = newpage && skipped;
 			return (WT_NOTFOUND);
+		}
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
 		    WT_UPDATE_DELETED_ISSET(upd)) {
-			*skipped = 1;
+			skipped = 1;
 			continue;
 		}
 		val->data = WT_UPDATE_DATA(upd);
@@ -294,7 +298,7 @@ new_page:	if (cbt->ins == NULL)
  *	Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
+__cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
@@ -303,10 +307,12 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	val = &cbt->iface.value;
+	skipped = 0;
 
 	/* Initialize for each new page. */
 	if (newpage) {
@@ -321,8 +327,10 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 	for (;;) {
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
-new_page:	if (cbt->recno < page->pg_var_recno)
+new_page:	if (cbt->recno < page->pg_var_recno) {
+			*need_evict = newpage && skipped;
 			return (WT_NOTFOUND);
+		}
 
 		/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
@@ -336,7 +344,7 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				*skipped = 1;
+				skipped = 1;
 				continue;
 			}
 
@@ -357,7 +365,7 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
 			if (unpack.type == WT_CELL_DEL) {
-				*skipped = 1;
+				skipped = 1;
 				continue;
 			}
 			WT_RET(__wt_page_cell_data_ref(
@@ -377,7 +385,7 @@ new_page:	if (cbt->recno < page->pg_var_recno)
  *	Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
@@ -385,11 +393,13 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
+	skipped = 0;
 
 	/*
 	 * For row-store pages, we need a single item that tells us the part
@@ -431,9 +441,10 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage, int *skipped)
 			WT_RET(__cursor_skip_prev(cbt));
 
 new_insert:	if ((ins = cbt->ins) != NULL) {
-			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
-			    WT_UPDATE_DELETED_ISSET(upd)) {
-				*skipped = 1;
+			if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+				continue;
+			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				skipped = 1;
 				continue;
 			}
 			key->data = WT_INSERT_KEY(ins);
@@ -444,8 +455,10 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the beginning of the page. */
-		if (cbt->row_iteration_slot == 1)
+		if (cbt->row_iteration_slot == 1) {
+			*need_evict = newpage && skipped;
 			return (WT_NOTFOUND);
+		}
 		--cbt->row_iteration_slot;
 
 		/*
@@ -467,7 +480,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
-			*skipped = 1;
+			skipped = 1;
 			continue;
 		}
 
@@ -487,7 +500,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int skipped, newpage;
+	int need_evict, newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -512,7 +525,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	for (skipped = newpage = 0;; skipped = 0, newpage = 1) {
+	for (need_evict = newpage = 0;; need_evict = 0, newpage = 1) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 
@@ -532,7 +545,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				break;
 			case WT_PAGE_COL_VAR:
 				ret = __cursor_var_append_prev(
-				    cbt, newpage, &skipped);
+				    cbt, newpage, &need_evict);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -549,10 +562,12 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				ret = __cursor_fix_prev(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
-				ret = __cursor_var_prev(cbt, newpage, &skipped);
+				ret = __cursor_var_prev(
+				    cbt, newpage, &need_evict);
 				break;
 			case WT_PAGE_ROW_LEAF:
-				ret = __cursor_row_prev(cbt, newpage, &skipped);
+				ret = __cursor_row_prev(
+				    cbt, newpage, &need_evict);
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
@@ -560,7 +575,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 				break;
 		}
 
-		if (newpage && skipped)
+		if (need_evict)
 			page->read_gen = WT_READGEN_OLDEST;
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
