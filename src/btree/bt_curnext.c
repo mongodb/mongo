@@ -484,7 +484,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 		 * can have quadratic performance.
 		 */
 		if (need_evict)
-			page->read_gen = WT_READGEN_OLDEST;
+			__wt_page_evict_soon(page);
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
