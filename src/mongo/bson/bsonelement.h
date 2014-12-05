@@ -169,7 +169,7 @@ namespace mongo {
         }
 
         const StringData fieldNameStringData() const {
-            return StringData(fieldName(), fieldNameSize() - 1);
+            return StringData(fieldName(), eoo() ? 0 : fieldNameSize() - 1);
         }
 
         /** raw data of the element's value (so be careful). */
@@ -647,8 +647,8 @@ namespace mongo {
     }
 
     inline BSONElement::BSONElement() {
-        static char z = 0;
-        data = &z;
+        static const char kEooElement[] = "";
+        data = kEooElement;
         fieldNameSize_ = 0;
         totalSize = 1;
     }
