@@ -1021,7 +1021,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	    event_handler == NULL ? session->event_handler : event_handler);
 
 	TAILQ_INIT(&session_ret->cursors);
-	SLIST_INIT(&session_ret->dhandles);
+	TAILQ_INIT(&session_ret->dhandles);
 
 	/* Initialize transaction support: default to read-committed. */
 	session_ret->isolation = TXN_ISO_READ_COMMITTED;
