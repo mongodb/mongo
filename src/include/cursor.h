@@ -94,6 +94,8 @@ struct __wt_cursor_btree {
 					/* Next item(s) found during search */
 	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
 
+	uint32_t page_deleted_count;	/* Deleted items on the page */
+
 	uint64_t recno;			/* Record number */
 
 	/*
