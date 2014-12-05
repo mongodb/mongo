@@ -276,14 +276,16 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 	for (;;) {
 		WT_RET(__cursor_skip_prev(cbt));
 new_page:	if (cbt->ins == NULL) {
-			*need_evict = newpage && skipped;
+			*need_evict = (newpage && skipped) ||
+			    skipped > WT_BTREE_DELETE_THRESHOLD;
 			return (WT_NOTFOUND);
 		}
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
-		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
-		    WT_UPDATE_DELETED_ISSET(upd)) {
-			skipped = 1;
+		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL)
+			continue;
+		if (WT_UPDATE_DELETED_ISSET(upd)) {
+			++skipped;
 			continue;
 		}
 		val->data = WT_UPDATE_DATA(upd);
@@ -328,7 +330,8 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage, int *need_evict)
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
 new_page:	if (cbt->recno < page->pg_var_recno) {
-			*need_evict = newpage && skipped;
+			*need_evict = (newpage && skipped) ||
+			    skipped > WT_BTREE_DELETE_THRESHOLD;
 			return (WT_NOTFOUND);
 		}
 
@@ -344,7 +347,7 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				skipped = 1;
+				++skipped;
 				continue;
 			}
 
@@ -364,10 +367,8 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			if (unpack.type == WT_CELL_DEL) {
-				skipped = 1;
+			if (unpack.type == WT_CELL_DEL)
 				continue;
-			}
 			WT_RET(__wt_page_cell_data_ref(
 			    session, page, &unpack, &cbt->tmp));
 
@@ -444,7 +445,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
 				continue;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				skipped = 1;
+				++skipped;
 				continue;
 			}
 			key->data = WT_INSERT_KEY(ins);
@@ -456,7 +457,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 
 		/* Check for the beginning of the page. */
 		if (cbt->row_iteration_slot == 1) {
-			*need_evict = newpage && skipped;
+			*need_evict = (newpage && skipped) ||
+			    skipped > WT_BTREE_DELETE_THRESHOLD;
 			return (WT_NOTFOUND);
 		}
 		--cbt->row_iteration_slot;
@@ -480,7 +482,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
-			skipped = 1;
+			++skipped;
 			continue;
 		}
 
