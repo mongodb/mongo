@@ -132,8 +132,8 @@ struct __wt_connection_impl {
 
 	uint64_t  split_gen;		/* Generation number for splits */
 
-					/* Locked: data handle list */
-	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
+					/* Locked: data handle queue */
+	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */

@@ -140,7 +140,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 
 	/* Increment the reference count if we already have the btree open. */
 	hash = __wt_hash_city64(name, strlen(name));
-	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if ((hash == dhandle->name_hash &&
 		     strcmp(name, dhandle->name) == 0) &&
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
@@ -211,7 +211,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * need new files again soon, until they are cached by all sessions.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
-	SLIST_INSERT_HEAD(&conn->dhlh, dhandle, l);
+	TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
 
 	session->dhandle = dhandle;
 	return (0);
@@ -478,7 +478,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (apply_checkpoints || dhandle->checkpoint == NULL) &&
 		    ((uri == NULL && WT_PREFIX_MATCH(dhandle->name, "file:") &&
@@ -530,7 +530,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (strcmp(dhandle->name, uri) == 0 &&
 		    ((dhandle->checkpoint == NULL && checkpoint == NULL) ||
 		    (dhandle->checkpoint != NULL && checkpoint != NULL &&
@@ -574,7 +574,7 @@ __wt_conn_dhandle_close_all(
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	WT_ASSERT(session, session->dhandle == NULL);
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (strcmp(dhandle->name, name) != 0)
 			continue;
 
@@ -634,7 +634,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	if (!final && dhandle->session_ref != 0)
 		return (EBUSY);
 
-	SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
+	TAILQ_REMOVE(&conn->dhqh, dhandle, q);
 	return (0);
 
 }
@@ -706,7 +706,7 @@ __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 	 * the list, so we do it the hard way.
 	 */
 restart:
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
 
@@ -725,7 +725,7 @@ restart:
 	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
 	/* Close the metadata file handle. */
-	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)
+	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1)));
 
