@@ -119,7 +119,7 @@ namespace mongo {
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
 #endif
     }
 
@@ -134,7 +134,7 @@ namespace mongo {
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
         log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
 #endif
         throw e;
     }
@@ -144,7 +144,7 @@ namespace mongo {
         logContext();
         breakpoint();
         log() << "\n\n***aborting after invariant() failure\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
     }
 
     NOINLINE_DECL void invariantOKFailed(const char *msg, const Status& status, const char *file,
@@ -153,7 +153,7 @@ namespace mongo {
         logContext();
         breakpoint();
         log() << "\n\n***aborting after invariant() failure\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
     }
 
     NOINLINE_DECL void fassertFailed( int msgid ) {
@@ -161,14 +161,14 @@ namespace mongo {
         logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
     }
 
     NOINLINE_DECL void fassertFailedNoTrace( int msgid ) {
         log() << "Fatal Assertion " << msgid << endl;
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-        quickExit(EXIT_ABRUPT); // bypass our handler for SIGABRT, which prints a stack trace.
+        quickExit(EXIT_ABRUPT);
     }
 
     MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status) {
@@ -176,15 +176,14 @@ namespace mongo {
         logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-        abort();
+        quickExit(EXIT_ABRUPT);
     }
 
     MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTrace(int msgid, const Status& status) {
         log() << "Fatal assertion " <<  msgid << " " << status;
-        logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-        quickExit(EXIT_ABRUPT); // bypass our handler for SIGABRT, which prints a stack trace.
+        quickExit(EXIT_ABRUPT);
     }
 
     void uasserted(int msgid , const string &msg) {
@@ -244,14 +243,6 @@ namespace mongo {
 
     std::string causedBy( const Status& e ){
         return causedBy( e.reason() );
-    }
-
-    NOINLINE_DECL void streamNotGood( int code , const std::string& msg , std::ios& myios ) {
-        stringstream ss;
-        // errno might not work on all systems for streams
-        // if it doesn't for a system should deal with here
-        ss << msg << " stream invalid: " << errnoWithDescription();
-        throw UserException( code , ss.str() );
     }
 
     string errnoWithPrefix( const char * prefix ) {

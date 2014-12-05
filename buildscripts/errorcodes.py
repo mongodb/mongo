@@ -50,9 +50,9 @@ def parseSourceFiles( callback ):
     quick = [ "assert" , "Exception"]
 
     patterns = [
-        re.compile( r"[umsgf]asser(?:t|ted) *\( *(\d+)" ) ,
+        re.compile( r"[umsg]asser(?:t|ted)(?:NoTrace)? *\( *(\d+)" ) ,
         re.compile( r"(?:User|Msg|MsgAssertion)Exception *\( *(\d+)" ),
-        re.compile( r"fassertFailed(?:NoTrace|WithStatus)? *\( *(\d+)" )
+        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)? *\( *(\d+)" ),
     ]
 
     bad = [ re.compile( r"^\s*assert *\(" ) ]
