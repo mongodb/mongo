@@ -90,7 +90,7 @@ namespace mongo {
         Status validateDollarPrefixElement(const mb::ConstElement elem, const bool deep) {
             mb::ConstElement curr = elem;
             StringData currName = elem.getFieldName();
-
+            LOG(5) << "validateDollarPrefixElement -- validating field '" << currName << "'";
             // Found a $db field
             if (currName == "$db") {
                 if (curr.getType() != String) {
@@ -144,6 +144,25 @@ namespace mongo {
 
             }
 
+            return Status::OK();
+        }
+
+        /**
+         * Checks that all parents, of the element passed in, are valid for storage
+         *
+         * Note: The elem argument must be in a valid state when using this function
+         */
+        Status storageValidParents(const mb::ConstElement& elem) {
+            const mb::ConstElement& root = elem.getDocument().root();
+            const mb::ConstElement& parent = elem.parent();
+            if (elem != root && parent.ok() && parent != root) {
+                Status s = storageValid(parent, false);
+                if (s.isOK()) {
+                    s = storageValidParents(parent);
+                }
+
+                return s;
+            }
             return Status::OK();
         }
 
@@ -262,9 +281,17 @@ namespace mongo {
 
                     // newElem might be missing if $unset/$renamed-away
                     if (newElem.ok()) {
+
+                        // Check element, and its children
                         Status s = storageValid(newElem, true);
                         if (!s.isOK())
                             return s;
+
+                        // Check parents to make sure they are valid as well.
+                        s = storageValidParents(newElem);
+                        if (!s.isOK())
+                            return s;
+
                     }
                     // Check if the updated field conflicts with immutable fields
                     immutableFieldRef.findConflicts(&current, &changedImmutableFields);
