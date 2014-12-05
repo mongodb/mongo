@@ -58,7 +58,7 @@ load("jstests/files/mongofiles_common.js");
     jsTest.log("Searching files in GridFS with '" + passthrough.name + "' passthrough");
 
     // these search strings should be matched
-    var searchStrings = ["files", ".txt", "ile"];
+    var searchStrings = ["files", ".txt", "ile", "."];
 
     // add the verbatim file names put into GridFS
     for (var i = 0; i < filesToInsert.length; i++) {
