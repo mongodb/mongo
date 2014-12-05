@@ -130,24 +130,27 @@ class MultiVersionDownloader :
                 tf.extractall(path=temp_dir)
                 tf.close()
             except:
-                tf.close()
                 # support for windows
+                zfile = zipfile.ZipFile(temp_file)
                 try:
                     if not os.path.exists(temp_dir):
                         os.makedirs(temp_dir)
-                    zfile = zipfile.ZipFile(temp_file)
                     for name in zfile.namelist():
                         _, filename = os.path.split(name)
                         print "Decompressing " + filename + " on " + temp_dir
                         zfile.extract(name, temp_dir)
-                    zfile.close()
                 except:
                     zfile.close()
                     raise
+                zfile.close()
             temp_install_dir = os.path.join(temp_dir, extract_dir)
             shutil.move(temp_install_dir, self.install_dir)
             shutil.rmtree(temp_dir)
-            os.remove(temp_file)
+            try:
+                os.remove(temp_file)
+            except Exception as e:
+                print e
+                pass
         self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
 
 
@@ -169,10 +172,15 @@ class MultiVersionDownloader :
             try:
                 os.symlink(os.path.join(installed_dir, "bin", executable),\
                            os.path.join(self.link_dir, link_name))
-            except OSError as exc:
-                if exc.errno == errno.EEXIST:
-                    pass
-                else: raise
+            except Exception as exc:
+                try:
+                    # support for windows
+                    shutil.copy2(os.path.join(installed_dir, "bin", executable),\
+                               os.path.join(self.link_dir, link_name))
+                except:
+                    if exc.errno == errno.EEXIST:
+                        pass
+                    else: raise
 
 
 CL_HELP_MESSAGE = \
