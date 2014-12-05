@@ -466,6 +466,43 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     }
 
+    TEST_F(TopoCoordTest, BlacklistSyncSourceNoChaining) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "settings" << BSON("chainingAllowed" << false) <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 10 << "host" << "hself") <<
+                              BSON("_id" << 20 << "host" << "h2") <<
+                              BSON("_id" << 30 << "host" << "h3"))),
+                     0);
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_PRIMARY,
+                            OpTime(2, 0), Milliseconds(100));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_PRIMARY,
+                            OpTime(2, 0), Milliseconds(100));
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(2, 0), Milliseconds(100));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(2, 0), Milliseconds(100));
+
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+
+        Date_t expireTime = 100;
+        getTopoCoord().blacklistSyncSource(HostAndPort("h2"), expireTime);
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        // Can't choose any sync source now.
+        ASSERT(getTopoCoord().getSyncSourceAddress().empty());
+
+        // After time has passed, should go back to the primary
+        getTopoCoord().chooseNewSyncSource(expireTime, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    }
+
     TEST_F(TopoCoordTest, OnlyUnauthorizedUpCausesRecovering) {
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 1 <<

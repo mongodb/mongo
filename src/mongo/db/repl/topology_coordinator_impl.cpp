@@ -185,6 +185,12 @@ namespace {
                 _syncSource = HostAndPort();
                 return _syncSource;
             }
+            else if (_memberIsBlacklisted(*_currentPrimaryMember(), now)) {
+                LOG(1) << "Cannot select sync source because chaining is"
+                    "not allowed and primary is not currently accepting our updates";
+                _syncSource = HostAndPort();
+                return _syncSource;
+            }
             else {
                 _syncSource = _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
                 std::string msg(str::stream() << "syncing from primary: "
@@ -275,24 +281,10 @@ namespace {
                     }
                 }
 
-                std::map<HostAndPort,Date_t>::iterator vetoed = 
-                    _syncSourceBlacklist.find(itMemberConfig.getHostAndPort());
-                if (vetoed != _syncSourceBlacklist.end()) {
-                    // Do some veto housekeeping
-
-                    // if this was on the veto list, check if it was vetoed in the last "while".
-                    // if it was, skip.
-                    if (vetoed->second > now) {
-                        if (now % 5 == 0) {
-                            log() << "replSet not trying to sync from " << vetoed->first
-                                  << ", it is vetoed for " << (vetoed->second - now)/1000
-                                  << " more seconds";
-                        }
-                        continue;
-                    }
-                    _syncSourceBlacklist.erase(vetoed);
-                    // fall through, this is a valid candidate now
+                if (_memberIsBlacklisted(itMemberConfig, now)) {
+                    continue;
                 }
+
                 // This candidate has passed all tests; set 'closestIndex'
                 closestIndex = itIndex;
             }
@@ -316,6 +308,20 @@ namespace {
         log() << msg << rsLog;
         setMyHeartbeatMessage(now, msg);
         return _syncSource;
+    }
+
+    bool TopologyCoordinatorImpl::_memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now)
+    {
+        std::map<HostAndPort,Date_t>::iterator blacklisted =
+            _syncSourceBlacklist.find(memberConfig.getHostAndPort());
+        if (blacklisted != _syncSourceBlacklist.end()) {
+            if (blacklisted->second > now) {
+                return true;
+            }
+            // Do some veto housekeeping; side-effect!
+            _syncSourceBlacklist.erase(blacklisted);
+        }
+        return false;
     }
 
     void TopologyCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {

@@ -308,6 +308,14 @@ namespace repl {
 
         MemberState _getMyState() const;
 
+        /**
+         * Looks up the provided member in the blacklist and returns true if the member's blacklist
+         * expire time is after 'now'.  If the member is found but the expire time is before 'now',
+         * the member is removed from _syncSourceBlacklist and the function returns false.
+         * If the member is not found in the blacklist, the function simply returns false.
+         **/
+        bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now);
+
         // This node's role in the replication protocol.
         Role _role;
 
