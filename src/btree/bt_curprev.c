@@ -524,7 +524,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
-	cbt->page_deleted_count = 0;
 	for (newpage = 0;; newpage = 1) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));

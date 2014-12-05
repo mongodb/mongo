@@ -357,6 +357,11 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 	F_SET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
 	/*
+	 * Clear the count of deleted items on the page.
+	 */
+	cbt->page_deleted_count = 0;
+
+	/*
 	 * If we don't have a search page, then we're done, we're starting at
 	 * the beginning or end of the tree, not as a result of a search.
 	 */
@@ -433,7 +438,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	cbt->page_deleted_count = 0;
 	for (newpage = 0;; newpage = 1) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
