@@ -45,13 +45,13 @@ namespace mongo {
 
         string s = "eliot was here";
 
-        DiskLoc loc1;
+        RecordId loc1;
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
                 loc1 = res.getValue();
                 uow.commit();
@@ -66,7 +66,7 @@ namespace mongo {
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
 
             RecordData rd;
-            ASSERT( !rs->findRecord( opCtx.get(), DiskLoc(111,17), &rd ) );
+            ASSERT( !rs->findRecord( opCtx.get(), RecordId(111,17), &rd ) );
             ASSERT( rd.data() == NULL );
 
             ASSERT( rs->findRecord( opCtx.get(), loc1, &rd ) );
@@ -77,7 +77,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
                 uow.commit();
             }
@@ -108,7 +108,7 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
         
-        DiskLoc loc1;
+        RecordId loc1;
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -116,7 +116,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 DummyDocWriter dw;
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), &dw, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), &dw, false );
                 ASSERT_OK( res.getStatus() );
                 loc1 = res.getValue();
                 uow.commit();
@@ -137,13 +137,13 @@ namespace mongo {
 
         string s = "eliot was here";
 
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -183,13 +183,13 @@ namespace mongo {
 
         string s = "eliot was here";
 
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
                 res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
@@ -227,12 +227,12 @@ namespace mongo {
         string s1 = "eliot was here";
         string s2 = "eliot was here again";
 
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                            s1.c_str(), s1.size() + 1,
                                                            false );
                 ASSERT_OK( res.getStatus() );
@@ -251,7 +251,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(), loc,
+                StatusWith<RecordId> res = rs->updateRecord( opCtx.get(), loc,
                                                            s2.c_str(), s2.size() + 1,
                                                            false, NULL );
                 ASSERT_OK( res.getStatus() );
@@ -276,13 +276,13 @@ namespace mongo {
         string s1 = "aaa111bbb";
         string s2 = "aaa222bbb";
 
-        DiskLoc loc;
+        RecordId loc;
         const RecordData s1Rec(s1.c_str(), s1.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
                                                             s1Rec.data(),
                                                             s1Rec.size(),
                                                             -1 );
@@ -336,12 +336,12 @@ namespace mongo {
 
         string s = "eliot was here";
 
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -410,7 +410,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get() ) );
             while ( !it->isEOF() ) {
-                DiskLoc loc = it->getNext();
+                RecordId loc = it->getNext();
                 RecordData data = it->dataFor( loc );
                 string s = str::stream() << "eliot" << x++;
                 ASSERT_EQUALS( s, data.data() );
@@ -422,10 +422,10 @@ namespace mongo {
             int x = N;
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(),
-                                                           DiskLoc(),
+                                                           RecordId(),
                                                            CollectionScanParams::BACKWARD ) );
             while ( !it->isEOF() ) {
-                DiskLoc loc = it->getNext();
+                RecordId loc = it->getNext();
                 RecordData data = it->dataFor( loc );
                 string s = str::stream() << "eliot" << --x;
                 ASSERT_EQUALS( s, data.data() );

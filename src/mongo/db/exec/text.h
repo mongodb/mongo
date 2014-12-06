@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 #include <map>
@@ -110,7 +110,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -141,7 +141,7 @@ namespace mongo {
          * score) pair for this document.  Also rejects documents that don't match this stage's
          * filter.
          */
-        void addTerm(const BSONObj& key, const DiskLoc& loc);
+        void addTerm(const BSONObj& key, const RecordId& loc);
 
         /**
          * Possibly return a result.  FYI, this may perform a fetch directly if it is needed to
@@ -181,7 +181,7 @@ namespace mongo {
         // Temporary score data filled out by sub-scans.  Used in READING_TERMS and
         // RETURNING_RESULTS.
         // Maps from diskloc -> aggregate score for doc.
-        typedef unordered_map<DiskLoc, double, DiskLoc::Hasher> ScoreMap;
+        typedef unordered_map<RecordId, double, RecordId::Hasher> ScoreMap;
         ScoreMap _scores;
         ScoreMap::const_iterator _scoreIterator;
     };

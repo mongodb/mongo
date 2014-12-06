@@ -17,6 +17,7 @@ res3 = mydb.runCommand( "dbhash" );
 assert( res3.fromCache.indexOf( "config.foo" ) < 0 );
 assert.neq( res1.collections.foo, res3.collections.foo );
 
-
+// Validate dbHash with an empty database does not trigger an fassert/invariant
+assert.commandFailed(db.runCommand( {"dbhash" : "" }));
 
 

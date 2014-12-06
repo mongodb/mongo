@@ -72,10 +72,10 @@ namespace QueryStageMergeSortTests {
             _client.remove(ns(), obj);
         }
 
-        void getLocs(set<DiskLoc>* out, Collection* coll) {
+        void getLocs(set<RecordId>* out, Collection* coll) {
             RecordIterator* it = coll->getIterator(&_txn);
             while (!it->isEOF()) {
-                DiskLoc nextLoc = it->getNext();
+                RecordId nextLoc = it->getNext();
                 out->insert(nextLoc);
             }
             delete it;
@@ -547,10 +547,10 @@ namespace QueryStageMergeSortTests {
                 ms->addChild(new IndexScan(&_txn, params, &ws, NULL));
             }
 
-            set<DiskLoc> locs;
+            set<RecordId> locs;
             getLocs(&locs, coll);
 
-            set<DiskLoc>::iterator it = locs.begin();
+            set<RecordId>::iterator it = locs.begin();
 
             // Get 10 results.  Should be getting results in order of 'locs'.
             int count = 0;

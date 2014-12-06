@@ -35,7 +35,7 @@
 namespace mongo {
 
     /**
-     * The find command will be the main entry point for running queries once newRunQuery()
+     * The find command will be the main entry point for running queries once runQuery()
      * is deprecated.
      *
      * Currently, only explains run through the FindCmd, and regular queries use the old code

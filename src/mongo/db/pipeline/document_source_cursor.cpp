@@ -120,7 +120,7 @@ namespace mongo {
                 state != PlanExecutor::DEAD);
 
         uassert(17285, "cursor encountered an error: " + WorkingSetCommon::toStatusString(obj),
-                state != PlanExecutor::EXEC_ERROR);
+                state != PlanExecutor::FAILURE);
 
         massert(17286, str::stream() << "Unexpected return from PlanExecutor::getNext: " << state,
                 state == PlanExecutor::IS_EOF || state == PlanExecutor::ADVANCED);

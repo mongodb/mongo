@@ -163,11 +163,14 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *
 extern int __wt_tree_walk(WT_SESSION_IMPL *session, WT_REF **refp, uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, uint64_t recno, WT_ITEM *value, WT_UPDATE *upd, int is_remove);
 extern int __wt_col_search(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt);
-extern int __wt_rec_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern void __wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp);
-extern int __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
+extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp);
+extern int __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
 extern int __wt_ovfl_discard_add(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell);
 extern void __wt_ovfl_discard_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page, uint8_t **addrp, size_t *addr_sizep, const void *value, size_t value_size);
@@ -178,7 +181,7 @@ extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uin
 extern void __wt_ovfl_txnc_free(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_write(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags);
+extern int __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags);
 extern int __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk);

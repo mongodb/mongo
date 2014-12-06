@@ -34,6 +34,7 @@
 namespace mongo {
 
     class OperationContext;
+    class PlanExecutor;
 
     struct DeleteStageParams {
         DeleteStageParams() :
@@ -58,7 +59,7 @@ namespace mongo {
     };
 
     /**
-     * This stage delete documents by DiskLoc that are returned from its child.  NEED_TIME
+     * This stage delete documents by RecordId that are returned from its child.  NEED_TIME
      * is returned after deleting a document.
      *
      * Callers of work() must be holding a write lock (and, for shouldCallLogOp=true deletes,
@@ -79,7 +80,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -92,6 +93,13 @@ namespace mongo {
         virtual const SpecificStats* getSpecificStats();
 
         static const char* kStageType;
+
+        /**
+         * Extracts the number of documents deleted by the update plan 'exec'.
+         *
+         * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
+         */
+        static long long getNumDeleted(PlanExecutor* exec);
 
     private:
         // Transactional context.  Not owned by us.

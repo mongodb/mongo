@@ -262,7 +262,7 @@ namespace mongo {
 
             //ss << "<a href=\"/_status\">_status</a>";
             {
-                const map<string, Command*> *m = Command::webCommands();
+                const Command::CommandMap* m = Command::webCommands();
                 if( m ) {
                     ss <<
                        a("",
@@ -271,7 +271,7 @@ namespace mongo {
                          "for easier human viewing",
                          "Commands")
                        << ": ";
-                    for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ ) {
+                    for( Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i ) {
                         stringstream h;
                         i->second->help(h);
                         string help = h.str();
@@ -499,11 +499,11 @@ namespace mongo {
             ss << start("Commands List");
             ss << p( a("/", "back", "Home") );
             ss << p( "<b>MongoDB List of <a href=\"http://dochub.mongodb.org/core/commands\">Commands</a></b>\n" );
-            const map<string, Command*> *m = Command::commandsByBestName();
+            const Command::CommandMap* m = Command::commandsByBestName();
             ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
             ss << table();
             ss << "<tr><th>Command</th><th>Attributes</th><th>Help</th></tr>\n";
-            for( map<string, Command*>::const_iterator i = m->begin(); i != m->end(); i++ )
+            for( Command::CommandMap::const_iterator i = m->begin(); i != m->end(); ++i )
                 i->second->htmlHelp(ss);
             ss << _table() << _end();
 
@@ -522,11 +522,11 @@ namespace mongo {
         }
 
         Command * _cmd( const string& cmd ) const {
-            const map<string,Command*> *m = Command::webCommands();
+            const Command::CommandMap* m = Command::webCommands();
             if( ! m )
                 return 0;
 
-            map<string,Command*>::const_iterator i = m->find(cmd);
+            Command::CommandMap::const_iterator i = m->find(cmd);
             if ( i == m->end() )
                 return 0;
 

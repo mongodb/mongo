@@ -40,9 +40,6 @@
 
 namespace mongo {
 
-    /**
-     * ALL and ELEM_MATCH inherit from this.
-     */
     class ArrayMatchingMatchExpression : public MatchExpression {
     public:
         ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
@@ -161,59 +158,6 @@ namespace mongo {
 
     private:
         int _size; // >= 0 real, < 0, nothing will match
-    };
-
-    /**
-     * i'm suprised this isn't a regular AllMatchExpression
-     */
-    class AllElemMatchOp : public MatchExpression {
-    public:
-        AllElemMatchOp() : MatchExpression( ALL ){}
-        virtual ~AllElemMatchOp();
-
-        Status init( const StringData& path );
-        void add( ArrayMatchingMatchExpression* expr );
-
-        virtual MatchExpression* shallowClone() const {
-            AllElemMatchOp* e = new AllElemMatchOp();
-            e->init(path());
-            for (size_t i = 0; i < _list.size(); ++i) {
-                e->add(reinterpret_cast<ArrayMatchingMatchExpression*>(
-                    _list[i]->shallowClone()));
-            }
-            if ( getTag() ) {
-                e->setTag(getTag()->clone());
-            }
-            return e;
-        }
-
-        virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
-
-        /**
-         * @param e has to be an array
-         */
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        virtual void toBSON(BSONObjBuilder* out) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const;
-
-        virtual size_t numChildren() const { return _list.size(); }
-
-        virtual MatchExpression* getChild( size_t i ) const { return _list[i]; }
-
-        virtual std::vector<MatchExpression*>* getChildVector() { return &_list; }
-
-        const StringData path() const { return _path; }
-
-    private:
-        bool _allMatch( const BSONObj& anArray ) const;
-
-        StringData _path;
-        ElementPath _elementPath;
-        std::vector<MatchExpression*> _list;
     };
 
 }

@@ -61,10 +61,10 @@ namespace QueryStageKeep {
             _client.dropCollection(ns());
         }
 
-        void getLocs(set<DiskLoc>* out, Collection* coll) {
+        void getLocs(set<RecordId>* out, Collection* coll) {
             RecordIterator* it = coll->getIterator(&_txn);
             while (!it->isEOF()) {
-                DiskLoc nextLoc = it->getNext();
+                RecordId nextLoc = it->getNext();
                 out->insert(nextLoc);
             }
             delete it;
@@ -135,7 +135,7 @@ namespace QueryStageKeep {
             params.collection = coll;
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
-            params.start = DiskLoc();
+            params.start = RecordId();
             CollectionScan* cs = new CollectionScan(&_txn, params, &ws, NULL);
 
             // Create a KeepMutations stage to merge in the 10 flagged objects.

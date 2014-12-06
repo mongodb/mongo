@@ -198,7 +198,7 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
         var v = extra[k];
         if( k in MongoRunner.logicalOptions ) continue
         a.push( "--" + k );
-        if ( v != null )
+        if ( v != null && v !== "")
             a.push( v );                    
     }
 

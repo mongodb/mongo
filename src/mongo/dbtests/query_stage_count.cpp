@@ -106,13 +106,13 @@ namespace QueryStageCount {
             wunit.commit();
         }
 
-        void remove(const DiskLoc& loc) {
+        void remove(const RecordId& loc) {
             WriteUnitOfWork wunit(&_txn);
             _coll->deleteDocument(&_txn, loc, false, false, NULL);
             wunit.commit();
         }
 
-        void update(const DiskLoc& oldLoc, const BSONObj& newDoc) {
+        void update(const RecordId& oldLoc, const BSONObj& newDoc) {
             WriteUnitOfWork wunit(&_txn);
             _coll->updateDocument(&_txn, oldLoc, newDoc, false, NULL);
             wunit.commit();
@@ -216,7 +216,7 @@ namespace QueryStageCount {
         static const char* ns() { return "unittest.QueryStageCount"; }
 
     protected:
-        vector<DiskLoc> _locs;
+        vector<RecordId> _locs;
         OperationContextImpl _txn;
         Lock::DBLock _dbLock;
         Client::Context _ctx;

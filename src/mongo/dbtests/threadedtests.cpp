@@ -114,12 +114,6 @@ namespace ThreadedTests {
             Client::initThread("mongomutextest");
 
             MMAPV1LockerImpl lockState(1);
-            mongo::unittest::log().stream() 
-                << "Thread "
-                << boost::this_thread::get_id()
-                << " has lock state "
-                << &lockState
-                << '\n';
 
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
@@ -173,11 +167,9 @@ namespace ThreadedTests {
                         if( q == 0 ) { 
                             Lock::DBRead r(&lockState, "foo");
                             ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
-                            ASSERT(!lockState.isRecursive());
 
                             Lock::DBRead r2(&lockState, "foo");
                             ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
-                            ASSERT(lockState.isRecursive());
 
                             Lock::DBRead r3(&lockState, "local");
                             ASSERT(lockState.isDbLockedForMode("foo", MODE_S));

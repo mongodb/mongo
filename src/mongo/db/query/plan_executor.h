@@ -38,7 +38,7 @@ namespace mongo {
 
     class BSONObj;
     class Collection;
-    class DiskLoc;
+    class RecordId;
     class PlanStage;
     class PlanExecutor;
     struct PlanStageStats;
@@ -71,7 +71,7 @@ namespace mongo {
             // If the underlying PlanStage has any information on the error, it will be available in
             // the objOut parameter. Call WorkingSetCommon::toStatusString() to retrieve the error
             // details from the output BSON object.
-            EXEC_ERROR,
+            FAILURE,
         };
 
         /**
@@ -88,7 +88,7 @@ namespace mongo {
             // 0. Let's say you have PlanExecutor* exec.
             //
             // 1. Register your PlanExecutor with ClientCursor. Registered executors are informed
-            // about DiskLoc deletions and namespace invalidation, as well as other important
+            // about RecordId deletions and namespace invalidation, as well as other important
             // events. Do this by calling registerExec() on the executor. Alternatively, this can
             // be done per-yield (as described below).
             //
@@ -247,7 +247,7 @@ namespace mongo {
          *
          * If a YIELD_AUTO policy is set, then this method may yield.
          */
-        ExecState getNext(BSONObj* objOut, DiskLoc* dlOut);
+        ExecState getNext(BSONObj* objOut, RecordId* dlOut);
 
         /**
          * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.
@@ -296,7 +296,7 @@ namespace mongo {
          * state.  As such, if the plan yields, it must be notified of relevant writes so that
          * we can ensure that it doesn't crash if we try to access invalid state.
          */
-        void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         /**
          * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
@@ -311,7 +311,7 @@ namespace mongo {
          * Everybody who sets the policy to YIELD_AUTO really wants to call registerExec()
          * immediately after EXCEPT commands that create cursors...so we expose the ability to
          * register (or not) here, rather than require all users to have yet another RAII object.
-         * Only cursor-creating things like new_find.cpp set registerExecutor to false.
+         * Only cursor-creating things like find.cpp set registerExecutor to false.
          */
         void setYieldPolicy(YieldPolicy policy, bool registerExecutor = true);
 
@@ -319,7 +319,7 @@ namespace mongo {
         /**
          * RAII approach to ensuring that plan executors are deregistered.
          *
-         * While retrieving the first batch of results, newRunQuery manually registers the executor
+         * While retrieving the first batch of results, runQuery manually registers the executor
          * with ClientCursor.  Certain query execution paths, namely $where, can throw an exception.
          * If we fail to deregister the executor, we will call invalidate/kill on the
          * still-registered-yet-deleted executor.

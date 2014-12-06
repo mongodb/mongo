@@ -93,7 +93,7 @@ namespace {
         ASSERT_EQUALS(stats->unyields, 1U);
 
         // invalidates
-        const DiskLoc dl(0, 0);
+        const RecordId dl(0, 0);
         mock->invalidate(NULL, dl, INVALIDATION_MUTATION);
         ASSERT_EQUALS(stats->invalidates, 1U);
 

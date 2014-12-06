@@ -86,13 +86,13 @@ namespace mongo {
                     WorkingSetMember* member = _ws->get(id);
 
                     if (!member->hasLoc()) {
-                        // Can't dedup data unless there's a DiskLoc.  We go ahead and use its
+                        // Can't dedup data unless there's a RecordId.  We go ahead and use its
                         // result.
                         _noResultToMerge.pop();
                     }
                     else {
                         ++_specificStats.dupsTested;
-                        // ...and there's a diskloc and and we've seen the DiskLoc before
+                        // ...and there's a diskloc and and we've seen the RecordId before
                         if (_seen.end() != _seen.find(member->loc)) {
                             // ...drop it.
                             _ws->free(id);
@@ -203,7 +203,7 @@ namespace mongo {
     }
 
     void MergeSortStage::invalidate(OperationContext* txn,
-                                    const DiskLoc& dl,
+                                    const RecordId& dl,
                                     InvalidationType type) {
         ++_commonStats.invalidates;
         for (size_t i = 0; i < _children.size(); ++i) {

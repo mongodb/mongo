@@ -215,6 +215,10 @@ namespace repl {
         }
         catch (const DBException& e) {
             log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
+            // blacklist sync target for .5 seconds and find a new one
+            replCoord->blacklistSyncSource(_syncTarget,
+                                           Date_t(curTimeMillis64() + 500));
+            BackgroundSync::get()->clearSyncTarget();
             _resetConnection();
             return e.toStatus();
         }
@@ -222,6 +226,10 @@ namespace repl {
         Status status = Command::getStatusFromCommandResult(res);
         if (!status.isOK()) {
             log() << "SyncSourceFeedback error sending update, response: " << res.toString() <<endl;
+            // blacklist sync target for .5 seconds and find a new one
+            replCoord->blacklistSyncSource(_syncTarget,
+                                           Date_t(curTimeMillis64() + 500));
+            BackgroundSync::get()->clearSyncTarget();
             _resetConnection();
         }
         return status;

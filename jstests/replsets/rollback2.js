@@ -41,6 +41,7 @@ load("jstests/replsets/rslib.js");
     replTest.bridge();
 
     // Make sure we have a master and that that master is node A
+    replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
     var master = replTest.getMaster();
     var a_conn = conns[0];
     a_conn.setSlaveOk();

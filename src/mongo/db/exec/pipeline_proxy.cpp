@@ -82,7 +82,7 @@ namespace mongo {
     }
 
     void PipelineProxyStage::invalidate(OperationContext* txn,
-                                        const DiskLoc& dl,
+                                        const RecordId& dl,
                                         InvalidationType type) {
         // propagate to child executor if still in use
         if (boost::shared_ptr<PlanExecutor> exec = _childExec.lock()) {

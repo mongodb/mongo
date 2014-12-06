@@ -90,7 +90,7 @@ namespace mongo {
         if (pin) {
             invariant(cursor);
             invariant(cursor->getExecutor() == exec);
-            invariant(cursor->isAggCursor);
+            invariant(cursor->isAggCursor());
         }
 
         BSONElement batchSizeElem = cmdObj.getFieldDotted("cursor.batchSize");
@@ -151,7 +151,7 @@ namespace mongo {
             txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
-            // will be restored in newGetMore().
+            // will be restored in getMore().
             exec->saveState();
         }
 
@@ -277,8 +277,9 @@ namespace mongo {
 
                 if (collection) {
                     // XXX
-                    ClientCursor* cursor = new ClientCursor(collection, execHolder.release());
-                    cursor->isAggCursor = true; // enable special locking behavior
+                    const bool isAggCursor = true; // enable special locking behavior
+                    ClientCursor* cursor = new ClientCursor(collection, execHolder.release(), 0,
+                                                            BSONObj(), isAggCursor);
                     pin.reset(new ClientCursorPin(collection, cursor->cursorid()));
                     // Don't add any code between here and the start of the try block.
                 }

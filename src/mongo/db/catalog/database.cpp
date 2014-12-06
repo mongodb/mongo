@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/global_environment_d.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -463,7 +464,6 @@ namespace mongo {
         return _dbEntry->renameCollection( txn, fromNS, toNS, stayTemp );
     }
 
-
     Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
         Collection* c = getCollection( txn, ns );
         if ( !c ) {
@@ -501,8 +501,7 @@ namespace mongo {
 
         txn->recoveryUnit()->registerChange( new AddCollectionChange(this, ns) );
 
-        Status status = _dbEntry->createCollection(txn, ns,
-                                                options, allocateDefaultSpace);
+        Status status = _dbEntry->createCollection(txn, ns, options, allocateDefaultSpace);
         massertNoTraceStatusOK(status);
 
         Collection* collection = getCollection(txn, ns);
@@ -596,7 +595,12 @@ namespace mongo {
                            "collection already exists" );
 
         CollectionOptions collectionOptions;
-        Status status = collectionOptions.parse(options, storageGlobalParams.engine);
+        Status status = collectionOptions.parse(options);
+        if ( !status.isOK() )
+            return status;
+
+        status = validateStorageOptions(collectionOptions.storageEngine,
+                                        &StorageEngine::Factory::validateCollectionStorageOptions);
         if ( !status.isOK() )
             return status;
 

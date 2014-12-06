@@ -195,7 +195,7 @@ rs.test.getSecondaries().forEach(function(secondary) {
     secondary.getDB( "test" ).fsyncUnlock();
 })
 // Clean up the data
-assert.writeOK( ts.remove( { primaryOnly: true, x: 60 }, { writeConcern: { w: 2 }} ) );
+assert.writeOK( ts.remove( { primaryOnly: true, x: 60 }, { writeConcern: { w: 3 }} ) );
 
 for ( i=0; i<10; i++ ) {
     m = new Mongo( s.s.name );

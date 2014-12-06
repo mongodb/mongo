@@ -77,7 +77,7 @@ namespace IndexUpdateTests {
                                       "name" << "a_1" );
             int32_t lenWHdr = indexInfo.objsize() + Record::HeaderSize;
             const char* systemIndexes = "unittests.system.indexes";
-            DiskLoc infoLoc = allocateSpaceForANewRecord( systemIndexes,
+            RecordId infoLoc = allocateSpaceForANewRecord( systemIndexes,
                                                           nsdetails( systemIndexes ),
                                                           lenWHdr,
                                                           false );
@@ -216,12 +216,12 @@ namespace IndexUpdateTests {
             // Add index keys to the phaseOne.
             int32_t nKeys = 130;
             for( int32_t i = 0; i < nKeys; ++i ) {
-                phaseOne.sorter->add( BSON( "a" << i ), /* dummy disk loc */ DiskLoc(), false );
+                phaseOne.sorter->add( BSON( "a" << i ), /* dummy disk loc */ RecordId(), false );
             }
             phaseOne.nkeys = phaseOne.n = nKeys;
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
-            set<DiskLoc> dups;
+            set<RecordId> dups;
             CurOp* op = txn.getCurOp();
             ProgressMeterHolder pm (op->setMessage("BuildBottomUp",
                                                    "BuildBottomUp Progress",
@@ -282,12 +282,12 @@ namespace IndexUpdateTests {
             int32_t nKeys = 130;
             // Add index keys to the phaseOne.
             for( int32_t i = 0; i < nKeys; ++i ) {
-                phaseOne.sorter->add( BSON( "a" << i ), /* dummy disk loc */ DiskLoc(), false );
+                phaseOne.sorter->add( BSON( "a" << i ), /* dummy disk loc */ RecordId(), false );
             }
             phaseOne.nkeys = phaseOne.n = nKeys;
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
-            set<DiskLoc> dups;
+            set<RecordId> dups;
             CurOp* op = txn.getCurOp();
             ProgressMeterHolder pm (op->setMessage("InterruptBuildBottomUp",
                                                    "InterruptBuildBottomUp Progress",
@@ -417,17 +417,17 @@ namespace IndexUpdateTests {
             // Create a new collection.
             Database* db = _ctx.ctx().db();
             Collection* coll;
-            DiskLoc loc1;
-            DiskLoc loc2;
+            RecordId loc1;
+            RecordId loc2;
             {
                 WriteUnitOfWork wunit(&_txn);
                 db->dropCollection( &_txn, _ns );
                 coll = db->createCollection( &_txn, _ns );
 
-                StatusWith<DiskLoc> swLoc1 = coll->insertDocument(&_txn,
+                StatusWith<RecordId> swLoc1 = coll->insertDocument(&_txn,
                                                                 BSON("_id" << 1 << "a" << "dup"),
                                                                 true);
-                StatusWith<DiskLoc> swLoc2 = coll->insertDocument(&_txn,
+                StatusWith<RecordId> swLoc2 = coll->insertDocument(&_txn,
                                                                 BSON("_id" << 2 << "a" << "dup"),
                                                                 true);
                 ASSERT_OK(swLoc1.getStatus());
@@ -450,7 +450,7 @@ namespace IndexUpdateTests {
 
             ASSERT_OK(indexer.init(spec));
 
-            std::set<DiskLoc> dups;
+            std::set<RecordId> dups;
             ASSERT_OK(indexer.insertAllDocumentsInCollection(&dups));
 
             // either loc1 or loc2 should be in dups but not both.
@@ -668,7 +668,7 @@ namespace IndexUpdateTests {
                                       "name" << name );
             int32_t lenWHdr = indexInfo.objsize() + Record::HeaderSize;
             const char* systemIndexes = "unittests.system.indexes";
-            DiskLoc infoLoc = allocateSpaceForANewRecord( systemIndexes,
+            RecordId infoLoc = allocateSpaceForANewRecord( systemIndexes,
                                                           nsdetails( systemIndexes ),
                                                           lenWHdr,
                                                           false );
@@ -846,6 +846,52 @@ namespace IndexUpdateTests {
         }
     };
 
+    class StorageEngineOptions : public IndexBuildBase {
+    public:
+        void run() {
+            // "storageEngine" field has to be an object if present.
+            ASSERT_NOT_OK(createIndex("unittest", _createSpec(12345)));
+
+            // 'storageEngine' must not be empty.
+            ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSONObj())));
+
+            // Every field under "storageEngine" must match a registered storage engine.
+            ASSERT_NOT_OK(createIndex("unittest",
+                                      _createSpec(BSON("unknownEngine" << BSONObj()))));
+
+            // Testing with 'wiredTiger' because the registered storage engine factory
+            // supports custom index options under 'storageEngine'.
+            const std::string storageEngineName = "wiredTiger";
+
+            // Run 'wiredTiger' tests if the storage engine is supported.
+            if (getGlobalEnvironment()->isRegisteredStorageEngine(storageEngineName)) {
+                // Every field under "storageEngine" has to be an object.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSON(storageEngineName << 1))));
+
+                // Storage engine options must pass validation by the storage engine factory.
+                // For 'wiredTiger', embedded document must contain 'configString'.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("unknown" << 1)))));
+
+                // Configuration string for 'wiredTiger' must be a string.
+                ASSERT_NOT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("configString" << 1)))));
+
+                // Valid 'wiredTiger' configuration.
+                ASSERT_OK(createIndex("unittest", _createSpec(
+                    BSON(storageEngineName << BSON("configString" << "block_compressor=zlib")))));
+            }
+        }
+    protected:
+        template <typename T>
+        BSONObj _createSpec(T storageEngineValue) {
+            return BSON("name" << "super2"
+                        << "ns" << _ns
+                        << "key" << BSON("a" << 1)
+                        << "storageEngine" << storageEngineValue);
+        }
+    };
+
     class IndexCatatalogFixIndexKey {
     public:
         void run() {
@@ -893,6 +939,7 @@ namespace IndexUpdateTests {
             add<SameSpecDifferentUnique>();
             add<SameSpecDifferentSparse>();
             add<SameSpecDifferentTTL>();
+            add<StorageEngineOptions>();
 
             add<IndexCatatalogFixIndexKey>();
         }

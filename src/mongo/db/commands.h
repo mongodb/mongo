@@ -40,6 +40,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -63,6 +64,8 @@ namespace mutablebson {
         // interpreted as a collection name.
         std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) const;
     public:
+
+        typedef StringMap<Command*> CommandMap;
 
         // Return the namespace for the command. If the first field in 'cmdObj' is of type
         // mongo::String, then that field is interpreted as the collection name, and is
@@ -221,9 +224,9 @@ namespace mutablebson {
 
         static void logIfSlow( const Timer& cmdTimer,  const std::string& msg);
 
-        static std::map<std::string,Command*> * _commands;
-        static std::map<std::string,Command*> * _commandsByBestName;
-        static std::map<std::string,Command*> * _webCommands;
+        static CommandMap* _commands;
+        static CommandMap* _commandsByBestName;
+        static CommandMap* _webCommands;
 
         // Counters for how many times this command has been executed and failed
         Counter64 _commandsExecuted;
@@ -239,8 +242,8 @@ namespace mutablebson {
                                                      Database* db, 
                                                      const BSONObj& cmdObj);
 
-        static const std::map<std::string,Command*>* commandsByBestName() { return _commandsByBestName; }
-        static const std::map<std::string,Command*>* webCommands() { return _webCommands; }
+        static const CommandMap* commandsByBestName() { return _commandsByBestName; }
+        static const CommandMap* webCommands() { return _webCommands; }
 
         // Counter for unknown commands
         static Counter64 unknownCommands;
@@ -250,7 +253,7 @@ namespace mutablebson {
                                          BSONObj& jsobj,
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
-        static Command * findCommand( const std::string& name );
+        static Command* findCommand( const StringData& name );
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,

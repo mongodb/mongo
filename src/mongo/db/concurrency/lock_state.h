@@ -211,8 +211,6 @@ namespace mongo {
 
         virtual void dump() const;
 
-        virtual unsigned recursiveCount() const { return _recursive; }
-
         virtual bool isW() const;
         virtual bool isR() const;
         virtual bool hasAnyReadLock() const;
@@ -220,21 +218,10 @@ namespace mongo {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
-        virtual bool isRecursive() const;
 
         virtual void assertWriteLocked(const StringData& ns) const;
 
-        /** 
-         * Pending means we are currently trying to get a lock.
-         */
         virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
-
-        // ----
-
-        // Those are only used for TempRelease. Eventually they should be removed.
-        virtual void enterScopedLock(Lock::ScopedLock* lock);
-        virtual Lock::ScopedLock* getCurrentScopedLock() const;
-        virtual void leaveScopedLock(Lock::ScopedLock* lock);
 
         virtual void setIsBatchWriter(bool newValue) { _batchWriter = newValue; }
         virtual bool isBatchWriter() const { return _batchWriter; }
@@ -246,15 +233,9 @@ namespace mongo {
 
         bool _batchWriter;
         bool _lockPendingParallelWriter;
-
-        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
-
-        // for temprelease
-        // for the nonrecursive case. otherwise there would be many
-        // the first lock goes here, which is ok since we can't yield recursive locks
-        Lock::ScopedLock* _scopedLk;
     };
 
+    typedef LockerImpl<false> DefaultLockerImpl;
     typedef LockerImpl<true> MMAPV1LockerImpl;
 
 

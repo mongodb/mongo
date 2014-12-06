@@ -39,7 +39,7 @@
 #include "mongo/db/global_optime.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
@@ -486,7 +486,7 @@ namespace QueryTests {
 
             // Inserting a document into a capped collection can force another document out.
             // In this case, the capped collection has 2 documents, so inserting two more clobbers
-            // whatever DiskLoc that the underlying cursor had as its state.
+            // whatever RecordId that the underlying cursor had as its state.
             //
             // In the Cursor world, the ClientCursor was responsible for manipulating cursors.  It
             // would detect that the cursor's "refloc" (translation: diskloc required to maintain
@@ -1469,7 +1469,7 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            string exhaust = newRunQuery( &_txn, message, queryMessage, *cc().curop(), result, false );
+            string exhaust = runQuery( &_txn, message, queryMessage, *cc().curop(), result, false );
             ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }

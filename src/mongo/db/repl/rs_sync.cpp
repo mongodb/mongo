@@ -68,7 +68,7 @@ namespace repl {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
         // Set initial indexPrefetch setting
-        std::string& prefetch = replCoord->getSettings().rsIndexPrefetch;
+        const std::string& prefetch = replCoord->getSettings().rsIndexPrefetch;
         if (!prefetch.empty()) {
             BackgroundSync::IndexPrefetchConfig prefetchConfig = BackgroundSync::PREFETCH_ALL;
             if (prefetch == "none")

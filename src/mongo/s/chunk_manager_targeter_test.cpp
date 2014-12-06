@@ -270,10 +270,9 @@ namespace {
     //    -> foo.a: [1, 1]
     // Or -> foo.a: [2, 2]
     TEST(CMCollapseTreeTest, BasicAllElemMatch) {
-        Interval expectedInterval1(BSON("" << 1 << "" << 1), true, true);
-        Interval expectedInterval2(BSON("" << 2 << "" << 2), true, true);
+        Interval expectedInterval(BSON("" << 1 << "" << 1), true, true);
 
-        const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}";
+        const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}} ]}}";
         auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
@@ -287,8 +286,7 @@ namespace {
 
         // Choose one of the two possible solutions.
         // Two solutions differ only by assignment of index tags.
-        ASSERT(Interval::INTERVAL_EQUALS == interval.compare(expectedInterval1)
-            || Interval::INTERVAL_EQUALS == interval.compare(expectedInterval2));
+        ASSERT(Interval::INTERVAL_EQUALS == interval.compare(expectedInterval));
     }
 
     // {a : [1, 2, 3]} -> a: [1, 1], [[1, 2, 3], [1, 2, 3]]

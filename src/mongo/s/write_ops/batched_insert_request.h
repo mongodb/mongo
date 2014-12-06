@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_request_metadata.h"
@@ -87,12 +88,13 @@ namespace mongo {
         //
 
         void setCollName(const StringData& collName);
-        void unsetCollName();
-        bool isCollNameSet() const;
+        void setCollNameNS(const NamespaceString& collName);
         const std::string& getCollName() const;
+        const NamespaceString& getCollNameNS() const;
+
+        const NamespaceString& getTargetingNSS() const;
 
         void addToDocuments(const BSONObj& documents);
-        void unsetDocuments();
         bool isDocumentsSet() const;
         std::size_t sizeDocuments() const;
         const std::vector<BSONObj>& getDocuments() const;
@@ -121,7 +123,7 @@ namespace mongo {
         // Convention: (M)andatory, (O)ptional
 
         // (M)  collection we're inserting on
-        std::string _collName;
+        NamespaceString _collName;
         bool _isCollNameSet;
 
         // (M)  array of documents to be inserted
@@ -138,6 +140,9 @@ namespace mongo {
 
         // (O)  metadata associated with this request for internal use.
         scoped_ptr<BatchedRequestMetadata> _metadata;
+
+        // (O)  cached copied of target ns
+        NamespaceString _targetNSS;
     };
 
 } // namespace mongo

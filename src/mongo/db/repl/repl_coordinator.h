@@ -106,10 +106,8 @@ namespace repl {
 
         /**
          * Returns a reference to the parsed command line arguments that are related to replication.
-         * TODO(spencer): Change this to a const ref once we are no longer using it for mutable
-         * global state.
          */
-        virtual ReplSettings& getSettings() = 0;
+        virtual const ReplSettings& getSettings() const = 0;
 
         enum Mode {
             modeNone = 0,
@@ -171,14 +169,6 @@ namespace repl {
          * performed on the client associated with "txn".
          */
         virtual StatusAndDuration awaitReplicationOfLastOpForClient(
-                const OperationContext* txn,
-                const WriteConcernOptions& writeConcern) = 0;
-
-        /**
-         * Like awaitReplication(), above, but waits for the replication of the last operation
-         * applied to this node.
-         */
-        virtual StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern) = 0;
 
@@ -511,7 +501,7 @@ namespace repl {
         /**
          * Returns a BSONObj containing a representation of the current default write concern.
          */
-        virtual BSONObj getGetLastErrorDefault() = 0;
+        virtual WriteConcernOptions getGetLastErrorDefault() = 0;
 
         /**
          * Checks that the --replSet flag was passed when starting up the node and that the node

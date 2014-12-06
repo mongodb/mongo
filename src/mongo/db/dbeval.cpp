@@ -78,6 +78,7 @@ namespace mongo {
         }
 
         scoped_ptr<Scope> s(globalScriptEngine->newScope());
+        s->registerOperation(txn);
 
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {

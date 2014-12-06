@@ -160,7 +160,25 @@ var DBExplainQuery = (function() {
                 var explainCmd = {explain: innerCmd};
                 explainCmd["verbosity"] = this._verbosity;
 
-                var explainResult = this._query._db.runCommand(explainCmd);
+                // We explicitly run a find against the $cmd collection instead of using the
+                // runCommand helper so that we can set a read preference on the command.
+                var cmdColl = this._query._db.getCollection("$cmd");
+                var cmdQuery = cmdColl.find(explainCmd,
+                                            {}, // projection
+                                            -1, // limit
+                                            0, // skip
+                                            0, // batchSize
+                                            this._query._options);
+
+                // Handle read preference.
+                if ("$readPreference" in this._query._query) {
+                    // A read preference was set on the query. Pull the read pref up so that it is
+                    // set on the explain command.
+                    var prefObj = this._query._query.$readPreference;
+                    cmdQuery.readPref(prefObj.mode, prefObj.tags);
+                }
+
+                var explainResult = cmdQuery.next();
                 if (!explainResult.ok && explainResult.code === CMD_NOT_FOUND_CODE) {
                     // One of the shards doesn't have the explain command available. Retry using
                     // the legacy $explain format, which should be supported by all shards.

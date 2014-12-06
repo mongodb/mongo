@@ -124,7 +124,7 @@ namespace QueryStageUpdate {
 
         void getLocs(Collection* collection,
                      CollectionScanParams::Direction direction,
-                     vector<DiskLoc>* out) {
+                     vector<RecordId>* out) {
             WorkingSet ws;
 
             CollectionScanParams params;
@@ -257,8 +257,8 @@ namespace QueryStageUpdate {
                 Database* db = ctx.ctx().db();
                 Collection* coll = db->getCollection(&_txn, ns());
 
-                // Get the DiskLocs that would be returned by an in-order scan.
-                vector<DiskLoc> locs;
+                // Get the RecordIds that would be returned by an in-order scan.
+                vector<RecordId> locs;
                 getLocs(coll, CollectionScanParams::FORWARD, &locs);
 
                 UpdateRequest request(nsString());

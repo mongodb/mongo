@@ -51,6 +51,10 @@ namespace mongo {
         return false;
     }
 
+    StorageFactoriesIterator* GlobalEnvironmentNoop::makeStorageFactoriesIterator() {
+        return NULL;
+    }
+
     void GlobalEnvironmentNoop::setKillAllOperations() { }
 
     void GlobalEnvironmentNoop::unsetKillAllOperations() { }
@@ -63,19 +67,9 @@ namespace mongo {
         return false;
     }
 
+    void GlobalEnvironmentNoop::killAllUserOperations(const OperationContext* txn) {}
+
     void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
-    }
-
-    void GlobalEnvironmentNoop::registerOperationContext(OperationContext* txn) {
-
-    }
-
-    void GlobalEnvironmentNoop::unregisterOperationContext(OperationContext* txn) {
-
-    }
-
-    void GlobalEnvironmentNoop::forEachOperationContext(ProcessOperationContext* procOpCtx) {
-
     }
 
     OperationContext* GlobalEnvironmentNoop::newOpCtx() {

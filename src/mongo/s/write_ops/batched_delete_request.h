@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -88,9 +89,11 @@ namespace mongo {
         //
 
         void setCollName(const StringData& collName);
-        void unsetCollName();
-        bool isCollNameSet() const;
+        void setCollNameNS(const NamespaceString& collName);
         const std::string& getCollName() const;
+        const NamespaceString& getCollNameNS() const;
+
+        const NamespaceString& getTargetingNSS() const;
 
         void setDeletes(const std::vector<BatchedDeleteDocument*>& deletes);
 
@@ -126,7 +129,7 @@ namespace mongo {
         // Convention: (M)andatory, (O)ptional
 
         // (M)  collection we're deleting from
-        std::string _collName;
+        NamespaceString _collName;
         bool _isCollNameSet;
 
         // (M)  array of individual deletes

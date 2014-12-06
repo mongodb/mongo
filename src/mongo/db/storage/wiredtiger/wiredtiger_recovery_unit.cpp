@@ -170,6 +170,10 @@ namespace mongo {
         return dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
     }
 
+    void WiredTigerRecoveryUnit::assertInActiveTxn() const {
+        fassert( 28575, _active );
+    }
+
     WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
         if ( !_session ) {
             _session = _sessionCache->getSession();
@@ -188,7 +192,7 @@ namespace mongo {
         }
     }
 
-    void WiredTigerRecoveryUnit::setOplogReadTill( const DiskLoc& loc ) {
+    void WiredTigerRecoveryUnit::setOplogReadTill( const RecordId& loc ) {
         _oplogReadTill = loc;
     }
 

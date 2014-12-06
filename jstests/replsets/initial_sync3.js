@@ -16,7 +16,7 @@ replTest.initiate({
     _id : name,
     members : [
         {_id:0, host : host+":"+port[0], priority: 10},
-        {_id:1, host : host+":"+port[1]},
+        {_id:1, host : host+":"+port[1], priority: 0},
         {_id:2, host : host+":"+port[2], priority : 0, buildIndexes : false},
                ]});
 

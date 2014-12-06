@@ -12,12 +12,10 @@
  * counted collection must not be empty; hence an initial write to the collection is required.
  */
 
-if (0) {// SERVER-14143
-
 t = db.jstests_killop
 t.drop();
 
-t.save( {} );
+t.save( {x:1} );
 
 /**
  * This function filters for the operations that we're looking for, based on their state and
@@ -41,25 +39,27 @@ function ops() {
 var s1 = null;
 var s2 = null;
 try {
+    jsTestLog("Starting long-running $where operation");
     s1 = startParallelShell( "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
     s2 = startParallelShell( "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
 
+    jsTestLog("Finding ops in currentOp() output");
     o = [];
     assert.soon(function() { o = ops(); return o.length == 2; },
                 { toString: function () { return tojson(db.currentOp().inprog); } },
                10000);
+    start = new Date();
+    jsTestLog("Killing ops");
     db.killOp( o[ 0 ] );
     db.killOp( o[ 1 ] );
-    start = new Date();
 }
 finally {
+    jsTestLog("Waiting for ops to terminate");
     if (s1) s1();
     if (s2) s2();
 }
 
-// don't want to pass if timeout killed the js function NOTE: This test will sometimes pass when the
-// JS engine did actually kill the operation, because the JS timeout is 30 seconds of wall clock
-// time from the moment the operation starts, but "start" measures from shortly after the test sends
-// the killop message to the server.
-assert( ( new Date() ) - start < 30000 );
-}
+// don't want to pass if timeout killed the js function.
+var end = new Date();
+var diff = end - start;
+assert.lt( diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);

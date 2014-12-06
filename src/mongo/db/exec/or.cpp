@@ -73,7 +73,7 @@ namespace mongo {
             if (_dedup && member->hasLoc()) {
                 ++_specificStats.dupsTested;
 
-                // ...and we've seen the DiskLoc before
+                // ...and we've seen the RecordId before
                 if (_seen.end() != _seen.find(member->loc)) {
                     // ...drop it.
                     ++_specificStats.dupsDropped;
@@ -155,7 +155,7 @@ namespace mongo {
         }
     }
 
-    void OrStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void OrStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
@@ -167,7 +167,7 @@ namespace mongo {
         // If we see DL again it is not the same record as it once was so we still want to
         // return it.
         if (_dedup && INVALIDATION_DELETION == type) {
-            unordered_set<DiskLoc, DiskLoc::Hasher>::iterator it = _seen.find(dl);
+            unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
             if (_seen.end() != it) {
                 ++_specificStats.locsForgotten;
                 _seen.erase(dl);

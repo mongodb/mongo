@@ -113,6 +113,7 @@ namespace mongo {
           _threadId(boost::this_thread::get_id()),
           _connectionId(p ? p->connectionId() : 0),
           _god(0),
+          _txn(NULL),
           _lastOp(0),
           _shutdown(false) {
 
@@ -329,8 +330,14 @@ namespace mongo {
         if (_connectionId) {
             builder.appendNumber("connectionId", _connectionId);
         }
+    }
 
-        _curOp->reportState(&builder);
+    void Client::setOperationContext(OperationContext* txn) {
+        // We can only set or unset the OperationContexts, never swap them.
+        invariant((txn == NULL) ^ (_txn == NULL));
+
+        boost::unique_lock<SpinLock> uniqueLock(_lock);
+        _txn = txn;
     }
 
     string Client::clientAddress(bool includePort) const {

@@ -69,7 +69,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }

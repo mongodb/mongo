@@ -946,9 +946,7 @@ namespace mongo {
                 bool mandatory = expressionRequiresIndex(child);
 
                 // Recursively prepMemo for the subnode. We fall through
-                // to this case for logical nodes other than AND (e.g. OR)
-                // and for array nodes other than ELEM_MATCH_OBJECT or
-                // ELEM_MATCH_VALUE (e.g. ALL).
+                // to this case for logical nodes other than AND (e.g. OR).
                 if (prepMemo(child, context)) {
                     size_t childID = memoIDForNode(child);
 

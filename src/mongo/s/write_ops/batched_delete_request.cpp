@@ -102,8 +102,10 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, collName, &_collName, errMsg);
+        std::string collNameTemp;
+        fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _collName = NamespaceString(collNameTemp);
         _isCollNameSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, deletes, &_deletes, errMsg);
@@ -133,7 +135,7 @@ namespace mongo {
     }
 
     void BatchedDeleteRequest::clear() {
-        _collName.clear();
+        _collName = NamespaceString();
         _isCollNameSet = false;
 
         unsetDeletes();
@@ -177,23 +179,29 @@ namespace mongo {
     std::string BatchedDeleteRequest::toString() const {
         return toBSON().toString();
     }
-
+    
     void BatchedDeleteRequest::setCollName(const StringData& collName) {
-        _collName = collName.toString();
+        _collName = NamespaceString(collName);
         _isCollNameSet = true;
-    }
-
-    void BatchedDeleteRequest::unsetCollName() {
-         _isCollNameSet = false;
-     }
-
-    bool BatchedDeleteRequest::isCollNameSet() const {
-         return _isCollNameSet;
     }
 
     const std::string& BatchedDeleteRequest::getCollName() const {
         dassert(_isCollNameSet);
+        return _collName.ns();
+    }
+
+    void BatchedDeleteRequest::setCollNameNS(const NamespaceString& collName) {
+        _collName = collName;
+        _isCollNameSet = true;
+    }
+
+    const NamespaceString& BatchedDeleteRequest::getCollNameNS() const {
+        dassert(_isCollNameSet);
         return _collName;
+    }
+
+    const NamespaceString& BatchedDeleteRequest::getTargetingNSS() const {
+        return getCollNameNS();
     }
 
     void BatchedDeleteRequest::setDeletes(const std::vector<BatchedDeleteDocument*>& deletes) {

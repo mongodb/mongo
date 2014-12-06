@@ -111,8 +111,7 @@ namespace mongo {
          * Example: a: {$elemMatch: {b:1, c:1}}.
          */
         static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
-            return me->isArray() && (MatchExpression::ELEM_MATCH_OBJECT == me->matchType()
-                                     || MatchExpression::ALL == me->matchType());
+            return me->isArray() && MatchExpression::ELEM_MATCH_OBJECT == me->matchType();
         }
 
         /**

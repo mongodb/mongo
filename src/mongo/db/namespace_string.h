@@ -236,6 +236,17 @@ namespace mongo {
         return true;
     }
 
+    /**
+     * foo = true
+     * foo. = false
+     * foo.a = false
+     */
+    inline bool nsIsDbOnly(const StringData& ns) {
+        size_t i = ns.find('.');
+        if (i == std::string::npos)
+            return true;
+        return false;
+    }
 
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like

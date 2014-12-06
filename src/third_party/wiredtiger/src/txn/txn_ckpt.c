@@ -706,17 +706,18 @@ __checkpoint_worker(
 			if (F_ISSET(ckpt, WT_CKPT_DELETE))
 				++deleted;
 		/*
-		 * Complicated test: if we only deleted a single checkpoint, and
-		 * it was the last checkpoint in the object, and it has the same
-		 * name as the checkpoint we're taking (correcting for internal
-		 * checkpoint names with their generational suffix numbers), we
-		 * can skip the checkpoint, there's nothing to do.
+		 * Complicated test: if the last checkpoint in the object has
+		 * the same name as the checkpoint we're taking (correcting for
+		 * internal checkpoint names with their generational suffix
+		 * numbers), we can skip the checkpoint, there's nothing to do.
+		 * The exception is if we're deleting two or more checkpoints:
+		 * then we may save space.
 		 */
-		if (deleted == 1 &&
-		    F_ISSET(ckpt - 1, WT_CKPT_DELETE) &&
+		if (ckpt > ckptbase &&
 		    (strcmp(name, (ckpt - 1)->name) == 0 ||
 		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
-		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))))
+		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))) &&
+		    deleted < 2)
 			goto done;
 	}
 

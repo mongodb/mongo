@@ -27,7 +27,7 @@
  */
 
 /**
- * This file tests db/exec/and_*.cpp and DiskLoc invalidation.  DiskLoc invalidation forces a fetch
+ * This file tests db/exec/and_*.cpp and RecordId invalidation.  RecordId invalidation forces a fetch
  * so we cannot test it outside of a dbtest.
  */
 
@@ -72,11 +72,11 @@ namespace QueryStageAnd {
             return descriptor;
         }
 
-        void getLocs(set<DiskLoc>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(),
+        void getLocs(set<RecordId>* out, Collection* coll) {
+            RecordIterator* it = coll->getIterator(&_txn, RecordId(),
                                                    CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
-                DiskLoc nextLoc = it->getNext();
+                RecordId nextLoc = it->getNext();
                 out->insert(nextLoc);
             }
             delete it;
@@ -150,8 +150,8 @@ namespace QueryStageAnd {
     //
 
     /**
-     * Invalidate a DiskLoc held by a hashed AND before the AND finishes evaluating.  The AND should
-     * process all other data just fine and flag the invalidated DiskLoc in the WorkingSet.
+     * Invalidate a RecordId held by a hashed AND before the AND finishes evaluating.  The AND should
+     * process all other data just fine and flag the invalidated RecordId in the WorkingSet.
      */
     class QueryStageAndHashInvalidation : public QueryStageAndBase {
     public:
@@ -205,10 +205,10 @@ namespace QueryStageAnd {
             // ...yield
             ah->saveState();
             // ...invalidate one of the read objects
-            set<DiskLoc> data;
+            set<RecordId> data;
             getLocs(&data, coll);
             size_t memUsageBefore = ah->getMemUsage();
-            for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
+            for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
                 if (coll->docFor(&_txn, *it)["foo"].numberInt() == 15) {
                     ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
                     remove(coll->docFor(&_txn, *it));
@@ -304,14 +304,14 @@ namespace QueryStageAnd {
             const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
             ASSERT_EQUALS(size_t(0), flagged.size());
 
-            // "delete" deletedObj (by invalidating the DiskLoc of the obj that matches it).
+            // "delete" deletedObj (by invalidating the RecordId of the obj that matches it).
             BSONObj deletedObj = BSON("_id" << 20 << "foo" << 20 << "bar" << 20 << "baz" << 20);
             ah->saveState();
-            set<DiskLoc> data;
+            set<RecordId> data;
             getLocs(&data, coll);
 
             size_t memUsageBefore = ah->getMemUsage();
-            for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
+            for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
                 if (0 == deletedObj.woCompare(coll->docFor(&_txn, *it))) {
                     ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
                     break;
@@ -902,8 +902,8 @@ namespace QueryStageAnd {
     //
 
     /**
-     * Invalidate a DiskLoc held by a sorted AND before the AND finishes evaluating.  The AND should
-     * process all other data just fine and flag the invalidated DiskLoc in the WorkingSet.
+     * Invalidate a RecordId held by a sorted AND before the AND finishes evaluating.  The AND should
+     * process all other data just fine and flag the invalidated RecordId in the WorkingSet.
      */
     class QueryStageAndSortedInvalidation : public QueryStageAndBase {
     public:
@@ -942,18 +942,18 @@ namespace QueryStageAnd {
             ah->addChild(new IndexScan(&_txn, params, &ws, NULL));
 
             // Get the set of disklocs in our collection to use later.
-            set<DiskLoc> data;
+            set<RecordId> data;
             getLocs(&data, coll);
 
             // We're making an assumption here that happens to be true because we clear out the
-            // collection before running this: increasing inserts have increasing DiskLocs.
+            // collection before running this: increasing inserts have increasing RecordIds.
             // This isn't true in general if the collection is not dropped beforehand.
             WorkingSetID id = WorkingSet::INVALID_ID;
 
             // Sorted AND looks at the first child, which is an index scan over foo==1.
             ah->work(&id);
 
-            // The first thing that the index scan returns (due to increasing DiskLoc trick) is the
+            // The first thing that the index scan returns (due to increasing RecordId trick) is the
             // very first insert, which should be the very first thing in data.  Let's invalidate it
             // and make sure it shows up in the flagged results.
             ah->saveState();
@@ -971,7 +971,7 @@ namespace QueryStageAnd {
             ASSERT_TRUE(member->getFieldDotted("bar", &elt));
             ASSERT_EQUALS(1, elt.numberInt());
 
-            set<DiskLoc>::iterator it = data.begin();
+            set<RecordId>::iterator it = data.begin();
 
             // Proceed along, AND-ing results.
             int count = 0;

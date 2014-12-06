@@ -786,7 +786,7 @@ int
 __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
+	WT_LSM_CHUNK *chunk, *last_chunk;
 	uint32_t nchunks, new_id;
 	int first_switch;
 
@@ -795,20 +795,17 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	nchunks = lsm_tree->nchunks;
 
 	first_switch = nchunks == 0 ? 1 : 0;
+
 	/*
 	 * Check if a switch is still needed: we may have raced while waiting
 	 * for a lock.
 	 */
-	chunk = NULL;
+	last_chunk = NULL;
 	if (!first_switch &&
-	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
-	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+	    (last_chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
+	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 		goto err;
-
-	/* Set the switch transaction in the previous chunk, if necessary. */
-	if (chunk != NULL && chunk->switch_txn == WT_TXN_NONE)
-		chunk->switch_txn = __wt_txn_new_id(session);
 
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
@@ -834,6 +831,10 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	++lsm_tree->dsk_gen;
 
 	lsm_tree->modified = 1;
+
+	/* Set the switch transaction in the previous chunk, if necessary. */
+	if (last_chunk != NULL && last_chunk->switch_txn == WT_TXN_NONE)
+		last_chunk->switch_txn = __wt_txn_new_id(session);
 
 err:	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	/*

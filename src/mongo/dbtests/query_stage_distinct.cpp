@@ -79,7 +79,7 @@ namespace QueryStageDistinct {
 
             // Distinct hack execution is always covered.
             // Key value is retrieved from working set key data
-            // instead of DiskLoc.
+            // instead of RecordId.
             ASSERT_FALSE(member->hasObj());
             BSONElement keyElt;
             ASSERT_TRUE(member->getFieldDotted(field, &keyElt));

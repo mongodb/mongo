@@ -93,6 +93,10 @@ namespace mongo {
         return builder.obj();
     }
 
+    static void extractIndexNSS(const BSONObj& indexDesc, NamespaceString* indexNSS) {
+        *indexNSS = NamespaceString(indexDesc["ns"].str());
+    }
+
     bool BatchedInsertRequest::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
@@ -106,9 +110,11 @@ namespace mongo {
             BSONElement sourceEl = sourceIt.next();
 
             if ( collName() == sourceEl.fieldName() ) {
+                std::string temp;
                 FieldParser::FieldState fieldState =
-                    FieldParser::extract( sourceEl, collName, &_collName, errMsg );
+                    FieldParser::extract( sourceEl, collName, &temp, errMsg );
                 if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _collName = NamespaceString(temp);
                 _isCollNameSet = fieldState == FieldParser::FIELD_SET;
             }
             else if ( documents() == sourceEl.fieldName() ) {
@@ -116,6 +122,8 @@ namespace mongo {
                     FieldParser::extract( sourceEl, documents, &_documents, errMsg );
                 if ( fieldState == FieldParser::FIELD_INVALID ) return false;
                 _isDocumentsSet = fieldState == FieldParser::FIELD_SET;
+                if (_documents.size() >= 1)
+                    extractIndexNSS(_documents.at(0), &_targetNSS);
             }
             else if ( writeConcern() == sourceEl.fieldName() ) {
                 FieldParser::FieldState fieldState =
@@ -148,7 +156,8 @@ namespace mongo {
     }
 
     void BatchedInsertRequest::clear() {
-        _collName.clear();
+        _collName = NamespaceString();
+        _targetNSS = NamespaceString();
         _isCollNameSet = false;
 
         _documents.clear();
@@ -167,6 +176,7 @@ namespace mongo {
         other->clear();
 
         other->_collName = _collName;
+        other->_targetNSS = _targetNSS;
         other->_isCollNameSet = _isCollNameSet;
 
         for(std::vector<BSONObj>::const_iterator it = _documents.begin();
@@ -193,31 +203,35 @@ namespace mongo {
     }
 
     void BatchedInsertRequest::setCollName(const StringData& collName) {
-        _collName = collName.toString();
+        _collName = NamespaceString(collName);
         _isCollNameSet = true;
-    }
-
-    void BatchedInsertRequest::unsetCollName() {
-         _isCollNameSet = false;
-     }
-
-    bool BatchedInsertRequest::isCollNameSet() const {
-         return _isCollNameSet;
     }
 
     const std::string& BatchedInsertRequest::getCollName() const {
         dassert(_isCollNameSet);
+        return _collName.ns();
+    }
+
+    void BatchedInsertRequest::setCollNameNS(const NamespaceString& collName) {
+        _collName = collName;
+        _isCollNameSet = true;
+    }
+
+    const NamespaceString& BatchedInsertRequest::getCollNameNS() const {
+        dassert(_isCollNameSet);
         return _collName;
+    }
+
+    const NamespaceString& BatchedInsertRequest::getTargetingNSS() const {
+        return _targetNSS;
     }
 
     void BatchedInsertRequest::addToDocuments(const BSONObj& documents) {
         _documents.push_back(documents);
         _isDocumentsSet = true;
-    }
 
-    void BatchedInsertRequest::unsetDocuments() {
-        _documents.clear();
-        _isDocumentsSet = false;
+        if (_documents.size() == 1)
+            extractIndexNSS(_documents.at(0), &_targetNSS);
     }
 
     bool BatchedInsertRequest::isDocumentsSet() const {

@@ -63,11 +63,11 @@ namespace {
             _locker.reset(new LockerImpl<false>(idCounter.addAndFetch(1)));
         }
 
-        getGlobalEnvironment()->registerOperationContext(this);
+        _client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
-        getGlobalEnvironment()->unregisterOperationContext(this);
+        _client->setOperationContext(NULL);
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {

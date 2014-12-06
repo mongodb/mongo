@@ -56,7 +56,7 @@ namespace mongo {
             invariant(version == 1 || version == 0);
         }
 
-        typedef std::pair<BSONObj, DiskLoc> Data;
+        typedef std::pair<BSONObj, RecordId> Data;
 
         int operator() (const Data& l, const Data& r) const {
             int x = (_version == 1
@@ -91,7 +91,7 @@ namespace mongo {
 
     Status BtreeBasedBulkAccessMethod::insert(OperationContext* txn,
                                               const BSONObj& obj,
-                                              const DiskLoc& loc,
+                                              const RecordId& loc,
                                               const InsertDeleteOptions& options,
                                               int64_t* numInserted) {
         BSONObjSet keys;
@@ -114,7 +114,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeBasedBulkAccessMethod::commit(set<DiskLoc>* dupsToDrop,
+    Status BtreeBasedBulkAccessMethod::commit(set<RecordId>* dupsToDrop,
                                               bool mayInterrupt,
                                               bool dupsAllowed) {
         Timer timer;
@@ -187,4 +187,4 @@ namespace mongo {
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"
-MONGO_CREATE_SORTER(mongo::BSONObj, mongo::DiskLoc, mongo::BtreeExternalSortComparison);
+MONGO_CREATE_SORTER(mongo::BSONObj, mongo::RecordId, mongo::BtreeExternalSortComparison);

@@ -10,6 +10,7 @@ if has_option("rocksdb"):
             'rocks_record_store.cpp',
             'rocks_recovery_unit.cpp',
             'rocks_sorted_data_impl.cpp',
+            'rocks_transaction.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',

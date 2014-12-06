@@ -101,9 +101,7 @@ namespace mongo {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        if (!force &&
-                replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                replCoord->getCurrentMemberState().primary()) {
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
             long long timeoutSecs = 0;
             if (cmdObj.hasField("timeoutSecs")) {
                 timeoutSecs = cmdObj["timeoutSecs"].numberLong();
@@ -111,23 +109,11 @@ namespace mongo {
 
             Status status = repl::getGlobalReplicationCoordinator()->stepDown(
                     txn,
-                    false,
+                    force,
                     repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
                     repl::ReplicationCoordinator::Milliseconds(120 * 1000));
             if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
                 return appendCommandStatus(result, status);
-            }
-
-            // TODO(spencer): This block can be removed once stepDown() guarantees that a secondary
-            // is fully caught up instead of just within 10 seconds of the primary.
-            if (status.code() != ErrorCodes::NotMaster) {
-                WriteConcernOptions writeConcern;
-                writeConcern.wNumNodes = 2;
-                writeConcern.wTimeout = 60 * 1000; // 1 minute
-                // Note that return value is ignored - we shut down after 1 minute even if we're not
-                // done replicating.
-                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpApplied(
-                        txn, writeConcern);
             }
         }
 
@@ -852,7 +838,7 @@ namespace mongo {
             long long size = 0;
             long long numObjects = 0;
 
-            DiskLoc loc;
+            RecordId loc;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
                 if ( estimate )
@@ -1046,7 +1032,8 @@ namespace mongo {
                         continue;
                     }
 
-                    IndexDescriptor* idx = coll->getIndexCatalog()->findIndexByKeyPattern( txn, keyPattern );
+                    const IndexDescriptor* idx = coll->getIndexCatalog()
+                                                     ->findIndexByKeyPattern( txn, keyPattern );
                     if ( idx == NULL ) {
                         errmsg = str::stream() << "cannot find index " << keyPattern
                                                << " for ns " << ns;
@@ -1066,11 +1053,13 @@ namespace mongo {
                     }
 
                     if ( oldExpireSecs != newExpireSecs ) {
-                        // change expireAfterSeconds
                         result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
+                        // Change the value of "expireAfterSeconds" on disk.
                         coll->getCatalogEntry()->updateTTLSetting( txn,
                                                                    idx->indexName(),
                                                                    newExpireSecs.numberLong() );
+                        // Notify the index catalog that the definition of this index changed.
+                        idx = coll->getIndexCatalog()->refreshEntry( txn, idx );
                         result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }

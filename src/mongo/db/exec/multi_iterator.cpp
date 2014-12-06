@@ -57,10 +57,10 @@ namespace mongo {
         if ( _collection == NULL )
             return PlanStage::DEAD;
 
-        // The DiskLoc we're about to look at it might not be in memory. In this case
+        // The RecordId we're about to look at it might not be in memory. In this case
         // we request a yield while we fetch the document.
         if (!_iterators.empty()) {
-            DiskLoc curr = _iterators.back()->curr();
+            RecordId curr = _iterators.back()->curr();
             if (!curr.isNull()) {
                 std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
                 if (NULL != fetcher.get()) {
@@ -74,7 +74,7 @@ namespace mongo {
             }
         }
 
-        DiskLoc next = _advance();
+        RecordId next = _advance();
         if (next.isNull())
             return PlanStage::IS_EOF;
 
@@ -113,7 +113,7 @@ namespace mongo {
     }
 
     void MultiIteratorStage::invalidate(OperationContext* txn,
-                                        const DiskLoc& dl,
+                                        const RecordId& dl,
                                         InvalidationType type) {
         switch ( type ) {
         case INVALIDATION_DELETION:
@@ -132,16 +132,16 @@ namespace mongo {
         return empty;
     }
 
-    DiskLoc MultiIteratorStage::_advance() {
+    RecordId MultiIteratorStage::_advance() {
         while (!_iterators.empty()) {
-            DiskLoc out = _iterators.back()->getNext();
+            RecordId out = _iterators.back()->getNext();
             if (!out.isNull())
                 return out;
 
             _iterators.popAndDeleteBack();
         }
 
-        return DiskLoc();
+        return RecordId();
     }
 
 } // namespace mongo

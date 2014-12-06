@@ -39,14 +39,14 @@ namespace mongo {
         // Already in our desired state.
         if (member->state == WorkingSetMember::OWNED_OBJ) { return true; }
 
-        // We can't do anything without a DiskLoc.
+        // We can't do anything without a RecordId.
         if (!member->hasLoc()) { return false; }
 
         // Do the fetch, invalidate the DL.
         member->obj = collection->docFor(txn, member->loc).getOwned();
 
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->loc = DiskLoc();
+        member->loc = RecordId();
         return true;
     }
 
@@ -63,7 +63,7 @@ namespace mongo {
             return;
         }
 
-        // We should have a DiskLoc but need to retrieve the obj. Get the obj now and reset all WSM
+        // We should have a RecordId but need to retrieve the obj. Get the obj now and reset all WSM
         // state appropriately.
         invariant(member->hasLoc());
         member->obj = collection->docFor(txn, member->loc);

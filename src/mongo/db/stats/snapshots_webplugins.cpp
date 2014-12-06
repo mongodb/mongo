@@ -44,8 +44,6 @@ namespace {
         virtual void init() {}
 
         virtual void run(OperationContext* txn, stringstream& ss) {
-            statsSnapshots.outputLockInfoHTML( ss );
-
             ss << "<a "
                "href=\"http://dochub.mongodb.org/core/concurrency\" "
                "title=\"snapshot: was the db in the write lock when this page was generated?\">";
@@ -108,8 +106,6 @@ namespace {
                "<th colspan=2>Updates</th>"
                "<th colspan=2>Removes</th>";
             ss << "</tr>\n";
-
-            display( ss , (double) delta->elapsed() , "TOTAL" , delta->globalUsageDiff() );
 
             Top::UsageMap usage = delta->collectionUsageDiff();
             for ( Top::UsageMap::const_iterator i=usage.begin(); i != usage.end(); ++i ) {

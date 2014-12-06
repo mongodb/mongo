@@ -46,6 +46,15 @@ namespace mongo {
             virtual StringData getCanonicalName() const {
                 return "mmapv1";
             }
+
+            virtual Status validateCollectionStorageOptions(const BSONObj& options) const
+            {
+                return Status::OK();
+            }
+
+            virtual Status validateIndexStorageOptions(const BSONObj& options) const {
+                return Status::OK();
+            }
         };
 
     } // namespace

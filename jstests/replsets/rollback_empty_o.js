@@ -27,6 +27,8 @@ var b_conn = conns[1];
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
+replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
+
 // get master and do an initial write
 var master = replTest.getMaster();
 assert(master === conns[0], "conns[0] assumed to be master");

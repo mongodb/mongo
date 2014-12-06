@@ -58,6 +58,7 @@ namespace repl {
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeConnections();
+        virtual void killAllUserOperations(OperationContext* txn);
         virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
         virtual OperationContext* createOperationContext(const std::string& threadName);

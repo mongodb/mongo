@@ -212,7 +212,8 @@ namespace mongo {
         }
     }
 
-    bool RangeDeleter::queueDelete(const RangeDeleterOptions& options,
+    bool RangeDeleter::queueDelete(OperationContext* txn,
+                                   const RangeDeleterOptions& options,
                                    Notification* notifyDone,
                                    std::string* errMsg) {
         string dummy;
@@ -241,8 +242,7 @@ namespace mongo {
         }
 
         if (options.waitForOpenCursors) {
-            boost::scoped_ptr<OperationContext> txn(getGlobalEnvironment()->newOpCtx());
-            _env->getCursorIds(txn.get(), ns, &toDelete->cursorsToWait);
+            _env->getCursorIds(txn, ns, &toDelete->cursorsToWait);
         }
 
         toDelete->stats.queueStartTS = jsTime();

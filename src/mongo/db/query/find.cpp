@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
@@ -118,7 +118,7 @@ namespace mongo {
     // Failpoint for checking whether we've received a getmore.
     MONGO_FP_DECLARE(failReceivedGetmore);
 
-    // TODO: Move this and the other command stuff in newRunQuery outta here and up a level.
+    // TODO: Move this and the other command stuff in runQuery outta here and up a level.
     static bool runCommands(OperationContext* txn,
                             const char *ns,
                             BSONObj& jsobj,
@@ -173,15 +173,15 @@ namespace mongo {
      *        when this method returns an empty result, incrementing pass on each call.  
      *        Thus, pass == 0 indicates this is the first "attempt" before any 'awaiting'.
      */
-    QueryResult::View newGetMore(OperationContext* txn,
-                            const char* ns,
-                            int ntoreturn,
-                            long long cursorid,
-                            CurOp& curop,
-                            int pass,
-                            bool& exhaust,
-                            bool* isCursorAuthorized,
-                            bool fromDBDirectClient) {
+    QueryResult::View getMore(OperationContext* txn,
+                              const char* ns,
+                              int ntoreturn,
+                              long long cursorid,
+                              CurOp& curop,
+                              int pass,
+                              bool& exhaust,
+                              bool* isCursorAuthorized,
+                              bool fromDBDirectClient) {
 
         // For testing, we may want to fail if we receive a getmore.
         if (MONGO_FAIL_POINT(failReceivedGetmore)) {
@@ -275,7 +275,7 @@ namespace mongo {
                 cc->updateSlaveLocation(txn, curop); 
             }
 
-            if (cc->isAggCursor) {
+            if (cc->isAggCursor()) {
                 // Agg cursors handle their own locking internally.
                 ctx.reset(); // unlocks
             }
@@ -329,9 +329,9 @@ namespace mongo {
             // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
-            if (PlanExecutor::DEAD == state || PlanExecutor::EXEC_ERROR == state) {
+            if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
                 // Propagate this error to caller.
-                if (PlanExecutor::EXEC_ERROR == state) {
+                if (PlanExecutor::FAILURE == state) {
                     scoped_ptr<PlanStageStats> stats(exec->getStats());
                     error() << "Plan executor error, stats: "
                             << Explain::statsToBSON(*stats);
@@ -457,12 +457,12 @@ namespace mongo {
                           "$gt or $gte over the 'ts' field.");
         }
 
-        DiskLoc startLoc = DiskLoc().setInvalid();
+        RecordId startLoc = RecordId().setInvalid();
 
         // See if the RecordStore supports the oplogStartHack
         const BSONElement tsElem = extractOplogTsOptime(tsExpr);
         if (tsElem.type() == Timestamp) {
-            StatusWith<DiskLoc> goal = oploghack::keyForOptime(tsElem._opTime());
+            StatusWith<RecordId> goal = oploghack::keyForOptime(tsElem._opTime());
             if (goal.isOK()) {
                 startLoc = collection->getRecordStore()->oplogStartHack(txn, goal.getValue());
             }
@@ -485,7 +485,7 @@ namespace mongo {
             invariant(execStatus.isOK());
             scoped_ptr<PlanExecutor> exec(rawExec);
 
-            // The stage returns a DiskLoc of where to start.
+            // The stage returns a RecordId of where to start.
             PlanExecutor::ExecState state = exec->getNext(NULL, &startLoc);
 
             // This is normal.  The start of the oplog is the beginning of the collection.
@@ -517,12 +517,12 @@ namespace mongo {
                                   PlanExecutor::YIELD_AUTO, execOut);
     }
 
-    std::string newRunQuery(OperationContext* txn,
-                            Message& m,
-                            QueryMessage& q,
-                            CurOp& curop,
-                            Message &result,
-                            bool fromDBDirectClient) {
+    std::string runQuery(OperationContext* txn,
+                         Message& m,
+                         QueryMessage& q,
+                         CurOp& curop,
+                         Message &result,
+                         bool fromDBDirectClient) {
         // Validate the namespace.
         const NamespaceString nss(q.ns);
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
@@ -755,7 +755,7 @@ namespace mongo {
         exec->deregisterExec();
 
         // Caller expects exceptions thrown in certain cases.
-        if (PlanExecutor::EXEC_ERROR == state) {
+        if (PlanExecutor::FAILURE == state) {
             scoped_ptr<PlanStageStats> stats(exec->getStats());
             error() << "Plan executor error, stats: "
                     << Explain::statsToBSON(*stats);

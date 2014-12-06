@@ -64,11 +64,11 @@ namespace mongo {
         }
 
 
-        DiskLoc loc;
+        RecordId loc;
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
+            StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
             ASSERT_OK( res.getStatus() );
             loc = res.getValue();
             uow.commit();
@@ -96,7 +96,7 @@ namespace mongo {
         string ns = "a.b";
 
         // 'loc' holds location of "abc" and is referenced after restarting engine.
-        DiskLoc loc;
+        RecordId loc;
         {
             scoped_ptr<RecordStore> rs;
             {
@@ -109,7 +109,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( engine );
                 WriteUnitOfWork uow( &opCtx );
-                StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
+                StatusWith<RecordId> res = rs->insertRecord( &opCtx, "abc", 4, false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -151,7 +151,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            ASSERT_OK( sorted->insert( &opCtx, BSON( "" << 5 ), DiskLoc( 6, 4 ), true ) );
+            ASSERT_OK( sorted->insert( &opCtx, BSON( "" << 5 ), RecordId( 6, 4 ), true ) );
             uow.commit();
         }
 
@@ -173,7 +173,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
             rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true) );
+            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
             uow.commit();
         }
 
@@ -189,7 +189,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            catalog.reset( new KVCatalog( rs.get(), true) );
+            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
             catalog->init( &opCtx );
             uow.commit();
         }
@@ -217,7 +217,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
             rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get(), true) );
+            catalog.reset( new KVCatalog( rs.get(), true, false, false) );
             uow.commit();
         }
 
@@ -226,6 +226,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
             ASSERT_NOT_EQUALS( "a.b", catalog->getCollectionIdent( "a.b" ) );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
             uow.commit();
         }
 
@@ -237,7 +238,7 @@ namespace mongo {
             md.ns ="a.b";
             md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
                                                                              false,
-                                                                             DiskLoc(),
+                                                                             RecordId(),
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             uow.commit();
@@ -252,6 +253,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             ASSERT_EQUALS( idxIndent, catalog->getIndexIdent( &opCtx, "a.b", "foo" ) );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
         }
 
         {
@@ -263,7 +265,7 @@ namespace mongo {
             catalog->putMetaData( &opCtx, "a.b", md ); // remove index
             md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
                                                                              false,
-                                                                             DiskLoc(),
+                                                                             RecordId(),
                                                                              false ) );
             catalog->putMetaData( &opCtx, "a.b", md );
             uow.commit();
@@ -275,5 +277,132 @@ namespace mongo {
         }
 
     }
+
+    TEST( KVCatalogTest, DirectoryPerDb1 ) {
+        scoped_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
+        KVEngine* engine = helper->getEngine();
+
+        scoped_ptr<RecordStore> rs;
+        scoped_ptr<KVCatalog> catalog;
+        {
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            catalog.reset( new KVCatalog( rs.get(), true, true, false) );
+            uow.commit();
+        }
+
+        { // collection
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
+            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
+            uow.commit();
+        }
+
+        { // index
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+
+            BSONCollectionCatalogEntry::MetaData md;
+            md.ns ="a.b";
+            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
+                                                                             false,
+                                                                             RecordId(),
+                                                                             false ) );
+            catalog->putMetaData( &opCtx, "a.b", md );
+            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
+            uow.commit();
+        }
+
+    }
+
+    TEST( KVCatalogTest, Split1 ) {
+        scoped_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
+        KVEngine* engine = helper->getEngine();
+
+        scoped_ptr<RecordStore> rs;
+        scoped_ptr<KVCatalog> catalog;
+        {
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            catalog.reset( new KVCatalog( rs.get(), true, false, true) );
+            uow.commit();
+        }
+
+        {
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
+            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "collection/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
+            uow.commit();
+        }
+
+        { // index
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+
+            BSONCollectionCatalogEntry::MetaData md;
+            md.ns ="a.b";
+            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
+                                                                             false,
+                                                                             RecordId(),
+                                                                             false ) );
+            catalog->putMetaData( &opCtx, "a.b", md );
+            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "index/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
+            uow.commit();
+        }
+
+    }
+
+    TEST( KVCatalogTest, DirectoryPerAndSplit1 ) {
+        scoped_ptr<KVHarnessHelper> helper( KVHarnessHelper::create() );
+        KVEngine* engine = helper->getEngine();
+
+        scoped_ptr<RecordStore> rs;
+        scoped_ptr<KVCatalog> catalog;
+        {
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
+            catalog.reset( new KVCatalog( rs.get(), true, true, true) );
+            uow.commit();
+        }
+
+        {
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+            ASSERT_OK( catalog->newCollection( &opCtx, "a.b", CollectionOptions() ) );
+            ASSERT_STRING_CONTAINS( catalog->getCollectionIdent( "a.b" ), "a/collection/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getCollectionIdent( "a.b" ) ) );
+            uow.commit();
+        }
+
+        { // index
+            MyOperationContext opCtx( engine );
+            WriteUnitOfWork uow( &opCtx );
+
+            BSONCollectionCatalogEntry::MetaData md;
+            md.ns ="a.b";
+            md.indexes.push_back( BSONCollectionCatalogEntry::IndexMetaData( BSON( "name" << "foo" ),
+                                                                             false,
+                                                                             RecordId(),
+                                                                             false ) );
+            catalog->putMetaData( &opCtx, "a.b", md );
+            ASSERT_STRING_CONTAINS( catalog->getIndexIdent( &opCtx, "a.b", "foo" ), "a/index/" );
+            ASSERT_TRUE( catalog->isUserDataIdent( catalog->getIndexIdent( &opCtx, "a.b", "foo" ) ) );
+            uow.commit();
+        }
+
+    }
+
 
 }

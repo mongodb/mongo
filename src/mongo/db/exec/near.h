@@ -32,12 +32,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -85,7 +85,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual vector<PlanStage*> getChildren() const;
 
@@ -176,7 +176,7 @@ namespace mongo {
 
         // May need to track disklocs from the child stage to do our own deduping, also to do
         // invalidation of buffered results.
-        unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> _nextIntervalSeen;
+        unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _nextIntervalSeen;
 
         // Stats for the stage covering this interval
         scoped_ptr<IntervalStats> _nextIntervalStats;

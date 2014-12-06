@@ -189,7 +189,7 @@ namespace mongo {
         size_t memUsage = 0;
 
         if (hasLoc()) {
-            memUsage += sizeof(DiskLoc);
+            memUsage += sizeof(RecordId);
         }
 
         // XXX: Unowned objects count towards current size.

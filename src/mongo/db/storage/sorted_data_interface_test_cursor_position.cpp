@@ -51,8 +51,8 @@ namespace mongo {
             scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), 1 ) );
             scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), 1 ) );
 
-            ASSERT( !cursor1->locate( minKey, minDiskLoc ) );
-            ASSERT( !cursor2->locate( minKey, minDiskLoc ) );
+            ASSERT( !cursor1->locate( minKey, RecordId::min() ) );
+            ASSERT( !cursor2->locate( minKey, RecordId::min() ) );
             ASSERT( cursor1->isEOF() );
             ASSERT( cursor2->isEOF() );
             ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
@@ -76,8 +76,8 @@ namespace mongo {
             scoped_ptr<SortedDataInterface::Cursor> cursor1( sorted->newCursor( opCtx.get(), -1 ) );
             scoped_ptr<SortedDataInterface::Cursor> cursor2( sorted->newCursor( opCtx.get(), -1 ) );
 
-            ASSERT( !cursor1->locate( maxKey, maxDiskLoc ) );
-            ASSERT( !cursor2->locate( maxKey, maxDiskLoc ) );
+            ASSERT( !cursor1->locate( maxKey, RecordId::max() ) );
+            ASSERT( !cursor2->locate( maxKey, RecordId::max() ) );
             ASSERT( cursor1->isEOF() );
             ASSERT( cursor2->isEOF() );
             ASSERT( cursor1->pointsToSamePlaceAs( *cursor2 ) );
@@ -258,7 +258,7 @@ namespace mongo {
     }
 
     // Verify that two forward cursors positioned at a duplicate key, but with
-    // different DiskLocs are not considered to point to the same place.
+    // different RecordIds are not considered to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentDiskLocs ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -296,7 +296,7 @@ namespace mongo {
     }
 
     // Verify that two reverse cursors positioned at a duplicate key, but with
-    // different DiskLocs are not considered to point to the same place.
+    // different RecordIds are not considered to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentDiskLocsReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
@@ -410,7 +410,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
@@ -424,7 +424,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, minDiskLoc ) );
+            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
             for ( int i = 0; i < nToInsert; i++ ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT( cursor->pointsToSamePlaceAs( *cursor ) );
@@ -450,7 +450,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
@@ -464,7 +464,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, maxDiskLoc ) );
+            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT( cursor->pointsToSamePlaceAs( *cursor ) );

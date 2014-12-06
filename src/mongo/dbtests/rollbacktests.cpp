@@ -34,8 +34,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -83,11 +83,11 @@ namespace {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
         return coll->truncate( txn );
     }
-    DiskLoc insertRecord( OperationContext* txn,
+    RecordId insertRecord( OperationContext* txn,
                           const NamespaceString& nss,
                           const BSONObj& data ) {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
-        StatusWith<DiskLoc> status = coll->insertDocument( txn, data, false );
+        StatusWith<RecordId> status = coll->insertDocument( txn, data, false );
         ASSERT_OK( status.getStatus() );
         return status.getValue();
     }
@@ -97,7 +97,7 @@ namespace {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
         scoped_ptr<RecordIterator> iter( coll->getIterator( txn ) );
         ASSERT( !iter->isEOF() );
-        DiskLoc loc = iter->getNext();
+        RecordId loc = iter->getNext();
         ASSERT( iter->isEOF() );
         ASSERT_EQ( data, coll->docFor( txn, loc ) );
     }
@@ -642,10 +642,10 @@ namespace {
             invariant(ice);
             HeadManager* headManager = ice->headManager();
 
-            const DiskLoc oldHead = headManager->getHead(&txn);
+            const RecordId oldHead = headManager->getHead(&txn);
             ASSERT_EQ(oldHead, ice->head(&txn));
 
-            const DiskLoc dummyHead(123, 456);
+            const RecordId dummyHead(123, 456);
             ASSERT_NE(oldHead, dummyHead);
 
             // END SETUP / START TEST

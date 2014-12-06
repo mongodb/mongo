@@ -72,3 +72,19 @@ no_clear_list = [
     'transaction: transaction range of IDs currently pinned',
     'session: open cursor count',
 ]
+prefix_list = [
+    'data-handle',
+    'reconciliation',
+    'LSM',
+    'log',
+    'cache',
+    'transaction',
+    'cursor',
+    'connection',
+    'session',
+    'block-manager',
+    'async',
+    'btree',
+    'compression',
+]
+groups = {'cursor': ['cursor', 'session'], 'lsm': ['LSM', 'transaction'], 'system': ['connection', 'data-handle', 'session'], 'evict': ['cache', 'connection', 'block-manager'], 'memory': ['cache', 'connection', 'reconciliation']}

@@ -442,6 +442,7 @@ namespace mongo {
           _boundsIncrement(0.0) {
 
         getNearStats()->keyPattern = twoDIndex->keyPattern();
+        getNearStats()->indexName = twoDIndex->indexName();
     }
 
     GeoNear2DStage::~GeoNear2DStage() {
@@ -850,6 +851,7 @@ namespace mongo {
           _boundsIncrement(0.0) {
 
         getNearStats()->keyPattern = s2Index->keyPattern();
+        getNearStats()->indexName = s2Index->indexName();
     }
 
     GeoNear2DSphereStage::~GeoNear2DSphereStage() {

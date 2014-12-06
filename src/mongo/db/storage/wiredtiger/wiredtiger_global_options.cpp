@@ -47,6 +47,11 @@ namespace mongo {
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig",
                 "wiredTigerIndexConfig", moe::String, "WiredTiger index configuration settings");
 
+        wiredTigerOptions.addOptionChaining("storage.wiredTiger.directoryForIndexes",
+                                            "wiredTigerDirectoryForIndexes",
+                                            moe::Switch,
+                                            "Put indexes and data in different directories" );
+
         return options->addSection(wiredTigerOptions);
     }
 
@@ -59,18 +64,23 @@ namespace mongo {
         if (params.count("storage.wiredTiger.engineConfig")) {
             wiredTigerGlobalOptions.engineConfig =
                          params["storage.wiredTiger.engineConfig"].as<string>();
-            std::cerr << "Engine option: " << wiredTigerGlobalOptions.engineConfig << std::endl;
+            log() << "Engine option: " << wiredTigerGlobalOptions.engineConfig;
         }
         if (params.count("storage.wiredTiger.collectionConfig")) {
             wiredTigerGlobalOptions.collectionConfig =
                          params["storage.wiredTiger.collectionConfig"].as<string>();
-            std::cerr << "Collection option: " << wiredTigerGlobalOptions.collectionConfig << std::endl;
+            log() << "Collection option: " << wiredTigerGlobalOptions.collectionConfig;
         }
         if (params.count("storage.wiredTiger.indexConfig")) {
             wiredTigerGlobalOptions.indexConfig =
                          params["storage.wiredTiger.indexConfig"].as<string>();
-            std::cerr << "Index option: " << wiredTigerGlobalOptions.indexConfig << std::endl;
+            log() << "Index option: " << wiredTigerGlobalOptions.indexConfig;
         }
+        if (params.count("storage.wiredTiger.directoryForIndexes")) {
+            wiredTigerGlobalOptions.directoryForIndexes =
+                params["storage.wiredTiger.directoryForIndexes"].as<bool>();
+        }
+
         return Status::OK();
     }
 }

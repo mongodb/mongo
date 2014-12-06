@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -55,7 +55,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         /**
          * ID Hack has a very strict criteria for the queries it supports.
@@ -94,16 +94,13 @@ namespace mongo {
         // The value to match against the _id field.
         BSONObj _key;
 
-        // Did someone call kill() on us?
-        bool _killed;
-
         // Have we returned our one document?
         bool _done;
 
         // Do we need to add index key metadata for $returnKey?
         bool _addKeyMetadata;
 
-        // If we want to return a DiskLoc and it points to something that's not in memory,
+        // If we want to return a RecordId and it points to something that's not in memory,
         // we return a "please page this in" result. We add a RecordFetcher given back to us by the
         // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
         // the fetch request.

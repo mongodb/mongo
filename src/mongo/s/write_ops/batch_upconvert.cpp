@@ -97,7 +97,7 @@ namespace mongo {
             // No exceptions from here on
             BatchedCommandRequest* request =
                 new BatchedCommandRequest( BatchedCommandRequest::BatchType_Insert );
-            request->setNS( nss.ns() );
+            request->setNSS( nss );
             for ( vector<BSONObj>::const_iterator it = docs.begin(); it != docs.end(); ++it ) {
                 request->getInsertRequest()->addToDocuments( *it );
             }
@@ -128,7 +128,7 @@ namespace mongo {
 
         BatchedCommandRequest* request =
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Update );
-        request->setNS( nss.ns() );
+        request->setNSS( nss );
         request->getUpdateRequest()->addToUpdates( updateDoc );
         request->setWriteConcern( WriteConcernOptions::Acknowledged );
 
@@ -151,7 +151,7 @@ namespace mongo {
 
         BatchedCommandRequest* request =
             new BatchedCommandRequest( BatchedCommandRequest::BatchType_Delete );
-        request->setNS( nss.ns() );
+        request->setNSS( nss );
         request->getDeleteRequest()->addToDeletes( deleteDoc );
         request->setWriteConcern( WriteConcernOptions::Acknowledged );
 

@@ -78,7 +78,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        virtual void cleanShutdown(OperationContext* txn) {};
+        virtual void cleanShutdown() {};
 
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
     private:

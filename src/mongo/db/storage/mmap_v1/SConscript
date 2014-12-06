@@ -164,3 +164,4 @@ env.CppUnitTest(
         ]
     )
 
+env.CppUnitTest('diskloc_test', 'diskloc_test.cpp', LIBDEPS=[])

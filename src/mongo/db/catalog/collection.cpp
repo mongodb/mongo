@@ -131,7 +131,7 @@ namespace mongo {
     }
 
     RecordIterator* Collection::getIterator( OperationContext* txn,
-                                             const DiskLoc& start,
+                                             const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const {
         invariant( ok() );
         return _recordStore->getIterator( txn, start, dir );
@@ -143,11 +143,11 @@ namespace mongo {
 
     int64_t Collection::countTableScan( OperationContext* txn, const MatchExpression* expression ) {
         scoped_ptr<RecordIterator> iterator( getIterator( txn,
-                                                          DiskLoc(),
+                                                          RecordId(),
                                                           CollectionScanParams::FORWARD ) );
         int64_t count = 0;
         while ( !iterator->isEOF() ) {
-            DiskLoc loc = iterator->getNext();
+            RecordId loc = iterator->getNext();
             BSONObj obj = docFor( txn, loc );
             if ( expression->matchesBSON( obj ) )
                 count++;
@@ -156,11 +156,11 @@ namespace mongo {
         return count;
     }
 
-    BSONObj Collection::docFor(OperationContext* txn, const DiskLoc& loc) const {
+    BSONObj Collection::docFor(OperationContext* txn, const RecordId& loc) const {
         return  _recordStore->dataFor( txn, loc ).releaseToBson();
     }
 
-    bool Collection::findDoc(OperationContext* txn, const DiskLoc& loc, BSONObj* out) const {
+    bool Collection::findDoc(OperationContext* txn, const RecordId& loc, BSONObj* out) const {
         RecordData rd;
         if ( !_recordStore->findRecord( txn, loc, &rd ) )
             return false;
@@ -168,26 +168,26 @@ namespace mongo {
         return true;
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
+    StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
         invariant( !_indexCatalog.haveAnyIndexes() ); // eventually can implement, just not done
 
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+        StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
                                                               doc,
                                                               _enforceQuota( enforceQuota ) );
         if ( !loc.isOK() )
             return loc;
 
-        return StatusWith<DiskLoc>( loc );
+        return StatusWith<RecordId>( loc );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
+    StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota ) {
         if ( _indexCatalog.findIdIndex( txn ) ) {
             if ( docToInsert["_id"].eoo() ) {
-                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                return StatusWith<RecordId>( ErrorCodes::InternalError,
                                             str::stream() << "Collection::insertDocument got "
                                             "document without _id for ns:" << _ns.ns() );
             }
@@ -196,11 +196,11 @@ namespace mongo {
         return _insertDocument( txn, docToInsert, enforceQuota );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
+    StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& doc,
                                                     MultiIndexBlock* indexBlock,
                                                     bool enforceQuota ) {
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+        StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
                                                               doc.objdata(),
                                                               doc.objsize(),
                                                               _enforceQuota(enforceQuota) );
@@ -210,18 +210,18 @@ namespace mongo {
 
         Status status = indexBlock->insert( doc, loc.getValue() );
         if ( !status.isOK() )
-            return StatusWith<DiskLoc>( status );
+            return StatusWith<RecordId>( status );
 
         return loc;
     }
 
     RecordFetcher* Collection::documentNeedsFetch( OperationContext* txn,
-                                                   const DiskLoc& loc ) const {
+                                                   const RecordId& loc ) const {
         return _recordStore->recordNeedsFetch( txn, loc );
     }
 
 
-    StatusWith<DiskLoc> Collection::_insertDocument( OperationContext* txn,
+    StatusWith<RecordId> Collection::_insertDocument( OperationContext* txn,
                                                      const BSONObj& docToInsert,
                                                      bool enforceQuota ) {
 
@@ -229,26 +229,26 @@ namespace mongo {
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
 
-        StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
+        StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
                                                               docToInsert.objdata(),
                                                               docToInsert.objsize(),
                                                               _enforceQuota( enforceQuota ) );
         if ( !loc.isOK() )
             return loc;
 
-        invariant( minDiskLoc < loc.getValue() );
-        invariant( loc.getValue() < maxDiskLoc );
+        invariant( RecordId::min() < loc.getValue() );
+        invariant( loc.getValue() < RecordId::max() );
 
         _infoCache.notifyOfWriteOp();
 
         Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
         if (!s.isOK())
-            return StatusWith<DiskLoc>(s);
+            return StatusWith<RecordId>(s);
 
         return loc;
     }
 
-    Status Collection::aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
+    Status Collection::aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) {
 
         BSONObj doc = docFor( txn, loc );
 
@@ -261,7 +261,7 @@ namespace mongo {
     }
 
     void Collection::deleteDocument( OperationContext* txn,
-                                     const DiskLoc& loc,
+                                     const RecordId& loc,
                                      bool cappedOK,
                                      bool noWarn,
                                      BSONObj* deletedId ) {
@@ -293,8 +293,8 @@ namespace mongo {
     Counter64 moveCounter;
     ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
 
-    StatusWith<DiskLoc> Collection::updateDocument( OperationContext* txn,
-                                                    const DiskLoc& oldLocation,
+    StatusWith<RecordId> Collection::updateDocument( OperationContext* txn,
+                                                    const RecordId& oldLocation,
                                                     const BSONObj& objNew,
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
@@ -305,7 +305,7 @@ namespace mongo {
             BSONElement oldId = objOld["_id"];
             BSONElement newId = objNew["_id"];
             if ( oldId != newId )
-                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                return StatusWith<RecordId>( ErrorCodes::InternalError,
                                             "in Collection::updateDocument _id mismatch",
                                             13596 );
         }
@@ -332,13 +332,13 @@ namespace mongo {
             updateTickets.mutableMap()[descriptor] = updateTicket;
             Status ret = iam->validateUpdate(txn, objOld, objNew, oldLocation, options, updateTicket );
             if ( !ret.isOK() ) {
-                return StatusWith<DiskLoc>( ret );
+                return StatusWith<RecordId>( ret );
             }
         }
 
         // This can call back into Collection::recordStoreGoingToMove.  If that happens, the old
         // object is removed from all indexes.
-        StatusWith<DiskLoc> newLocation = _recordStore->updateRecord( txn,
+        StatusWith<RecordId> newLocation = _recordStore->updateRecord( txn,
                                                                       oldLocation,
                                                                       objNew.objdata(),
                                                                       objNew.objsize(),
@@ -366,7 +366,7 @@ namespace mongo {
 
             Status s = _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
             if (!s.isOK())
-                return StatusWith<DiskLoc>(s);
+                return StatusWith<RecordId>(s);
 
             return newLocation;
         }
@@ -384,7 +384,7 @@ namespace mongo {
             int64_t updatedKeys;
             Status ret = iam->update(txn, *updateTickets.mutableMap()[descriptor], &updatedKeys);
             if ( !ret.isOK() )
-                return StatusWith<DiskLoc>( ret );
+                return StatusWith<RecordId>( ret );
             if ( debug )
                 debug->keyUpdates += updatedKeys;
         }
@@ -396,7 +396,7 @@ namespace mongo {
     }
 
     Status Collection::recordStoreGoingToMove( OperationContext* txn,
-                                               const DiskLoc& oldLocation,
+                                               const RecordId& oldLocation,
                                                const char* oldBuffer,
                                                size_t oldSize ) {
         moveCounter.increment();
@@ -407,7 +407,7 @@ namespace mongo {
 
 
     Status Collection::updateDocumentWithDamages( OperationContext* txn,
-                                                  const DiskLoc& loc,
+                                                  const RecordId& loc,
                                                   const RecordData& oldRec,
                                                   const char* damageSource,
                                                   const mutablebson::DamageVector& damages ) {
@@ -514,7 +514,7 @@ namespace mongo {
     }
 
     void Collection::temp_cappedTruncateAfter(OperationContext* txn,
-                                              DiskLoc end,
+                                              RecordId end,
                                               bool inclusive) {
         invariant( isCapped() );
         reinterpret_cast<CappedRecordStoreV1*>(

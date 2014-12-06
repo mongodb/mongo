@@ -800,7 +800,9 @@ function appendSetParameterArgs(argArray) {
         else if (programName.endsWith('mongod')) {
             // set storageEngine for mongod
             if (jsTest.options().storageEngine) {
-                argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                if ( argArray.indexOf( "--storageEngine" ) < 0 ) {
+                    argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                }
             }
             if (jsTest.options().wiredTigerEngineConfig) {
                 argArray.push.apply(argArray, ['--wiredTigerEngineConfig', jsTest.options().wiredTigerEngineConfig]);
@@ -907,7 +909,6 @@ runMongoProgram = function() {
         args.unshift( progName,
                       '-u', jsTestOptions().authUser,
                       '-p', jsTestOptions().authPassword,
-                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
     }
@@ -933,7 +934,6 @@ startMongoProgramNoConnect = function() {
         args.unshift(progName,
                      '-u', jsTestOptions().authUser,
                      '-p', jsTestOptions().authPassword,
-                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
 

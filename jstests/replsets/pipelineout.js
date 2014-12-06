@@ -6,7 +6,7 @@ var nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate({"_id" : name,
                    "members" : [
-                         {"_id" : 0, "host" : nodes[0], "priority" : 5},
+                         {"_id" : 0, "host" : nodes[0]},
                          {"_id" : 1, "host" : nodes[1]}
      ]});
 

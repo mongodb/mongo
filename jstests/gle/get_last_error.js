@@ -1,8 +1,17 @@
 // Check that the wtime and writtenTo fields are set or unset depending on the writeConcern used.
 // First check on a replica set with different combinations of writeConcern
-var replTest = new ReplSetTest( {name: "SERVER-9005", oplogSize: 1, nodes: 3} );
+var name = "SERVER-9005";
+var replTest = new ReplSetTest( {name: name, oplogSize: 1, nodes: 3} );
 var nodes = replTest.startSet();
-replTest.initiate();
+replTest.initiate({
+    _id: name,
+    members: [
+        { _id: 0, host: replTest.nodeList()[0] },
+        { _id: 1, host: replTest.nodeList()[1] },
+        { _id: 2, host: replTest.nodeList()[2] }
+    ],
+    settings: { chainingAllowed: false }
+});
 var master = replTest.getMaster();
 var mdb = master.getDB("test");
 

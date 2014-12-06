@@ -39,7 +39,7 @@ namespace mongo {
 
     class WiredTigerGlobalOptions {
     public:
-        WiredTigerGlobalOptions() {};
+        WiredTigerGlobalOptions() : directoryForIndexes(false) {};
 
         Status add(moe::OptionSection* options);
         bool handlePreValidation(const moe::Environment& params);
@@ -48,6 +48,7 @@ namespace mongo {
         std::string engineConfig;
         std::string collectionConfig;
         std::string indexConfig;
+        bool directoryForIndexes;
     };
 
     extern WiredTigerGlobalOptions wiredTigerGlobalOptions;

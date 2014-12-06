@@ -340,7 +340,7 @@ namespace {
             new MMAPV1DatabaseCatalogEntry(opCtx,
                                            db,
                                            storageGlobalParams.dbpath,
-                                           mmapv1GlobalOptions.directoryperdb,
+                                           storageGlobalParams.directoryperdb,
                                            false);
 
         boost::mutex::scoped_lock lk(_entryMapMutex);
@@ -380,7 +380,7 @@ namespace {
         for ( boost::filesystem::directory_iterator i( path );
               i != boost::filesystem::directory_iterator();
               ++i ) {
-            if (mmapv1GlobalOptions.directoryperdb) {
+            if (storageGlobalParams.directoryperdb) {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );
@@ -403,7 +403,7 @@ namespace {
         return getDur().isDurable();
     }
 
-    void MMAPV1Engine::cleanShutdown(OperationContext* txn) {
+    void MMAPV1Engine::cleanShutdown() {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a
         // synchronous signal, which we don't expect
@@ -413,8 +413,7 @@ namespace {
         if (storageGlobalParams.dur) {
             log() << "shutdown: final commit..." << endl;
 
-            getDur().commitAndStopDurThread(txn);
-
+            getDur().commitAndStopDurThread();
             flushAllFiles(true);
         }
 

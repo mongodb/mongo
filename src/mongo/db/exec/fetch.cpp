@@ -85,7 +85,7 @@ namespace mongo {
             return returnIfMatches(member, id, out);
         }
 
-        // If we're here, we're not waiting for a DiskLoc to be fetched.  Get another to-be-fetched
+        // If we're here, we're not waiting for a RecordId to be fetched.  Get another to-be-fetched
         // result from our child.
         WorkingSetID id = WorkingSet::INVALID_ID;
         StageState status = _child->work(&id);
@@ -118,7 +118,7 @@ namespace mongo {
                     }
                 }
 
-                // The doc is already in memory, so go ahead and grab it. Now we have a DiskLoc
+                // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
                 // as well as an unowned object
                 member->obj = _collection->docFor(_txn, member->loc);
                 member->keyData.clear();
@@ -164,7 +164,7 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void FetchStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void FetchStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         _child->invalidate(txn, dl, type);

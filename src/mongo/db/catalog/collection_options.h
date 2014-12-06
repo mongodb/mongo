@@ -49,13 +49,6 @@ namespace mongo {
          */
         Status parse( const BSONObj& obj );
 
-        /**
-         * Same functionality as parse(BSONObj) with the additional restriction that the only
-         * field under 'storageEngine, if provided, must have a field name matching
-         * 'storageEngineName'.
-         */
-        Status parse(const BSONObj& obj, const std::string& storageEngineName);
-
         BSONObj toBSON() const;
 
         /**

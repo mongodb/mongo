@@ -325,7 +325,7 @@ namespace mongo {
         auto_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
         const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
-        const NamespaceString nss = NamespaceString( request.getNS() );
+        const NamespaceString& nss = request.getNSS();
         if ( !nss.isValid() ) {
             toBatchError( Status( ErrorCodes::InvalidNamespace,
                                   nss.ns() + " is not a valid namespace" ),
@@ -408,7 +408,7 @@ namespace mongo {
                                     BatchedCommandResponse* response ) {
 
         ChunkManagerTargeter targeter;
-        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
+        Status targetInitStatus = targeter.init( request.getTargetingNSS() );
 
         if ( !targetInitStatus.isOK() ) {
 

@@ -31,12 +31,12 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -75,7 +75,7 @@ namespace mongo {
         virtual bool isEOF();
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -117,7 +117,7 @@ namespace mongo {
         boost::scoped_ptr<BtreeIndexCursor> _endCursor;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
-        unordered_set<DiskLoc, DiskLoc::Hasher> _returned;
+        unordered_set<RecordId, RecordId::Hasher> _returned;
 
         CountScanParams _params;
 

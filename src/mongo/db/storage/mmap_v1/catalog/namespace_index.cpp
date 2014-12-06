@@ -106,7 +106,7 @@ namespace mongo {
 
     boost::filesystem::path NamespaceIndex::path() const {
         boost::filesystem::path ret( _dir );
-        if (mmapv1GlobalOptions.directoryperdb)
+        if (storageGlobalParams.directoryperdb)
             ret /= _database;
         ret /= ( _database + ".ns" );
         return ret;
@@ -127,7 +127,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::maybeMkdir() const {
-        if (!mmapv1GlobalOptions.directoryperdb)
+        if (!storageGlobalParams.directoryperdb)
             return;
         boost::filesystem::path dir( _dir );
         dir /= _database;

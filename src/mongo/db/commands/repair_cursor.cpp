@@ -94,7 +94,7 @@ namespace mongo {
             invariant(execStatus.isOK());
             std::auto_ptr<PlanExecutor> exec(rawExec);
 
-            // 'exec' will be used in newGetMore(). It was automatically registered on construction
+            // 'exec' will be used in getMore(). It was automatically registered on construction
             // due to the auto yield policy, so it could yield during plan selection. We deregister
             // it now so that it can be registed with ClientCursor.
             exec->deregisterExec();

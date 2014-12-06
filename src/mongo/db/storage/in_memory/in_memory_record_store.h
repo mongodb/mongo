@@ -57,36 +57,36 @@ namespace mongo {
 
         virtual const char* name() const;
 
-        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
 
-        virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* rd ) const;
+        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* rd ) const;
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
+        virtual void deleteRecord( OperationContext* txn, const RecordId& dl );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                  const RecordId& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start,
+                                             const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
@@ -95,7 +95,7 @@ namespace mongo {
 
         virtual Status truncate( OperationContext* txn );
 
-        virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        virtual void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
 
         virtual bool compactSupported() const;
         virtual Status compact( OperationContext* txn,
@@ -131,8 +131,8 @@ namespace mongo {
             return _data->records.size();
         }
 
-        virtual DiskLoc oplogStartHack(OperationContext* txn,
-                                       const DiskLoc& startingPosition) const;
+        virtual RecordId oplogStartHack(OperationContext* txn,
+                                       const RecordId& startingPosition) const;
 
     protected:
         struct InMemoryRecord {
@@ -145,15 +145,15 @@ namespace mongo {
             boost::shared_array<char> data;
         };
 
-        virtual const InMemoryRecord* recordFor( const DiskLoc& loc ) const;
-        virtual InMemoryRecord* recordFor( const DiskLoc& loc );
+        virtual const InMemoryRecord* recordFor( const RecordId& loc ) const;
+        virtual InMemoryRecord* recordFor( const RecordId& loc );
 
     public:
         //
         // Not in RecordStore interface
         //
 
-        typedef std::map<DiskLoc, InMemoryRecord> Records;
+        typedef std::map<RecordId, InMemoryRecord> Records;
 
         bool isCapped() const { return _isCapped; }
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
@@ -167,9 +167,9 @@ namespace mongo {
         class RemoveChange;
         class TruncateChange;
 
-        StatusWith<DiskLoc> extractAndCheckLocForOplog(const char* data, int len) const;
+        StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
 
-        DiskLoc allocateLoc();
+        RecordId allocateLoc();
         bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
 
@@ -197,28 +197,28 @@ namespace mongo {
         InMemoryRecordIterator(OperationContext* txn,
                                const InMemoryRecordStore::Records& records,
                                const InMemoryRecordStore& rs,
-                               DiskLoc start = DiskLoc(),
+                               RecordId start = RecordId(),
                                bool tailable = false);
 
         virtual bool isEOF();
 
-        virtual DiskLoc curr();
+        virtual RecordId curr();
 
-        virtual DiskLoc getNext();
+        virtual RecordId getNext();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
 
         virtual void saveState();
 
         virtual bool restoreState(OperationContext* txn);
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const RecordId& loc ) const;
 
     private:
         OperationContext* _txn; // not owned
         InMemoryRecordStore::Records::const_iterator _it;
         bool _tailable;
-        DiskLoc _lastLoc; // only for restarting tailable
+        RecordId _lastLoc; // only for restarting tailable
         bool _killedByInvalidate;
 
         const InMemoryRecordStore::Records& _records;
@@ -230,27 +230,27 @@ namespace mongo {
         InMemoryRecordReverseIterator(OperationContext* txn,
                                       const InMemoryRecordStore::Records& records,
                                       const InMemoryRecordStore& rs,
-                                      DiskLoc start = DiskLoc());
+                                      RecordId start = RecordId());
 
         virtual bool isEOF();
 
-        virtual DiskLoc curr();
+        virtual RecordId curr();
 
-        virtual DiskLoc getNext();
+        virtual RecordId getNext();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
 
         virtual void saveState();
 
         virtual bool restoreState(OperationContext* txn);
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const RecordId& loc ) const;
 
     private:
         OperationContext* _txn; // not owned
         InMemoryRecordStore::Records::const_reverse_iterator _it;
         bool _killedByInvalidate;
-        DiskLoc _savedLoc; // isNull if saved at EOF
+        RecordId _savedLoc; // isNull if saved at EOF
 
         const InMemoryRecordStore::Records& _records;
         const InMemoryRecordStore& _rs;

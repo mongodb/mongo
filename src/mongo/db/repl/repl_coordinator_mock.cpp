@@ -31,6 +31,7 @@
 #include "mongo/db/repl/repl_coordinator_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -48,7 +49,7 @@ namespace repl {
         // TODO
     }
 
-    ReplSettings& ReplicationCoordinatorMock::getSettings() {
+    const ReplSettings& ReplicationCoordinatorMock::getSettings() const {
         return _settings;
     }
 
@@ -81,13 +82,6 @@ namespace repl {
 
     ReplicationCoordinator::StatusAndDuration
             ReplicationCoordinatorMock::awaitReplicationOfLastOpForClient(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        return StatusAndDuration(Status::OK(), Milliseconds(0));
-    }
-
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorMock::awaitReplicationOfLastOpApplied(
                     const OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -270,9 +264,8 @@ namespace repl {
         return Status::OK();
     }
 
-    BSONObj ReplicationCoordinatorMock::getGetLastErrorDefault() {
-        // TODO
-        return BSONObj();
+    WriteConcernOptions ReplicationCoordinatorMock::getGetLastErrorDefault() {
+        return WriteConcernOptions();
     }
 
     Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {

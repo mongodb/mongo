@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -48,7 +48,7 @@ namespace mongo {
         /**
          * This will be called right before loc is deleted when wrapping.
          */
-        virtual Status aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) = 0;
+        virtual Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) = 0;
     };
 
 }

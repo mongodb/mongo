@@ -213,10 +213,10 @@ namespace {
                           "Cannot write empty storage engine name to metadata file.");
         }
 
-        boost::filesystem::path metadataPath =
-            boost::filesystem::path(_dbpath) / kMetadataBasename;
-        std::string filenameTemp = metadataPath.string() + ".tmp";
-        try {
+        boost::filesystem::path metadataTempPath =
+            boost::filesystem::path(_dbpath) / (kMetadataBasename + ".tmp");
+        {
+            std::string filenameTemp = metadataTempPath.string();
             std::ofstream ofs(filenameTemp.c_str(), std::ios_base::out | std::ios_base::binary);
             if (!ofs) {
                 return Status(ErrorCodes::FileNotOpen, str::stream()
@@ -229,22 +229,19 @@ namespace {
                 return Status(ErrorCodes::InternalError, str::stream()
                     << "Failed to write BSON data to " << filenameTemp);
             }
-            ofs.flush();
-        }
-        catch (const std::exception& ex) {
-            return Status(ErrorCodes::InternalError, str::stream()
-                << "Unexpected error while writing metadata to " << filenameTemp
-                << ": " << ex.what());
         }
 
-        // Rename temp file to actual metadata file.
-        // Removing original metafile first
-        std::string filename = metadataPath.string();
-        ::remove(filename.c_str());
-        if (::rename(filenameTemp.c_str(), filename.c_str())) {
+        // Rename temporary file to actual metadata file.
+        boost::filesystem::path metadataPath =
+            boost::filesystem::path(_dbpath) / kMetadataBasename;
+        try {
+            boost::filesystem::rename(metadataTempPath, metadataPath);
+        }
+        catch (const std::exception& ex) {
             return Status(ErrorCodes::FileRenameFailed, str::stream()
-                << "Failed to rename " << filename << " to " << filenameTemp
-                << ": " << errnoWithDescription());
+                << "Unexpected error while renaming temporary metadata file "
+                << metadataTempPath.string() << " to " << metadataPath.string()
+                << ": " << ex.what());
         }
 
         return Status::OK();

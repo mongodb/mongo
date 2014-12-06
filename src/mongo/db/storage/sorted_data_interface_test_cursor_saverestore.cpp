@@ -53,7 +53,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
@@ -67,11 +67,11 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, minDiskLoc ) );
+            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
             for ( int i = 0; i < nToInsert; i++ ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << i ), cursor->getKey() );
-                ASSERT_EQUALS( DiskLoc( 42, i * 2 ), cursor->getDiskLoc() );
+                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
                 cursor->advance();
                 cursor->savePosition();
                 cursor->restorePosition( opCtx.get() );
@@ -98,7 +98,7 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
@@ -112,11 +112,11 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, maxDiskLoc ) );
+            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << i ), cursor->getKey() );
-                ASSERT_EQUALS( DiskLoc( 42, i * 2 ), cursor->getDiskLoc() );
+                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
                 cursor->advance();
                 cursor->savePosition();
                 cursor->restorePosition( opCtx.get() );
@@ -127,7 +127,7 @@ namespace mongo {
 
     // Insert the same key multiple times and try to iterate through each
     // occurrence using a forward cursor while calling savePosition() and
-    // restorePosition() in succession. Verify that the DiskLoc is saved
+    // restorePosition() in succession. Verify that the RecordId is saved
     // as part of the current position of the cursor.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
@@ -143,7 +143,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc, true /* allow duplicates */ ) );
                 uow.commit();
             }
@@ -157,11 +157,11 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( minKey, minDiskLoc ) );
+            ASSERT( !cursor->locate( minKey, RecordId::min() ) );
             for ( int i = 0; i < nToInsert; i++ ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( DiskLoc( 42, i * 2 ), cursor->getDiskLoc() );
+                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
                 cursor->advance();
                 cursor->savePosition();
                 cursor->restorePosition( opCtx.get() );
@@ -172,7 +172,7 @@ namespace mongo {
 
     // Insert the same key multiple times and try to iterate through each
     // occurrence using a reverse cursor while calling savePosition() and
-    // restorePosition() in succession. Verify that the DiskLoc is saved
+    // restorePosition() in succession. Verify that the RecordId is saved
     // as part of the current position of the cursor.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
@@ -188,7 +188,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                DiskLoc loc( 42, i * 2 );
+                RecordId loc( 42, i * 2 );
                 ASSERT_OK( sorted->insert( opCtx.get(), key1, loc, true /* allow duplicates */ ) );
                 uow.commit();
             }
@@ -202,11 +202,11 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( maxKey, maxDiskLoc ) );
+            ASSERT( !cursor->locate( maxKey, RecordId::max() ) );
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( key1, cursor->getKey() );
-                ASSERT_EQUALS( DiskLoc( 42, i * 2 ), cursor->getDiskLoc() );
+                ASSERT_EQUALS( RecordId( 42, i * 2 ), cursor->getRecordId() );
                 cursor->advance();
                 cursor->savePosition();
                 cursor->restorePosition( opCtx.get() );

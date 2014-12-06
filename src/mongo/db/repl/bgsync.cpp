@@ -105,7 +105,6 @@ namespace {
                                        _lastFetchedHash(0),
                                        _pause(true),
                                        _appliedBuffer(true),
-                                       _assumingPrimary(false),
                                        _replCoord(getGlobalReplicationCoordinator()),
                                        _initialSyncRequestedFlag(false),
                                        _indexPrefetchConfig(PREFETCH_ALL) {
@@ -384,24 +383,6 @@ namespace {
         bufferSizeGauge.decrement(getSize(op));
     }
 
-    bool BackgroundSync::isStale(OpTime lastOpTimeFetched, 
-                                 OplogReader& r, 
-                                 BSONObj& remoteOldestOp) {
-        remoteOldestOp = r.findOne(rsoplog, Query());
-        OpTime remoteTs = remoteOldestOp["ts"]._opTime();
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-
-            if (lastOpTimeFetched >= remoteTs) {
-                return false;
-            }
-            log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong();
-            log() << "replSet lastOpTimeFetched: " << lastOpTimeFetched.toStringLong();
-        }
-
-        return true;
-    }
-
     bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
         string hn = r.conn()->getServerAddress();
 
@@ -478,25 +459,6 @@ namespace {
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
             " " << _lastFetchedHash;
-    }
-
-    bool BackgroundSync::isAssumingPrimary_inlock() {
-        return _assumingPrimary;
-    }
-
-    void BackgroundSync::stopReplicationAndFlushBuffer() {
-        boost::unique_lock<boost::mutex> lck(_mutex);
-
-        // 1. Tell syncing to stop
-        _assumingPrimary = true;
-
-        // 2. Wait for syncing to stop and buffer to be applied
-        while (!(_pause && _appliedBuffer)) {
-            _condvar.wait(lck);
-        }
-
-        // 3. Now actually become primary
-        _assumingPrimary = false;
     }
 
     long long BackgroundSync::getLastAppliedHash() const {

@@ -30,6 +30,7 @@
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
+
 #include <deque>
 
 #include "mongo/db/concurrency/lock_mgr_defs.h"
@@ -121,26 +122,45 @@ namespace mongo {
         void dump() const;
 
     private:
-
         // The deadlock detector needs to access the buckets and locks directly
         friend class DeadlockDetector;
 
+        // The lockheads need access to the partitions
+        friend struct LockHead;
+
         // These types describe the locks hash table
-        typedef unordered_map<ResourceId, LockHead*> LockHeadMap;
-        typedef LockHeadMap::value_type LockHeadPair;
 
         struct LockBucket {
             LockBucket() : mutex("LockManager") { }
             SimpleMutex mutex;
-            LockHeadMap data;
+            typedef unordered_map<ResourceId, LockHead*> Map;
+            Map data;
+            LockHead* findOrInsert(ResourceId resId);
         };
 
+        // Each locker maps to a partition that is used for resources acquired in intent modes
+        // modes and potentially other modes that don't conflict with themselves. This avoids
+        // contention on the regular LockHead in the lock manager.
+        struct Partition {
+            Partition() : mutex("LockManager") { }
+            PartitionedLockHead* find(ResourceId resId);
+            PartitionedLockHead* findOrInsert(ResourceId resId);
+            typedef unordered_map<ResourceId, PartitionedLockHead*> Map;
+            SimpleMutex mutex;
+            Map data;
+        };
 
         /**
          * Retrieves the bucket in which the particular resource must reside. There is no need to
          * hold a lock when calling this function.
          */
         LockBucket* _getBucket(ResourceId resId) const;
+
+
+        /**
+         * Retrieves the Partition that a particular LockRequest should use for intent locking.
+         */
+        Partition* _getPartition(LockRequest* request) const;
 
         /**
          * Prints the contents of a bucket to the log.
@@ -151,7 +171,7 @@ namespace mongo {
          * Should be invoked when the state of a lock changes in a way, which could potentially
          * allow other blocked requests to proceed.
          *
-         * MUST be called under the lock bucket's spin lock.
+         * MUST be called under the lock bucket's mutex.
          *
          * @param lock Lock whose grant state should be recalculated.
          * @param checkConflictQueue Whether to go through the conflict queue. This is an
@@ -162,6 +182,9 @@ namespace mongo {
 
         static const unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
+
+        static const unsigned _numPartitions;
+        Partition* _partitions;
     };
 
 

@@ -31,11 +31,11 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -52,7 +52,7 @@ namespace mongo {
 
         virtual bool isEOF();
 
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         //
         // Manage our OperationContext. We intentionally don't propagate to the child

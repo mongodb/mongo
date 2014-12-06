@@ -28,46 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
 
-
 namespace mongo {
-
-    /**
-     * This is passed to the iterator for global environments and aggregates information about the
-     * locks which are currently being held or waited on.
-     */
-    class LockStateAggregator : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-        LockStateAggregator(bool blockedOnly) 
-            : numWriteLocked(0),
-              numReadLocked(0),
-              _blockedOnly(blockedOnly) {
-
-        }
-
-        virtual void processOpContext(OperationContext* txn) {
-            if (_blockedOnly && !txn->lockState()->hasLockPending()) {
-                return;
-            }
-
-            if (txn->lockState()->isWriteLocked()) {
-                numWriteLocked++;
-            }
-            else {
-                numReadLocked++;
-            }
-        }
-
-        int numWriteLocked;
-        int numReadLocked;
-
-    private:
-        const bool _blockedOnly;
-    };
-
 
     class GlobalLockServerStatusSection : public ServerStatusSection {
     public:
@@ -80,41 +45,78 @@ namespace mongo {
         virtual BSONObj generateSection(OperationContext* txn,
                                         const BSONElement& configElement) const {
 
-            BSONObjBuilder t;
-
-            t.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
-
-            // SERVER-14978: Need to report the global lock statistics somehow
-            //
-            // t.append( "lockTime" , qlk.stats.getTimeLocked( 'W' ) );
+            int numTotal = 0;
+            int numWriteLocked = 0;
+            int numReadLocked = 0;
+            int numWaitingRead = 0;
+            int numWaitingWrite = 0;
 
             // This returns the blocked lock states
             {
-                BSONObjBuilder ttt(t.subobjStart("currentQueue"));
+                boost::mutex::scoped_lock scopedLock(Client::clientsMutex);
 
-                LockStateAggregator blocked(true);
-                getGlobalEnvironment()->forEachOperationContext(&blocked);
+                // Count all clients
+                numTotal = Client::clients.size();
 
-                ttt.append("total", blocked.numReadLocked + blocked.numWriteLocked);
-                ttt.append("readers", blocked.numReadLocked);
-                ttt.append("writers", blocked.numWriteLocked);
-                ttt.done();
+                ClientSet::const_iterator it = Client::clients.begin();
+                for (; it != Client::clients.end(); it++) {
+                    Client* client = *it;
+                    invariant(client);
+
+                    boost::unique_lock<Client> uniqueLock(*client);
+
+                    const OperationContext* opCtx = client->getOperationContext();
+                    if (opCtx == NULL) continue;
+
+                    if (opCtx->lockState()->getWaitingResource().isValid()) {
+                        // Count client as blocked
+                        if (opCtx->lockState()->isWriteLocked()) {
+                            numWaitingWrite++;
+                            numWriteLocked++;
+                        }
+                        else {
+                            numWaitingRead++;
+                            numReadLocked++;
+                        }
+                    }
+                    else {
+                        // Count client as not blocked
+                        if (opCtx->lockState()->isWriteLocked()) {
+                            numWriteLocked++;
+                        }
+                        else {
+                            numReadLocked++;
+                        }
+                    }
+                }
             }
 
-            // This returns all the active clients (including those holding locks)
+            // Construct the actual return value out of the mutex
+            BSONObjBuilder ret;
+
+            ret.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
+
             {
-                BSONObjBuilder ttt(t.subobjStart("activeClients"));
+                BSONObjBuilder currentQueueBuilder(ret.subobjStart("currentQueue"));
 
-                LockStateAggregator active(false);
-                getGlobalEnvironment()->forEachOperationContext(&active);
-
-                ttt.append("total", active.numReadLocked + active.numWriteLocked);
-                ttt.append("readers", active.numReadLocked);
-                ttt.append("writers", active.numWriteLocked);
-                ttt.done();
+                currentQueueBuilder.append("total", numWaitingRead + numWaitingWrite);
+                currentQueueBuilder.append("readers", numWaitingRead);
+                currentQueueBuilder.append("writers", numWaitingWrite);
+                currentQueueBuilder.done();
             }
 
-            return t.obj();
+            {
+                BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
+
+                activeClientsBuilder.append("total", numTotal);
+                activeClientsBuilder.append("readers", numReadLocked);
+                activeClientsBuilder.append("writers", numWriteLocked);
+                activeClientsBuilder.done();
+            }
+
+            ret.done();
+
+            return ret.obj();
         }
 
     private:

@@ -16,11 +16,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -61,10 +62,8 @@ namespace IndexCatalogTests {
 
             int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
-            WriteUnitOfWork wuow(&txn);
-            Helpers::ensureIndex(&txn, _coll, BSON("x" << 1), false, "_x_0");
-            Helpers::ensureIndex(&txn, _coll, BSON("y" << 1), false, "_y_0");
-            wuow.commit();
+            dbtests::createIndex(&txn, _ns, BSON("x" << 1));
+            dbtests::createIndex(&txn, _ns, BSON("y" << 1));
 
             ASSERT_TRUE(_catalog->numIndexesReady(&txn) == numFinishedIndexesStart+2);
 
@@ -78,7 +77,7 @@ namespace IndexCatalogTests {
                 while (boit.more() && !foundIndex) {
                     BSONElement e = boit.next();
                     if (str::equals(e.fieldName(), "name") &&
-                            str::equals(e.valuestrsafe(), "_y_0")) {
+                            str::equals(e.valuestrsafe(), "y_1")) {
                         foundIndex = true;
                         break;
                     }
@@ -95,12 +94,78 @@ namespace IndexCatalogTests {
         Database* _db;
     };
 
+    /**
+     * Test for IndexCatalog::refreshEntry().
+     */
+    class RefreshEntry {
+    public:
+        RefreshEntry() {
+            OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
+
+            _db = ctx.db();
+            _coll = _db->createCollection(&txn, _ns);
+            _catalog = _coll->getIndexCatalog();
+            wuow.commit();
+        }
+
+        ~RefreshEntry () {
+            OperationContextImpl txn;
+            ScopedTransaction transaction(&txn, MODE_IX);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+            Client::Context ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
+
+            _db->dropCollection(&txn, _ns);
+            wuow.commit();
+        }
+
+        void run() {
+            OperationContextImpl txn;
+            Client::WriteContext ctx(&txn, _ns);
+            const std::string indexName = "x_1";
+
+            ASSERT_OK(dbtests::createIndexFromSpec(&txn, _ns, BSON("name" << indexName <<
+                                                                   "ns" << _ns <<
+                                                                   "key" << BSON("x" << 1) <<
+                                                                   "expireAfterSeconds" << 5)));
+
+            const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);
+            ASSERT(desc);
+            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+            // Change value of "expireAfterSeconds" on disk.
+            WriteUnitOfWork wuow(&txn);
+            _coll->getCatalogEntry()->updateTTLSetting(&txn, "x_1", 10);
+            wuow.commit();
+
+            // Verify that the catalog does not yet know of the change.
+            desc = _catalog->findIndexByName(&txn, indexName);
+            ASSERT_EQUALS(5, desc->infoObj()["expireAfterSeconds"].numberLong());
+
+            // Notify the catalog of the change.
+            desc = _catalog->refreshEntry(&txn, desc);
+
+            // Test that the catalog reflects the change.
+            ASSERT_EQUALS(10, desc->infoObj()["expireAfterSeconds"].numberLong());
+        }
+
+    private:
+        IndexCatalog* _catalog;
+        Collection* _coll;
+        Database* _db;
+    };
+
     class IndexCatalogTests : public Suite {
     public:
         IndexCatalogTests() : Suite( "indexcatalogtests" ) {
         }
         void setupTests() {
             add<IndexIteratorTests>();
+            add<RefreshEntry>();
         }
     };
 

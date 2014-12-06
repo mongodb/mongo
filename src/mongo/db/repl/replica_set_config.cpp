@@ -327,7 +327,8 @@ namespace {
         if (voterCount > kMaxVotingMembers || voterCount == 0) {
             return Status(ErrorCodes::BadValue, str::stream() <<
                           "Replica set configuration contains " << voterCount <<
-                          " voting members, but must be between 0 and " << kMaxVotingMembers);
+                          " voting members, but must be at least 1 and no more than " <<
+                          kMaxVotingMembers);
         }
 
         if (electableCount == 0) {

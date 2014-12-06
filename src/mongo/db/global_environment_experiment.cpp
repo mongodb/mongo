@@ -30,9 +30,10 @@
 
 #include "mongo/db/global_environment_experiment.h"
 
+#include "mongo/bson/bsonobjiterator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
-
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -80,6 +81,42 @@ namespace mongo {
 
         // For the purpose of unit-tests, which were written to assume MMAP V1-like behaviour
         return true;
+    }
+
+    Status validateStorageOptions(const BSONObj& storageEngineOptions,
+       stdx::function<Status (const StorageEngine::Factory* const, const BSONObj&)> validateFunc) {
+
+        BSONObjIterator storageIt(storageEngineOptions);
+        while (storageIt.more()) {
+            BSONElement storageElement = storageIt.next();
+            StringData storageEngineName = storageElement.fieldNameStringData();
+            if (storageElement.type() != mongo::Object) {
+                return Status(ErrorCodes::BadValue, str::stream()
+                    << "'storageEngine." << storageElement.fieldNameStringData()
+                    << "' has to be an embedded document.");
+            }
+
+            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalEnvironment()->
+                                                            makeStorageFactoriesIterator());
+            invariant(sfi);
+            bool found = false;
+            while (sfi->more()) {
+                const StorageEngine::Factory* const& factory = sfi->next();
+                if (storageEngineName != factory->getCanonicalName()) {
+                    continue;
+                }
+                Status status = validateFunc(factory, storageElement.Obj());
+                if ( !status.isOK() ) {
+                    return status;
+                }
+                found = true;
+            }
+            if (!found) {
+                return Status(ErrorCodes::InvalidOptions, str::stream() << storageEngineName <<
+                              " is not a registered storage engine for this server");
+            }
+        }
+        return Status::OK();
     }
 
 }  // namespace mongo

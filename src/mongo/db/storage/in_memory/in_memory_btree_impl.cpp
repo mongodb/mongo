@@ -74,8 +74,8 @@ namespace {
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
 
-    bool isDup(const IndexSet& data, const BSONObj& key, DiskLoc loc) {
-        const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, DiskLoc()));
+    bool isDup(const IndexSet& data, const BSONObj& key, RecordId loc) {
+        const IndexSet::const_iterator it = data.find(IndexKeyEntry(key, RecordId()));
         if (it == data.end())
             return false;
 
@@ -93,8 +93,8 @@ namespace {
             invariant(_data->empty());
         }
 
-        Status addKey(const BSONObj& key, const DiskLoc& loc) {
-            // inserts should be in ascending (key, DiskLoc) order.
+        Status addKey(const BSONObj& key, const RecordId& loc) {
+            // inserts should be in ascending (key, RecordId) order.
 
             if ( key.objsize() >= TempKeyMaxSize ) {
                 return Status(ErrorCodes::KeyTooLong, "key too big");
@@ -105,11 +105,11 @@ namespace {
             invariant(!hasFieldNames(key));
 
             if (!_data->empty()) {
-                // Compare specified key with last inserted key, ignoring its DiskLoc
-                int cmp = _comparator.compare(IndexKeyEntry(key, DiskLoc()), *_last);
+                // Compare specified key with last inserted key, ignoring its RecordId
+                int cmp = _comparator.compare(IndexKeyEntry(key, RecordId()), *_last);
                 if (cmp < 0 || (_dupsAllowed && cmp == 0 && loc < _last->loc)) {
                     return Status(ErrorCodes::InternalError,
-                                  "expected ascending (key, DiskLoc) order in bulk builder");
+                                  "expected ascending (key, RecordId) order in bulk builder");
                 }
                 else if (!_dupsAllowed && cmp == 0 && loc != _last->loc) {
                     return dupKeyError(key);
@@ -129,7 +129,7 @@ namespace {
         const bool _dupsAllowed;
 
         IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
-        IndexSet::const_iterator _last;    // or (key, DiskLoc) ordering violations
+        IndexSet::const_iterator _last;    // or (key, RecordId) ordering violations
     };
 
     class InMemoryBtreeImpl : public SortedDataInterface {
@@ -146,7 +146,7 @@ namespace {
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
-                              const DiskLoc& loc,
+                              const RecordId& loc,
                               bool dupsAllowed) {
 
             invariant(!loc.isNull());
@@ -174,7 +174,7 @@ namespace {
 
         virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
-                             const DiskLoc& loc,
+                             const RecordId& loc,
                              bool dupsAllowed) {
             invariant(!loc.isNull());
             invariant(loc.isValid());
@@ -199,7 +199,7 @@ namespace {
             return _currentKeySize + ( sizeof(IndexKeyEntry) * _data->size() );
         }
 
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
             invariant(!hasFieldNames(key));
             if (isDup(*_data, key, loc))
                 return dupKeyError(key);
@@ -235,11 +235,11 @@ namespace {
                 return _it == other._it;
             }
 
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket) {
+            virtual void aboutToDeleteBucket(const RecordId& bucket) {
                 invariant(!"aboutToDeleteBucket should not be called");
             }
 
-            virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+            virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
                 if ( _it == _data.end() ) {
@@ -266,7 +266,7 @@ namespace {
                                                         keyEnd,
                                                         keyEndInclusive,
                                                         1), // forward
-                                                   DiskLoc()));
+                                                   RecordId()));
             }
 
             void advanceTo(const BSONObj &keyBegin,
@@ -282,7 +282,7 @@ namespace {
                 return _it->key;
             }
 
-            virtual DiskLoc getDiskLoc() const {
+            virtual RecordId getRecordId() const {
                 return _it->loc;
             }
 
@@ -320,7 +320,7 @@ namespace {
             // For save/restorePosition since _it may be invalidated durring a yield.
             bool _savedAtEnd;
             BSONObj _savedKey;
-            DiskLoc _savedLoc;
+            RecordId _savedLoc;
 
         };
 
@@ -345,11 +345,11 @@ namespace {
                 return _it == other._it;
             }
 
-            virtual void aboutToDeleteBucket(const DiskLoc& bucket) {
+            virtual void aboutToDeleteBucket(const RecordId& bucket) {
                 invariant(!"aboutToDeleteBucket should not be called");
             }
 
-            virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
+            virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
 
@@ -378,7 +378,7 @@ namespace {
                                                   keyEnd,
                                                   keyEndInclusive,
                                                   -1), // reverse
-                                             DiskLoc()));
+                                             RecordId()));
             }
 
             void advanceTo(const BSONObj &keyBegin,
@@ -394,7 +394,7 @@ namespace {
                 return _it->key;
             }
 
-            virtual DiskLoc getDiskLoc() const {
+            virtual RecordId getRecordId() const {
                 return _it->loc;
             }
 
@@ -446,7 +446,7 @@ namespace {
             // For save/restorePosition since _it may be invalidated durring a yield.
             bool _savedAtEnd;
             BSONObj _savedKey;
-            DiskLoc _savedLoc;
+            RecordId _savedLoc;
         };
 
         virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const {

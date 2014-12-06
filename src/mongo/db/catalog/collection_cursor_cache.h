@@ -31,9 +31,9 @@
 #pragma once
 
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 
@@ -63,10 +63,10 @@ namespace mongo {
 
         /**
          * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
-         * must called *before* the provided DiskLoc is about to be deleted or mutated.
+         * must called *before* the provided RecordId is about to be deleted or mutated.
          */
         void invalidateDocument( OperationContext* txn,
-                                 const DiskLoc& dl,
+                                 const RecordId& dl,
                                  InvalidationType type );
 
         /*

@@ -182,10 +182,9 @@ namespace mongo {
                 + storageGlobalParams.kDefaultDbPath);
 
 #endif
-        storage_options.addOptionChaining("storage.mmapv1.directoryPerDB", "directoryperdb",
-                moe::Switch,
-                "each database will be stored in a separate directory",
-                "storage.directoryPerDB");
+        storage_options.addOptionChaining("storage.directoryPerDB", "directoryperdb",
+                                          moe::Switch,
+                                          "each database will be stored in a separate directory");
 
         general_options.addOptionChaining("noIndexBuildRetry", "noIndexBuildRetry", moe::Switch,
                 "don't retry any index builds that were interrupted by shutdown")
@@ -944,8 +943,8 @@ namespace mongo {
             mmapv1GlobalOptions.syncdelay = params["storage.mmapv1.syncPeriodSecs"].as<double>();
         }
 
-        if (params.count("storage.mmapv1.directoryPerDB")) {
-            mmapv1GlobalOptions.directoryperdb = params["storage.mmapv1.directoryPerDB"].as<bool>();
+        if (params.count("storage.directoryPerDB")) {
+            storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
         }
         if (params.count("cpu")) {
             serverGlobalParams.cpu = params["cpu"].as<bool>();

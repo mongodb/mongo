@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/currentop_command.h"
 #include "mongo/db/db.h"
@@ -63,14 +64,17 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/ops/parsed_delete.h"
+#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_driver.h"
-#include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/find.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
@@ -217,7 +221,7 @@ namespace {
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
-            dbresponse.exhaustNS = newRunQuery(txn, m, q, op, *resp, fromDBDirectClient);
+            dbresponse.exhaustNS = runQuery(txn, m, q, op, *resp, fromDBDirectClient);
             verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
@@ -569,8 +573,8 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                UpdateExecutor executor(txn, &request, &op.debug());
-                uassertStatusOK(executor.prepare());
+                ParsedUpdate parsedUpdate(txn, &request);
+                uassertStatusOK(parsedUpdate.parseRequest());
 
                 //  Tentatively take an intent lock, fix up if we need to create the collection
                 ScopedTransaction transaction(txn, MODE_IX);
@@ -584,7 +588,17 @@ namespace {
 
                 //  The common case: no implicit collection creation
                 if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
-                    UpdateResult res = executor.execute(ctx.db());
+                    PlanExecutor* rawExec;
+                    uassertStatusOK(getExecutorUpdate(txn,
+                                                      ctx.db()->getCollection(txn, ns),
+                                                      &parsedUpdate,
+                                                      &op.debug(),
+                                                      &rawExec));
+                    boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                    // Run the plan and get stats out.
+                    uassertStatusOK(exec->executePlan());
+                    UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
 
                     // for getlasterror
                     lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -604,8 +618,8 @@ namespace {
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
         {
-            UpdateExecutor executor(txn, &request, &op.debug());
-            uassertStatusOK(executor.prepare());
+            ParsedUpdate parsedUpdate(txn, &request);
+            uassertStatusOK(parsedUpdate.parseRequest());
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
@@ -624,7 +638,18 @@ namespace {
                 wuow.commit();
             }
 
-            UpdateResult res = executor.execute(db);
+            PlanExecutor* rawExec;
+            uassertStatusOK(getExecutorUpdate(txn,
+                                              ctx.db()->getCollection(txn, ns),
+                                              &parsedUpdate,
+                                              &op.debug(),
+                                              &rawExec));
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+            // Run the plan and get stats out.
+            uassertStatusOK(exec->executePlan());
+            UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
+
             lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
         }
     }
@@ -657,8 +682,8 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                DeleteExecutor executor(txn, &request);
-                uassertStatusOK(executor.prepare());
+                ParsedDelete parsedDelete(txn, &request);
+                uassertStatusOK(parsedDelete.parseRequest());
 
                 AutoGetDb autoDb(txn, ns.db(), MODE_IX);
                 if (!autoDb.getDb()) break;
@@ -666,8 +691,17 @@ namespace {
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
 
-                long long n = executor.execute(ctx.db());
-                lastError.getSafe()->recordDelete( n );
+                PlanExecutor* rawExec;
+                uassertStatusOK(getExecutorDelete(txn,
+                                                  ctx.db()->getCollection(txn, ns),
+                                                  &parsedDelete,
+                                                  &rawExec));
+                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+                // Run the plan and get the number of docs deleted.
+                uassertStatusOK(exec->executePlan());
+                long long n = DeleteStage::getNumDeleted(exec.get());
+                lastError.getSafe()->recordDelete(n);
                 op.debug().ndeleted = n;
 
                 break;
@@ -727,15 +761,15 @@ namespace {
                     }
                 }
 
-                msgdata = newGetMore(txn,
-                                     ns,
-                                     ntoreturn,
-                                     cursorid,
-                                     curop,
-                                     pass,
-                                     exhaust,
-                                     &isCursorAuthorized,
-                                     fromDBDirectClient);
+                msgdata = getMore(txn,
+                                  ns,
+                                  ntoreturn,
+                                  cursorid,
+                                  curop,
+                                  pass,
+                                  exhaust,
+                                  &isCursorAuthorized,
+                                  fromDBDirectClient);
             }
             catch ( AssertionException& e ) {
                 if ( isCursorAuthorized ) {
@@ -830,7 +864,7 @@ namespace {
                         BSON("create" << nsToCollectionSubstring(ns)));
         }
 
-        StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
+        StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
         uassertStatusOK( status.getStatus() );
         repl::logOp(txn, "i", ns, js);
         wunit.commit();
@@ -1024,10 +1058,7 @@ namespace {
         return shutdownInProgress.loadRelaxed() != 0;
     }
 
-    static void shutdownServer(OperationContext* txn) {
-        // Must hold global lock to get to here
-        invariant(txn->lockState()->isW());
-
+    static void shutdownServer() {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
 
@@ -1039,7 +1070,7 @@ namespace {
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->cleanShutdown(txn);
+        storageEngine->cleanShutdown();
     }
 
     void exitCleanly(ExitCode code) {
@@ -1055,20 +1086,30 @@ namespace {
             invariant(false);
         }
 
-        OperationContextImpl txn;
-
         getGlobalEnvironment()->setKillAllOperations();
 
         repl::getGlobalReplicationCoordinator()->shutdown();
 
-        ScopedTransaction transaction(&txn, MODE_X);
-        Lock::GlobalWrite lk(txn.lockState());
+        // We should always be able to acquire the global lock at shutdown.
+        //
+        // TODO: This call chain uses the locker directly, because we do not want to start an
+        // operation context, which also instantiates a recovery unit. Also, using the
+        // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
+        // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
+        DefaultLockerImpl globalLocker(0);
+        LockResult result = globalLocker.lockGlobalBegin(MODE_X);
+        if (result == LOCK_WAITING) {
+            result = globalLocker.lockGlobalComplete(UINT_MAX);
+        }
+
+        invariant(LOCK_OK == result);
+
         log() << "now exiting" << endl;
 
         // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
         // and data files, close sockets, etc.
         try {
-            shutdownServer(&txn);
+            shutdownServer();
         }
         catch (const DBException& ex) {
             severe() << "shutdown failed with DBException " << ex;
@@ -1082,6 +1123,7 @@ namespace {
             severe() << "shutdown failed with exception";
             std::terminate();
         }
+
         dbexit( code );
     }
 

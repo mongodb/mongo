@@ -226,8 +226,6 @@ add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , False )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , False )
 
-add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
-
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
@@ -1398,6 +1396,10 @@ def doConfigure(myenv):
         # GCC >= 4.6. Error explained in https://svn.boost.org/trac/boost/ticket/6136 .
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-but-set-variable")
 
+        # This has been suppressed in gcc 4.8, due to false positives, but not in clang.  So
+        # we explicitly disable it here.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-missing-braces")
+
     # Check if we need to disable null-conversion warnings
     if using_clang():
         def CheckNullConversion(context):
@@ -1720,7 +1722,7 @@ def doConfigure(myenv):
             print("Using the leak sanitizer requires a valid symbolizer")
             Exit(1)
 
-    if using_msvc():
+    if using_msvc() and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
         #
         myenv.Append( CCFLAGS=["/Gw", "/Gy"] )
@@ -2045,8 +2047,6 @@ env = doConfigure( env )
 
 env['PDB'] = '${TARGET.base}.pdb'
 
-enforce_glibc = linux and releaseBuild and not has_option("no-glibc-check")
-
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -2256,7 +2256,6 @@ Export("boostSuffix")
 Export("darwin windows solaris linux freebsd nix openbsd")
 Export('module_sconscripts')
 Export("debugBuild optBuild")
-Export("enforce_glibc")
 Export("s3push")
 Export("use_clang")
 Export("wiredtiger")

@@ -32,8 +32,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -72,12 +72,12 @@ namespace mongo {
                                         const StringData& indexName,
                                         bool multikey = true) = 0;
 
-        virtual DiskLoc getIndexHead( OperationContext* txn,
+        virtual RecordId getIndexHead( OperationContext* txn,
                                       const StringData& indexName ) const = 0;
 
         virtual void setIndexHead( OperationContext* txn,
                                    const StringData& indexName,
-                                   const DiskLoc& newHead ) = 0;
+                                   const RecordId& newHead ) = 0;
 
         virtual bool isIndexReady( OperationContext* txn,
                                    const StringData& indexName ) const = 0;

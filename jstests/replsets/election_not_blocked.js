@@ -20,6 +20,7 @@
                 {_id: 1, host: host+":"+port[1]},
                 {_id: 2, host: host+":"+port[2], hidden: true, priority: 0},
             ]});
+    replTest.waitForState(replTest.nodes[0], replTest.PRIMARY, 60 * 1000);
     var master = replTest.getMaster();
 
     // do a write

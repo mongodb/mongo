@@ -123,10 +123,10 @@ namespace mongo {
                     verify( cm );
                     c = cm->findIntersectingChunk( chunkInfo.chunk.min );
 
-                    log() << "forcing a split because migrate failed for size reasons" << endl;
+                    log() << "performing a split because migrate failed for size reasons";
 
-                    Status status = c->split(true /* atMedian */, NULL, NULL);
-                    log() << "forced split results: " << status << endl;
+                    Status status = c->split(Chunk::normal, NULL, NULL);
+                    log() << "split results: " << status << endl;
 
                     if ( !status.isOK() ) {
                         log() << "marking chunk as jumbo: " << c->toString() << endl;

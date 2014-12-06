@@ -50,7 +50,7 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual ReplSettings& getSettings();
+        virtual const ReplSettings& getSettings() const;
 
         virtual bool isReplEnabled() const;
 
@@ -68,10 +68,6 @@ namespace repl {
                 const WriteConcernOptions& writeConcern);
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
-                const OperationContext* txn,
-                const WriteConcernOptions& writeConcern);
-
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
@@ -174,7 +170,7 @@ namespace repl {
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
-        virtual BSONObj getGetLastErrorDefault();
+        virtual WriteConcernOptions getGetLastErrorDefault();
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
@@ -188,7 +184,7 @@ namespace repl {
 
     private:
 
-        ReplSettings _settings;
+        const ReplSettings _settings;
     };
 
 } // namespace repl

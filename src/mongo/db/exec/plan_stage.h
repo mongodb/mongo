@@ -35,7 +35,7 @@
 namespace mongo {
 
     class Collection;
-    class DiskLoc;
+    class RecordId;
     class OperationContext;
 
     /**
@@ -208,9 +208,9 @@ namespace mongo {
         virtual void restoreState(OperationContext* opCtx) = 0;
 
         /**
-         * Notifies a stage that a DiskLoc is going to be deleted (or in-place updated) so that the
+         * Notifies a stage that a RecordId is going to be deleted (or in-place updated) so that the
          * stage can invalidate or modify any state required to continue processing without this
-         * DiskLoc.
+         * RecordId.
          *
          * Can only be called after a saveState but before a restoreState.
          *
@@ -219,7 +219,7 @@ namespace mongo {
          * stage's own OperationContext is inactive during the invalidate and should not be used).
          */
         virtual void invalidate(OperationContext* txn,
-                                const DiskLoc& dl,
+                                const RecordId& dl,
                                 InvalidationType type) = 0;
 
         /**

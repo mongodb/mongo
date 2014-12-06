@@ -29,8 +29,9 @@
 #pragma once
 
 #include <vector>
-#include "mongo/db/diskloc.h"
+
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -84,7 +85,7 @@ namespace mongo {
         virtual BSONObj getKey() const = 0;
 
         // Current value we point at.  Assumes !isEOF().
-        virtual DiskLoc getValue() const = 0;
+        virtual RecordId getValue() const = 0;
 
         //
         // Yielding support

@@ -19,19 +19,18 @@ var nodes = replTest.nodeList();
 var conns = replTest.startSet();
 replTest.initiate({"_id": name,
                    "members": [
-                       { "_id": 0, "host": nodes[0], priority: 3 },
+                       { "_id": 0, "host": nodes[0] },
                        { "_id": 1, "host": nodes[1] },
                        { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                   });
-var a_conn = conns[0];
-var b_conn = conns[1];
+// get master and do an initial write
+var master = replTest.getMaster();
+var a_conn = master;
+var slaves = replTest.liveNodes.slaves;
+var b_conn = slaves[0];
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
-// get master and do an initial write
-var master = replTest.getMaster();
-assert(master === conns[0], "conns[0] assumed to be master");
-assert(a_conn.host === master.host, "a_conn assumed to be master");
 var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 

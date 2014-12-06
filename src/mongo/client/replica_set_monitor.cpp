@@ -442,7 +442,16 @@ namespace {
             builder.append("ismaster", node.isMaster); // intentionally not camelCase
             builder.append("hidden", false); // we don't keep hidden nodes in the set
             builder.append("secondary", node.isUp && !node.isMaster);
-            builder.append("pingTimeMillis", int(node.latencyMicros / 1000));
+
+            int32_t pingTimeMillis = 0;
+            if (node.latencyMicros / 1000 > numeric_limits<int32_t>::max()) {
+                // In particular, Node::unknownLatency does not fit in an int32.
+                pingTimeMillis = numeric_limits<int32_t>::max();
+            }
+            else {
+                pingTimeMillis = node.latencyMicros / 1000;
+            }
+            builder.append("pingTimeMillis", pingTimeMillis);
 
             if (!node.tags.isEmpty()) {
                 builder.append("tags", node.tags);

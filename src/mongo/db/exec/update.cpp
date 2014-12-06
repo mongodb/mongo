@@ -37,6 +37,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update_lifecycle.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
@@ -408,9 +409,13 @@ namespace mongo {
           _doc(params.driver->getDocument()) {
         // We are an update until we fall into the insert case.
         params.driver->setContext(ModifierInterface::ExecInfo::UPDATE_CONTEXT);
+
+        // Before we even start executing, we know whether or not this is a replacement
+        // style or $mod style update.
+        _specificStats.isDocReplacement = params.driver->isDocReplacement();
     }
 
-    void UpdateStage::transformAndUpdate(BSONObj& oldObj, DiskLoc& loc) {
+    void UpdateStage::transformAndUpdate(BSONObj& oldObj, RecordId& loc) {
         const UpdateRequest* request = _params.request;
         UpdateDriver* driver = _params.driver;
         CanonicalQuery* cq = _params.canonicalQuery;
@@ -520,13 +525,13 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
-                    StatusWith<DiskLoc> res = _collection->updateDocument(_txn,
+                    StatusWith<RecordId> res = _collection->updateDocument(_txn,
                                                                           loc,
                                                                           newObj,
                                                                           true,
                                                                           _params.opDebug);
                     uassertStatusOK(res.getStatus());
-                    DiskLoc newLoc = res.getValue();
+                    RecordId newLoc = res.getValue();
 
                     // If the document moved, we might see it again in a collection scan (maybe it's
                     // a document after our current document).
@@ -641,7 +646,7 @@ namespace mongo {
 
         WriteUnitOfWork wunit(_txn);
         invariant(_collection);
-        StatusWith<DiskLoc> newLoc = _collection->insertDocument(_txn,
+        StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
                                                                  newObj,
                                                                  !request->isGod()/*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
@@ -707,7 +712,7 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == status) {
             // Need to get these things from the result returned by the child.
-            DiskLoc loc;
+            RecordId loc;
             BSONObj oldObj;
 
             WorkingSetMember* member = _ws->get(id);
@@ -726,7 +731,7 @@ namespace mongo {
             invariant(member->hasObj());
             oldObj = member->obj;
 
-            // If we're here, then we have retrieved both a DiskLoc and the corresponding
+            // If we're here, then we have retrieved both a RecordId and the corresponding
             // unowned object from the child stage. Since we have the object and the diskloc,
             // we can free the WSM.
             _ws->free(id);
@@ -858,7 +863,7 @@ namespace mongo {
         uassertStatusOK(restoreUpdateState(opCtx));
     }
 
-    void UpdateStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void UpdateStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         _child->invalidate(txn, dl, type);
     }
@@ -884,5 +889,43 @@ namespace mongo {
     const SpecificStats* UpdateStage::getSpecificStats() {
         return &_specificStats;
     }
+
+    // static
+    UpdateResult UpdateStage::makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug) {
+        // Get stats from the root stage.
+        invariant(exec->getRootStage()->isEOF());
+        invariant(exec->getRootStage()->stageType() == STAGE_UPDATE);
+        UpdateStage* updateStage = static_cast<UpdateStage*>(exec->getRootStage());
+        const UpdateStats* updateStats =
+            static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+
+        // Use stats from the root stage to fill out opDebug.
+        opDebug->nMatched = updateStats->nMatched;
+        opDebug->nModified = updateStats->nModified;
+        opDebug->upsert = updateStats->inserted;
+        opDebug->fastmodinsert = updateStats->fastmodinsert;
+        opDebug->fastmod = updateStats->fastmod;
+
+        // Historically, 'opDebug' considers 'nMatched' and 'nModified' to be 1 (rather than 0)
+        // if there is an upsert that inserts a document. The UpdateStage does not participate
+        // in this madness in order to have saner stats reporting for explain. This means that
+        // we have to set these values "manually" in the case of an insert.
+        if (updateStats->inserted) {
+            opDebug->nMatched = 1;
+            opDebug->nModified = 1;
+        }
+
+        // Get summary information about the plan.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(exec, &stats);
+        opDebug->nscanned = stats.totalKeysExamined;
+        opDebug->nscannedObjects = stats.totalDocsExamined;
+
+        return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
+                            !updateStats->isDocReplacement /* $mod or obj replacement */,
+                            opDebug->nModified /* number of modified docs, no no-ops */,
+                            opDebug->nMatched /* # of docs matched/updated, even no-ops */,
+                            updateStats->objInserted);
+    };
 
 } // namespace mongo

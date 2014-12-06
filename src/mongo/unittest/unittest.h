@@ -154,6 +154,18 @@
         }                                                               \
     } while (false)
 
+#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS ) do {              \
+        std::string myString( BIG_STRING );                             \
+        if ( myString.find(CONTAINS) == std::string::npos ) {           \
+            std::string err( "Expected " #BIG_STRING " (" );            \
+            err += myString;                                            \
+            err += string(") to contain " #CONTAINS );                  \
+            ::mongo::unittest::TestAssertionFailure(__FILE__,           \
+                                                    __LINE__,           \
+                                                    err).stream();      \
+        }                                                               \
+    } while (false)
+
 /**
  * Construct a single test, named "TEST_NAME" within the test case "CASE_NAME".
  *

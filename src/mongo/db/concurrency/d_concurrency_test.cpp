@@ -138,6 +138,20 @@ namespace mongo {
         ASSERT(ls.isW());
     }
 
+    TEST(DConcurrency, TempReleaseRecursive) {
+        MMAPV1LockerImpl ls(1);
+        Lock::GlobalWrite globalWrite(&ls);
+        Lock::DBLock lk(&ls, "SomeDBName", MODE_X);
+
+        {
+            Lock::TempRelease tempRelease(&ls);
+            ASSERT(ls.isW());
+            ASSERT(ls.isDbLockedForMode("SomeDBName", MODE_X));
+        }
+
+        ASSERT(ls.isW());
+    }
+
     TEST(DConcurrency, DBReadTakesS) {
         MMAPV1LockerImpl ls(1);
 

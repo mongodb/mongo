@@ -94,36 +94,36 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const RecordId& loc ) const;
 
-        virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* out ) const;
+        virtual bool findRecord( OperationContext* txn, const RecordId& loc, RecordData* out ) const;
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
+        virtual void deleteRecord( OperationContext* txn, const RecordId& dl );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
+        virtual StatusWith<RecordId> insertRecord( OperationContext* txn,
                                                   const DocWriter* doc,
                                                   bool enforceQuota );
 
-        virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
-                                                  const DiskLoc& oldLocation,
+        virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
+                                                  const RecordId& oldLocation,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier );
 
         virtual Status updateWithDamages( OperationContext* txn,
-                                          const DiskLoc& loc,
+                                          const RecordId& loc,
                                           const RecordData& oldRec,
                                           const char* damangeSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start = DiskLoc(),
+                                             const RecordId& start = RecordId(),
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD ) const;
 
@@ -154,11 +154,11 @@ namespace mongo {
                                         BSONObjBuilder* info = NULL );
 
         virtual void temp_cappedTruncateAfter(OperationContext* txn,
-                                              DiskLoc end,
+                                              RecordId end,
                                               bool inclusive);
 
-        virtual DiskLoc oplogStartHack(OperationContext* txn,
-                                       const DiskLoc& startingPosition) const;
+        virtual RecordId oplogStartHack(OperationContext* txn,
+                                       const RecordId& startingPosition) const;
 
         virtual Status oplogDiskLocRegister( OperationContext* txn,
                                              const OpTime& opTime );
@@ -177,8 +177,8 @@ namespace mongo {
 
         void setSizeStorer( WiredTigerSizeStorer* ss ) { _sizeStorer = ss; }
 
-        void dealtWithCappedLoc( const DiskLoc& loc );
-        bool isCappedHidden( const DiskLoc& loc ) const;
+        void dealtWithCappedLoc( const RecordId& loc );
+        bool isCappedHidden( const RecordId& loc ) const;
 
     private:
 
@@ -186,24 +186,24 @@ namespace mongo {
         public:
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
-                      const DiskLoc& start,
+                      const RecordId& start,
                       const CollectionScanParams::Direction& dir,
                       bool forParallelCollectionScan );
 
             virtual ~Iterator();
 
             virtual bool isEOF();
-            virtual DiskLoc curr();
-            virtual DiskLoc getNext();
-            virtual void invalidate(const DiskLoc& dl);
+            virtual RecordId curr();
+            virtual RecordId getNext();
+            virtual void invalidate(const RecordId& dl);
             virtual void saveState();
             virtual bool restoreState(OperationContext *txn);
-            virtual RecordData dataFor( const DiskLoc& loc ) const;
+            virtual RecordData dataFor( const RecordId& loc ) const;
 
         private:
             void _getNext();
-            void _locate( const DiskLoc &loc, bool exact );
-            DiskLoc _curr() const; // const version of public curr method
+            void _locate( const RecordId &loc, bool exact );
+            RecordId _curr() const; // const version of public curr method
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
@@ -212,10 +212,10 @@ namespace mongo {
             bool _forParallelCollectionScan;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
-            const DiskLoc _readUntilForOplog;
+            const RecordId _readUntilForOplog;
 
-            DiskLoc _loc; // Cached key of _cursor. Update any time _cursor is moved.
-            DiskLoc _lastLoc; // the last thing returned from getNext()
+            RecordId _loc; // Cached key of _cursor. Update any time _cursor is moved.
+            RecordId _lastLoc; // the last thing returned from getNext()
         };
 
         class NumRecordsChange;
@@ -223,19 +223,19 @@ namespace mongo {
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
 
-        static uint64_t _makeKey(const DiskLoc &loc);
-        static DiskLoc _fromKey(uint64_t k);
+        static uint64_t _makeKey(const RecordId &loc);
+        static RecordId _fromKey(uint64_t k);
 
-        void _addUncommitedDiskLoc_inlock( OperationContext* txn, const DiskLoc& loc );
+        void _addUncommitedDiskLoc_inlock( OperationContext* txn, const RecordId& loc );
 
-        DiskLoc _nextId();
-        void _setId(DiskLoc loc);
+        RecordId _nextId();
+        void _setId(RecordId loc);
         bool cappedAndNeedDelete() const;
-        void cappedDeleteAsNeeded(OperationContext* txn, const DiskLoc& justInserted );
+        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
-        StatusWith<DiskLoc> extractAndCheckLocForOplog(const char* data, int len);
+        StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len);
         void _oplogSetStartHack( WiredTigerRecoveryUnit* wru ) const;
 
         const std::string _uri;
@@ -251,10 +251,10 @@ namespace mongo {
 
         const bool _useOplogHack;
 
-        typedef std::vector<DiskLoc> SortedDiskLocs;
+        typedef std::vector<RecordId> SortedDiskLocs;
         SortedDiskLocs _uncommittedDiskLocs;
-        DiskLoc _oplog_visibleTo;
-        DiskLoc _oplog_highestSeen;
+        RecordId _oplog_visibleTo;
+        RecordId _oplog_highestSeen;
         mutable boost::mutex _uncommittedDiskLocsMutex;
 
         AtomicUInt64 _nextIdNum;

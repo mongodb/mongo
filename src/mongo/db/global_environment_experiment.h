@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -55,6 +56,17 @@ namespace mongo {
         virtual ~KillOpListenerInterface() {}
     };
 
+    class StorageFactoriesIterator {
+        MONGO_DISALLOW_COPYING(StorageFactoriesIterator);
+    public:
+        virtual ~StorageFactoriesIterator() { }
+        virtual bool more() const = 0;
+        virtual const StorageEngine::Factory* const & next() = 0;
+        virtual const StorageEngine::Factory* const & get() const = 0;
+    protected:
+        StorageFactoriesIterator() { }
+    };
+
     class GlobalEnvironmentExperiment {
         MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
@@ -76,6 +88,12 @@ namespace mongo {
          * Returns true if "name" refers to a registered storage engine.
          */
         virtual bool isRegisteredStorageEngine(const std::string& name) = 0;
+
+        /**
+         * Produce an iterator over all registered storage engine factories.
+         * Caller owns the returned object and is responsible for deleting when finished.
+         */
+        virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
 
         /**
          * Set the storage engine.  The engine must have been registered via registerStorageEngine.
@@ -115,54 +133,18 @@ namespace mongo {
         virtual bool killOperation(unsigned int opId) = 0;
 
         /**
+         * Kills all operations that have a Client that is associated with an incoming user
+         * connection, except for the one associated with txn.
+         */
+        virtual void killAllUserOperations(const OperationContext* txn) = 0;
+
+        /**
          * Registers a listener to be notified each time an op is killed.
          *
          * listener does not become owned by the environment. As there is currently no way to
          * unregister, the listener object must outlive this GlobalEnvironmentExperiment object.
          */
         virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
-
-        /**
-         * Registers the specified operation context on the global environment, so it is
-         * discoverable by diagnostics tools.
-         *
-         * This function must be thread-safe.
-         */
-        virtual void registerOperationContext(OperationContext* txn) = 0;
-
-        /**
-         * Unregisters a previously-registered operation context. It is an error to unregister the
-         * same context twice or to unregister a context, which has not previously been registered.
-         *
-         * This function must be thread-safe.
-         */
-        virtual void unregisterOperationContext(OperationContext* txn) = 0;
-
-        /**
-         * Notification object to be passed to forEachOperationContext so that certain processing
-         * can be done on all registered contexts.
-         */
-        class ProcessOperationContext {
-        public:
-
-            /**
-             * Invoked for each registered OperationContext. The pointer is guaranteed to be stable
-             * until the call returns.
-             * 
-             * Implementations of this method should not acquire locks or do any operations, which 
-             * might block and should generally do as little work as possible in order to not block
-             * the iteration or the release of the OperationContext.
-             */
-            virtual void processOpContext(OperationContext* txn) = 0;
-
-            virtual ~ProcessOperationContext() { }
-        };
-
-        /**
-         * Iterates over all registered operation contexts and invokes 
-         * ProcessOperationContext::processOpContext for each.
-         */
-        virtual void forEachOperationContext(ProcessOperationContext* procOpCtx) = 0;
 
         /**
          * Returns a new OperationContext.  Caller owns pointer.
@@ -206,5 +188,18 @@ namespace mongo {
      * Returns true if the storage engine in use is MMAPV1.
      */
     bool isMMAPV1();
+
+    /*
+     * Extracts the storageEngine bson from the CollectionOptions provided.  Loops through each
+     * provided storageEngine and asks the matching registered storage engine if the
+     * collection/index options are valid.  Returns an error if the collection/index options are
+     * invalid.
+     * If no matching registered storage engine is found, return an error.
+     * Validation function 'func' must be either:
+     * - &StorageEngine::Factory::validateCollectionStorageOptions; or
+     * - &StorageEngine::Factory::validateIndexStorageOptions
+     */
+    Status validateStorageOptions(const BSONObj& storageEngineOptions,
+        stdx::function<Status (const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
 
 }  // namespace mongo

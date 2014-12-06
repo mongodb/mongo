@@ -132,8 +132,7 @@ namespace mongo {
     RocksEngine::~RocksEngine() {}
 
     RecoveryUnit* RocksEngine::newRecoveryUnit() {
-        // TODO  change this to false once higher level code explicitly commits every transaction
-        return new RocksRecoveryUnit(_db.get(), true);
+        return new RocksRecoveryUnit(&_transactionEngine, _db.get());
     }
 
     Status RocksEngine::createRecordStore(OperationContext* opCtx,

@@ -79,7 +79,7 @@ namespace mongo {
                     return false;
                 }
             }
-            StatusWith<DiskLoc> res = collection->insertDocument( txn, obj, false );
+            StatusWith<RecordId> res = collection->insertDocument( txn, obj, false );
             Status status = res.getStatus();
             if (status.isOK()) {
                 wunit.commit();
@@ -156,7 +156,7 @@ namespace mongo {
             Collection* collection = ctx.getCollection();
             massert( 13417, "captrunc collection not found or empty", collection);
 
-            DiskLoc end;
+            RecordId end;
             {
                 boost::scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
                                                                                      nss.ns(),

@@ -32,7 +32,7 @@
 
 #include <vector>
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {

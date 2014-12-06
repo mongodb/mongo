@@ -82,7 +82,7 @@ namespace repl {
 
         virtual void shutdown();
 
-        virtual ReplSettings& getSettings();
+        virtual const ReplSettings& getSettings() const;
 
         virtual Mode getReplicationMode() const;
 
@@ -110,10 +110,6 @@ namespace repl {
                 const WriteConcernOptions& writeConcern);
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
-                const OperationContext* txn,
-                const WriteConcernOptions& writeConcern);
-
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
@@ -215,7 +211,7 @@ namespace repl {
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
-        virtual BSONObj getGetLastErrorDefault();
+        virtual WriteConcernOptions getGetLastErrorDefault();
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
@@ -298,10 +294,10 @@ namespace repl {
         struct SlaveInfo {
             OpTime opTime; // Our last known OpTime that this slave has replicated to.
             HostAndPort hostAndPort; // Client address of the slave.
-            int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
+            int memberId; // Id of the node in the replica set config, or -1 if we're not a replSet.
             OID rid; // RID of the node.
             bool self; // Whether this SlaveInfo stores the information about ourself
-            SlaveInfo() : memberID(-1), self(false) {}
+            SlaveInfo() : memberId(-1), self(false) {}
         };
 
         typedef std::vector<SlaveInfo> SlaveInfoVector;
@@ -763,10 +759,7 @@ namespace repl {
         unordered_set<HostAndPort> _seedList;                                             // (X)
 
         // Parsed command line arguments related to replication.
-        // TODO(spencer): Currently there is global mutable state
-        // in ReplSettings, but we should be able to get rid of that after the legacy repl
-        // coordinator is gone. At that point we can make this const.
-        ReplSettings _settings;                                                           // (R)
+        const ReplSettings _settings;                                                     // (R)
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;                                 // (X)

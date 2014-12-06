@@ -1869,7 +1869,7 @@ namespace {
         ASSERT_OK(args.initialize(BSON("replSetUpdatePosition" << 1 <<
                                        "optimes" << BSON_ARRAY(
                                            BSON("cfgver" << 2 <<
-                                                "memberID" << 0 <<
+                                                "memberId" << 0 <<
                                                 "optime" << time2)))));
 
         ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args));
@@ -1881,7 +1881,7 @@ namespace {
         ASSERT_OK(args2.initialize(BSON("replSetUpdatePosition" << 1 <<
                                         "optimes" << BSON_ARRAY(
                                             BSON("cfgver" << 3 <<
-                                                 "memberID" << 1 <<
+                                                 "memberId" << 1 <<
                                                  "optime" << time2)))));
 
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
@@ -1894,7 +1894,7 @@ namespace {
         ASSERT_OK(args3.initialize(BSON("replSetUpdatePosition" << 1 <<
                                         "optimes" << BSON_ARRAY(
                                             BSON("cfgver" << 2 <<
-                                                 "memberID" << 9 <<
+                                                 "memberId" << 9 <<
                                                  "optime" << time2)))));
 
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
@@ -1908,10 +1908,10 @@ namespace {
         ASSERT_OK(args4.initialize(BSON("replSetUpdatePosition" << 1 <<
                                         "optimes" << BSON_ARRAY(
                                             BSON("cfgver" << 2 <<
-                                                 "memberID" << 1 <<
+                                                 "memberId" << 1 <<
                                                  "optime" << time2) <<
                                             BSON("cfgver" << 2 <<
-                                                 "memberID" << 2 <<
+                                                 "memberId" << 2 <<
                                                  "optime" << time2)))));
 
         ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args4));

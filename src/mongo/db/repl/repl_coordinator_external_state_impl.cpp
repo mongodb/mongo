@@ -227,6 +227,11 @@ namespace {
         MessagingPort::closeAllSockets(ScopedConn::keepOpen);
     }
 
+    void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {
+        GlobalEnvironmentExperiment* environment = getGlobalEnvironment();
+        environment->killAllUserOperations(txn);
+    }
+
     void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
         shardingState.resetShardingState();
     }

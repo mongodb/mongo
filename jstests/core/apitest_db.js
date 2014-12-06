@@ -40,7 +40,7 @@ assert(found, "found test.test in system.namespaces");
 
 // storageEngine in collection options must:
 // - be a document
-// - contains a single field of document type with the name of the current storage engine.
+// - contain at least one field of document type with the name of a registered storage engine.
 db.getCollection('test').drop();
 var storageEngineName = db.serverStatus().storageEngine.name;
 assert.commandFailed(db.createCollection('test', {storageEngine: {}}));

@@ -188,7 +188,7 @@ namespace mongo {
                 return _btree->getKey(_txn, _bucket, _ofs);
             }
 
-            virtual DiskLoc getDiskLoc() const {
+            virtual RecordId getRecordId() const {
                 return _btree->getDiskLoc(_txn, _bucket, _ofs);
             }
 
@@ -201,7 +201,7 @@ namespace mongo {
             virtual void savePosition() {
                 if (!_bucket.isNull()) {
                     _savedKey = getKey().getOwned();
-                    _savedLoc = getDiskLoc();
+                    _savedLoc = getRecordId();
                 }
             }
 

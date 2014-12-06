@@ -33,9 +33,9 @@
 #include <vector>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -109,6 +109,21 @@ namespace mongo {
                               const std::string& type,
                               std::vector<IndexDescriptor*>& matches,
                               bool includeUnfinishedIndexes = false ) const;
+
+
+        /**
+         * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
+         * must be a ready index that is already registered with the index catalog.  Returns an
+         * unowned pointer to the descriptor for the new index definition.
+         *
+         * Use this method to notify the IndexCatalog that the spec for this index has changed.
+         *
+         * It is invalid to dereference 'oldDesc' after calling this method.  This method broadcasts
+         * an invalidateAll() on the cursor cache to notify other users of the IndexCatalog that
+         * this descriptor is now invalid.
+         */
+        const IndexDescriptor* refreshEntry( OperationContext* txn,
+                                             const IndexDescriptor* oldDesc );
 
         // never returns NULL
         const IndexCatalogEntry* getEntry( const IndexDescriptor* desc ) const;
@@ -272,11 +287,11 @@ namespace mongo {
         // ----- data modifiers ------
 
         // this throws for now
-        Status indexRecord(OperationContext* txn, const BSONObj& obj, const DiskLoc &loc);
+        Status indexRecord(OperationContext* txn, const BSONObj& obj, const RecordId &loc);
 
         void unindexRecord(OperationContext* txn,
                            const BSONObj& obj,
-                           const DiskLoc& loc,
+                           const RecordId& loc,
                            bool noWarn);
 
         // ------- temp internal -------
@@ -311,12 +326,12 @@ namespace mongo {
         Status _indexRecord(OperationContext* txn,
                             IndexCatalogEntry* index,
                             const BSONObj& obj,
-                            const DiskLoc &loc );
+                            const RecordId &loc );
 
         Status _unindexRecord(OperationContext* txn,
                               IndexCatalogEntry* index,
                               const BSONObj& obj,
-                              const DiskLoc &loc,
+                              const RecordId &loc,
                               bool logIfError);
 
         /**

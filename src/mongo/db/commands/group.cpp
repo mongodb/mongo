@@ -153,7 +153,7 @@ namespace mongo {
         BSONObj retval;
         PlanExecutor::ExecState state = planExecutor->getNext(&retval, NULL);
         if (PlanExecutor::ADVANCED != state) {
-            if (PlanExecutor::EXEC_ERROR == state &&
+            if (PlanExecutor::FAILURE == state &&
                 WorkingSetCommon::isValidStatusMemberObject(retval)) {
                 return appendCommandStatus(out, WorkingSetCommon::getMemberObjectStatus(retval));
             }

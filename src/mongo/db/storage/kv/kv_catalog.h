@@ -38,7 +38,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 namespace mongo {
@@ -51,7 +51,10 @@ namespace mongo {
         /**
          * @param rs - does NOT take ownership
          */
-        KVCatalog( RecordStore* rs, bool isRsThreadSafe );
+        KVCatalog( RecordStore* rs,
+                   bool isRsThreadSafe,
+                   bool directoryPerDb,
+                   bool directoryForIndexes );
         ~KVCatalog();
 
         void init( OperationContext* opCtx );
@@ -95,9 +98,14 @@ namespace mongo {
 
         BSONObj _findEntry( OperationContext* opCtx,
                             const StringData& ns,
-                            DiskLoc* out=NULL ) const;
+                            RecordId* out=NULL ) const;
 
-        std::string _newUniqueIdent(const char* kind);
+        /**
+         * Generates a new unique identifier for a new "thing".
+         * @param ns - the containing ns
+         * @param kind - what this "thing" is, likely collection or index
+         */
+        std::string _newUniqueIdent(const StringData& ns, const char* kind);
 
         // Helpers only used by constructor and init(). Don't call from elsewhere.
         static std::string _newRand();
@@ -105,6 +113,8 @@ namespace mongo {
 
         RecordStore* _rs; // not owned
         const bool _isRsThreadSafe;
+        const bool _directoryPerDb;
+        const bool _directoryForIndexes;
 
         // These two are only used for ident generation inside _newUniqueIdent.
         std::string _rand; // effectively const after init() returns
@@ -112,10 +122,10 @@ namespace mongo {
 
         struct Entry {
             Entry(){}
-            Entry( std::string i, DiskLoc l )
+            Entry( std::string i, RecordId l )
                 : ident(i), storedLoc( l ) {}
             std::string ident;
-            DiskLoc storedLoc;
+            RecordId storedLoc;
         };
         typedef std::map<std::string,Entry> NSToIdentMap;
         NSToIdentMap _idents;

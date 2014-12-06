@@ -61,6 +61,7 @@ namespace repl {
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
+        virtual void killAllUserOperations(OperationContext* txn);
         virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
         virtual OperationContext* createOperationContext(const std::string& threadName);

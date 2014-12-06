@@ -34,12 +34,14 @@
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 
-#include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/db/storage/rocks/rocks_transaction.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
@@ -67,7 +69,9 @@ namespace mongo {
                                            _order);
         }
 
-        virtual RecoveryUnit* newRecoveryUnit() { return new RocksRecoveryUnit(_db.get()); }
+        virtual RecoveryUnit* newRecoveryUnit() {
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get());
+        }
 
     private:
         Ordering _order;
@@ -75,7 +79,83 @@ namespace mongo {
         unittest::TempDir _tempDir;
         scoped_ptr<rocksdb::DB> _db;
         shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
+        RocksTransactionEngine _transactionEngine;
     };
 
     HarnessHelper* newHarnessHelper() { return new RocksSortedDataImplHarness(); }
+
+    TEST(RocksSortedDataImplTest, Isolation) {
+        scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+        scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            ASSERT(sorted->isEmpty(opCtx.get()));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            {
+                WriteUnitOfWork uow(opCtx.get());
+
+                ASSERT_OK(sorted->insert(opCtx.get(), key1, loc1, false));
+                ASSERT_OK(sorted->insert(opCtx.get(), key2, loc2, false));
+
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
+            scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
+
+            scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+            scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
+
+            ASSERT_OK(sorted->insert(t1.get(), key3, loc3, false));
+            ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
+
+            try {
+                // this should fail
+                sorted->insert(t2.get(), key3, loc5, false);
+                ASSERT(0);
+            }
+            catch (WriteConflictException& dle) {
+                w2.reset(NULL);
+                t2.reset(NULL);
+            }
+
+            w1->commit();  // this should succeed
+        }
+
+        {
+            scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
+            scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
+
+            scoped_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
+            // ensure we start w2 transaction
+            ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
+
+            {
+                scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
+
+                {
+                    WriteUnitOfWork w(t1.get());
+                    ASSERT_OK(sorted->insert(t1.get(), key5, loc3, false));
+                    w.commit();
+                }
+                w1->commit();
+            }
+
+            try {
+                // this should fail because our key5 is too old
+                sorted->insert(t2.get(), key5, loc5, false);
+                ASSERT(0);
+            }
+            catch (WriteConflictException& dle) {
+                w2.reset(NULL);
+                t2.reset(NULL);
+            }
+        }
+    }
 }

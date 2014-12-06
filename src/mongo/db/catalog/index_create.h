@@ -36,8 +36,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
 
@@ -139,7 +139,7 @@ namespace mongo {
          *
          * Should not be called inside of a WriteUnitOfWork.
          */
-        Status insertAllDocumentsInCollection(std::set<DiskLoc>* dupsOut = NULL);
+        Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = NULL);
 
         /**
          * Call this after init() for each document in the collection.
@@ -148,7 +148,7 @@ namespace mongo {
          *
          * Should be called inside of a WriteUnitOfWork.
          */
-        Status insert(const BSONObj& wholeDocument, const DiskLoc& loc);
+        Status insert(const BSONObj& wholeDocument, const RecordId& loc);
 
         /**
          * Call this after the last insert(). This gives the index builder a chance to do any
@@ -162,7 +162,7 @@ namespace mongo {
          *
          * Should not be called inside of a WriteUnitOfWork.
          */
-        Status doneInserting(std::set<DiskLoc>* dupsOut = NULL);
+        Status doneInserting(std::set<RecordId>* dupsOut = NULL);
 
         /**
          * Marks the index ready for use. Should only be called as the last method after

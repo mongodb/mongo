@@ -429,9 +429,9 @@ namespace mongo {
     }
 
     bool IndexScanNode::sortedByDiskLoc() const {
-        // Indices use DiskLoc as an additional key after the actual index key.
+        // Indices use RecordId as an additional key after the actual index key.
         // Therefore, if we're only examining one index key, the output is sorted
-        // by DiskLoc.
+        // by RecordId.
 
         // If it's a simple range query, it's easy to determine if the range is a point.
         if (bounds.isSimpleRange) {

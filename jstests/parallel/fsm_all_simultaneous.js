@@ -6,6 +6,7 @@ var blacklist = [
     'indexed_insert_multikey.js' // SERVER-16143
 ].map(function(file) { return dir + '/' + file; });
 
-runWorkloadsInParallel(ls(dir).filter(function(file) {
-    return !Array.contains(blacklist, file);
-}));
+// SERVER-16196 re-enable executing workloads
+// runWorkloadsInParallel(ls(dir).filter(function(file) {
+//     return !Array.contains(blacklist, file);
+// }));

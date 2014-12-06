@@ -28,7 +28,7 @@
 
 /** Unit tests for DiskLoc. */
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 
 #include "mongo/unittest/unittest.h"
 

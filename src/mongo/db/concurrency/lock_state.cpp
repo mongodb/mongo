@@ -188,11 +188,6 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isRecursive() const {
-        return recursiveCount() > 1;
-    }
-
-    template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::assertWriteLocked(const StringData& ns) const {
         if (!isWriteLocked(ns)) {
             dump();
@@ -225,31 +220,6 @@ namespace {
         _lock.unlock();
 
         log() << ss.str() << std::endl;
-    }
-
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::enterScopedLock(Lock::ScopedLock* lock) {
-        _recursive++;
-        if (_recursive == 1) {
-            invariant(_scopedLk == NULL);
-            _scopedLk = lock;
-        }
-    }
-
-    template<bool IsForMMAPV1>
-    Lock::ScopedLock* LockerImpl<IsForMMAPV1>::getCurrentScopedLock() const {
-        invariant(_recursive == 1);
-        return _scopedLk;
-    }
-
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::leaveScopedLock(Lock::ScopedLock* lock) {
-        if (_recursive == 1) {
-            // Sanity check we are releasing the same lock
-            invariant(_scopedLk == lock);
-            _scopedLk = NULL;
-        }
-        _recursive--;
     }
 
 
@@ -295,9 +265,7 @@ namespace {
         : _id(id),
           _wuowNestingLevel(0),
           _batchWriter(false),
-          _lockPendingParallelWriter(false),
-          _recursive(0),
-          _scopedLk(NULL) {
+          _lockPendingParallelWriter(false) {
 
     }
 
@@ -485,7 +453,7 @@ namespace {
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
                                                     LockMode mode) const {
-        invariant(!nsIsFull(dbName));
+        invariant(nsIsDbOnly(dbName));
 
         if (isW()) return true;
         if (isR() && isSharedMode(mode)) return true;

@@ -83,7 +83,7 @@ namespace mongo {
         }
 
         // we work from the back to the front since the back has the newest data.
-        const DiskLoc loc = _subIterators.back()->getNext();
+        const RecordId loc = _subIterators.back()->getNext();
         _subIterators.popAndDeleteBack();
 
         // TODO: should we ever try and return NEED_FETCH here?
@@ -130,7 +130,7 @@ namespace mongo {
 
         if (!_filter->matchesBSON(member->obj)) {
             _done = true;
-            // DiskLoc is returned in *out.
+            // RecordId is returned in *out.
             return PlanStage::ADVANCED;
         }
         else {
@@ -141,7 +141,7 @@ namespace mongo {
 
     bool OplogStart::isEOF() { return _done; }
 
-    void OplogStart::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+    void OplogStart::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         if (_needInit) { return; }
 
         if (INVALIDATION_DELETION != type) { return; }

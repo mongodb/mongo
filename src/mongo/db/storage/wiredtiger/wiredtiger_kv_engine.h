@@ -101,7 +101,7 @@ namespace mongo {
 
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
 
-        virtual void cleanShutdown(OperationContext* txn);
+        virtual void cleanShutdown();
 
         // wiredtiger specific
         // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
@@ -118,12 +118,15 @@ namespace mongo {
 
     private:
 
+        void _checkIdentPath( const StringData& ident );
+
         string _uri( const StringData& ident ) const;
         bool _drop( const StringData& ident );
 
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;
         boost::scoped_ptr<WiredTigerSessionCache> _sessionCache;
+        std::string _path;
         bool _durable;
 
         string _rsOptions;

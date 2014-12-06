@@ -184,7 +184,7 @@ namespace mongo {
 
                 // Fixup the namespace to be a full ns internally
                 NamespaceString nss( dbName, request.getNS() );
-                request.setNS( nss.ns() );
+                request.setNSS( nss );
 
                 writer.write( request, &response );
             }

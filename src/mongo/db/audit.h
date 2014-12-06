@@ -42,6 +42,7 @@ namespace mongo {
     class AuthorizationSession;
     class BSONObj;
     class ClientBasic;
+    class Command;
     class NamespaceString;
     class ReplSetConfig;
     class StringData;
@@ -74,7 +75,8 @@ namespace audit {
     void logCommandAuthzCheck(
             ClientBasic* client,
             const NamespaceString& ns,
-            const mutablebson::Document& cmdObj,
+            const BSONObj& cmdObj,
+            Command* command,
             ErrorCodes::Error result);
 
     /**

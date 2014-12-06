@@ -1,5 +1,3 @@
-if (0) {// SERVER-14143
-
 t = db.jstests_evald;
 t.drop();
 
@@ -97,4 +95,3 @@ doIt("while(1) {              " +
      "       while(1) {;}     " +
      "   } catch (e) {}       " +
      "}", true );
-}

@@ -28,9 +28,10 @@ var m2expected = {
 };
 var m2result = m2.getDB("admin").runCommand( "getCmdLineOpts" );
 
-//remove setParameter and storage.engine as it is variable depending on the way the test is started.
+// remove variables that depend on the way the test is started.
 delete m2result.parsed.setParameter
 delete m2result.parsed.storage.engine
+delete m2result.parsed.storage.wiredTiger
 assert.docEq( m2expected.parsed, m2result.parsed );
 
 // test JSON config file
@@ -54,7 +55,8 @@ var m3expected = {
 };
 var m3result = m3.getDB("admin").runCommand( "getCmdLineOpts" );
 
-//remove setParameter and storage.engine as it is variable depending on the way the test is started.
+// remove variables that depend on the way the test is started.
 delete m3result.parsed.setParameter
 delete m3result.parsed.storage.engine
+delete m3result.parsed.storage.wiredTiger
 assert.docEq( m3expected.parsed, m3result.parsed );

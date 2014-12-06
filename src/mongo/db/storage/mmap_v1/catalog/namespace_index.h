@@ -34,9 +34,9 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/diskloc.h"
 #include "mongo/db/storage/mmap_v1/catalog/hashtab.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
 namespace mongo {

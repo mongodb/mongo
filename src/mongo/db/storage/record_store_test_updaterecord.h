@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
@@ -42,7 +42,7 @@ namespace {
 
     class UpdateMoveNotifierSpy : public UpdateMoveNotifier {
     public:
-        UpdateMoveNotifierSpy( OperationContext* txn, const DiskLoc &loc,
+        UpdateMoveNotifierSpy( OperationContext* txn, const RecordId &loc,
                                const char *buf, size_t size )
                 : _txn( txn ), _loc( loc ), _data( buf, size ), nCalls( 0 ) {
         }
@@ -50,7 +50,7 @@ namespace {
         ~UpdateMoveNotifierSpy() { }
 
         Status recordStoreGoingToMove( OperationContext *txn,
-                                       const DiskLoc &oldLocation,
+                                       const RecordId &oldLocation,
                                        const char *oldBuffer,
                                        size_t oldSize ) {
             nCalls++;
@@ -64,7 +64,7 @@ namespace {
 
     private:
         OperationContext *_txn;
-        DiskLoc _loc;
+        RecordId _loc;
         string _data;
 
         int nCalls; // to verify that recordStoreGoingToMove() gets called once

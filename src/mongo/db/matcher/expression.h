@@ -51,7 +51,7 @@ namespace mongo {
             AND, OR, NOR, NOT,
 
             // array types
-            ALL, ELEM_MATCH_OBJECT, ELEM_MATCH_VALUE, SIZE,
+            ELEM_MATCH_OBJECT, ELEM_MATCH_VALUE, SIZE,
 
             // leaf types
             LTE, LT, EQ, GT, GTE, REGEX, MOD, EXISTS, MATCH_IN, NIN,
@@ -125,11 +125,11 @@ namespace mongo {
          * Is this node an array operator?  Array operators have multiple clauses but operate on one
          * field.
          *
-         * ALL (AllElemMatchOp)
          * ELEM_MATCH_VALUE, ELEM_MATCH_OBJECT, SIZE (ArrayMatchingMatchExpression)
          */
         bool isArray() const {
-            return SIZE == _matchType || ALL == _matchType || ELEM_MATCH_VALUE == _matchType
+            return SIZE == _matchType
+                   || ELEM_MATCH_VALUE == _matchType
                    || ELEM_MATCH_OBJECT == _matchType;
         }
 

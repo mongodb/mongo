@@ -57,7 +57,7 @@ namespace mongo {
 
         virtual void setIndexHead( OperationContext* txn,
                                    const StringData& indexName,
-                                   const DiskLoc& newHead );
+                                   const RecordId& newHead );
 
         virtual Status removeIndex( OperationContext* txn,
                                     const StringData& indexName );

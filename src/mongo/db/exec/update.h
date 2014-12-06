@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
 
 namespace mongo {
 
@@ -87,7 +88,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -101,12 +102,23 @@ namespace mongo {
 
         static const char* kStageType;
 
+        /**
+         * Converts the execution stats (stored by the update stage as an UpdateStats) for the
+         * update plan represented by 'exec' into the UpdateResult format used to report the results
+         * of writes.
+         *
+         * Also responsible for filling out 'opDebug' with execution info.
+         *
+         * Should only be called once this stage is EOF.
+         */
+        static UpdateResult makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug);
+
     private:
         /**
-         * Computes the result of applying mods to the document 'oldObj' at DiskLoc 'loc' in
+         * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
          * memory, then commits these changes to the database.
          */
-        void transformAndUpdate(BSONObj& oldObj, DiskLoc& loc);
+        void transformAndUpdate(BSONObj& oldObj, RecordId& loc);
 
         /**
          * Computes the document to insert and inserts it into the collection. Used if the
@@ -161,7 +173,7 @@ namespace mongo {
         // document and we wouldn't want to update that.
         //
         // So, no matter what, we keep track of where the doc wound up.
-        typedef unordered_set<DiskLoc, DiskLoc::Hasher> DiskLocSet;
+        typedef unordered_set<RecordId, RecordId::Hasher> DiskLocSet;
         const boost::scoped_ptr<DiskLocSet> _updatedLocs;
 
         // These get reused for each update.

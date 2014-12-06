@@ -85,9 +85,14 @@ namespace {
         const Entry _entry;
     };
 
-    KVCatalog::KVCatalog( RecordStore* rs, bool isRsThreadSafe )
+    KVCatalog::KVCatalog( RecordStore* rs,
+                          bool isRsThreadSafe,
+                          bool directoryPerDb,
+                          bool directoryForIndexes )
         : _rs( rs )
         , _isRsThreadSafe(isRsThreadSafe)
+        , _directoryPerDb(directoryPerDb)
+        , _directoryForIndexes(directoryForIndexes)
         , _rand(_newRand())
     {}
 
@@ -109,16 +114,23 @@ namespace {
         return false;
     }
 
-    std::string KVCatalog::_newUniqueIdent(const char* kind) {
+    std::string KVCatalog::_newUniqueIdent(const StringData& ns, const char* kind) {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-        return str::stream() << kind << '-' << _next.fetchAndAdd(1) << '-' << _rand;
+        StringBuilder buf;
+        if ( _directoryPerDb ) {
+            buf << nsToDatabaseSubstring( ns ) << '/';
+        }
+        buf << kind;
+        buf << ( _directoryForIndexes ? '/' : '-' );
+        buf << _next.fetchAndAdd(1) << '-' << _rand;
+        return buf.str();
     }
 
     void KVCatalog::init( OperationContext* opCtx ) {
         // No locking needed since called single threaded.
         scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
         while ( !it->isEOF()  ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
 
@@ -155,7 +167,7 @@ namespace {
                                              MODE_X));
         }
 
-        const string ident = _newUniqueIdent("collection");
+        const string ident = _newUniqueIdent(ns, "collection");
 
         boost::mutex::scoped_lock lk( _identsLock );
         Entry& old = _idents[ns.toString()];
@@ -177,7 +189,7 @@ namespace {
             obj = b.obj();
         }
 
-        StatusWith<DiskLoc> res = _rs->insertRecord( opCtx, obj.objdata(), obj.objsize(), false );
+        StatusWith<RecordId> res = _rs->insertRecord( opCtx, obj.objdata(), obj.objsize(), false );
         if ( !res.isOK() )
             return res.getStatus();
 
@@ -203,7 +215,7 @@ namespace {
 
     BSONObj KVCatalog::_findEntry( OperationContext* opCtx,
                                    const StringData& ns,
-                                   DiskLoc* out ) const {
+                                   RecordId* out ) const {
 
         boost::scoped_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
@@ -212,7 +224,7 @@ namespace {
                                              MODE_S));
         }
 
-        DiskLoc dl;
+        RecordId dl;
         {
             boost::mutex::scoped_lock lk( _identsLock );
             NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
@@ -256,7 +268,7 @@ namespace {
                                              MODE_X));
         }
 
-        DiskLoc loc;
+        RecordId loc;
         BSONObj obj = _findEntry( opCtx, ns, &loc );
 
         {
@@ -278,7 +290,7 @@ namespace {
                     continue;
                 }
                 // missing, create new
-                newIdentMap.append( name, _newUniqueIdent("index") );
+                newIdentMap.append( name, _newUniqueIdent(ns, "index") );
             }
             b.append( "idxIdent", newIdentMap.obj() );
 
@@ -287,7 +299,7 @@ namespace {
             obj = b.obj();
         }
 
-        StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
+        StatusWith<RecordId> status = _rs->updateRecord( opCtx,
                                                         loc,
                                                         obj.objdata(),
                                                         obj.objsize(),
@@ -309,7 +321,7 @@ namespace {
                                              MODE_X));
         }
 
-        DiskLoc loc;
+        RecordId loc;
         BSONObj old = _findEntry( opCtx, fromNS, &loc ).getOwned();
         {
             BSONObjBuilder b;
@@ -326,7 +338,7 @@ namespace {
             b.appendElementsUnique( old );
 
             BSONObj obj = b.obj();
-            StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
+            StatusWith<RecordId> status = _rs->updateRecord( opCtx,
                                                             loc,
                                                             obj.objdata(),
                                                             obj.objsize(),
@@ -396,7 +408,7 @@ namespace {
 
         scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
         while ( !it->isEOF()  ) {
-            DiskLoc loc = it->getNext();
+            RecordId loc = it->getNext();
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
             v.push_back( obj["ident"].String() );
@@ -417,7 +429,11 @@ namespace {
     }
 
     bool KVCatalog::isUserDataIdent( const StringData& ident ) const {
-        return ident.startsWith( "index-" ) || ident.startsWith( "collection-" );
+        return
+            ident.find( "index-" ) != std::string::npos ||
+            ident.find( "index/" ) != std::string::npos ||
+            ident.find( "collection-" ) != std::string::npos ||
+            ident.find( "collection/" ) != std::string::npos;
     }
 
 }
