@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
@@ -70,8 +71,9 @@ namespace mongo {
               _connection(_dbpath.path(), extraStrings),
               _sessionCache(_connection.getConnection()) { }
 
-        WiredTigerSession* getSession() {
-            return _sessionCache.getSession();
+
+        WiredTigerSessionCache* getSessionCache() {
+            return &_sessionCache;
         }
 
     private:
@@ -82,7 +84,8 @@ namespace mongo {
 
     TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-        WiredTigerSession* session = harnessHelper.getSession();
+        WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+        WiredTigerSession* session = recoveryUnit.getSession();
         StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
             "statistics:table:no_such_table", "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
         ASSERT_NOT_OK(result.getStatus());
@@ -91,7 +94,8 @@ namespace mongo {
 
     TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(none)");
-        WiredTigerSession* session = harnessHelper.getSession();
+        WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+        WiredTigerSession* session = recoveryUnit.getSession();
         WT_SESSION* wtSession = session->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
         StatusWith<uint64_t> result = WiredTigerUtil::getStatisticsValue(session->getSession(),
@@ -102,7 +106,8 @@ namespace mongo {
 
     TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-        WiredTigerSession* session = harnessHelper.getSession();
+        WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+        WiredTigerSession* session = recoveryUnit.getSession();
         WT_SESSION* wtSession = session->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
         // Use connection statistics key which does not apply to a table.
@@ -114,7 +119,8 @@ namespace mongo {
 
     TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-        WiredTigerSession* session = harnessHelper.getSession();
+        WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+        WiredTigerSession* session = recoveryUnit.getSession();
         WT_SESSION* wtSession = session->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
         // Use connection statistics key which does not apply to a table.
@@ -127,7 +133,8 @@ namespace mongo {
 
     TEST(WiredTigerUtilTest, GetStatisticsValueAsUInt8) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-        WiredTigerSession* session = harnessHelper.getSession();
+        WiredTigerRecoveryUnit recoveryUnit(harnessHelper.getSessionCache());
+        WiredTigerSession* session = recoveryUnit.getSession();
         WT_SESSION* wtSession = session->getSession();
         ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", NULL)));
 
