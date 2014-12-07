@@ -298,15 +298,7 @@ func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("query '%v' is not valid JSON: %v", queryRaw, err)
 	}
 
-	for key, val := range parsedJSON {
-		if valSubDoc, ok := val.(map[string]interface{}); ok {
-			newVal, err := bsonutil.ParseSpecialKeys(valSubDoc)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing query '%v': %v", valSubDoc, err)
-			}
-			parsedJSON[key] = newVal
-		}
-	}
+	bsonutil.ConvertJSONDocumentToBSON(parsedJSON)
 	return parsedJSON, nil
 }
 

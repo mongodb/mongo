@@ -98,7 +98,7 @@
 
     // make sure the query was applied correctly
     assert.eq(1, destColl.count());
-    assert.eq(1, destColl.count({ a: 2, 'x.b': '1', 'x.c': '2' }));
+    assert.eq(1, destColl.count({ a: 2, "x.c": '2' }));
 
     // remove the export, clear the destination collection
     removeFile(exportTarget);
@@ -124,6 +124,26 @@
 
     // make sure the query was applied correctly
     assert.eq(4, destColl.count());
+
+    // TOOLS-469 test queries containing extended JSON field (like dates)
+    sourceColl.drop()
+    destColl.drop()
+    sourceColl.insert({ a: 1, x: ISODate("2014-12-11T13:52:39.498Z"), y: ISODate("2014-12-13T13:52:39.498Z")});
+    ret = toolTest.runTool.apply(
+        toolTest,
+        ['export', '--out', exportTarget, '--db', 'test',
+            '--collection', 'source', '--query', '{x:{$gt:Date(1418305949498), $lt:Date(1418305979498)}, y:{$gt:{$date:1418478749498}, $lt:{$date:1418478769498}}}'].
+            concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+    ret = toolTest.runTool.apply(
+        toolTest,
+        ['import', '--file', exportTarget, '--db', 'test',
+            '--collection', 'dest'].
+            concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+    assert.eq(1, destColl.count());
 
     // success
     toolTest.stop();
