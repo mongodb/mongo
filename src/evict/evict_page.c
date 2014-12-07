@@ -7,11 +7,11 @@
 
 #include "wt_internal.h"
 
-static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static void __rec_discard_tree(WT_SESSION_IMPL *, WT_REF *, int, int);
-static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *, int *);
+static int  __evict_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
+static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int, int, int *, int *);
+static void __evict_discard_tree(WT_SESSION_IMPL *, WT_REF *, int, int);
+static void __evict_excl_clear(WT_SESSION_IMPL *);
 
 /*
  * __wt_evict --
@@ -50,7 +50,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * unlikely eviction would choose an internal page with children, it's
 	 * not disallowed anywhere.
 	 */
-	WT_ERR(__rec_review(session, ref, exclusive, 1, &inmem_split, &istree));
+	WT_ERR(
+	    __evict_review(session, ref, exclusive, 1, &inmem_split, &istree));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
@@ -74,7 +75,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/* Discard any subtree rooted in this page. */
 	if (istree)
-		__rec_discard_tree(session, ref, exclusive, 1);
+		__evict_discard_tree(session, ref, exclusive, 1);
 
 	/* Update the reference and discard the page. */
 	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -92,7 +93,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			__wt_ref_out(session, ref);
 		else
 			WT_ERR(
-			    __rec_page_dirty_update(session, ref, exclusive));
+			    __evict_page_dirty_update(session, ref, exclusive));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
@@ -104,7 +105,7 @@ err:		/*
 		 * we've acquired.
 		 */
 		if (!exclusive)
-			__rec_excl_clear(session);
+			__evict_excl_clear(session);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
@@ -135,11 +136,11 @@ __wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __rec_page_dirty_update --
+ * __evict_page_dirty_update --
  *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 {
 	WT_ADDR *addr;
 	WT_PAGE *parent;
@@ -221,12 +222,12 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 }
 
 /*
- * __rec_discard_tree --
+ * __evict_discard_tree --
  *	Discard the tree rooted a page (that is, any pages merged into it),
  * then the page itself.
  */
 static void
-__rec_discard_tree(
+__evict_discard_tree(
     WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int top)
 {
 	WT_REF *child;
@@ -241,7 +242,7 @@ __rec_discard_tree(
 				continue;
 			WT_ASSERT(session,
 			    exclusive || child->state == WT_REF_LOCKED);
-			__rec_discard_tree(session, child, exclusive, 0);
+			__evict_discard_tree(session, child, exclusive, 0);
 		} WT_INTL_FOREACH_END;
 		/* FALLTHROUGH */
 	default:
@@ -252,12 +253,12 @@ __rec_discard_tree(
 }
 
 /*
- * __rec_review --
+ * __evict_review --
  *	Get exclusive access to the page and review the page and its subtree
  *	for conditions that would block its eviction.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
+__evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
     int exclusive, int top, int *inmem_splitp, int *istreep)
 {
 	WT_BTREE *btree;
@@ -274,7 +275,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * locked down.
 	 */
 	if (!exclusive) {
-		WT_RET(__hazard_exclusive(session, ref, top));
+		WT_RET(__evict_exclusive(session, ref, top));
 
 		/*
 		 * Now the page is locked, remove it from the LRU eviction
@@ -304,7 +305,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 				 * page.
 				 */
 				*istreep = 1;
-				WT_RET(__rec_review(session, child, exclusive,
+				WT_RET(__evict_review(session, child, exclusive,
 				    0, inmem_splitp, istreep));
 				break;
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -453,11 +454,11 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 }
 
 /*
- * __rec_excl_clear --
+ * __evict_excl_clear --
  *	Discard exclusive access and return a page's subtree to availability.
  */
 static void
-__rec_excl_clear(WT_SESSION_IMPL *session)
+__evict_excl_clear(WT_SESSION_IMPL *session)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -472,11 +473,11 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 }
 
 /*
- * __hazard_exclusive --
+ * __evict_exclusive --
  *	Request exclusive access to a page.
  */
 static int
-__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
+__evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 {
 	/*
 	 * Make sure there is space to track exclusive access so we can unlock
