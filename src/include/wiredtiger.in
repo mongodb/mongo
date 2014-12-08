@@ -2311,10 +2311,6 @@ struct __wt_config_item {
 	 *
 	 * The bytes referenced by \c str are <b>not</b> nul-terminated,
 	 * use the \c len field instead of a terminating nul byte.
-	 *
-	 * If the configuration string's value is "none", the \c str field
-	 * will be set to an empty value, that is, the \c len field will be
-	 * zero.
 	 */
 	const char *str;
 
