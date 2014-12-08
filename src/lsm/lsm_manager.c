@@ -9,7 +9,6 @@
 
 static int __lsm_manager_aggressive_update(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_manager_run_server(WT_SESSION_IMPL *);
-static int __lsm_manager_worker_setup(WT_SESSION_IMPL *);
 
 static void * __lsm_worker_manager(void *);
 
@@ -363,26 +362,6 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __lsm_manager_worker_setup --
- *	Do setup owned by the LSM manager thread including starting the worker
- *	threads.
- */
-static int
-__lsm_manager_worker_setup(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LSM_MANAGER *manager;
-	WT_LSM_WORKER_ARGS *worker_args;
-
-	conn = S2C(session);
-	manager = &conn->lsm_manager;
-
-	WT_RET(__lsm_general_worker_start(session));
-
-	return (0);
-}
-
-/*
  * __lsm_manager_worker_shutdown --
  *	Shutdown the LSM manager and worker threads.
  */
@@ -516,7 +495,7 @@ __lsm_worker_manager(void *arg)
 	cookie = (WT_LSM_WORKER_ARGS *)arg;
 	session = cookie->session;
 
-	WT_ERR(__lsm_manager_worker_setup(session));
+	WT_ERR(__lsm_general_worker_start(session));
 	WT_ERR(__lsm_manager_run_server(session));
 	WT_ERR(__lsm_manager_worker_shutdown(session));
 
