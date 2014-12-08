@@ -17,7 +17,7 @@ __schema_add_table(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_TABLE *table;
-	uint64_t hash;
+	uint64_t bucket;
 
 	/* Make sure the metadata is open before getting other locks. */
 	WT_RET(__wt_metadata_open(session));
@@ -27,9 +27,9 @@ __schema_add_table(WT_SESSION_IMPL *session,
 	    session, name, namelen, ok_incomplete, &table));
 	WT_RET(ret);
 
-	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
+	bucket = table->name_hash % WT_HASH_ARRAY_SIZE;
 	SLIST_INSERT_HEAD(&session->tables, table, l);
-	SLIST_INSERT_HEAD(&session->tablehash[hash], table, hashl);
+	SLIST_INSERT_HEAD(&session->tablehash[bucket], table, hashl);
 	*tablep = table;
 
 	return (0);
@@ -45,12 +45,12 @@ __schema_find_table(WT_SESSION_IMPL *session,
 {
 	WT_TABLE *table;
 	const char *tablename;
-	uint64_t hash;
+	uint64_t bucket;
 
-	hash = __wt_hash_city64(name, namelen) % WT_HASH_ARRAY_SIZE;
+	bucket = __wt_hash_city64(name, namelen) % WT_HASH_ARRAY_SIZE;
 
 restart:
-	SLIST_FOREACH(table, &session->tablehash[hash], hashl) {
+	SLIST_FOREACH(table, &session->tablehash[bucket], hashl) {
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
@@ -200,12 +200,12 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 int
 __wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
-	uint64_t hash;
+	uint64_t bucket;
 	WT_ASSERT(session, table->refcnt <= 1);
 
-	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
+	bucket = table->name_hash % WT_HASH_ARRAY_SIZE;
 	SLIST_REMOVE(&session->tables, table, __wt_table, l);
-	SLIST_REMOVE(&session->tablehash[hash], table, __wt_table, hashl);
+	SLIST_REMOVE(&session->tablehash[bucket], table, __wt_table, hashl);
 	return (__wt_schema_destroy_table(session, table));
 }
 
