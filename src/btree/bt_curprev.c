@@ -263,11 +263,9 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
-	skipped = 0;
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
@@ -285,22 +283,13 @@ new_page:	if (cbt->ins == NULL) {
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL)
 			continue;
 		if (WT_UPDATE_DELETED_ISSET(upd)) {
-			++skipped;
+			++cbt->page_deleted_count;
 			continue;
 		}
 		val->data = WT_UPDATE_DATA(upd);
 		val->size = upd->size;
 		break;
 	}
-
-	/*
-	 * If we saw a lot of deleted records, try to evict the page when we
-	 * release it.  Otherwise repeatedly deleting from the end of a tree
-	 * can have quadratic performance.
-	 */
-	if (cbt->ref != NULL &&
-	    ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD))
-		__wt_page_evict_soon(cbt->ref->page);
 	return (ret);
 }
 
@@ -319,12 +308,10 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	val = &cbt->iface.value;
-	skipped = 0;
 
 	/* Initialize for each new page. */
 	if (newpage) {
@@ -358,7 +345,7 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 		    NULL : __wt_txn_read(session, cbt->ins->upd);
 		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				++skipped;
+				++cbt->page_deleted_count;
 				continue;
 			}
 
@@ -389,14 +376,6 @@ new_page:	if (cbt->recno < page->pg_var_recno) {
 		val->size = cbt->tmp.size;
 		break;
 	}
-
-	/*
-	 * If we saw a lot of deleted records, try to evict the page when we
-	 * release it.  Otherwise repeatedly deleting from the end of a tree
-	 * can have quadratic performance.
-	 */
-	if ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD)
-		__wt_page_evict_soon(page);
 	return (ret);
 }
 
@@ -414,13 +393,11 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	int skipped;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
-	skipped = 0;
 
 	/*
 	 * For row-store pages, we need a single item that tells us the part
@@ -465,7 +442,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
 				continue;
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
-				++skipped;
+				++cbt->page_deleted_count;
 				continue;
 			}
 			key->data = WT_INSERT_KEY(ins);
@@ -501,21 +478,13 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		rip = &page->pg_row_d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
-			++skipped;
+			++cbt->page_deleted_count;
 			continue;
 		}
 
 		ret = __cursor_row_slot_return(cbt, rip, upd);
 		break;
 	}
-
-	/*
-	 * If we saw a lot of deleted records, try to evict the page when we
-	 * release it.  Otherwise repeatedly deleting from the end of a tree
-	 * can have quadratic performance.
-	 */
-	if ((newpage && skipped) || skipped > WT_BTREE_DELETE_THRESHOLD)
-		__wt_page_evict_soon(page);
 	return (ret);
 }
 
@@ -601,6 +570,20 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 			if (ret != WT_NOTFOUND)
 				break;
 		}
+
+		/*
+		 * If we saw a lot of deleted records on this page, or we went
+		 * all the way through a page and only saw deleted records, try
+		 * to evict the page when we release it.  Otherwise repeatedly
+		 * deleting from the beginning of a tree can have quadratic
+		 * performance.  Take care not to force eviction of pages that
+		 * are genuinely empty, in new trees.
+		 */
+		if (page != NULL &&
+		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
+		    (newpage && cbt->page_deleted_count > 0)))
+			__wt_page_evict_soon(page);
+		cbt->page_deleted_count = 0;
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
