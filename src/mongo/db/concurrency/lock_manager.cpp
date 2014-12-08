@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/concurrency/lock_mgr_new.h"
+#include "mongo/db/concurrency/lock_manager.h"
 
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"

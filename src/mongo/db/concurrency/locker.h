@@ -33,7 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/lock_mgr_new.h"
+#include "mongo/db/concurrency/lock_manager.h"
 
 namespace mongo {
     

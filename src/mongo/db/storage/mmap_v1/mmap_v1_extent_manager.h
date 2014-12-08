@@ -36,7 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/lock_mgr_defs.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"

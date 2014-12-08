@@ -13,10 +13,10 @@ env.Library(
 )
 
 env.Library(
-    target='lock_mgr',
+    target='lock_manager',
     source=[
         'd_concurrency.cpp',
-        'lock_mgr_new.cpp',
+        'lock_manager.cpp',
         'lock_state.cpp',
     ],
     LIBDEPS=[
@@ -30,14 +30,14 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='lock_mgr_test',
+    target='lock_manager_test',
     source=['d_concurrency_test.cpp',
             'deadlock_detection_test.cpp',
             'fast_map_noalloc_test.cpp',
-            'lock_mgr_new_test.cpp',
+            'lock_manager_test.cpp',
             'lock_state_test.cpp',
     ],
     LIBDEPS=[
-        'lock_mgr'
+        'lock_manager'
     ]
 )

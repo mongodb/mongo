@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/lock_mgr_new.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_state.h"
 
 namespace mongo {

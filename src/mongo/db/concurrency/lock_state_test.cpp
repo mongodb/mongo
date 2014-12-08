@@ -32,7 +32,7 @@
 
 #include <vector>
 
-#include "mongo/db/concurrency/lock_mgr_test_help.h"
+#include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
