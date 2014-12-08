@@ -472,10 +472,8 @@ static int
 __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	conn = S2C(session);
 	/*
 	 * We need to pull the handle into the session handle
 	 * cache and make sure it's referenced to stop other
