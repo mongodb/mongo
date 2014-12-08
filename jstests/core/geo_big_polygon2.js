@@ -1,13 +1,17 @@
 //
 //  Big Polygon related tests
+//  - Tests the capability for a geo query with a big polygon object (strictCRS)
+//    $geoWithin & $geoIntersects
+//  - Big polygon objects cannot be stored
+//    Try all different shapes queries against various stored geo points, line & polygons
 
-var pointCRS = {
+var crs84CRS = {
     type: "name",
     properties: {
         name: "urn:ogc:def:crs:OGC:1.3:CRS84"
     }
 };
-var sphereCRS = {
+var epsg4326CRS = {
     type: "name",
     properties: {
         name: "EPSG:4326"
@@ -74,19 +78,19 @@ var objects = [
         }
     },
     {
-        name: "north pole - pointCRS",
+        name: "north pole - crs84CRS",
         geo: {
             type: "Point",
             coordinates: [ -97.9 , 90.0 ],
-            crs: pointCRS
+            crs: crs84CRS
         }
     },
     {
-        name: "south pole - sphereCRS",
+        name: "south pole - epsg4326CRS",
         geo: {
             type: "Point",
             coordinates: [ -97.9 , -90.0 ],
-            crs: sphereCRS
+            crs: epsg4326CRS
         }
     },
     {
@@ -113,14 +117,14 @@ var objects = [
         }
     },
     {
-        name: "line crossing equator - sphereCRS",
+        name: "line crossing equator - epsg4326CRS",
         geo: {
             type: "LineString",
             coordinates: [
                 [ -77.0451853, -12.0553442 ],
                 [ -76.7784557, 18.0098528 ]
             ],
-            crs: sphereCRS
+            crs: epsg4326CRS
         }
     },
     {
@@ -830,9 +834,11 @@ indexes.forEach(function(index) {
         docArray = coll.find(q).toArray();
         assert.eq(p.nI, docArray.length, p.name + " intersects");
         // Update on matching docs
-        assert.eq(p.nI,
-            coll.update(q, {$set: {stored: ObjectId()}}, {multi: true}).nModified,
-            "update " + p.name);
+        var result = coll.update(q, {$set: {stored: ObjectId()}}, {multi: true});
+        // only check nModified if write commands are enabled
+        if ( coll.getMongo().writeMode() == "commands" ) {
+            assert.eq(p.nI, result.nModified, "update " + p.name);
+        }
         // Remove & restore matching docs
         assert.eq(p.nI, coll.remove(q).nRemoved, "remove " + p.name);
         var bulk = coll.initializeUnorderedBulkOp();

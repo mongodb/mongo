@@ -1,14 +1,22 @@
 //
 //  Big Polygon edge cases
 //
+//  - Tests for invalid query operations
+//    Non-polygon types (point, multiPoint, lineString) with strictCRSo
+//    $nearSphere & $geoNear query with big polygon
+//    Aggregate with $geonear on a big polygon
+//    Stored object with strictCRS (no 2dsphere index) are ignored in a query
+//  - Other cases which should work
+//    MapReduce with a big polygon
+//    CRS84 & EPSG4326 objects should be retrieved from query with big polygon
 
-var pointCRS = {
+var crs84CRS = {
     type: "name",
     properties: {
         name: "urn:ogc:def:crs:OGC:1.3:CRS84"
     }
 };
-var sphereCRS = {
+var epsg4326CRS = {
     type: "name",
     properties: {
         name: "EPSG:4326"
@@ -220,45 +228,45 @@ coll.remove({});
 // Objects should be found from query
 objects = [
     {
-        name: "NYC Times Square - point pointCRS",
+        name: "NYC Times Square - point crs84CRS",
         geo: {
             type: "Point",
             coordinates: [ -73.9857 , 40.7577 ],
-            crs: pointCRS
+            crs: crs84CRS
         }
     },
     {
-        name: "NYC Times Square - point sphereCRS",
+        name: "NYC Times Square - point epsg4326CRS",
         geo: {
             type: "Point",
             coordinates: [ -73.9857 , 40.7577 ],
-            crs: sphereCRS
+            crs: epsg4326CRS
         }
     },
     {
-        name: "NYC CitiField & JFK - multipoint pointCRS",
+        name: "NYC CitiField & JFK - multipoint crs84CRS",
         geo: {
             type: "MultiPoint",
             coordinates: [
                 [ -73.8458 , 40.7569 ],
                 [ -73.7789 , 40.6397 ]
             ],
-            crs: pointCRS
+            crs: crs84CRS
         }
     },
     {
-        name: "NYC CitiField & JFK - multipoint sphereCRS",
+        name: "NYC CitiField & JFK - multipoint epsg4326CRS",
         geo: {
             type: "MultiPoint",
             coordinates: [
                 [ -73.8458 , 40.7569 ],
                 [ -73.7789 , 40.6397 ]
             ],
-            crs: sphereCRS
+            crs: epsg4326CRS
         }
     },
     {
-        name: "NYC - Times Square to CitiField to JFK - line/string pointCRS",
+        name: "NYC - Times Square to CitiField to JFK - line/string crs84CRS",
         geo: {
             type: "LineString",
             coordinates: [
@@ -266,11 +274,11 @@ objects = [
                 [ -73.8458 , 40.7569 ],
                 [ -73.7789 , 40.6397 ]
             ],
-            crs: pointCRS
+            crs: crs84CRS
         }
     },
     {
-        name: "NYC - Times Square to CitiField to JFK - line/string sphereCRS",
+        name: "NYC - Times Square to CitiField to JFK - line/string epsg4326CRS",
         geo: {
             type: "LineString",
             coordinates: [
@@ -278,33 +286,33 @@ objects = [
                 [ -73.8458 , 40.7569 ],
                 [ -73.7789 , 40.6397 ]
             ],
-            crs: sphereCRS
+            crs: epsg4326CRS
         }
     }
 ];
 
-// Insert GeoJson pointCRS & sphereCRS objects
+// Insert GeoJson crs84CRS & epsg4326CRS objects
 objects.forEach(function(o) {
     assert.writeOK(coll.insert(o), "Geo Json insert" + o.name);
 });
 
-// Make sure stored pointCRS & sphereCRS documents can be found
+// Make sure stored crs84CRS & epsg4326CRS documents can be found
 totalDocs = coll.count();
 
 assert.eq(totalDocs,
     coll.count({geo: {$geoWithin: {$geometry: poly}}}),
-    "pointCRS or sphereCRS within");
+    "crs84CRS or epsg4326CRS within");
 assert.eq(totalDocs,
     coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
-    "pointCRS or sphereCRS intersects");
+    "crs84CRS or epsg4326CRS intersects");
 
 // Add index and look again for stored point & spherical CRS documents
 assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}), "2dsphere index");
 
 assert.eq(totalDocs,
     coll.count({geo: {$geoWithin: {$geometry: poly}}}),
-    "2dsphere index - pointCRS or sphereCRS within");
+    "2dsphere index - crs84CRS or epsg4326CRS within");
 assert.eq(totalDocs,
     coll.count({geo: {$geoIntersects: {$geometry: poly}}}),
-    "2dsphere index - pointCRS or sphereCRS intersects");
+    "2dsphere index - crs84CRS or epsg4326CRS intersects");
 
