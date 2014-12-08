@@ -1893,6 +1893,8 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
  * log files are written.  If the value is not an absolute path name\, the files
  * are created relative to the database home., a string; default \c "".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean
+ * flag; default \c true.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management., a set of related configuration options defined below.}
