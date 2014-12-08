@@ -2318,7 +2318,7 @@ struct __wt_config_item {
 	size_t len;
 
 	/*!
-	 * The value of a configuration boolean, integer or string.
+	 * The numeric value of a configuration boolean or integer.
 	 *
 	 * If the configuration string's value is "true" or "false", the
 	 * \c val field will be set to 1 (true), or 0 (false).
