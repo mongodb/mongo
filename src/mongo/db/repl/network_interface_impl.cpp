@@ -58,7 +58,7 @@ namespace {
     const int kMinThreads = 1;
     const int kMaxThreads = 51;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
     const Seconds kMaxIdleThreadAge(30);
-    const Seconds kDefaultMaxConnectionAge(30);
+    const Seconds kMaxConnectionAge(30);
 
 }  // namespace
 
@@ -71,17 +71,6 @@ namespace {
         MONGO_DISALLOW_COPYING(ConnectionPool);
     public:
         struct ConnectionInfo;
-
-        /**
-         * Options for configuring the pool.
-         */
-        struct Options {
-            Options() : maxConnectionAge(kDefaultMaxConnectionAge) {
-            }
-
-            // Maximum age of a connection, before it is reaped.
-            Seconds maxConnectionAge;
-        };
 
         typedef stdx::list<ConnectionInfo> ConnectionList;
         typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
@@ -127,11 +116,7 @@ namespace {
             const ConnectionList::iterator _connInfo;
         };
 
-        /**
-         * Constructs a new connection pool, configured with the given options.
-         */
-        explicit ConnectionPool(const Options& options);
-
+        ConnectionPool();
         ~ConnectionPool();
 
         /**
@@ -197,9 +182,6 @@ namespace {
 
         // List of non-idle connections.
         ConnectionList _inUseConnections;
-
-        // Options with which this pool was configured.
-        Options _options;
     };
 
     /**
@@ -226,8 +208,7 @@ namespace {
         return _connInfo->conn;
     }
 
-    NetworkInterfaceImpl::ConnectionPool::ConnectionPool(const Options& options) :
-        _options(options) {}
+    NetworkInterfaceImpl::ConnectionPool::ConnectionPool() {}
 
     NetworkInterfaceImpl::ConnectionPool::~ConnectionPool() {
         cleanUpOlderThan(Date_t(~0ULL));
@@ -272,7 +253,7 @@ namespace {
             const ConnectionInfo& connInfo) const {
 
         const Date_t expirationDate =
-            connInfo.creationDate + _options.maxConnectionAge.total_milliseconds();
+            connInfo.creationDate + kMaxConnectionAge.total_milliseconds();
         if (expirationDate <= now) {
             return false;
         }
@@ -379,8 +360,7 @@ namespace {
         _isExecutorRunnable(false),
         _inShutdown(false),
         _numActiveNetworkRequests(0) {
-        ConnectionPool::Options options;
-        _connPool.reset(new ConnectionPool(options));
+        _connPool.reset(new ConnectionPool());
     }
 
     NetworkInterfaceImpl::~NetworkInterfaceImpl() { }
