@@ -91,8 +91,6 @@ __drop_index(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_INDEX *idx;
-
-
 	WT_DECL_RET;
 	WT_TABLE *table;
 
