@@ -1022,6 +1022,14 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->dhandles);
+	/*
+	 * If we don't have one, allocate the dhandle hash array.
+	 */
+	if (session_ret->dhhash == NULL)
+		WT_ERR(__wt_calloc(session_ret, WT_DHANDLE_HASH_ARRAY,
+		    sizeof(struct __dhandles_hash), &session_ret->dhhash));
+	for (i = 0; i < WT_DHANDLE_HASH_ARRAY; i++)
+		TAILQ_INIT(&session_ret->dhhash[i]);
 
 	/* Initialize transaction support: default to read-committed. */
 	session_ret->isolation = TXN_ISO_READ_COMMITTED;

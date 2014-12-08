@@ -508,7 +508,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	uint64_t hash, hash_index;
+	uint64_t hash;
 
 	conn = S2C(session);
 
@@ -519,9 +519,9 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	 * name.  If we don't have a URI we walk the entire dhandle list.
 	 */
 	if (uri != NULL) {
-		hash = __wt_hash_city64(uri, strlen(uri));
-		hash_index = hash % WT_DHANDLE_HASH_ARRAY;
-		TAILQ_FOREACH(dhandle, &conn->dhhash[hash_index], hashq)
+		hash = __wt_hash_city64(uri, strlen(uri)) %
+		    WT_DHANDLE_HASH_ARRAY;
+		TAILQ_FOREACH(dhandle, &conn->dhhash[hash], hashq)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    (hash == dhandle->name_hash &&
 			     strcmp(uri, dhandle->name) == 0) &&
@@ -555,16 +555,15 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
-	uint64_t hash, hash_index;
+	uint64_t hash;
 
 	conn = S2C(session);
 	saved_dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	hash = __wt_hash_city64(uri, strlen(uri));
-	hash_index = hash % WT_DHANDLE_HASH_ARRAY;
-	TAILQ_FOREACH(dhandle, &conn->dhhash[hash_index], hashq)
+	hash = __wt_hash_city64(uri, strlen(uri)) % WT_DHANDLE_HASH_ARRAY;
+	TAILQ_FOREACH(dhandle, &conn->dhhash[hash], hashq)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (hash == dhandle->name_hash &&
 		     strcmp(uri, dhandle->name) == 0) &&

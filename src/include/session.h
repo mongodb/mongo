@@ -14,6 +14,7 @@ struct __wt_data_handle_cache {
 	WT_DATA_HANDLE *dhandle;
 
 	TAILQ_ENTRY(__wt_data_handle_cache) q;
+	TAILQ_ENTRY(__wt_data_handle_cache) hashq;
 };
 
 /*
@@ -59,6 +60,8 @@ struct __wt_session_impl {
 
 					/* Session handle reference list */
 	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+					/* Hashed handle reference list array */
+	TAILQ_HEAD(__dhandles_hash, __wt_data_handle_cache) *dhhash;
 #define	WT_DHANDLE_SWEEP_WAIT	60	/* Wait before discarding */
 #define	WT_DHANDLE_SWEEP_PERIOD	20	/* Only sweep every 20 seconds */
 	time_t last_sweep;		/* Last sweep for dead handles */

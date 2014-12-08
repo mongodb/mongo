@@ -52,11 +52,14 @@ __session_add_dhandle(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
+	uint64_t hash;
 
 	WT_RET(__wt_calloc_def(session, 1, &dhandle_cache));
 	dhandle_cache->dhandle = session->dhandle;
 
+	hash = dhandle_cache->dhandle->name_hash % WT_DHANDLE_HASH_ARRAY;
 	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
+	TAILQ_INSERT_HEAD(&session->dhhash[hash], dhandle_cache, hashq);
 
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
@@ -290,8 +293,11 @@ static void
 __session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
-	TAILQ_REMOVE(
-	    &session->dhandles, dhandle_cache, q);
+	uint64_t hash;
+
+	hash = dhandle_cache->dhandle->name_hash % WT_DHANDLE_HASH_ARRAY;
+	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
+	TAILQ_REMOVE(&session->dhhash[hash], dhandle_cache, hashq);
 
 	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
 
@@ -388,11 +394,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	dhandle = NULL;
 
-	hash = __wt_hash_city64(uri, strlen(uri));
-	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
+	hash = __wt_hash_city64(uri, strlen(uri)) % WT_DHANDLE_HASH_ARRAY;
+	TAILQ_FOREACH(dhandle_cache, &session->dhhash[hash], hashq) {
 		dhandle = dhandle_cache->dhandle;
-		if (hash != dhandle->name_hash ||
-		    strcmp(uri, dhandle->name) != 0)
+		if (strcmp(uri, dhandle->name) != 0)
 			continue;
 		if (checkpoint == NULL && dhandle->checkpoint == NULL)
 			break;
