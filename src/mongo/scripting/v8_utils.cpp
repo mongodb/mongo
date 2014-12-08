@@ -248,39 +248,34 @@ namespace mongo {
             int32_t count;
         };
 
-        boost::shared_ptr<Latch> get(string desc) {
+        boost::shared_ptr<Latch> get(int32_t desc) {
             boost::lock_guard<boost::mutex> lock(mutex);
             Map::iterator iter = _latches.find(desc);
             jsassert(iter != _latches.end(), "not a valid CountDownLatch descriptor");
             return iter->second;
         }
 
-        typedef map< string, boost::shared_ptr<Latch> > Map;
+        typedef std::map< int32_t, boost::shared_ptr<Latch> > Map;
         Map _latches;
         boost::mutex _mutex;
         int32_t _counter;
     public:
         CountDownLatchHolder() : _counter(0) {}
-        string make(int32_t count) {
+        int32_t make(int32_t count) {
+            jsassert(count >= 0, "argument must be >= 0");
             boost::lock_guard<boost::mutex> lock(_mutex);
-            int32_t id = ++_counter;
-            string desc;
-            {
-                stringstream ss;
-                ss << "latch" << id;
-                desc = ss.str();
-            }
-            _latches.insert(make_pair(desc, boost::make_shared<Latch>(count)));
+            int32_t desc = ++_counter;
+            _latches.insert(std::make_pair(desc, boost::make_shared<Latch>(count)));
             return desc;
         }
-        void await(string desc) {
+        void await(int32_t desc) {
             boost::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             while (latch->count != 0) {
                 latch->cv.wait(lock);
             }
         }
-        void countDown(string desc) {
+        void countDown(int32_t desc) {
             boost::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             if (latch->count > 0) {
@@ -290,7 +285,7 @@ namespace mongo {
                 latch->cv.notify_all();
             }
         }
-        int32_t getCount(string desc) {
+        int32_t getCount(int32_t desc) {
             boost::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             return latch->count;
@@ -302,29 +297,29 @@ namespace mongo {
 
     v8::Handle<v8::Value> CountDownLatchNew(V8Scope* scope, const v8::Arguments& args) {
         jsassert(args.Length() == 1, "need exactly one argument");
-        jsassert(args[0]->IsInt32(), "argument must be an int32");
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
         int32_t count = v8::Local<v8::Integer>::Cast(args[0])->Value();
-        return v8::String::New(globalCountDownLatchHolder.make(count).c_str());
+        return v8::Int32::New(globalCountDownLatchHolder.make(count));
     }
 
     v8::Handle<v8::Value> CountDownLatchAwait(V8Scope* scope, const v8::Arguments& args) {
         jsassert(args.Length() == 1, "need exactly one argument");
-        jsassert(args[0]->IsString(), "argument must be a string");
-        globalCountDownLatchHolder.await(toSTLString(args[0]));
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        globalCountDownLatchHolder.await(args[0]->ToInt32()->Value());
         return v8::Undefined();
     }
 
     v8::Handle<v8::Value> CountDownLatchCountDown(V8Scope* scope, const v8::Arguments& args) {
         jsassert(args.Length() == 1, "need exactly one argument");
-        jsassert(args[0]->IsString(), "argument must be a string");
-        globalCountDownLatchHolder.countDown(toSTLString(args[0]));
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        globalCountDownLatchHolder.countDown(args[0]->ToInt32()->Value());
         return v8::Undefined();
     }
 
     v8::Handle<v8::Value> CountDownLatchGetCount(V8Scope* scope, const v8::Arguments& args) {
         jsassert(args.Length() == 1, "need exactly one argument");
-        jsassert(args[0]->IsString(), "argument must be a string");
-        return v8::Int32::New(globalCountDownLatchHolder.getCount(toSTLString(args[0])));
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        return v8::Int32::New(globalCountDownLatchHolder.getCount(args[0]->ToInt32()->Value()));
     }
 
     JSThreadConfig *thisConfig(V8Scope* scope, const v8::Arguments& args) {

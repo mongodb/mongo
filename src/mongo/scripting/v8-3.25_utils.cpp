@@ -32,6 +32,8 @@
 #include "mongo/scripting/v8-3.25_utils.h"
 
 #include <boost/smart_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include <iostream>
@@ -240,6 +242,94 @@ namespace mongo {
         shared_ptr<SharedData> _sharedData;
     };
 
+    class CountDownLatchHolder {
+    private:
+        struct Latch {
+            Latch(int32_t count) : count(count) {}
+            boost::condition_variable cv;
+            boost::mutex mutex;
+            int32_t count;
+        };
+
+        boost::shared_ptr<Latch> get(int32_t desc) {
+            boost::lock_guard<boost::mutex> lock(mutex);
+            Map::iterator iter = _latches.find(desc);
+            jsassert(iter != _latches.end(), "not a valid CountDownLatch descriptor");
+            return iter->second;
+        }
+
+        typedef std::map< int32_t, boost::shared_ptr<Latch> > Map;
+        Map _latches;
+        boost::mutex _mutex;
+        int32_t _counter;
+    public:
+        CountDownLatchHolder() : _counter(0) {}
+        int32_t make(int32_t count) {
+            jsassert(count >= 0, "argument must be >= 0");
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            int32_t desc = ++_counter;
+            _latches.insert(std::make_pair(desc, boost::make_shared<Latch>(count)));
+            return desc;
+        }
+        void await(int32_t desc) {
+            boost::shared_ptr<Latch> latch = get(desc);
+            boost::unique_lock<boost::mutex> lock(latch->mutex);
+            while (latch->count != 0) {
+                latch->cv.wait(lock);
+            }
+        }
+        void countDown(int32_t desc) {
+            boost::shared_ptr<Latch> latch = get(desc);
+            boost::unique_lock<boost::mutex> lock(latch->mutex);
+            if (latch->count > 0) {
+                latch->count--;
+            }
+            if (latch->count == 0) {
+                latch->cv.notify_all();
+            }
+        }
+        int32_t getCount(int32_t desc) {
+            boost::shared_ptr<Latch> latch = get(desc);
+            boost::unique_lock<boost::mutex> lock(latch->mutex);
+            return latch->count;
+        }
+    };
+    namespace {
+        CountDownLatchHolder globalCountDownLatchHolder;
+    }
+
+    v8::Local<v8::Value> CountDownLatchNew(V8Scope* scope,
+                                           const v8::FunctionCallbackInfo<v8::Value>& args) {
+        jsassert(args.Length() == 1, "need exactly one argument");
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        int32_t count = v8::Local<v8::Integer>::Cast(args[0])->Value();
+        return v8::Int32::New(scope->getIsolate(), globalCountDownLatchHolder.make(count));
+    }
+
+    v8::Local<v8::Value> CountDownLatchAwait(V8Scope* scope,
+                                             const v8::FunctionCallbackInfo<v8::Value>& args) {
+        jsassert(args.Length() == 1, "need exactly one argument");
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        globalCountDownLatchHolder.await(args[0]->ToInt32()->Value());
+        return v8::Undefined(scope->getIsolate());
+    }
+
+    v8::Local<v8::Value> CountDownLatchCountDown(V8Scope* scope,
+                                                 const v8::FunctionCallbackInfo<v8::Value>& args) {
+        jsassert(args.Length() == 1, "need exactly one argument");
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        globalCountDownLatchHolder.countDown(args[0]->ToInt32()->Value());
+        return v8::Undefined(scope->getIsolate());
+    }
+
+    v8::Local<v8::Value> CountDownLatchGetCount(V8Scope* scope,
+                                                const v8::FunctionCallbackInfo<v8::Value>& args) {
+        jsassert(args.Length() == 1, "need exactly one argument");
+        jsassert(args[0]->IsInt32(), "argument must be an integer");
+        return v8::Int32::New(scope->getIsolate(),
+                              globalCountDownLatchHolder.getCount(args[0]->ToInt32()->Value()));
+    }
+
     JSThreadConfig *thisConfig(V8Scope* scope, const v8::FunctionCallbackInfo<v8::Value>& args) {
         v8::Local<v8::External> c = v8::Local<v8::External>::Cast(
                 args.This()->GetHiddenValue(v8::String::NewFromUtf8(scope->getIsolate(),
@@ -325,6 +415,13 @@ namespace mongo {
                      v8::Local<v8::Context> context) {
         scope->injectV8Function("_threadInject", ThreadInject, global);
         scope->injectV8Function("_scopedThreadInject", ScopedThreadInject, global);
+
+        scope->setObject("CountDownLatch", BSONObj(), false);
+        v8::Handle<v8::Object> cdl = scope->get("CountDownLatch").As<v8::Object>();
+        scope->injectV8Function("_new", CountDownLatchNew, cdl);
+        scope->injectV8Function("_await", CountDownLatchAwait, cdl);
+        scope->injectV8Function("_countDown", CountDownLatchCountDown, cdl);
+        scope->injectV8Function("_getCount", CountDownLatchGetCount, cdl);
     }
 
     v8::Local<v8::Value> v8AssertionException(const char* errorMessage) {
