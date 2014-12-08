@@ -180,6 +180,7 @@ extern int __wt_config_subinit( WT_SESSION_IMPL *session, WT_CONFIG *conf, WT_CO
 extern int __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_get(WT_SESSION_IMPL *session, const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_gets(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value);
+extern int __wt_config_gets_none(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_getone(WT_SESSION_IMPL *session, const char *config, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_getones(WT_SESSION_IMPL *session, const char *config, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_gets_def(WT_SESSION_IMPL *session, const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value);
@@ -217,7 +218,7 @@ extern int __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize);
 extern int __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *name, const char *ckpt, uint32_t flags);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int force);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session, const char *name, const char *ckpt, const char *cfg[], uint32_t flags);
-extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, int apply_checkpoints, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
+extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, int apply_checkpoints, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_dhandle_close_all( WT_SESSION_IMPL *session, const char *name, int force);
 extern int __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final);
