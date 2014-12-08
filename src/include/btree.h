@@ -53,6 +53,9 @@
  */
 #define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
 
+/* Evict pages if we see this many consecutive deleted records. */
+#define	WT_BTREE_DELETE_THRESHOLD	1000
+
 /*
  * WT_BTREE --
  *	A btree handle.
