@@ -82,14 +82,15 @@ struct __wt_named_extractor {
  * Macros to ensure the dhandle is inserted or removed from both the
  * main queue and the hashed queue.
  */
-#define	WT_CONN_DHANDLE_INSERT(conn, dhandle, hash) do {		\
+#define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
 	SLIST_INSERT_HEAD(&(conn)->dhlh, dhandle, l);			\
-	SLIST_INSERT_HEAD(&(conn)->dhhash[hash], dhandle, hashl);	\
+	SLIST_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashl);	\
 } while (0)
 
-#define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, hash) do {		\
+#define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket) do {		\
 	SLIST_REMOVE(&(conn)->dhlh, dhandle, __wt_data_handle, l);	\
-	SLIST_REMOVE(&(conn)->dhhash[hash], dhandle, __wt_data_handle, hashl);\
+	SLIST_REMOVE(&(conn)->dhhash[bucket],				\
+	    dhandle, __wt_data_handle, hashl);				\
 } while (0)
 
 /*

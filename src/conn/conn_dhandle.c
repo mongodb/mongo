@@ -129,7 +129,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	uint64_t hash, hash_index;
+	uint64_t bucket;
 
 	WT_UNUSED(flags);	/* Only used in diagnostic builds */
 	conn = S2C(session);
@@ -139,9 +139,8 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session,
 	    !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	/* Increment the reference count if we already have the btree open. */
-	hash = __wt_hash_city64(name, strlen(name));
-	hash_index = hash % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[hash_index], hashl)
+	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
+	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 		if (strcmp(name, dhandle->name) == 0 &&
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
@@ -166,7 +165,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	uint32_t hash;
+	uint32_t bucket;
 
 	conn = S2C(session);
 
@@ -213,8 +212,8 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * Find the right hash bucket to insert into as well.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
-	hash = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	WT_CONN_DHANDLE_INSERT(conn, dhandle, hash);
+	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket);
 
 	session->dhandle = dhandle;
 	return (0);
@@ -506,7 +505,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	uint64_t hash, hash_index;
+	uint64_t bucket;
 
 	conn = S2C(session);
 
@@ -517,9 +516,9 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	 * name.  If we don't have a URI we walk the entire dhandle list.
 	 */
 	if (uri != NULL) {
-		hash = __wt_hash_city64(uri, strlen(uri));
-		hash_index = hash % WT_HASH_ARRAY_SIZE;
-		SLIST_FOREACH(dhandle, &conn->dhhash[hash_index], hashl)
+		bucket =
+		    __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
+		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    strcmp(uri, dhandle->name) == 0 &&
 			    (apply_checkpoints || dhandle->checkpoint == NULL))
@@ -552,7 +551,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
-	uint64_t hash, hash_index;
+	uint64_t bucket, hash;
 
 	conn = S2C(session);
 	saved_dhandle = session->dhandle;
@@ -560,8 +559,8 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	hash = __wt_hash_city64(uri, strlen(uri));
-	hash_index = hash % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[hash_index], hashl)
+	bucket = hash % WT_HASH_ARRAY_SIZE;
+	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (hash == dhandle->name_hash &&
 		     strcmp(uri, dhandle->name) == 0) &&
@@ -657,11 +656,11 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
-	uint64_t hash;
+	uint64_t bucket;
 
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	hash = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
@@ -669,7 +668,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	if (!final && dhandle->session_ref != 0)
 		return (EBUSY);
 
-	WT_CONN_DHANDLE_REMOVE(conn, dhandle, hash);
+	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket);
 	return (0);
 
 }
