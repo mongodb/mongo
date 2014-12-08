@@ -1,5 +1,36 @@
 # This file is a python script that describes the WiredTiger API.
 
+class Error:
+    def __init__(self, name, desc, long_desc=None, **flags):
+        self.name = name
+        self.desc = desc
+        self.long_desc = long_desc
+        self.flags = flags
+
+errors = [
+    Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
+        This error is generated when the application attempts to insert
+        a record with the same key as an existing record without the
+        'overwrite' configuration to WT_SESSION::open_cursor.'''),
+    Error('WT_ERROR', 'non-specific WiredTiger error', '''
+        This error is returned when an error is not covered by a
+        specific error return.'''),
+    Error('WT_NOTFOUND', 'item not found', '''
+        This error indicates an operation did not find a value to
+        return.  This includes cursor search and other operations
+        where no record matched the cursor's search key such as
+        WT_CURSOR::update or WT_CURSOR::remove.'''),
+    Error('WT_PANIC', 'WiredTiger library panic', '''
+        This error indicates an underlying problem that requires the
+        application exit and restart.'''),
+    Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
+    Error('WT_ROLLBACK', 'conflict between concurrent operations', '''
+        This error is generated when an operation cannot be completed
+        due to a conflict with concurrent operations.  The operation
+        may be retried; if a transaction is in progress, it should be
+        rolled back and the operation retried in a new transaction.'''),
+]
+
 class Method:
     def __init__(self, config, **flags):
         self.config = config
@@ -68,45 +99,45 @@ lsm_config = [
         options only relevant for LSM data sources''',
         type='category', subconfig=[
         Config('auto_throttle', 'true', r'''
-        Throttle inserts into LSM trees if flushing to disk isn't
-        keeping up''',
-        type='boolean'),
+            Throttle inserts into LSM trees if flushing to disk isn't
+            keeping up''',
+            type='boolean'),
         Config('bloom', 'true', r'''
-        create bloom filters on LSM tree chunks as they are merged''',
-        type='boolean'),
+            create bloom filters on LSM tree chunks as they are merged''',
+            type='boolean'),
         Config('bloom_config', '', r'''
-        config string used when creating Bloom filter files, passed
-        to WT_SESSION::create'''),
+            config string used when creating Bloom filter files, passed
+            to WT_SESSION::create'''),
         Config('bloom_bit_count', '16', r'''
-        the number of bits used per item for LSM bloom filters''',
-        min='2', max='1000'),
+            the number of bits used per item for LSM bloom filters''',
+            min='2', max='1000'),
         Config('bloom_hash_count', '8', r'''
-        the number of hash values per item used for LSM bloom
-        filters''',
-        min='2', max='100'),
+            the number of hash values per item used for LSM bloom
+            filters''',
+            min='2', max='100'),
         Config('bloom_oldest', 'false', r'''
-        create a bloom filter on the oldest LSM tree chunk. Only
-        supported if bloom filters are enabled''',
-        type='boolean'),
+            create a bloom filter on the oldest LSM tree chunk. Only
+            supported if bloom filters are enabled''',
+            type='boolean'),
         Config('chunk_max', '5GB', r'''
-        the maximum size a single chunk can be. Chunks larger than this
-        size are not considered for further merges. This is a soft
-        limit, and chunks larger than this value can be created.  Must
-        be larger than chunk_size''',
-        min='100MB', max='10TB'),
+            the maximum size a single chunk can be. Chunks larger than this
+            size are not considered for further merges. This is a soft
+            limit, and chunks larger than this value can be created.  Must
+            be larger than chunk_size''',
+            min='100MB', max='10TB'),
         Config('chunk_size', '10MB', r'''
-        the maximum size of the in-memory chunk of an LSM tree.  This
-        limit is soft - it is possible for chunks to be temporarily
-        larger than this value.  This overrides the \c memory_page_max
-        setting''',
-        min='512K', max='500MB'),
+            the maximum size of the in-memory chunk of an LSM tree.  This
+            limit is soft - it is possible for chunks to be temporarily
+            larger than this value.  This overrides the \c memory_page_max
+            setting''',
+            min='512K', max='500MB'),
         Config('merge_max', '15', r'''
-        the maximum number of chunks to include in a merge operation''',
-        min='2', max='100'),
+            the maximum number of chunks to include in a merge operation''',
+            min='2', max='100'),
         Config('merge_min', '0', r'''
-        the minimum number of chunks to include in a merge operation. If
-        set to 0 or 1 half the value of merge_max is used''',
-        max='100'),
+            the minimum number of chunks to include in a merge operation. If
+            set to 0 or 1 half the value of merge_max is used''',
+            max='100'),
     ]),
 ]
 
@@ -126,7 +157,7 @@ file_config = format_meta + [
         min='512B', max='128MB'),
     Config('block_compressor', '', r'''
         configure a compressor for file blocks.  Permitted values are
-        empty (off) or \c "bzip2", \c "snappy" or custom compression
+        \c "none", \c "bzip2", \c "snappy" or custom compression
         engine \c "name" created with WT_CONNECTION::add_compressor.
         See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
@@ -153,13 +184,13 @@ file_config = format_meta + [
         the file format''',
         choices=['btree']),
     Config('huffman_key', '', r'''
-        configure Huffman encoding for keys.  Permitted values
-        are empty (off), \c "english", \c "utf8<file>" or \c
-        "utf16<file>".  See @ref huffman for more information'''),
+        configure Huffman encoding for keys.  Permitted values are
+        \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
+        See @ref huffman for more information'''),
     Config('huffman_value', '', r'''
-        configure Huffman encoding for values.  Permitted values
-        are empty (off), \c "english", \c "utf8<file>" or \c
-        "utf16<file>".  See @ref huffman for more information'''),
+        configure Huffman encoding for values.  Permitted values are
+        \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
+        See @ref huffman for more information'''),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -259,10 +290,10 @@ table_only_config = [
 
 index_only_config = [
     Config('extractor', '', r'''
-    configure custom extractor for indices.  Value must be an extractor
-    name created with WT_CONNECTION::add_extractor'''),
+        configure custom extractor for indices.  Value must be an extractor
+        name created with WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
-    configure the index to be immutable - that is an index is not changed
+        configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),
 ]
 
@@ -281,16 +312,16 @@ connection_runtime_config = [
         asynchronous operations configuration options''',
         type='category', subconfig=[
         Config('enabled', 'false', r'''
-        enable asynchronous operation''',
-        type='boolean'),
+            enable asynchronous operation''',
+            type='boolean'),
         Config('ops_max', '1024', r'''
-        maximum number of expected simultaneous asynchronous
-        operations''', min='10', max='4096'),
+            maximum number of expected simultaneous asynchronous
+                operations''', min='10', max='4096'),
         Config('threads', '2', r'''
-        the number of worker threads to service asynchronous
-        requests''',
-        min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
-        ]),
+            the number of worker threads to service asynchronous
+                requests''',
+                min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
+            ]),
     Config('cache_size', '100MB', r'''
         maximum heap memory to allocate for the cache. A database should
         configure either a cache_size or a shared_cache not both''',
@@ -299,17 +330,17 @@ connection_runtime_config = [
         periodically checkpoint the database''',
         type='category', subconfig=[
         Config('name', '"WiredTigerCheckpoint"', r'''
-        the checkpoint name'''),
+            the checkpoint name'''),
         Config('log_size', '0', r'''
-        wait for this amount of log record bytes to be written to
-        the log between each checkpoint.  A database can configure
-        both log_size and wait to set an upper bound for checkpoints;
-        setting this value above 0 configures periodic checkpoints''',
-        min='0', max='2GB'),
+            wait for this amount of log record bytes to be written to
+                the log between each checkpoint.  A database can configure
+                both log_size and wait to set an upper bound for checkpoints;
+                setting this value above 0 configures periodic checkpoints''',
+            min='0', max='2GB'),
         Config('wait', '0', r'''
-        seconds to wait between each checkpoint; setting this value
-        above 0 configures periodic checkpoints''',
-        min='0', max='100000'),
+            seconds to wait between each checkpoint; setting this value
+            above 0 configures periodic checkpoints''',
+            min='0', max='100000'),
         ]),
     Config('error_prefix', '', r'''
         prefix string for error messages'''),
@@ -330,12 +361,12 @@ connection_runtime_config = [
         configure database wide options for LSM tree management''',
         type='category', subconfig=[
         Config('worker_thread_max', '4', r'''
-        Configure a set of threads to manage merging LSM trees in
+            Configure a set of threads to manage merging LSM trees in
             the database.''',
-        min='3', max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
+            min='3', max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
         Config('merge', 'true', r'''
-        merge LSM chunks where possible''',
-        type='boolean')
+            merge LSM chunks where possible''',
+            type='boolean')
         ]),
     Config('lsm_merge', 'true', r'''
         merge LSM chunks where possible (deprecated)''',
@@ -343,34 +374,34 @@ connection_runtime_config = [
     Config('eviction', '', r'''
         eviction configuration options.''',
         type='category', subconfig=[
-        Config('threads_max', '1', r'''
+            Config('threads_max', '1', r'''
         maximum number of threads WiredTiger will start to help evict
         pages from cache. The number of threads started will vary
         depending on the current eviction load''',
-        min=1, max=20),
-        Config('threads_min', '1', r'''
-        minimum number of threads WiredTiger will start to help evict
-        pages from cache. The number of threads currently running will
-        vary depending on the current eviction load''',
-        min=1, max=20),
-        ]),
+                min=1, max=20),
+            Config('threads_min', '1', r'''
+                minimum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads currently running will
+                vary depending on the current eviction load''',
+                min=1, max=20),
+            ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both''',
         type='category', subconfig=[
         Config('chunk', '10MB', r'''
-        the granularity that a shared cache is redistributed''',
-        min='1MB', max='10TB'),
+            the granularity that a shared cache is redistributed''',
+            min='1MB', max='10TB'),
         Config('reserve', '0', r'''
-        amount of cache this database is guaranteed to have
-        available from the shared cache. This setting is per
-        database. Defaults to the chunk size''', type='int'),
+            amount of cache this database is guaranteed to have
+            available from the shared cache. This setting is per
+            database. Defaults to the chunk size''', type='int'),
         Config('name', '', r'''
-        name of a cache that is shared between databases'''),
+            name of a cache that is shared between databases'''),
         Config('size', '500MB', r'''
-        maximum memory to allocate for the shared cache. Setting
-        this will update the value if one is already set''',
-        min='1MB', max='10TB')
+            maximum memory to allocate for the shared cache. Setting
+            this will update the value if one is already set''',
+            min='1MB', max='10TB')
         ]),
     Config('statistics', 'none', r'''
         Maintain database statistics, which may impact performance.
@@ -391,54 +422,54 @@ connection_runtime_config = [
         to a file.  See @ref statistics for more information''',
         type='category', subconfig=[
         Config('on_close', 'false', r'''log statistics on database close''',
-        type='boolean'),
+            type='boolean'),
         Config('path', '"WiredTigerStat.%d.%H"', r'''
-        the pathname to a file into which the log records are written,
-        may contain ISO C standard strftime conversion specifications.
-        If the value is not an absolute path name, the file is created
-        relative to the database home'''),
+            the pathname to a file into which the log records are written,
+            may contain ISO C standard strftime conversion specifications.
+            If the value is not an absolute path name, the file is created
+            relative to the database home'''),
         Config('sources', '', r'''
-        if non-empty, include statistics for the list of data source
-        URIs, if they are open at the time of the statistics logging.
-        The list may include URIs matching a single data source
-        ("table:mytable"), or a URI matching all data sources of a
-        particular type ("table:")''',
-        type='list'),
+            if non-empty, include statistics for the list of data source
+            URIs, if they are open at the time of the statistics logging.
+            The list may include URIs matching a single data source
+            ("table:mytable"), or a URI matching all data sources of a
+            particular type ("table:")''',
+            type='list'),
         Config('timestamp', '"%b %d %H:%M:%S"', r'''
-        a timestamp prepended to each log record, may contain strftime
-        conversion specifications'''),
+            a timestamp prepended to each log record, may contain strftime
+            conversion specifications'''),
         Config('wait', '0', r'''
-        seconds to wait between each write of the log records''',
-        min='0', max='100000'),
+            seconds to wait between each write of the log records''',
+            min='0', max='100000'),
         ]),
     Config('verbose', '', r'''
         enable messages for various events. Only available if WiredTiger
         is configured with --enable-verbose. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
         type='list', choices=[
-        'api',
-        'block',
-        'checkpoint',
-        'compact',
-        'evict',
-        'evictserver',
-        'fileops',
-        'log',
-        'lsm',
-        'metadata',
-        'mutex',
-        'overflow',
-        'read',
-        'reconcile',
-        'recovery',
-        'salvage',
-        'shared_cache',
-        'split',
-        'temporary',
-        'transaction',
-        'verify',
-        'version',
-        'write']),
+            'api',
+            'block',
+            'checkpoint',
+            'compact',
+            'evict',
+            'evictserver',
+            'fileops',
+            'log',
+            'lsm',
+            'metadata',
+            'mutex',
+            'overflow',
+            'read',
+            'reconcile',
+            'recovery',
+            'salvage',
+            'shared_cache',
+            'split',
+            'temporary',
+            'transaction',
+            'verify',
+            'version',
+            'write']),
 ]
 
 session_config = [
@@ -722,8 +753,8 @@ methods = {
         has not been modified, this option forces the checkpoint''',
         type='boolean'),
     Config('name', '', r'''
-        if non-empty, specify a name for the checkpoint (note that
-        checkpoints including LSM trees may not be named)'''),
+        if set, specify a name for the checkpoint (note that checkpoints
+        including LSM trees may not be named)'''),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
 ]),
@@ -786,10 +817,10 @@ methods = {
 #    argument to the wiredtiger_open call.
 # wiredtiger_open_basecfg:
 #    Configuration values allowed in the WiredTiger.basecfg file (remove
-#    creation-specific configuration strings and add a version string).
+# creation-specific configuration strings and add a version string).
 # wiredtiger_open_usercfg:
 #    Configuration values allowed in the WiredTiger.config file (remove
-#    creation-specific configuration strings).
+# creation-specific configuration strings).
 # wiredtiger_open_all:
 #    All of the above configuration values combined
 'wiredtiger_open' : Method(

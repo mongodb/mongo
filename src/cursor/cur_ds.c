@@ -498,7 +498,7 @@ __wt_curds_open(
 	/* Data-source cursors may have a custom collator. */
 	WT_ERR(
 	    __wt_config_getones(session, metaconf, "app_metadata", &metadata));
-	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
 	if (cval.len != 0)
 		WT_ERR(__wt_collator_config(session, uri, &cval, &metadata,
 		    &data_source->collator, &data_source->collator_owned));
