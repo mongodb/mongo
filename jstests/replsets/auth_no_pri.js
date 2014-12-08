@@ -22,7 +22,7 @@ assert.throws(function() {rs.getMaster()}); // Should no longer be any primary
 // Make sure you can still authenticate a replset connection with no primary
 var conn2 = new Mongo(rs.getURL());
 conn2.setSlaveOk(true);
-assert(conn2.getDB('admin').auth('admin', 'pwd'));
+assert(conn2.getDB('admin').auth({user:'admin', pwd:'pwd', mechanism:"SCRAM-SHA-1"}));
 assert.eq(1, conn2.getDB('admin').foo.findOne().a);
 
 rs.stopSet();
