@@ -1726,7 +1726,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the collation to be used in calls to
-	 * 	WT_SESSION::create
+	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param collator the application-supplied collation handler
 	 * @configempty{connection.add_collator, see dist/api_data.py}
 	 * @errors
@@ -1746,7 +1746,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the compression function to be used in calls
-	 *	to WT_SESSION::create
+	 *	to WT_SESSION::create, may not be \c "none"
 	 * @param compressor the application-supplied compression handler
 	 * @configempty{connection.add_compressor, see dist/api_data.py}
 	 * @errors
@@ -1764,7 +1764,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the extractor to be used in calls to
-	 * 	WT_SESSION::create
+	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param extractor the application-supplied extractor
 	 * @configempty{connection.add_extractor, see dist/api_data.py}
 	 * @errors

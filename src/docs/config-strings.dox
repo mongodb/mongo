@@ -58,9 +58,6 @@ For example, the value \c 500B is the same as entering the number \c 500, the
 value \c 500K is the same as \c 512000 and the string \c 500GB is the same as
 \c 536870912000.
 
-Values of type "string" can be set to \c none, which is the same as specifying
-an empty string.
-
 Values of type of "boolean" can be set to any of \c false, \c true, \c 0 or
 \c 1.  If no value is specified for a key, the value \c 1 is implied.  For
 example, all of the following forms of the \c overwrite configuration string

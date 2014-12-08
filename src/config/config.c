@@ -498,24 +498,16 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	if (value->len == 0)
 		return (0);
 
-	switch (value->type) {
-	case WT_CONFIG_ITEM_BOOL:
-		break;
-	case WT_CONFIG_ITEM_ID:
-		if (WT_STRING_CASE_MATCH("true", value->str, value->len)) {
-			value->type = WT_CONFIG_ITEM_BOOL;
-			value->val = 1;
-			break;
-		}
+	if (value->type == WT_CONFIG_ITEM_ID) {
 		if (WT_STRING_CASE_MATCH("false", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
-			break;
+		} else if (
+		    WT_STRING_CASE_MATCH("true", value->str, value->len)) {
+			value->type = WT_CONFIG_ITEM_BOOL;
+			value->val = 1;
 		}
-		if (WT_STRING_CASE_MATCH("none", value->str, value->len))
-			value->len = 0;
-		break;
-	case WT_CONFIG_ITEM_NUM:
+	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
 
@@ -564,19 +556,11 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 */
 		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
 			goto range;
-		break;
-	case WT_CONFIG_ITEM_STRING:
-		if (WT_STRING_CASE_MATCH("none", value->str, value->len))
-			value->len = 0;
-		break;
-	case WT_CONFIG_ITEM_STRUCT:
-		break;
 	}
 
 	return (0);
 
-range:
-	return (__config_err(conf, "Number out of range", ERANGE));
+range:	return (__config_err(conf, "Number out of range", ERANGE));
 }
 
 /*
@@ -668,6 +652,21 @@ __wt_config_gets(WT_SESSION_IMPL *session,
 	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	return (__wt_config_get(session, cfg, &key_item, value));
+}
+
+/*
+ * __wt_config_gets_none --
+ *	Given a NULL-terminated list of configuration strings, find the final
+ *	value for a given string key.  Treat "none" as empty.
+ */
+int
+__wt_config_gets_none(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_RET(__wt_config_gets(session, cfg, key, value));
+	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+		value->len = 0;
+	return (0);
 }
 
 /*
