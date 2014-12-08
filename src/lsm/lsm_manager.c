@@ -97,7 +97,7 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 	 * both do flushes otherwise a single merge can lead to switched
 	 * chunks filling up the cache.
 	 */
-	if (manager->lsm_workers == 3)
+	if (manager->lsm_workers_max == 3)
 		FLD_SET(manager->lsm_worker_cookies[1].type, WT_LSM_WORK_FLUSH);
 	return (0);
 }
