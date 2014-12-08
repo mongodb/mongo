@@ -17,7 +17,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -150,6 +149,22 @@ func (dump *MongoDump) Dump() error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// verify we can use repair cursors
+	if dump.OutputOptions.Repair {
+		log.Log(log.DebugLow, "verifying that the connected server supports repairCursor")
+		if dump.isMongos {
+			return fmt.Errorf("cannot use --repair on mongos")
+		}
+		exampleIntent := dump.manager.Peek()
+		if exampleIntent != nil {
+			supported, err := dump.sessionProvider.SupportsRepairCursor(
+				exampleIntent.DB, exampleIntent.C)
+			if !supported {
+				return err // no extra context needed
+			}
+		}
 	}
 
 	var oplogStart bson.MongoTimestamp
@@ -359,15 +374,6 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		repairIter := session.DB(intent.DB).C(intent.C).Repair()
 		var repairCounter int64
 		if err := dump.dumpIterToWriter(repairIter, out, &repairCounter); err != nil {
-			if strings.Index(err.Error(), "no such cmd: repairCursor") > 0 {
-				// return a helpful error message for early server versions
-				return fmt.Errorf(
-					"error: --repair flag cannot be used on mongodb versions before 2.7.8.")
-			}
-			if strings.Index(err.Error(), "repair iterator not supported") > 0 {
-				// helpful error message if the storage engine does not support repair (WiredTiger)
-				return fmt.Errorf("error: --repair is not supported by the connected storage engine")
-			}
 			return fmt.Errorf("repair error: %v", err)
 		}
 		log.Logf(log.Always,

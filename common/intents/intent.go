@@ -162,6 +162,20 @@ func (manager *Manager) Pop() *Intent {
 	return intent
 }
 
+// Peek returns a copy of a stored intent from the manager without removing
+// the intent. This method is useful for edge cases that need to look ahead
+// at what collections are in the manager before they are scheduled.
+//
+// NOTE: There are no guarantees that peek will return a usable
+// intent after Finalize() is called.
+func (manager *Manager) Peek() *Intent {
+	if len(manager.intentsByDiscoveryOrder) == 0 {
+		return nil
+	}
+	intentCopy := *manager.intentsByDiscoveryOrder[0]
+	return &intentCopy
+}
+
 // Finish tells the prioritizer that mongorestore is done restoring
 // the given collection intent.
 func (manager *Manager) Finish(intent *Intent) {
