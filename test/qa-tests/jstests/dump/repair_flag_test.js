@@ -17,15 +17,18 @@ load('jstests/common/check_version.js');
   var dumpArgs = ['dump', '--db', 'foo',
     '--repair'].concat(commonToolArgs);
 
-  if (isAtLeastVersion(db.version(), '2.7.8')) {
+  if (isAtLeastVersion(db.version(), '2.7.8') && !toolTest.isSharded) {
     // Should succeed on >= 2.7.8
     assert(toolTest.runTool.apply(toolTest, dumpArgs) === 0,
-      'mongodump --repair should run successfully on mongodb >= 2.7.8');
+      'mongodump --repair should run successfully on mongodb >= 2.7.8 and ' +
+      'not shared');
   } else {
     // Should fail fast on < 2.7.8
     assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
       'mongodump should exit with a non-zero status when --repair is ' +
-      'specified on mongodb < 2.7.8');
+      'specified on mongodb < 2.7.8 or when running against mongos');
+
+    db.dropDatabase();
 
     var restoreArgs = ['restore'].concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,

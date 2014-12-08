@@ -17,6 +17,7 @@ if (typeof getToolTest === 'undefined') {
   // Run parallel shell that inserts every millisecond
   var insertsShell = startParallelShell(
     'print(\'starting insert\'); ' +
+    (toolTest.authCommand || '') +
     'for (var i = 0; i < 1000; ++i) { ' +
     '  db.getSiblingDB(\'foo\').bar.insert({ x: i }); ' +
     '  sleep(1); ' +
@@ -41,7 +42,7 @@ if (typeof getToolTest === 'undefined') {
   // --batchSize is necessary because config servers don't allow
   // batch writes, so if you've dumped the config DB you should
   // be careful to set this.
-  var restoreArgs = ['restore', /*'--batchSize', '1',*/ '--w', '1',
+  var restoreArgs = ['restore', '--batchSize', '1',
     '--drop'].concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
     'mongorestore should succeed');

@@ -32,7 +32,11 @@ if (typeof getToolTest === 'undefined') {
     'mongodump should crash gracefully when database is dropped');
 
   var output = rawMongoProgramOutput();
-  var expectedError = 'error reading from db: Exec error: PlanExecutor killed';
+  if (toolTest.isSharded) {
+    var expectedError = 'error reading from db: failed on : shard0001';
+  } else {
+    var expectedError = 'error reading from db: Exec error: PlanExecutor killed';
+  }
   assert(output.indexOf(expectedError) !== -1,
     'mongodump crash should output the correct error message');
 

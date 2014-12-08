@@ -20,6 +20,7 @@ if (typeof getToolTest === 'undefined') {
   // Run parallel shell that inserts every millisecond
   var insertsShell = startParallelShell(
     'print(\'starting insert\'); ' +
+    (toolTest.authCommand || '') +
     'for (var i = 1001; i < 2000; ++i) { ' +
     '  db.getSiblingDB(\'foo\').bar.insert({ x: i }); ' +
     '  sleep(1); ' +

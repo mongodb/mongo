@@ -9,7 +9,7 @@ if (typeof getToolTest === 'undefined') {
 
   if (!toolTest.isReplicaSet) {
     print('Nothing to do for testing oplog rollover without a replica set!');
-    return assert(false);
+    return assert(true);
   }
 
   // IMPORTANT: make sure global `db` object is equal to this db, because
