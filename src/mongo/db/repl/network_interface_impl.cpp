@@ -105,7 +105,7 @@ namespace {
             ConnectionPtr(ConnectionPool* pool,
                           const HostAndPort& target,
                           Date_t now,
-                          Seconds timeout) :
+                          Milliseconds timeout) :
                 _pool(pool), _connInfo(pool->acquireConnection(target, now, timeout)) {}
 
             /**
@@ -139,7 +139,7 @@ namespace {
          * Intended for use by ConnectionPtr.
          */
         ConnectionList::iterator acquireConnection(
-                const HostAndPort& target, Date_t now, Seconds timeout);
+                const HostAndPort& target, Date_t now, Milliseconds timeout);
 
         /**
          * Releases a connection back into the pool.
@@ -293,7 +293,7 @@ namespace {
     NetworkInterfaceImpl::ConnectionPool::acquireConnection(
             const HostAndPort& target,
             Date_t now,
-            Seconds timeout) {
+            Milliseconds timeout) {
         boost::unique_lock<boost::mutex> lk(_mutex);
         for (HostConnectionMap::iterator hostConns;
              ((hostConns = _connections.find(target)) != _connections.end());) {
@@ -309,7 +309,10 @@ namespace {
             lk.unlock();
             try {
                 if (candidate->conn->isStillConnected()) {
-                    candidate->conn->setSoTimeout(timeout.total_seconds());
+                    // setSoTimeout takes a double representing the number of seconds for send and
+                    // receive timeouts.  Thus, we must take total_milliseconds() and divide by
+                    // 1000.0 to get the number of seconds with a fractional part.
+                    candidate->conn->setSoTimeout(timeout.total_milliseconds() / 1000.0);
                     return candidate;
                 }
             }
@@ -325,7 +328,10 @@ namespace {
         // No idle connection in the pool; make a new one.
         lk.unlock();
         std::auto_ptr<DBClientConnection> conn(new DBClientConnection);
-        conn->setSoTimeout(timeout.total_seconds());
+        // setSoTimeout takes a double representing the number of seconds for send and receive
+        // timeouts.  Thus, we must take total_milliseconds() and divide by 1000.0 to get the number
+        // of seconds with a fractional part.
+        conn->setSoTimeout(timeout.total_milliseconds() / 1000.0);
         std::string errmsg;
         uassert(18915,
                 str::stream() << "Failed attempt to connect to " << target.toString() << "; " <<
@@ -586,22 +592,31 @@ namespace {
     }
 
     namespace {
-        // Duplicated in mock impl
-        StatusWith<int> getTimeoutMillis(Date_t expDate, Date_t nowDate) {
-            // check for timeout
-            int timeout = 0;
-            if (expDate != ReplicationExecutor::kNoExpirationDate) {
-                timeout = expDate >= nowDate ? expDate - nowDate :
-                                               ReplicationExecutor::kNoTimeout.total_milliseconds();
-                if (timeout < 0 ) {
-                    return StatusWith<int>(ErrorCodes::ExceededTimeLimit,
-                                               str::stream() << "Went to run command,"
-                                               " but it was too late. Expiration was set to "
-                                                             << dateToISOStringUTC(expDate));
-                }
+
+        /**
+         * Calculates the timeout for a network operation expiring at "expDate", given
+         * that it is now "nowDate".
+         *
+         * Returns 0 to indicate no expiration date, a number of milliseconds until "expDate", or
+         * ErrorCodes::ExceededTimeLimit if "expDate" is not later than "nowDate".
+         *
+         * TODO: Change return type to StatusWith<Milliseconds> once Milliseconds supports default
+         * construction or StatusWith<T> supports not constructing T when the result is a non-OK
+         * status.
+         */
+        StatusWith<int64_t> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
+            if (expDate == ReplicationExecutor::kNoExpirationDate) {
+                return StatusWith<int64_t>(0);
             }
-            return StatusWith<int>(timeout);
+            if (expDate <= nowDate) {
+                return StatusWith<int64_t>(
+                        ErrorCodes::ExceededTimeLimit,
+                        str::stream() << "Went to run command, but it was too late. "
+                        "Expiration was set to " << dateToISOStringUTC(expDate));
+            }
+            return StatusWith<int64_t>(expDate.asInt64() -  nowDate.asInt64());
         }
+
     } //namespace
 
     ResponseStatus NetworkInterfaceImpl::_runCommand(
@@ -611,16 +626,16 @@ namespace {
             BSONObj output;
 
             const Date_t requestStartDate = now();
-            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate,
-                                                             requestStartDate);
-            if (!timeoutStatus.isOK())
-                return ResponseStatus(timeoutStatus.getStatus());
+            StatusWith<int64_t> timeoutMillis = getTimeoutMillis(request.expirationDate,
+                                                                 requestStartDate);
+            if (!timeoutMillis.isOK()) {
+                return ResponseStatus(timeoutMillis.getStatus());
+            }
 
-            Seconds timeout(timeoutStatus.getValue());
             ConnectionPool::ConnectionPtr conn(_connPool.get(),
                                                request.target,
                                                requestStartDate,
-                                               timeout);
+                                               Milliseconds(timeoutMillis.getValue()));
             conn->runCommand(request.dbname, request.cmdObj, output);
             const Date_t requestFinishDate = now();
             conn.done(requestFinishDate);
