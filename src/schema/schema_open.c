@@ -508,7 +508,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 
 /*
  * __wt_schema_get_index --
- *	Find a column group by URI.
+ *	Find an index by URI.
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,

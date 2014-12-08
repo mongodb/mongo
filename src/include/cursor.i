@@ -117,6 +117,15 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	}
 
 	/*
+	 * If we were scanning and saw a lot of deleted records on this page,
+	 * try to evict the page when we release it.
+	 */
+	if (cbt->ref != NULL &&
+	    cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD)
+		__wt_page_evict_soon(cbt->ref->page);
+	cbt->page_deleted_count = 0;
+
+	/*
 	 * Release any page references we're holding.  This can trigger
 	 * eviction (e.g., forced eviction of big pages), so it is important to
 	 * do it after releasing our snapshot above.
