@@ -1,8 +1,7 @@
 package options
 
 type InputOptions struct {
-	Objcheck               bool   `long:"objcheck" description:"Validate object before inserting (default)"`
-	NoObjcheck             bool   `long:"noobjcheck" description:"Don't validate object before inserting"`
+	Objcheck               bool   `long:"objcheck" description:"Validate object before inserting"`
 	OplogReplay            bool   `long:"oplogReplay" description:"Replay oplog for point-in-time restore"`
 	OplogLimit             string `long:"oplogLimit" description:"Include oplog entries before the provided Timestamp (seconds[:ordinal])"`
 	RestoreDBUsersAndRoles bool   `long:"restoreDbUsersAndRoles" description:"Restore user and role definitions for the given database"`

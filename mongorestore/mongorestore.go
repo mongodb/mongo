@@ -46,15 +46,11 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// and we need to be able to see if they're both being used. We default to
 	// true here and then see if noobjcheck is enabled.
 	log.Log(log.DebugHigh, "checking options")
-	restore.objCheck = true
-	if restore.InputOptions.NoObjcheck {
-		restore.objCheck = false
-		log.Log(log.DebugHigh, "\tdumping with object check disabled")
-		if restore.InputOptions.Objcheck {
-			return fmt.Errorf("cannot use both the --objcheck and --noobjcheck flags")
-		}
-	} else {
+	if restore.InputOptions.Objcheck {
+		restore.objCheck = true
 		log.Log(log.DebugHigh, "\tdumping with object check enabled")
+	} else {
+		log.Log(log.DebugHigh, "\tdumping with object check disabled")
 	}
 
 	if restore.ToolOptions.DB == "" && restore.ToolOptions.Collection != "" {
