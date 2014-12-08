@@ -9,6 +9,14 @@ The statistic for the number of bytes written to the log minus the overhead of
 log record headers and padding was renamed to make the intent clearer.  Any
 applications using the old name will need to be updated.
 </dd>
+
+<dt>"none" configuration for collators, compressors and extractors</dt>
+<dd>
+Collators, compressors and extractors can now be disabled with an explicit
+\c "none" value as an alternative to using an empty string.  Any applications
+using the name \c "none" for a collator, compressor or extractor will need to
+be updated.
+</dd>
 </dl>
 
 @section version_241 Upgrading to Version 2.4.1

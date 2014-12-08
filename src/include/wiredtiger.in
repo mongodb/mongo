@@ -930,8 +930,8 @@ struct __wt_session {
 	 * configuration uses a best-fit algorithm., a string\, chosen from the
 	 * following options: \c "first"\, \c "best"; default \c best.}
 	 * @config{block_compressor, configure a compressor for file blocks.
-	 * Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
-	 * custom compression engine \c "name" created with
+	 * Permitted values are \c "none"\, \c "bzip2"\, \c "snappy" or custom
+	 * compression engine \c "name" created with
 	 * WT_CONNECTION::add_compressor.  See @ref compression for more
 	 * information., a string; default empty.}
 	 * @config{cache_resident, do not ever evict the object's pages; see
@@ -973,12 +973,12 @@ struct __wt_session {
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
-	 * values are empty (off)\, \c "english"\, \c "utf8<file>" or \c
+	 * values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
 	 * default empty.}
 	 * @config{huffman_value, configure Huffman encoding for values.
-	 * Permitted values are empty (off)\, \c "english"\, \c "utf8<file>" or
-	 * \c "utf16<file>". See @ref huffman for more information., a string;
+	 * Permitted values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
+	 * "utf16<file>". See @ref huffman for more information., a string;
 	 * default empty.}
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
@@ -1355,9 +1355,9 @@ struct __wt_session {
 	 * @config{force, by default\, checkpoints may be skipped if the
 	 * underlying object has not been modified\, this option forces the
 	 * checkpoint., a boolean flag; default \c false.}
-	 * @config{name, if non-empty\, specify a name for the checkpoint (note
-	 * that checkpoints including LSM trees may not be named)., a string;
-	 * default empty.}
+	 * @config{name, if set\, specify a name for the checkpoint (note that
+	 * checkpoints including LSM trees may not be named)., a string; default
+	 * empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects., a
 	 * list of strings; default empty.}
 	 * @configend
@@ -1726,7 +1726,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the collation to be used in calls to
-	 * 	WT_SESSION::create
+	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param collator the application-supplied collation handler
 	 * @configempty{connection.add_collator, see dist/api_data.py}
 	 * @errors
@@ -1746,7 +1746,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the compression function to be used in calls
-	 *	to WT_SESSION::create
+	 *	to WT_SESSION::create, may not be \c "none"
 	 * @param compressor the application-supplied compression handler
 	 * @configempty{connection.add_compressor, see dist/api_data.py}
 	 * @errors
@@ -1764,7 +1764,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param name the name of the extractor to be used in calls to
-	 * 	WT_SESSION::create
+	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param extractor the application-supplied extractor
 	 * @configempty{connection.add_extractor, see dist/api_data.py}
 	 * @errors
@@ -2323,7 +2323,7 @@ struct __wt_config_item {
 	size_t len;
 
 	/*!
-	 * The value of a configuration boolean or integer.
+	 * The numeric value of a configuration boolean or integer.
 	 *
 	 * If the configuration string's value is "true" or "false", the
 	 * \c val field will be set to 1 (true), or 0 (false).

@@ -467,7 +467,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
-    int apply_checkpoints,
+    int apply_checkpoints, const char *uri,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
@@ -480,9 +480,10 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
 		    (apply_checkpoints || dhandle->checkpoint == NULL) &&
-		    !WT_IS_METADATA(dhandle)) {
+		    ((uri == NULL && WT_PREFIX_MATCH(dhandle->name, "file:") &&
+		    !WT_IS_METADATA(dhandle)) ||
+		     (uri != NULL && strcmp(dhandle->name, uri) == 0))) {
 			/*
 			 * We need to pull the handle into the session handle
 			 * cache and make sure it's referenced to stop other

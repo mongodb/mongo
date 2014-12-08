@@ -156,7 +156,7 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 		}
 		WT_ERR(ckpt_closed ?
 		    __wt_meta_btree_apply(session, op, cfg) :
-		    __wt_conn_btree_apply(session, 0, op, cfg));
+		    __wt_conn_btree_apply(session, 0, NULL, op, cfg));
 	}
 
 	if (fullp != NULL)

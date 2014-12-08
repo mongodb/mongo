@@ -51,7 +51,8 @@ ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
 		return (0);
 
 	WT_CLEAR(cval);
-	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets_none(session, cfg, "collator", &cval));
 	if (cval.len == 0)
 		return (0);
 
@@ -287,6 +288,10 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
 
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for a collator: %s", name);
+
 	WT_ERR(__wt_calloc_def(session, 1, &ncoll));
 	WT_ERR(__wt_strdup(session, name, &ncoll->name));
 	ncoll->collator = collator;
@@ -353,6 +358,10 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
 	WT_UNUSED(cfg);
+
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for a compressor: %s", name);
 
 	WT_ERR(__wt_calloc_def(session, 1, &ncomp));
 	WT_ERR(__wt_strdup(session, name, &ncomp->name));
@@ -483,6 +492,10 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
+
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for an extractor: %s", name);
 
 	WT_ERR(__wt_calloc_def(session, 1, &nextractor));
 	WT_ERR(__wt_strdup(session, name, &nextractor->name));
