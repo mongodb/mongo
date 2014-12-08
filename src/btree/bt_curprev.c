@@ -572,12 +572,16 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 		}
 
 		/*
-		 * If we saw a lot of deleted records on this page, try to evict
-		 * the page when we release it.  Otherwise repeatedly deleting
-		 * from the beginning of a tree can have quadratic performance.
+		 * If we saw a lot of deleted records on this page, or we went
+		 * all the way through a page and only saw deleted records, try
+		 * to evict the page when we release it.  Otherwise repeatedly
+		 * deleting from the beginning of a tree can have quadratic
+		 * performance.  Take care not to force eviction of pages that
+		 * are genuinely empty, in new trees.
 		 */
 		if (page != NULL &&
-		    cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD)
+		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
+		    (newpage && cbt->page_deleted_count > 0)))
 			__wt_page_evict_soon(page);
 		cbt->page_deleted_count = 0;
 
