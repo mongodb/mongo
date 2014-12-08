@@ -145,7 +145,7 @@ namespace {
         if (!status.isOK()) {
             mongoutils::str::stream ss;
             ss << "failed to parse query: " << obj.toString()
-               << ". Reason: " << status.toString();
+               << ". Reason: " << status.getStatus().toString();
             FAIL(ss);
         }
         MatchExpression* expr(status.getValue());

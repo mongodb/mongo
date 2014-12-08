@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <boost/static_assert.hpp>
+#include <boost/type_traits/is_same.hpp> // TODO replace with std::is_same in C++11
+#include <iosfwd>
+
 #include "mongo/base/status.h"
 
 namespace mongo {
@@ -53,7 +57,9 @@ namespace mongo {
      */
     template<typename T>
     class StatusWith {
+        BOOST_STATIC_ASSERT(!(boost::is_same<T, Status>::value)); // StatusWith<Status> is banned.
     public:
+
         /**
          * for the error case
          */
@@ -64,7 +70,7 @@ namespace mongo {
         /**
          * for the error case
          */
-        explicit StatusWith( const Status& status )
+        /*implicit*/ StatusWith( const Status& status )
             : _status( status ) {
             // verify(( !status.isOK() ); // TODO
         }
@@ -72,7 +78,7 @@ namespace mongo {
         /**
          * for the OK case
          */
-        explicit StatusWith( const T& t )
+        /*implicit*/ StatusWith( const T& t )
             : _status( Status::OK() ), _t( t ) {
         }
 
@@ -81,10 +87,88 @@ namespace mongo {
 
         bool isOK() const { return _status.isOK(); }
 
-        std::string toString() const { return _status.toString(); }
     private:
         Status _status;
         T _t;
     };
 
-}
+    template<typename T>
+    std::ostream& operator<<(std::ostream& stream, const StatusWith<T>& sw) {
+        if (sw.isOK())
+            return stream << sw.getValue();
+        return stream << sw.getStatus();
+    }
+
+    //
+    // EqualityComparable(StatusWith<T>, T). Intentionally not providing an ordering relation.
+    //
+
+    template<typename T>
+    bool operator==(const StatusWith<T>& sw, const T& val) {
+        return sw.isOK() && sw.getValue() == val;
+    }
+
+    template<typename T>
+    bool operator==(const T& val, const StatusWith<T>& sw) {
+        return sw.isOK() && val == sw.getValue();
+    }
+
+    template<typename T>
+    bool operator!=(const StatusWith<T>& sw, const T& val) {
+        return !(sw == val);
+    }
+
+    template<typename T>
+    bool operator!=(const T& val, const StatusWith<T>& sw) {
+        return !(val == sw);
+    }
+
+    //
+    // EqualityComparable(StatusWith<T>, Status)
+    //
+
+    template<typename T>
+    bool operator==(const StatusWith<T>& sw, const Status& status) {
+        return sw.getStatus() == status;
+    }
+
+    template<typename T>
+    bool operator==(const Status& status, const StatusWith<T>& sw) {
+        return status == sw.getStatus();
+    }
+
+    template<typename T>
+    bool operator!=(const StatusWith<T>& sw, const Status& status) {
+        return !(sw == status);
+    }
+
+    template<typename T>
+    bool operator!=(const Status& status, const StatusWith<T>& sw) {
+        return !(status == sw);
+    }
+
+    //
+    // EqualityComparable(StatusWith<T>, ErrorCode)
+    //
+
+    template<typename T>
+    bool operator==(const StatusWith<T>& sw, const ErrorCodes& code) {
+        return sw.getStatus() == code;
+    }
+
+    template<typename T>
+    bool operator==(const ErrorCodes::Error& code, const StatusWith<T>& sw) {
+        return code == sw.getStatus();
+    }
+
+    template<typename T>
+    bool operator!=(const StatusWith<T>& sw, const ErrorCodes::Error& code) {
+        return !(sw == code);
+    }
+
+    template<typename T>
+    bool operator!=(const ErrorCodes::Error& code, const StatusWith<T>& sw) {
+        return !(code == sw);
+    }
+
+} // namespace mongo

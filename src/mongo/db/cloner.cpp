@@ -228,7 +228,7 @@ namespace mongo {
                 StatusWith<RecordId> loc = collection->insertDocument( txn, js, true );
                 if ( !loc.isOK() ) {
                     error() << "error: exception cloning object in " << from_collection
-                            << ' ' << loc.toString() << " obj:" << js;
+                            << ' ' << loc.getStatus() << " obj:" << js;
                 }
                 uassertStatusOK( loc.getStatus() );
                 if (logForRepl)

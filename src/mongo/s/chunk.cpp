@@ -142,7 +142,7 @@ namespace mongo {
                                                          chunk);
         if (!tagStatus.isOK()) {
             warning() << "Not auto-moving chunk because of an error encountered while "
-                      << "checking tag for chunk: " << tagStatus.toString() << endl;
+                      << "checking tag for chunk: " << tagStatus.getStatus() << endl;
             return false;
         }
 

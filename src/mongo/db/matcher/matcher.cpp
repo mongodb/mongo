@@ -47,7 +47,7 @@ namespace mongo {
 
         StatusWithMatchExpression result = MatchExpressionParser::parse(pattern, whereCallback);
         uassert( 16810,
-                 mongoutils::str::stream() << "bad query: " << result.toString(),
+                 mongoutils::str::stream() << "bad query: " << result.getStatus().toString(),
                  result.isOK() );
 
         _expression.reset( result.getValue() );

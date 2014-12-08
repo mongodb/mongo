@@ -140,7 +140,8 @@ namespace repl {
 
             StatusWith<RecordId> result = collection->insertDocument(txn, missingObj, true);
             uassert(15917,
-                    str::stream() << "failed to insert missing doc: " << result.toString(),
+                    str::stream() << "failed to insert missing doc: "
+                                  << result.getStatus().toString(),
                     result.isOK() );
 
             LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;

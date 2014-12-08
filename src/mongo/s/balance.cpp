@@ -642,7 +642,7 @@ namespace mongo {
                             writeConcern.reset(extractStatus.getValue());
                         }
                         else {
-                            warning() << extractStatus.toString();
+                            warning() << extractStatus.getStatus().toString();
                         }
                     }
 
