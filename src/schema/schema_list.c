@@ -17,6 +17,7 @@ __schema_add_table(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_TABLE *table;
+	uint64_t hash;
 
 	/* Make sure the metadata is open before getting other locks. */
 	WT_RET(__wt_metadata_open(session));
@@ -26,7 +27,9 @@ __schema_add_table(WT_SESSION_IMPL *session,
 	    session, name, namelen, ok_incomplete, &table));
 	WT_RET(ret);
 
+	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
 	TAILQ_INSERT_HEAD(&session->tables, table, q);
+	TAILQ_INSERT_HEAD(&session->tablehash[hash], table, hashq);
 	*tablep = table;
 
 	return (0);
@@ -44,12 +47,10 @@ __schema_find_table(WT_SESSION_IMPL *session,
 	const char *tablename;
 	uint64_t hash;
 
-	hash = __wt_hash_city64(name, namelen);
+	hash = __wt_hash_city64(name, namelen) % WT_HASH_ARRAY_SIZE;
 
 restart:
-	TAILQ_FOREACH(table, &session->tables, q) {
-		if (table->name_hash != hash)
-			continue;
+	TAILQ_FOREACH(table, &session->tablehash[hash], hashq) {
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
@@ -199,9 +200,12 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 int
 __wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	uint64_t hash;
 	WT_ASSERT(session, table->refcnt <= 1);
 
+	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
 	TAILQ_REMOVE(&session->tables, table, q);
+	TAILQ_REMOVE(&session->tablehash[hash], table, hashq);
 	return (__wt_schema_destroy_table(session, table));
 }
 

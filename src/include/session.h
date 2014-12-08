@@ -82,6 +82,7 @@ struct __wt_session_impl {
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 
 	TAILQ_HEAD(__tables, __wt_table) tables;
+	TAILQ_HEAD(__tables_hash, __wt_table) *tablehash;
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */

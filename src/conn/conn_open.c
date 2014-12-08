@@ -198,11 +198,13 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		for (i = 0; i < conn->session_size; ++s, ++i)
 			if (s != session) {
 				/*
-				 * If a dhandle hash array was allocated,
-				 * free it now.
+				 * If hash arrays were allocated,
+				 * free them now.
 				 */
 				if (s->dhhash != NULL)
 					__wt_free(session, s->dhhash);
+				if (s->tablehash != NULL)
+					__wt_free(session, s->tablehash);
 				__wt_free(session, s->hazard);
 			}
 

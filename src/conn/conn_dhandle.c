@@ -213,7 +213,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * Find the right hash bucket to insert into as well.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
-	hash = dhandle->name_hash % WT_DHANDLE_HASH_ARRAY;
+	hash = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_DHANDLE_INSERT(conn, dhandle, hash);
 
 	session->dhandle = dhandle;
@@ -518,7 +518,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	 */
 	if (uri != NULL) {
 		hash = __wt_hash_city64(uri, strlen(uri)) %
-		    WT_DHANDLE_HASH_ARRAY;
+		    WT_HASH_ARRAY_SIZE;
 		TAILQ_FOREACH(dhandle, &conn->dhhash[hash], hashq)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    (hash == dhandle->name_hash &&
@@ -560,7 +560,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
-	hash = __wt_hash_city64(uri, strlen(uri)) % WT_DHANDLE_HASH_ARRAY;
+	hash = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(dhandle, &conn->dhhash[hash], hashq)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (hash == dhandle->name_hash &&
@@ -661,7 +661,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	hash = dhandle->name_hash % WT_DHANDLE_HASH_ARRAY;
+	hash = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 

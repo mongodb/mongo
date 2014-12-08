@@ -19,7 +19,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
-	for (i = 0; i < WT_DHANDLE_HASH_ARRAY; i++)
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
 		TAILQ_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
 
 	TAILQ_INIT(&conn->dhqh);		/* Data handle list */
