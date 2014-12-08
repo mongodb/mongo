@@ -20,9 +20,10 @@ type CSVInputReader struct {
 	// csvRecord stores each line of input we read from the underlying reader
 	csvRecord []string
 
-	// numProcessed tracks how many the number of CSV records processed by the underlying reader
+	// numProcessed tracks the number of CSV records processed by the underlying reader
 	numProcessed uint64
 
+	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
 }
 
@@ -68,22 +69,19 @@ func (csvInputReader *CSVInputReader) ReadHeaderFromSource() ([]string, error) {
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
-// readChan channel and if any error is encountered, the error is sent on the
+// readDocChan channel and if any error is encountered, the error is sent on the
 // errChan channel. It keeps reading from the underlying input source until it
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
-func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D, errChan chan error) {
 	csvRecordChan := make(chan ConvertibleDoc, csvInputReader.numDecoders)
-	var err error
-
 	go func() {
+		var err error
 		for {
 			csvInputReader.csvRecord, err = csvInputReader.csvReader.Read()
 			if err != nil {
 				close(csvRecordChan)
-				if err == io.EOF {
-					errChan <- err
-				} else {
+				if err != io.EOF {
 					csvInputReader.numProcessed++
 					errChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
 				}
@@ -97,7 +95,7 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan
 			csvInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readChan, errChan)
+	errChan <- streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readDocChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for CSV input. It

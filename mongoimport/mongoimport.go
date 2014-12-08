@@ -28,6 +28,7 @@ const (
 const (
 	maxBSONSize         = 16 * (1024 * 1024)
 	maxMessageSizeBytes = 2 * maxBSONSize
+	workerBufferSize    = 16
 )
 
 // Wrapper for MongoImport functionality
@@ -260,15 +261,8 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	if err != nil {
 		return 0, err
 	}
-	var readErr error
 	defer func() {
 		session.Close()
-		if readErr != nil && readErr == io.EOF {
-			readErr = nil
-		}
-		if retErr == nil {
-			retErr = readErr
-		}
 	}()
 
 	connURL := mongoImport.ToolOptions.Host
@@ -311,23 +305,14 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 		}
 	}
 
-	// determine whether or not documents should be streamed in read order
-	ordered := mongoImport.IngestOptions.MaintainInsertionOrder
+	readDocChan := make(chan bson.D, workerBufferSize)
 
-	// set the batch size for ingestion
-	readDocChanSize := mongoImport.ToolOptions.BulkBufferSize * mongoImport.ToolOptions.NumDecodingWorkers
-	if readDocChanSize == 0 {
-		readDocChanSize = 1
-	}
-
-	// readDocChan is buffered with readDocChanSize to ensure we only block
-	// accepting reads if processing is slow
-	readDocChan := make(chan bson.D, readDocChanSize)
-
-	// any read errors should cause mongoimport to stop
-	// ingestion and immediately terminate; thus, we
-	// leave this channel unbuffered
+	// any read errors should cause mongoimport to stop ingestion and immediately
+	// terminate; thus, we leave this channel unbuffered
 	readErrChan := make(chan error)
+
+	// whether or not documents should be streamed in read order
+	ordered := mongoImport.IngestOptions.MaintainInsertionOrder
 
 	// handle all input reads in a separate goroutine
 	go inputReader.StreamDocument(ordered, readDocChan, readErrChan)
@@ -341,13 +326,12 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	if err = mongoImport.IngestDocuments(readDocChan); err != nil {
 		return mongoImport.insertionCount, err
 	}
-	readErr = <-readErrChan
-	return mongoImport.insertionCount, retErr
+	return mongoImport.insertionCount, <-readErrChan
 }
 
 // IngestDocuments takes a slice of documents and either inserts/upserts them -
 // based on whether an upsert is requested - into the given collection
-func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error) {
+func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (err error) {
 	// initialize the tomb where all goroutines go to die
 	mongoImport.tomb = &tomb.Tomb{}
 
@@ -366,7 +350,7 @@ func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error
 			// 2. The server becomes unreachable
 			// 3. There is an insertion/update error - e.g. duplicate key
 			//    error - and stopOnError is set to true
-			return mongoImport.ingestDocs(readChan)
+			return mongoImport.ingestDocs(readDocChan)
 		})
 	}
 	return mongoImport.tomb.Wait()
@@ -395,7 +379,7 @@ func (mongoImport *MongoImport) configureSession(session *mgo.Session) error {
 
 // ingestDocuments is a helper to IngestDocuments - it reads document off the
 // read channel and prepares then for insertion into the database
-func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
+func (mongoImport *MongoImport) ingestDocs(readDocChan chan bson.D) (err error) {
 	session, err := mongoImport.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error connecting to mongod: %v", err)
@@ -413,7 +397,7 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 readLoop:
 	for {
 		select {
-		case document, alive := <-readChan:
+		case document, alive := <-readDocChan:
 			if !alive {
 				break readLoop
 			}

@@ -18,11 +18,14 @@ const (
 type TSVInputReader struct {
 	// Fields is a list of field names in the BSON documents to be imported
 	Fields []string
+
 	// tsvReader is the underlying reader used to read data in from the TSV
 	// or TSV file
 	tsvReader *bufio.Reader
+
 	// tsvRecord stores each line of input we read from the underlying reader
 	tsvRecord string
+
 	// numProcessed tracks the number of TSV records processed by the underlying reader
 	numProcessed uint64
 
@@ -78,22 +81,19 @@ func (tsvInputReader *TSVInputReader) ReadHeaderFromSource() ([]string, error) {
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
-// readChan channel and if any error is encountered, the error is sent on the
+// readDocChan channel and if any error is encountered, the error is sent on the
 // errChan channel. It keeps reading from the underlying input source until it
 // hits EOF or an error. If ordered is true, it streams the documents in which
 // the documents are read
-func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D, errChan chan error) {
 	tsvRecordChan := make(chan ConvertibleDoc, tsvInputReader.numDecoders)
-	var err error
-
 	go func() {
+		var err error
 		for {
 			tsvInputReader.tsvRecord, err = tsvInputReader.tsvReader.ReadString(entryDelimiter)
 			if err != nil {
 				close(tsvRecordChan)
-				if err == io.EOF {
-					errChan <- err
-				} else {
+				if err != io.EOF {
 					tsvInputReader.numProcessed++
 					errChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
 				}
@@ -107,7 +107,7 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan
 			tsvInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readChan, errChan)
+	errChan <- streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readDocChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for TSV input. It

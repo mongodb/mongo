@@ -8,6 +8,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/tomb.v2"
 	"io"
 	"io/ioutil"
 	"os"
@@ -423,6 +424,7 @@ func TestProcessDocuments(t *testing.T) {
 			importWorker := &ImportWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
+				tomb: &tomb.Tomb{},
 			}
 			inputChannel <- csvConvertibleDocs[0]
 			inputChannel <- csvConvertibleDocs[1]
@@ -444,6 +446,7 @@ func TestProcessDocuments(t *testing.T) {
 			importWorker := &ImportWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
+				tomb: &tomb.Tomb{},
 			}
 			inputChannel <- csvConvertibleDocs[0]
 			inputChannel <- csvConvertibleDocs[1]
@@ -479,10 +482,12 @@ func TestDoSequentialStreaming(t *testing.T) {
 			&ImportWorker{
 				unprocessedDataChan:   workerInputChannel[0],
 				processedDocumentChan: workerOutputChannel[0],
+				tomb: &tomb.Tomb{},
 			},
 			&ImportWorker{
 				unprocessedDataChan:   workerInputChannel[1],
 				processedDocumentChan: workerOutputChannel[1],
+				tomb: &tomb.Tomb{},
 			},
 		}
 		Convey("documents moving through the input channel should be processed and returned in sequence", func() {
@@ -505,22 +510,22 @@ func TestDoSequentialStreaming(t *testing.T) {
 
 func TestStreamDocuments(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-
 	Convey(`Given:
 			1. a boolean indicating streaming order
 			2. an input channel where documents are streamed in
-			3. an output channel where processed documents are streamed out
-			4. an error channel where any errors encountered are streamed`, t, func() {
+			3. an output channel where processed documents are streamed out`, t, func() {
+
 		inputChannel := make(chan ConvertibleDoc, 5)
 		outputChannel := make(chan bson.D, 5)
-		errorChannel := make(chan error, 5)
+
 		Convey("the entire pipeline should complete without error under normal circumstances", func() {
 			// stream in some documents
 			for _, csvConvertibleDoc := range csvConvertibleDocs {
 				inputChannel <- csvConvertibleDoc
 			}
 			close(inputChannel)
-			streamDocuments(true, 3, inputChannel, outputChannel, errorChannel)
+			So(streamDocuments(true, 3, inputChannel, outputChannel), ShouldBeNil)
+
 			// ensure documents are streamed out and processed in the correct manner
 			for _, expectedDocument := range expectedDocuments {
 				So(<-outputChannel, ShouldResemble, expectedDocument)
@@ -536,9 +541,9 @@ func TestStreamDocuments(t *testing.T) {
 			}
 			inputChannel <- csvConvertibleDoc
 			close(inputChannel)
-			go streamDocuments(true, 3, inputChannel, outputChannel, errorChannel)
+
 			// ensure that an error is returned on the error channel
-			So(<-errorChannel, ShouldNotBeNil)
+			So(streamDocuments(true, 3, inputChannel, outputChannel), ShouldNotBeNil)
 		})
 	})
 }

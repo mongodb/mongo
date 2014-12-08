@@ -7,11 +7,11 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/tomb.v2"
 	"io"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // ConvertibleDoc is an interface implemented by special types which wrap data
@@ -25,8 +25,12 @@ type ConvertibleDoc interface {
 type ImportWorker struct {
 	// unprocessedDataChan is used to stream the input data for a worker to process
 	unprocessedDataChan chan ConvertibleDoc
+
 	// used to stream the processed document back to the caller
 	processedDocumentChan chan bson.D
+
+	// used to synchronise all worker goroutines
+	tomb *tomb.Tomb
 }
 
 // constructUpsertDocument constructs a BSON document to use for upserts
@@ -45,21 +49,22 @@ func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 	return upsertDocument
 }
 
-// doSequentialStreaming takes a slice of workers, an input channel and an output
-// channel. It sequentially writes unprocessed data read from the input channel
-// to each worker and then sequentially reads the processed data from each worker
-// before passing it on to the output channel
-func doSequentialStreaming(workers []*ImportWorker, input chan ConvertibleDoc, output chan bson.D) {
+// doSequentialStreaming takes a slice of workers, a readDocChan (input) channel and
+// an outputChan (output) channel. It sequentially writes unprocessed data read from
+// the input channel to each worker and then sequentially reads the processed data
+//  from each worker before passing it on to the output channel
+func doSequentialStreaming(workers []*ImportWorker, readDocChan chan ConvertibleDoc, outputChan chan bson.D) {
 	numWorkers := len(workers)
 
 	// feed in the data to be processed and do round-robin
 	// reads from each worker once processing is completed
 	go func() {
 		i := 0
-		for data := range input {
-			workers[i].unprocessedDataChan <- data
+		for doc := range readDocChan {
+			workers[i].unprocessedDataChan <- doc
 			i = (i + 1) % numWorkers
 		}
+
 		// close the read channels of all the workers
 		for i := 0; i < numWorkers; i++ {
 			close(workers[i].unprocessedDataChan)
@@ -73,7 +78,7 @@ func doSequentialStreaming(workers []*ImportWorker, input chan ConvertibleDoc, o
 	for {
 		processedDocument, open := <-workers[i].processedDocumentChan
 		if open {
-			output <- processedDocument
+			outputChan <- processedDocument
 		} else {
 			numDoneWorkers++
 		}
@@ -188,44 +193,40 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // channel in parallel and then sends over the processed data to the outputChan
 // channel - either in sequence or concurrently (depending on the value of
 // ordered) - in which the data was received
-func streamDocuments(ordered bool, numDecoders int, inputChan chan ConvertibleDoc, outputChan chan bson.D, errChan chan error) {
+func streamDocuments(ordered bool, numDecoders int, readDocChan chan ConvertibleDoc, outputChan chan bson.D) error {
 	if numDecoders == 0 {
 		numDecoders = 1
 	}
 	var importWorkers []*ImportWorker
-	// initialize all our concurrent processing threads
-	wg := &sync.WaitGroup{}
-	inChan := inputChan
+
+	importTomb := &tomb.Tomb{}
+
+	inChan := readDocChan
 	outChan := outputChan
 	for i := 0; i < numDecoders; i++ {
 		if ordered {
-			// TODO: experiment with buffered channel size; the buffer size of
-			// inChan should always be the same as that of outChan
-			workerBufferSize := 100
 			inChan = make(chan ConvertibleDoc, workerBufferSize)
 			outChan = make(chan bson.D, workerBufferSize)
 		}
 		importWorker := &ImportWorker{
 			unprocessedDataChan:   inChan,
 			processedDocumentChan: outChan,
+			tomb: importTomb,
 		}
 		importWorkers = append(importWorkers, importWorker)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := importWorker.processDocuments(ordered); err != nil {
-				errChan <- err
-			}
-		}()
+		importTomb.Go(func() error {
+			return importWorker.processDocuments(ordered)
+		})
 	}
 
 	// if ordered, we have to coordinate the sequence in which processed
 	// documents are passed to the main read channel
 	if ordered {
-		doSequentialStreaming(importWorkers, inputChan, outputChan)
+		doSequentialStreaming(importWorkers, readDocChan, outputChan)
 	}
-	wg.Wait()
+	err := importTomb.Wait()
 	close(outputChan)
+	return err
 }
 
 // tokensToBSON reads in slice of records - along with ordered fields names -
@@ -311,20 +312,27 @@ func validateFields(inputReader InputReader, hasHeaderLine bool) (validatedField
 	return validatedFields, nil
 }
 
-// processDocuments reads from the ConvertibleDoc channel and for a record,
-// converts it to a bson.D document before sending it on the
-// processedDocumentChan channel. Once the input channel it closed it closed
-// the processed channel if the worker streams its reads in order
+// processDocuments reads from the ConvertibleDoc channel and for each record, converts it
+// to a bson.D document before sending it on the processedDocumentChan channel. Once the
+// input channel is closed the processed channel is also closed if the worker streams its
+// reads in order
 func (importWorker *ImportWorker) processDocuments(ordered bool) error {
-	for convertibleDoc := range importWorker.unprocessedDataChan {
-		document, err := convertibleDoc.Convert()
-		if err != nil {
-			return err
-		}
-		importWorker.processedDocumentChan <- document
-	}
 	if ordered {
-		close(importWorker.processedDocumentChan)
+		defer close(importWorker.processedDocumentChan)
 	}
-	return nil
+	for {
+		select {
+		case convertibleDoc, alive := <-importWorker.unprocessedDataChan:
+			if !alive {
+				return nil
+			}
+			document, err := convertibleDoc.Convert()
+			if err != nil {
+				return err
+			}
+			importWorker.processedDocumentChan <- document
+		case <-importWorker.tomb.Dying():
+			return nil
+		}
+	}
 }

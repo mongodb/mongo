@@ -17,27 +17,32 @@ type JSONInputReader struct {
 	// IsArray indicates if the JSON import is an array of JSON documents
 	// or not
 	IsArray bool
-	// Decoder is used to read the next valid JSON documents from the input source
+
+	// Decoder is used to read the 	next valid JSON documents from the input source
 	Decoder *json.Decoder
+
 	// numProcessed indicates the number of JSON documents processed
 	numProcessed int64
+
 	// readOpeningBracket indicates if the underlying io.Reader has consumed
 	// an opening bracket from the input source. Used to prevent errors when
 	// a JSON input source contains just '[]'
 	readOpeningBracket bool
+
 	// expectedByte is used to store the next expected valid character for JSON
 	// array imports
 	expectedByte byte
+
 	// bytesFromReader is used to store the next byte read from the Reader for
 	// JSON array imports
 	bytesFromReader []byte
+
 	// separatorReader is used for JSON arrays to look for a valid array
 	// separator. It is a reader consisting of the decoder's buffer and the
 	// underlying reader
 	separatorReader io.Reader
 
-	// numDecoders is the number of concurrent goroutines to allow to be used
-	// for decoding the input stream
+	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
 }
 
@@ -96,15 +101,13 @@ func (jsonInputReader *JSONInputReader) ReadHeaderFromSource() ([]string, error)
 // the documents are read
 func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
 	rawChan := make(chan ConvertibleDoc, jsonInputReader.numDecoders)
-	var err error
 	go func() {
+		var err error
 		for {
 			if jsonInputReader.IsArray {
 				if err = jsonInputReader.readJSONArraySeparator(); err != nil {
 					close(rawChan)
-					if err == io.EOF {
-						errChan <- err
-					} else {
+					if err != io.EOF {
 						jsonInputReader.numProcessed++
 						errChan <- fmt.Errorf("error reading separator after document #%v: %v", jsonInputReader.numProcessed, err)
 					}
@@ -114,14 +117,17 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 			rawBytes, err := jsonInputReader.Decoder.ScanObject()
 			if err != nil {
 				close(rawChan)
-				errChan <- err
+				if err != io.EOF {
+					jsonInputReader.numProcessed++
+					errChan <- fmt.Errorf("error processing document #%v: %v", jsonInputReader.numProcessed, err)
+				}
 				return
 			}
 			rawChan <- JSONConvertibleDoc(rawBytes)
 			jsonInputReader.numProcessed++
 		}
 	}()
-	streamDocuments(ordered, jsonInputReader.numDecoders, rawChan, readChan, errChan)
+	errChan <- streamDocuments(ordered, jsonInputReader.numDecoders, rawChan, readChan)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for JSON input. It

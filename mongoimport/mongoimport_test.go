@@ -338,7 +338,6 @@ func TestImportDocuments(t *testing.T) {
 			}
 			defer session.Close()
 			session.DB(testDb).C(testCollection).DropCollection()
-			fmt.Println("droping", testDb, testCollection)
 		})
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
@@ -352,6 +351,16 @@ func TestImportDocuments(t *testing.T) {
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
+		})
+		Convey("an error should be thrown for JSON import on test data that is "+
+			"JSON array", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			mongoImport.InputOptions.File = "testdata/test_array.json"
+			mongoImport.IngestOptions.WriteConcern = "majority"
+			numImported, err := mongoImport.ImportDocuments()
+			So(err, ShouldNotBeNil)
+			So(numImported, ShouldEqual, 0)
 		})
 		Convey("TOOLS-247: no error should be thrown for JSON import on test "+
 			"data and all documents should be imported correctly", func() {
@@ -553,7 +562,6 @@ func TestImportDocuments(t *testing.T) {
 		})
 		Convey("an error should be thrown for CSV import on test data with "+
 			"duplicate _id if --stopOnError is set", func() {
-
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
@@ -571,6 +579,24 @@ func TestImportDocuments(t *testing.T) {
 				bson.M{"_id": 5, "b": 6, "c": 6},
 			}
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
+		})
+		Convey("an error should be thrown for JSON import on test data that "+
+			"is a JSON array without passing --jsonArray", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			mongoImport.InputOptions.File = "testdata/test_array.json"
+			mongoImport.IngestOptions.WriteConcern = "1"
+			_, err = mongoImport.ImportDocuments()
+			So(err, ShouldNotBeNil)
+		})
+		Convey("an error should be thrown if a plain JSON file is supplied", func() {
+			fileHandle, err := os.Open("testdata/test_plain.json")
+			So(err, ShouldBeNil)
+			jsonInputReader := NewJSONInputReader(true, fileHandle, 1)
+			errChan := make(chan error)
+			docChan := make(chan bson.D, 1)
+			go jsonInputReader.StreamDocument(true, docChan, errChan)
+			So(<-errChan, ShouldNotBeNil)
 		})
 		Convey("an error should be thrown for invalid CSV import on test data", func() {
 			mongoImport, err := NewMongoImport()

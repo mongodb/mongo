@@ -5,7 +5,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
-	"io"
 	"os"
 	"strings"
 	"testing"
@@ -25,10 +24,10 @@ func TestTSVStreamDocument(t *testing.T) {
 			}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
-			docChan := make(chan bson.D)
+			docChan := make(chan bson.D, 1)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
 			So(<-docChan, ShouldResemble, expectedRead)
-			So(<-errChan, ShouldEqual, io.EOF)
+			So(<-errChan, ShouldBeNil)
 		})
 
 		Convey("extra fields should be prefixed with 'field'", func() {
@@ -42,10 +41,10 @@ func TestTSVStreamDocument(t *testing.T) {
 			}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
-			docChan := make(chan bson.D)
+			docChan := make(chan bson.D, 1)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
 			So(<-docChan, ShouldResemble, expectedRead)
-			So(<-errChan, ShouldEqual, io.EOF)
+			So(<-errChan, ShouldBeNil)
 		})
 
 		Convey("mixed values should be parsed correctly", func() {
@@ -59,10 +58,10 @@ func TestTSVStreamDocument(t *testing.T) {
 			}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
-			docChan := make(chan bson.D)
+			docChan := make(chan bson.D, 1)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
 			So(<-docChan, ShouldResemble, expectedRead)
-			So(<-errChan, ShouldEqual, io.EOF)
+			So(<-errChan, ShouldBeNil)
 		})
 
 		Convey("calling StreamDocument() in succession for TSVs should "+
@@ -83,7 +82,7 @@ func TestTSVStreamDocument(t *testing.T) {
 			}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
-			docChan := make(chan bson.D)
+			docChan := make(chan bson.D, 1)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
 			for i := 0; i < len(expectedReads); i++ {
 				for j, readDocument := range <-docChan {
@@ -91,7 +90,7 @@ func TestTSVStreamDocument(t *testing.T) {
 					So(readDocument.Value, ShouldEqual, expectedReads[i][j].Value)
 				}
 			}
-			So(<-errChan, ShouldEqual, io.EOF)
+			So(<-errChan, ShouldBeNil)
 		})
 
 		Convey("calling StreamDocument() in succession for TSVs that contain "+
@@ -110,11 +109,11 @@ func TestTSVStreamDocument(t *testing.T) {
 			}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			errChan := make(chan error)
-			docChan := make(chan bson.D)
+			docChan := make(chan bson.D, 1)
 			go tsvInputReader.StreamDocument(true, docChan, errChan)
 			So(<-docChan, ShouldResemble, expectedReadOne)
 			So(<-docChan, ShouldResemble, expectedReadTwo)
-			So(<-errChan, ShouldEqual, io.EOF)
+			So(<-errChan, ShouldBeNil)
 		})
 
 		Convey("plain TSV input file sources should be parsed correctly and "+
@@ -135,11 +134,11 @@ func TestTSVStreamDocument(t *testing.T) {
 				So(err, ShouldBeNil)
 				tsvInputReader := NewTSVInputReader(fields, fileHandle, 1)
 				errChan := make(chan error)
-				docChan := make(chan bson.D)
+				docChan := make(chan bson.D, 1)
 				go tsvInputReader.StreamDocument(true, docChan, errChan)
 				So(<-docChan, ShouldResemble, expectedReadOne)
 				So(<-docChan, ShouldResemble, expectedReadTwo)
-				So(<-errChan, ShouldEqual, io.EOF)
+				So(<-errChan, ShouldBeNil)
 			})
 	})
 }
