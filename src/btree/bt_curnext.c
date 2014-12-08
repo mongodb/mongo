@@ -122,7 +122,6 @@ new_page:
 static inline int
 __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -137,10 +136,8 @@ __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	for (;;) {
 		cbt->ins = WT_SKIP_NEXT(cbt->ins);
-new_page:	if (cbt->ins == NULL) {
-			ret = WT_NOTFOUND;
-			break;
-		}
+new_page:	if (cbt->ins == NULL)
+			return (WT_NOTFOUND);
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL)
@@ -151,9 +148,9 @@ new_page:	if (cbt->ins == NULL) {
 		}
 		val->data = WT_UPDATE_DATA(upd);
 		val->size = upd->size;
-		break;
+		return (0);
 	}
-	return (ret);
+	/* NOTREACHED */
 }
 
 /*
@@ -166,7 +163,6 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
@@ -187,17 +183,13 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Move to the next entry and return the item. */
 	for (;;) {
-		if (cbt->recno >= cbt->last_standard_recno) {
-			ret = WT_NOTFOUND;
-			break;
-		}
+		if (cbt->recno >= cbt->last_standard_recno)
+			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, cbt->recno + 1);
 
 new_page:	/* Find the matching WT_COL slot. */
-		if ((cip = __col_var_search(page, cbt->recno)) == NULL) {
-			ret = WT_NOTFOUND;
-			break;
-		}
+		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
+			return (WT_NOTFOUND);
 		cbt->slot = WT_COL_SLOT(page, cip);
 
 		/* Check any insert list for a matching record. */
@@ -213,7 +205,7 @@ new_page:	/* Find the matching WT_COL slot. */
 
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
-			break;
+			return (0);
 		}
 
 		/*
@@ -236,10 +228,9 @@ new_page:	/* Find the matching WT_COL slot. */
 		}
 		val->data = cbt->tmp.data;
 		val->size = cbt->tmp.size;
-		break;
+		return (0);
 	}
-
-	return (ret);
+	/* NOTREACHED */
 }
 
 /*
@@ -249,7 +240,6 @@ new_page:	/* Find the matching WT_COL slot. */
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
 	WT_PAGE *page;
@@ -301,14 +291,12 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
-			break;
+			return (0);
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1) {
-			ret = WT_NOTFOUND;
-			break;
-		}
+		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1)
+			return (WT_NOTFOUND);
 		++cbt->row_iteration_slot;
 
 		/*
@@ -332,10 +320,9 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 			continue;
 		}
 
-		ret = __cursor_row_slot_return(cbt, rip, upd);
-		break;
+		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
-	return (ret);
+	/* NOTREACHED */
 }
 
 /*
