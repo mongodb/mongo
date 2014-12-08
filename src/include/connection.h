@@ -147,7 +147,7 @@ struct __wt_connection_impl {
 	uint64_t  split_gen;		/* Generation number for splits */
 
 					/* Locked: data handle hash array */
-#define	WT_HASH_ARRAY_SIZE	128
+#define	WT_HASH_ARRAY_SIZE	512
 	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
