@@ -79,6 +79,20 @@ struct __wt_named_extractor {
 	WT_CONN_CHECK_PANIC(S2C(session))
 
 /*
+ * Macros to ensure the dhandle is inserted or removed from both the
+ * main queue and the hashed queue.
+ */
+#define	WT_CONN_DHANDLE_INSERT(conn, dhandle, hash) do {		\
+	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->dhhash[hash], dhandle, hashq);	\
+} while (0)
+
+#define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, hash) do {		\
+	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_REMOVE(&(conn)->dhhash[hash], dhandle, hashq);		\
+} while (0)
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -132,6 +146,9 @@ struct __wt_connection_impl {
 
 	uint64_t  split_gen;		/* Generation number for splits */
 
+					/* Locked: data handle hash array */
+#define	WT_DHANDLE_HASH_ARRAY	128
+	TAILQ_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_DHANDLE_HASH_ARRAY];
 					/* Locked: data handle queue */
 	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
