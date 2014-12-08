@@ -35,7 +35,7 @@ var bulk = masterDB.jstests_fgsec.initializeUnorderedBulkOp();
 for(var i = 0; i < size; ++i) {
     bulk.insert({ i: i });
 }
-assert.writeOK(bulk.execute());
+assert.writeOK(bulk.execute( { w: "majority" } ));
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );
