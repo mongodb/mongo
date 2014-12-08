@@ -272,8 +272,14 @@ func validateHeaders(inputReader InputReader, hasHeaderLine bool) (validatedFiel
 	sort.Sort(sort.StringSlice(headers))
 
 	for index, header := range headers {
-		if strings.HasSuffix(header, ".") || strings.HasPrefix(header, ".") {
-			return nil, fmt.Errorf("header '%v' can not start or end in '.'", header)
+		if strings.HasSuffix(header, ".") {
+			return nil, fmt.Errorf("header '%v' can not end with a '.'", header)
+		}
+		if strings.HasPrefix(header, ".") {
+			return nil, fmt.Errorf("header '%v' can not start with a '.'", header)
+		}
+		if strings.HasPrefix(header, "$") {
+			return nil, fmt.Errorf("header '%v' can not start with a '$'", header)
 		}
 		if strings.Contains(header, "..") {
 			return nil, fmt.Errorf("header '%v' can not contain consecutive '.' characters", header)

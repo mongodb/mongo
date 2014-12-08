@@ -126,6 +126,16 @@ func TestValidateHeaders(t *testing.T) {
 			_, err = validateHeaders(NewCSVInputReader([]string{"a."}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
+		Convey("if the fields start in a '$', an error should be thrown", func() {
+			_, err := validateHeaders(NewCSVInputReader([]string{"$.a"}, fileHandle, 1), false)
+			So(err, ShouldNotBeNil)
+			_, err = validateHeaders(NewCSVInputReader([]string{"$"}, fileHandle, 1), false)
+			So(err, ShouldNotBeNil)
+			_, err = validateHeaders(NewCSVInputReader([]string{"$a"}, fileHandle, 1), false)
+			So(err, ShouldNotBeNil)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a$a"}, fileHandle, 1), false)
+			So(err, ShouldBeNil)
+		})
 		Convey("if the fields collide, an error should be thrown", func() {
 			_, err := validateHeaders(NewCSVInputReader([]string{"a", "a.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
