@@ -83,13 +83,13 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_DHANDLE_INSERT(conn, dhandle, hash) do {		\
-	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
-	TAILQ_INSERT_HEAD(&(conn)->dhhash[hash], dhandle, hashq);	\
+	SLIST_INSERT_HEAD(&(conn)->dhlh, dhandle, l);			\
+	SLIST_INSERT_HEAD(&(conn)->dhhash[hash], dhandle, hashl);	\
 } while (0)
 
 #define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, hash) do {		\
-	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
-	TAILQ_REMOVE(&(conn)->dhhash[hash], dhandle, hashq);		\
+	SLIST_REMOVE(&(conn)->dhlh, dhandle, __wt_data_handle, l);	\
+	SLIST_REMOVE(&(conn)->dhhash[hash], dhandle, __wt_data_handle, hashl);\
 } while (0)
 
 /*
@@ -148,9 +148,9 @@ struct __wt_connection_impl {
 
 					/* Locked: data handle hash array */
 #define	WT_HASH_ARRAY_SIZE	128
-	TAILQ_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
-					/* Locked: data handle queue */
-	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
+	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
+					/* Locked: data handle list */
+	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */

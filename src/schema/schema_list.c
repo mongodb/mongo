@@ -28,8 +28,8 @@ __schema_add_table(WT_SESSION_IMPL *session,
 	WT_RET(ret);
 
 	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_INSERT_HEAD(&session->tables, table, q);
-	TAILQ_INSERT_HEAD(&session->tablehash[hash], table, hashq);
+	SLIST_INSERT_HEAD(&session->tables, table, l);
+	SLIST_INSERT_HEAD(&session->tablehash[hash], table, hashl);
 	*tablep = table;
 
 	return (0);
@@ -50,7 +50,7 @@ __schema_find_table(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(name, namelen) % WT_HASH_ARRAY_SIZE;
 
 restart:
-	TAILQ_FOREACH(table, &session->tablehash[hash], hashq) {
+	SLIST_FOREACH(table, &session->tablehash[hash], hashl) {
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (WT_STRING_MATCH(tablename, name, namelen)) {
@@ -204,8 +204,8 @@ __wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_ASSERT(session, table->refcnt <= 1);
 
 	hash = table->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_REMOVE(&session->tables, table, q);
-	TAILQ_REMOVE(&session->tablehash[hash], table, hashq);
+	SLIST_REMOVE(&session->tables, table, __wt_table, l);
+	SLIST_REMOVE(&session->tablehash[hash], table, __wt_table, hashl);
 	return (__wt_schema_destroy_table(session, table));
 }
 
@@ -219,7 +219,7 @@ __wt_schema_close_tables(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
+	while ((table = SLIST_FIRST(&session->tables)) != NULL)
 		WT_TRET(__wt_schema_remove_table(session, table));
 	return (ret);
 }

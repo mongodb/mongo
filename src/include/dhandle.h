@@ -33,8 +33,8 @@
  */
 struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
-	TAILQ_ENTRY(__wt_data_handle) q;
-	TAILQ_ENTRY(__wt_data_handle) hashq;
+	SLIST_ENTRY(__wt_data_handle) l;
+	SLIST_ENTRY(__wt_data_handle) hashl;
 
 	/*
 	 * Sessions caching a connection's data handle will have a non-zero

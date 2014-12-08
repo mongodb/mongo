@@ -24,9 +24,9 @@ __sweep(WT_SESSION_IMPL *session)
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
 
-	dhandle = TAILQ_FIRST(&conn->dhqh);
+	dhandle = SLIST_FIRST(&conn->dhlh);
 	for (; dhandle != NULL; dhandle = dhandle_next) {
-		dhandle_next = TAILQ_NEXT(dhandle, q);
+		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (dhandle->session_ref != 0 ||
 		    now - dhandle->timeofdeath <= WT_DHANDLE_SWEEP_WAIT)
 			continue;

@@ -58,8 +58,8 @@ __session_add_dhandle(
 	dhandle_cache->dhandle = session->dhandle;
 
 	hash = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
-	TAILQ_INSERT_HEAD(&session->dhhash[hash], dhandle_cache, hashq);
+	SLIST_INSERT_HEAD(&session->dhandles, dhandle_cache, l);
+	SLIST_INSERT_HEAD(&session->dhhash[hash], dhandle_cache, hashl);
 
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
@@ -296,8 +296,10 @@ __session_discard_btree(
 	uint64_t hash;
 
 	hash = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
-	TAILQ_REMOVE(&session->dhhash[hash], dhandle_cache, hashq);
+	SLIST_REMOVE(
+	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
+	SLIST_REMOVE(&session->dhhash[hash],
+	    dhandle_cache, __wt_data_handle_cache, hashl);
 
 	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
 
@@ -313,7 +315,7 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 
-	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
+	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
 		__session_discard_btree(session, dhandle_cache);
 }
 
@@ -346,9 +348,9 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_STAT_FAST_CONN_INCR(session, dh_session_sweeps);
 
-	dhandle_cache = TAILQ_FIRST(&session->dhandles);
+	dhandle_cache = SLIST_FIRST(&session->dhandles);
 	while (dhandle_cache != NULL) {
-		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
+		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
@@ -395,7 +397,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	dhandle = NULL;
 
 	hash = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
-	TAILQ_FOREACH(dhandle_cache, &session->dhhash[hash], hashq) {
+	SLIST_FOREACH(dhandle_cache, &session->dhhash[hash], hashl) {
 		dhandle = dhandle_cache->dhandle;
 		if (strcmp(uri, dhandle->name) != 0)
 			continue;
