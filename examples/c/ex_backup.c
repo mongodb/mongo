@@ -274,8 +274,7 @@ main(void)
 	int i, ret;
 	char cmd_buf[256];
 
-	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
-	    home, home_incr, home, home_incr);
+	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir %s", home, home);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);

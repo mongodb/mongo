@@ -138,7 +138,8 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 
-	if (!S2C(session)->logging || F_ISSET(session, WT_SESSION_NO_LOGGING))
+	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
+	    F_ISSET(session, WT_SESSION_NO_LOGGING))
 		return (0);
 
 	txn = &session->txn;

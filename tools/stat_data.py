@@ -8,6 +8,7 @@ no_scale_per_second_list = [
     'cache: tracked dirty bytes in the cache',
     'cache: tracked dirty pages in the cache',
     'connection: files currently open',
+    'log: maximum log file size',
     'log: total log buffer size',
     'LSM: application work units currently queued',
     'LSM: merge work units currently queued',

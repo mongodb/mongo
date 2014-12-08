@@ -372,7 +372,9 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerInit
 WiredTigerLog
+WiredTigerPreplog
 WiredTigerStat
+WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
 Wmissing

@@ -24,7 +24,6 @@ src/btree/bt_cursor.c
 src/btree/bt_debug.c
 src/btree/bt_delete.c
 src/btree/bt_discard.c
-src/btree/bt_evict.c
 src/btree/bt_handle.c
 src/btree/bt_huffman.c
 src/btree/bt_io.c
@@ -33,6 +32,7 @@ src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
+src/btree/bt_split.c
 src/btree/bt_slvg.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
@@ -42,10 +42,6 @@ src/btree/bt_vrfy_dsk.c
 src/btree/bt_walk.c
 src/btree/col_modify.c
 src/btree/col_srch.c
-src/btree/rec_evict.c
-src/btree/rec_split.c
-src/btree/rec_track.c
-src/btree/rec_write.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
@@ -82,6 +78,9 @@ src/cursor/cur_metadata.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c
 src/cursor/cur_table.c
+src/evict/evict_file.c
+src/evict/evict_lru.c
+src/evict/evict_page.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c
@@ -131,6 +130,8 @@ src/os_win/os_yield.c
 src/packing/pack_api.c
 src/packing/pack_impl.c
 src/packing/pack_stream.c
+src/reconcile/rec_track.c
+src/reconcile/rec_write.c
 src/schema/schema_create.c
 src/schema/schema_drop.c
 src/schema/schema_list.c

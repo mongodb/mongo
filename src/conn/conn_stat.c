@@ -324,7 +324,8 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 */
 	if (conn->stat_sources != NULL) {
 		WT_WITH_DHANDLE_LOCK(session, ret =
-		    __wt_conn_btree_apply(session, 0, __statlog_apply, NULL));
+		    __wt_conn_btree_apply(
+		    session, 0, NULL, __statlog_apply, NULL));
 		WT_RET(ret);
 	}
 

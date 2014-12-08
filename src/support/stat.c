@@ -428,6 +428,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_writes.desc = "log: log write operations";
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_max_filesize.desc = "log: maximum log file size";
+	stats->log_prealloc_max.desc =
+	    "log: number of pre-allocated log files to create";
+	stats->log_prealloc_files.desc =
+	    "log: pre-allocated log files prepared";
+	stats->log_prealloc_used.desc = "log: pre-allocated log files used";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_scan_records.desc = "log: records processed by log scan";
 	stats->log_slot_switch_fails.desc =
@@ -564,6 +569,9 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;
 	stats->log_slot_consolidated.v = 0;
+	stats->log_prealloc_max.v = 0;
+	stats->log_prealloc_files.v = 0;
+	stats->log_prealloc_used.v = 0;
 	stats->log_slot_toobig.v = 0;
 	stats->log_scan_records.v = 0;
 	stats->log_slot_switch_fails.v = 0;
