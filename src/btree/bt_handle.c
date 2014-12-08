@@ -228,7 +228,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	if (btree->type == BTREE_ROW) {
 		WT_RET(
 		    __wt_config_gets(session, cfg, "app_metadata", &metadata));
-		WT_RET(__wt_config_gets(session, cfg, "collator", &cval));
+		WT_RET(__wt_config_gets_none(session, cfg, "collator", &cval));
 		if (cval.len != 0)
 			WT_RET(__wt_collator_config(
 			    session, btree->dhandle->name, &cval, &metadata,

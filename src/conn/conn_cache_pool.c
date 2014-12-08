@@ -47,8 +47,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
 	else {
-		WT_RET(
-		    __wt_config_gets(session, cfg, "shared_cache.name", &cval));
+		WT_RET(__wt_config_gets_none(
+		    session, cfg, "shared_cache.name", &cval));
 		if (cval.len == 0) {
 			/*
 			 * Tell the user if they configured some shared cache
