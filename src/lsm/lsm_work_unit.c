@@ -115,10 +115,13 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	} else
 		chunk = (evict_chunk != NULL) ? evict_chunk : flush_chunk;
 
-	(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
-	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Flush%s: return chunk %u of %u: %s",
-	    force ? " w/ force" : "", i, lsm_tree->nchunks, chunk->uri));
+	if (chunk != NULL) {
+		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+		    "Flush%s: return chunk %u of %u: %s",
+		    force ? " w/ force" : "",
+		    i, lsm_tree->nchunks, chunk->uri));
+	}
 
 err:	if (ret != 0 && chunk != NULL)
 		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
