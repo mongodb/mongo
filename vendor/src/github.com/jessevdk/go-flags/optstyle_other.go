@@ -12,8 +12,20 @@ const (
 	defaultNameArgDelimiter  = '='
 )
 
-func argumentIsOption(arg string) bool {
+func argumentStartsOption(arg string) bool {
 	return len(arg) > 0 && arg[0] == '-'
+}
+
+func argumentIsOption(arg string) bool {
+	if len(arg) > 1 && arg[0] == '-' && arg[1] != '-' {
+		return true
+	}
+
+	if len(arg) > 2 && arg[0] == '-' && arg[1] == '-' && arg[2] != '-' {
+		return true
+	}
+
+	return false
 }
 
 // stripOptionPrefix returns the option without the prefix and whether or

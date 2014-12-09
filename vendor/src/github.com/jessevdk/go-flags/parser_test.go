@@ -313,6 +313,7 @@ func TestOptionAsArgument(t *testing.T) {
 		expectError bool
 		errType     ErrorType
 		errMsg      string
+		rest        []string
 	}{
 		{
 			// short option must not be accepted as argument
@@ -333,7 +334,7 @@ func TestOptionAsArgument(t *testing.T) {
 			args:        []string{"--string-slice", "--"},
 			expectError: true,
 			errType:     ErrExpectedArgument,
-			errMsg:      "expected argument for flag `--string-slice', but got option `--'",
+			errMsg:      "expected argument for flag `--string-slice', but got double dash `--'",
 		},
 		{
 			// quoted and appended option should be accepted as argument (even if it looks like an option)
@@ -342,6 +343,10 @@ func TestOptionAsArgument(t *testing.T) {
 		{
 			// Accept any single character arguments including '-'
 			args: []string{"--string-slice", "-"},
+		},
+		{
+			args: []string{"-o", "-", "-"},
+			rest: []string{"-", "-"},
 		},
 	}
 	var opts struct {
@@ -353,7 +358,9 @@ func TestOptionAsArgument(t *testing.T) {
 		if test.expectError {
 			assertParseFail(t, test.errType, test.errMsg, &opts, test.args...)
 		} else {
-			assertParseSuccess(t, &opts, test.args...)
+			args := assertParseSuccess(t, &opts, test.args...)
+
+			assertStringArray(t, args, test.rest)
 		}
 	}
 }

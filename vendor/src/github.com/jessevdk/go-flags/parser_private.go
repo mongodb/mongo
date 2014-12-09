@@ -171,10 +171,10 @@ func (p *Parser) parseOption(s *parseState, name string, option *Option, canarg 
 		} else {
 			arg = s.pop()
 
-			// Accept any single character arguments including '-'.
-			// '-' is the special file name for the standard input or the standard output in many cases.
-			if len(arg) > 1 && argumentIsOption(arg) {
+			if argumentIsOption(arg) {
 				return newErrorf(ErrExpectedArgument, "expected argument for flag `%s', but got option `%s'", option, arg)
+			} else if p.Options&PassDoubleDash != 0 && arg == "--" {
+				return newErrorf(ErrExpectedArgument, "expected argument for flag `%s', but got double dash `--'", option)
 			}
 		}
 

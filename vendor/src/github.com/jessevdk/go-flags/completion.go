@@ -234,7 +234,7 @@ func (c *completion) complete(args []string) []Completion {
 	if opt != nil {
 		// Completion for the argument of 'opt'
 		ret = c.completeValue(opt.value, "", lastarg)
-	} else if argumentIsOption(lastarg) {
+	} else if argumentStartsOption(lastarg) {
 		// Complete the option
 		prefix, optname, islong := stripOptionPrefix(lastarg)
 		optname, split, argument := splitOption(prefix, optname, islong)

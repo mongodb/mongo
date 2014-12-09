@@ -36,7 +36,7 @@ func main() {
 
 	log.SetVerbosity(opts.Verbosity)
 
-	targetDir, err := getTargetDirFromArgs(extraArgs, os.Args, inputOpts.Directory)
+	targetDir, err := getTargetDirFromArgs(extraArgs, inputOpts.Directory)
 	if err != nil {
 		fmt.Printf("error parsing command line options: %v\n", err)
 		os.Exit(util.ExitBadOptions)
@@ -69,20 +69,16 @@ func main() {
 
 // getTargetDirFromArgs handles the logic and error cases of figuring out
 // the target restore directory.
-func getTargetDirFromArgs(extraArgs, osArgs []string, dirFlag string) (string, error) {
-	// This logic is in a switch statement so that the rules are understandable, the
-	// code below could be refactored for compactness at the expense of readability.
+func getTargetDirFromArgs(extraArgs []string, dirFlag string) (string, error) {
+	// This logic is in a switch statement so that the rules are understandable.
 	// We start by handling error cases, and then handle the different ways the target
 	// directory can be legally set.
 	switch {
 	case len(extraArgs) > 1:
 		// error on cases when there are too many positional arguments
-		fallthrough
-	case len(extraArgs) == 1 && (osArgs[len(osArgs)-1] == "-" || osArgs[len(osArgs)-2] == "-"):
-		// handle the special case where stdin (-) is passed in along with another argument
 		return "", fmt.Errorf("too many positional arguments")
 
-	case dirFlag != "" && (len(extraArgs) == 1 || osArgs[len(osArgs)-1] == "-"):
+	case dirFlag != "" && len(extraArgs) > 0:
 		// error when positional arguments and --dir are used
 		return "", fmt.Errorf(
 			"cannot use both --dir and a positional argument to set the target directory")
@@ -91,12 +87,7 @@ func getTargetDirFromArgs(extraArgs, osArgs []string, dirFlag string) (string, e
 		// a nice, simple case where one argument is given, so we use it
 		return extraArgs[0], nil
 
-	case len(extraArgs) == 0 && osArgs[len(osArgs)-1] == "-":
-		// we have to do a manual os.Args check due to edge case logic in our
-		// go-flags library that prevents a single dash from bubbling up
-		return "-", nil
-
-	case len(extraArgs) == 0 && dirFlag != "":
+	case dirFlag != "":
 		// if we have no extra args and a --dir flag, use the --dir flag
 		log.Log(log.Info, "using --dir flag instead of arguments")
 		return dirFlag, nil
