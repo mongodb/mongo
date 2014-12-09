@@ -82,30 +82,31 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	    lsm_tree->nchunks == 0)
 		return (__wt_lsm_tree_readunlock(session, lsm_tree));
 
-	/*
-	 * Normally we don't want to force out the last chunk.  But if we're
-	 * doing a forced flush, likely from a compact call, then we want
-	 * to include the final chunk.
-	 */
+	/* Search for a chunk to evict and/or a chunk to flush. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
-		if (evict_chunk == NULL &&
-		    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) && !chunk->evicted)
-			evict_chunk = chunk;
-		if (flush_chunk == NULL &&
-		    (force || i < lsm_tree->nchunks - 1) &&
-		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-		    chunk->switch_txn != 0)
+		if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+			/*
+			 * Normally we don't want to force out the last chunk.
+			 * But if we're doing a forced flush on behalf of a
+			 * compact, then we want to include the final chunk.
+			 */
+			if (evict_chunk == NULL &&
+			    !chunk->evicted &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE))
+				evict_chunk = chunk;
+		} else if (flush_chunk == NULL &&
+		    chunk->switch_txn != 0 &&
+		    (force || i < lsm_tree->nchunks - 1))
 			flush_chunk = chunk;
 	}
 
 	/*
-	 * Don't be overly zealous about pushing old
-	 * chunks from cache. Attempting too many drops
-	 * can interfere with checkpoints.
+	 * Don't be overly zealous about pushing old chunks from cache.
+	 * Attempting too many drops can interfere with checkpoints.
 	 *
-	 * If retrying a discard push an additional work unit
-	 * so there are enough to trigger checkpoints.
+	 * If retrying a discard push an additional work unit so there are
+	 * enough to trigger checkpoints.
 	 */
 	if (evict_chunk != NULL && flush_chunk != NULL) {
 		chunk = (__wt_random(session->rnd) & 1) ?
