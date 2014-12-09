@@ -150,6 +150,7 @@ namespace mongo {
 
         const Timer _timer;
         OperationContext* const _txn;
+        const ScopedTransaction _transaction;
         const AutoGetDb _db;
         const Lock::CollectionLock _collLock;
 

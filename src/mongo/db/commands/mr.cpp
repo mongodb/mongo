@@ -1341,7 +1341,7 @@ namespace mongo {
                         const NamespaceString nss(config.ns);
 
                         // Need lock and context to use it
-                        scoped_ptr<Lock::DBRead> lock(new Lock::DBRead(txn->lockState(), nss.db()));
+                        scoped_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
                         const WhereCallbackReal whereCallback(txn, nss.db());
 
@@ -1357,7 +1357,7 @@ namespace mongo {
                         }
                         std::auto_ptr<CanonicalQuery> cq(cqRaw);
 
-                        Database* db = dbHolder().get(txn, nss.db());
+                        Database* db = scopedAutoDb->getDb();
                         Collection* coll = state.getCollectionOrUassert(db, config.ns);
                         invariant(coll);
 
@@ -1405,14 +1405,14 @@ namespace mongo {
                                 // state and yield inside the reduceAndSpillInMemoryState method, so
                                 // it only happens if necessary.
                                 exec->saveState();
-                                lock.reset();
+                                scopedAutoDb.reset();
                                 state.reduceAndSpillInMemoryStateIfNeeded();
-                                lock.reset(new Lock::DBRead(txn->lockState(), nss.db()));
+                                scopedAutoDb.reset(new AutoGetDb(txn, nss.db(), MODE_S));
                                 exec->restoreState(txn);
 
                                 // Need to reload the database, in case it was dropped after we
                                 // released the lock
-                                db = dbHolder().get(txn, nss.db());
+                                db = scopedAutoDb->getDb();
                                 if (db == NULL) {
                                     // Database was deleted after we freed the lock
                                     StringBuilder sb;

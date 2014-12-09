@@ -217,6 +217,7 @@ namespace mongo {
     AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                        const std::string& ns)
             : _txn(txn),
+              _transaction(txn, MODE_IS),
               _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
               _collLock(_txn->lockState(), ns, MODE_IS),
               _coll(NULL) {
@@ -227,6 +228,7 @@ namespace mongo {
     AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                        const NamespaceString& nss)
             : _txn(txn),
+              _transaction(txn, MODE_IS),
               _db(_txn, nss.db(), MODE_IS),
               _collLock(_txn->lockState(), nss.toString(), MODE_IS),
               _coll(NULL) {
