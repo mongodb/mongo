@@ -44,6 +44,9 @@ type MongoImport struct {
 	// SessionProvider is used for connecting to the database
 	SessionProvider *db.SessionProvider
 
+	// indicates whether the connected server is part of a replica set
+	isReplicaSet bool
+
 	// insertionLock is used to prevent race conditions in incrementing
 	// the insertion count
 	insertionLock *sync.Mutex
@@ -52,12 +55,12 @@ type MongoImport struct {
 	// been inserted into the database
 	insertionCount uint64
 
-	// indicates whether the connected server is part of a replica set
-	isReplicaSet bool
-
 	// the tomb is used to synchronize ingestion goroutines and causes
 	// other sibling goroutines to terminate immediately if one errors out
 	tomb *tomb.Tomb
+
+	// fields to use for upsert operations
+	upsertFields []string
 }
 
 // InputReader is an interface that specifies how an input source should be
@@ -70,18 +73,14 @@ type InputReader interface {
 	// streams document in the order in which they are read from the reader
 	StreamDocument(ordered bool, readChannel chan bson.D, errorChannel chan error)
 
-	// SetHeader sets the header for the CSV/TSV import when --headerline is
-	// specified. It a --fields or --fieldFile argument is passed, it overwrites
-	// the values of those with what is read from the input source
-	SetHeader(bool) error
+	// SetFields attempts to set the input fields for the CSV/TSV import and returns
+	// an error if it's unable to do so. If --headerline is specified, it reads
+	// from the underlying reader to get the fields to set.  No-op for JSON imports
+	SetFields(bool) error
 
-	// ReadHeaderFromSource attempts to reads the header line for the
-	// specific implementation
+	// ReadHeaderFromSource attempts to read the header line for the
+	// specific implementation. No-op for JSON imports
 	ReadHeaderFromSource() ([]string, error)
-
-	// GetFields returns the current set of fields for the specific
-	// implementation
-	GetFields() []string
 }
 
 // ValidateSettings ensures that the tool specific options supplied for
@@ -144,6 +143,13 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		}
 		if mongoImport.InputOptions.FieldFile != nil {
 			return fmt.Errorf("can not use --fieldFile when input type is JSON")
+		}
+	}
+
+	if mongoImport.IngestOptions.UpsertFields != "" {
+		mongoImport.upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
+		if err := validateFields(mongoImport.upsertFields); err != nil {
+			return fmt.Errorf("invalid --upsertFields argument: %v", err)
 		}
 	}
 
@@ -245,7 +251,7 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 		return 0, err
 	}
 
-	err = inputReader.SetHeader(mongoImport.InputOptions.HeaderLine)
+	err = inputReader.SetFields(mongoImport.InputOptions.HeaderLine)
 	if err != nil {
 		return 0, err
 	}
@@ -441,14 +447,13 @@ readLoop:
 // to mongoimport
 func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *mgo.Collection) (numInserted int, err error) {
 	stopOnError := mongoImport.IngestOptions.StopOnError
-	upsertFields := strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
 	for _, rawBsonDocument := range documents {
 		document := bson.M{}
 		err = bson.Unmarshal(rawBsonDocument.Data, &document)
 		if err != nil {
 			return numInserted, fmt.Errorf("error unmarshaling document: %v", err)
 		}
-		selector := constructUpsertDocument(upsertFields, document)
+		selector := constructUpsertDocument(mongoImport.upsertFields, document)
 		if selector == nil {
 			err = collection.Insert(document)
 		} else {

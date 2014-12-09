@@ -167,6 +167,30 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
+		Convey("an error should be thrown if a field in the --upsertFields "+
+			"argument starts with a dollar sign", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
+			mongoImport.InputOptions.Type = CSV
+			mongoImport.IngestOptions.UpsertFields = "a,$b,c"
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+			mongoImport.IngestOptions.UpsertFields = "a,.b,c"
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
+		Convey("no error should be thrown if all fields in the --upsertFields "+
+			"argument are valid", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
+			mongoImport.InputOptions.Type = CSV
+			mongoImport.IngestOptions.UpsertFields = fields
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
+		})
+
 		Convey("no error should be thrown if --fields is supplied with CSV import", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
@@ -538,8 +562,8 @@ func TestImportDocuments(t *testing.T) {
 			}
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
-		Convey("CSV import with --upsert/--upsertFields with duplicate id should succeed"+
-			" if stopOnError is not set", func() {
+		Convey("CSV import with --upsert/--upsertFields with duplicate id should succeed "+
+			"if stopOnError is not set", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
@@ -547,7 +571,7 @@ func TestImportDocuments(t *testing.T) {
 			fields := "_id,b,c"
 			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.Upsert = true
-			mongoImport.IngestOptions.UpsertFields = "_id"
+			mongoImport.upsertFields = []string{"_id"}
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 5)

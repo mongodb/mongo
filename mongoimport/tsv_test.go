@@ -143,14 +143,14 @@ func TestTSVStreamDocument(t *testing.T) {
 	})
 }
 
-func TestTSVSetHeader(t *testing.T) {
+func TestTSVSetFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("setting the header should read the first line of the TSV", func() {
 			contents := "extraHeader1\textraHeader2\textraHeader3\n"
 			fields := []string{}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(tsvInputReader.SetHeader(true), ShouldBeNil)
+			So(tsvInputReader.SetFields(true), ShouldBeNil)
 			So(len(tsvInputReader.Fields), ShouldEqual, 3)
 		})
 		Convey("setting the header with fields already set, should "+
@@ -158,22 +158,11 @@ func TestTSVSetHeader(t *testing.T) {
 			contents := "extraHeader\textraHeader2\textraHeader3\n\n"
 			fields := []string{"a", "b", "c"}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			// if SetHeader() is called with fields already passed in,
+			// if SetFields() is called with fields already passed in,
 			// the header should be replaced with the read header line
-			So(tsvInputReader.SetHeader(true), ShouldBeNil)
+			So(tsvInputReader.SetFields(true), ShouldBeNil)
 			So(len(tsvInputReader.Fields), ShouldEqual, 3)
 			So(tsvInputReader.Fields, ShouldResemble, strings.Split(strings.Trim(contents, "\n"), tokenSeparator))
-		})
-	})
-}
-
-func TestTSVGetFields(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-	Convey("With a TSV input reader", t, func() {
-		Convey("getting the header should return any already set headers", func() {
-			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte{}), 1)
-			So(tsvInputReader.GetFields(), ShouldResemble, fields)
 		})
 	})
 }

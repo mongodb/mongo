@@ -255,61 +255,43 @@ func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) 
 	return document, nil
 }
 
-// validateFields takes an InputReader, and does some validation on the
-// header fields. It returns an error if an issue is found in the header list
-func validateFields(inputReader InputReader, hasHeaderLine bool) (validatedFields []string, err error) {
-	unsortedFields := []string{}
-	if hasHeaderLine {
-		unsortedFields, err = inputReader.ReadHeaderFromSource()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		unsortedFields = inputReader.GetFields()
-	}
+// validateFields takes a slice of fields and returns an error if the fields
+// are incompatible, returns nil otherwise
+func validateFields(fields []string) error {
+	fieldsCopy := make([]string, len(fields), len(fields))
+	copy(fieldsCopy, fields)
+	sort.Sort(sort.StringSlice(fieldsCopy))
 
-	fields := make([]string, len(unsortedFields), len(unsortedFields))
-	copy(fields, unsortedFields)
-	sort.Sort(sort.StringSlice(fields))
-
-	for index, field := range fields {
+	for index, field := range fieldsCopy {
 		if strings.HasSuffix(field, ".") {
-			return nil, fmt.Errorf("field '%v' can not end with a '.'", field)
+			return fmt.Errorf("field '%v' can not end with a '.'", field)
 		}
 		if strings.HasPrefix(field, ".") {
-			return nil, fmt.Errorf("field '%v' can not start with a '.'", field)
+			return fmt.Errorf("field '%v' can not start with a '.'", field)
 		}
 		if strings.HasPrefix(field, "$") {
-			return nil, fmt.Errorf("field '%v' can not start with a '$'", field)
+			return fmt.Errorf("field '%v' can not start with a '$'", field)
 		}
 		if strings.Contains(field, "..") {
-			return nil, fmt.Errorf("field '%v' can not contain consecutive '.' characters", field)
+			return fmt.Errorf("field '%v' can not contain consecutive '.' characters", field)
 		}
 		// NOTE: since fields is sorted, this check ensures that no field
 		// is incompatible with another one that occurs further down the list.
 		// meant to prevent cases where we have fields like "a" and "a.c"
-		for _, latterField := range fields[index+1:] {
+		for _, latterField := range fieldsCopy[index+1:] {
 			// NOTE: this means we will not support imports that have fields that
 			// include e.g. a, a.b
 			if strings.HasPrefix(latterField, field+".") {
-				return nil, fmt.Errorf("incompatible fields found: '%v' and '%v",
-					field, latterField)
+				return fmt.Errorf("incompatible fields found: '%v' and '%v'", field, latterField)
 			}
 			// NOTE: this means we will not support imports that have fields like
 			// a, a - since this is invalid in MongoDB
 			if field == latterField {
-				return nil, fmt.Errorf("fields can not be identical: '%v' and '%v",
-					field, latterField)
+				return fmt.Errorf("fields can not be identical: '%v' and '%v'", field, latterField)
 			}
 		}
-		validatedFields = append(validatedFields, unsortedFields[index])
 	}
-	if len(fields) == 1 {
-		log.Logf(log.Info, "using field: %v", validatedFields[0])
-	} else {
-		log.Logf(log.Info, "using fields: %v", strings.Join(validatedFields, ","))
-	}
-	return validatedFields, nil
+	return nil
 }
 
 // processDocuments reads from the ConvertibleDoc channel and for each record, converts it

@@ -10,9 +10,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/tomb.v2"
 	"io"
-	"io/ioutil"
-	"os"
-	"strings"
 	"testing"
 )
 
@@ -94,72 +91,34 @@ func TestValidateFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an import input, in validating the headers", t, func() {
-		fields := []string{"a", "b", "c"}
-		contents := "headerLine1, headerLine2"
-		csvFile, err := ioutil.TempFile("", "mongoimport_")
-		So(err, ShouldBeNil)
-		_, err = io.WriteString(csvFile, contents)
-		So(err, ShouldBeNil)
-		fileHandle, err := os.Open(csvFile.Name())
-		So(err, ShouldBeNil)
-
-		Convey("if headerLine is true, the first line in the input should be used", func() {
-			headers, err := validateFields(NewCSVInputReader(fields, fileHandle, 1), true)
-			So(err, ShouldBeNil)
-			So(len(headers), ShouldEqual, 2)
-			// spaces are trimed in the header
-			So(headers, ShouldResemble, strings.Split(strings.Replace(contents, " ", "", -1), ","))
-		})
-		Convey("if headerLine is false, the fields passed in should be used", func() {
-			headers, err := validateFields(NewCSVInputReader(fields, fileHandle, 1), false)
-			So(err, ShouldBeNil)
-			So(len(headers), ShouldEqual, 3)
-			// spaces are trimed in the header
-			So(headers, ShouldResemble, fields)
-		})
 		Convey("if the fields contain '..', an error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{"a..a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
+			So(validateFields([]string{"a..a"}), ShouldNotBeNil)
 		})
 		Convey("if the fields start/end in a '.', an error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{".a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a."}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
+			So(validateFields([]string{".a"}), ShouldNotBeNil)
+			So(validateFields([]string{"a."}), ShouldNotBeNil)
 		})
 		Convey("if the fields start in a '$', an error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{"$.a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"$"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"$a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a$a"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
+			So(validateFields([]string{"$.a"}), ShouldNotBeNil)
+			So(validateFields([]string{"$"}), ShouldNotBeNil)
+			So(validateFields([]string{"$a"}), ShouldNotBeNil)
+			So(validateFields([]string{"a$a"}), ShouldBeNil)
 		})
 		Convey("if the fields collide, an error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{"a", "a.a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
+			So(validateFields([]string{"a", "a.a"}), ShouldNotBeNil)
+			So(validateFields([]string{"a", "a.ba", "b.a"}), ShouldNotBeNil)
+			So(validateFields([]string{"a", "a.ba", "b.a"}), ShouldNotBeNil)
+			So(validateFields([]string{"a", "a.b.c"}), ShouldNotBeNil)
 		})
 		Convey("if the fields don't collide, no error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{"a", "aa"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
-			_, err = validateFields(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle, 1), false)
-			So(err, ShouldBeNil)
+			So(validateFields([]string{"a", "aa"}), ShouldBeNil)
+			So(validateFields([]string{"a", "aa", "b.a", "b.c"}), ShouldBeNil)
+			So(validateFields([]string{"a", "ba", "ab", "b.a"}), ShouldBeNil)
+			So(validateFields([]string{"a", "ba", "ab", "b.a", "b.c.d"}), ShouldBeNil)
+			So(validateFields([]string{"a", "ab.c"}), ShouldBeNil)
 		})
 		Convey("if the fields contain the same keys, an error should be thrown", func() {
-			_, err := validateFields(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle, 1), false)
-			So(err, ShouldNotBeNil)
+			So(validateFields([]string{"a", "ba", "a"}), ShouldNotBeNil)
 		})
 	})
 }
@@ -167,33 +126,32 @@ func TestValidateFields(t *testing.T) {
 func TestGetUpsertValue(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
-	Convey("Given a field and a BSON document, on calling getUpsertValue", t,
-		func() {
-			Convey("the value of the key should be correct for unnested "+
-				"documents", func() {
-				bsonDocument := bson.M{"a": 3}
-				So(getUpsertValue("a", bsonDocument), ShouldEqual, 3)
-			})
-			Convey("the value of the key should be correct for nested "+
-				"document fields", func() {
-				bsonDocument := bson.M{"a": bson.M{"b": 4}}
-				So(getUpsertValue("a.b", bsonDocument), ShouldEqual, 4)
-			})
-			Convey("the value of the key should be nil for unnested document "+
-				"fields that do not exist", func() {
-				bsonDocument := bson.M{"a": 4}
-				So(getUpsertValue("c", bsonDocument), ShouldBeNil)
-			})
-			Convey("the value of the key should be nil for nested document "+
-				"fields that do not exist", func() {
-				bsonDocument := bson.M{"a": bson.M{"b": 4}}
-				So(getUpsertValue("a.c", bsonDocument), ShouldBeNil)
-			})
-			Convey("the value of the key should be nil for nil document"+
-				"values", func() {
-				So(getUpsertValue("a", bson.M{"a": nil}), ShouldBeNil)
-			})
+	Convey("Given a field and a BSON document, on calling getUpsertValue", t, func() {
+		Convey("the value of the key should be correct for unnested "+
+			"documents", func() {
+			bsonDocument := bson.M{"a": 3}
+			So(getUpsertValue("a", bsonDocument), ShouldEqual, 3)
 		})
+		Convey("the value of the key should be correct for nested "+
+			"document fields", func() {
+			bsonDocument := bson.M{"a": bson.M{"b": 4}}
+			So(getUpsertValue("a.b", bsonDocument), ShouldEqual, 4)
+		})
+		Convey("the value of the key should be nil for unnested document "+
+			"fields that do not exist", func() {
+			bsonDocument := bson.M{"a": 4}
+			So(getUpsertValue("c", bsonDocument), ShouldBeNil)
+		})
+		Convey("the value of the key should be nil for nested document "+
+			"fields that do not exist", func() {
+			bsonDocument := bson.M{"a": bson.M{"b": 4}}
+			So(getUpsertValue("a.c", bsonDocument), ShouldBeNil)
+		})
+		Convey("the value of the key should be nil for nil document"+
+			"values", func() {
+			So(getUpsertValue("a", bson.M{"a": nil}), ShouldBeNil)
+		})
+	})
 }
 
 func TestConstructUpsertDocument(t *testing.T) {

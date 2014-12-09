@@ -3,6 +3,7 @@ package mongoimport
 import (
 	"bufio"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strings"
@@ -51,33 +52,38 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 	}
 }
 
-// SetHeader sets the import fields for a TSV importer
-func (tsvInputReader *TSVInputReader) SetHeader(hasHeaderLine bool) (err error) {
-	fields, err := validateFields(tsvInputReader, hasHeaderLine)
-	if err != nil {
+// SetFields sets the import fields for a TSV importer
+func (tsvInputReader *TSVInputReader) SetFields(hasHeaderLine bool) (err error) {
+	if hasHeaderLine {
+		fields, err := tsvInputReader.ReadHeaderFromSource()
+		if err != nil {
+			return err
+		}
+		tsvInputReader.Fields = fields
+	}
+	if err = validateFields(tsvInputReader.Fields); err != nil {
 		return err
 	}
-	tsvInputReader.Fields = fields
+	if len(tsvInputReader.Fields) == 1 {
+		log.Logf(log.Info, "using field: %v", tsvInputReader.Fields[0])
+	} else {
+		log.Logf(log.Info, "using fields: %v", strings.Join(tsvInputReader.Fields, ","))
+	}
 	return nil
 }
 
-// GetFields returns the current set of fields for a TSV importer
-func (tsvInputReader *TSVInputReader) GetFields() []string {
-	return tsvInputReader.Fields
-}
-
-// ReadHeaderFromSource reads the header field from the TSV importer's reader
+// ReadHeaderFromSource reads the header from the TSV importer's reader
 func (tsvInputReader *TSVInputReader) ReadHeaderFromSource() ([]string, error) {
-	unsortedHeaders := []string{}
-	stringHeaders, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
+	fields := []string{}
+	header, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
 		return nil, err
 	}
-	tokenizedHeaders := strings.Split(stringHeaders, tokenSeparator)
-	for _, header := range tokenizedHeaders {
-		unsortedHeaders = append(unsortedHeaders, strings.TrimRight(header, "\r\n"))
+	tokenizedFields := strings.Split(header, tokenSeparator)
+	for _, field := range tokenizedFields {
+		fields = append(fields, strings.TrimRight(field, "\r\n"))
 	}
-	return unsortedHeaders, nil
+	return fields, nil
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
