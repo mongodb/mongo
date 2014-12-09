@@ -55,8 +55,8 @@ namespace repl {
 
 namespace {
 
-    const int kMinThreads = 1;
-    const int kMaxThreads = 51;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
+    const size_t kMinThreads = 1;
+    const size_t kMaxThreads = 51;  // Set to 1 + max repl set size, for heartbeat + wiggle room.
     const Seconds kMaxIdleThreadAge(30);
     const Seconds kMaxConnectionAge(30);
 
