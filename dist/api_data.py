@@ -207,14 +207,15 @@ file_config = format_meta + [
         block compression is done''',
         min='512B', max='512MB'),
     Config('internal_item_max', '0', r'''
-        historic term for internal_key_max''', min=0,undoc=True),
+        historic term for internal_key_max''',
+        min=0, undoc=True),
     Config('internal_key_max', '0', r'''
         the largest key stored in an internal node, in bytes.  If set, keys
         larger than the specified size are stored as overflow items (which
         may require additional I/O to access).  The default and the maximum
         allowed value are both one-tenth the size of a newly split internal
         page''',
-        min='40B'),
+        min='0'),
     Config('key_gap', '10', r'''
         the maximum gap between instantiated keys in a Btree leaf page,
         constraining the number of keys processed to instantiate a
@@ -225,7 +226,7 @@ file_config = format_meta + [
         larger than the specified size are stored as overflow items (which
         may require additional I/O to access).  The default value is
         one-tenth the size of a newly split leaf page''',
-        min='40B'),
+        min='0'),
     Config('leaf_page_max', '32KB', r'''
         the maximum page size for leaf nodes, in bytes; the size must
         be a multiple of the allocation size, and is significant for
@@ -241,9 +242,10 @@ file_config = format_meta + [
         the maximum leaf page size, the page size is temporarily ignored
         when large values are written. The default is one-half the size of
         a newly split leaf page''',
-        min='40B',max='100KB'),
+        min='0'),
     Config('leaf_item_max', '0', r'''
-        historic term for leaf_key_max and leaf_value_max''', min=0,undoc=True),
+        historic term for leaf_key_max and leaf_value_max''',
+        min=0, undoc=True),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower

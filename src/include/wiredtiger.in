@@ -989,7 +989,7 @@ struct __wt_session {
 	 * stored as overflow items (which may require additional I/O to
 	 * access). The default and the maximum allowed value are both one-tenth
 	 * the size of a newly split internal page., an integer greater than or
-	 * equal to 40B; default \c 0.}
+	 * equal to 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
 	 * discarding unnecessary trailing bytes on internal keys (ignored for
 	 * custom collators)., a boolean flag; default \c true.}
@@ -1011,7 +1011,7 @@ struct __wt_session {
 	 * bytes.  If set\, keys larger than the specified size are stored as
 	 * overflow items (which may require additional I/O to access). The
 	 * default value is one-tenth the size of a newly split leaf page., an
-	 * integer greater than or equal to 40B; default \c 0.}
+	 * integer greater than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size\, and is
 	 * significant for applications wanting to maximize sequential data
@@ -1024,8 +1024,8 @@ struct __wt_session {
 	 * overflow items (which may require additional I/O to access). If the
 	 * size is larger than the maximum leaf page size\, the page size is
 	 * temporarily ignored when large values are written.  The default is
-	 * one-half the size of a newly split leaf page., an integer between 40B
-	 * and 100KB; default \c 0.}
+	 * one-half the size of a newly split leaf page., an integer greater
+	 * than or equal to 0; default \c 0.}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
