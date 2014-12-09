@@ -2,7 +2,7 @@
 // and makes sure their debug type values exist in the output.
 
 (function(){
-  var x = runMongoProgram( "bsondump", "--type=debug", "jstests/bsondump/testdata/all_types.bson");
+  var x = runMongoProgram( "bsondump", "--type=debug", "jstests/bson/testdata/all_types.bson");
   assert.eq(x, 0, "bsondump should exit successfully with 0");
 
   sleep(100);

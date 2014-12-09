@@ -2,7 +2,7 @@
 // and makes sure their JSON type representations exist in the output.
 
 (function(){
-  var x = runMongoProgram( "bsondump", "--type=json", "jstests/bsondump/testdata/all_types.bson");
+  var x = runMongoProgram( "bsondump", "--type=json", "jstests/bson/testdata/all_types.bson");
   assert.eq(x, 0, "bsondump should exit successfully with 0");
 
   sleep(100);

@@ -1,11 +1,11 @@
 // This test checks reasonable and unreasonable option configurations for bsondump
 
 (function(){
-    var sampleFilepath = "jstests/bsondump/testdata/sample.bson"
+    var sampleFilepath = "jstests/bson/testdata/sample.bson"
     var x = runMongoProgram( "bsondump", "--type=fake", sampleFilepath);
     assert.neq(x, 0, "bsondump should exit with failure when given a non-existent type");
 
-    x = runMongoProgram( "bsondump", "jstests/bsondump/testdata/asdfasdfasdf");
+    x = runMongoProgram( "bsondump", "jstests/bson/testdata/asdfasdfasdf");
     assert.neq(x, 0, "bsondump should exit with failure when given a non-existent file");
 
     x = runMongoProgram( "bsondump", "--noobjcheck", sampleFilepath);
