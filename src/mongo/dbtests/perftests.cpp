@@ -63,6 +63,7 @@
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version_reporting.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 #if (__cplusplus >= 201103L)
 #include <mutex>
@@ -179,6 +180,9 @@ namespace PerfTests {
 
         // anything you want to do before being timed
         virtual void prep() { }
+
+        // anything you want to do before threaded test
+        virtual void prepThreaded() {}
 
         virtual void timed() = 0;
 
@@ -370,6 +374,7 @@ namespace PerfTests {
             DBDirectClient c(&txn);
 
             const unsigned int Batch = batchSize();
+            prepThreaded();
             while( 1 ) {
                 unsigned int i = 0;
                 for( i = 0; i < Batch; i++ )
@@ -634,6 +639,117 @@ namespace PerfTests {
             lk.lock();
             lk.unlock();
         }
+    };
+
+    class locker_test : public B {
+    public:
+        boost::thread_specific_ptr<ResourceId> resId;
+        boost::thread_specific_ptr<Locker> locker;
+        boost::thread_specific_ptr<int> id;
+        boost::mutex lock;
+
+        // The following members are intitialized in the constructor
+        LockMode lockMode;
+        LockMode glockMode;
+        int sharedid;
+
+        locker_test(LockMode m = MODE_X, LockMode gm = MODE_IX)
+            : lockMode(m),
+              glockMode(gm),
+              sharedid(1) { }
+        virtual string name() {
+            return (str::stream() << "locker_contested" << lockMode);
+        }
+        virtual bool showDurStats() { return false; }
+        virtual bool testThreaded() { return true; }
+        virtual void prep() {
+            resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
+            locker.reset(new LockerImpl<true>(1));
+        }
+
+        virtual void prepThreaded() {
+            resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
+            id.reset(new int);
+            lock.lock();
+            *id = sharedid++;
+            lock.unlock();
+            locker.reset(new LockerImpl<true>(*id));
+        }
+
+        void timed() {
+            locker->lockGlobal(glockMode);
+            locker->lock(*resId, lockMode);
+            locker->unlockAll();
+        }
+
+        void timed2(DBClientBase* c) {
+            locker->lockGlobal(glockMode);
+            locker->lock(*resId, lockMode);
+            locker->unlockAll();
+        }
+    };
+
+    class glockerIX : public locker_test {
+    public:
+        virtual string name() {
+            return (str::stream() << "glocker" << glockMode);
+        }
+
+        void timed() {
+            locker->lockGlobal(glockMode);
+            locker->unlockAll();
+        }
+
+        void timed2(DBClientBase* c) {
+            locker->lockGlobal(glockMode);
+            locker->unlockAll();
+        }
+    };
+
+    class locker_test_uncontested : public locker_test {
+    public:
+        locker_test_uncontested(LockMode m = MODE_IX, LockMode gm = MODE_IX)
+            : locker_test(m, gm) { }
+        virtual string name() {
+            return (str::stream() << "locker_uncontested" << lockMode);
+        }
+
+        virtual void prepThreaded() {
+            id.reset(new int);
+
+            lock.lock();
+            *id = sharedid++;
+            lock.unlock();
+            locker.reset(new LockerImpl<true>(*id));
+            resId.reset(new ResourceId(RESOURCE_COLLECTION,
+                                       str::stream() << "TestDB.collection" << *id));
+        }
+    };
+
+
+    class glockerIS : public glockerIX {
+    public:
+        glockerIS() : glockerIX() { glockMode = MODE_IS; }
+    };
+
+    class locker_contestedX : public locker_test {
+    public:
+        locker_contestedX() : locker_test(MODE_X, MODE_IX) { }
+    };
+
+    class locker_contestedS : public locker_test {
+    public:
+        locker_contestedS() : locker_test(MODE_S, MODE_IS) { }
+    };
+
+    class locker_uncontestedX : public locker_test_uncontested {
+    public:
+        locker_uncontestedX() : locker_test_uncontested(MODE_X, MODE_IX) { }
+    };
+
+    class locker_uncontestedS : public locker_test_uncontested {
+    public:
+        locker_uncontestedS() : locker_test_uncontested(MODE_S, MODE_IS) { }
     };
 
     class CTM : public B {
@@ -1345,6 +1461,12 @@ namespace PerfTests {
 #endif
                 add< rlock >();
                 add< wlock >();
+                add< glockerIX > ();
+                add< glockerIS > ();
+                add< locker_contestedX >();
+                add< locker_uncontestedX >();
+                add< locker_contestedS >();
+                add< locker_uncontestedS >();
                 add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
