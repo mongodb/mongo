@@ -1465,7 +1465,10 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	conn = S2C(session);
 	ip = record;
-	if ((compressor = conn->log_compressor) != NULL) {
+	if ((compressor = conn->log_compressor) != NULL &&
+	    record->size < log->allocsize)
+		WT_STAT_FAST_CONN_INCR(session, log_compress_small);
+	else if (compressor != NULL) {
 		/* Skip the log header */
 		log = conn->log;
 		src = (uint8_t *)record->mem + WT_LOG_COMPRESS_SKIP;

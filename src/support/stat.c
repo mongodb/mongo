@@ -424,6 +424,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_compress_writes.desc = "log: log records compressed";
 	stats->log_compress_write_fails.desc =
 	    "log: log records not compressed";
+	stats->log_compress_small.desc =
+	    "log: log records too small to compress";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
@@ -572,6 +574,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_reads.v = 0;
 	stats->log_compress_writes.v = 0;
 	stats->log_compress_write_fails.v = 0;
+	stats->log_compress_small.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
 	stats->log_sync.v = 0;

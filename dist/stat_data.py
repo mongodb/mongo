@@ -198,6 +198,7 @@ connection_stats = [
     LogStat('log_close_yields', 'yields waiting for previous log file close'),
     LogStat('log_compress_len', 'total size of compressed records'),
     LogStat('log_compress_mem', 'total in-memory size of compressed records'),
+    LogStat('log_compress_small', 'log records too small to compress'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
