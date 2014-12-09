@@ -732,7 +732,17 @@ namespace {
             }
         }
 
-        // Grant any conflicting requests, which might now be unblocked
+        // Grant any conflicting requests, which might now be unblocked. Note that the loop below
+        // slightly violates fairness in that it will grant *all* compatible requests on the line
+        // even though there might be conflicting ones interspersed between them. For example,
+        // consider an X lock was just freed and the conflict queue looked like this:
+        //
+        //      IS -> IS -> X -> X -> S -> IS
+        //
+        // In strict FIFO, we should grant the first two IS modes and then stop when we reach the
+        // first X mode (the third request on the queue). However, the loop below would actually
+        // grant all IS + S modes and once they all drain it will grant X.
+
         LockRequest* iterNext = NULL;
 
         for (LockRequest* iter = lock->conflictList._front;
@@ -745,7 +755,9 @@ namespace {
             // the granted queue.
             iterNext = iter->next;
 
-            if (conflicts(iter->mode, lock->grantedModes)) continue;
+            if (conflicts(iter->mode, lock->grantedModes)) {
+                continue;
+            }
 
             iter->status = LockRequest::STATUS_GRANTED;
 
@@ -760,6 +772,12 @@ namespace {
             }
 
             iter->notify->notify(lock->resourceId, LOCK_OK);
+
+            // Small optimization - nothing is compatible with MODE_X, so no point in looking
+            // further in the conflict queue.
+            if (iter->mode == MODE_X) {
+                break;
+            }
         }
 
         // This is a convenient place to check that the state of the two request queues is in sync
