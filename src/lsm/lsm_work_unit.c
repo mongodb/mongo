@@ -78,7 +78,8 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE) ||
+	    lsm_tree->nchunks == 0)
 		return (__wt_lsm_tree_readunlock(session, lsm_tree));
 
 	/*
