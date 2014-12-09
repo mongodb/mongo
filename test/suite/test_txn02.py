@@ -162,8 +162,9 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 self.check(backup_conn.open_session(), None, committed)
             finally:
                 # Yield so that the archive thread gets a chance to run
-                # before we close the connection.
-                time.sleep(0)
+                # before we close the connection.  time.sleep(0) is not
+                # guaranteed to force a context switch.  So use a small time.
+                time.sleep(0.01)
                 backup_conn.close()
             count += 1
         #
