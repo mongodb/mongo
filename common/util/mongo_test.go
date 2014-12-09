@@ -87,6 +87,10 @@ func TestInvalidNames(t *testing.T) {
 			So(ValidateCollectionName("col"), ShouldBeNil)
 			So(ValidateFullNamespace("db space.col"), ShouldNotBeNil)
 		})
+		Convey("db x$x is invalid", func() {
+			So(ValidateDBName("x$x"), ShouldNotBeNil)
+			So(ValidateFullNamespace("x$x.y"), ShouldNotBeNil)
+		})
 		Convey("[null].[null] is invalid", func() {
 			So(ValidateDBName("\x00"), ShouldNotBeNil)
 			So(ValidateCollectionName("\x00"), ShouldNotBeNil)

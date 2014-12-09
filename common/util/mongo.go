@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	InvalidDBChars         = "/\\. \"\x00"
+	InvalidDBChars         = "/\\. \"\x00$"
 	InvalidCollectionChars = "$\x00"
 	DefaultHost            = "localhost"
 	DefaultPort            = "27017"
