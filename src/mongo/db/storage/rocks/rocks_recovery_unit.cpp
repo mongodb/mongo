@@ -112,6 +112,8 @@ namespace mongo {
         return _writeBatch.get();
     }
 
+    void RocksRecoveryUnit::setOplogReadTill(const RecordId& record) { _oplogReadTill = record; }
+
     void RocksRecoveryUnit::registerChange(Change* change) { _changes.push_back(change); }
 
     void RocksRecoveryUnit::_releaseSnapshot() {

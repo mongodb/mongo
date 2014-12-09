@@ -85,6 +85,7 @@ namespace mongo {
         rocksdb::WriteBatchWithIndex* writeBatch();
 
         const rocksdb::Snapshot* snapshot();
+        bool hasSnapshot() { return _snapshot != nullptr; }
 
         RocksTransaction* transaction() { return &_transaction; }
 
@@ -97,6 +98,9 @@ namespace mongo {
                               std::atomic<long long>* counter, long long delta);
 
         long long getDeltaCounter(const rocksdb::Slice& counterKey);
+
+        void setOplogReadTill(const RecordId& loc);
+        RecordId getOplogReadTill() const { return _oplogReadTill; }
 
         RocksRecoveryUnit* newRocksRecoveryUnit() {
             return new RocksRecoveryUnit(_transactionEngine, _db, _durable);
@@ -137,6 +141,8 @@ namespace mongo {
         Changes _changes;
 
         int _depth;
+
+        RecordId _oplogReadTill;
     };
 
 }

@@ -34,6 +34,7 @@
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 
 #include <memory>
+#include <algorithm>
 
 #include <boost/scoped_array.hpp>
 
@@ -48,10 +49,86 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
+#include "mongo/db/storage/oplog_hack.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    namespace {
+
+        class CappedInsertChange : public RecoveryUnit::Change {
+        public:
+            CappedInsertChange(CappedVisibilityManager* cappedVisibilityManager,
+                               const RecordId& record)
+                : _cappedVisibilityManager(cappedVisibilityManager), _record(record) {}
+
+            virtual void commit() { _cappedVisibilityManager->dealtWithCappedRecord(_record); }
+
+            virtual void rollback() { _cappedVisibilityManager->dealtWithCappedRecord(_record); }
+
+        private:
+            CappedVisibilityManager* _cappedVisibilityManager;
+            RecordId _record;
+        };
+    }  // namespace
+
+    void CappedVisibilityManager::addUncommittedRecord(OperationContext* txn,
+                                                       const RecordId& record) {
+        boost::mutex::scoped_lock lk(_lock);
+        _addUncommittedRecord_inlock(txn, record);
+    }
+
+    void CappedVisibilityManager::_addUncommittedRecord_inlock(OperationContext* txn,
+                                                               const RecordId& record) {
+        // todo: make this a dassert at some point
+        invariant(_uncommittedRecords.empty() || _uncommittedRecords.back() < record);
+        _uncommittedRecords.push_back(record);
+        txn->recoveryUnit()->registerChange(new CappedInsertChange(this, record));
+        _oplog_highestSeen = record;
+    }
+
+    RecordId CappedVisibilityManager::getNextAndAddUncommittedRecord(
+        OperationContext* txn, std::function<RecordId()> nextId) {
+        boost::mutex::scoped_lock lk(_lock);
+        RecordId record = nextId();
+        _addUncommittedRecord_inlock(txn, record);
+        return record;
+    }
+
+    void CappedVisibilityManager::dealtWithCappedRecord(const RecordId& record) {
+        boost::mutex::scoped_lock lk(_lock);
+        std::vector<RecordId>::iterator it =
+            std::find(_uncommittedRecords.begin(), _uncommittedRecords.end(), record);
+        invariant(it != _uncommittedRecords.end());
+        _uncommittedRecords.erase(it);
+    }
+
+    bool CappedVisibilityManager::isCappedHidden(const RecordId& record) const {
+        boost::mutex::scoped_lock lk(_lock);
+        if (_uncommittedRecords.empty()) {
+            return false;
+        }
+        return _uncommittedRecords.front() <= record;
+    }
+
+    void CappedVisibilityManager::updateHighestSeen(const RecordId& record) {
+        if (record > _oplog_highestSeen) {
+            boost::mutex::scoped_lock lk(_lock);
+            if (record > _oplog_highestSeen) {
+                _oplog_highestSeen = record;
+            }
+        }
+    }
+
+    RecordId CappedVisibilityManager::oplogStartHack() const {
+        boost::mutex::scoped_lock lk(_lock);
+        if (_uncommittedRecords.empty()) {
+            return _oplog_highestSeen;
+        } else {
+            return _uncommittedRecords.front();
+        }
+    }
 
     RocksRecordStore::RocksRecordStore(const StringData& ns, const StringData& id,
                                        rocksdb::DB* db,  // not owned here
@@ -67,6 +144,8 @@ namespace mongo {
           _cappedDeleteCallback(cappedDeleteCallback),
           _isOplog(NamespaceString::oplog(ns)),
           _oplogCounter(0),
+          _cappedVisibilityManager((_isCapped || _isOplog) ? new CappedVisibilityManager()
+                                                           : nullptr),
           _ident(id.toString()),
           _dataSizeKey("datasize-" + id.toString()),
           _numRecordsKey("numrecords-" + id.toString()) {
@@ -89,6 +168,9 @@ namespace mongo {
         if (iter->Valid()) {
             rocksdb::Slice lastSlice = iter->key();
             RecordId lastId = _makeRecordId(lastSlice);
+            if (_isOplog || _isCapped) {
+                _cappedVisibilityManager->updateHighestSeen(lastId);
+            }
             _nextIdNum.store(lastId.repr() + 1);
         }
         else {
@@ -265,7 +347,20 @@ namespace mongo {
 
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
 
-        RecordId loc = _nextId();
+        RecordId loc;
+        if (_isOplog) {
+            StatusWith<RecordId> status = oploghack::extractKey(data, len);
+            if (!status.isOK()) {
+                return status;
+            }
+            loc = status.getValue();
+            _cappedVisibilityManager->updateHighestSeen(loc);
+        } else if (_isCapped) {
+            loc = _cappedVisibilityManager->getNextAndAddUncommittedRecord(
+                txn, [&]() { return _nextId(); });
+        } else {
+            loc = _nextId();
+        }
 
         // XXX it might be safe to remove this, since we just allocated new unique RecordId.
         // However, we need to check if any other transaction can start modifying this RecordId
@@ -362,16 +457,18 @@ namespace mongo {
         return Status::OK();
     }
 
-    RecordIterator* RocksRecordStore::getIterator( OperationContext* txn,
-                                                   const RecordId& start,
-                                                   const CollectionScanParams::Direction& dir
-                                                   ) const {
-        return new Iterator(txn, _db, _columnFamily, dir, start);
-    }
+    RecordIterator* RocksRecordStore::getIterator(OperationContext* txn, const RecordId& start,
+                                                  const CollectionScanParams::Direction& dir)
+        const {
+        if (_isOplog && dir == CollectionScanParams::FORWARD) {
+            auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+            if (!ru->hasSnapshot() || ru->getOplogReadTill().isNull()) {
+                // we don't have snapshot, we can update our view
+                ru->setOplogReadTill(_cappedVisibilityManager->oplogStartHack());
+            }
+        }
 
-
-    RecordIterator* RocksRecordStore::getIteratorForRepair( OperationContext* txn ) const {
-        return getIterator( txn );
+        return new Iterator(txn, _db, _columnFamily, _cappedVisibilityManager, dir, start);
     }
 
     std::vector<RecordIterator*> RocksRecordStore::getManyIterators( OperationContext* txn ) const {
@@ -484,6 +581,63 @@ namespace mongo {
         return Status(ErrorCodes::InvalidOptions, "Invalid option: " + optionName);
     }
 
+    Status RocksRecordStore::oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime) {
+        invariant(_isOplog);
+        StatusWith<RecordId> record = oploghack::keyForOptime(opTime);
+        if (record.isOK()) {
+            _cappedVisibilityManager->addUncommittedRecord(txn, record.getValue());
+        }
+
+        return record.getStatus();
+    }
+
+    /**
+     * Return the RecordId of an oplog entry as close to startingPosition as possible without
+     * being higher. If there are no entries <= startingPosition, return RecordId().
+     */
+    boost::optional<RecordId> RocksRecordStore::oplogStartHack(
+        OperationContext* txn, const RecordId& startingPosition) const {
+
+        if (!_isOplog) {
+            return boost::none;
+        }
+
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        ru->setOplogReadTill(_cappedVisibilityManager->oplogStartHack());
+
+        boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_columnFamily.get()));
+        iter->Seek(_makeKey(startingPosition));
+        if (!iter->Valid()) {
+            iter->SeekToLast();
+            if (iter->Valid()) {
+                // startingPosition is bigger than everything else
+                return _makeRecordId(iter->key());
+            } else {
+                // record store is empty
+                return RecordId();
+            }
+        }
+
+        // We're at or past target:
+        // 1) if we're at -- return
+        // 2) if we're past -- do a prev()
+        RecordId foundKey = reinterpret_cast<const RecordId*>(iter->key().data())[0];
+        int cmp = startingPosition.compare(foundKey);
+        if (cmp != 0) {
+            // RocksDB invariant -- iterator needs to land at or past target when Seek-ing
+            invariant(cmp < 0);
+            // we're past target -- prev()
+            iter->Prev();
+        }
+
+        if (!iter->Valid()) {
+            // there are no entries <= startingPosition
+            return RecordId();
+        }
+
+        return _makeRecordId(iter->key());
+    }
+
     namespace {
         class RocksCollectionComparator : public rocksdb::Comparator {
             public:
@@ -543,12 +697,8 @@ namespace mongo {
     }
 
     RecordId RocksRecordStore::_nextId() {
-        const uint64_t myId = _nextIdNum.fetchAndAdd(1);
-        int a = myId >> 32;
-        // This masks the lowest 4 bytes of myId
-        int ofs = myId & 0x00000000FFFFFFFF;
-        RecordId loc( a, ofs );
-        return loc;
+        invariant(!_isOplog);
+        return RecordId(_nextIdNum.fetchAndAdd(1));
     }
 
     rocksdb::Slice RocksRecordStore::_makeKey(const RecordId& loc) {
@@ -614,12 +764,15 @@ namespace mongo {
     RocksRecordStore::Iterator::Iterator(
         OperationContext* txn, rocksdb::DB* db,
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+        boost::shared_ptr<CappedVisibilityManager> cappedVisibilityManager,
         const CollectionScanParams::Direction& dir, const RecordId& start)
         : _txn(txn),
           _db(db),
           _cf(columnFamily),
+          _cappedVisibilityManager(cappedVisibilityManager),
           _dir(dir),
           _eof(true),
+          _readUntilForOplog(RocksRecoveryUnit::getRocksRecoveryUnit(txn)->getOplogReadTill()),
           _iterator(RocksRecoveryUnit::getRocksRecoveryUnit(txn)->NewIterator(_cf.get())) {
 
         _locate(start);
@@ -657,15 +810,32 @@ namespace mongo {
 
         if (_iterator->Valid()) {
             _curr = _decodeCurr();
+            if (_cappedVisibilityManager.get()) {  // isCapped?
+                if (_readUntilForOplog.isNull()) {
+                    // this is the normal capped case
+                    if (_cappedVisibilityManager->isCappedHidden(_curr)) {
+                        _eof = true;
+                    }
+                } else {
+                    // this is for oplogs
+                    if (_curr > _readUntilForOplog ||
+                        (_curr == _readUntilForOplog &&
+                         _cappedVisibilityManager->isCappedHidden(_curr))) {
+                        _eof = true;
+                    }
+                }
+            }  // isCapped?
         } else {
             _eof = true;
             // we leave _curr as it is on purpose
         }
+
+        _checkStatus();
         return toReturn;
     }
 
     void RocksRecordStore::Iterator::invalidate( const RecordId& dl ) {
-        _iterator.reset( NULL );
+        // this should never be called
     }
 
     void RocksRecordStore::Iterator::saveState() {

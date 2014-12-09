@@ -69,7 +69,16 @@ namespace mongo {
         }
 
         virtual RecordStore* newNonCappedRecordStore() {
-            return new RocksRecordStore("foo.bar", "1", _db.get(), _cf);
+          return newNonCappedRecordStore("foo.bar");
+        }
+        RecordStore* newNonCappedRecordStore(const std::string& ns) {
+            return new RocksRecordStore(ns, "1", _db.get(), _cf);
+        }
+
+        RecordStore* newCappedRecordStore(const std::string& ns, int64_t cappedMaxSize,
+                                          int64_t cappedMaxDocs) {
+            return new RocksRecordStore(ns, "1", _db.get(), _cf, true, cappedMaxSize,
+                                        cappedMaxDocs);
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
@@ -190,4 +199,279 @@ namespace mongo {
 
         }
     }
+
+    StatusWith<RecordId> insertBSON(scoped_ptr<OperationContext>& opCtx,
+                                   scoped_ptr<RecordStore>& rs,
+                                   const OpTime& opTime) {
+        BSONObj obj = BSON( "ts" << opTime );
+        WriteUnitOfWork wuow(opCtx.get());
+        RocksRecordStore* rrs = dynamic_cast<RocksRecordStore*>(rs.get());
+        invariant( rrs );
+        Status status = rrs->oplogDiskLocRegister( opCtx.get(), opTime );
+        if (!status.isOK())
+            return StatusWith<RecordId>( status );
+        StatusWith<RecordId> res = rs->insertRecord(opCtx.get(),
+                                                   obj.objdata(),
+                                                   obj.objsize(),
+                                                   false);
+        if (res.isOK())
+            wuow.commit();
+        return res;
+    }
+
+    // TODO remove from here once mongo made the test generic
+    TEST(RocksRecordStoreTest, OplogHack) {
+        RocksRecordStoreHarnessHelper harnessHelper;
+        scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("local.oplog.foo"));
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+
+            // always illegal
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,-1)).getStatus(),
+                  ErrorCodes::BadValue);
+
+            {
+                BSONObj obj = BSON("not_ts" << OpTime(2,1));
+                ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
+                                           false ).getStatus(),
+                          ErrorCodes::BadValue);
+
+                obj = BSON( "ts" << "not an OpTime" );
+                ASSERT_EQ(rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(),
+                                           false ).getStatus(),
+                          ErrorCodes::BadValue);
+            }
+
+            // currently dasserts
+            // ASSERT_EQ(insertBSON(opCtx, rs, BSON("ts" << OpTime(-2,1))).getStatus(),
+            // ErrorCodes::BadValue);
+
+            // success cases
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,1)).getValue(),
+                      RecordId(1,1));
+
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(1,2)).getValue(),
+                      RecordId(1,2));
+
+            ASSERT_EQ(insertBSON(opCtx, rs, OpTime(2,2)).getValue(),
+                      RecordId(2,2));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            // find start
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), RecordId()); // nothing <=
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,1)), RecordId(1,2)); // between
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,2)), RecordId(2,2)); // ==
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(2,2)); // > highest
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(2,2),  false); // no-op
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(2,2));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1,2),  false); // deletes 2,2
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(1,2));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1,2),  true); // deletes 1,2
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId(1,1));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            WriteUnitOfWork wuow(opCtx.get());
+            ASSERT_OK(rs->truncate(opCtx.get())); // deletes 1,1 and leaves collection empty
+            wuow.commit();
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+            ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(2,3)), RecordId());
+        }
+    }
+
+    TEST(RocksRecordStoreTest, OplogHackOnNonOplog) {
+        RocksRecordStoreHarnessHelper harnessHelper;
+        scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("local.NOT_oplog.foo"));
+
+        scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+
+        BSONObj obj = BSON( "ts" << OpTime(2,-1) );
+        {
+            WriteUnitOfWork wuow( opCtx.get() );
+            ASSERT_OK(rs->insertRecord(opCtx.get(), obj.objdata(),
+                                       obj.objsize(), false ).getStatus());
+            wuow.commit();
+        }
+        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), boost::none);
+    }
+
+    TEST(RocksRecordStoreTest, CappedOrder) {
+        scoped_ptr<RocksRecordStoreHarnessHelper> harnessHelper(new RocksRecordStoreHarnessHelper());
+        scoped_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("a.b", 100000,10000));
+
+        RecordId loc1;
+
+        { // first insert a document
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                ASSERT_OK( res.getStatus() );
+                loc1 = res.getValue();
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+            ASSERT( !it->isEOF() );
+            ASSERT_EQ( loc1, it->getNext() );
+            ASSERT( it->isEOF() );
+        }
+
+        {
+            // now we insert 2 docs, but commit the 2nd one fiirst
+            // we make sure we can't find the 2nd until the first is commited
+            scoped_ptr<OperationContext> t1( harnessHelper->newOperationContext() );
+            scoped_ptr<WriteUnitOfWork> w1( new WriteUnitOfWork( t1.get() ) );
+            rs->insertRecord( t1.get(), "b", 2, false );
+            // do not commit yet
+
+            { // create 2nd doc
+                scoped_ptr<OperationContext> t2( harnessHelper->newOperationContext() );
+                {
+                    WriteUnitOfWork w2( t2.get() );
+                    rs->insertRecord( t2.get(), "c", 2, false );
+                    w2.commit();
+                }
+            }
+
+            { // state should be the same
+                scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+                scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+                ASSERT( !it->isEOF() );
+                ASSERT_EQ( loc1, it->getNext() );
+                ASSERT( it->isEOF() );
+            }
+
+            w1->commit();
+        }
+
+        { // now all 3 docs should be visible
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+            ASSERT( !it->isEOF() );
+            ASSERT_EQ( loc1, it->getNext() );
+            ASSERT( !it->isEOF() );
+            it->getNext();
+            ASSERT( !it->isEOF() );
+            it->getNext();
+            ASSERT( it->isEOF() );
+        }
+    }
+
+    RecordId _oplogOrderInsertOplog( OperationContext* txn,
+                                    scoped_ptr<RecordStore>& rs,
+                                    int inc ) {
+        OpTime opTime = OpTime(5,inc);
+        RocksRecordStore* rrs = dynamic_cast<RocksRecordStore*>(rs.get());
+        Status status = rrs->oplogDiskLocRegister( txn, opTime );
+        ASSERT_OK( status );
+        BSONObj obj = BSON( "ts" << opTime );
+        StatusWith<RecordId> res = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
+        ASSERT_OK( res.getStatus() );
+        return res.getValue();
+    }
+
+    TEST(RocksRecordStoreTest, OplogOrder) {
+        scoped_ptr<RocksRecordStoreHarnessHelper> harnessHelper(
+            new RocksRecordStoreHarnessHelper());
+        scoped_ptr<RecordStore> rs(
+            harnessHelper->newCappedRecordStore("local.oplog.foo", 100000, 10000));
+        {
+            const RocksRecordStore* rrs = dynamic_cast<RocksRecordStore*>(rs.get());
+            ASSERT( rrs->isOplog() );
+        }
+
+        RecordId loc1;
+
+        { // first insert a document
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                loc1 = _oplogOrderInsertOplog( opCtx.get(), rs, 1 );
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+            ASSERT( !it->isEOF() );
+            ASSERT_EQ( loc1, it->getNext() );
+            ASSERT( it->isEOF() );
+        }
+
+        {
+            // now we insert 2 docs, but commit the 2nd one fiirst
+            // we make sure we can't find the 2nd until the first is commited
+            scoped_ptr<OperationContext> t1( harnessHelper->newOperationContext() );
+            scoped_ptr<WriteUnitOfWork> w1( new WriteUnitOfWork( t1.get() ) );
+            _oplogOrderInsertOplog( t1.get(), rs, 2 );
+            // do not commit yet
+
+            { // create 2nd doc
+                scoped_ptr<OperationContext> t2( harnessHelper->newOperationContext() );
+                {
+                    WriteUnitOfWork w2( t2.get() );
+                    _oplogOrderInsertOplog( t2.get(), rs, 3 );
+                    w2.commit();
+                }
+            }
+
+            { // state should be the same
+                scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+                scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+                ASSERT( !it->isEOF() );
+                ASSERT_EQ( loc1, it->getNext() );
+                ASSERT( it->isEOF() );
+            }
+
+            w1->commit();
+        }
+
+        { // now all 3 docs should be visible
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(), loc1 ) );
+            ASSERT( !it->isEOF() );
+            ASSERT_EQ( loc1, it->getNext() );
+            ASSERT( !it->isEOF() );
+            it->getNext();
+            ASSERT( !it->isEOF() );
+            it->getNext();
+            ASSERT( it->isEOF() );
+        }
+    }
+
 }
