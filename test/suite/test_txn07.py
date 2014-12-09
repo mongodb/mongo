@@ -270,6 +270,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         cmem = stat_cursor[stat.conn.log_compress_mem][2]
         cwrites = stat_cursor[stat.conn.log_compress_writes][2]
         cfails = stat_cursor[stat.conn.log_compress_write_fails][2]
+        csmall = stat_cursor[stat.conn.log_compress_small][2]
         stat_cursor.close()
 
         # Check the log state after the entire op completes
@@ -283,11 +284,11 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         elif self.compress == 'nop':
             self.assertEqual(clen, cmem)
             self.assertEqual(cwrites, 0)
-            self.assertEqual(cfails > 0, True)
+            self.assertEqual((cfails > 0 or csmall > 0), True)
         else:
             self.assertEqual(clen < cmem, True)
             self.assertEqual(cwrites > 0, True)
-            self.assertEqual(cfails > 0, True)
+            self.assertEqual((cfails > 0 or csmall > 0), True)
 
 if __name__ == '__main__':
     wttest.run()
