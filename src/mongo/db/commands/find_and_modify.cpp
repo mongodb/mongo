@@ -223,10 +223,15 @@ namespace mongo {
             bool found = false;
             {
                 CanonicalQuery* cq;
+                const BSONObj projection;
+                const long long skip = 0;
+                const long long limit = -1; // 1 document requested; negative indicates hard limit.
                 uassertStatusOK(CanonicalQuery::canonicalize(ns,
                                                              query,
                                                              sort,
-                                                             BSONObj(),  // projection
+                                                             projection,
+                                                             skip,
+                                                             limit,
                                                              &cq,
                                                              whereCallback));
 
