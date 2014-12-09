@@ -79,6 +79,21 @@ struct __wt_named_extractor {
 	WT_CONN_CHECK_PANIC(S2C(session))
 
 /*
+ * Macros to ensure the dhandle is inserted or removed from both the
+ * main queue and the hashed queue.
+ */
+#define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
+	SLIST_INSERT_HEAD(&(conn)->dhlh, dhandle, l);			\
+	SLIST_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashl);	\
+} while (0)
+
+#define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket) do {		\
+	SLIST_REMOVE(&(conn)->dhlh, dhandle, __wt_data_handle, l);	\
+	SLIST_REMOVE(&(conn)->dhhash[bucket],				\
+	    dhandle, __wt_data_handle, hashl);				\
+} while (0)
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -132,6 +147,15 @@ struct __wt_connection_impl {
 
 	uint64_t  split_gen;		/* Generation number for splits */
 
+	/*
+	 * The connection keeps a cache of data handles. The set of handles
+	 * can grow quite large so we maintain both a simple list and a hash
+	 * table of lists. The hash table key is based on a hash of the table
+	 * URI.
+	 */
+					/* Locked: data handle hash array */
+#define	WT_HASH_ARRAY_SIZE	512
+	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
 					/* Locked: LSM handle list. */

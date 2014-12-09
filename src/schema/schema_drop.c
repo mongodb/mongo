@@ -34,9 +34,6 @@ __drop_file(
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));
-	if (force && ret == WT_NOTFOUND)
-		ret = 0;
-
 	if (!remove_files)
 		return (ret);
 
@@ -107,7 +104,7 @@ __drop_index(
  */
 static int
 __drop_table(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -145,9 +142,7 @@ __drop_table(
 	/* Remove the metadata entry (ignore missing items). */
 	WT_ERR(__wt_metadata_remove(session, uri));
 
-err:	if (force && ret == WT_NOTFOUND)
-		ret = 0;
-	if (table != NULL)
+err:	if (table != NULL)
 		__wt_schema_release_table(session, table);
 	return (ret);
 }
@@ -181,7 +176,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __drop_table(session, uri, force, cfg);
+		ret = __drop_table(session, uri, cfg);
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->drop == NULL ?
 		    __wt_object_unsupported(session, uri) :
@@ -191,12 +186,10 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		ret = __wt_bad_object_type(session, uri);
 
 	/*
-	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the
-	 * assumption WT_NOTFOUND means there was no metadata entry.  The
-	 * underlying drop functions should handle this case (we passed them
-	 * the "force" value), but better safe than sorry.
+	 * Map WT_NOTFOUND to ENOENT, based on the assumption WT_NOTFOUND means
+	 * there was no metadata entry.  Map ENOENT to zero if force is set.
 	 */
-	if (ret == WT_NOTFOUND)
+	if (ret == WT_NOTFOUND || ret == ENOENT)
 		ret = force ? 0 : ENOENT;
 
 	/* Bump the schema generation so that stale data is ignored. */
