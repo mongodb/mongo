@@ -21,13 +21,13 @@ if (typeof getToolTest === 'undefined') {
   var insertsShell = startParallelShell(
     'print(\'starting insert\'); ' +
     (toolTest.authCommand || '') +
-    'for (var i = 1001; i < 2000; ++i) { ' +
+    'for (var i = 1001; i < 10000; ++i) { ' +
     '  db.getSiblingDB(\'foo\').bar.insert({ x: i }); ' +
     '  sleep(1); ' +
     '}');
 
   // Give some time for inserts to actually start before dumping
-  sleep(100);
+  sleep(1000);
 
   var countBeforeMongodump = db.bar.count();
   // Crash if parallel shell hasn't started inserting yet
