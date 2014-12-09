@@ -176,8 +176,9 @@ namespace mongo {
 
             // default impl uses all shards for DB
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                conf->getAllShards(shards);
+                vector<Shard> shardList;
+                Shard::getAllShards(shardList);
+                shards.insert(shardList.begin(), shardList.end());
             }
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {}
@@ -301,7 +302,9 @@ namespace mongo {
                     shards.insert(conf->getShard(fullns));
                 }
                 else {
-                    conf->getChunkManager(fullns)->getAllShards(shards);
+                    vector<Shard> shardList;
+                    Shard::getAllShards(shardList);
+                    shards.insert(shardList.begin(), shardList.end());
                 }
             }
         };
