@@ -25,19 +25,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn05.py
+# test_txn07.py
 # Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, time
+import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
+from wiredtiger import wiredtiger_open, stat
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
-class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
+class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
-    tablename = 'test_txn05'
+    tablename = 'test_txn07'
     uri = 'table:' + tablename
     archive_list = ['true', 'false']
     sync_list = [
@@ -49,9 +49,9 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
 
     types = [
         ('row', dict(tabletype='row',
-                    create_params = 'key_format=i,value_format=i')),
+                    create_params = 'key_format=i,value_format=S')),
         ('var', dict(tabletype='var',
-                    create_params = 'key_format=r,value_format=i')),
+                    create_params = 'key_format=r,value_format=S')),
         ('fix', dict(tabletype='fix',
                     create_params = 'key_format=r,value_format=8t')),
     ]
@@ -62,9 +62,16 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         ('trunc-stop', dict(op1=('stop', 2))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
+    compress = [
+        ('bzip2', dict(compress='bzip2')),
+        ('nop', dict(compress='nop')),
+        ('snappy', dict(compress='snappy')),
+        ('zlib', dict(compress='zlib')),
+        ('none', dict(compress='')),
+    ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s))
-    # scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s))[:3]
+    scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s,
+                                                    compress))
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
@@ -74,14 +81,33 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
             self.scenario_number % len(self.sync_list)]
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         conn_params = \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-                'create,error_prefix="%s: ",' % self.shortid() + \
+                'log=(archive=false,enabled,file_max=%s,' % self.logmax + \
+                'compressor=%s)' % self.compress + \
+                self.extensionArg(self.compress) + \
+                ',create,error_prefix="%s: ",' % self.shortid() + \
+                "statistics=(fast)," + \
                 'transaction_sync="%s",' % self.txn_sync
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = wiredtiger_open(dir, conn_params)
+        try:
+            conn = wiredtiger_open(dir, conn_params)
+        except wiredtiger.WiredTigerError as e:
+            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
         self.pr(`conn`)
         self.session2 = conn.open_session()
         return conn
+
+    # Return the wiredtiger_open extension argument for a shared library.
+    def extensionArg(self, name):
+        if name == None or name == '':
+            return ''
+
+        testdir = os.path.dirname(__file__)
+        extdir = os.path.join(run.wt_builddir, 'ext/compressors')
+        extfile = os.path.join(
+            extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
+        if not os.path.exists(extfile):
+            self.skipTest('compression extension "' + extfile + '" not built')
+        return ',extensions=["' + extfile + '"]'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -112,7 +138,9 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         # Opening a clone of the database home directory should run
         # recovery and see the committed results.
         self.backup(self.backup_dir)
-        backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
+        backup_conn_params = 'log=(enabled,file_max=%s,' % self.logmax + \
+                'compressor=%s)' % self.compress + \
+                self.extensionArg(self.compress)
         backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
         try:
             self.check(backup_conn.open_session(), None, committed)
@@ -144,8 +172,8 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
                  # Let other threads like archive run before closing.
                  # time.sleep(0) is not guaranteed to force a context switch.
                  # Use a small timeout.
-                time.sleep(0.01)
-                backup_conn.close()
+                 time.sleep(0.01)
+                 backup_conn.close()
             count += 1
         #
         # Check logs after repeated openings. The first log should
@@ -169,8 +197,13 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
         # Set up the table with entries for 1-5.
         # We then truncate starting or ending in various places.
         c = self.session.open_cursor(self.uri, None)
-        current = {1:1, 2:1, 3:1, 4:1, 5:1}
-        c.set_value(1)
+        if self.tabletype == 'fix':
+            value = 1
+        else:
+            # Choose large compressible values for the string cases.
+            value = 'abc' * 1000000
+        current = {1:value, 2:value, 3:value, 4:value, 5:value}
+        c.set_value(value)
         for k in current:
             c.set_key(k)
             c.insert()
@@ -232,9 +265,30 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
 
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        clen = stat_cursor[stat.conn.log_compress_len][2]
+        cmem = stat_cursor[stat.conn.log_compress_mem][2]
+        cwrites = stat_cursor[stat.conn.log_compress_writes][2]
+        cfails = stat_cursor[stat.conn.log_compress_write_fails][2]
+        csmall = stat_cursor[stat.conn.log_compress_small][2]
+        stat_cursor.close()
+
         # Check the log state after the entire op completes
         # and run recovery.
         self.check_log(committed)
+
+        if self.compress == '':
+            self.assertEqual(clen, cmem)
+            self.assertEqual(cwrites, 0)
+            self.assertEqual(cfails, 0)
+        elif self.compress == 'nop':
+            self.assertEqual(clen, cmem)
+            self.assertEqual(cwrites, 0)
+            self.assertEqual((cfails > 0 or csmall > 0), True)
+        else:
+            self.assertEqual(clen < cmem, True)
+            self.assertEqual(cwrites > 0, True)
+            self.assertEqual((cfails > 0 or csmall > 0), True)
 
 if __name__ == '__main__':
     wttest.run()

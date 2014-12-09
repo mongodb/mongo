@@ -45,6 +45,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_NAMED_COMPRESSOR *ncomp;
 
 	conn = S2C(session);
 
@@ -59,6 +60,20 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
 	if (cval.val != 0)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
+
+	conn->log_compressor = NULL;
+	WT_RET(__wt_config_gets(session, cfg, "log.compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
+				conn->log_compressor = ncomp->compressor;
+				break;
+			}
+		if (conn->log_compressor == NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "unknown log compressor '%.*s'",
+			    (int)cval.len, cval.str);
+	}
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (wt_off_t)cval.val;

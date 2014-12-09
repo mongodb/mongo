@@ -60,7 +60,7 @@ sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
 for d in os.listdir(wt_3rdpartydir):
     for subdir in ('lib', 'python', ''):
         if os.path.exists(os.path.join(wt_3rdpartydir, d, subdir)):
-            sys.path.append(os.path.join(wt_3rdpartydir, d, subdir))
+            sys.path.insert(1, os.path.join(wt_3rdpartydir, d, subdir))
             break
 
 import wttest
