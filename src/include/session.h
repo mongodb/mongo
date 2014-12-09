@@ -14,6 +14,7 @@ struct __wt_data_handle_cache {
 	WT_DATA_HANDLE *dhandle;
 
 	SLIST_ENTRY(__wt_data_handle_cache) l;
+	SLIST_ENTRY(__wt_data_handle_cache) hashl;
 };
 
 /*
@@ -57,8 +58,16 @@ struct __wt_session_impl {
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
 
+	/*
+	 * Each session keeps a cache of data handles open. The set of handles
+	 * can grow quite large so we maintain both a simple list and a hash
+	 * table of lists. The hash table key is based on a hash of the table
+	 * URI.
+	 */
 					/* Session handle reference list */
 	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+					/* Hashed handle reference list array */
+	SLIST_HEAD(__dhandles_hash, __wt_data_handle_cache) *dhhash;
 #define	WT_DHANDLE_SWEEP_WAIT	60	/* Wait before discarding */
 #define	WT_DHANDLE_SWEEP_PERIOD	20	/* Only sweep every 20 seconds */
 	time_t last_sweep;		/* Last sweep for dead handles */
@@ -78,7 +87,8 @@ struct __wt_session_impl {
 	int	 meta_track_nest;	/* Nesting level of meta transaction */
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 
-	TAILQ_HEAD(__tables, __wt_table) tables;
+	SLIST_HEAD(__tables, __wt_table) tables;
+	SLIST_HEAD(__tables_hash, __wt_table) *tablehash;
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
