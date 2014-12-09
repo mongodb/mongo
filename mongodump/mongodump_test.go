@@ -6,10 +6,9 @@ import (
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongodump/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -35,23 +34,23 @@ var (
 func simpleMongoDumpInstance() *MongoDump {
 	ssl := testutil.GetSSLOptions()
 	auth := testutil.GetAuthOptions()
-	namespace := &commonOpts.Namespace{
+	namespace := &options.Namespace{
 		DB: testDB,
 	}
-	connection := &commonOpts.Connection{
+	connection := &options.Connection{
 		Host: testServer,
 		Port: testPort,
 	}
-	toolOptions := &commonOpts.ToolOptions{
+	toolOptions := &options.ToolOptions{
 		SSL:           &ssl,
 		Namespace:     namespace,
 		Connection:    connection,
 		Auth:          &auth,
-		HiddenOptions: &commonOpts.HiddenOptions{},
-		Verbosity:     &commonOpts.Verbosity{},
+		HiddenOptions: &options.HiddenOptions{},
+		Verbosity:     &options.Verbosity{},
 	}
-	outputOptions := &options.OutputOptions{}
-	inputOptions := &options.InputOptions{}
+	outputOptions := &OutputOptions{}
+	inputOptions := &InputOptions{}
 
 	log.SetVerbosity(toolOptions.Verbosity)
 
@@ -65,8 +64,8 @@ func simpleMongoDumpInstance() *MongoDump {
 func getBareSession() (*mgo.Session, error) {
 	ssl := testutil.GetSSLOptions()
 	auth := testutil.GetAuthOptions()
-	sessionProvider, err := db.NewSessionProvider(commonOpts.ToolOptions{
-		Connection: &commonOpts.Connection{
+	sessionProvider, err := db.NewSessionProvider(options.ToolOptions{
+		Connection: &options.Connection{
 			Host: testServer,
 			Port: testPort,
 		},

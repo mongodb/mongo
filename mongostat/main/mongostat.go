@@ -3,10 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
-	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
 	"strconv"
 	"strings"
@@ -15,13 +14,13 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New(
+	opts := options.New(
 		"mongostat",
 		"[options] <polling interval in seconds>",
-		commonopts.EnabledOptions{Connection: true, Auth: true, Namespace: false})
+		options.EnabledOptions{Connection: true, Auth: true, Namespace: false})
 
-	// add mongotop-specific options
-	statOpts := &options.StatOptions{}
+	// add mongostat-specific options
+	statOpts := &mongostat.StatOptions{}
 	opts.AddOptions(statOpts)
 
 	extra, err := opts.Parse()

@@ -3,7 +3,6 @@ package mongodump
 import (
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongodump/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"path/filepath"
@@ -24,8 +23,8 @@ func TestMongoDumpKerberos(t *testing.T) {
 
 		mongoDump := MongoDump{
 			ToolOptions:   opts,
-			InputOptions:  &options.InputOptions{},
-			OutputOptions: &options.OutputOptions{},
+			InputOptions:  &InputOptions{},
+			OutputOptions: &OutputOptions{},
 		}
 
 		mongoDump.OutputOptions.Out = KERBEROS_DUMP_DIRECTORY

@@ -2,12 +2,11 @@ package bsondump
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/bsondump/options"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
@@ -15,8 +14,8 @@ import (
 )
 
 type BSONDump struct {
-	ToolOptions     *commonopts.ToolOptions
-	BSONDumpOptions *options.BSONDumpOptions
+	ToolOptions     *options.ToolOptions
+	BSONDumpOptions *BSONDumpOptions
 	FileName        string
 	Out             io.Writer
 }

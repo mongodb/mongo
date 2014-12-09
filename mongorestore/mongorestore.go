@@ -5,19 +5,18 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"sync"
 )
 
 type MongoRestore struct {
-	ToolOptions   *commonopts.ToolOptions
-	InputOptions  *options.InputOptions
-	OutputOptions *options.OutputOptions
+	ToolOptions   *options.ToolOptions
+	InputOptions  *InputOptions
+	OutputOptions *OutputOptions
 
 	SessionProvider *db.SessionProvider
 

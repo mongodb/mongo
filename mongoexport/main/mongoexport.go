@@ -3,20 +3,19 @@ package main
 import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport"
-	"github.com/mongodb/mongo-tools/mongoexport/options"
 	"os"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongoexport", "<options>", commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := options.New("mongoexport", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
-	outputOpts := &options.OutputFormatOptions{}
+	outputOpts := &mongoexport.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)
-	inputOpts := &options.InputOptions{}
+	inputOpts := &mongoexport.InputOptions{}
 	opts.AddOptions(inputOpts)
 
 	args, err := opts.Parse()

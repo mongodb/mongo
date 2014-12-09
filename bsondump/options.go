@@ -1,4 +1,4 @@
-package options
+package bsondump
 
 type BSONDumpOptions struct {
 	Type     string `long:"type" default:"json" description:"type of output: debug, json"`

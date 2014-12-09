@@ -6,9 +6,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	sloppyjson "github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongoexport/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -31,12 +30,12 @@ var (
 // Wrapper for mongoexport functionality
 type MongoExport struct {
 	// generic mongo tool options
-	ToolOptions commonopts.ToolOptions
+	ToolOptions options.ToolOptions
 
 	// OutputOpts controls options for how the exported data should be formatted
-	OutputOpts *options.OutputFormatOptions
+	OutputOpts *OutputFormatOptions
 
-	InputOpts *options.InputOptions
+	InputOpts *InputOptions
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider

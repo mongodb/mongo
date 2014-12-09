@@ -1,4 +1,4 @@
-package options
+package mongorestore
 
 type InputOptions struct {
 	Objcheck               bool   `long:"objcheck" description:"Validate object before inserting"`

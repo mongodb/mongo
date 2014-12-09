@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport"
-	"github.com/mongodb/mongo-tools/mongoimport/options"
 	"os"
 )
 
@@ -16,11 +15,11 @@ func main() {
 	usageStr := " --host myhost --db my_cms --collection docs < mydocfile." +
 		"json \n\nImport CSV, TSV or JSON data into MongoDB.\n\nWhen importing " +
 		"JSON documents, each document must be a separate line of the input file."
-	opts := commonopts.New("mongoimport", usageStr, commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := options.New("mongoimport", usageStr, options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
-	inputOpts := &options.InputOptions{}
+	inputOpts := &mongoimport.InputOptions{}
 	opts.AddOptions(inputOpts)
-	ingestOpts := &options.IngestOptions{}
+	ingestOpts := &mongoimport.IngestOptions{}
 	opts.AddOptions(ingestOpts)
 
 	args, err := opts.Parse()

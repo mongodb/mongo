@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/mongostat/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"strings"
@@ -19,10 +18,10 @@ const storageEngineWarning = `Warning: not all columns will apply to mongods run
 //internal cluster state used for running mongostat.
 type MongoStat struct {
 	// generic mongo tool options
-	Options *commonopts.ToolOptions
+	Options *options.ToolOptions
 
 	// mongostat-specific output options
-	StatOptions *options.StatOptions
+	StatOptions *StatOptions
 
 	//How long to sleep between printing the rows, and polling the server
 	SleepInterval time.Duration
@@ -245,10 +244,10 @@ func (cluster *AsyncClusterMonitor) Monitor(maxRows int, done chan error, sleep 
 
 //Utility constructor for NodeMonitor that copies the same connection settings
 //from an instance of ToolOptions, but for a different host name.
-func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) (*NodeMonitor, error) {
+func NewNodeMonitor(opts options.ToolOptions, fullHost string, all bool) (*NodeMonitor, error) {
 	optsCopy := opts
 	host, port := parseHostPort(fullHost)
-	optsCopy.Connection = &commonopts.Connection{Host: host, Port: port}
+	optsCopy.Connection = &options.Connection{Host: host, Port: port}
 	optsCopy.Direct = true
 	sessionProvider, err := db.NewSessionProvider(optsCopy)
 	if err != nil {

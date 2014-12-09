@@ -2,21 +2,20 @@ package main
 
 import (
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongodump"
-	"github.com/mongodb/mongo-tools/mongodump/options"
 	"os"
 	"strings"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongodump", "<options>", commonopts.EnabledOptions{true, true, true})
+	opts := options.New("mongodump", "<options>", options.EnabledOptions{true, true, true})
 
-	inputOpts := &options.InputOptions{}
+	inputOpts := &mongodump.InputOptions{}
 	opts.AddOptions(inputOpts)
-	outputOpts := &options.OutputOptions{}
+	outputOpts := &mongodump.OutputOptions{}
 	opts.AddOptions(outputOpts)
 
 	extraArgs, err := opts.Parse()

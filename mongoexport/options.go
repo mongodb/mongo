@@ -1,4 +1,4 @@
-package options
+package mongoexport
 
 type OutputFormatOptions struct {
 	//Fields is an option to directly specify comma-separated fields to export to CSV

@@ -4,10 +4,9 @@ package main
 import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongotop"
-	"github.com/mongodb/mongo-tools/mongotop/options"
 	"os"
 	"strconv"
 	"time"
@@ -16,11 +15,11 @@ import (
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.New("mongotop", "<options> <sleeptime>",
-		commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: false})
+	opts := options.New("mongotop", "<options> <sleeptime>",
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add mongotop-specific options
-	outputOpts := &options.Output{}
+	outputOpts := &mongotop.Output{}
 	opts.AddOptions(outputOpts)
 
 	extra, err := opts.Parse()

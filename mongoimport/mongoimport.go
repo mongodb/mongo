@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongoimport/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/tomb.v2"
@@ -34,13 +33,13 @@ const (
 // Wrapper for MongoImport functionality
 type MongoImport struct {
 	// generic mongo tool options
-	ToolOptions *commonOpts.ToolOptions
+	ToolOptions *options.ToolOptions
 
 	// InputOptions defines options used to read data to be ingested
-	InputOptions *options.InputOptions
+	InputOptions *InputOptions
 
 	// IngestOptions defines options used to ingest data into MongoDB
-	IngestOptions *options.IngestOptions
+	IngestOptions *IngestOptions
 
 	// SessionProvider is used for connecting to the database
 	SessionProvider *db.SessionProvider

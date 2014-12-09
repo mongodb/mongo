@@ -9,9 +9,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
-	"github.com/mongodb/mongo-tools/mongodump/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -29,10 +28,10 @@ const (
 
 type MongoDump struct {
 	// basic mongo tool options
-	ToolOptions *commonopts.ToolOptions
+	ToolOptions *options.ToolOptions
 
-	InputOptions  *options.InputOptions
-	OutputOptions *options.OutputOptions
+	InputOptions  *InputOptions
+	OutputOptions *OutputOptions
 
 	sessionProvider *db.SessionProvider
 

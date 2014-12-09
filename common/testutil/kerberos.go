@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"fmt"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"os"
 	"runtime"
 )
@@ -11,20 +11,20 @@ var (
 	WINDOWS_KERBEROS_PASSWORD_ENV = "MONGODB_KERBEROS_PASSWORD"
 )
 
-func GetKerberosOptions() (*commonopts.ToolOptions, error) {
-	opts := &commonopts.ToolOptions{
-		Namespace: &commonopts.Namespace{
+func GetKerberosOptions() (*options.ToolOptions, error) {
+	opts := &options.ToolOptions{
+		Namespace: &options.Namespace{
 			DB:         "kerberos",
 			Collection: "test",
 		},
-		SSL: &commonopts.SSL{},
-		Auth: &commonopts.Auth{
+		SSL: &options.SSL{},
+		Auth: &options.Auth{
 			Username:  "drivers@LDAPTEST.10GEN.CC",
 			Source:    "$external",
 			Mechanism: "GSSAPI",
 		},
-		Kerberos: &commonopts.Kerberos{},
-		Connection: &commonopts.Connection{
+		Kerberos: &options.Kerberos{},
+		Connection: &options.Connection{
 			Host: "ldaptest.10gen.cc",
 			Port: "27017",
 		},

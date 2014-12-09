@@ -1,4 +1,4 @@
-package options
+package mongofiles
 
 type StorageOptions struct {
 	// Specified database to use. defaults to 'test' if none is specified

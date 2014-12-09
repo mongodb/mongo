@@ -1,5 +1,5 @@
 // Package options implements mongotop-specific command-line options.
-package options
+package mongotop
 
 import ()
 

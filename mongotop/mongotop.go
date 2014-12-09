@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/mongotop/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"time"
 )
 
 // Wrapper for the mongotop functionality
 type MongoTop struct {
 	// Generic mongo tool options
-	Options *commonopts.ToolOptions
+	Options *options.ToolOptions
 
 	// Mongotop-specific output options
-	OutputOptions *options.Output
+	OutputOptions *Output
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider

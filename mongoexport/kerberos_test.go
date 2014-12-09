@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/mongoexport/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"strings"
 	"testing"
@@ -23,7 +22,7 @@ func TestKerberos(t *testing.T) {
 
 		export := MongoExport{
 			ToolOptions:     *opts,
-			OutputOpts:      &options.OutputFormatOptions{},
+			OutputOpts:      &OutputFormatOptions{},
 			InputOpts:       nil,
 			SessionProvider: sessionProvider,
 		}

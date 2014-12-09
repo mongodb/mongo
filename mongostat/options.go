@@ -1,5 +1,5 @@
 // Package options implements mongostat-specific command-line options.
-package options
+package mongostat
 
 import ()
 

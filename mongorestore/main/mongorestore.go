@@ -4,19 +4,18 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongorestore"
-	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"os"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongorestore", "<options>", commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: true})
-	inputOpts := &options.InputOptions{}
+	opts := options.New("mongorestore", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	inputOpts := &mongorestore.InputOptions{}
 	opts.AddOptions(inputOpts)
-	outputOpts := &options.OutputOptions{}
+	outputOpts := &mongorestore.OutputOptions{}
 	opts.AddOptions(outputOpts)
 
 	extraArgs, err := opts.Parse()

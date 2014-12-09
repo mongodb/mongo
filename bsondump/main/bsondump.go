@@ -3,17 +3,16 @@ package main
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/bsondump"
-	"github.com/mongodb/mongo-tools/bsondump/options"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 )
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("bsondump", "<file>", commonopts.EnabledOptions{})
-	bsonDumpOpts := &options.BSONDumpOptions{}
+	opts := options.New("bsondump", "<file>", options.EnabledOptions{})
+	bsonDumpOpts := &bsondump.BSONDumpOptions{}
 	opts.AddOptions(bsonDumpOpts)
 
 	extra, err := opts.Parse()

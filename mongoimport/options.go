@@ -1,4 +1,4 @@
-package options
+package mongoimport
 
 type InputOptions struct {
 	// Fields is an option to directly specify comma-separated fields to import to CSV

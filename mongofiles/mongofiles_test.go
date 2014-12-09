@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongofiles/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
 	"io"
@@ -24,15 +23,15 @@ var (
 
 	ssl        = testutil.GetSSLOptions()
 	auth       = testutil.GetAuthOptions()
-	connection = &commonOpts.Connection{
+	connection = &options.Connection{
 		Host: testServer,
 		Port: testPort,
 	}
-	toolOptions = &commonOpts.ToolOptions{
+	toolOptions = &options.ToolOptions{
 		SSL:        &ssl,
 		Connection: connection,
 		Auth:       &auth,
-		Verbosity:  &commonOpts.Verbosity{},
+		Verbosity:  &options.Verbosity{},
 	}
 )
 
@@ -98,7 +97,7 @@ func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
 
 	mongofiles := MongoFiles{
 		ToolOptions:     toolOptions,
-		StorageOptions:  &options.StorageOptions{GridFSPrefix: "fs"},
+		StorageOptions:  &StorageOptions{GridFSPrefix: "fs"},
 		SessionProvider: sessionProvider,
 		Command:         args[0],
 		FileName:        args[1],

@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -26,10 +25,10 @@ const (
 
 type MongoFiles struct {
 	// generic mongo tool options
-	ToolOptions *commonOpts.ToolOptions
+	ToolOptions *options.ToolOptions
 
 	// mongofiles-specific storage options
-	StorageOptions *options.StorageOptions
+	StorageOptions *StorageOptions
 
 	// for connecting to the db
 	SessionProvider *db.SessionProvider

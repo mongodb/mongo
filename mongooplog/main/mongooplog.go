@@ -4,20 +4,19 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongooplog"
-	"github.com/mongodb/mongo-tools/mongooplog/options"
 	"os"
 )
 
 func main() {
 
 	// initialize command line options
-	opts := commonopts.New("mongooplog", "<options>", commonopts.EnabledOptions{Auth: true, Connection: true, Namespace: false})
+	opts := options.New("mongooplog", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add the mongooplog-specific options
-	sourceOpts := &options.SourceOptions{}
+	sourceOpts := &mongooplog.SourceOptions{}
 	opts.AddOptions(sourceOpts)
 
 	// parse the command line options

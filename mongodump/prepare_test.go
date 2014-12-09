@@ -2,7 +2,6 @@ package mongodump
 
 import (
 	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/mongodump/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )
@@ -14,7 +13,7 @@ func TestSkipCollection(t *testing.T) {
 	Convey("With a mongodump that excludes collections 'test' and 'fake'"+
 		" and excludes prefixes 'pre-' and 'no'", t, func() {
 		md := &MongoDump{
-			OutputOptions: &options.OutputOptions{
+			OutputOptions: &OutputOptions{
 				ExcludedCollections:        []string{"test", "fake"},
 				ExcludedCollectionPrefixes: []string{"pre-", "no"},
 			},

@@ -2,9 +2,8 @@ package mongooplog
 
 import (
 	"github.com/mongodb/mongo-tools/common/db"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/mongooplog/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
@@ -13,27 +12,27 @@ import (
 func TestBasicOps(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 
-	var opts *commonopts.ToolOptions
-	var sourceOpts *options.SourceOptions
+	var opts *options.ToolOptions
+	var sourceOpts *SourceOptions
 
 	Convey("When replicating operations", t, func() {
 		ssl := testutil.GetSSLOptions()
 		auth := testutil.GetAuthOptions()
 
 		// specify localhost:27017 as the destination host
-		opts = &commonopts.ToolOptions{
-			Namespace: &commonopts.Namespace{},
+		opts = &options.ToolOptions{
+			Namespace: &options.Namespace{},
 			SSL:       &ssl,
 			Auth:      &auth,
-			Kerberos:  &commonopts.Kerberos{},
-			Connection: &commonopts.Connection{
+			Kerberos:  &options.Kerberos{},
+			Connection: &options.Connection{
 				Host: "localhost",
 				Port: "27017",
 			},
 		}
 
 		// specify localhost:27017 as the source host
-		sourceOpts = &options.SourceOptions{
+		sourceOpts = &SourceOptions{
 			Seconds: 84600,            // the default
 			OplogNS: "local.oplog.rs", // the default
 		}

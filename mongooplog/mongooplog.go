@@ -3,9 +3,8 @@ package mongooplog
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/mongodb/mongo-tools/mongooplog/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
@@ -13,10 +12,10 @@ import (
 
 type MongoOplog struct {
 	// standard tool options
-	ToolOptions *commonopts.ToolOptions
+	ToolOptions *options.ToolOptions
 
 	// mongooplog-specific options
-	SourceOptions *options.SourceOptions
+	SourceOptions *SourceOptions
 
 	// session provider for the source server
 	SessionProviderFrom *db.SessionProvider
@@ -118,7 +117,7 @@ type OplogEntry struct {
 // get the cursor for the oplog collection, based on the options
 // passed in to mongooplog
 func buildTailingCursor(oplog *mgo.Collection,
-	sourceOptions *options.SourceOptions) *mgo.Iter {
+	sourceOptions *SourceOptions) *mgo.Iter {
 
 	// how many seconds in the past we need
 	secondsInPast := time.Duration(sourceOptions.Seconds) * time.Second

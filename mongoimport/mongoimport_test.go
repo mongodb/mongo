@@ -3,9 +3,8 @@ package mongoimport
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
-	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/mongoimport/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -50,30 +49,30 @@ func checkOnlyHasDocuments(sessionProvider db.SessionProvider, expectedDocuments
 
 // getBasicToolOptions returns a test helper to instantiate the session provider
 // for calls to StreamDocument
-func getBasicToolOptions() *commonOpts.ToolOptions {
+func getBasicToolOptions() *options.ToolOptions {
 	ssl := testutil.GetSSLOptions()
 	auth := testutil.GetAuthOptions()
-	namespace := &commonOpts.Namespace{
+	namespace := &options.Namespace{
 		DB:         testDb,
 		Collection: testCollection,
 	}
-	connection := &commonOpts.Connection{
+	connection := &options.Connection{
 		Host: "localhost",
 		Port: "27017",
 	}
-	return &commonOpts.ToolOptions{
+	return &options.ToolOptions{
 		SSL:           &ssl,
 		Namespace:     namespace,
 		Connection:    connection,
-		HiddenOptions: &commonOpts.HiddenOptions{},
+		HiddenOptions: &options.HiddenOptions{},
 		Auth:          &auth,
 	}
 }
 
 func NewMongoImport() (*MongoImport, error) {
 	toolOptions := getBasicToolOptions()
-	inputOptions := &options.InputOptions{}
-	ingestOptions := &options.IngestOptions{}
+	inputOptions := &InputOptions{}
+	ingestOptions := &IngestOptions{}
 	provider, err := db.NewSessionProvider(*toolOptions)
 	if err != nil {
 		return nil, err
