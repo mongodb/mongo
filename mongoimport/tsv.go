@@ -72,7 +72,7 @@ func (tsvInputReader *TSVInputReader) ReadHeaderFromSource() ([]string, error) {
 	}
 	tokenizedHeaders := strings.Split(stringHeaders, tokenSeparator)
 	for _, header := range tokenizedHeaders {
-		unsortedHeaders = append(unsortedHeaders, strings.TrimSpace(header))
+		unsortedHeaders = append(unsortedHeaders, strings.TrimRight(header, "\r\n"))
 	}
 	return unsortedHeaders, nil
 }

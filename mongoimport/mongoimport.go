@@ -114,22 +114,36 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	if mongoImport.InputOptions.Type == CSV ||
 		mongoImport.InputOptions.Type == TSV {
 		if !mongoImport.InputOptions.HeaderLine {
-			if mongoImport.InputOptions.Fields == "" &&
-				mongoImport.InputOptions.FieldFile == "" {
-				return fmt.Errorf("You need to specify fields or have a " +
-					"header line to import this file type")
+			if mongoImport.InputOptions.Fields == nil &&
+				mongoImport.InputOptions.FieldFile == nil {
+				return fmt.Errorf("must specify --fields, --fieldFile or --headerline to import this file type")
 			}
-			if mongoImport.InputOptions.Fields != "" &&
-				mongoImport.InputOptions.FieldFile != "" {
+			if mongoImport.InputOptions.FieldFile != nil &&
+				*mongoImport.InputOptions.FieldFile == "" {
+				return fmt.Errorf("--fieldFile can not be empty string")
+			}
+			if mongoImport.InputOptions.Fields != nil &&
+				mongoImport.InputOptions.FieldFile != nil {
 				return fmt.Errorf("incompatible options: --fields and --fieldFile")
 			}
 		} else {
-			if mongoImport.InputOptions.Fields != "" {
+			if mongoImport.InputOptions.Fields != nil {
 				return fmt.Errorf("incompatible options: --fields and --headerline")
 			}
-			if mongoImport.InputOptions.FieldFile != "" {
+			if mongoImport.InputOptions.FieldFile != nil {
 				return fmt.Errorf("incompatible options: --fieldFile and --headerline")
 			}
+		}
+	} else {
+		// input type is JSON
+		if mongoImport.InputOptions.HeaderLine {
+			return fmt.Errorf("can not use --headerline when input type is JSON")
+		}
+		if mongoImport.InputOptions.Fields != nil {
+			return fmt.Errorf("can not use --fields when input type is JSON")
+		}
+		if mongoImport.InputOptions.FieldFile != nil {
+			return fmt.Errorf("can not use --fieldFile when input type is JSON")
 		}
 	}
 
@@ -520,10 +534,10 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 func (mongoImport *MongoImport) getInputReader(in io.Reader) (InputReader, error) {
 	var fields []string
 	var err error
-	if len(mongoImport.InputOptions.Fields) != 0 {
-		fields = strings.Split(strings.Trim(mongoImport.InputOptions.Fields, " "), ",")
-	} else if mongoImport.InputOptions.FieldFile != "" {
-		fields, err = util.GetFieldsFromFile(mongoImport.InputOptions.FieldFile)
+	if mongoImport.InputOptions.Fields != nil {
+		fields = strings.Split(*mongoImport.InputOptions.Fields, ",")
+	} else if mongoImport.InputOptions.FieldFile != nil {
+		fields, err = util.GetFieldsFromFile(*mongoImport.InputOptions.FieldFile)
 		if err != nil {
 			return nil, err
 		}

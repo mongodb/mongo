@@ -2,10 +2,10 @@ package options
 
 type InputOptions struct {
 	// Fields is an option to directly specify comma-separated fields to import to CSV
-	Fields string `long:"fields" short:"f" description:"comma separated list of field names e.g. -f name,age"`
+	Fields *string `long:"fields" short:"f" description:"comma separated list of field names e.g. -f name,age"`
 
 	// FieldFile is a filename that refers to a list of fields to import, 1 per line
-	FieldFile string `long:"fieldFile" description:"file with field names - 1 per line"`
+	FieldFile *string `long:"fieldFile" description:"file with field names - 1 per line"`
 
 	// JSONArray if set will import the documents an array of JSON doccuments
 	JSONArray bool `long:"jsonArray" description:"output to a JSON array rather than one object per line"`

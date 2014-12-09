@@ -117,7 +117,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			"but --fields is supplied", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.Fields = "a,b,c"
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.InputOptions.Type = CSV
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
@@ -125,23 +126,74 @@ func TestMongoImportValidateSettings(t *testing.T) {
 		Convey("no error should be thrown if no input type is supplied", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.Fields = "a,b,c"
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
+		})
+
+		Convey("an error should be thrown if --headerline is used with JSON input", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			mongoImport.InputOptions.HeaderLine = true
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
+		Convey("an error should be thrown if --fields is used with JSON input", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fields := ""
+			mongoImport.InputOptions.Fields = &fields
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+			fields = "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
+		Convey("an error should be thrown if --fieldFile is used with JSON input", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fieldFile := ""
+			mongoImport.InputOptions.FieldFile = &fieldFile
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+			fieldFile = "test.csv"
+			mongoImport.InputOptions.FieldFile = &fieldFile
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fieldFile is supplied", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.FieldFile = "test.csv"
+			fieldFile := "test.csv"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			mongoImport.InputOptions.Type = CSV
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
+		})
+
+		Convey("no error should be thrown if --fields is supplied with CSV import", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
+			mongoImport.InputOptions.Type = CSV
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
+			fields = ""
+			mongoImport.InputOptions.Fields = &fields
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
+		})
+
+		Convey("an error should be thrown if empty --fieldFile is used with CSV input", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			fieldFile := ""
+			mongoImport.InputOptions.Type = CSV
+			mongoImport.InputOptions.FieldFile = &fieldFile
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if no collection and no file is supplied", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.FieldFile = "test.csv"
+			fieldFile := "test.csv"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.ToolOptions.Namespace.Collection = ""
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
@@ -152,7 +204,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "input"
-			mongoImport.InputOptions.FieldFile = "test.csv"
+			fieldFile := "test.csv"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.ToolOptions.Namespace.Collection = ""
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
@@ -165,7 +218,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
-			mongoImport.InputOptions.FieldFile = "test.csv"
+			fieldFile := "test.csv"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.ToolOptions.Namespace.Collection = ""
 			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
@@ -222,7 +276,8 @@ func TestGetInputReader(t *testing.T) {
 		Convey("no error should be thrown if --fields is used", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.Fields = "a,b,c"
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
 			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
@@ -231,7 +286,8 @@ func TestGetInputReader(t *testing.T) {
 			"references a valid file", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.FieldFile = "testdata/test_array.json"
+			fieldFile := "testdata/test_array.json"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
@@ -239,7 +295,8 @@ func TestGetInputReader(t *testing.T) {
 			"references an invalid file", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			mongoImport.InputOptions.FieldFile = "/path/to/input/file/dot/input.txt"
+			fieldFile := "/path/to/input/file/dot/input.txt"
+			mongoImport.InputOptions.FieldFile = &fieldFile
 			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldNotBeNil)
 		})
@@ -289,7 +346,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "a,b,c"
+			fields := "a,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.WriteConcern = "majority"
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
@@ -310,7 +368,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_blanks.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.IgnoreBlanks = true
 
 			numImported, err := mongoImport.ImportDocuments()
@@ -328,7 +387,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_blanks.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
@@ -344,7 +404,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.Upsert = true
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			numImported, err := mongoImport.ImportDocuments()
@@ -363,7 +424,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.StopOnError = true
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			mongoImport.IngestOptions.WriteConcern = "majority"
@@ -383,7 +445,8 @@ func TestImportDocuments(t *testing.T) {
 
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.StopOnError = false
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
@@ -403,7 +466,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.Drop = true
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			mongoImport.IngestOptions.WriteConcern = "majority"
@@ -422,7 +486,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.InputOptions.HeaderLine = true
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
@@ -437,7 +502,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = csvFile.Name()
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.InputOptions.HeaderLine = true
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldEqual, io.EOF)
@@ -449,7 +515,8 @@ func TestImportDocuments(t *testing.T) {
 
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
-			mongoImport.InputOptions.Fields = "_id,c,b"
+			fields := "_id,c,b"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.Upsert = true
 			mongoImport.IngestOptions.UpsertFields = "_id"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
@@ -469,7 +536,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.Upsert = true
 			mongoImport.IngestOptions.UpsertFields = "_id"
 			numImported, err := mongoImport.ImportDocuments()
@@ -490,7 +558,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.StopOnError = true
 			mongoImport.IngestOptions.WriteConcern = "1"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
@@ -508,7 +577,8 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test_bad.csv"
-			mongoImport.InputOptions.Fields = "_id,b,c"
+			fields := "_id,b,c"
+			mongoImport.InputOptions.Fields = &fields
 			mongoImport.IngestOptions.StopOnError = true
 			mongoImport.IngestOptions.WriteConcern = "1"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
