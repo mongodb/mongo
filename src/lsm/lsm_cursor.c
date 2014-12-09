@@ -107,7 +107,8 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 		/* If we overflow the soft limit, just request a switch. */
 		if (!hard_limit)
 			return (__clsm_request_switch(clsm));
-	}
+	} else
+		WT_RET(__clsm_request_switch(clsm));
 
 	/*
 	 * If there is no primary chunk, or it has overflowed the hard limit,
@@ -122,8 +123,9 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	    lsm_tree->nchunks == 0 ||
 	    clsm->dsk_gen == lsm_tree->dsk_gen;
 	    ++waited) {
-		if (waited % 100 == 0)
-			__clsm_request_switch(clsm);
+		if (waited % 1000 == 0)
+			WT_RET(__wt_lsm_manager_push_entry(
+			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 		__wt_sleep(0, 10);
 	}
 
