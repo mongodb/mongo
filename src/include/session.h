@@ -58,6 +58,12 @@ struct __wt_session_impl {
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
 
+	/*
+	 * Each session keeps a cache of data handles open. The set of handles
+	 * can grow quite large so we maintain both a simple list and a hash
+	 * table of lists. The hash table key is based on a hash of the table
+	 * URI.
+	 */
 					/* Session handle reference list */
 	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 					/* Hashed handle reference list array */

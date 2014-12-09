@@ -147,6 +147,12 @@ struct __wt_connection_impl {
 
 	uint64_t  split_gen;		/* Generation number for splits */
 
+	/*
+	 * The connection keeps a cache of data handles. The set of handles
+	 * can grow quite large so we maintain both a simple list and a hash
+	 * table of lists. The hash table key is based on a hash of the table
+	 * URI.
+	 */
 					/* Locked: data handle hash array */
 #define	WT_HASH_ARRAY_SIZE	512
 	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
