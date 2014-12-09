@@ -60,6 +60,11 @@ func main() {
 		return
 	}
 
+	if opts.Auth.Username != "" && opts.Auth.Source == "" {
+		log.Logf(log.Always, "--authenticationDatabase is required")
+		os.Exit(util.ExitBadOptions)
+	}
+
 	var formatter mongostat.LineFormatter
 	formatter = &mongostat.GridLineFormatter{!statOpts.NoHeaders, 10}
 	if statOpts.Json {

@@ -57,6 +57,11 @@ func main() {
 		os.Exit(util.ExitBadOptions)
 	}
 
+	if opts.Auth.Username != "" && opts.Auth.Source == "" {
+		log.Logf(log.Always, "--authenticationDatabase is required")
+		os.Exit(util.ExitBadOptions)
+	}
+
 	// connect directly, unless a replica set name is explicitly specified
 	_, setName := util.ParseConnectionString(opts.Host)
 	opts.Direct = (setName == "")
