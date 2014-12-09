@@ -314,7 +314,7 @@ func TestGetSourceReader(t *testing.T) {
 				mongoImport.InputOptions.File = "/path/to/input/file/dot/input.txt"
 				mongoImport.InputOptions.Type = CSV
 				mongoImport.ToolOptions.Namespace.Collection = ""
-				_, err = mongoImport.getSourceReader()
+				_, _, err = mongoImport.getSourceReader()
 				So(err, ShouldNotBeNil)
 			})
 
@@ -323,7 +323,7 @@ func TestGetSourceReader(t *testing.T) {
 				So(err, ShouldBeNil)
 				mongoImport.InputOptions.File = "testdata/test_array.json"
 				mongoImport.InputOptions.Type = JSON
-				_, err = mongoImport.getSourceReader()
+				_, _, err = mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 
@@ -331,7 +331,7 @@ func TestGetSourceReader(t *testing.T) {
 				mongoImport, err := NewMongoImport()
 				So(err, ShouldBeNil)
 				mongoImport.InputOptions.File = ""
-				_, err = mongoImport.getSourceReader()
+				_, _, err = mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 		})

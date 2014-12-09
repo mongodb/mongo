@@ -36,6 +36,29 @@ type ImportWorker struct {
 	tomb *tomb.Tomb
 }
 
+// an interface for tracking the number of bytes, which is used in mongoimport to feed
+// the progress bar.
+type sizeTracker interface {
+	Size() int64
+}
+
+// sizeTrackingReader implements Reader and sizeTracker by wrapping an io.Reader and keeping track
+// of the total number of bytes read from each call to Read().
+type sizeTrackingReader struct {
+	reader    io.Reader
+	bytesRead int64
+}
+
+func (str *sizeTrackingReader) Size() int64 {
+	return str.bytesRead
+}
+
+func (str *sizeTrackingReader) Read(p []byte) (n int, err error) {
+	n, err = str.reader.Read(p)
+	str.bytesRead += int64(n)
+	return
+}
+
 // constructUpsertDocument constructs a BSON document to use for upserts
 func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 	upsertDocument := bson.M{}

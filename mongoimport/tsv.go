@@ -31,6 +31,9 @@ type TSVInputReader struct {
 
 	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
+
+	// embedded sizeTracker exposes the Size() method to check the number of bytes read so far
+	sizeTracker
 }
 
 // TSVConvertibleDoc implements the ConvertibleDoc interface for TSV input
@@ -43,11 +46,13 @@ type TSVConvertibleDoc struct {
 // NewTSVInputReader returns a TSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
 func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInputReader {
+	szCount := &sizeTrackingReader{in, 0}
 	return &TSVInputReader{
 		Fields:       fields,
 		tsvReader:    bufio.NewReader(in),
 		numProcessed: uint64(0),
 		numDecoders:  numDecoders,
+		sizeTracker:  szCount,
 	}
 }
 

@@ -371,8 +371,8 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		// handle repairs as a special case, since we cannot count them
 		log.Logf(log.Always, "writing repair of %v to %v", intent.Key(), outFilepath)
 		repairIter := session.DB(intent.DB).C(intent.C).Repair()
-		var repairCounter int64
-		if err := dump.dumpIterToWriter(repairIter, out, &repairCounter); err != nil {
+		repairCounter := progress.NewCounter(1) // this counter is ignored
+		if err := dump.dumpIterToWriter(repairIter, out, repairCounter); err != nil {
 			return fmt.Errorf("repair error: %v", err)
 		}
 		log.Logf(log.Always,
@@ -405,20 +405,18 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 func (dump *MongoDump) dumpQueryToWriter(
 	query *mgo.Query, intent *intents.Intent, writer io.Writer) (err error) {
 
-	var dumpCounter int64
-
 	total, err := query.Count()
 	if err != nil {
 		return fmt.Errorf("error reading from db: %v", err)
 	}
 	log.Logf(log.Info, "\t%v documents", total)
 
-	bar := &progress.ProgressBar{
-		Name:       intent.Key(),
-		Max:        int64(total),
-		CounterPtr: &dumpCounter,
-		Writer:     log.Writer(0),
-		BarLength:  ProgressBarLength,
+	dumpProgressor := progress.NewCounter(int64(total))
+	bar := &progress.Bar{
+		Name:      intent.Key(),
+		Watching:  dumpProgressor,
+		Writer:    log.Writer(0),
+		BarLength: ProgressBarLength,
 	}
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
@@ -427,13 +425,13 @@ func (dump *MongoDump) dumpQueryToWriter(
 	// this allows disk i/o to not block reads from the db,
 	// which gives a slight speedup on benchmarks
 	iter := query.Iter()
-	return dump.dumpIterToWriter(iter, writer, &dumpCounter)
+	return dump.dumpIterToWriter(iter, writer, dumpProgressor)
 }
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
 // a counter, and dumps the iterator's contents to the writer.
 func (dump *MongoDump) dumpIterToWriter(
-	iter *mgo.Iter, writer io.Writer, counterPtr *int64) error {
+	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable) error {
 
 	buffChan := make(chan []byte)
 	go func() {
@@ -475,7 +473,7 @@ func (dump *MongoDump) dumpIterToWriter(
 		if err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
-		*counterPtr++
+		progressCount.Inc(1)
 	}
 	err := w.Flush()
 	if err != nil {

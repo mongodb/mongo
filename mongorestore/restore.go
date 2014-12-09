@@ -220,18 +220,15 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 
 	collection := session.DB(dbName).C(colName)
 
-	// progress bar handlers
-	var bytesRead int64
-
+	watchProgressor := progress.NewCounter(fileSize)
 	// only print progress bar if we know the bounds
 	// TODO have useful progress meters when max=0
 	if fileSize > 0 {
-		bar := &progress.ProgressBar{
-			Name:       fmt.Sprintf("%v.%v", dbName, colName),
-			Max:        int64(fileSize),
-			CounterPtr: &bytesRead,
-			Writer:     log.Writer(0),
-			BarLength:  ProgressBarLength,
+		bar := &progress.Bar{
+			Name:      fmt.Sprintf("%v.%v", dbName, colName),
+			Watching:  watchProgressor,
+			Writer:    log.Writer(0),
+			BarLength: ProgressBarLength,
 		}
 		restore.progressManager.Attach(bar)
 		defer restore.progressManager.Detach(bar)
@@ -256,7 +253,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 				if !alive {
 					return
 				}
-				bytesRead += size
+				watchProgressor.Inc(size)
 			case <-killChan:
 				return
 			}

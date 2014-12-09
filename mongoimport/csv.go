@@ -25,6 +25,9 @@ type CSVInputReader struct {
 
 	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
+
+	// embedded sizeTracker exposes the Size() method to check the number of bytes read so far
+	sizeTracker 
 }
 
 // CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
@@ -36,7 +39,8 @@ type CSVConvertibleDoc struct {
 // NewCSVInputReader returns a CSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
 func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInputReader {
-	csvReader := csv.NewReader(in)
+	szCount := &sizeTrackingReader{in, 0}
+	csvReader := csv.NewReader(szCount)
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
 	csvReader.TrimLeadingSpace = true
@@ -45,6 +49,7 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 		csvReader:    csvReader,
 		numProcessed: uint64(0),
 		numDecoders:  numDecoders,
+		sizeTracker:  szCount,
 	}
 }
 

@@ -9,23 +9,24 @@ import (
 )
 
 func TestBasicProgressBar(t *testing.T) {
-	var localCounter int64
+
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {
-		pbar := &ProgressBar{
-			Name:       "\nTEST",
-			Max:        10,
-			CounterPtr: &localCounter,
-			WaitTime:   3 * time.Millisecond,
-			Writer:     writeBuffer,
-			BarLength:  10,
+		watching := NewCounter(10)
+		pbar := &Bar{
+			Name:      "\nTEST",
+			Watching:  watching,
+			WaitTime:  3 * time.Millisecond,
+			Writer:    writeBuffer,
+			BarLength: 10,
 		}
 
 		Convey("running it while incrementing its counter", func() {
 			pbar.Start()
 			// iterate though each value 1-10, sleeping to make sure it is written
-			for localCounter = 0; localCounter < 10; localCounter++ {
+			for localCounter := 0; localCounter < 10; localCounter++ {
+				watching.Inc(1)
 				time.Sleep(5 * time.Millisecond)
 			}
 			pbar.Stop()
@@ -54,17 +55,17 @@ func TestBasicProgressBar(t *testing.T) {
 }
 
 func TestBarConcurrency(t *testing.T) {
-	var localCounter int64
+	//var localCounter int64
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {
-		localCounter = 777
-		pbar := &ProgressBar{
-			Name:       "\nTEST",
-			Max:        1000,
-			CounterPtr: &localCounter,
-			WaitTime:   10 * time.Millisecond,
-			Writer:     writeBuffer,
+		watching := NewCounter(1000)
+		watching.Inc(777)
+		pbar := &Bar{
+			Name:     "\nTEST",
+			Watching: watching,
+			WaitTime: 10 * time.Millisecond,
+			Writer:   writeBuffer,
 		}
 
 		Convey("starting and stopping it using some sketchy timing", func() {
@@ -72,7 +73,7 @@ func TestBarConcurrency(t *testing.T) {
 			time.Sleep(15 * time.Millisecond)
 			pbar.Stop()
 			// change this value after stopping and make sure it never gets used
-			localCounter = 219
+			watching.Inc(-558)
 			time.Sleep(15 * time.Millisecond)
 
 			Convey("the bar should have only logged one count", func() {

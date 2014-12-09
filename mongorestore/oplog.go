@@ -53,16 +53,16 @@ func (restore *MongoRestore) RestoreOplog() error {
 	entryArray := make([]interface{}, 0, 1024)
 	rawOplogEntry := &bson.Raw{}
 
-	var totalBytes, totalOps int64
+	var totalOps int64
 	var entrySize, bufferedBytes int
 
-	bar := progress.ProgressBar{
-		Name:       "oplog",
-		Max:        size,
-		CounterPtr: &totalBytes,
-		WaitTime:   3 * time.Second,
-		Writer:     log.Writer(0),
-		BarLength:  ProgressBarLength,
+	oplogProgressor := progress.NewCounter(size)
+	bar := progress.Bar{
+		Name:      "oplog",
+		Watching:  oplogProgressor,
+		WaitTime:  3 * time.Second,
+		Writer:    log.Writer(0),
+		BarLength: ProgressBarLength,
 	}
 	bar.Start()
 	defer bar.Stop()
@@ -109,7 +109,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 		totalOps++
 		bufferedBytes += entrySize
-		totalBytes += int64(entrySize)
+		oplogProgressor.Inc(int64(entrySize))
 		entryArray = append(entryArray, entryAsOplog)
 	}
 	// finally, flush the remaining entries

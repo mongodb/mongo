@@ -13,7 +13,7 @@ import (
 type Manager struct {
 	WaitTime time.Duration
 
-	bars     []*ProgressBar
+	bars     []*Bar
 	barsLock *sync.Mutex
 	stopChan chan struct{}
 }
@@ -30,7 +30,7 @@ func NewProgressBarManager(waitTime time.Duration) *Manager {
 // Attach registers the given progress bar with the manager. Should be used as
 //  myManager.Attach(myBar)
 //  defer myManager.Detach(myBar)
-func (manager *Manager) Attach(pb *ProgressBar) {
+func (manager *Manager) Attach(pb *Bar) {
 	// first some quick error checks
 	if pb.Name == "" {
 		panic("cannot attach a nameless bar to a progress bar manager")
@@ -53,7 +53,7 @@ func (manager *Manager) Attach(pb *ProgressBar) {
 // Detach removes the given progress bar from the manager.
 // Insert order is maintained for consistent ordering of the printed bars.
 //  Note: the manager removes progress bars by "Name" not by memory location
-func (manager *Manager) Detach(pb *ProgressBar) {
+func (manager *Manager) Detach(pb *Bar) {
 	if pb.Name == "" {
 		panic("cannot detach a nameless bar from a progress bar manager")
 	}
@@ -61,7 +61,7 @@ func (manager *Manager) Detach(pb *ProgressBar) {
 	manager.barsLock.Lock()
 	defer manager.barsLock.Unlock()
 
-	updatedBars := make([]*ProgressBar, 0, len(manager.bars)-1)
+	updatedBars := make([]*Bar, 0, len(manager.bars)-1)
 	for _, bar := range manager.bars {
 		// move all bars to the updated list except for the bar we want to detach
 		if bar.Name != pb.Name {

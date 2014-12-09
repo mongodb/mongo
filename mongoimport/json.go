@@ -42,6 +42,9 @@ type JSONInputReader struct {
 	// underlying reader
 	separatorReader io.Reader
 
+	// embedded sizeTracker exposes the Size() method to check the number of bytes read so far
+	sizeTracker
+
 	// numDecoders is the number of concurrent goroutines to use for decoding
 	numDecoders int
 }
@@ -70,9 +73,12 @@ var (
 // NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader
 func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
+
+	szCount := &sizeTrackingReader{in, 0}
 	return &JSONInputReader{
 		IsArray:            isArray,
-		Decoder:            json.NewDecoder(in),
+		sizeTracker:        szCount,
+		Decoder:            json.NewDecoder(szCount),
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
 		numDecoders:        numDecoders,
@@ -156,12 +162,13 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 
 	var readByte byte
 	scanp := 0
-	jsonInputReader.separatorReader = io.MultiReader(
+
+	separatorReader := io.MultiReader(
 		jsonInputReader.Decoder.Buffered(),
 		jsonInputReader.Decoder.R,
 	)
 	for readByte != jsonInputReader.expectedByte {
-		n, err := jsonInputReader.separatorReader.Read(jsonInputReader.bytesFromReader)
+		n, err := separatorReader.Read(jsonInputReader.bytesFromReader)
 		scanp += n
 		if n == 0 || err != nil {
 			if err == io.EOF {
@@ -175,7 +182,7 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
-				_, err = jsonInputReader.separatorReader.Read(jsonInputReader.bytesFromReader)
+				_, err = separatorReader.Read(jsonInputReader.bytesFromReader)
 				if err != nil {
 					// takes care of the '[]' case
 					if !jsonInputReader.readOpeningBracket {

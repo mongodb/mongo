@@ -17,29 +17,27 @@ func TestManagerAttachAndDetach(t *testing.T) {
 		So(manager, ShouldNotBeNil)
 
 		Convey("adding 3 bars", func() {
-			localCounter := int64(5)
-			pbar1 := &ProgressBar{
-				Name:       "\nTEST1",
-				Max:        10,
-				CounterPtr: &localCounter,
-				Writer:     writeBuffer,
-				BarLength:  10,
+			watching := NewCounter(10)
+			watching.Inc(5)
+			pbar1 := &Bar{
+				Name:      "\nTEST1",
+				Watching:  watching,
+				Writer:    writeBuffer,
+				BarLength: 10,
 			}
 			manager.Attach(pbar1)
-			pbar2 := &ProgressBar{
-				Name:       "\nTEST2",
-				Max:        10,
-				CounterPtr: &localCounter,
-				Writer:     writeBuffer,
-				BarLength:  10,
+			pbar2 := &Bar{
+				Name:      "\nTEST2",
+				Watching:  watching,
+				Writer:    writeBuffer,
+				BarLength: 10,
 			}
 			manager.Attach(pbar2)
-			pbar3 := &ProgressBar{
-				Name:       "\nTEST3",
-				Max:        10,
-				CounterPtr: &localCounter,
-				Writer:     writeBuffer,
-				BarLength:  10,
+			pbar3 := &Bar{
+				Name:      "\nTEST3",
+				Watching:  watching,
+				Writer:    writeBuffer,
+				BarLength: 10,
 			}
 			manager.Attach(pbar3)
 
@@ -71,12 +69,12 @@ func TestManagerAttachAndDetach(t *testing.T) {
 				})
 
 				Convey("but adding a new bar should print 1,2,4", func() {
-					pbar4 := &ProgressBar{
-						Name:       "\nTEST4",
-						Max:        10,
-						CounterPtr: &localCounter,
-						Writer:     writeBuffer,
-						BarLength:  10,
+					watching := NewCounter(10)
+					pbar4 := &Bar{
+						Name:      "\nTEST4",
+						Watching:  watching,
+						Writer:    writeBuffer,
+						BarLength: 10,
 					}
 					manager.Attach(pbar4)
 
@@ -115,13 +113,13 @@ func TestManagerStartAndStop(t *testing.T) {
 	Convey("With a progress.Manager with a WaitTime of 10 ms and one bar", t, func() {
 		manager = NewProgressBarManager(time.Millisecond * 10)
 		So(manager, ShouldNotBeNil)
-		localCounter := int64(5)
-		pbar := &ProgressBar{
-			Name:       "\nTEST",
-			Max:        10,
-			CounterPtr: &localCounter,
-			Writer:     writeBuffer,
-			BarLength:  10,
+		watching := NewCounter(10)
+		watching.Inc(5)
+		pbar := &Bar{
+			Name:      "\nTEST",
+			Watching:  watching,
+			Writer:    writeBuffer,
+			BarLength: 10,
 		}
 		manager.Attach(pbar)
 

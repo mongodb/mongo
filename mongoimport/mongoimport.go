@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -63,19 +64,19 @@ type MongoImport struct {
 	upsertFields []string
 }
 
-// InputReader is an interface that wraps the StreamDocument and ReadAndValidateHeader
-// methods.
-//
-// StreamDocument sends InputReader processed BSON documents on the read channel
-// If an error is encountered during processing, it is sent on the err channel.
-// Otherwise, once documents are streamed, nil is sent on the err channel.
-//
-// ReadAndValidateHeader reads the header line from the InputReader and returns
-// a non-nil error if the fields from the header line are invalid; returns
-// nil otherwise. No-op for JSON input readers
 type InputReader interface {
+	// StreamDocument sends InputReader processed BSON documents on the read channel
+	// If an error is encountered during processing, it is sent on the err channel.
+	// Otherwise, once documents are streamed, nil is sent on the err channel.
 	StreamDocument(ordered bool, read chan bson.D, err chan error)
+
+	// ReadAndValidateHeader reads the header line from the InputReader and returns
+	// a non-nil error if the fields from the header line are invalid; returns
+	// nil otherwise. No-op for JSON input readers
 	ReadAndValidateHeader() error
+
+	// embedded io.Reader that tracks number of bytes read, to allow feeding into progress bar
+	sizeTracker
 }
 
 // ValidateSettings ensures that the tool specific options supplied for
@@ -223,29 +224,45 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	return nil
 }
 
-// getSourceReader returns an io.Reader to read from the input source
-func (mongoImport *MongoImport) getSourceReader() (io.ReadCloser, error) {
+// getSourceReader returns an io.Reader to read from the input source. Also
+// returns a progress.Progressor which can be used to track progress if the
+// reader supports it.
+func (mongoImport *MongoImport) getSourceReader() (io.ReadCloser, int64, error) {
 	if mongoImport.InputOptions.File != "" {
 		file, err := os.Open(util.ToUniversalPath(mongoImport.InputOptions.File))
 		if err != nil {
-			return nil, err
+			return nil, -1, err
 		}
 		fileStat, err := file.Stat()
 		if err != nil {
-			return nil, err
+			return nil, -1, err
 		}
 		log.Logf(log.Info, "filesize: %v bytes", fileStat.Size())
-		return file, err
+		return file, int64(fileStat.Size()), err
 	}
-	log.Logf(log.Info, "filesize: 0 bytes")
-	return os.Stdin, nil
+
+	log.Logf(log.Info, "reading from stdin")
+
+	// Stdin has undefined max size, so no progressor
+	return os.Stdin, -1, nil
+}
+
+// fileSizeProgressor implements Progressor to allow a sizeTracker to hook up with a
+// progress.Bar instance, so that the progress bar can report the percentage of the file read.
+type fileSizeProgressor struct {
+	max int64
+	sizeTracker
+}
+
+func (fsp *fileSizeProgressor) Progress() (int64, int64) {
+	return fsp.max, fsp.sizeTracker.Size()
 }
 
 // ImportDocuments is used to write input data to the database. It returns the
 // number of documents successfully imported to the appropriate namespace and
 // any error encountered in doing this
 func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
-	source, err := mongoImport.getSourceReader()
+	source, fileSize, err := mongoImport.getSourceReader()
 	if err != nil {
 		return 0, err
 	}
@@ -261,6 +278,16 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 			return 0, err
 		}
 	}
+
+	if fileSize > 0 {
+		bar := &progress.Bar{
+			Name:     fmt.Sprintf("%v.%v", mongoImport.ToolOptions.DB, mongoImport.ToolOptions.Collection),
+			Watching: &fileSizeProgressor{fileSize, inputReader},
+			Writer:   log.Writer(0),
+		}
+		bar.Start()
+	}
+
 	return mongoImport.importDocuments(inputReader)
 }
 
@@ -420,7 +447,7 @@ readLoop:
 				}
 				// TODO: TOOLS-313; better to use a progress bar here
 				if mongoImport.insertionCount%10000 == 0 {
-					log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
+					log.Logf(log.Info, "Progress: %v documents inserted...", mongoImport.insertionCount)
 				}
 				documents = documents[:0]
 				numMessageBytes = 0
