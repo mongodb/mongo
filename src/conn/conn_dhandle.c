@@ -665,7 +665,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	/* Check if the handle was reacquired by a session while we waited. */
-	if (!final && dhandle->session_ref != 0)
+	if (!final && dhandle->session_inuse != 0)
 		return (EBUSY);
 
 	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket);

@@ -886,8 +886,8 @@ retry:	while (slot < max_entries && ret == 0) {
 			dhandle = SLIST_FIRST(&conn->dhlh);
 		else {
 			if (incr) {
-				WT_ASSERT(session, dhandle->session_ref > 0);
-				(void)WT_ATOMIC_SUB4(dhandle->session_ref, 1);
+				WT_ASSERT(session, dhandle->session_inuse > 0);
+				(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
 				incr = 0;
 			}
 			dhandle = SLIST_NEXT(dhandle, l);
@@ -935,7 +935,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		btree->evict_walk_skips = 0;
 		old_slot = slot;
 
-		(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
+		(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
 		incr = 1;
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		dhandle_locked = 0;
@@ -965,8 +965,8 @@ retry:	while (slot < max_entries && ret == 0) {
 	}
 
 	if (incr) {
-		WT_ASSERT(session, dhandle->session_ref > 0);
-		(void)WT_ATOMIC_SUB4(dhandle->session_ref, 1);
+		WT_ASSERT(session, dhandle->session_inuse > 0);
+		(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
 		incr = 0;
 	}
 

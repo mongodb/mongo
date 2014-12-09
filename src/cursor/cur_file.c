@@ -328,8 +328,11 @@ __curfile_close(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cbt->btree);
 	WT_TRET(__wt_btcur_close(cbt));
-	if (cbt->btree != NULL)
+	if (cbt->btree != NULL) {
+		/* Increment the data-source's in-use counter. */
+		__wt_cursor_dhandle_decr_use(session);
 		WT_TRET(__wt_session_release_btree(session));
+	}
 	/* The URI is owned by the btree handle. */
 	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
@@ -475,6 +478,8 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 
 	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 
+	/* Increment the data-source's in-use counter. */
+	__wt_cursor_dhandle_incr_use(session);
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */
