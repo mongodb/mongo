@@ -89,7 +89,7 @@ func convertBSONDToRaw(documents []bson.D) []bson.Raw {
 	return rawBSONDocuments
 }
 
-func TestValidateHeaders(t *testing.T) {
+func TestValidateFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an import input, in validating the headers", t, func() {
@@ -103,61 +103,61 @@ func TestValidateHeaders(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("if headerLine is true, the first line in the input should be used", func() {
-			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle, 1), true)
+			headers, err := validateFields(NewCSVInputReader(fields, fileHandle, 1), true)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 2)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, strings.Split(strings.Replace(contents, " ", "", -1), ","))
 		})
 		Convey("if headerLine is false, the fields passed in should be used", func() {
-			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle, 1), false)
+			headers, err := validateFields(NewCSVInputReader(fields, fileHandle, 1), false)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 3)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, fields)
 		})
 		Convey("if the fields contain '..', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a..a"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{"a..a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields start/end in a '.', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{".a"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{".a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a."}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a."}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields start in a '$', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"$.a"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{"$.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"$"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"$"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"$a"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"$a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a$a"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a$a"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
 		})
 		Convey("if the fields collide, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "a.a"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{"a", "a.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields don't collide, no error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "aa"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{"a", "aa"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle, 1), false)
+			_, err = validateFields(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle, 1), false)
 			So(err, ShouldBeNil)
 		})
 		Convey("if the fields contain the same keys, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle, 1), false)
+			_, err := validateFields(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle, 1), false)
 			So(err, ShouldNotBeNil)
 		})
 	})

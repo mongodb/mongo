@@ -66,7 +66,7 @@ type InputReader interface {
 	// StreamDocument reads the given record from the given io.Reader according
 	// to the format supported by the underlying InputReader implementation. It
 	// returns the documents read on the readChannel channel and also sends any
-	// errors it encounters on the errorChannel channel. If ordered is true, it
+	// error it encounters on the errorChannel channel. If ordered is true, it
 	// streams document in the order in which they are read from the reader
 	StreamDocument(ordered bool, readChannel chan bson.D, errorChannel chan error)
 
@@ -75,13 +75,13 @@ type InputReader interface {
 	// the values of those with what is read from the input source
 	SetHeader(bool) error
 
-	// ReadHeadersFromSource attempts to reads the header fields for the
+	// ReadHeaderFromSource attempts to reads the header line for the
 	// specific implementation
-	ReadHeadersFromSource() ([]string, error)
+	ReadHeaderFromSource() ([]string, error)
 
-	// GetHeaders returns the current set of header fields for the specific
+	// GetFields returns the current set of fields for the specific
 	// implementation
-	GetHeaders() []string
+	GetFields() []string
 }
 
 // ValidateSettings ensures that the tool specific options supplied for

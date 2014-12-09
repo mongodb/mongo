@@ -79,13 +79,13 @@ func (jsonInputReader *JSONInputReader) SetHeader(hasHeaderLine bool) error {
 	return nil
 }
 
-// GetHeaders is a no-op for JSON imports
-func (jsonInputReader *JSONInputReader) GetHeaders() []string {
+// GetFields is a no-op for JSON imports
+func (jsonInputReader *JSONInputReader) GetFields() []string {
 	return nil
 }
 
-// ReadHeadersFromSource is a no-op for JSON imports
-func (jsonInputReader *JSONInputReader) ReadHeadersFromSource() ([]string, error) {
+// ReadHeaderFromSource is a no-op for JSON imports
+func (jsonInputReader *JSONInputReader) ReadHeaderFromSource() ([]string, error) {
 	return nil, nil
 }
 

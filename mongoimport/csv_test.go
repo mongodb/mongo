@@ -286,18 +286,18 @@ func TestCSVSetHeader(t *testing.T) {
 	})
 }
 
-func TestCSVGetHeaders(t *testing.T) {
+func TestCSVGetFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte{}), 1)
-			So(csvInputReader.GetHeaders(), ShouldResemble, fields)
+			So(csvInputReader.GetFields(), ShouldResemble, fields)
 		})
 	})
 }
 
-func TestCSVReadHeadersFromSource(t *testing.T) {
+func TestCSVReadHeaderFromSource(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
@@ -305,7 +305,7 @@ func TestCSVReadHeadersFromSource(t *testing.T) {
 			fileHandle, err := os.Open("testdata/test.csv")
 			So(err, ShouldBeNil)
 			csvInputReader := NewCSVInputReader([]string{}, fileHandle, 1)
-			headers, err := csvInputReader.ReadHeadersFromSource()
+			headers, err := csvInputReader.ReadHeaderFromSource()
 			So(err, ShouldBeNil)
 			So(headers, ShouldResemble, expectedHeaders)
 		})

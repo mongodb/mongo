@@ -47,9 +47,9 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 	}
 }
 
-// SetHeader sets the header field for a CSV
+// SetHeader sets the import fields for a CSV importer
 func (csvInputReader *CSVInputReader) SetHeader(hasHeaderLine bool) (err error) {
-	fields, err := validateHeaders(csvInputReader, hasHeaderLine)
+	fields, err := validateFields(csvInputReader, hasHeaderLine)
 	if err != nil {
 		return err
 	}
@@ -57,13 +57,13 @@ func (csvInputReader *CSVInputReader) SetHeader(hasHeaderLine bool) (err error) 
 	return nil
 }
 
-// GetHeaders returns the current header fields for a CSV importer
-func (csvInputReader *CSVInputReader) GetHeaders() []string {
+// GetFields returns the current set of fields for a CSV importer
+func (csvInputReader *CSVInputReader) GetFields() []string {
 	return csvInputReader.Fields
 }
 
-// ReadHeadersFromSource reads the header field from the CSV importer's reader
-func (csvInputReader *CSVInputReader) ReadHeadersFromSource() ([]string, error) {
+// ReadHeaderFromSource reads the header line from the CSV importer's reader
+func (csvInputReader *CSVInputReader) ReadHeaderFromSource() ([]string, error) {
 	return csvInputReader.csvReader.Read()
 }
 

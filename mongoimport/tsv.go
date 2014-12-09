@@ -48,9 +48,9 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 	}
 }
 
-// SetHeader sets the header field for a TSV
+// SetHeader sets the import fields for a TSV importer
 func (tsvInputReader *TSVInputReader) SetHeader(hasHeaderLine bool) (err error) {
-	fields, err := validateHeaders(tsvInputReader, hasHeaderLine)
+	fields, err := validateFields(tsvInputReader, hasHeaderLine)
 	if err != nil {
 		return err
 	}
@@ -58,13 +58,13 @@ func (tsvInputReader *TSVInputReader) SetHeader(hasHeaderLine bool) (err error) 
 	return nil
 }
 
-// GetHeaders returns the current header fields for a TSV importer
-func (tsvInputReader *TSVInputReader) GetHeaders() []string {
+// GetFields returns the current set of fields for a TSV importer
+func (tsvInputReader *TSVInputReader) GetFields() []string {
 	return tsvInputReader.Fields
 }
 
-// ReadHeadersFromSource reads the header field from the TSV importer's reader
-func (tsvInputReader *TSVInputReader) ReadHeadersFromSource() ([]string, error) {
+// ReadHeaderFromSource reads the header field from the TSV importer's reader
+func (tsvInputReader *TSVInputReader) ReadHeaderFromSource() ([]string, error) {
 	unsortedHeaders := []string{}
 	stringHeaders, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
 	if err != nil {

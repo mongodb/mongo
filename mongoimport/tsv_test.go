@@ -168,18 +168,18 @@ func TestTSVSetHeader(t *testing.T) {
 	})
 }
 
-func TestTSVGetHeaders(t *testing.T) {
+func TestTSVGetFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte{}), 1)
-			So(tsvInputReader.GetHeaders(), ShouldResemble, fields)
+			So(tsvInputReader.GetFields(), ShouldResemble, fields)
 		})
 	})
 }
 
-func TestTSVReadHeadersFromSource(t *testing.T) {
+func TestTSVReadHeaderFromSource(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
@@ -187,7 +187,7 @@ func TestTSVReadHeadersFromSource(t *testing.T) {
 			fileHandle, err := os.Open("testdata/test.tsv")
 			So(err, ShouldBeNil)
 			tsvInputReader := NewTSVInputReader([]string{}, fileHandle, 1)
-			headers, err := tsvInputReader.ReadHeadersFromSource()
+			headers, err := tsvInputReader.ReadHeaderFromSource()
 			So(err, ShouldBeNil)
 			So(headers, ShouldResemble, expectedHeaders)
 		})
