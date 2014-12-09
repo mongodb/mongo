@@ -43,7 +43,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -457,69 +456,6 @@ namespace ThreadedTests {
         }
     };
 
-    class List1Test2 : public ThreadedTest<> {
-        static const int iterations = 1000; // note: a lot of iterations will use a lot of memory as List1 leaks on purpose
-        class M : public List1<M>::Base {
-        public:
-            M(int x) : _x(x) { }
-            const int _x;
-        };
-        List1<M> l;
-    public:
-        void validate() { }
-        void subthread(int) {
-            for(int i=0; i < iterations; i++) {
-                int r = std::rand() % 256;
-                if( r == 0 ) {
-                    l.orphanAll();
-                }
-                else if( r < 4 ) { 
-                    l.push(new M(r));
-                }
-                else {
-                    M *orph = 0;
-                    for( M *m = l.head(); m; m=m->next() ) { 
-                        ASSERT( m->_x > 0 && m->_x < 4 );
-                        if( r > 192 && std::rand() % 8 == 0 )
-                            orph = m;
-                    }
-                    if( orph ) {
-                        try { 
-                            l.orphan(orph);
-                        }
-                        catch(...) { }
-                    }
-                }
-            }
-        }
-    };
-
-    class List1Test {
-    public:
-        class M : public List1<M>::Base {
-            ~M();
-        public:
-            M( int x ) {
-                num = x;
-            }
-            int num;
-        };
-
-        void run(){
-            List1<M> l;
-            
-            vector<M*> ms;
-            for ( int i=0; i<5; i++ ) {
-                M * m = new M(i);
-                ms.push_back( m );
-                l.push( m );
-            }
-            
-            // must assert as the item is missing
-            ASSERT_THROWS( l.orphan( new M( -3 ) ) , UserException );
-        }
-    };
-
     // we don't use upgrade so that part is not important currently but the other aspects of this test are 
     // interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
     class UpgradableTest : public ThreadedTest<7> {
@@ -871,8 +807,6 @@ namespace ThreadedTests {
             add< CondSlack >();
 
             add< UpgradableTest >();
-            add< List1Test >();
-            add< List1Test2 >();
 
             add< IsAtomicWordAtomic<AtomicUInt32> >();
             add< IsAtomicWordAtomic<AtomicUInt64> >();

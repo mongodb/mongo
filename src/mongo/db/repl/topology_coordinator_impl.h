@@ -37,7 +37,6 @@
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
