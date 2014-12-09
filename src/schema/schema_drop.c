@@ -57,7 +57,7 @@ __drop_file(
  */
 static int
 __drop_colgroup(
-    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -82,7 +82,7 @@ __drop_colgroup(
  */
 static int
 __drop_index(
-    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_INDEX *idx;
 	WT_DECL_RET;
@@ -169,11 +169,11 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_CLEAR_BTREE_IN_SESSION(session);
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __drop_colgroup(session, uri, cfg);
+		ret = __drop_colgroup(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __drop_file(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __drop_index(session, uri, cfg);
+		ret = __drop_index(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
