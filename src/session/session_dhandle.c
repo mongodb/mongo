@@ -52,11 +52,14 @@ __session_add_dhandle(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE **dhandle_cachep)
 {
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
+	uint64_t bucket;
 
 	WT_RET(__wt_calloc_def(session, 1, &dhandle_cache));
 	dhandle_cache->dhandle = session->dhandle;
 
+	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	SLIST_INSERT_HEAD(&session->dhandles, dhandle_cache, l);
+	SLIST_INSERT_HEAD(&session->dhhash[bucket], dhandle_cache, hashl);
 
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
@@ -290,8 +293,13 @@ static void
 __session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
+	uint64_t bucket;
+
+	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	SLIST_REMOVE(
 	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
+	SLIST_REMOVE(&session->dhhash[bucket],
+	    dhandle_cache, __wt_data_handle_cache, hashl);
 
 	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
 
@@ -381,18 +389,17 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
-	uint64_t hash;
+	uint64_t bucket;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 	WT_ASSERT(session, !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
 	dhandle = NULL;
 
-	hash = __wt_hash_city64(uri, strlen(uri));
-	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
+	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
+	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 		dhandle = dhandle_cache->dhandle;
-		if (hash != dhandle->name_hash ||
-		    strcmp(uri, dhandle->name) != 0)
+		if (strcmp(uri, dhandle->name) != 0)
 			continue;
 		if (checkpoint == NULL && dhandle->checkpoint == NULL)
 			break;
