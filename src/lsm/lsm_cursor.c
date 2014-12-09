@@ -74,10 +74,9 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 		primary = NULL;
 		have_primary = 0;
 	} else {
-		if ((primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
-			return (0);
+		primary = clsm->cursors[clsm->nchunks - 1];
 		primary_chunk = clsm->primary_chunk;
-		have_primary = (primary_chunk != NULL &&
+		have_primary = (primary != NULL && primary_chunk != NULL &&
 		    (primary_chunk->switch_txn == WT_TXN_NONE ||
 		    TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
 	}
@@ -104,11 +103,14 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 		/* If there was no overflow, we're done. */
 		if (!ovfl)
 			return (0);
-		/* If we overflow the soft limit, just request a switch. */
-		if (!hard_limit)
-			return (__clsm_request_switch(clsm));
-	} else
-		WT_RET(__clsm_request_switch(clsm));
+	}
+
+	/* Request a switch. */
+	WT_RET(__clsm_request_switch(clsm));
+
+	/* If we only overflowed the soft limit, we're done. */
+	if (have_primary && !hard_limit)
+		return (0);
 
 	/*
 	 * If there is no primary chunk, or it has overflowed the hard limit,
