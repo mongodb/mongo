@@ -1404,9 +1404,11 @@ namespace mongo {
                                 // TODO: As an optimization, we might want to do the save/restore
                                 // state and yield inside the reduceAndSpillInMemoryState method, so
                                 // it only happens if necessary.
+                                exec->saveState();
                                 lock.reset();
                                 state.reduceAndSpillInMemoryStateIfNeeded();
                                 lock.reset(new Lock::DBRead(txn->lockState(), nss.db()));
+                                exec->restoreState(txn);
 
                                 // Need to reload the database, in case it was dropped after we
                                 // released the lock
