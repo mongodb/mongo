@@ -231,7 +231,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		 * what we use.
 		 */
 		if (compression_failed ||
-		    buf->size / btree->allocsize ==
+		    buf->size / btree->allocsize <=
 		    result_len / btree->allocsize) {
 			ip = buf;
 			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);

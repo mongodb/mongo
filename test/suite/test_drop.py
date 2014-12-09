@@ -71,10 +71,22 @@ class test_drop(wttest.WiredTigerTestCase):
     # Test drop of a non-existent object: force succeeds, without force fails.
     def test_drop_dne(self):
         uri = self.uri + self.name
+        cguri = 'colgroup:' + self.name
+        idxuri = 'index:' + self.name + ':indexname'
+        lsmuri = 'lsm:' + self.name
         confirm_does_not_exist(self, uri)
         self.session.drop(uri, 'force')
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
+        self.session.drop(cguri, 'force')
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.drop(cguri, None))
+        self.session.drop(idxuri, 'force')
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.drop(idxuri, None))
+        self.session.drop(lsmuri, 'force')
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.drop(lsmuri, None))
 
 
 if __name__ == '__main__':

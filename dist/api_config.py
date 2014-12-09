@@ -155,7 +155,7 @@ compare_srcfile(tmp_file, f)
 f='../src/config/config_def.c'
 tfile = open(tmp_file, 'w')
 
-tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
+tfile.write('''/* DO NOT EDIT: automatically built by dist/api_config.py. */
 
 #include "wt_internal.h"
 ''')

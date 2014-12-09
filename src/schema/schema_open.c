@@ -395,6 +395,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_def(session, 1, &table));
 	table->name = tablename;
 	tablename = NULL;
+	table->name_hash = __wt_hash_city64(name, namelen);
 
 	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
 
@@ -508,7 +509,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 
 /*
  * __wt_schema_get_index --
- *	Find a column group by URI.
+ *	Find an index by URI.
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
