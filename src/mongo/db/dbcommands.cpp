@@ -1140,6 +1140,7 @@ namespace mongo {
             // We lock the entire database in S-mode in order to ensure that the contents will not
             // change for the stats snapshot. This might be unnecessary and if it becomes a
             // performance issue, we can take IS lock and then lock collection-by-collection.
+            ScopedTransaction scopedXact(txn, MODE_IS);
             AutoGetDb autoDb(txn, ns, MODE_S);
 
             result.append("db", ns);

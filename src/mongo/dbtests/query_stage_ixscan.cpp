@@ -37,10 +37,14 @@ namespace QueryStageIxscan {
 
     class IndexScanTest {
     public:
-        IndexScanTest() :
-            _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-            _ctx(&_txn, ns()),
-            _coll(NULL) { }
+        IndexScanTest()
+            : _txn(),
+              _scopedXact(&_txn, MODE_IX),
+              _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+              _ctx(&_txn, ns()),
+              _coll(NULL) {
+
+        }
 
         virtual ~IndexScanTest() { }
 
@@ -84,11 +88,13 @@ namespace QueryStageIxscan {
 
     protected:
         OperationContextImpl _txn;
-        WorkingSet _ws;
 
+        ScopedTransaction _scopedXact;
         Lock::DBLock _dbLock;
         Client::Context _ctx;
         Collection* _coll;
+
+        WorkingSet _ws;
     };
 
     // SERVER-15958: Some IndexScanStats info must be initialized on construction of an IndexScan.

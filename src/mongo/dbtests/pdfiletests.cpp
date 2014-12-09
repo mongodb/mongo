@@ -29,7 +29,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
@@ -43,8 +43,10 @@ namespace PdfileTests {
     namespace Insert {
         class Base {
         public:
-            Base() : _lk(_txn.lockState()),
+            Base() : _scopedXact(&_txn, MODE_X),
+                     _lk(_txn.lockState()),
                      _context(&_txn, ns()) {
+
             }
 
             virtual ~Base() {
@@ -64,6 +66,7 @@ namespace PdfileTests {
             }
 
             OperationContextImpl _txn;
+            ScopedTransaction _scopedXact;
             Lock::GlobalWrite _lk;
             Client::Context _context;
         };

@@ -100,6 +100,7 @@ namespace mongo {
         }
     }
 
+
     Lock::GlobalWrite::GlobalWrite(Locker* lockState, unsigned timeoutms)
         : ScopedLock(lockState) {
 
@@ -116,6 +117,7 @@ namespace mongo {
         _lockState->unlockAll();
     }
 
+
     Lock::GlobalRead::GlobalRead(Locker* lockState, unsigned timeoutms)
         : ScopedLock(lockState) {
 
@@ -129,20 +131,15 @@ namespace mongo {
         _lockState->unlockAll();
     }
 
+
     Lock::DBLock::DBLock(Locker* lockState, const StringData& db, LockMode mode)
         : ScopedLock(lockState),
           _id(RESOURCE_DATABASE, db),
+          _lockState(lockState),
           _mode(mode) {
 
         massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
-        lockDB();
-    }
 
-    Lock::DBLock::~DBLock() {
-        unlockDB();
-    }
-
-    void Lock::DBLock::lockDB() {
         const bool isRead = (_mode == MODE_S || _mode == MODE_IS);
 
         _lockState->lockGlobal(isRead ? MODE_IS : MODE_IX);
@@ -152,6 +149,12 @@ namespace mongo {
         else {
             _lockState->lock(_id, isRead ? MODE_S : MODE_X);
         }
+    }
+
+    Lock::DBLock::~DBLock() {
+        _lockState->unlock(_id);
+
+        _lockState->unlockAll();
     }
 
     void Lock::DBLock::relockWithMode(const LockMode newMode) {
@@ -175,11 +178,6 @@ namespace mongo {
         }
     }
 
-    void Lock::DBLock::unlockDB() {
-        _lockState->unlock(_id);
-
-        _lockState->unlockAll();
-    }
 
     Lock::CollectionLock::CollectionLock(Locker* lockState,
                                          const StringData& ns,
@@ -213,8 +211,8 @@ namespace mongo {
         if (supportsDocLocking() || enableCollectionLocking) {
             _lockState->lock(_id, mode);
         }
-
     }
+
 
     Lock::ResourceLock::ResourceLock(Locker* lockState, ResourceId rid, LockMode mode)
             : _rid(rid),
@@ -226,8 +224,6 @@ namespace mongo {
         _lockState->unlock(_rid);
     }
 
-    Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
-        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), MODE_S) { }
 
     writelocktry::writelocktry(Locker* lockState, int tryms) :
         _got( false ),
@@ -246,6 +242,7 @@ namespace mongo {
 
     }
 
+
     // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
     readlocktry::readlocktry(Locker* lockState, int tryms) :
         _got( false ),
@@ -263,5 +260,4 @@ namespace mongo {
     readlocktry::~readlocktry() {
 
     }
-
 }

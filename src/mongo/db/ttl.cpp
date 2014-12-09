@@ -209,9 +209,12 @@ namespace mongo {
             {
                 const string ns = idx["ns"].String();
 
+                ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, dbName, MODE_IX);
                 Database* db = autoDb.getDb();
-                if (!db) return false;
+                if (!db) {
+                    return false;
+                }
 
                 Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
 

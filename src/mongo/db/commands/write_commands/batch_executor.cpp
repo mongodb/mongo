@@ -1353,8 +1353,11 @@ namespace mongo {
                     return;
                 }
 
+                ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, nss.db(), MODE_IX);
-                if (!autoDb.getDb()) break;
+                if (!autoDb.getDb()) {
+                    break;
+                }
 
                 Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
 

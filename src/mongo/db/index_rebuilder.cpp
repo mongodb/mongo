@@ -156,6 +156,8 @@ namespace {
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
                  ++dbName) {
+
+                ScopedTransaction scopedXact(txn, MODE_IS);
                 AutoGetDb autoDb(txn, *dbName, MODE_S);
 
                 Database* db = autoDb.getDb();

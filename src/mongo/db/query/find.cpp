@@ -589,6 +589,7 @@ namespace mongo {
         // Parse, canonicalize, plan, transcribe, and get a plan executor.
         PlanExecutor* rawExec = NULL;
 
+        ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollectionForRead ctx(txn, nss);
 
         const int dbProfilingLevel = (ctx.getDb() != NULL) ? ctx.getDb()->getProfilingLevel() :

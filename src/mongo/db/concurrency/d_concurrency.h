@@ -156,10 +156,9 @@ namespace mongo {
             void relockWithMode(const LockMode newMode);
 
         private:
-            void lockDB();
-            void unlockDB();
-
             const ResourceId _id;
+            Locker* const _lockState;
+
             LockMode _mode; // may be changed through relockWithMode
         };
 
@@ -185,6 +184,7 @@ namespace mongo {
             ~CollectionLock();
 
             void relockWithMode( const LockMode mode, Lock::DBLock& dblock );
+
         private:
             const ResourceId _id;
             Locker* const _lockState;
@@ -207,19 +207,6 @@ namespace mongo {
         private:
             const ResourceId _rid;
             Locker* const _lockState;
-        };
-
-
-        /**
-         * Shared database lock -- DEPRECATED, please transition to DBLock and collection locks
-         *
-         * Allows concurrent read access to the given database, blocking any writers.
-         * Allows further (recursive) acquisision of database locks for this database in shared
-         * or intent-shared mode. Also acquires global lock in intent-shared (IS) mode.
-         */
-        class DBRead : public DBLock {
-        public:
-            DBRead(Locker* lockState, const StringData& dbOrNs);
         };
     };
 

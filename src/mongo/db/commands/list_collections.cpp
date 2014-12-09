@@ -67,6 +67,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
+            ScopedTransaction scopedXact(txn, MODE_IS);
             AutoGetDb autoDb(txn, dbname, MODE_S);
 
             const Database* d = autoDb.getDb();

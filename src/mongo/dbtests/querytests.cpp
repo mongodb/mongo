@@ -54,17 +54,11 @@ namespace mongo {
 namespace QueryTests {
 
     class Base {
-    protected:
-        OperationContextImpl _txn;
-        Lock::GlobalWrite _lk;
-        Client::Context _context;
-
-        Database* _database;
-        Collection* _collection;
-
     public:
-        Base() : _lk(_txn.lockState()),
+        Base() : _scopedXact(&_txn, MODE_X),
+                 _lk(_txn.lockState()),
                  _context(&_txn, ns()) {
+
             {
                 WriteUnitOfWork wunit(&_txn);
                 _database = _context.db();
@@ -75,8 +69,10 @@ namespace QueryTests {
                 _collection = _database->createCollection( &_txn, ns() );
                 wunit.commit();
             }
+
             addIndex( fromjson( "{\"a\":1}" ) );
         }
+
         ~Base() {
             try {
                 WriteUnitOfWork wunit(&_txn);
@@ -87,16 +83,20 @@ namespace QueryTests {
                 FAIL( "Exception while cleaning up collection" );
             }
         }
+
     protected:
         static const char *ns() {
             return "unittests.querytests";
         }
+
         void addIndex( const BSONObj &key ) {
             Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
+
         void insert( const char *s ) {
             insert( fromjson( s ) );
         }
+
         void insert( const BSONObj &o ) {
             WriteUnitOfWork wunit(&_txn);
             if ( o["_id"].eoo() ) {
@@ -112,6 +112,15 @@ namespace QueryTests {
             }
             wunit.commit();
         }
+
+
+        OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
+        Lock::GlobalWrite _lk;
+        Client::Context _context;
+
+        Database* _database;
+        Collection* _collection;
     };
 
     class FindOneOr : public Base {
@@ -1441,13 +1450,16 @@ namespace QueryTests {
     
     class CollectionInternalBase : public CollectionBase {
     public:
-        CollectionInternalBase( const char *nsLeaf ) :
-          CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), "unittests", MODE_X),
-          _ctx(&_txn, ns()) {
+        CollectionInternalBase( const char *nsLeaf )
+                : CollectionBase( nsLeaf ),
+                  _scopedXact(&_txn, MODE_IX),
+                  _lk(_txn.lockState(), "unittests", MODE_X),
+                  _ctx(&_txn, ns()) {
+
         }
 
     private:
+        ScopedTransaction _scopedXact;
         Lock::DBLock _lk;
         Client::Context _ctx;
     };

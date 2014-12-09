@@ -47,10 +47,13 @@ namespace QueryStageCount {
     class CountStageTest {
     public:
         CountStageTest()
-            : _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X)
-            , _ctx(&_txn, ns())
-            , _coll(NULL)
-        {}
+            : _txn(),
+              _scopedXact(&_txn, MODE_IX),
+              _dbLock(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+              _ctx(&_txn, ns()),
+              _coll(NULL) {
+
+        }
 
         virtual ~CountStageTest() {}
 
@@ -218,6 +221,7 @@ namespace QueryStageCount {
     protected:
         vector<RecordId> _locs;
         OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
         Lock::DBLock _dbLock;
         Client::Context _ctx;
         Collection* _coll;

@@ -685,8 +685,11 @@ namespace {
                 ParsedDelete parsedDelete(txn, &request);
                 uassertStatusOK(parsedDelete.parseRequest());
 
+                ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, ns.db(), MODE_IX);
-                if (!autoDb.getDb()) break;
+                if (!autoDb.getDb()) {
+                    break;
+                }
 
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);

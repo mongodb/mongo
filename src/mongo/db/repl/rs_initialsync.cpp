@@ -373,6 +373,7 @@ namespace {
         log() << "initial sync finishing up";
 
         {
+            ScopedTransaction scopedXact(&txn, MODE_IX);
             AutoGetDb autodb(&txn, "local", MODE_X);
             OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
             log() << "replSet set minValid=" << lastOpTimeWritten;
