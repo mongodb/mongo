@@ -1926,8 +1926,7 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::setFollowerMode(MemberState::MS newMode) {
-        // TODO(emilkie): Uncomment once legacy StateBox is replaced with replcoord's MemberState.
-        //invariant(_role == Role::follower);
+        invariant(_role == Role::follower);
         switch (newMode) {
         case MemberState::RS_RECOVERING:
         case MemberState::RS_ROLLBACK:

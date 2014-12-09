@@ -67,7 +67,7 @@ namespace {
         // start up, become secondary, receive reconfig
         OperationContextNoop txn;
         init();
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -85,7 +85,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigWithUninitializableConfig) {
         // start up, become primary, receive uninitializable config
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -116,7 +116,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigWithWrongReplSetName) {
         // start up, become primary, receive config with incorrect replset name
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -144,7 +144,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigValidateFails) {
         // start up, become primary, validate fails
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -200,7 +200,7 @@ namespace {
         // start up, become primary, fail during quorum check due to a heartbeat
         // containing a higher config version
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -236,7 +236,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigStoreLocalConfigDocumentFails) {
         // start up, become primary, saving the config fails
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -274,7 +274,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigWhileReconfiggingFails) {
         // start up, become primary, reconfig, then before that reconfig concludes, reconfig again
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -347,7 +347,7 @@ namespace {
     TEST_F(ReplCoordTest, ReconfigSuccessful) {
         // start up, become primary, reconfig successfully
         OperationContextNoop txn;
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -384,7 +384,7 @@ namespace {
          // start up, become primary, receive reconfig via heartbeat, then a second one
          // from reconfig
          OperationContextNoop txn;
-         assertStart(ReplicationCoordinator::modeReplSet,
+         assertStartSuccess(
                      BSON("_id" << "mySet" <<
                           "version" << 2 <<
                           "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -436,7 +436,7 @@ namespace {
 //     TEST_F(ReplCoordTest, HBReconfigDuringReconfigFails) {
 //         // start up, become primary, reconfig, while reconfigging receive reconfig via heartbeat
 //         OperationContextNoop txn;
-//         assertStart(ReplicationCoordinator::modeReplSet,
+//         assertStartSuccess(
 //                     BSON("_id" << "mySet" <<
 //                          "version" << 2 <<
 //                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -503,7 +503,7 @@ namespace {
         // start up, become a secondary, receive a forced reconfig
         OperationContextNoop txn;
         init();
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "mySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<

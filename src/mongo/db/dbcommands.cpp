@@ -101,21 +101,18 @@ namespace mongo {
     bool CmdShutdown::run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-            long long timeoutSecs = 0;
-            if (cmdObj.hasField("timeoutSecs")) {
-                timeoutSecs = cmdObj["timeoutSecs"].numberLong();
-            }
+        long long timeoutSecs = 0;
+        if (cmdObj.hasField("timeoutSecs")) {
+            timeoutSecs = cmdObj["timeoutSecs"].numberLong();
+        }
 
-            Status status = repl::getGlobalReplicationCoordinator()->stepDown(
-                    txn,
-                    force,
-                    repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
-                    repl::ReplicationCoordinator::Milliseconds(120 * 1000));
-            if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
-                return appendCommandStatus(result, status);
-            }
+        Status status = repl::getGlobalReplicationCoordinator()->stepDown(
+                txn,
+                force,
+                repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
+                repl::ReplicationCoordinator::Milliseconds(120 * 1000));
+        if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
+            return appendCommandStatus(result, status);
         }
 
         shutdownHelper();
@@ -1249,10 +1246,17 @@ namespace mongo {
         }
     }
 
-    /* Sometimes we cannot set maintenance mode, in which case the call to setMaintenanceMode will
-       return a non-OK status.  This class does not treat that case as an error which means that
-       anybody using it is assuming it is ok to continue execution without maintenance mode.  This
-       assumption needs to be audited and documented. */
+    /**
+     * Guard object for making a good-faith effort to enter maintenance mode and leave it when it
+     * goes out of scope.
+     *
+     * Sometimes we cannot set maintenance mode, in which case the call to setMaintenanceMode will
+     * return a non-OK status.  This class does not treat that case as an error which means that
+     * anybody using it is assuming it is ok to continue execution without maintenance mode.
+     *
+     * TODO: This assumption needs to be audited and documented, or this behavior should be moved
+     * elsewhere.
+     */
     class MaintenanceModeSetter {
     public:
         MaintenanceModeSetter() :
@@ -1399,9 +1403,7 @@ namespace mongo {
 
         txn->getCurOp()->setCommand(c);
 
-        if (c->maintenanceMode() &&
-                repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                        repl::ReplicationCoordinator::modeReplSet) {
+        if (c->maintenanceMode()) {
             mmSetter.reset(new MaintenanceModeSetter);
         }
 

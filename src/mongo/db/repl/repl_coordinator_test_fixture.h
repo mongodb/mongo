@@ -147,14 +147,6 @@ namespace repl {
         void start(const HostAndPort& selfHost);
 
         /**
-         * Asserts that calling start(configDoc, selfHost) leaves the coordinator under test in
-         * expectedMode.
-         */
-        void assertStart(ReplicationCoordinator::Mode expectedMode,
-                         const BSONObj& configDoc,
-                         const HostAndPort& selfHost);
-
-        /**
          * Brings the repl coord from SECONDARY to PRIMARY by simulating the messages required to
          * elect it.
          *
@@ -169,7 +161,8 @@ namespace repl {
         void simulateStepDownOnIsolation();
 
         /**
-         * Shorthand for assertStart(ReplicationCoordinator::modeReplSet, configDoc, selfHost).
+         * Asserts that calling start(configDoc, selfHost) successfully initiates the
+         * ReplicationCoordinator under test.
          */
         void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
 

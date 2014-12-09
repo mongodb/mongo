@@ -756,6 +756,9 @@ namespace repl {
         // Parsed command line arguments related to replication.
         const ReplSettings _settings;                                                     // (R)
 
+        // Mode of replication specified by _settings.
+        const Mode _replMode;                                                             // (R)
+
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;                                 // (X)
 

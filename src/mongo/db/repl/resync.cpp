@@ -72,11 +72,12 @@ namespace repl {
 
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+                const MemberState memberState = replCoord->getCurrentMemberState();
+                if (memberState.startup()) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotYetInitialized,
                                                               "no replication yet active"));
                 }
-                if (replCoord->getCurrentMemberState().primary() ||
+                if (memberState.primary() ||
                         !replCoord->setFollowerMode(MemberState::RS_STARTUP2)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotSecondary,
                                                               "primaries cannot resync"));

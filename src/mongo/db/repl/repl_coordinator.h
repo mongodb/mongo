@@ -116,9 +116,8 @@ namespace repl {
         };
 
         /**
-         * Returns a value indicating whether this node is a standalone, master/slave, or replicaset
-         * note: nodes are determined to be replicaset members by the presence of a replset config.
-         *       This means that nodes will appear to be standalone until a config is received.
+         * Returns a value indicating whether this node was configured at start-up to run
+         * standalone, as part of a master-slave pair, or as a member of a replica set.
          */
         virtual Mode getReplicationMode() const = 0;
 

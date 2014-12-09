@@ -151,18 +151,11 @@ namespace {
         start();
     }
 
-    void ReplCoordTest::assertStart(
-            ReplicationCoordinator::Mode expectedMode,
-            const BSONObj& configDoc,
-            const HostAndPort& selfHost) {
-        start(configDoc, selfHost);
-        ASSERT_EQUALS(expectedMode, getReplCoord()->getReplicationMode());
-    }
-
     void ReplCoordTest::assertStartSuccess(
             const BSONObj& configDoc,
             const HostAndPort& selfHost) {
-        assertStart(ReplicationCoordinator::modeReplSet, configDoc, selfHost);
+        start(configDoc, selfHost);
+        ASSERT_NE(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Milliseconds millis) {

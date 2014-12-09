@@ -241,7 +241,7 @@ namespace repl {
 
     bool ReplicationCoordinatorMock::buildsIndexes() {
         // TODO
-        return false;
+        return true;
     }
 
     std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {

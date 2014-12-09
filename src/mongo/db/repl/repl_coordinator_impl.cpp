@@ -133,6 +133,18 @@ namespace {
         boost::condition_variable* condVar;
     };
 
+namespace {
+    ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& settings) {
+        if (settings.usingReplSets()) {
+            return ReplicationCoordinator::modeReplSet;
+        }
+        if (settings.master || settings.slave) {
+            return ReplicationCoordinator::modeMasterSlave;
+        }
+        return ReplicationCoordinator::modeNone;
+    }
+}  // namespace
+
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
             const ReplSettings& settings,
             ReplicationCoordinatorExternalState* externalState,
@@ -140,6 +152,7 @@ namespace {
             TopologyCoordinator* topCoord,
             int64_t prngSeed) :
         _settings(settings),
+        _replMode(getReplicationModeFromSettings(settings)),
         _topCoord(topCoord),
         _replExecutor(network, prngSeed),
         _externalState(externalState),
@@ -357,18 +370,11 @@ namespace {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::getReplicationMode() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
         return _getReplicationMode_inlock();
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorImpl::_getReplicationMode_inlock() const {
-        if (_rsConfig.isInitialized()) {
-            return modeReplSet;
-        }
-        else if (_settings.slave || _settings.master) {
-            return modeMasterSlave;
-        }
-        return modeNone;
+        return _replMode;
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
@@ -377,7 +383,6 @@ namespace {
     }
 
     MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
-        invariant(_settings.usingReplSets());
         return _currentState;
     }
 
@@ -1472,6 +1477,11 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
+        if (_getReplicationMode_inlock() != modeReplSet) {
+            return Status(ErrorCodes::NoReplicationEnabled,
+                          "can only set maintenance mode on replica set members");
+        }
+
         Status result(ErrorCodes::InternalError, "didn't set status in _setMaintenanceMode_helper");
         CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_setMaintenanceMode_helper,
@@ -2149,6 +2159,9 @@ namespace {
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {
         boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_thisMembersConfigIndex == -1) {
+            return true;
+        }
         const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
         return self.shouldBuildIndexes();
     }
@@ -2177,6 +2190,9 @@ namespace {
         invariant(_settings.usingReplSets());
 
         std::vector<HostAndPort> nodes;
+        if (_thisMembersConfigIndex == -1) {
+            return nodes;
+        }
 
         for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
             if (i == _thisMembersConfigIndex)
@@ -2229,7 +2245,7 @@ namespace {
             return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
         }
 
-        if (getReplicationMode() != modeReplSet) {
+        if (getCurrentMemberState().startup()) {
             result->append("info", "run rs.initiate(...) if not yet done for the set");
             return Status(ErrorCodes::NotYetInitialized, "no replset config has been received");
         }
@@ -2238,7 +2254,7 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::isReplEnabled() const {
-        return _settings.usingReplSets() || _settings.master || _settings.slave;
+        return getReplicationMode() != modeNone;
     }
 
     void ReplicationCoordinatorImpl::_chooseNewSyncSource(

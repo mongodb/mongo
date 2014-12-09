@@ -64,8 +64,7 @@ namespace {
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
     TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -74,8 +73,7 @@ namespace {
 
     TEST_F(ReplCoordTest, StartupWithConfigMissingSelf) {
         startCapturingLogMessages();
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -88,7 +86,7 @@ namespace {
     TEST_F(ReplCoordTest, StartupWithLocalConfigSetNameMismatch) {
         init("mySet");
         startCapturingLogMessages();
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "notMySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -102,7 +100,7 @@ namespace {
         start();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("Did not find local "));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithEmptyConfig) {
@@ -112,14 +110,14 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         // Starting uninitialized, show that we can perform the initiate behavior.
         BSONObjBuilder result1;
@@ -154,7 +152,7 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         // Having failed to initiate once, show that we can now initiate.
         BSONObjBuilder result1;
@@ -170,8 +168,7 @@ namespace {
 
     TEST_F(ReplCoordTest, InitiateFailsIfAlreadyInitialized) {
         OperationContextNoop txn;
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -218,7 +215,7 @@ namespace {
     TEST_F(ReplCoordTest, InitiateFailsIfQuorumNotMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -243,13 +240,13 @@ namespace {
         ASSERT_EQUALS(startDate + 10, getNet()->now());
         prsiThread.join();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiatePassesIfQuorumMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -286,7 +283,7 @@ namespace {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -298,14 +295,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
         OperationContextNoop txn;
         init("");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -317,14 +314,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWhileStoringLocalConfigDocument) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
@@ -338,7 +335,7 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
@@ -1319,7 +1316,7 @@ namespace {
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
         init();
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeMaster) {
@@ -1341,14 +1338,13 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeRepl) {
-        // modeReplSet only once config isInitialized
+        // modeReplSet if the set name was supplied.
         ReplSettings settings;
         settings.replSet = "mySet/node1:12345";
         init(settings);
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone,
-                      getReplCoord()->getReplicationMode());
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
