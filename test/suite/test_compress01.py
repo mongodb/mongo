@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_compress01.py
-#   Basic compression operations
+#   Basic block compression operations
 #
 
 import os, run

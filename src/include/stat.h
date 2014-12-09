@@ -196,6 +196,11 @@ struct __wt_connection_stats {
 	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;
 	WT_STATS log_close_yields;
+	WT_STATS log_compress_len;
+	WT_STATS log_compress_mem;
+	WT_STATS log_compress_small;
+	WT_STATS log_compress_write_fails;
+	WT_STATS log_compress_writes;
 	WT_STATS log_max_filesize;
 	WT_STATS log_prealloc_files;
 	WT_STATS log_prealloc_max;

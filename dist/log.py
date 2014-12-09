@@ -8,14 +8,14 @@ import log_data
 tmp_file = '__tmp'
 
 # Map log record types to:
-# (C type, pack type, printf format, printf arg(s))
+# (C type, pack type, printf format, printf arg(s), printf setup)
 field_types = {
-    'string' : ('const char *', 'S', '%s', 'arg'),
-    'item' : ('WT_ITEM *', 'u', '%.*s',
-        '(int)arg.size, (const char *)arg.data'),
-    'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg'),
-    'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg'),
-    'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg'),
+    'string' : ('const char *', 'S', '%s', 'arg', ''),
+    'item' : ('WT_ITEM *', 'u', '%s', 'escaped',
+        'WT_RET(__logrec_jsonify_str(session, &escaped, &arg));'),
+    'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg', ''),
+    'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg', ''),
+    'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg', ''),
 }
 
 def cintype(f):
@@ -37,6 +37,18 @@ def clocaltype(f):
         return type[:-2]
     return type
 
+def escape_decl(fields):
+    for f in fields:
+        if 'escaped' in field_types[f[0]][4]:
+            return '\n\tchar *escaped;'
+    return ''
+
+def has_escape(fields):
+    for f in fields:
+        if 'escaped' in field_types[f[0]][4]:
+            return True
+    return False
+
 def pack_fmt(fields):
     return ''.join(field_types[f[0]][1] for f in fields)
 
@@ -51,7 +63,12 @@ def printf_fmt(f):
 
 def printf_arg(f):
     arg = field_types[f[0]][3].replace('arg', f[1])
-    return '\n\t    ' + arg if f[0] == 'item' else ' ' + arg
+    return ' ' + arg
+
+def printf_setup(f):
+    stmt = field_types[f[0]][4].replace('arg', f[1])
+    return '' if stmt == '' else stmt + '\n\t'
+
 
 #####################################################################
 # Update log.h with #defines for types
@@ -132,6 +149,41 @@ __wt_logop_read(WT_SESSION_IMPL *session,
 \treturn (__wt_struct_unpack(
 \t    session, *pp, WT_PTRDIFF(end, *pp), "II", optypep, opsizep));
 }
+
+static size_t
+__logrec_json_unpack_str(char *dest, size_t destlen, const char *src,
+    size_t srclen)
+{
+\tsize_t total;
+\tsize_t n;
+
+\ttotal = 0;
+\twhile (srclen > 0) {
+\t\tn = __wt_json_unpack_char(*src++, (u_char *)dest, destlen, 0);
+\t\tsrclen--;
+\t\tif (n > destlen)
+\t\t\tdestlen = 0;
+\t\telse {
+\t\t\tdestlen -= n;
+\t\t\tdest += n;
+\t\t}
+\t\ttotal += n;
+\t}
+\tif (destlen > 0)
+\t\t*dest = '\\0';
+\treturn (total + 1);
+}
+
+static int
+__logrec_jsonify_str(WT_SESSION_IMPL *session, char **destp, WT_ITEM *item)
+{
+\tsize_t needed;
+
+\tneeded = __logrec_json_unpack_str(NULL, 0, item->data, item->size);
+\tWT_RET(__wt_realloc(session, NULL, needed, destp));
+\t(void)__logrec_json_unpack_str(*destp, needed, item->data, item->size);
+\treturn (0);
+}
 ''')
 
 # Emit code to read, write and print log operations (within a log record)
@@ -205,22 +257,25 @@ __wt_logop_%(name)s_print(
 {
 \t%(arg_decls)s
 
-\tWT_RET(__wt_logop_%(name)s_unpack(
+\t%(arg_init)sWT_RET(__wt_logop_%(name)s_unpack(
 \t    session, pp, end%(arg_addrs)s));
 
 \tfprintf(out, "    \\"optype\\": \\"%(name)s\\",\\n");
 \t%(print_args)s
-\treturn (0);
+\t%(arg_fini)sreturn (0);
 }
 ''' % {
     'name' : optype.name,
-    'arg_decls' : '\n\t'.join('%s%s%s;' %
+    'arg_decls' : ('\n\t'.join('%s%s%s;' %
         (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1])
-        for f in optype.fields),
+        for f in optype.fields)) + escape_decl(optype.fields),
+    'arg_init' : ('escaped = NULL;\n\t' if has_escape(optype.fields) else ''),
+    'arg_fini' : ('__wt_free(session, escaped);\n\t'
+    if has_escape(optype.fields) else ''),
     'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
     'print_args' : '\n\t'.join(
-        'fprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' %
-        (f[1], printf_fmt(f), printf_arg(f))
+        '%sfprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' %
+        (printf_setup(f), f[1], printf_fmt(f), printf_arg(f))
         for f in optype.fields),
 })
 

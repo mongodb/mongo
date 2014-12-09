@@ -157,9 +157,10 @@ file_config = format_meta + [
         min='512B', max='128MB'),
     Config('block_compressor', '', r'''
         configure a compressor for file blocks.  Permitted values are
-        \c "none", \c "bzip2", \c "snappy" or custom compression
-        engine \c "name" created with WT_CONNECTION::add_compressor.
-        See @ref compression for more information'''),
+        \c "none" or custom compression engine name created with
+        WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+        for \c "snappy" or \c "zlib" compression, these names are also
+        available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages; see @ref
         tuning_cache_resident for more information''',
@@ -173,8 +174,9 @@ file_config = format_meta + [
         has been corrupted''',
         choices=['on', 'off', 'uncompressed']),
     Config('collator', '', r'''
-        configure custom collation for keys.  Value must be a collator
-        name created with WT_CONNECTION::add_collator'''),
+        configure custom collation for keys.  Permitted values are
+        \c "none" or a custom collator name created with
+        WT_CONNECTION::add_collator'''),
     Config('dictionary', '0', r'''
         the maximum number of unique values remembered in the Btree
         row-store leaf page value dictionary; see
@@ -290,8 +292,9 @@ table_only_config = [
 
 index_only_config = [
     Config('extractor', '', r'''
-        configure custom extractor for indices.  Value must be an extractor
-        name created with WT_CONNECTION::add_extractor'''),
+        configure custom extractor for indices.  Permitted values are
+        \c "none" or an extractor name created with
+        WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
         configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),
@@ -522,6 +525,11 @@ common_wiredtiger_open = [
         Config('archive', 'true', r'''
             automatically archive unneeded log files''',
             type='boolean'),
+        Config('compressor', '', r'''
+            configure a compressor for log records.  Permitted values are
+            empty (off) or \c "bzip2", \c "snappy" or custom compression
+            engine \c "name" created with WT_CONNECTION::add_compressor.
+            See @ref compression for more information'''),
         Config('enabled', 'false', r'''
             enable logging subsystem''',
             type='boolean'),
