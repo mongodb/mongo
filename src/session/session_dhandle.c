@@ -7,41 +7,7 @@
 
 #include "wt_internal.h"
 
-/*
- * __wt_session_dhandle_incr_use --
- *	Increment the session data source's in-use counter.
- */
-void
-__wt_session_dhandle_incr_use(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE *dhandle;
-
-	dhandle = session->dhandle;
-
-	(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
-}
-
-/*
- * __session_dhandle_decr_use --
- *	Decrement the session data source's in-use counter.
- */
-static int
-__session_dhandle_decr_use(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-
-	dhandle = session->dhandle;
-
-	/*
-	 * Decrement the in-use count on the underlying data-source -- if we're
-	 * the last reference, set the time-of-death timestamp.
-	 */
-	WT_ASSERT(session, dhandle->session_inuse > 0);
-	if (WT_ATOMIC_SUB4(dhandle->session_inuse, 1) == 0)
-		WT_TRET(__wt_seconds(session, &dhandle->timeofdeath));
-	return (0);
-}
+static int __session_dhandle_sweep(WT_SESSION_IMPL *);
 
 /*
  * __session_add_dhandle --
@@ -65,7 +31,9 @@ __session_add_dhandle(
 		*dhandle_cachep = dhandle_cache;
 
 	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
-	return (0);
+
+	/* Sweep the handle list to remove any dead handles. */
+	return (__session_dhandle_sweep(session));
 }
 
 /*
@@ -164,13 +132,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-
-	/*
-	 * Decrement the data-source's in-use counter. We ignore errors because
-	 * they're insignificant and handling them complicates error handling in
-	 * this function more than I'm willing to live with.
-	 */
-	(void)__session_dhandle_decr_use(session);
 
 	locked = F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ? WRITELOCK : READLOCK;
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
@@ -324,18 +285,11 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
  *	Discard any session dhandles that are not open.
  */
 static int
-__session_dhandle_sweep(WT_SESSION_IMPL *session, uint32_t flags)
+__session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
 	time_t now;
-
-	/*
-	 * Check the local flag WT_DHANDLE_LOCK_ONLY; a common caller with that
-	 * flag is in the path to discard the handle, don't sweep in that case.
-	 */
-	if (LF_ISSET(WT_DHANDLE_LOCK_ONLY))
-		return (0);
 
 	/*
 	 * Periodically sweep for dead handles; if we've swept recently, don't
@@ -447,16 +401,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))
 		WT_RET(__session_add_dhandle(session, NULL));
 
-	/* Sweep the handle list to remove any dead handles. */
-	WT_RET(__session_dhandle_sweep(session, flags));
-
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
 
-done:	/* Increment the data-source's in-use counter. */
-	__wt_session_dhandle_incr_use(session);
-
-	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
+done:	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
 	    F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE));
 	F_SET(session->dhandle, LF_ISSET(WT_DHANDLE_DISCARD_CLOSE));
 

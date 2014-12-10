@@ -68,12 +68,11 @@ __wt_metadata_cursor(
 
 	/* 
 	 * We use the metadata a lot, so we have a handle cached; lock it and
-	 * increment the in-use counter.
+	 * increment the in-use counter once the cursor is open.
 	 */
 	WT_ERR(__wt_session_lock_dhandle(session, 0));
-	__wt_session_dhandle_incr_use(session);
-
-	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
+	WT_ERR(__wt_curfile_create(session, NULL, cfg, 0, 0, cursorp));
+	__wt_cursor_dhandle_incr_use(session);
 
 	/* Restore the caller's btree. */
 err:	session->dhandle = saved_dhandle;

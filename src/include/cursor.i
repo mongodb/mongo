@@ -136,6 +136,38 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __wt_cursor_dhandle_incr_use --
+ *	Increment the in-use counter in cursor's data source.
+ */
+static inline void
+__wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+
+	/* If we open a handle with a time of death set, clear it. */
+	if (WT_ATOMIC_ADD4(dhandle->session_inuse, 1) == 1 &&
+	    dhandle->timeofdeath != 0)
+		dhandle->timeofdeath = 0;
+}
+
+/*
+ * __wt_cursor_dhandle_decr_use --
+ *	Decrement the in-use counter in cursor's data source.
+ */
+static inline void
+__wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+
+	WT_ASSERT(session, dhandle->session_inuse > 0);
+	(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+}
+
+/*
  * __cursor_func_init --
  *	Cursor call setup.
  */
