@@ -516,10 +516,10 @@ namespace mongo {
     // HELPERS FOR CUROP MANAGEMENT AND GLOBAL STATS
     //
 
-    static CurOp* beginCurrentOp( Client* client, const BatchItemRef& currWrite ) {
+    static void beginCurrentOp( CurOp* currentOp, Client* client, const BatchItemRef& currWrite ) {
 
         // Execute the write item as a child operation of the current operation.
-        auto_ptr<CurOp> currentOp( new CurOp( client, client->curop() ) );
+        // This is not done by out callers
 
         // Set up the child op with more info
         HostAndPort remote =
@@ -551,7 +551,6 @@ namespace mongo {
             currentOp->debug().ndeleted = 0;
         }
 
-        return currentOp.release();
     }
 
     void WriteBatchExecutor::incOpStats( const BatchItemRef& currWrite ) {
@@ -887,7 +886,8 @@ namespace mongo {
                                          WriteErrorDetail** error ) {
 
         // BEGIN CURRENT OP
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _txn->getClient(), updateItem ) );
+        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
         incOpStats( updateItem );
 
         WriteOpResult result;
@@ -898,8 +898,8 @@ namespace mongo {
             *upsertedId = result.getStats().upsertedID;
         }
         // END CURRENT OP
-        incWriteStats( updateItem, result.getStats(), result.getError(), currentOp.get() );
-        finishCurrentOp( _txn, currentOp.get(), result.getError() );
+        incWriteStats( updateItem, result.getStats(), result.getError(), &currentOp );
+        finishCurrentOp( _txn, &currentOp, result.getError() );
 
         // End current transaction and release snapshot.
         _txn->recoveryUnit()->commitAndRestart();
@@ -916,7 +916,8 @@ namespace mongo {
         // Removes are similar to updates, but page faults are handled externally
 
         // BEGIN CURRENT OP
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _txn->getClient(), removeItem ) );
+        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
         incOpStats( removeItem );
 
         WriteOpResult result;
@@ -924,8 +925,8 @@ namespace mongo {
         multiRemove( _txn, removeItem, &result );
 
         // END CURRENT OP
-        incWriteStats( removeItem, result.getStats(), result.getError(), currentOp.get() );
-        finishCurrentOp( _txn, currentOp.get(), result.getError() );
+        incWriteStats( removeItem, result.getStats(), result.getError(), &currentOp );
+        finishCurrentOp( _txn, &currentOp, result.getError() );
 
         // End current transaction and release snapshot.
         _txn->recoveryUnit()->commitAndRestart();
@@ -1074,7 +1075,8 @@ namespace mongo {
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
-        scoped_ptr<CurOp> currentOp(beginCurrentOp(_txn->getClient(), currInsertItem));
+        CurOp currentOp( _txn->getClient(), _txn->getClient()->curop() );
+        beginCurrentOp( &currentOp, _txn->getClient(), currInsertItem );
         incOpStats(currInsertItem);
 
         WriteOpResult result;
@@ -1083,8 +1085,8 @@ namespace mongo {
         incWriteStats(currInsertItem,
                       result.getStats(),
                       result.getError(),
-                      currentOp.get());
-        finishCurrentOp(_txn, currentOp.get(), result.getError());
+                      &currentOp);
+        finishCurrentOp(_txn, &currentOp, result.getError());
 
         if (result.getError()) {
             *error = result.releaseError();
