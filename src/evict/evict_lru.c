@@ -451,7 +451,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 		/*
 		 * Track whether pages are being evicted and progress is made.
-		 * At this point we know we need to evict.  
+		 * At this point we know we need to evict.
 		 */
 		pages_evicted = cache->pages_evict;
 
