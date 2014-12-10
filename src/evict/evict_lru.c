@@ -427,10 +427,16 @@ __evict_pass(WT_SESSION_IMPL *session)
 	WT_EVICT_WORKER *worker;
 	int loop;
 	uint32_t flags;
-	uint64_t bytes_inuse;
+	uint64_t bytes_inuse, pages_evicted;
 
 	conn = S2C(session);
 	cache = conn->cache;
+
+	/*
+	 * Track whether pages are being evicted.  This will be cleared
+	 * by the next thread to successfully evict a page.
+	 */
+	pages_evicted = cache->pages_evict;
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
@@ -452,18 +458,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 		if (loop > 10)
 			LF_SET(WT_EVICT_PASS_AGGRESSIVE);
 
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		/*
-		 * When the cache is full, track whether pages are being
-		 * evicted.  This will be cleared by the next thread to
-		 * successfully evict a page.
-		 */
-		if (bytes_inuse > conn->cache_size) {
-			F_SET(cache, WT_EVICT_NO_PROGRESS);
-		} else
-			F_CLR(cache, WT_EVICT_NO_PROGRESS);
-
 		/* Start a worker if we have capacity and the cache is full. */
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		if (bytes_inuse > conn->cache_size &&
 		    conn->evict_workers < conn->evict_workers_max) {
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
@@ -489,7 +485,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * any progress at all, mark the cache "stuck" and go back to
 		 * sleep, it's not something we can fix.
 		 */
-		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
+		if (pages_evicted == cache->pages_evict) {
 			/*
 			 * Back off if we aren't making progress: walks hold
 			 * the handle list lock, which blocks other operations
@@ -1292,8 +1288,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_RET(ret);
 
 	cache = S2C(session)->cache;
-	if (F_ISSET(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK))
-		F_CLR(cache, WT_EVICT_NO_PROGRESS | WT_EVICT_STUCK);
+	if (F_ISSET(cache, WT_EVICT_STUCK))
+		F_CLR(cache, WT_EVICT_STUCK);
 
 	return (ret);
 }
