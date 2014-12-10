@@ -32,14 +32,14 @@ disk is necessary, it is usually desirable to read a large amount of
 data, assuming some locality of reference in the application's access
 pattern).
 
-The default page size configuration (2KB for \c internal_page_max and
-32KB for \c leaf_page_max), are appropriate for applications with
-relatively small keys and values.
+The default page size configurations (2KB for \c internal_page_max, 32KB
+for \c leaf_page_max), are appropriate for applications with relatively
+small keys and values.
 
-Applications doing table scans in out-of-memory workloads might increase
-both internal and leaf page sizes to transfer more data per I/O.
-
-Applications focused on read/write amplification might decrease the page
+- Applications doing full-table scans through out-of-memory workloads
+might increase both internal and leaf page sizes to transfer more data
+per I/O.
+- Applications focused on read/write amplification might decrease the page
 size to better match the underlying storage block size.
 
 When block compression has been configured, configured page sizes will
@@ -47,43 +47,47 @@ not match the actual size of the page on disk. Block compression in
 WiredTiger happens within the I/O subsystem, and so a page might split
 even if subsequent compression would result in a resulting page size
 small enough to leave as a single page.  In other words, page sizes are
-based on in-memory sizes, not on-disk sizes.
+based on in-memory sizes, not on-disk sizes. Applications needing to
+write specific sized blocks may want to consider implementing a
+WT_COMPRESSOR::compress_raw function.
 
-The configured page size also determines the default size of overflow
-items, that is, keys and values too large to easily store on a page.
-Overflow items are stored separately in the file from the page where the
-item logically appears, and so referencing overflow items is more
-expensive than referencing on-page items, requiring off-page access and
-additional I/O in many cases  For this reason, it is important to avoid
-creating large numbers of overflow items that are commonly referenced.
+The page sizes also determine the default size of overflow items, that
+is, keys and values too large to easily store on a page.  Overflow items
+are stored separately in the file from the page where the item logically
+appears, and so reading or writing an overflow item is more expensive
+than an on-page item, normally requiring additional I/O.  Additionally,
+overflow values are not cached in memory. This means overflow items
+won't affect the caching behavior of the application, but it also means
+that each time an overflow value is read, it is re-read from disk.
 
-This is especially important for keys, as keys on internal pages are
-referenced during random searches, not just during data retrieval.
-Generally, applications should make every attempt to avoid creating
-overflow keys.
+For both of these reasons, applications should avoid creating large
+numbers of commonly referenced overflow items.  This is especially
+important for keys, as keys on internal pages are referenced during
+random searches, not just during data retrieval.  Generally,
+applications should make every attempt to avoid creating overflow keys.
 
-Applications with large keys and values, and concerned with latency,
+- Applications with large keys and values, and concerned with latency,
 might increase the page size to avoid creating overflow items, in order
-to avoid the additional work of retrieving them.
+to avoid the additional cost of retrieving them.
 
-Applications with large keys and values, doing random searches, might
+- Applications with large keys and values, doing random searches, might
 decrease the page size to avoid wasting cache space on overflow items
 that aren't likely to be needed.
 
-Applications with large keys and values, and doing table scans, might
+- Applications with large keys and values, doing table scans, might
 increase the page size to avoid creating overflow items, as the overflow
-items will have to be read into cache in all cases anyway.
+items must be read into memory in all cases, anyway.
 
 The \c internal_key_max, \c leaf_key_max and \c leaf_value_max
 configuration values allow applications to change the size at which a
 key or value will be treated as an overflow item.
 
 The value of \c internal_key_max is relative to the maximum internal
-page size.  Because the number of keys on an internal page usually
-determines the depth of the tree, the \c internal_key_max value can only
-be adjusted within a certain range, and the configured value will be
-automatically adjusted by WiredTiger to ensure at a reasonable number
-of keys fit on an internal page.
+page size.  Because the number of keys on an internal page determines
+the depth of the tree, the \c internal_key_max value can only be
+adjusted within a certain range, and the configured value will be
+automatically adjusted by WiredTiger, if necessary to ensure a
+reasonable number of keys fit on an internal page.
 
 The values of \c leaf_key_max and \c leaf_value_max are not relative to
 the maximum leaf page size. If either is larger than the maximum page
@@ -91,9 +95,9 @@ size, the page size will be ignored when the larger keys and values are
 being written, and a larger page will be created as necessary.
 
 Most applications should not need to tune the maximum key and value
-sizes.  Applications requiring a small page size but also having latency
-concerns such that the additional work to retrieve an overflow item is
-an issue, may find them useful.
+sizes.  Applications requiring a small page size, but also having
+latency concerns such that the additional work to retrieve an overflow
+item is an issue, may find them useful.
 
 @section tune_page_sizes_split_percentage Split percentage
 
@@ -131,4 +135,4 @@ Most applications should not need to tune the allocation size; it is
 primarily intended for applications coping with the specific
 requirements some file systems make to support features like direct I/O.
 
- */
+*/
