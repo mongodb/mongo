@@ -387,7 +387,7 @@ sh.getBalancerLockDetails = function() {
     if (lock.state == 0){
         return false;
     }
-    return lock.state;
+    return lock;
 }
 
 sh.getBalancerWindow = function() {
