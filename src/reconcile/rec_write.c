@@ -96,16 +96,15 @@ typedef struct {
 	 * image size.
 	 *
 	 * First, the sizes of the page we're building.  If WiredTiger is doing
-	 * page layout, page_size is the same as page_size_max.  We accumulate
-	 * the maximum page size of raw data and when we reach that size, we
-	 * split the page into multiple chunks, eventually compressing those
-	 * chunks.  When the application is doing page layout (raw compression
-	 * is configured), page_size can continue to grow past page_size_max,
-	 * and we keep accumulating raw data until the raw compression callback
-	 * accepts it.
+	 * page layout, page_size is the same as page_size_orig. We accumulate
+	 * a "page size" of raw data and when we reach that size, we split the
+	 * page into multiple chunks, eventually compressing those chunks.  When
+	 * the application is doing page layout (raw compression is configured),
+	 * page_size can continue to grow past page_size_orig, and we keep
+	 * accumulating raw data until the raw compression callback accepts it.
 	 */
-	uint32_t page_size;		/* Current page size */
-	uint32_t page_size_max;		/* Maximum on-disk page size */
+	uint32_t page_size;		/* Set page size */
+	uint32_t page_size_orig;	/* Saved set page size */
 
 	/*
 	 * Second, the split size: if we're doing the page layout, split to a
@@ -1606,7 +1605,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * we don't want to increment our way up to the amount of data needed by
 	 * the application to successfully compress to the target page size.
 	 */
-	r->page_size = r->page_size_max = max;
+	r->page_size = r->page_size_orig = max;
 	if (r->raw_compression)
 		r->page_size *= 10;
 
@@ -1662,11 +1661,11 @@ __rec_split_init(WT_SESSION_IMPL *session,
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 	}
 	else if (page->type == WT_PAGE_COL_FIX) {
-		r->split_size = r->page_size_max;
+		r->split_size = r->page_size;
 		r->space_avail =
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 	} else {
-		r->split_size = __wt_split_page_size(btree, r->page_size_max);
+		r->split_size = __wt_split_page_size(btree, r->page_size);
 		r->space_avail =
 		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 	}
@@ -2240,7 +2239,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * compress_raw method, and there are bytes in the header just for us.
 	 */
 	if (compressor->pre_size == NULL)
-		result_len = r->page_size_max;
+		result_len = r->page_size_orig;
 	else
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
@@ -2255,7 +2254,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	ret = compressor->compress_raw(compressor, wt_session,
-	    r->page_size_max, btree->split_pct,
+	    r->page_size_orig, btree->split_pct,
 	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
@@ -2621,7 +2620,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->page_size_max, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->page_size, &tmp));
 	dsk = tmp->mem;
 	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
