@@ -60,12 +60,13 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_TRET(__wt_session_release_btree(session));
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
-		WT_ERR(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		WT_ERR(__wt_schema_worker(session, colgroup->source,
-		    file_func, name_func, cfg, open_flags));
+		WT_ERR(__wt_schema_get_colgroup(
+		    session, uri, 0, NULL, &colgroup));
+		WT_ERR(__wt_schema_worker(session,
+		    colgroup->source, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
-		WT_ERR(__wt_schema_get_index(session, uri, NULL, &idx));
+		WT_ERR(__wt_schema_get_index(session, uri, 0, NULL, &idx));
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {

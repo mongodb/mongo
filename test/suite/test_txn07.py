@@ -147,50 +147,6 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         finally:
             backup_conn.close()
 
-    def check_log(self, committed):
-        self.backup(self.backup_dir)
-        #
-        # Open and close the backup connection a few times to force
-        # repeated recovery and log archiving even if later recoveries
-        # are essentially no-ops. Confirm that the backup contains
-        # the committed operations after recovery.
-        #
-        # Cycle through the different archive values in a
-        # deterministic manner.
-        self.archive = self.archive_list[
-            self.scenario_number % len(self.archive_list)]
-        backup_conn_params = \
-            'log=(enabled,file_max=%s,archive=%s)' % (self.logmax, self.archive)
-        orig_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
-        endcount = 2
-        count = 0
-        while count < endcount:
-            backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
-            try:
-                 self.check(backup_conn.open_session(), None, committed)
-            finally:
-                 # Let other threads like archive run before closing.
-                 # time.sleep(0) is not guaranteed to force a context switch.
-                 # Use a small timeout.
-                 time.sleep(0.01)
-                 backup_conn.close()
-            count += 1
-        #
-        # Check logs after repeated openings. The first log should
-        # have been archived if configured. Subsequent openings would not
-        # archive because no checkpoint is written due to no modifications.
-        #
-        cur_logs = fnmatch.filter(os.listdir(self.backup_dir), "*Log*")
-        for o in orig_logs:
-            if self.archive == 'true':
-                self.assertEqual(False, o in cur_logs)
-            else:
-                self.assertEqual(True, o in cur_logs)
-        #
-        # Run printlog and make sure it exits with zero status.
-        #
-        self.runWt(['-h', self.backup_dir, 'printlog'], outfilename='printlog.out')
-
     def test_ops(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         self.session.create(self.uri, self.create_params)
@@ -272,10 +228,6 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         cfails = stat_cursor[stat.conn.log_compress_write_fails][2]
         csmall = stat_cursor[stat.conn.log_compress_small][2]
         stat_cursor.close()
-
-        # Check the log state after the entire op completes
-        # and run recovery.
-        self.check_log(committed)
 
         if self.compress == '':
             self.assertEqual(clen, cmem)
