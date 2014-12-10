@@ -35,6 +35,7 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -219,7 +220,7 @@ namespace {
     }
 
     TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
-        // one responds with -10000 votes, and one doesn't respond, and we are not elected
+        // one responds with a bad 'vote' field, and one doesn't respond, and we are not elected
         startCapturingLogMessages();
         BSONObj configObj = BSON("_id" << "mySet" <<
                                  "version" << 1 <<
@@ -263,6 +264,95 @@ namespace {
         stopCapturingLogMessages();
         ASSERT_EQUALS(1,
                 countLogLinesContaining("wrong type for vote argument in replSetElect command"));
+    }
+
+    TEST_F(ReplCoordElectTest, ElectionDuringHBReconfigFails) {
+        // start up, receive reconfig via heartbeat while at the same time, become candidate.
+        // candidate state should be cleared.
+        OperationContextNoop txn;
+        assertStartSuccess(
+            BSON("_id" << "mySet" <<
+                 "version" << 2 <<
+                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
+                                         BSON("_id" << 2 << "host" << "node2:12345") <<
+                                         BSON("_id" << 3 << "host" << "node3:12345") <<
+                                         BSON("_id" << 4 << "host" << "node4:12345") <<
+                                         BSON("_id" << 5 << "host" << "node5:12345") )),
+            HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(OpTime(100,0));
+
+        // set hbreconfig to hang while in progress
+        getExternalState()->setStoreLocalConfigDocumentToHang(true);
+
+        // hb reconfig
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        ReplSetHeartbeatResponse hbResp2;
+        ReplicaSetConfig config;
+        config.initialize(BSON("_id" << "mySet" <<
+                               "version" << 3 <<
+                               "members" << BSON_ARRAY(BSON("_id" << 1 <<
+                                                            "host" << "node1:12345") <<
+                                                       BSON("_id" << 2 <<
+                                                            "host" << "node2:12345"))));
+        hbResp2.setConfig(config);
+        hbResp2.setVersion(3);
+        hbResp2.setSetName("mySet");
+        hbResp2.setState(MemberState::RS_SECONDARY);
+        BSONObjBuilder respObj2;
+        respObj2 << "ok" << 1;
+        hbResp2.addToBSON(&respObj2);
+        net->runUntil(net->now() + 10*1000); // run until we've sent a heartbeat request
+        const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
+        net->scheduleResponse(noi2, net->now(), makeResponseStatus(respObj2.obj()));
+        net->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+
+        // prepare candidacy
+        BSONObjBuilder result;
+        ReplicationCoordinator::ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = config.toBSON();
+        ASSERT_EQUALS(ErrorCodes::ConfigurationInProgress,
+                      getReplCoord()->processReplSetReconfig(&txn, args, &result));
+
+        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
+        startCapturingLogMessages();
+
+        // receive sufficient heartbeats to trigger an election
+        ReplicationCoordinatorImpl* replCoord = getReplCoord();
+        ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
+        net->enterNetwork();
+        for (int i = 0; i < 2; ++i) {
+            const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            log() << request.target.toString() << " processing " << request.cmdObj;
+            ReplSetHeartbeatArgs hbArgs;
+            if (hbArgs.initialize(request.cmdObj).isOK()) {
+                ReplSetHeartbeatResponse hbResp;
+                hbResp.setSetName(rsConfig.getReplSetName());
+                hbResp.setState(MemberState::RS_SECONDARY);
+                hbResp.setVersion(rsConfig.getConfigVersion());
+                BSONObjBuilder respObj;
+                respObj << "ok" << 1;
+                hbResp.addToBSON(&respObj);
+                net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+            }
+            else {
+                error() << "Black holing unexpected request to " << request.target << ": " <<
+                    request.cmdObj;
+                net->blackHole(noi);
+            }
+            net->runReadyNetworkOperations();
+        }
+
+        stopCapturingLogMessages();
+        // ensure node does not stand for election
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("Not standing for election; processing "
+                                              "a configuration change"));
+        getExternalState()->setStoreLocalConfigDocumentToHang(false);
     }
 
 }
