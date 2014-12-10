@@ -155,6 +155,10 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 		return nil, nil, err
 	}
 
+	if exp.InputOpts.SlaveOk {
+		session.SetMode(mgo.Monotonic, true)
+	}
+
 	skip := 0
 	if exp.InputOpts != nil {
 		skip = exp.InputOpts.Skip
