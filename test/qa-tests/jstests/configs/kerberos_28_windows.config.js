@@ -11,13 +11,11 @@
 var getToolTest;
 
 (function() {
-  var AUTH_USER = 'luke.skywalker@MADHACKER.BIZ';
-
   getToolTest = function(name) {
     var toolTest = new ToolTest(name, {});
     var db;
 
-    db = toolTest.db = new Mongo('karpov.madhacker.biz:27017').getDB('test');
+    db = toolTest.db = new Mongo(AUTH_HOSTNAME + ':27017').getDB('test');
 
     /** Overwrite so toolTest.runTool doesn't append --host */
     ToolTest.prototype.runTool = function() {
@@ -30,13 +28,13 @@ var getToolTest;
       pwd: AUTH_PASSWORD,
       mechanism: 'GSSAPI',
       serviceName: 'mongodb',
-      serviceHostname: 'karpov.madhacker.biz'
+      serviceHostname: AUTH_HOSTNAME
     });
 
     toolTest.authCommand = 'db.getSiblingDB(\'$external\').auth({ user: ' +
       '\'' + AUTH_USER + '\', pwd: \'' + AUTH_PASSWORD +'\', ' +
       'mechanism: \'GSSAPI\', ' +
-      'serviceName: \'mongodb\', serviceHostname: \'karpov.madhacker.biz\' });';
+      'serviceName: \'mongodb\', serviceHostname: \'' + AUTH_HOSTNAME + '\' });';
 
     toolTest.stop = function() {
       print('No need to stop on Kerberos windows config. Test succeeded');
@@ -48,12 +46,12 @@ var getToolTest;
 
 var getCommonToolArguments = function() {
   return [
-    '--username', 'luke.skywalker@MADHACKER.BIZ',
+    '--username', AUTH_USER,
     '--password', AUTH_PASSWORD,
-    '--host', 'karpov.madhacker.biz',
+    '--host', AUTH_HOSTNAME,
     '--authenticationDatabase', '$external',
     '--authenticationMechanism', 'GSSAPI',
     '--gssapiServiceName', 'mongodb',
-    '--gssapiHostName', 'karpov.madhacker.biz'
+    '--gssapiHostName', AUTH_HOSTNAME
   ];
 };
