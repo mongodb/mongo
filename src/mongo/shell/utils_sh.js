@@ -382,24 +382,24 @@ sh.getBalancerLockDetails = function() {
     var configDB = db.getSiblingDB('config');
     var lock = configDB.locks.findOne({ _id : 'balancer' });
     if (lock == null) {
-        return false;
+        return null;
     }
     if (lock.state == 0){
-        return false;
+        return null;
     }
-    return lock.state;
+    return lock;
 }
 
 sh.getBalancerWindow = function() {
     var configDB = db.getSiblingDB('config');
     var settings = configDB.settings.findOne({ _id : 'balancer' });
     if ( settings == null ) {
-        return false;
+        return null;
     }
     if (settings.hasOwnProperty("activeWindow")){
         return settings.activeWindow;
     }
-    return false;
+    return null
 }
 
 sh.getActiveMigrations = function() {

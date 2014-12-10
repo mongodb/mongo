@@ -688,13 +688,13 @@ printShardingStatus = function( configDB , verbose ){
 
         //Output details of the current balancer round
         var balLock = sh.getBalancerLockDetails()
-        if ( balLock != false ) {
+        if ( balLock ) {
             output( "\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who );
         }
 
         //Output the balancer window
         var balSettings = sh.getBalancerWindow()
-        if ( balSettings != false ) {
+        if ( balSettings ) {
             output( "\t\tBalancer active window is set between " +
                 balSettings.start + " and " + balSettings.stop + " server local time");
         }
