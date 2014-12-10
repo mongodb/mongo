@@ -438,7 +438,6 @@ namespace {
         boost::unique_lock<boost::mutex> lock(_mutex);
 
         _pause = true;
-        _syncSourceReader.resetConnection();
         _syncSourceHost = HostAndPort();
         _lastOpTimeFetched = OpTime(0,0);
         _lastFetchedHash = 0;
