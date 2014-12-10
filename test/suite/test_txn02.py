@@ -161,10 +161,9 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             try:
                 self.check(backup_conn.open_session(), None, committed)
             finally:
-                # Yield so that the archive thread gets a chance to run
-                # before we close the connection.  time.sleep(0) is not
-                # guaranteed to force a context switch.  So use a small time.
-                time.sleep(0.01)
+                # Sleep long enough so that the archive thread is guaranteed
+                # to run before we close the connection.
+                time.sleep(1.0)
                 backup_conn.close()
             count += 1
         #
@@ -255,8 +254,11 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             self.check_all(current, committed)
 
         # Check the log state after the entire op completes
-        # and run recovery.
-        self.check_log(committed)
+        # and run recovery.  check_log() takes over a second
+        # to run, so we don't want to run it for all scenarios;
+        # rather, we run it about 100 times overall.
+        if self.scenario_number % (len(test_txn02.scenarios) / 100 + 1) == 0:
+            self.check_log(committed)
 
 if __name__ == '__main__':
     wttest.run()
