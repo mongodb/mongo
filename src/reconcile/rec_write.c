@@ -1886,7 +1886,7 @@ err:	__wt_scr_free(&update);
  *	Grow the split buffer.
  */
 static int
-__rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
+__rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -1895,17 +1895,12 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	/*
-	 * Don't change the page size, we want to revert to the usual page size
-	 * after this page gets pushed out.
-	 */
 	len = WT_PTRDIFF(r->first_free, r->dsk.mem);
-	corrected_page_size = len + next_len;
+	corrected_page_size = len + add_len;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
 	WT_RET(__wt_buf_grow(session, &r->dsk, corrected_page_size));
 	r->first_free = (uint8_t *)r->dsk.mem + len;
-	r->space_avail =
-	    corrected_page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
+	r->space_avail += add_len;
 	return (0);
 }
 
@@ -2239,7 +2234,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * compress_raw method, and there are bytes in the header just for us.
 	 */
 	if (compressor->pre_size == NULL)
-		result_len = r->page_size_orig;
+		result_len = (size_t)r->raw_offsets[slots];
 	else
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,

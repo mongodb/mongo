@@ -2635,7 +2635,7 @@ struct __wt_compressor {
 	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
 	 * the destination buffer will be at least the size returned by that
 	 * method; otherwise, the destination buffer will be at least as large
-	 * as \c src_len.
+	 * as the length of the data to compress.
 	 *
 	 * If compression would not shrink the data or the \c dst buffer is not
 	 * large enough to hold the compressed data, the callback should set
@@ -2705,10 +2705,8 @@ struct __wt_compressor {
 	 * On entry, \c dst points to the destination buffer with a length
 	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
 	 * the destination buffer will be at least the size returned by that
-	 * method; otherwise, the destination buffer will be at least the
-	 * maximum size for the page being written (that is, when writing a
-	 * row-store leaf page, the destination buffer will be at least as
-	 * large as the \c leaf_page_max configuration value).
+	 * method; otherwise, the destination buffer will be at least as large
+	 * as the length of the data to compress.
 	 *
 	 * After successful completion, the callback should return \c 0, and
 	 * set \c result_slotsp to the number of byte strings encoded and
