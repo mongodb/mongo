@@ -73,7 +73,8 @@ __sweep(WT_SESSION_IMPL *session)
 
 		/* If the handle is open, try to close it. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
+			WT_WITH_DHANDLE(session, dhandle,
+			    ret = __wt_conn_btree_sync_and_close(session, 0));
 
 		/*
 		 * If there are no longer any references to the handle in any
