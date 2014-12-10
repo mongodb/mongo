@@ -213,6 +213,11 @@ namespace {
         locker.unlockAll();
     }
 
+
+    // These two tests exercise single-threaded performance of uncontended lock acquisition. It
+    // is not practical to run them on debug builds.
+#ifndef _DEBUG
+
     TEST(Locker, PerformanceBoostSharedMutex) {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
             boost::mutex mtx;
@@ -268,5 +273,7 @@ namespace {
                   << " ns";
         }
     }
+
+#endif  // _DEBUG
 
 } // namespace mongo
