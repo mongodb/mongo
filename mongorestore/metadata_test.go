@@ -76,3 +76,93 @@ func TestCollectionExists(t *testing.T) {
 		})
 	})
 }
+
+func TestGetDumpAuthVersion(t *testing.T) {
+
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	restore := &MongoRestore{}
+
+	Convey("With a test mongorestore", t, func() {
+		Convey("and no --restoreDbUsersAndRoles", func() {
+			restore = &MongoRestore{
+				InputOptions: &InputOptions{},
+				ToolOptions:  &commonOpts.ToolOptions{},
+			}
+			Convey("auth version 1 should be detected", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 1)
+			})
+
+			Convey("auth version 3 should be detected", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				restore.manager.Put(&intents.Intent{
+					DB:       "admin",
+					C:        "system.version",
+					BSONPath: "testdata/auth_version_3.bson",
+				})
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 3)
+			})
+
+			Convey("auth version 5 should be detected", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				restore.manager.Put(&intents.Intent{
+					DB:       "admin",
+					C:        "system.version",
+					BSONPath: "testdata/auth_version_5.bson",
+				})
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 5)
+			})
+		})
+
+		Convey("using --restoreDbUsersAndRoles", func() {
+			restore = &MongoRestore{
+				InputOptions: &InputOptions{
+					RestoreDBUsersAndRoles: true,
+				},
+				ToolOptions: &commonOpts.ToolOptions{
+					Namespace: &commonOpts.Namespace{
+						DB: "TestDB",
+					},
+				},
+			}
+
+			Convey("auth version 3 should be detected when no file exists", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 3)
+			})
+
+			Convey("auth version 3 should be detected when a version 3 file exists", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				restore.manager.Put(&intents.Intent{
+					DB:       "admin",
+					C:        "system.version",
+					BSONPath: "testdata/auth_version_3.bson",
+				})
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 3)
+			})
+
+			Convey("auth version 5 should be detected", func() {
+				restore.manager = intents.NewCategorizingIntentManager()
+				restore.manager.Put(&intents.Intent{
+					DB:       "admin",
+					C:        "system.version",
+					BSONPath: "testdata/auth_version_5.bson",
+				})
+				version, err := restore.GetDumpAuthVersion()
+				So(err, ShouldBeNil)
+				So(version, ShouldEqual, 5)
+			})
+		})
+	})
+
+}

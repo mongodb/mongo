@@ -49,6 +49,16 @@ func (it *Intent) IsRoles() bool {
 	return false
 }
 
+func (it *Intent) IsAuthVersion() bool {
+	if it.C == "$admin.system.version" {
+		return true
+	}
+	if it.DB == "admin" && it.C == "system.version" {
+		return true
+	}
+	return false
+}
+
 func (it *Intent) IsSystemIndexes() bool {
 	return it.C == "system.indexes" && it.BSONPath != ""
 }
@@ -76,10 +86,11 @@ type Manager struct {
 	// special cases that should be saved but not be part of the queue.
 	// used to deal with oplog and user/roles restoration, which are
 	// handled outside of the basic logic of the tool
-	oplogIntent  *Intent
-	usersIntent  *Intent
-	rolesIntent  *Intent
-	indexIntents map[string]*Intent
+	oplogIntent   *Intent
+	usersIntent   *Intent
+	rolesIntent   *Intent
+	versionIntent *Intent
+	indexIntents  map[string]*Intent
 }
 
 func NewCategorizingIntentManager() *Manager {
@@ -124,6 +135,12 @@ func (manager *Manager) Put(intent *Intent) {
 		if intent.IsRoles() {
 			if intent.BSONPath != "" {
 				manager.rolesIntent = intent
+			}
+			return
+		}
+		if intent.IsAuthVersion() {
+			if intent.BSONPath != "" {
+				manager.versionIntent = intent
 			}
 			return
 		}
@@ -204,6 +221,11 @@ func (manager *Manager) Users() *Intent {
 // Roles returns the intent of the user roles collection to restore, a special case
 func (manager *Manager) Roles() *Intent {
 	return manager.rolesIntent
+}
+
+// AuthVersion returns the intent of the version collection to restore, a special case
+func (manager *Manager) AuthVersion() *Intent {
+	return manager.versionIntent
 }
 
 // Finalize processes the intents for prioritization. Currently only two

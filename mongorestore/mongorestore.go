@@ -2,6 +2,7 @@ package mongorestore
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/auth"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
@@ -30,10 +31,11 @@ type MongoRestore struct {
 	safety          *mgo.Safe
 	progressManager *progress.Manager
 
-	objCheck   bool
-	oplogLimit bson.MongoTimestamp
-	useStdin   bool
-	isMongos   bool
+	objCheck     bool
+	oplogLimit   bson.MongoTimestamp
+	useStdin     bool
+	isMongos     bool
+	authVersions authVersionPair
 
 	// a map of database names to a list of collection names
 	knownCollections      map[string][]string
@@ -135,7 +137,7 @@ func (restore *MongoRestore) Restore() error {
 		return err
 	}
 
-	// 1. Build up all intents to be restored
+	// Build up all intents to be restored
 	restore.manager = intents.NewCategorizingIntentManager()
 
 	switch {
@@ -162,7 +164,28 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("error scanning filesystem: %v", err)
 	}
 
-	// 2. Restore them...
+	// If restoring users and roles, make sure we validate auth versions
+	restoreAuthCollections := restore.InputOptions.RestoreDBUsersAndRoles ||
+		restore.ToolOptions.DB == "" || restore.ToolOptions.DB == "admin"
+	if restoreAuthCollections {
+		log.Log(log.Info, "comparing auth version of the dump directory and target server")
+		restore.authVersions.Dump, err = restore.GetDumpAuthVersion()
+		if err != nil {
+			return fmt.Errorf("error getting auth version from dump: %v", err)
+		}
+		restore.authVersions.Server, err = auth.GetAuthVersion(restore.SessionProvider)
+		if err != nil {
+			return fmt.Errorf("error getting auth version of server: %v", err)
+		}
+		err = restore.ValidateAuthVersions()
+		if err != nil {
+			return fmt.Errorf(
+				"the users and roles collections in the dump have an incompatible auth version with target server: %v",
+				err)
+		}
+	}
+
+	// Restore the regular collections
 	if restore.OutputOptions.NumParallelCollections > 0 {
 		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {
@@ -174,9 +197,8 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("restore error: %v", err)
 	}
 
-	// 3. Restore users/roles
-	// TODO comment all cases
-	if restore.InputOptions.RestoreDBUsersAndRoles || restore.ToolOptions.DB == "" || restore.ToolOptions.DB == "admin" {
+	// Restore users/roles
+	if restoreAuthCollections {
 		if restore.manager.Users() != nil {
 			err = restore.RestoreUsersOrRoles(Users, restore.manager.Users())
 			if err != nil {
@@ -191,7 +213,7 @@ func (restore *MongoRestore) Restore() error {
 		}
 	}
 
-	// 4. Restore oplog
+	// Restore oplog
 	if restore.InputOptions.OplogReplay {
 		err = restore.RestoreOplog()
 		if err != nil {

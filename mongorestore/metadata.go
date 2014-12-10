@@ -17,6 +17,14 @@ import (
 const Users = "users"
 const Roles = "roles"
 
+// struct for working with auth versions
+type authVersionPair struct {
+	// Dump is the auth version of the users/roles collection files in the target dump directory
+	Dump int
+	// Server is the auth version of the connected MongoDB server
+	Server int
+}
+
 type Metadata struct {
 	Options bson.D          `json:"options,omitempty"`
 	Indexes []IndexDocument `json:"indexes"`
@@ -332,4 +340,91 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("_mergeAuthzCollections command: %v", res["errmsg"])
 	}
 	return nil
+}
+
+// GetDumpAuthVersion reads the admin.system.version collection in the dump directory
+// to determine the auth version of the files in the dump. If that collection is not
+// present in the dump, we try to infer the auth version based on its absence.
+// Returns the auth version number and any errors that occur.
+func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
+	// first handle the case where we have no auth version
+	intent := restore.manager.AuthVersion()
+	if intent == nil {
+		if restore.InputOptions.RestoreDBUsersAndRoles {
+			// If we are using --restoreDbUsersAndRoles, we cannot guarantee an
+			// $admin.system.version collection from a 2.6 server,
+			// so we can assume up to version 3.
+			//TODO better logs?
+			log.Logf(log.Always, "no system.version bson file found in '%v' database dump", restore.ToolOptions.DB)
+			log.Log(log.Always, "warning: assuming users and roles collections are of auth version 3")
+			log.Log(log.Always, "if users are from an earlier version of MongoDB, they may not restore properly")
+			return 3, nil
+		}
+		log.Log(log.Info, "no system.version bson file found in dump")
+		log.Log(log.Always, "assuming users in the dump directory are from <= 2.4 (auth version 1)")
+		return 1, nil
+	}
+	rawFile, err := os.Open(intent.BSONPath)
+	if err != nil {
+		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.BSONPath, err)
+	}
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+	defer bsonSource.Close()
+
+	versionDoc := struct {
+		CurrentVersion int `bson:"currentVersion"`
+	}{}
+	bsonSource.Next(&versionDoc)
+	if err = bsonSource.Err(); err != nil {
+		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.BSONPath, err)
+	}
+	authVersion := versionDoc.CurrentVersion
+	if authVersion == 0 {
+		// 0 is not a possible valid version number, so this can only indicate bad input
+		return 0, fmt.Errorf("system.version bson file does not have 'currentVersion' field")
+	}
+	return authVersion, nil
+}
+
+// ValidateAuthVersions compares the auth version of the dump files and the
+// auth version of the target server, and errors with a detailed message
+// if the versions are not compatible.
+func (restore *MongoRestore) ValidateAuthVersions() error {
+	if restore.authVersions.Dump == 2 || restore.authVersions.Dump == 4 {
+		return fmt.Errorf(
+			"cannot restore users and roles from a dump file with auth version %v; "+
+				"finish the upgrade or roll it back", restore.authVersions.Dump)
+	}
+	if restore.authVersions.Server == 2 || restore.authVersions.Server == 4 {
+		return fmt.Errorf(
+			"cannot restore users and roles to a server with auth version %v; "+
+				"finish the upgrade or roll it back", restore.authVersions.Server)
+	}
+	switch restore.authVersions {
+	case authVersionPair{3, 5}:
+		log.Log(log.Info,
+			"restoring users and roles of auth version 3 to a server of auth version 5")
+	case authVersionPair{5, 5}:
+		log.Log(log.Info,
+			"restoring users and roles of auth version 5 to a server of auth version 5")
+	case authVersionPair{1, 5}:
+		return fmt.Errorf("cannot restore users of auth version 1 to a server of auth version 5")
+	case authVersionPair{5, 3}:
+		return fmt.Errorf("cannot restore users of auth version 5 to a server of auth version 3")
+	case authVersionPair{1, 3}:
+		log.Log(log.Info,
+			"restoring users and roles of auth version 1 to a server of auth version 3")
+		log.Log(log.Always,
+			"users and roles will have to be updated with the authSchemaUpgrade command")
+	case authVersionPair{5, 1}:
+		fallthrough
+	case authVersionPair{3, 1}:
+		return fmt.Errorf(
+			"cannot restore users and roles dump file >= auth version 3 to a server of auth version 1")
+	default:
+		return fmt.Errorf("invalid auth pair: dump=%v, server=%v",
+			restore.authVersions.Dump, restore.authVersions.Server)
+	}
+	return nil
+
 }

@@ -82,7 +82,7 @@
         // do a full restore
         ret = toolTest.runTool('restore' + (restoreVersion ? ('-'+restoreVersion) : ''), 
             '--username', 'admin28', '--password', 
-            'password', dumpTarget);
+            'password', '--stopOnError', dumpTarget);
         assert.eq(0, ret);
 
         // make sure the data and users are all there
