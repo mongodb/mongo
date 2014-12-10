@@ -246,7 +246,7 @@ func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) 
 		} else {
 			key := "field" + strconv.Itoa(index)
 			if util.StringSliceContains(fields, key) {
-				return nil, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
+				return nil, fmt.Errorf("Duplicate field name - on %v - for token #%v ('%v') in document #%v",
 					key, index+1, parsedValue, numProcessed)
 			}
 			document = append(document, bson.DocElem{key, parsedValue})
@@ -255,50 +255,56 @@ func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) 
 	return document, nil
 }
 
-// validateHeaders takes an InputReader, and does some validation on the
+// validateFields takes an InputReader, and does some validation on the
 // header fields. It returns an error if an issue is found in the header list
-func validateHeaders(inputReader InputReader, hasHeaderLine bool) (validatedFields []string, err error) {
-	unsortedHeaders := []string{}
+func validateFields(inputReader InputReader, hasHeaderLine bool) (validatedFields []string, err error) {
+	unsortedFields := []string{}
 	if hasHeaderLine {
-		unsortedHeaders, err = inputReader.ReadHeadersFromSource()
+		unsortedFields, err = inputReader.ReadHeaderFromSource()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		unsortedHeaders = inputReader.GetHeaders()
+		unsortedFields = inputReader.GetFields()
 	}
 
-	headers := make([]string, len(unsortedHeaders), len(unsortedHeaders))
-	copy(headers, unsortedHeaders)
-	sort.Sort(sort.StringSlice(headers))
+	fields := make([]string, len(unsortedFields), len(unsortedFields))
+	copy(fields, unsortedFields)
+	sort.Sort(sort.StringSlice(fields))
 
-	for index, header := range headers {
-		if strings.HasSuffix(header, ".") || strings.HasPrefix(header, ".") {
-			return nil, fmt.Errorf("field name '%v' can not start or end in '.'", header)
+	for index, field := range fields {
+		if strings.HasSuffix(field, ".") {
+			return nil, fmt.Errorf("field '%v' can not end with a '.'", field)
 		}
-		if strings.Contains(header, "..") {
-			return nil, fmt.Errorf("field name '%v' can not contain consecutive '.' characters", header)
+		if strings.HasPrefix(field, ".") {
+			return nil, fmt.Errorf("field '%v' can not start with a '.'", field)
 		}
-		// NOTE: since headers is sorted, this check ensures that no header
+		if strings.HasPrefix(field, "$") {
+			return nil, fmt.Errorf("field '%v' can not start with a '$'", field)
+		}
+		if strings.Contains(field, "..") {
+			return nil, fmt.Errorf("field '%v' can not contain consecutive '.' characters", field)
+		}
+		// NOTE: since fields is sorted, this check ensures that no field
 		// is incompatible with another one that occurs further down the list.
-		// meant to prevent cases where we have headers like "a" and "a.c"
-		for _, latterHeader := range headers[index+1:] {
+		// meant to prevent cases where we have fields like "a" and "a.c"
+		for _, latterField := range fields[index+1:] {
 			// NOTE: this means we will not support imports that have fields that
 			// include e.g. a, a.b
-			if strings.HasPrefix(latterHeader, header+".") {
-				return nil, fmt.Errorf("incompatible field names found: '%v' and '%v'",
-					header, latterHeader)
+			if strings.HasPrefix(latterField, field+".") {
+				return nil, fmt.Errorf("incompatible fields found: '%v' and '%v",
+					field, latterField)
 			}
 			// NOTE: this means we will not support imports that have fields like
 			// a, a - since this is invalid in MongoDB
-			if header == latterHeader {
-				return nil, fmt.Errorf("field names can not be identical: '%v' and '%v'",
-					header, latterHeader)
+			if field == latterField {
+				return nil, fmt.Errorf("fields can not be identical: '%v' and '%v",
+					field, latterField)
 			}
 		}
-		validatedFields = append(validatedFields, unsortedHeaders[index])
+		validatedFields = append(validatedFields, unsortedFields[index])
 	}
-	if len(headers) == 1 {
+	if len(fields) == 1 {
 		log.Logf(log.Info, "using field: %v", validatedFields[0])
 	} else {
 		log.Logf(log.Info, "using fields: %v", strings.Join(validatedFields, ","))
