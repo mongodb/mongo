@@ -309,7 +309,7 @@ func TestGetInputReader(t *testing.T) {
 			"references a valid file", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
-			fieldFile := "testdata/test_array.json"
+			fieldFile := "testdata/test.csv"
 			mongoImport.InputOptions.FieldFile = &fieldFile
 			_, err = mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)

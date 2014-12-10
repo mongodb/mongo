@@ -256,7 +256,7 @@ func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) 
 }
 
 // validateFields takes a slice of fields and returns an error if the fields
-// are incompatible, returns nil otherwise
+// are invalid, returns nil otherwise
 func validateFields(fields []string) error {
 	fieldsCopy := make([]string, len(fields), len(fields))
 	copy(fieldsCopy, fields)
@@ -290,6 +290,19 @@ func validateFields(fields []string) error {
 				return fmt.Errorf("fields can not be identical: '%v' and '%v'", field, latterField)
 			}
 		}
+	}
+	return nil
+}
+
+// validateReaderFields is a helper to validate fields for input readers
+func validateReaderFields(fields []string) error {
+	if err := validateFields(fields); err != nil {
+		return err
+	}
+	if len(fields) == 1 {
+		log.Logf(log.Info, "using field: %v", fields[0])
+	} else {
+		log.Logf(log.Info, "using fields: %v", strings.Join(fields, ","))
 	}
 	return nil
 }

@@ -152,7 +152,7 @@ func TestCSVStreamDocument(t *testing.T) {
 	})
 }
 
-func TestCSVSetFields(t *testing.T) {
+func TestCSVReadAndValidateHeader(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	var err error
 	Convey("With a CSV input reader", t, func() {
@@ -160,7 +160,7 @@ func TestCSVSetFields(t *testing.T) {
 			contents := "extraHeader1, extraHeader2, extraHeader3"
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 		})
 
@@ -168,24 +168,24 @@ func TestCSVSetFields(t *testing.T) {
 			contents := "a, b, c"
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 			contents = "a.b.c, a.b.d, c"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 
 			contents = "a.b, ab, a.c"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 
 			contents = "a, ab, ac, dd"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(csvInputReader.Fields), ShouldEqual, 4)
 		})
 
@@ -193,47 +193,47 @@ func TestCSVSetFields(t *testing.T) {
 			contents := "a, a.b, c"
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldNotBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldNotBeNil)
 
 			contents = "a.b.c, a.b.d.c, a.b.d"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldNotBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldNotBeNil)
 
 			contents = "a, a, a"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldNotBeNil)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldNotBeNil)
 		})
 
 		Convey("setting the header that ends in a dot should error", func() {
 			contents := "c, a., b"
 			fields := []string{}
 			So(err, ShouldBeNil)
-			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetFields(true), ShouldNotBeNil)
+			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).ReadAndValidateHeader(), ShouldNotBeNil)
 		})
 
 		Convey("setting the header that starts in a dot should error", func() {
 			contents := "c, .a, b"
 			fields := []string{}
-			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetFields(true), ShouldNotBeNil)
+			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).ReadAndValidateHeader(), ShouldNotBeNil)
 		})
 
 		Convey("setting the header that contains multiple consecutive dots should error", func() {
 			contents := "c, a..a, b"
 			fields := []string{}
-			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetFields(true), ShouldNotBeNil)
+			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).ReadAndValidateHeader(), ShouldNotBeNil)
 
 			contents = "c, a.a, b.b...b"
 			fields = []string{}
-			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).SetFields(true), ShouldNotBeNil)
+			So(NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1).ReadAndValidateHeader(), ShouldNotBeNil)
 		})
 
 		Convey("setting the header using an empty file should return EOF", func() {
 			contents := ""
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldEqual, io.EOF)
+			So(csvInputReader.ReadAndValidateHeader(), ShouldEqual, io.EOF)
 			So(len(csvInputReader.Fields), ShouldEqual, 0)
 		})
 		Convey("setting the header with fields already set, should "+
@@ -241,8 +241,8 @@ func TestCSVSetFields(t *testing.T) {
 			contents := "extraHeader1,extraHeader2,extraHeader3"
 			fields := []string{"a", "b", "c"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(csvInputReader.SetFields(true), ShouldBeNil)
-			// if SetFields() is called with fields already passed in,
+			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
+			// if ReadAndValidateHeader() is called with fields already passed in,
 			// the header should be replaced with the read header line
 			So(len(csvInputReader.Fields), ShouldEqual, 3)
 			So(csvInputReader.Fields, ShouldResemble, strings.Split(contents, ","))

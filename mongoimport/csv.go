@@ -2,11 +2,9 @@ package mongoimport
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/mongoimport/csv"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"strings"
 )
 
 // CSVInputReader is a struct that implements the InputReader interface for a
@@ -50,24 +48,14 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 	}
 }
 
-// SetFields sets the import fields for a CSV importer
-func (csvInputReader *CSVInputReader) SetFields(hasHeaderLine bool) (err error) {
-	if hasHeaderLine {
-		fields, err := csvInputReader.ReadHeaderFromSource()
-		if err != nil {
-			return err
-		}
-		csvInputReader.Fields = fields
-	}
-	if err = validateFields(csvInputReader.Fields); err != nil {
+// ReadAndValidateHeader sets the import fields for a CSV importer
+func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
+	fields, err := csvInputReader.ReadHeaderFromSource()
+	if err != nil {
 		return err
 	}
-	if len(csvInputReader.Fields) == 1 {
-		log.Logf(log.Info, "using field: %v", csvInputReader.Fields[0])
-	} else {
-		log.Logf(log.Info, "using fields: %v", strings.Join(csvInputReader.Fields, ","))
-	}
-	return nil
+	csvInputReader.Fields = fields
+	return validateReaderFields(csvInputReader.Fields)
 }
 
 // ReadHeaderFromSource reads the header line from the CSV importer's reader

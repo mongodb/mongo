@@ -73,13 +73,13 @@ type InputReader interface {
 	// streams document in the order in which they are read from the reader
 	StreamDocument(ordered bool, readChannel chan bson.D, errorChannel chan error)
 
-	// SetFields attempts to set the input fields for the CSV/TSV import and returns
-	// an error if it's unable to do so. If --headerline is specified, it reads
-	// from the underlying reader to get the fields to set.  No-op for JSON imports
-	SetFields(bool) error
+	// ReadAndValidateHeader reads the header line from the InputReader and returns
+	// a non-nil error if the fields from the header line are invalid; returns
+	// nil otherwise. No-op for JSON input readers
+	ReadAndValidateHeader() error
 
 	// ReadHeaderFromSource attempts to read the header line for the
-	// specific implementation. No-op for JSON imports
+	// specific implementation. No-op for JSON input readers
 	ReadHeaderFromSource() ([]string, error)
 }
 
@@ -251,9 +251,10 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 		return 0, err
 	}
 
-	err = inputReader.SetFields(mongoImport.InputOptions.HeaderLine)
-	if err != nil {
-		return 0, err
+	if mongoImport.InputOptions.HeaderLine {
+		if err = inputReader.ReadAndValidateHeader(); err != nil {
+			return 0, err
+		}
 	}
 	return mongoImport.importDocuments(inputReader)
 }
@@ -530,6 +531,14 @@ func (mongoImport *MongoImport) getInputReader(in io.Reader) (InputReader, error
 			return nil, err
 		}
 	}
+
+	// header fields validation can only happen once we have an input reader
+	if !mongoImport.InputOptions.HeaderLine {
+		if err = validateReaderFields(fields); err != nil {
+			return nil, err
+		}
+	}
+
 	if mongoImport.InputOptions.Type == CSV {
 		return NewCSVInputReader(fields, in, mongoImport.ToolOptions.NumDecodingWorkers), nil
 	} else if mongoImport.InputOptions.Type == TSV {

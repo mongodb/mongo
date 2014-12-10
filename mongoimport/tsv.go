@@ -3,7 +3,6 @@ package mongoimport
 import (
 	"bufio"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strings"
@@ -52,24 +51,14 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 	}
 }
 
-// SetFields sets the import fields for a TSV importer
-func (tsvInputReader *TSVInputReader) SetFields(hasHeaderLine bool) (err error) {
-	if hasHeaderLine {
-		fields, err := tsvInputReader.ReadHeaderFromSource()
-		if err != nil {
-			return err
-		}
-		tsvInputReader.Fields = fields
-	}
-	if err = validateFields(tsvInputReader.Fields); err != nil {
+// ReadAndValidateHeader sets the import fields for a TSV importer
+func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
+	fields, err := tsvInputReader.ReadHeaderFromSource()
+	if err != nil {
 		return err
 	}
-	if len(tsvInputReader.Fields) == 1 {
-		log.Logf(log.Info, "using field: %v", tsvInputReader.Fields[0])
-	} else {
-		log.Logf(log.Info, "using fields: %v", strings.Join(tsvInputReader.Fields, ","))
-	}
-	return nil
+	tsvInputReader.Fields = fields
+	return validateReaderFields(tsvInputReader.Fields)
 }
 
 // ReadHeaderFromSource reads the header from the TSV importer's reader

@@ -79,8 +79,8 @@ func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputR
 	}
 }
 
-// SetFields is a no-op for JSON imports
-func (jsonInputReader *JSONInputReader) SetFields(hasHeaderLine bool) error {
+// ReadAndValidateHeader is a no-op for JSON imports
+func (jsonInputReader *JSONInputReader) ReadAndValidateHeader() error {
 	return nil
 }
 
