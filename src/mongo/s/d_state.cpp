@@ -198,7 +198,7 @@ namespace mongo {
                                     const BSONObj& max,
                                     ChunkVersion version) {
         
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -227,8 +227,8 @@ namespace mongo {
     void ShardingState::undoDonateChunk(OperationContext* txn,
                                         const string& ns,
                                         CollectionMetadataPtr prevMetadata) {
-
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        
+        txn->lockState()->assertWriteLocked( ns );        
         scoped_lock lk( _mutex );
         
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
@@ -245,7 +245,7 @@ namespace mongo {
                                      const OID& epoch,
                                      string* errMsg ) {
         
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -290,7 +290,7 @@ namespace mongo {
                                        const OID& epoch,
                                        string* errMsg ) {
         
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -335,7 +335,7 @@ namespace mongo {
                                     const vector<BSONObj>& splitKeys,
                                     ChunkVersion version ) {
         
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
@@ -359,7 +359,7 @@ namespace mongo {
                                      const BSONObj& maxKey,
                                      ChunkVersion mergedVersion ) {
 
-        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        txn->lockState()->assertWriteLocked( ns );
         scoped_lock lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );

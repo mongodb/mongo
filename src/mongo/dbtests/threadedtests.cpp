@@ -125,7 +125,7 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r(txn.lockState());
-                    ASSERT(txn.lockState()->isReadLocked());
+                    ASSERT(txn.lockState()->hasAnyReadLock());
                 }
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {

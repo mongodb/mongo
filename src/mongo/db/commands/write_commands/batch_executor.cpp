@@ -433,7 +433,7 @@ namespace mongo {
                                   WriteOpResult* result) {
 
         const NamespaceString& nss = request.getTargetingNSS();
-        dassert(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IX));
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         ChunkVersion requestShardVersion =
             request.isMetadataSet() && request.getMetadata()->isShardVersionSet() ?
@@ -486,7 +486,7 @@ namespace mongo {
                                       WriteOpResult* result) {
 
         const NamespaceString& nss = request.getTargetingNSS();
-        dassert(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IX));
+        txn->lockState()->assertWriteLocked( nss.ns() );
 
         if ( !request.isUniqueIndexRequest() )
             return true;
@@ -1103,7 +1103,8 @@ namespace mongo {
                               WriteOpResult* result ) {
 
         const string& insertNS = collection->ns().ns();
-        invariant(txn->lockState()->isCollectionLockedForMode(insertNS, MODE_IX));
+
+        txn->lockState()->assertWriteLocked( insertNS );
 
         WriteUnitOfWork wunit(txn);
         StatusWith<RecordId> status = collection->insertDocument( txn, docToInsert, true );

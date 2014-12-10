@@ -176,7 +176,7 @@ namespace mongo {
         Lock::DBLock r1(&ls, "db1", MODE_X);
         Lock::DBLock r2(&ls, "db1", MODE_X);
 
-        ASSERT(ls.isDbLockedForMode("db1", MODE_X));
+        ASSERT(ls.isWriteLocked("db1"));
     }
 
     TEST(DConcurrency, MultipleConflictingDBLocksOnSameThread) {
@@ -185,8 +185,7 @@ namespace mongo {
         Lock::DBLock r1(&ls, "db1", MODE_X);
         Lock::DBLock r2(&ls, "db1", MODE_S);
 
-        ASSERT(ls.isDbLockedForMode("db1", MODE_X));
-        ASSERT(ls.isDbLockedForMode("db1", MODE_S));
+        ASSERT(ls.isWriteLocked("db1"));
     }
 
     TEST(DConcurrency, IsDbLockedForSMode) {

@@ -190,9 +190,7 @@ namespace mongo {
                                              int sizeNeeded,
                                              bool preallocateNextFile) {
 
-        // Database must be stable and we need to be in some sort of an update operation in order
-        // to add a new file.
-        invariant(txn->lockState()->isDbLockedForMode(_dbname, MODE_IX));
+        invariant(txn->lockState()->isWriteLocked(_dbname));
 
         const int allocFileId = _files.size();
 

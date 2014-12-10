@@ -161,6 +161,11 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
+    bool LockerImpl<IsForMMAPV1>::hasAnyReadLock() const {
+        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
+    }
+
+    template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isLocked() const {
         return getLockMode(resourceIdGlobal) != MODE_NONE;
     }
@@ -171,8 +176,24 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isReadLocked() const {
-        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
+    bool LockerImpl<IsForMMAPV1>::isWriteLocked(const StringData& ns) const {
+        if (isWriteLocked()) {
+            return true;
+        }
+
+        const StringData db = nsToDatabaseSubstring(ns);
+        const ResourceId resIdNs(RESOURCE_DATABASE, db);
+
+        return isLockHeldForMode(resIdNs, MODE_X);
+    }
+
+    template<bool IsForMMAPV1>
+    void LockerImpl<IsForMMAPV1>::assertWriteLocked(const StringData& ns) const {
+        if (!isWriteLocked(ns)) {
+            dump();
+            msgasserted(
+                16105, mongoutils::str::stream() << "expected to be write locked for " << ns);
+        }
     }
 
     template<bool IsForMMAPV1>

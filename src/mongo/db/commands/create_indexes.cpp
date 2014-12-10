@@ -247,8 +247,7 @@ namespace mongo {
         static Status checkUniqueIndexConstraints(OperationContext* txn,
                                                   const StringData& ns,
                                                   const BSONObj& newIdxKey) {
-
-            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+            txn->lockState()->assertWriteLocked( ns );
 
             if ( shardingState.enabled() ) {
                 CollectionMetadataPtr metadata(
