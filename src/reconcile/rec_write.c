@@ -2214,24 +2214,26 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	    WT_STORE_SIZE(WT_PTRDIFF(cell, dsk) - WT_BLOCK_COMPRESS_SKIP);
 
 	/*
-	 * Allocate a destination buffer.  If there's a pre-size function, use
-	 * it to determine the destination buffer's minimum size, otherwise the
-	 * destination buffer is documented to be at least the maximum object
-	 * size.
+	 * Allocate a destination buffer. If there's a pre-size function, call
+	 * it to determine the destination buffer's size, else the destination
+	 * buffer is documented to be at least the source size. (We can't use
+	 * the target page size, any single key/value could be larger than the
+	 * page size. Don't bother figuring out a minimum, just use the source
+	 * size.)
 	 *
-	 * The destination buffer really only needs to be large enough for the
-	 * target block size, corrected for the requirements of the underlying
-	 * block manager.  If the target block size is 8KB, that's a multiple
-	 * of 512B and so the underlying block manager is fine with it.  But...
-	 * we don't control what the pre_size method returns us as a required
-	 * size, and we don't want to document the compress_raw method has to
-	 * skip bytes in the buffer because that's confusing, so do something
-	 * more complicated.  First, find out how much space the compress_raw
-	 * function might need, either the value returned from pre_size, or the
-	 * maximum object size.  Add the compress-skip bytes, and then correct
-	 * that value for the underlying block manager.   As a result, we have
-	 * a destination buffer that's the right "object" size when calling the
-	 * compress_raw method, and there are bytes in the header just for us.
+	 * The destination buffer needs to be large enough for the final block
+	 * size, corrected for the requirements of the underlying block manager.
+	 * If the final block size is 8KB, that's a multiple of 512B and so the
+	 * underlying block manager is fine with it.  But... we don't control
+	 * what the pre_size method returns us as a required size, and we don't
+	 * want to document the compress_raw method has to skip bytes in the
+	 * buffer because that's confusing, so do something more complicated.
+	 * First, find out how much space the compress_raw function might need,
+	 * either the value returned from pre_size, or the initial source size.
+	 * Add the compress-skip bytes, and then correct that value for the
+	 * underlying block manager.   As a result, we have a destination buffer
+	 * that's large enough when calling the compress_raw method, and there
+	 * are bytes in the header just for us.
 	 */
 	if (compressor->pre_size == NULL)
 		result_len = (size_t)r->raw_offsets[slots];
