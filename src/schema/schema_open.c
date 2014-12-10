@@ -472,7 +472,7 @@ err:		if (table != NULL)
  */
 int
 __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
-    const char *uri, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+    const char *uri, int quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
 {
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
@@ -504,6 +504,8 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	}
 
 	__wt_schema_release_table(session, table);
+	if (quiet)
+		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }
 
@@ -513,7 +515,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
-    const char *uri, WT_TABLE **tablep, WT_INDEX **indexp)
+    const char *uri, int quiet, WT_TABLE **tablep, WT_INDEX **indexp)
 {
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -554,5 +556,7 @@ err:	__wt_schema_release_table(session, table);
 	if (*indexp != NULL)
 		return (0);
 
+	if (quiet)
+		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }

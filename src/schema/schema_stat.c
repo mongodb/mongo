@@ -19,7 +19,7 @@ __wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+	WT_RET(__wt_schema_get_colgroup(session, uri, 0, NULL, &colgroup));
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", colgroup->source));
@@ -41,7 +41,7 @@ __wt_curstat_index_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_INDEX *idx;
 
-	WT_RET(__wt_schema_get_index(session, uri, NULL, &idx));
+	WT_RET(__wt_schema_get_index(session, uri, 0, NULL, &idx));
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", idx->source));
