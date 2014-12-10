@@ -490,7 +490,7 @@ namespace {
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
-            if (txn->lockState()->hasAnyReadLock()) {
+            if (txn->lockState()->isReadLocked()) {
                 MONGO_LOG_COMPONENT(1, logComponentForOp(op))
                         << "note: not profiling because recursive read lock" << endl;
             }

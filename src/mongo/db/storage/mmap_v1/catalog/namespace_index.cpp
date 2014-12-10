@@ -69,19 +69,27 @@ namespace mongo {
     }
 
     void NamespaceIndex::add_ns( OperationContext* txn,
-                                 const Namespace& ns, const NamespaceDetails* details ) {
-        string nsString = ns.toString();
-        txn->lockState()->assertWriteLocked( nsString );
-        massert( 17315, "no . in ns", nsString.find( '.' ) != string::npos );
+                                 const Namespace& ns,
+                                 const NamespaceDetails* details ) {
+
+        const NamespaceString nss(ns.toString());
+        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+
+        massert(17315, "no . in ns", nsIsFull(nss.toString()));
+
         init( txn );
         uassert( 10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
     }
 
     void NamespaceIndex::kill_ns( OperationContext* txn, const StringData& ns) {
-        txn->lockState()->assertWriteLocked(ns);
-        if ( !_ht.get() )
+        const NamespaceString nss(ns.toString());
+        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+
+        if (!_ht.get()) {
             return;
-        Namespace n(ns);
+        }
+
+        const Namespace n(ns);
         _ht->kill(txn, n);
 
         if (ns.size() <= Namespace::MaxNsColletionLen) {

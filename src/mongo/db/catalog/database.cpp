@@ -218,8 +218,7 @@ namespace mongo {
     }
 
     void Database::clearTmpCollections(OperationContext* txn) {
-
-        txn->lockState()->assertWriteLocked( _name );
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         list<string> collections;
         _dbEntry->getCollectionNamespaces( &collections );
@@ -554,10 +553,11 @@ namespace mongo {
     void dropDatabase(OperationContext* txn, Database* db ) {
         invariant( db );
 
-        string name = db->name(); // just to have safe
+        // Store the name so we have if for after the db object is deleted
+        const string name = db->name();
         LOG(1) << "dropDatabase " << name << endl;
 
-        txn->lockState()->assertWriteLocked( name );
+        invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
         BackgroundOperation::assertNoBgOpInProgForDb(name.c_str());
 

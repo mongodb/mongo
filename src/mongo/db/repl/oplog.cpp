@@ -579,7 +579,7 @@ namespace repl {
 
         bool valueB = fieldB.booleanSafe();
 
-        txn->lockState()->assertWriteLocked(ns);
+        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
         Collection* collection = db->getCollection( txn, ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
