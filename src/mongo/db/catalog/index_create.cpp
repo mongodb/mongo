@@ -205,9 +205,9 @@ namespace mongo {
 
     Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
-        ProgressMeter* progress = _txn->setMessage(curopMessage,
-                                                   curopMessage,
-                                                   _collection->numRecords(_txn));
+        ProgressMeterHolder progress(*_txn->setMessage(curopMessage,
+                                                       curopMessage,
+                                                       _collection->numRecords(_txn)));
 
         Timer t;
 

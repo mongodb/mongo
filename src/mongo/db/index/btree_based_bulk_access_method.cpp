@@ -121,11 +121,10 @@ namespace mongo {
 
         scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
-        // verifies that pm and op refer to the same ProgressMeter
-        ProgressMeter& pm = _txn->getCurOp()->setMessage("Index Bulk Build: (2/3) btree bottom up",
-                                                         "Index: (2/3) BTree Bottom Up Progress",
-                                                         _keysInserted,
-                                                         10);
+        ProgressMeterHolder pm(*_txn->setMessage("Index Bulk Build: (2/3) btree bottom up",
+                                                 "Index: (2/3) BTree Bottom Up Progress",
+                                                 _keysInserted,
+                                                 10));
 
         scoped_ptr<SortedDataBuilderInterface> builder;
 
