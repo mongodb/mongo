@@ -253,10 +253,9 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
 
-        # Check the log state after the entire op completes
-        # and run recovery.  check_log() takes over a second
-        # to run, so we don't want to run it for all scenarios;
-        # rather, we run it about 100 times overall.
+        # Check the log state after the entire op completes and run recovery.
+        # check_log() takes over a second to run, so we don't want to run it
+        # for all scenarios, rather, we run it about 100 times overall.
         if self.scenario_number % (len(test_txn02.scenarios) / 100 + 1) == 0:
             self.check_log(committed)
 
