@@ -27,17 +27,24 @@
 
 #include "format.h"
 
+#ifndef MAX
+#define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
+#endif
+
 static inline uint32_t
 kv_len(uint64_t keyno, uint32_t min, uint32_t max)
 {
 	/*
-	 * We want to focus on relatively small key/value items, but admitting
-	 * the possibility of larger items.  Pick a size close to the minimum
-	 * most of the time, only roll the dice for a really big item 1 in 20
-	 * times.  (The configuration can force large key/value minimum sizes,
-	 * where every key/value item will be an overflow.)
+	 * Focus on relatively small key/value items, admitting the possibility
+	 * of larger items.  Pick a size close to the minimum most of the time,
+	 * only create a larger item 1 in 20 times, and a really big item 1 in
+	 * 1000 times. (Configuration can force large key/value minimum sizes,
+	 * where every key/value item is an overflow.)
 	 */
-	if (keyno % 20 != 0 && max > min + 20)
+	if (keyno % 1000 == 0 && max < KILOBYTE(80)) {
+		min = KILOBYTE(80);
+		max = KILOBYTE(100);
+	} else if (keyno % 20 != 0 && max > min + 20)
 		max = min + 20;
 	return (MMRAND(min, max));
 }
@@ -65,13 +72,14 @@ void
 key_gen_setup(uint8_t **keyp)
 {
 	uint8_t *key;
-	size_t i;
+	size_t i, len;
 
 	*keyp = NULL;
 
-	if ((key = malloc(g.c_key_max)) == NULL)
+	len = MAX(KILOBYTE(100), g.c_key_max);
+	if ((key = malloc(len)) == NULL)
 		die(errno, "malloc");
-	for (i = 0; i < g.c_key_max; ++i)
+	for (i = 0; i < len; ++i)
 		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
 	*keyp = key;
 }
@@ -118,7 +126,7 @@ val_gen_setup(uint8_t **valp)
 	 * into the buffer by a few extra bytes, used to generate different
 	 * data for column-store run-length encoded files.
 	 */
-	len = g.c_value_max + 20;
+	len = MAX(KILOBYTE(100), g.c_value_max) + 20;
 	if ((val = malloc(len)) == NULL)
 		die(errno, "malloc");
 	for (i = 0; i < len; ++i)
