@@ -36,15 +36,8 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-    // Dispenses unique OperationContext identifiers
-    AtomicUInt64 idCounter(0);
-}
-
     OperationContextReplMock::OperationContextReplMock()
-        : _lockState(new MMAPV1LockerImpl(idCounter.addAndFetch(1))) {
-
-    }
+        : _lockState(new MMAPV1LockerImpl()) { }
 
     OperationContextReplMock::~OperationContextReplMock() {}
 

@@ -35,7 +35,7 @@ namespace mongo {
 
     class LockerForTests : public LockerImpl<false> {
     public:
-        explicit LockerForTests(LockerId lockerId) : LockerImpl<false>(lockerId) {
+        explicit LockerForTests() {
             lockGlobal(MODE_S);
         }
 

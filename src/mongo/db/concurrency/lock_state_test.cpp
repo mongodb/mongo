@@ -44,7 +44,7 @@ namespace {
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         locker.lockGlobal(MODE_IX);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
@@ -62,7 +62,7 @@ namespace {
     TEST(LockerImpl, ReLockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         locker.lockGlobal(MODE_IX);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_S));
@@ -80,11 +80,11 @@ namespace {
     TEST(LockerImpl, ConflictWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IX));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_X));
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
         ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
 
@@ -99,11 +99,11 @@ namespace {
     TEST(LockerImpl, ConflictUpgradeWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_S));
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
 
@@ -115,7 +115,7 @@ namespace {
     }
 
     TEST(LockerImpl, ReadTransaction) {
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
 
         locker.lockGlobal(MODE_IS);
         locker.unlockAll();
@@ -135,7 +135,7 @@ namespace {
     TEST(LockerImpl, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -162,7 +162,7 @@ namespace {
     TEST(LockerImpl, saveAndRestoreGlobalAcquiredTwice) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -188,7 +188,7 @@ namespace {
     TEST(LockerImpl, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
 
         const ResourceId resIdDatabase(RESOURCE_DATABASE, std::string("TestDB"));
         const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -248,10 +248,10 @@ namespace {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
             std::vector<boost::shared_ptr<LockerForTests> > lockers(numLockers);
             for (int i = 0; i < numLockers; i++) {
-                lockers[i].reset(new LockerForTests(LockerId(100 + i)));
+                lockers[i].reset(new LockerForTests());
             }
 
-            LockerImpl<true> locker(1);
+            LockerImpl<true> locker;
 
             // Do some warm-up loops
             for (int i = 0; i < 1000; i++) {

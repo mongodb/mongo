@@ -57,6 +57,9 @@ namespace {
     // How often (in millis) to check for deadlock if a lock has not been granted for some time
     const unsigned DeadlockTimeoutMs = 100;
 
+    // Dispenses unique LockerId identifiers
+    AtomicUInt64 idCounter(0);
+
     /**
      * Used to sort locks by granularity when snapshotting lock state. We must report and reacquire
      * locks in the same granularity in which they are acquired (i.e. global, flush, database,
@@ -176,6 +179,13 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
+    void LockerImpl<IsForMMAPV1>::assertEmpty() const {
+        invariant(!inAWriteUnitOfWork());
+        invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
+        invariant(_requests.empty());
+    }
+
+    template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::dump() const {
         StringBuilder ss;
         ss << "lock status: ";
@@ -240,8 +250,8 @@ namespace {
     //
 
     template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::LockerImpl(LockerId id)
-        : _id(id),
+    LockerImpl<IsForMMAPV1>::LockerImpl()
+        : _id(idCounter.addAndFetch(1)),
           _wuowNestingLevel(0),
           _batchWriter(false),
           _lockPendingParallelWriter(false) {
@@ -253,9 +263,7 @@ namespace {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
-        invariant(!inAWriteUnitOfWork());
-        invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
-        invariant(_requests.empty());
+        assertEmpty();
     }
 
     template<bool IsForMMAPV1>

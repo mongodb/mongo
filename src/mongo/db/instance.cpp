@@ -1099,7 +1099,7 @@ namespace {
         // operation context, which also instantiates a recovery unit. Also, using the
         // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
         // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
-        DefaultLockerImpl globalLocker(0);
+        DefaultLockerImpl globalLocker;
         LockResult result = globalLocker.lockGlobalBegin(MODE_X);
         if (result == LOCK_WAITING) {
             result = globalLocker.lockGlobalComplete(UINT_MAX);

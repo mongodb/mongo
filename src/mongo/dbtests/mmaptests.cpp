@@ -66,7 +66,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            MMAPV1LockerImpl lockState(1);
+            MMAPV1LockerImpl lockState;
             Lock::GlobalWrite lk(&lockState);
 
             {

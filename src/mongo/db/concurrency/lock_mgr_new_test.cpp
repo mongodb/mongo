@@ -83,7 +83,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -102,7 +102,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -137,7 +137,7 @@ namespace mongo {
 
         boost::scoped_ptr<MMAPV1LockerImpl> locker[6];
         for (int i = 0; i < 6; i++) {
-            locker[i].reset(new MMAPV1LockerImpl(i));
+            locker[i].reset(new MMAPV1LockerImpl());
         }
 
         TrackingLockGrantNotification notify[6];
@@ -168,7 +168,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
@@ -196,7 +196,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_IS));
@@ -224,7 +224,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
@@ -252,7 +252,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         LockRequestCombo request(&locker);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_X));
@@ -280,8 +280,8 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker1;
+        MMAPV1LockerImpl locker2;
 
         LockRequestCombo request1(&locker1);
         LockRequestCombo request2(&locker2);
@@ -319,7 +319,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -353,10 +353,10 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         TrackingLockGrantNotification notify1;
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         TrackingLockGrantNotification notify2;
 
         LockRequest request1;
@@ -386,7 +386,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -419,8 +419,8 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker1;
+        MMAPV1LockerImpl locker2;
 
         LockRequestCombo request1(&locker1);
         LockRequestCombo request2(&locker2);
@@ -454,8 +454,8 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker1;
+        MMAPV1LockerImpl locker2;
 
         LockRequestCombo request1(&locker1);
         LockRequestCombo request2(&locker2);
@@ -489,7 +489,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker(1);
+        MMAPV1LockerImpl locker;
         TrackingLockGrantNotification notify;
 
         LockRequest request[3];
@@ -521,11 +521,11 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         LockRequestCombo request1(&locker1);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_S));
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         LockRequestCombo request2(&locker2);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_S));
 
@@ -542,11 +542,11 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         LockRequestCombo request1(&locker1);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         LockRequestCombo request2(&locker2);
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
 
@@ -568,14 +568,14 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl lockerExisting(1);
+        MMAPV1LockerImpl lockerExisting;
         TrackingLockGrantNotification notifyExisting;
         LockRequest requestExisting;
         requestExisting.initNew(&lockerExisting, &notifyExisting);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &requestExisting, existingMode));
 
-        MMAPV1LockerImpl lockerNew(1);
+        MMAPV1LockerImpl lockerNew;
         TrackingLockGrantNotification notifyNew;
         LockRequest requestNew;
         requestNew.initNew(&lockerNew, &notifyNew);
@@ -618,19 +618,19 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl lockerX(1);
+        MMAPV1LockerImpl lockerX;
         LockRequestCombo requestX(&lockerX);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &requestX, MODE_X));
 
         // The subsequent request will block
-        MMAPV1LockerImpl lockerLow(2);
+        MMAPV1LockerImpl lockerLow;
         LockRequestCombo requestLow(&lockerLow);
 
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestLow, MODE_X));
 
         // This is a "queue jumping request", which will go before locker 2 above
-        MMAPV1LockerImpl lockerHi(2);
+        MMAPV1LockerImpl lockerHi;
         LockRequestCombo requestHi(&lockerHi);
         requestHi.enqueueAtFront = true;
 
@@ -656,14 +656,14 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_GLOBAL, 0);
 
-        MMAPV1LockerImpl locker1(1);
+        MMAPV1LockerImpl locker1;
         LockRequestCombo request1(&locker1);
 
-        MMAPV1LockerImpl locker2(2);
+        MMAPV1LockerImpl locker2;
         LockRequestCombo request2(&locker2);
         request2.compatibleFirst = true;
 
-        MMAPV1LockerImpl locker3(3);
+        MMAPV1LockerImpl locker3;
         LockRequestCombo request3(&locker3);
 
         // Lock all in IS mode
@@ -672,14 +672,14 @@ namespace mongo {
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request3, MODE_IS));
 
         // Now an exclusive mode comes, which would block
-        MMAPV1LockerImpl lockerX(4);
+        MMAPV1LockerImpl lockerX;
         LockRequestCombo requestX(&lockerX);
 
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
 
         // If an S comes, it should be granted, because of request2
         {
-            MMAPV1LockerImpl lockerS(5);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -690,7 +690,7 @@ namespace mongo {
 
         // If S comes again, it should be granted, because of request2 still there
         {
-            MMAPV1LockerImpl lockerS(6);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -700,7 +700,7 @@ namespace mongo {
         ASSERT(lockMgr.unlock(&request2));
 
         {
-            MMAPV1LockerImpl lockerS(7);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -715,18 +715,18 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_GLOBAL, 0);
 
-        MMAPV1LockerImpl lockerXInitial(1);
+        MMAPV1LockerImpl lockerXInitial;
         LockRequestCombo requestXInitial(&lockerXInitial);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &requestXInitial, MODE_X));
 
-        MMAPV1LockerImpl locker1(2);
+        MMAPV1LockerImpl locker1;
         LockRequestCombo request1(&locker1);
 
-        MMAPV1LockerImpl locker2(3);
+        MMAPV1LockerImpl locker2;
         LockRequestCombo request2(&locker2);
         request2.compatibleFirst = true;
 
-        MMAPV1LockerImpl locker3(4);
+        MMAPV1LockerImpl locker3;
         LockRequestCombo request3(&locker3);
 
         // Lock all in IS mode (should block behind the global lock)
@@ -735,7 +735,7 @@ namespace mongo {
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, MODE_IS));
 
         // Now an exclusive mode comes, which would block behind the IS modes
-        MMAPV1LockerImpl lockerX(5);
+        MMAPV1LockerImpl lockerX;
         LockRequestCombo requestX(&lockerX);
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
 
@@ -747,7 +747,7 @@ namespace mongo {
 
         // If an S comes, it should be granted, because of request2
         {
-            MMAPV1LockerImpl lockerS(6);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -758,7 +758,7 @@ namespace mongo {
 
         // If S comes again, it should be granted, because of request2 still there
         {
-            MMAPV1LockerImpl lockerS(7);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_OK == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -768,7 +768,7 @@ namespace mongo {
         ASSERT(lockMgr.unlock(&request2));
 
         {
-            MMAPV1LockerImpl lockerS(8);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -783,22 +783,22 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_GLOBAL, 0);
 
-        MMAPV1LockerImpl lockerSInitial(1);
+        MMAPV1LockerImpl lockerSInitial;
         LockRequestCombo requestSInitial(&lockerSInitial);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &requestSInitial, MODE_S));
 
-        MMAPV1LockerImpl lockerX(2);
+        MMAPV1LockerImpl lockerX;
         LockRequestCombo requestX(&lockerX);
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestX, MODE_X));
 
-        MMAPV1LockerImpl lockerPending(3);
+        MMAPV1LockerImpl lockerPending;
         LockRequestCombo requestPending(&lockerPending);
         requestPending.compatibleFirst = true;
         ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestPending, MODE_S));
 
         // S1 is not granted yet, so the policy should still be FIFO
         {
-            MMAPV1LockerImpl lockerS(4);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));
@@ -808,7 +808,7 @@ namespace mongo {
         ASSERT(lockMgr.unlock(&requestPending));
 
         {
-            MMAPV1LockerImpl lockerS(5);
+            MMAPV1LockerImpl lockerS;
             LockRequestCombo requestS(&lockerS);
             ASSERT(LOCK_WAITING == lockMgr.lock(resId, &requestS, MODE_S));
             ASSERT(lockMgr.unlock(&requestS));

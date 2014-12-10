@@ -44,30 +44,20 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-namespace {
-    // Dispenses unique OperationContext identifiers
-    AtomicUInt64 idCounter(0);
-}
 
-    OperationContextImpl::OperationContextImpl() : _client(currentClient.get()) {
-        invariant(_client);
-
+    OperationContextImpl::OperationContextImpl()
+        : _client(currentClient.get()),
+          _locker(_client->getLocker()) {
+        invariant(_locker);
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit());
-
-        if (storageEngine->isMmapV1()) {
-            _locker.reset(new MMAPV1LockerImpl(idCounter.addAndFetch(1)));
-        }
-        else {
-            _locker.reset(new LockerImpl<false>(idCounter.addAndFetch(1)));
-        }
-
         _client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
-        _client->setOperationContext(NULL);
+        _locker->assertEmpty();
+        _client->resetOperationContext();
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {
@@ -87,7 +77,7 @@ namespace {
     }
 
     Locker* OperationContextImpl::lockState() const {
-        return _locker.get();
+        return _locker;
     }
 
     ProgressMeter* OperationContextImpl::setMessage(const char * msg,

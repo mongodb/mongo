@@ -51,8 +51,10 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
@@ -107,6 +109,17 @@ namespace mongo {
         clients.insert(client);
     }
 
+namespace {
+    //  Create an appropriate new locker for the storage engine in use. Caller owns.
+    Locker* newLocker() {
+        if (isMMAPV1()) {
+            return new MMAPV1LockerImpl();
+        }
+
+        return new LockerImpl<false>();
+    }
+}
+
     Client::Client(const string& desc, AbstractMessagingPort *p)
         : ClientBasic(p),
           _desc(desc),
@@ -114,6 +127,7 @@ namespace mongo {
           _connectionId(p ? p->connectionId() : 0),
           _god(0),
           _txn(NULL),
+          _locker(newLocker()),
           _lastOp(0),
           _shutdown(false) {
 
@@ -335,11 +349,17 @@ namespace mongo {
     }
 
     void Client::setOperationContext(OperationContext* txn) {
-        // We can only set or unset the OperationContexts, never swap them.
-        invariant((txn == NULL) ^ (_txn == NULL));
+        // We can only set the OperationContext once before resetting it.
+        invariant(txn != NULL && _txn == NULL);
 
         boost::unique_lock<SpinLock> uniqueLock(_lock);
         _txn = txn;
+    }
+
+    void Client::resetOperationContext() {
+        invariant(_txn != NULL);
+        boost::unique_lock<SpinLock> uniqueLock(_lock);
+        _txn = NULL;
     }
 
     string Client::clientAddress(bool includePort) const {

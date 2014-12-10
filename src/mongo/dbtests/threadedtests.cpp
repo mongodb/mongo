@@ -245,11 +245,11 @@ namespace ThreadedTests {
 
         virtual void validate() {
             {
-                MMAPV1LockerImpl ls(1);
+                MMAPV1LockerImpl ls;
                 Lock::GlobalWrite w(&ls);
             }
             {
-                MMAPV1LockerImpl ls(1);
+                MMAPV1LockerImpl ls;
                 Lock::GlobalRead r(&ls);
             }
         }

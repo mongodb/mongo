@@ -58,6 +58,7 @@ namespace mongo {
     class Client;
     class Collection;
     class AbstractMessagingPort;
+    class Locker;
 
     TSP_DECLARE(Client, currentClient)
 
@@ -203,18 +204,22 @@ namespace mongo {
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
+        // Return a reference to the Locker for this client. Client retains ownership.
+        Locker* getLocker() const { return _locker.get(); }
+
         /* report what the last operation was.  used by getlasterror */
         void appendLastOp( BSONObjBuilder& b ) const;
         void reportState(BSONObjBuilder& builder);
 
-        // Ensures stability of the client. When the client is locked, it is safe to access its
-        // contents. For example, the OperationContext will not disappear.
+        // Ensures stability of the client's OperationContext. When the client is locked,
+        // the OperationContext will not disappear.
         void lock() { _lock.lock(); }
         void unlock() { _lock.unlock(); }
 
         // Changes the currently active operation context on this client. There can only be one
         // active OperationContext at a time.
         void setOperationContext(OperationContext* txn);
+        void resetOperationContext();
         const OperationContext* getOperationContext() const { return _txn; }
 
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
@@ -250,6 +255,10 @@ namespace mongo {
 
         // Changes, based on what operation is running. Some of this should be in OperationContext.
         CurOp* _curOp;
+
+        // By having Client, rather than the OperationContext, own the Locker,  setup cost such as
+        // allocating OS resources can be amortized over multiple operations.
+        boost::scoped_ptr<Locker> const _locker;
 
         // Used by replication
         OpTime _lastOp;

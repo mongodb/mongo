@@ -89,7 +89,7 @@ namespace mongo {
          * Instantiates new locker. Must be given a unique identifier for disambiguation. Lockers
          * having the same identifier will not conflict on lock acquisition.
          */
-        LockerImpl(LockerId id);
+        LockerImpl();
 
         virtual ~LockerImpl();
 
@@ -217,6 +217,8 @@ namespace mongo {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isReadLocked() const;
+
+        virtual void assertEmpty() const;
 
         virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
 

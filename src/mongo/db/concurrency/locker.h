@@ -258,6 +258,10 @@ namespace mongo {
         virtual bool isWriteLocked() const = 0;
         virtual bool isReadLocked() const = 0;
 
+        // This asserts we're not in a WriteUnitOfWork, and there are no requests on the Locker,
+        // so it would be safe to call the destructor or reuse the Locker.
+        virtual void assertEmpty() const = 0;
+
         /**
          * Pending means we are currently trying to get a lock (could be the parallel batch writer
          * lock).

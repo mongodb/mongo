@@ -651,12 +651,10 @@ namespace PerfTests {
         // The following members are intitialized in the constructor
         LockMode lockMode;
         LockMode glockMode;
-        int sharedid;
 
         locker_test(LockMode m = MODE_X, LockMode gm = MODE_IX)
             : lockMode(m),
-              glockMode(gm),
-              sharedid(1) { }
+              glockMode(gm) { }
         virtual string name() {
             return (str::stream() << "locker_contested" << lockMode);
         }
@@ -664,16 +662,15 @@ namespace PerfTests {
         virtual bool testThreaded() { return true; }
         virtual void prep() {
             resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
-            locker.reset(new LockerImpl<true>(1));
+            locker.reset(new LockerImpl<true>);
         }
 
         virtual void prepThreaded() {
             resId.reset(new ResourceId(RESOURCE_COLLECTION, std::string("TestDB.collection")));
             id.reset(new int);
             lock.lock();
-            *id = sharedid++;
             lock.unlock();
-            locker.reset(new LockerImpl<true>(*id));
+            locker.reset(new LockerImpl<true>);
         }
 
         void timed() {
@@ -718,9 +715,8 @@ namespace PerfTests {
             id.reset(new int);
 
             lock.lock();
-            *id = sharedid++;
             lock.unlock();
-            locker.reset(new LockerImpl<true>(*id));
+            locker.reset(new LockerImpl<true>);
             resId.reset(new ResourceId(RESOURCE_COLLECTION,
                                        str::stream() << "TestDB.collection" << *id));
         }
