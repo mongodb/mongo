@@ -274,21 +274,6 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 	})
 }
 
-func TestCSVReadHeaderFromSource(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-	Convey("With a CSV input reader", t, func() {
-		Convey("getting the header should return any already set headers", func() {
-			expectedHeaders := []string{"1", "2", "3"}
-			fileHandle, err := os.Open("testdata/test.csv")
-			So(err, ShouldBeNil)
-			csvInputReader := NewCSVInputReader([]string{}, fileHandle, 1)
-			headers, err := csvInputReader.ReadHeaderFromSource()
-			So(err, ShouldBeNil)
-			So(headers, ShouldResemble, expectedHeaders)
-		})
-	})
-}
-
 func TestCSVConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {

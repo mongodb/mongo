@@ -53,26 +53,14 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 
 // ReadAndValidateHeader sets the import fields for a TSV importer
 func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
-	fields, err := tsvInputReader.ReadHeaderFromSource()
+	header, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
 		return err
 	}
-	tsvInputReader.Fields = fields
+	for _, field := range strings.Split(header, tokenSeparator) {
+		tsvInputReader.Fields = append(tsvInputReader.Fields, strings.TrimRight(field, "\r\n"))
+	}
 	return validateReaderFields(tsvInputReader.Fields)
-}
-
-// ReadHeaderFromSource reads the header from the TSV importer's reader
-func (tsvInputReader *TSVInputReader) ReadHeaderFromSource() ([]string, error) {
-	fields := []string{}
-	header, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
-	if err != nil {
-		return nil, err
-	}
-	tokenizedFields := strings.Split(header, tokenSeparator)
-	for _, field := range tokenizedFields {
-		fields = append(fields, strings.TrimRight(field, "\r\n"))
-	}
-	return fields, nil
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the

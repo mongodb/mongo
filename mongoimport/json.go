@@ -84,11 +84,6 @@ func (jsonInputReader *JSONInputReader) ReadAndValidateHeader() error {
 	return nil
 }
 
-// ReadHeaderFromSource is a no-op for JSON imports
-func (jsonInputReader *JSONInputReader) ReadHeaderFromSource() ([]string, error) {
-	return nil, nil
-}
-
 // StreamDocument takes in two channels: it sends processed documents on the
 // readChan channel and if any error is encountered, the error is sent on the
 // errChan channel. It keeps reading from the underlying input source until it

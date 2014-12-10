@@ -77,10 +77,6 @@ type InputReader interface {
 	// a non-nil error if the fields from the header line are invalid; returns
 	// nil otherwise. No-op for JSON input readers
 	ReadAndValidateHeader() error
-
-	// ReadHeaderFromSource attempts to read the header line for the
-	// specific implementation. No-op for JSON input readers
-	ReadHeaderFromSource() ([]string, error)
 }
 
 // ValidateSettings ensures that the tool specific options supplied for

@@ -6,7 +6,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -152,32 +151,6 @@ func TestTSVReadAndValidateHeader(t *testing.T) {
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(tsvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			So(len(tsvInputReader.Fields), ShouldEqual, 3)
-		})
-		Convey("setting the header with fields already set, should "+
-			"the header line with the existing fields", func() {
-			contents := "extraHeader\textraHeader2\textraHeader3\n\n"
-			fields := []string{"a", "b", "c"}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			// if ReadAndValidateHeader() is called with fields already passed in,
-			// the header should be replaced with the read header line
-			So(tsvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(tsvInputReader.Fields), ShouldEqual, 3)
-			So(tsvInputReader.Fields, ShouldResemble, strings.Split(strings.Trim(contents, "\n"), tokenSeparator))
-		})
-	})
-}
-
-func TestTSVReadHeaderFromSource(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-	Convey("With a TSV input reader", t, func() {
-		Convey("getting the header should return any already set headers", func() {
-			expectedHeaders := []string{"1", "2", "3"}
-			fileHandle, err := os.Open("testdata/test.tsv")
-			So(err, ShouldBeNil)
-			tsvInputReader := NewTSVInputReader([]string{}, fileHandle, 1)
-			headers, err := tsvInputReader.ReadHeaderFromSource()
-			So(err, ShouldBeNil)
-			So(headers, ShouldResemble, expectedHeaders)
 		})
 	})
 }

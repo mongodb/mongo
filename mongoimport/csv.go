@@ -50,17 +50,12 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 
 // ReadAndValidateHeader sets the import fields for a CSV importer
 func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
-	fields, err := csvInputReader.ReadHeaderFromSource()
+	fields, err := csvInputReader.csvReader.Read()
 	if err != nil {
 		return err
 	}
 	csvInputReader.Fields = fields
 	return validateReaderFields(csvInputReader.Fields)
-}
-
-// ReadHeaderFromSource reads the header line from the CSV importer's reader
-func (csvInputReader *CSVInputReader) ReadHeaderFromSource() ([]string, error) {
-	return csvInputReader.csvReader.Read()
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
