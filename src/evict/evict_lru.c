@@ -432,12 +432,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/*
-	 * Track whether pages are being evicted.  This will be cleared
-	 * by the next thread to successfully evict a page.
-	 */
-	pages_evicted = cache->pages_evict;
-
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
 		/*
@@ -454,6 +448,12 @@ __evict_pass(WT_SESSION_IMPL *session)
 		WT_RET(__evict_has_work(session, &flags));
 		if (flags == 0)
 			break;
+
+		/*
+		 * Track whether pages are being evicted and progress is made.
+		 * At this point we know we need to evict.  
+		 */
+		pages_evicted = cache->pages_evict;
 
 		if (loop > 10)
 			LF_SET(WT_EVICT_PASS_AGGRESSIVE);
