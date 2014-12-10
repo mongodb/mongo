@@ -899,6 +899,7 @@ suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "stat": ("stat/*.js", False),
                         "bson": ("bson/*.js", False),
                         "export": ("export/*.js", False),
+                        "import": ("import/*.js", False),
                     }
 
 def get_module_suites():
