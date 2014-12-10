@@ -28,6 +28,8 @@ __sweep(WT_SESSION_IMPL *session)
 	dhandle = SLIST_FIRST(&conn->dhlh);
 	for (; dhandle != NULL; dhandle = dhandle_next) {
 		dhandle_next = SLIST_NEXT(dhandle, l);
+		if (WT_IS_METADATA(dhandle))
+			continue;
 		if (dhandle->session_inuse == 0 && dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
 			continue;
