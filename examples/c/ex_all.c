@@ -538,7 +538,7 @@ session_ops(WT_SESSION *session)
 	/*! [Create a table and configure a large leaf value max] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=S,value_format=S"
-	    "leaf_page_max=16KBleaf_value_max=256KB");
+	    "leaf_page_max=16KB,leaf_value_max=256KB");
 	/*! [Create a table and configure a large leaf value max] */
 	ret = session->drop(session, "table:mytable", NULL);
 
