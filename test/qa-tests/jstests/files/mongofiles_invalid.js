@@ -1,25 +1,24 @@
 // mongofiles_invalid.js; runs mongofiles with an invalid command and
 // option - ensures it fails in all cases
 //
-
-var testName = "mongofiles_invalid";
-load("jstests/files/mongofiles_common.js");
+var testName = 'mongofiles_invalid';
+load('jstests/files/util/mongofiles_common.js');
 
 (function() {
-  jsTest.log("Testing mongofiles with invalid commands and options");
+  jsTest.log('Testing mongofiles with invalid commands and options');
 
   var runTests = function(topology, passthrough) {
     var t = topology.init(passthrough);
     var conn = t.connection();
-    var db = conn.getDB("test");
+    var db = conn.getDB('test');
 
-    jsTest.log("Running with file with invalid options onw passthrough " + passthrough.name);
+    jsTest.log('Running with file with invalid options onw passthrough ' + passthrough.name);
 
     // run with invalid option
-    assert.neq(runMongoProgram.apply(this, ["mongofiles", "--invalid", conn.port, "put", filesToInsert[0]].concat(passthrough.args)), 0, "invalid-option: mongofiles succeeded when it should have failed");
+    assert.neq(runMongoProgram.apply(this, ['mongofiles', '--invalid', conn.port, 'put', filesToInsert[0]].concat(passthrough.args)), 0, 'invalid-option: mongofiles succeeded when it should have failed');
 
     // run with invalid command
-    assert.neq(runMongoProgram.apply(this, ["mongofiles", "--port", conn.port, "invalid", filesToInsert[0]].concat(passthrough.args)), 0, "invalid-command: mongofiles succeeded when it should have failed");
+    assert.neq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, 'invalid', filesToInsert[0]].concat(passthrough.args)), 0, 'invalid-command: mongofiles succeeded when it should have failed');
 
     t.stop();
   };
@@ -30,5 +29,4 @@ load("jstests/files/mongofiles_common.js");
     runTests(replicaSetTopology, passthrough);
     runTests(shardedClusterTopology, passthrough);
   });
-
 })();

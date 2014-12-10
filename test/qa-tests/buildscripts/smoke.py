@@ -897,6 +897,7 @@ def report():
 suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "restore": ("restore/*.js", False),
                         "stat": ("stat/*.js", False),
+                        "top": ("top/*.js", False),
                         "bson": ("bson/*.js", False),
                         "export": ("export/*.js", False),
                         "import": ("import/*.js", False),

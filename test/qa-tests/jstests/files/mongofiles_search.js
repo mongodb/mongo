@@ -1,9 +1,8 @@
 // mongofiles_search.js; ensures that the search command returns any and all
 // files that match the regex supplied
 //
-
-var testName = "mongofiles_search";
-load("jstests/files/mongofiles_common.js");
+var testName = 'mongofiles_search';
+load('jstests/files/util/mongofiles_common.js');
 
 (function() {
   var conn;
@@ -17,10 +16,10 @@ load("jstests/files/mongofiles_common.js");
     for (var i = 0; i < searchStrings.length; i++) {
       clearRawMongoProgramOutput();
       var queryString = searchStrings[i];
-      assert.eq(runMongoProgram.apply(this, ["mongofiles", "--quiet", "--port", conn.port, "search", queryString].concat(passthrough.args)), 0, "search command failed on '" + queryString + "' - part of '" + searchStrings + "'");
+      assert.eq(runMongoProgram.apply(this, ['mongofiles', '--quiet', '--port', conn.port, 'search', queryString].concat(passthrough.args)), 0, 'search command failed on ' + queryString + ' - part of ' + searchStrings);
 
       var matchFound = hasMatch(rawMongoProgramOutput(), queryString, exactString);
-      assert.eq(matchFound, expectedResult, "search failed - expected '" + expectedResult + "' got '" + matchFound + "'");
+      assert.eq(matchFound, expectedResult, 'search failed - expected ' + expectedResult + ' got ' + matchFound);
     }
   };
 
@@ -29,7 +28,7 @@ load("jstests/files/mongofiles_common.js");
   // exactString argument is not empty, hasMatch further checks that the line
   // matches the argument
   var hasMatch = function(output, matchItem, exactString) {
-    var lines = output.split("\n");
+    var lines = output.split('\n');
     var shellOutputRegex = /^sh.*/;
     for (var i = 0; i < lines.length; i++) {
       if (lines[i].match(shellOutputRegex) && lines[i].match(matchItem)) {
@@ -44,21 +43,21 @@ load("jstests/files/mongofiles_common.js");
   };
 
   var runTests = function(topology, passthrough) {
-    jsTest.log("Testing mongofiles search command");
+    jsTest.log('Testing mongofiles search command');
     var t = topology.init(passthrough);
     conn = t.connection();
-    var db = conn.getDB("test");
+    var db = conn.getDB('test');
 
-    jsTest.log("Putting files into GridFS with '" + passthrough.name + "' passthrough");
+    jsTest.log('Putting files into GridFS with ' + passthrough.name + ' passthrough');
 
     for (var i = 0; i < filesToInsert.length; i++) {
-      assert.eq(runMongoProgram.apply(this, ["mongofiles", "--port", conn.port, "put", filesToInsert[i]].concat(passthrough.args)), 0, "put failed on '" + filesToInsert[i] + "' when it should have succeeded");
+      assert.eq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, 'put', filesToInsert[i]].concat(passthrough.args)), 0, 'put failed on ' + filesToInsert[i] + ' when it should have succeeded');
     }
 
-    jsTest.log("Searching files in GridFS with '" + passthrough.name + "' passthrough");
+    jsTest.log('Searching files in GridFS with ' + passthrough.name + ' passthrough');
 
     // these search strings should be matched
-    var searchStrings = ["files", ".txt", "ile", "."];
+    var searchStrings = ['files', '.txt', 'ile', '.'];
 
     // add the verbatim file names put into GridFS
     for (var i = 0; i < filesToInsert.length; i++) {
@@ -69,13 +68,13 @@ load("jstests/files/mongofiles_common.js");
     assertHasFiles(passthrough, searchStrings, 0);
 
     // these search strings should NOT be matched
-    searchStrings = ["random", "always", "filer"];
+    searchStrings = ['random', 'always', 'filer'];
     assertHasFiles(passthrough, searchStrings, 1);
 
     // test that only the requested file is returned
     for (var i = 0; i < filesToInsert.length; i++) {
       var currentFile = filesToInsert[i];
-      jsTest.log("Searching for file " + currentFile + " with '" + passthrough.name + "' passthrough");
+      jsTest.log('Searching for file ' + currentFile + ' with ' + passthrough.name + ' passthrough');
 
       // ensure the requested file is returned
       assertHasFiles(passthrough, [currentFile], 0);
@@ -96,5 +95,4 @@ load("jstests/files/mongofiles_common.js");
     runTests(replicaSetTopology, passthrough);
     runTests(shardedClusterTopology, passthrough);
   });
-
 })();

@@ -1,23 +1,20 @@
-// mongofiles_common.js; contains utility functions to run mongofiles tests
+// topology_helper.js; contains utility functions to run tests
 //
 
-// these must have unique names
-var filesToInsert = ["jstests/files/testdata/files1.txt", "jstests/files/testdata/files2.txt", "jstests/files/testdata/files3.txt"];
-
 // auth related variables
-var authUser = "user";
-var authPassword = "password";
-var authArgs = ["--authenticationDatabase", "admin", "--authenticationMechanism", "SCRAM-SHA-1", "-u", authUser, "-p", authPassword];
-var keyFile = "jstests/libs/key1";
+var authUser = 'user';
+var authPassword = 'password';
+var authArgs = ['--authenticationDatabase', 'admin', '--authenticationMechanism', 'SCRAM-SHA-1', '-u', authUser, '-p', authPassword];
+var keyFile = 'jstests/libs/key1';
 
 // topology startup settings
 var auth = {
-  name: "auth",
+  name: 'auth',
   args: authArgs,
 }
 
 var plain = {
-  name: "plain",
+  name: 'plain',
   args: [],
 }
 
@@ -31,7 +28,7 @@ var passthroughs = [plain, auth];
 
 var standaloneTopology = {
   init: function(passthrough) {
-    jsTest.log("Using standalone topology");
+    jsTest.log('Using standalone topology');
 
     passthrough = passthrough || [];
     var startupArgs = buildStartupArgs(passthrough);
@@ -59,7 +56,7 @@ var standaloneTopology = {
 
 var replicaSetTopology = {
   init: function(passthrough) {
-    jsTest.log("Using replica set topology");
+    jsTest.log('Using replica set topology');
 
     passthrough = passthrough || [];
     var startupArgs = buildStartupArgs(passthrough);
@@ -69,11 +66,11 @@ var replicaSetTopology = {
 
     // start the replica set
     this.replTest.startSet();
-    jsTest.log("Started replica set");
+    jsTest.log('Started replica set');
 
     // initiate the replica set with a default config
     this.replTest.initiate();
-    jsTest.log("Initiated replica set");
+    jsTest.log('Initiated replica set');
 
     // set up the auth user if needed
     if (requiresAuth(passthrough)) {
@@ -96,7 +93,7 @@ var replicaSetTopology = {
 
 var shardedClusterTopology = {
   init: function(passthrough) {
-    jsTest.log("Using sharded cluster topology");
+    jsTest.log('Using sharded cluster topology');
 
     passthrough = passthrough || [];
     var other = buildStartupArgs(passthrough);
@@ -137,18 +134,18 @@ var shardedClusterTopology = {
 
 // runAuthSetup creates a user with root role on the admin database
 var runAuthSetup = function(topology) {
-  jsTest.log("Running auth setup");
+  jsTest.log('Running auth setup');
 
   var conn = topology.connection();
-  var db = conn.getDB("test");
+  var db = conn.getDB('test');
 
-  db.getSiblingDB("admin").createUser({
+  db.getSiblingDB('admin').createUser({
     user: authUser,
     pwd: authPassword,
-    roles: ["root"],
+    roles: ['root'],
   });
 
-  assert.eq(db.getSiblingDB("admin").auth(authUser, authPassword), 1, "authentication failed");
+  assert.eq(db.getSiblingDB('admin').auth(authUser, authPassword), 1, 'authentication failed');
 };
 
 // buildStartupArgs constructs the proper object to be passed as arguments in
@@ -156,7 +153,7 @@ var runAuthSetup = function(topology) {
 var buildStartupArgs = function(passthrough) {
   var startupArgs = {};
   if (passthrough.name === auth.name) {
-    startupArgs.auth = "";
+    startupArgs.auth = '';
     startupArgs.keyFile = keyFile;
   }
   return startupArgs;
