@@ -4199,7 +4199,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	size_t size;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int dictionary, onpage_ovfl, ovfl_key;
+	int dictionary, key_onpage_ovfl, ovfl_key;
 	const void *p;
 	void *copy;
 
@@ -4428,9 +4428,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 * If the key is an overflow key that hasn't been removed, use
 		 * the original backing blocks.
 		 */
-		onpage_ovfl = kpack != NULL &&
+		key_onpage_ovfl = kpack != NULL &&
 		    kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
-		if (onpage_ovfl) {
+		if (key_onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
@@ -4505,10 +4505,10 @@ build:
 				 * key.  In that case, we have to build the key
 				 * now because we are about to promote it.
 				 */
-				if (onpage_ovfl) {
+				if (key_onpage_ovfl) {
 					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
-					onpage_ovfl = 0;
+					key_onpage_ovfl = 0;
 				}
 				WT_ERR(__rec_split(
 				    session, r, key->len + val->len));
