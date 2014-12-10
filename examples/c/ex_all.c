@@ -535,6 +535,13 @@ session_ops(WT_SESSION *session)
 	/*! [Create a table and configure the page size] */
 	ret = session->drop(session, "table:mytable", NULL);
 
+	/*! [Create a table and configure a large leaf value max] */
+	ret = session->create(session,
+	    "table:mytable", "key_format=S,value_format=S"
+	    "leaf_page_max=16KBleaf_value_max=256KB");
+	/*! [Create a table and configure a large leaf value max] */
+	ret = session->drop(session, "table:mytable", NULL);
+
 	/*
 	 * This example code gets run, and the compression libraries might not
 	 * be loaded, causing the create to fail.  The documentation requires

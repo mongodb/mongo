@@ -99,6 +99,10 @@ sizes.  Applications requiring a small page size, but also having
 latency concerns such that the additional work to retrieve an overflow
 item is an issue, may find them useful.
 
+An example of configuring a large leaf overflow value:
+
+@snippet ex_all.c Create a table and configure a large leaf value max
+
 @section tune_page_sizes_split_percentage Split percentage
 
 The \c split_pct configuration string configures the size of a split
