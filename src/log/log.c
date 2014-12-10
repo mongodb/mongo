@@ -1531,8 +1531,10 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			ip = citem;
 			complrp = (WT_LOG_RECORD *)citem->mem;
 			F_SET(complrp, WT_LOG_RECORD_COMPRESSED);
-			complrp->len = result_len;
-			complrp->mem_len = record->size;
+			WT_ASSERT(session, result_len < UINT32_MAX &&
+			    record->size < UINT32_MAX);
+			complrp->len = WT_STORE_SIZE(result_len);
+			complrp->mem_len = WT_STORE_SIZE(record->size);
 		}
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);
