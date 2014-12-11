@@ -25,9 +25,6 @@ type ToolOptions struct {
 	// The version of the tool
 	VersionStr string
 
-	// String describing usage, not including the tool name
-	UsageStr string
-
 	// Sub-option types
 	*General
 	*Verbosity
@@ -139,7 +136,6 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 	opts := &ToolOptions{
 		AppName:    appName,
 		VersionStr: VersionStr,
-		UsageStr:   usageStr,
 
 		General:       &General{},
 		Verbosity:     &Verbosity{},
@@ -149,7 +145,8 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 		Namespace:     &Namespace{},
 		HiddenOptions: hiddenOpts,
 		Kerberos:      &Kerberos{},
-		parser:        flags.NewNamedParser(appName, flags.None),
+		parser: flags.NewNamedParser(
+			fmt.Sprintf("%v %v", appName, usageStr), flags.None),
 	}
 
 	opts.parser.UnknownOptionHandler = func(option string, arg flags.SplitArgument, args []string) ([]string, error) {
