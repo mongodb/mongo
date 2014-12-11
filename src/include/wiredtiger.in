@@ -3176,7 +3176,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			1056
 /*! data-handle: connection dhandles swept */
 #define	WT_STAT_CONN_DH_CONN_HANDLES			1057
-/*! data-handle: connection dhandles attempts */
+/*! data-handle: connection sweeps */
 #define	WT_STAT_CONN_DH_CONN_SWEEPS			1058
 /*! data-handle: session dhandles swept */
 #define	WT_STAT_CONN_DH_SESSION_HANDLES			1059

@@ -408,9 +408,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "cursor: cursor search calls";
 	stats->cursor_search_near.desc = "cursor: cursor search near calls";
 	stats->cursor_update.desc = "cursor: cursor update calls";
-	stats->dh_conn_sweeps.desc =
-	    "data-handle: connection dhandles attempts";
 	stats->dh_conn_handles.desc = "data-handle: connection dhandles swept";
+	stats->dh_conn_sweeps.desc = "data-handle: connection sweeps";
 	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
 	stats->log_slot_closes.desc = "log: consolidated slot closures";
@@ -564,8 +563,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
-	stats->dh_conn_sweeps.v = 0;
 	stats->dh_conn_handles.v = 0;
+	stats->dh_conn_sweeps.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_session_sweeps.v = 0;
 	stats->log_slot_closes.v = 0;
