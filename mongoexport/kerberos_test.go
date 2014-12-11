@@ -23,7 +23,7 @@ func TestKerberos(t *testing.T) {
 		export := MongoExport{
 			ToolOptions:     *opts,
 			OutputOpts:      &OutputFormatOptions{},
-			InputOpts:       nil,
+			InputOpts:       &InputOptions{},
 			SessionProvider: sessionProvider,
 		}
 
