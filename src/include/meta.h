@@ -25,7 +25,7 @@
  * against the metafile URI. The validity is checked on connection open
  * when diagnostic is enabled.
  */
-#define	WT_METAFILE_NAME_HASH	1045034099109282882llu	/* Metadata file hash */
+#define	WT_METAFILE_NAME_HASH	1045034099109282882LLU	/* Metadata file hash */
 #define	WT_IS_METADATA(dh)						\
 	((dh)->name_hash == WT_METAFILE_NAME_HASH &&			\
 	strcmp((dh)->name, WT_METAFILE_URI) == 0)
