@@ -68,8 +68,16 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 		 * throttling stalls.
 		 */
 		if (manager->lsm_workers == 1)
+
+			/*
+			 * If there are only two threads handling work units
+			 * let them both do flushes otherwise a single merge
+			 * can lead to switched chunks filling up the cache.
+			 */
 			worker_args->type =
 			    WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
+			if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
+				worker_args->type |= WT_LSM_WORK_FLUSH;
 		else {
 			worker_args->type =
 			    WT_LSM_WORK_BLOOM |
@@ -92,13 +100,6 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 		WT_RET(__wt_lsm_worker_start(session, worker_args));
 	}
 
-	/*
-	 * If there are only two threads handling work units let them
-	 * both do flushes otherwise a single merge can lead to switched
-	 * chunks filling up the cache.
-	 */
-	if (manager->lsm_workers_max == 3)
-		FLD_SET(manager->lsm_worker_cookies[1].type, WT_LSM_WORK_FLUSH);
 	return (0);
 }
 

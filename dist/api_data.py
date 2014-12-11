@@ -366,7 +366,8 @@ connection_runtime_config = [
         Config('worker_thread_max', '4', r'''
             Configure a set of threads to manage merging LSM trees in
             the database.''',
-            min='3', max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
+            min='3',     # !!! Must match WT_LSM_MIN_WORKERS
+            max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
         Config('merge', 'true', r'''
             merge LSM chunks where possible''',
             type='boolean')
