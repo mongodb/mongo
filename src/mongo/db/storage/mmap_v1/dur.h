@@ -133,7 +133,7 @@ namespace mongo {
                 from growing too large.
                 @return true if commited
             */
-            virtual bool commitIfNeeded(OperationContext* txn) = 0;
+            virtual bool commitIfNeeded() = 0;
 
             /**
              * Invoked at clean shutdown time. Performs one last commit/flush and terminates the
@@ -200,7 +200,7 @@ namespace mongo {
             void createdFile(const std::string& filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow(OperationContext* txn);
-            bool commitIfNeeded(OperationContext* txn);
+            bool commitIfNeeded();
             void syncDataAndTruncateJournal(OperationContext* txn) {}
             bool isDurable() const { return false; }
             void commitAndStopDurThread() { }
@@ -215,7 +215,7 @@ namespace mongo {
             void createdFile(const std::string& filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow(OperationContext* txn);
-            bool commitIfNeeded(OperationContext* txn);
+            bool commitIfNeeded();
             void syncDataAndTruncateJournal(OperationContext* txn);
             bool isDurable() const { return true; }
             void commitAndStopDurThread();

@@ -68,7 +68,7 @@ namespace mongo {
 
         virtual void finishInit();
 
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
+        virtual RecoveryUnit* newRecoveryUnit();
 
         virtual void listDatabases( std::vector<std::string>* out ) const;
 

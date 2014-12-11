@@ -208,7 +208,7 @@ namespace mongo {
             return false;
         }
 
-        bool NonDurableImpl::commitIfNeeded(OperationContext* txn) {
+        bool NonDurableImpl::commitIfNeeded() {
             return false;
         }
 
@@ -278,7 +278,7 @@ namespace mongo {
             return p;
         }
 
-        bool DurableImpl::commitIfNeeded(OperationContext* txn) {
+        bool DurableImpl::commitIfNeeded() {
             if (MONGO_likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
             }

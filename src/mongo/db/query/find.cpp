@@ -254,7 +254,7 @@ namespace mongo {
                 if (!cc->hasRecoveryUnit()) {
                     // Start using a new RecoveryUnit
                     cc->setOwnedRecoveryUnit(
-                        getGlobalEnvironment()->getGlobalStorageEngine()->newRecoveryUnit(txn));
+                        getGlobalEnvironment()->getGlobalStorageEngine()->newRecoveryUnit());
 
                 }
                 // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
@@ -841,7 +841,7 @@ namespace mongo {
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
                 cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
+                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
             }
 
             QLOG() << "caching executor with cursorid " << ccId

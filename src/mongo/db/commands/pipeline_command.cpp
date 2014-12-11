@@ -148,7 +148,7 @@ namespace mongo {
             // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
             cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
+            txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
             // will be restored in getMore().

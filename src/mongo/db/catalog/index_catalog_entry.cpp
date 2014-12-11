@@ -194,7 +194,7 @@ namespace mongo {
         // with snapshot isolation.
         {
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit(txn));
+            RecoveryUnitSwap ruSwap(txn, storageEngine->newRecoveryUnit());
 
             WriteUnitOfWork wuow(txn);
 

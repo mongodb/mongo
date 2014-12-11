@@ -101,7 +101,7 @@ namespace mongo {
          *
          * Caller owns the returned pointer.
          */
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx ) = 0;
+        virtual RecoveryUnit* newRecoveryUnit() = 0;
 
         /**
          * List the databases stored in this storage engine.

@@ -54,7 +54,7 @@ namespace {
 
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
-        _recovery.reset(storageEngine->newRecoveryUnit(this));
+        _recovery.reset(storageEngine->newRecoveryUnit());
 
         if (storageEngine->isMmapV1()) {
             _locker.reset(new MMAPV1LockerImpl(idCounter.addAndFetch(1)));

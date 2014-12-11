@@ -47,7 +47,7 @@ namespace mongo {
 
         void finishInit();
 
-        RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
+        RecoveryUnit* newRecoveryUnit();
         void listDatabases( std::vector<std::string>* out ) const;
         int flushAllFiles( bool sync );
 

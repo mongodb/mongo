@@ -35,17 +35,15 @@
 #include <algorithm>
 #include <string>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    DurRecoveryUnit::DurRecoveryUnit(OperationContext* txn)
-        : _txn(txn),
-          _mustRollback(false)
-    {}
+    DurRecoveryUnit::DurRecoveryUnit() : _mustRollback(false) {
+
+    }
 
     void DurRecoveryUnit::beginUnitOfWork() {
         _startOfUncommittedChangesForLevel.push_back(Indexes(_changes.size(), _writes.size()));
@@ -69,7 +67,7 @@ namespace mongo {
         commitChanges();
 
         // global journal flush opportunity
-        getDur().commitIfNeeded(_txn);
+        getDur().commitIfNeeded();
     }
 
     void DurRecoveryUnit::endUnitOfWork() {

@@ -314,8 +314,8 @@ namespace {
         _entryMap.clear();
     }
 
-    RecoveryUnit* MMAPV1Engine::newRecoveryUnit( OperationContext* opCtx ) {
-        return new DurRecoveryUnit( opCtx );
+    RecoveryUnit* MMAPV1Engine::newRecoveryUnit() {
+        return new DurRecoveryUnit();
     }
 
     void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {
