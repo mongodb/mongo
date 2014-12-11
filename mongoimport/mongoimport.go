@@ -63,19 +63,20 @@ type MongoImport struct {
 	upsertFields []string
 }
 
-// InputReader is an interface that specifies how an input source should be
-// converted to BSON
+// InputReader is an interface that wraps the StreamDocument and ReadAndValidateHeader
+// methods.
+//
+// StreamDocument reads the given record from the given io.Reader according
+// to the format supported by the underlying InputReader implementation. It
+// returns the documents read on the readChannel channel and also sends any
+// error it encounters on the errorChannel channel. If ordered is true, it
+// streams document in the order in which they are read from the reader
+//
+// ReadAndValidateHeader reads the header line from the InputReader and returns
+// a non-nil error if the fields from the header line are invalid; returns
+// nil otherwise. No-op for JSON input readers
 type InputReader interface {
-	// StreamDocument reads the given record from the given io.Reader according
-	// to the format supported by the underlying InputReader implementation. It
-	// returns the documents read on the readChannel channel and also sends any
-	// error it encounters on the errorChannel channel. If ordered is true, it
-	// streams document in the order in which they are read from the reader
 	StreamDocument(ordered bool, readChannel chan bson.D, errorChannel chan error)
-
-	// ReadAndValidateHeader reads the header line from the InputReader and returns
-	// a non-nil error if the fields from the header line are invalid; returns
-	// nil otherwise. No-op for JSON input readers
 	ReadAndValidateHeader() error
 }
 
@@ -300,8 +301,6 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 		collection := session.DB(mongoImport.ToolOptions.DB).
 			C(mongoImport.ToolOptions.Collection)
 		if err := collection.DropCollection(); err != nil {
-			// TODO: do all mongods (e.g. v2.4) return this same
-			// error message?
 			if err.Error() != db.ErrNsNotFound.Error() {
 				return 0, err
 			}
@@ -353,7 +352,7 @@ func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (err er
 			// 2. The server becomes unreachable
 			// 3. There is an insertion/update error - e.g. duplicate key
 			//    error - and stopOnError is set to true
-			return mongoImport.ingestDocs(readDocChan)
+			return mongoImport.runInsertionWorker(readDocChan)
 		})
 	}
 	return mongoImport.tomb.Wait()
@@ -380,9 +379,9 @@ func (mongoImport *MongoImport) configureSession(session *mgo.Session) error {
 	return nil
 }
 
-// ingestDocuments is a helper to IngestDocuments - it reads document off the
-// read channel and prepares then for insertion into the database
-func (mongoImport *MongoImport) ingestDocs(readDocChan chan bson.D) (err error) {
+// runInsertionWorker is a helper to InsertDocuments - it reads document off
+// the read channel and prepares then in batches for insertion into the databas
+func (mongoImport *MongoImport) runInsertionWorker(readDocChan chan bson.D) (err error) {
 	session, err := mongoImport.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error connecting to mongod: %v", err)
@@ -409,7 +408,7 @@ readLoop:
 			// and send documents over the wire when we hit the batch size
 			// or when we're at/over the maximum message size threshold
 			if len(documents) == mongoImport.ToolOptions.BulkBufferSize || numMessageBytes >= maxMessageSizeBytes {
-				if err = mongoImport.ingester(documents, collection); err != nil {
+				if err = mongoImport.insert(documents, collection); err != nil {
 					return err
 				}
 				// TODO: TOOLS-313; better to use a progress bar here
@@ -435,7 +434,7 @@ readLoop:
 
 	// ingest any documents left in slice
 	if len(documents) != 0 {
-		return mongoImport.ingester(documents, collection)
+		return mongoImport.insert(documents, collection)
 	}
 	return nil
 }
@@ -467,10 +466,10 @@ func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *m
 	return numInserted, nil
 }
 
-// ingester performs the actual insertion/updates. If no upsert fields are
+// insert  performs the actual insertion/updates. If no upsert fields are
 // present in the document to be inserted, it simply inserts the documents
 // into the given collection
-func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.Collection) (err error) {
+func (mongoImport *MongoImport) insert(documents []bson.Raw, collection *mgo.Collection) (err error) {
 	numInserted := 0
 	stopOnError := mongoImport.IngestOptions.StopOnError
 	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
@@ -495,6 +494,7 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		if !maintainInsertionOrder {
 			bulk.Unordered()
 		}
+
 		// mgo.Bulk doesn't currently implement write commands so mgo.BulkResult
 		// isn't informative
 		_, err = bulk.Run()
@@ -515,8 +515,7 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 	return filterIngestError(stopOnError, err)
 }
 
-// getInputReader returns an implementation of InputReader which can handle
-// transforming TSV, CSV, or JSON into appropriate BSON documents
+// getInputReader returns an implementation of InputReader based on the input type
 func (mongoImport *MongoImport) getInputReader(in io.Reader) (InputReader, error) {
 	var fields []string
 	var err error
