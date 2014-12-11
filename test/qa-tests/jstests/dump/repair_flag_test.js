@@ -34,6 +34,7 @@ load('jstests/common/check_version.js');
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     assert.eq(0, db.bar.count());
+    assert.eq(0, ls('dump/foo').length, 'dump directory should be empty, but it was not');
   }
 
   toolTest.stop();
