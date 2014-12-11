@@ -15,6 +15,9 @@ type OutputFormatOptions struct {
 
 	//JSONArray if set will export the documents an array of json docs
 	JSONArray bool `long:"jsonArray" description:"output to a json array rather than one object per line"`
+
+	//Pretty to format the JSON results
+	Pretty bool `long:"pretty" description:"output to json in pretty mode"`
 }
 
 func (self *OutputFormatOptions) Name() string {

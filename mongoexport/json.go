@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"bytes"
 )
 
 // JSONExportOutput is an implementation of ExportOutput that writes documents
@@ -13,7 +14,9 @@ import (
 type JSONExportOutput struct {
 	// ArrayOutput when set to true indicates that the output should be written
 	// as a JSON array, where each document is an element in the array.
+	// Pretty when set to true indicates that the output will be written in pretty() mode
 	ArrayOutput bool
+	PrettyOutput bool
 	Encoder     *json.Encoder
 	Out         io.Writer
 	NumExported int64
@@ -21,9 +24,10 @@ type JSONExportOutput struct {
 
 // NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
 // configured to write data to the given io.Writer
-func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
+func NewJSONExportOutput(arrayOutput bool, prettyOutput bool, out io.Writer) *JSONExportOutput {
 	return &JSONExportOutput{
 		arrayOutput,
+		prettyOutput,
 		json.NewEncoder(out),
 		out,
 		0,
@@ -63,9 +67,14 @@ func (jsonExporter *JSONExportOutput) Flush() error {
 // ExportDocument converts the given document to extended json, and writes it
 // to the output.
 func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
-	if jsonExporter.ArrayOutput {
+	if jsonExporter.ArrayOutput || jsonExporter.PrettyOutput {
 		if jsonExporter.NumExported >= 1 {
-			jsonExporter.Out.Write([]byte(","))
+			if jsonExporter.ArrayOutput {
+				jsonExporter.Out.Write([]byte(","))
+			}
+			if jsonExporter.PrettyOutput {
+				jsonExporter.Out.Write([]byte("\n"))
+			}
 		}
 		extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
 		if err != nil {
@@ -75,7 +84,14 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 		if err != nil {
 			return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
 		}
-		jsonExporter.Out.Write(jsonOut)
+		if jsonExporter.PrettyOutput{
+			var jsonFormatted bytes.Buffer
+			json.Indent(&jsonFormatted, jsonOut, "", "\t")
+			jsonExporter.Out.Write(jsonFormatted.Bytes())
+		}
+		if jsonExporter.ArrayOutput {
+			jsonExporter.Out.Write(jsonOut)
+		}
 	} else {
 		extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
 		if err != nil {
