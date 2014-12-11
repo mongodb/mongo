@@ -247,74 +247,75 @@ namespace mongo {
         return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
     }
 
-
     class MigrateFromStatus {
     public:
-        MigrateFromStatus() : _mutex("MigrateFromStatus") {
-            _active = false;
-            _inCriticalSection = false;
-            _memoryUsed = 0;
+        MigrateFromStatus():
+            _mutex("MigrateFromStatus"),
+            _inCriticalSection(false),
+            _memoryUsed(0),
+            _active(false),
+            _cloneLocsMutex("MigrateFromTrackerMutex") {
         }
 
         /**
          * @return false if cannot start. One of the reason for not being able to
          *     start is there is already an existing migration in progress.
          */
-        bool start( const std::string& ns ,
-                    const BSONObj& min ,
-                    const BSONObj& max ,
-                    const BSONObj& shardKeyPattern ) {
+        bool start(OperationContext* txn,
+                   const std::string& ns,
+                   const BSONObj& min,
+                   const BSONObj& max,
+                   const BSONObj& shardKeyPattern) {
+            verify(!min.isEmpty());
+            verify(!max.isEmpty());
+            verify(!ns.empty());
 
-            scoped_lock l(_mutex); // reads and writes _active
+            // Get global shared to synchronize with logOp. Also see comments in the class
+            // members declaration for more details.
+            Lock::GlobalRead globalShared(txn->lockState());
+            scoped_lock l(_mutex);
 
             if (_active) {
                 return false;
             }
-
-            verify( ! min.isEmpty() );
-            verify( ! max.isEmpty() );
-            verify( ns.size() );
 
             _ns = ns;
             _min = min;
             _max = max;
             _shardKeyPattern = shardKeyPattern;
 
-            verify( _cloneLocs.size() == 0 );
-            verify( _deleted.size() == 0 );
-            verify( _reload.size() == 0 );
-            verify( _memoryUsed == 0 );
+            verify(_deleted.size() == 0);
+            verify(_reload.size() == 0);
+            verify(_memoryUsed == 0);
 
             _active = true;
+
+            scoped_lock tLock(_cloneLocsMutex);
+            verify(_cloneLocs.size() == 0);
+
             return true;
         }
 
         void done(OperationContext* txn) {
-            log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
+            log() << "MigrateFromStatus::done About to acquire global lock to exit critical "
                     "section" << endl;
 
-            _deleteNotifyExec.reset( NULL );
-
-            // TODO: Change this. This is a bad hack for protecting some of the data structures
-            // below that were not properly synchronized with the intended latches in some
-            // usages.
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(_ns), MODE_IX);
-            Lock::CollectionLock collLock(txn->lockState(), _ns, MODE_X);
-            log() << "MigrateFromStatus::done coll lock for " << _ns << " acquired" << endl;
-
-            {
-                scoped_spinlock lk( _trackerLocks );
-                _deleted.clear();
-                _reload.clear();
-                _cloneLocs.clear();
-            }
-            _memoryUsed = 0;
-
+            // Get global shared to synchronize with logOp. Also see comments in the class
+            // members declaration for more details.
+            Lock::GlobalRead globalShared(txn->lockState());
             scoped_lock l(_mutex);
+
             _active = false;
+            _deleteNotifyExec.reset( NULL );
             _inCriticalSection = false;
             _inCriticalSectionCV.notify_all();
+
+            _deleted.clear();
+            _reload.clear();
+            _memoryUsed = 0;
+
+            scoped_lock lk(_cloneLocsMutex);
+            _cloneLocs.clear();
         }
 
         void logOp(OperationContext* txn,
@@ -323,10 +324,12 @@ namespace mongo {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
-            if ( ! _getActive() )
+            dassert(txn->lockState()->isWriteLocked()); // Must have Global IX.
+
+            if (!_active)
                 return;
 
-            if ( _ns != ns )
+            if (_ns != ns)
                 return;
 
             // no need to log if this is not an insertion, an update, or an actual deletion
@@ -360,6 +363,7 @@ namespace mongo {
                     return;
                 }
 
+                scoped_lock sl(_mutex);
                 // can't filter deletes :(
                 _deleted.push_back( ide.wrap() );
                 _memoryUsed += ide.size() + 5;
@@ -371,46 +375,64 @@ namespace mongo {
                 break;
 
             case 'u':
-                Client::Context ctx(txn,  _ns );
-                if ( ! Helpers::findById( txn, ctx.db(), _ns.c_str(), ide.wrap(), it ) ) {
-                    warning() << "logOpForSharding couldn't find: " << ide << " even though should have" << migrateLog;
+                Client::Context ctx(txn, _ns);
+                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), ide.wrap(), it)) {
+                    warning() << "logOpForSharding couldn't find: " << ide
+                              << " even though should have" << migrateLog;
                     return;
                 }
                 break;
 
             }
 
-            if ( ! isInRange( it , _min , _max , _shardKeyPattern ) )
+            if (!isInRange(it, _min, _max, _shardKeyPattern)) {
                 return;
+            }
 
-            _reload.push_back( ide.wrap() );
+            scoped_lock sl(_mutex);
+            _reload.push_back(ide.wrap());
             _memoryUsed += ide.size() + 5;
         }
 
-        void xfer( OperationContext* txn, Database* db, list<BSONObj> * l , BSONObjBuilder& b , const char * name , long long& size , bool explode ) {
+        /**
+         * Insert items from docIdList to a new array with the given fieldName in the given
+         * builder. If explode is true, the inserted object will be the full version of the
+         * document. Note that the whenever an item from the docList is inserted to the array,
+         * it will also be removed from docList.
+         *
+         * Should be holding the collection lock for ns if explode is true.
+         */
+        void xfer(OperationContext* txn,
+                  const string& ns,
+                  Database* db,
+                  list<BSONObj> *docIdList,
+                  BSONObjBuilder& builder,
+                  const char* fieldName,
+                  long long& size,
+                  bool explode) {
             const long long maxSize = 1024 * 1024;
 
-            if ( l->size() == 0 || size > maxSize )
+            if (docIdList->size() == 0 || size > maxSize)
                 return;
 
-            BSONArrayBuilder arr(b.subarrayStart(name));
+            BSONArrayBuilder arr(builder.subarrayStart(fieldName));
 
-            list<BSONObj>::iterator i = l->begin();
-
-            while ( i != l->end() && size < maxSize ) {
-                BSONObj t = *i;
-                if ( explode ) {
-                    BSONObj it;
-                    if ( Helpers::findById( txn, db , _ns.c_str() , t, it ) ) {
-                        arr.append( it );
-                        size += it.objsize();
+            list<BSONObj>::iterator docIdIter = docIdList->begin();
+            while (docIdIter != docIdList->end() && size < maxSize) {
+                BSONObj idDoc = *docIdIter;
+                if (explode) {
+                    BSONObj fullDoc;
+                    if (Helpers::findById(txn, db, ns.c_str(), idDoc, fullDoc)) {
+                        arr.append( fullDoc );
+                        size += fullDoc.objsize();
                     }
                 }
                 else {
-                    arr.append( t );
+                    arr.append(idDoc);
+                    size += idDoc.objsize();
                 }
-                i = l->erase( i );
-                size += t.objsize();
+
+                docIdIter = docIdList->erase(docIdIter);
             }
 
             arr.done();
@@ -421,18 +443,20 @@ namespace mongo {
          * transfers mods from src to dest
          */
         bool transferMods(OperationContext* txn, string& errmsg, BSONObjBuilder& b) {
-            if ( ! _getActive() ) {
-                errmsg = "no active migration!";
-                return false;
-            }
-
             long long size = 0;
 
             {
-                AutoGetCollectionForRead ctx(txn, _ns);
+                AutoGetCollectionForRead ctx(txn, getNS());
 
-                xfer(txn, ctx.getDb(), &_deleted, b, "deleted", size, false);
-                xfer(txn, ctx.getDb(), &_reload, b, "reload", size, true);
+                scoped_lock sl(_mutex);
+                if (!_active) {
+                    errmsg = "no active migration!";
+                    return false;
+                }
+
+                // TODO: fix SERVER-16540 race
+                xfer(txn, _ns, ctx.getDb(), &_deleted, b, "deleted", size, false);
+                xfer(txn, _ns, ctx.getDb(), &_reload, b, "reload", size, true);
             }
 
             b.append( "size" , size );
@@ -441,54 +465,68 @@ namespace mongo {
         }
 
         /**
-         * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs (to avoid seeking disk later)
+         * Get the disklocs that belong to the chunk migrated and sort them in _cloneLocs
+         * (to avoid seeking disk later).
          *
-         * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices) is considered too large to move
-         * @param errmsg filled with textual description of error if this call return false
-         * @return false if approximate chunk size is too big to move or true otherwise
+         * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices)
+         *                     is considered too large to move.
+         * @param errmsg filled with textual description of error if this call return false.
+         * @return false if approximate chunk size is too big to move or true otherwise.
          */
         bool storeCurrentLocs(OperationContext* txn,
                               long long maxChunkSize,
                               string& errmsg,
                               BSONObjBuilder& result ) {
-            AutoGetCollectionForRead ctx(txn, _ns);
+            AutoGetCollectionForRead ctx(txn, getNS());
             Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
                 return false;
             }
 
-            invariant( _deleteNotifyExec.get() == NULL );
-            WorkingSet* ws = new WorkingSet();
-            DeleteNotificationStage* dns = new DeleteNotificationStage();
-            PlanExecutor* deleteNotifyExec;
-            // Takes ownership of 'ws' and 'dns'.
-            Status execStatus = PlanExecutor::make(txn,
-                                                   ws,
-                                                   dns,
-                                                   collection,
-                                                   PlanExecutor::YIELD_MANUAL,
-                                                   &deleteNotifyExec);
-            invariant(execStatus.isOK());
-            deleteNotifyExec->registerExec();
-            _deleteNotifyExec.reset(deleteNotifyExec);
-
             // Allow multiKey based on the invariant that shard keys must be single-valued.
             // Therefore, any multi-key index prefixed by shard key cannot be multikey over
             // the shard key fields.
             IndexDescriptor *idx =
-                collection->getIndexCatalog()->findIndexByPrefix( txn,
-                                                                  _shardKeyPattern ,
-                                                                  false );  /* allow multi key */
+                collection->getIndexCatalog()->findIndexByPrefix(txn,
+                                                                 _shardKeyPattern ,
+                                                                 false);  /* allow multi key */
 
-            if ( idx == NULL ) {
-                errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
+            if (idx == NULL) {
+                errmsg = str::stream() << "can't find index with prefix " << _shardKeyPattern
+                                       << " in storeCurrentLocs for " << _ns;
                 return false;
             }
+
             // Assume both min and max non-empty, append MinKey's to make them fit chosen index
-            KeyPattern kp( idx->keyPattern() );
-            BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
-            BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
+            BSONObj min;
+            BSONObj max;
+            KeyPattern kp(idx->keyPattern());
+
+            {
+                // It's alright not to lock _mutex all the way through based on the assumption
+                // that this is only called by the main thread that drives the migration and
+                // only it can start and stop the current migration.
+                scoped_lock sl(_mutex);
+
+                invariant( _deleteNotifyExec.get() == NULL );
+                WorkingSet* ws = new WorkingSet();
+                DeleteNotificationStage* dns = new DeleteNotificationStage();
+                PlanExecutor* deleteNotifyExec;
+                // Takes ownership of 'ws' and 'dns'.
+                Status execStatus = PlanExecutor::make(txn,
+                                                       ws,
+                                                       dns,
+                                                       collection,
+                                                       PlanExecutor::YIELD_MANUAL,
+                                                       &deleteNotifyExec);
+                invariant(execStatus.isOK());
+                deleteNotifyExec->registerExec();
+                _deleteNotifyExec.reset(deleteNotifyExec);
+
+                min = Helpers::toKeyFormat(kp.extendRangeBound(_min, false));
+                max = Helpers::toKeyFormat(kp.extendRangeBound(_max, false));
+            }
 
             auto_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn, collection, idx, min, max, false));
@@ -505,7 +543,7 @@ namespace mongo {
             if ( totalRecs > 0 ) {
                 avgRecSize = collection->dataSize(txn) / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
-                maxRecsWhenFull = std::min( (unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
+                maxRecsWhenFull = std::min((unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
             else {
                 avgRecSize = 0;
@@ -519,96 +557,119 @@ namespace mongo {
             RecordId dl;
             while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
-                    scoped_spinlock lk( _trackerLocks );
+                    scoped_lock lk(_cloneLocsMutex);
                     _cloneLocs.insert( dl );
                 }
 
                 if ( ++recCount > maxRecsWhenFull ) {
                     isLargeChunk = true;
+                    // continue on despite knowing that it will fail,
+                    // just to get the correct value for recCount.
                 }
             }
             exec.reset();
 
             if ( isLargeChunk ) {
+                scoped_lock sl(_mutex);
                 warning() << "cannot move chunk: the maximum number of documents for a chunk is "
                           << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
-                          << " , average document size is " << avgRecSize << ". Found "
-                          << recCount << " documents in chunk " << " ns: " << _ns << " " << _min
-                          << " -> " << _max << migrateLog;
+                          << " , average document size is " << avgRecSize
+                          << ". Found " << recCount << " documents in chunk "
+                          << " ns: " << _ns << " "
+                          << _min << " -> " << _max << migrateLog;
+
                 result.appendBool( "chunkTooBig" , true );
                 result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
                 return false;
             }
 
-            {
-                scoped_spinlock lk( _trackerLocks );
-                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
-            }
+            log() << "moveChunk number of documents: " << cloneLocsRemaining() << migrateLog;
+
             txn->recoveryUnit()->commitAndRestart();
             return true;
         }
 
         bool clone(OperationContext* txn, string& errmsg , BSONObjBuilder& result ) {
-            if ( ! _getActive() ) {
-                errmsg = "not active";
-                return false;
-            }
-
             ElapsedTracker tracker(internalQueryExecYieldIterations,
                                    internalQueryExecYieldPeriodMS);
 
-            int allocSize;
+            int allocSize = 0;
             {
-                AutoGetCollectionForRead ctx(txn, _ns);
+                AutoGetCollectionForRead ctx(txn, getNS());
+
+                scoped_lock sl(_mutex);
+                if (!_active) {
+                    errmsg = "not active";
+                    return false;
+                }
+
                 Collection* collection = ctx.getCollection();
-                invariant(collection);
-                scoped_spinlock lk( _trackerLocks );
+                if (!collection) {
+                    errmsg = str::stream() << "collection " << _ns << " does not exist";
+                    return false;
+                }
+
                 allocSize =
                     std::min(BSONObjMaxUserSize,
-                             (int)((12 + collection->averageObjectSize(txn)) * _cloneLocs.size()));
+                             static_cast<int>((12 + collection->averageObjectSize(txn)) *
+                                     cloneLocsRemaining()));
             }
-            BSONArrayBuilder a (allocSize);
-            
-            while ( 1 ) {
-                bool filledBuffer = false;
-                
-                AutoGetCollectionForRead ctx(txn, _ns);
+
+            bool isBufferFilled = false;
+            BSONArrayBuilder clonedDocsArrayBuilder(allocSize);
+            while (!isBufferFilled) {
+                AutoGetCollectionForRead ctx(txn, getNS());
+
+                scoped_lock sl(_mutex);
+                if (!_active) {
+                    errmsg = "not active";
+                    return false;
+                }
+
+                // TODO: fix SERVER-16540 race
+
                 Collection* collection = ctx.getCollection();
 
-                scoped_spinlock lk( _trackerLocks );
-                set<RecordId>::iterator i = _cloneLocs.begin();
-                for ( ; i!=_cloneLocs.end(); ++i ) {
+                if (!collection) {
+                    errmsg = str::stream() << "collection " << _ns << " does not exist";
+                    return false;
+                }
+
+                scoped_lock lk(_cloneLocsMutex);
+                set<RecordId>::iterator cloneLocsIter = _cloneLocs.begin();
+                for ( ; cloneLocsIter != _cloneLocs.end(); ++cloneLocsIter) {
                     if (tracker.intervalHasElapsed()) // should I yield?
                         break;
-                    
-                    invariant( collection );
 
-                    RecordId dl = *i;
-                    BSONObj o;
-                    if ( !collection->findDoc( txn, dl, &o ) ) {
+                    RecordId dl = *cloneLocsIter;
+                    BSONObj doc;
+                    if (!collection->findDoc(txn, dl, &doc)) {
                         // doc was deleted
                         continue;
                     }
 
-                    // use the builder size instead of accumulating 'o's size so that we take into consideration
-                    // the overhead of BSONArray indices, and *always* append one doc
-                    if ( a.arrSize() != 0 &&
-                         a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                        filledBuffer = true; // break out of outer while loop
+                    // Use the builder size instead of accumulating 'doc's size so that we take
+                    // into consideration the overhead of BSONArray indices, and *always*
+                    // append one doc.
+                    if (clonedDocsArrayBuilder.arrSize() != 0 &&
+                        clonedDocsArrayBuilder.len() + doc.objsize() + 1024 > BSONObjMaxUserSize) {
+                        isBufferFilled = true; // break out of outer while loop
                         break;
                     }
-                    
-                    a.append( o );
+
+                    clonedDocsArrayBuilder.append(doc);
                 }
-                
-                _cloneLocs.erase( _cloneLocs.begin() , i );
-                
-                if ( _cloneLocs.empty() || filledBuffer )
+
+                _cloneLocs.erase(_cloneLocs.begin(), cloneLocsIter);
+
+                // Note: must be holding _cloneLocsMutex, don't move this inside while condition!
+                if (_cloneLocs.empty()) {
                     break;
+                }
             }
 
-            result.appendArray( "objects" , a.arr() );
+            result.appendArray("objects", clonedDocsArrayBuilder.arr());
             return true;
         }
 
@@ -617,18 +678,19 @@ namespace mongo {
             // that check only works for non-mmapv1 engines, and this is needed
             // for mmapv1.
 
-            // lock not needed right now
-            // but trying to prevent a future bug
-            scoped_spinlock lk( _trackerLocks );
+            scoped_lock lk(_cloneLocsMutex);
             _cloneLocs.erase( dl );
         }
 
         std::size_t cloneLocsRemaining() {
-            scoped_spinlock lk( _trackerLocks );
+            scoped_lock lk(_cloneLocsMutex);
             return _cloneLocs.size();
         }
 
-        long long mbUsed() const { return _memoryUsed / ( 1024 * 1024 ); }
+        long long mbUsed() const {
+            scoped_lock lk(_mutex);
+            return _memoryUsed / ( 1024 * 1024 );
+        }
 
         bool getInCriticalSection() const {
             scoped_lock l(_mutex);
@@ -639,6 +701,11 @@ namespace mongo {
             scoped_lock l(_mutex);
             _inCriticalSection = b;
             _inCriticalSectionCV.notify_all();
+        }
+
+        std::string getNS() const {
+            scoped_lock sl(_mutex);
+            return _ns;
         }
 
         /**
@@ -661,31 +728,6 @@ namespace mongo {
         bool isActive() const { return _getActive(); }
 
     private:
-        mutable mongo::mutex _mutex; // protect _inCriticalSection and _active
-        boost::condition _inCriticalSectionCV;
-
-        bool _inCriticalSection;
-        bool _active;
-
-        string _ns;
-        BSONObj _min;
-        BSONObj _max;
-        BSONObj _shardKeyPattern;
-
-        // we need the lock in case there is a malicious _migrateClone for example
-        // even though it shouldn't be needed under normal operation
-        SpinLock _trackerLocks;
-
-        // disk locs yet to be transferred from here to the other side
-        // no locking needed because built initially by 1 thread in a read lock
-        // emptied by 1 thread in a read lock
-        // updates applied by 1 thread in a write lock
-        set<RecordId> _cloneLocs;
-
-        list<BSONObj> _reload; // objects that were modified that must be recloned
-        list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
-        long long _memoryUsed; // bytes in _reload + _deleted
-
         bool _getActive() const { scoped_lock l(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
 
@@ -736,7 +778,49 @@ namespace mongo {
             }
         };
 
-        scoped_ptr<PlanExecutor> _deleteNotifyExec;
+        //
+        // All member variables are labeled with one of the following codes indicating the
+        // synchronization rules for accessing them.
+        //
+        // (M)  Must hold _mutex for access.
+        // (MG) For reads, _mutex *OR* Global IX Lock must be held.
+        //      For writes, the _mutex *AND* (Global Shared or Exclusive Lock) must be held.
+        // (C)  Must hold _cloneLocsMutex for access.
+        //
+        // Locking order:
+        //
+        // Global Lock -> _mutex -> _cloneLocsMutex
+
+        mutable mongo::mutex _mutex;
+
+        boost::condition _inCriticalSectionCV;                                           // (M)
+
+        // Is migration currently in critical section. This can be used to block new writes.
+        bool _inCriticalSection;                                                         // (M)
+
+        scoped_ptr<PlanExecutor> _deleteNotifyExec;                                      // (M)
+
+        // List of _id of documents that were modified that must be re-cloned.
+        list<BSONObj> _reload;                                                           // (M)
+
+        // List of _id of documents that were deleted during clone that should be deleted later.
+        list<BSONObj> _deleted;                                                          // (M)
+
+        // bytes in _reload + _deleted
+        long long _memoryUsed;                                                           // (M)
+
+        // If a migration is currently active.
+        bool _active;                                                                    // (MG)
+
+        string _ns;                                                                      // (MG)
+        BSONObj _min;                                                                    // (MG)
+        BSONObj _max;                                                                    // (MG)
+        BSONObj _shardKeyPattern;                                                        // (MG)
+
+        mutable mongo::mutex _cloneLocsMutex;
+
+        // List of record id that needs to be transferred from here to the other side.
+        set<RecordId> _cloneLocs;                                                        // (C)
 
     } migrateFromStatus;
 
@@ -755,7 +839,8 @@ namespace mongo {
                              const BSONObj& max ,
                              const BSONObj& shardKeyPattern )
                 : _txn(txn) {
-            _isAnotherMigrationActive = !migrateFromStatus.start(ns, min, max, shardKeyPattern);
+            _isAnotherMigrationActive =
+                    !migrateFromStatus.start(txn, ns, min, max, shardKeyPattern);
         }
         ~MigrateStatusHolder() {
             if (!_isAnotherMigrationActive) {
@@ -1354,8 +1439,8 @@ namespace mongo {
                         Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                         Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
-                        log() << "moveChunk global lock acquired to reset shard version from "
-                              "failed migration"
+                        log() << "moveChunk collection lock acquired to reset shard version from "
+                                 "failed migration"
                               << endl;
 
                         // revert the chunk manager back to the state before "forgetting" about the
@@ -1521,7 +1606,7 @@ namespace mongo {
                     // can safely back out of the migration here, by resetting the shard
                     // version that we bumped up to in the donateChunk() call above.
 
-                    log() << "About to acquire moveChunk global lock to reset shard version from "
+                    log() << "About to acquire moveChunk coll lock to reset shard version from "
                           << "failed migration" << endl;
 
                     {
