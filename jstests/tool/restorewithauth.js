@@ -14,6 +14,7 @@
  * 9) Try restore with correct auth credentials. The restore should succeed this time.
  */
 
+
 var port = allocatePorts(1)[0];
 baseName = "jstests_restorewithauth";
 var conn = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
@@ -27,8 +28,15 @@ for( var i = 0; i < 4; i++ ) {
 }
 
 // make sure the collection exists
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 1 )
+var listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+var barColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    }
+});
+assert.neq(null, barColl, "bar collection doesn't exist");
 
 //make sure it has no index except _id
 assert.eq(foo.bar.getIndexes().length, 1);
@@ -61,19 +69,37 @@ admin.auth( "admin" , "admin" );
 var foo = conn.getDB( "foo" )
 
 // make sure no collection with the same name exists
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 0 )
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "baz"}}).collections.length, 0 )
+listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+barColl = null;
+var bazColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    } else if (coll.name === "baz") {
+        bazColl = coll;
+    }
+});
+assert.eq(null, barColl, "bar collection already exists");
+assert.eq(null, bazColl, "baz collection already exists");
 
 // now try to restore dump
 x = runMongoProgram( "mongorestore", "-h", "127.0.0.1:" + port,  "--dir" , dumpdir, "-vvvvv" );
 
 // make sure that the collection isn't restored
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 0 )
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "baz"}}).collections.length, 0 )
+listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+barColl = null;
+bazColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    } else if (coll.name === "baz") {
+        bazColl = coll;
+    }
+});
+assert.eq(null, barColl, "bar collection was restored");
+assert.eq(null, bazColl, "baz collection was restored");
 
 // now try to restore dump with correct credentials
 x = runMongoProgram( "mongorestore",
@@ -86,10 +112,19 @@ x = runMongoProgram( "mongorestore",
                      "-vvvvv");
 
 // make sure that the collection was restored
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 1 )
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "baz"}}).collections.length, 1 )
+listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+barColl = null;
+bazColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    } else if (coll.name === "baz") {
+        bazColl = coll;
+    }
+});
+assert.neq(null, barColl, "bar collection was not restored");
+assert.neq(null, bazColl, "baz collection was not restored");
 
 // make sure the collection has 4 documents
 assert.eq(foo.bar.count(), 4);
@@ -98,10 +133,19 @@ assert.eq(foo.baz.count(), 4);
 foo.dropDatabase();
 
 // make sure that the collection is empty
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 0 )
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "baz"}}).collections.length, 0 )
+listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+barColl = null;
+bazColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    } else if (coll.name === "baz") {
+        bazColl = coll;
+    }
+});
+assert.eq(null, barColl, "bar collection was restored");
+assert.eq(null, bazColl, "baz collection was restored");
 
 foo.createUser({user: 'user', pwd: 'password', roles: jsTest.basicUserRoles});
 
@@ -115,13 +159,21 @@ x = runMongoProgram("mongorestore",
                     "-vvvvv");
 
 // make sure that the collection was restored
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "bar"}}).collections.length, 1 )
-assert.eq( foo.runCommand({"listCollections": 1,
-			   "filter": {"name": "baz"}}).collections.length, 1 )
+listCollOut = foo.runCommand("listCollections");
+assert.eq(1, listCollOut.ok);
+barColl = null;
+bazColl = null;
+listCollOut.collections.forEach(function(coll) {
+    if (coll.name === "bar") {
+        barColl = coll;
+    } else if (coll.name === "baz") {
+        bazColl = coll;
+    }
+});
+assert.neq(null, barColl, "bar collection was not restored");
+assert.neq(null, bazColl, "baz collection was not restored");
 assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
-assert.eq(foo.bar.getIndexes().length, 2);
-assert.eq(foo.baz.getIndexes().length, 1);
+assert.eq(foo.bar.getIndexes().length + foo.baz.getIndexes().length, 3); // _id on foo, _id on bar, x on foo
 
 stopMongod( port );
