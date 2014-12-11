@@ -144,10 +144,18 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		}
 	}
 
-	if mongoImport.IngestOptions.UpsertFields != "" {
-		mongoImport.upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
-		if err := validateFields(mongoImport.upsertFields); err != nil {
-			return fmt.Errorf("invalid --upsertFields argument: %v", err)
+	if !mongoImport.IngestOptions.Upsert && mongoImport.IngestOptions.UpsertFields != "" {
+		return fmt.Errorf("can not use --upsertFields without --upsert")
+	}
+
+	if mongoImport.IngestOptions.Upsert {
+		if mongoImport.IngestOptions.UpsertFields == "" {
+			mongoImport.upsertFields = []string{"_id"}
+		} else {
+			mongoImport.upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
+			if err := validateFields(mongoImport.upsertFields); err != nil {
+				return fmt.Errorf("invalid --upsertFields argument: %v", err)
+			}
 		}
 		log.Logf(log.Info, "using upsert fields: %v", mongoImport.upsertFields)
 	}
@@ -479,7 +487,7 @@ func (mongoImport *MongoImport) insert(documents []bson.Raw, collection *mgo.Col
 		mongoImport.insertionLock.Unlock()
 	}()
 
-	if len(mongoImport.upsertFields) != 0 {
+	if mongoImport.IngestOptions.Upsert {
 		numInserted, err = mongoImport.handleUpsert(documents, collection)
 		return err
 	} else {
