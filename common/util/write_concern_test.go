@@ -38,6 +38,12 @@ func TestBuildWriteConcern(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(writeConcern, ShouldBeNil)
 		})
+		Convey("with a negative w value, an error should be returned", func() {
+			_, err := BuildWriteConcern(`{w:-1}`, false)
+			So(err, ShouldNotBeNil)
+			_, err = BuildWriteConcern(`{w:-2}`, false)
+			So(err, ShouldNotBeNil)
+		})
 		Convey("with a w value of 0, with j set, a non-nil write concern should be returned", func() {
 			writeConcern, err := BuildWriteConcern(`{w:0, j:true}`, false)
 			So(err, ShouldBeNil)

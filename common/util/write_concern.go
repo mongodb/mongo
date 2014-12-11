@@ -42,6 +42,9 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 			sessionSafety.WMode = writeConcern
 		} else {
 			sessionSafety.W = wValue
+			if wValue < 0 {
+				return sessionSafety, fmt.Errorf("invalid '%v' argument: %v", w, wValue)
+			}
 		}
 		return sessionSafety, nil
 	}
@@ -73,9 +76,11 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 			sessionSafety.WMode = wStrVal
 		} else {
 			sessionSafety.W = wValue
+			if wValue < 0 {
+				return sessionSafety, fmt.Errorf("invalid '%v' argument: %v", w, wValue)
+			}
 		}
 	}
-
 	return sessionSafety, nil
 }
 

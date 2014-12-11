@@ -66,17 +66,15 @@ type MongoImport struct {
 // InputReader is an interface that wraps the StreamDocument and ReadAndValidateHeader
 // methods.
 //
-// StreamDocument reads the given record from the given io.Reader according
-// to the format supported by the underlying InputReader implementation. It
-// returns the documents read on the readChannel channel and also sends any
-// error it encounters on the errorChannel channel. If ordered is true, it
-// streams document in the order in which they are read from the reader
+// StreamDocument sends InputReader processed BSON documents on the read channel
+// If an error is encountered during processing, it is sent on the err channel.
+// Otherwise, once documents are streamed, nil is sent on the err channel.
 //
 // ReadAndValidateHeader reads the header line from the InputReader and returns
 // a non-nil error if the fields from the header line are invalid; returns
 // nil otherwise. No-op for JSON input readers
 type InputReader interface {
-	StreamDocument(ordered bool, readChannel chan bson.D, errorChannel chan error)
+	StreamDocument(ordered bool, read chan bson.D, err chan error)
 	ReadAndValidateHeader() error
 }
 
@@ -268,9 +266,7 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	if err != nil {
 		return 0, err
 	}
-	defer func() {
-		session.Close()
-	}()
+	defer session.Close()
 
 	connURL := mongoImport.ToolOptions.Host
 	if connURL == "" {

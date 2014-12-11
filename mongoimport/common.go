@@ -14,14 +14,16 @@ import (
 	"strings"
 )
 
-// ConvertibleDoc is an interface implemented by special types which wrap data
-// gotten for various input readers - i.e. CSV, JSON, TSV. It exposes one
-// function - Convert() - which converts the special type to a bson.D document
+// ConvertibleDoc is an interface that adds the basic Convert method.
+//
+// Convert returns a valid BSON document that has been converted by the
+// underlying implementation. If conversion fails, err will be set.
 type ConvertibleDoc interface {
 	Convert() (bson.D, error)
 }
 
-// ImportWorker is used to process documents concurrently
+// An ImportWorker reads ConvertibleDoc from the unprocessedDataChan channel and
+// sends processed BSON documents on the processedDocumentChan channel
 type ImportWorker struct {
 	// unprocessedDataChan is used to stream the input data for a worker to process
 	unprocessedDataChan chan ConvertibleDoc
@@ -52,7 +54,7 @@ func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 // doSequentialStreaming takes a slice of workers, a readDocChan (input) channel and
 // an outputChan (output) channel. It sequentially writes unprocessed data read from
 // the input channel to each worker and then sequentially reads the processed data
-//  from each worker before passing it on to the output channel
+// from each worker before passing it on to the output channel
 func doSequentialStreaming(workers []*ImportWorker, readDocChan chan ConvertibleDoc, outputChan chan bson.D) {
 	numWorkers := len(workers)
 
