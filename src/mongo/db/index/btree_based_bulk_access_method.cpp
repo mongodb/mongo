@@ -151,16 +151,19 @@ namespace mongo {
             Status status = builder->addKey(d.first, d.second);
 
             if (!status.isOK()) {
-                if (ErrorCodes::DuplicateKey != status.code()) {
-                    return status;
+                // Overlong key that's OK to skip?
+                if (status.code() == ErrorCodes::KeyTooLong && _real->ignoreKeyTooLong(_txn)) {
+                    continue;
                 }
 
-                invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
+                // Check if this is a duplicate that's OK to skip
+                if (status.code() == ErrorCodes::DuplicateKey) {
+                    invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
 
-                // If we're here it's a duplicate key.
-                if (dupsToDrop) {
-                    dupsToDrop->insert(d.second);
-                    continue;
+                    if (dupsToDrop) {
+                        dupsToDrop->insert(d.second);
+                        continue;
+                    }
                 }
 
                 return status;

@@ -64,6 +64,11 @@ namespace mongo {
         verify(0 == _descriptor->version() || 1 == _descriptor->version());
     }
 
+    bool BtreeBasedAccessMethod::ignoreKeyTooLong(OperationContext *txn) {
+        // Ignore this error if we're on a secondary or if the user requested it
+        return !txn->isPrimaryFor(_btreeState->ns()) || !failIndexKeyTooLong;
+    }
+
     // Find the keys for obj, put them in the tree pointing to loc
     Status BtreeBasedAccessMethod::insert(OperationContext* txn,
                                           const BSONObj& obj,
@@ -88,19 +93,11 @@ namespace mongo {
 
             // Error cases.
 
-            if (ErrorCodes::KeyTooLong == status.code()) {
-                // Ignore this error if we're on a secondary.
-                if (!txn->isPrimaryFor(_btreeState->ns())) {
-                    continue;
-                }
-
-                // The user set a parameter to ignore key too long errors.
-                if (!failIndexKeyTooLong) {
-                    continue;
-                }
+            if (status.code() == ErrorCodes::KeyTooLong && ignoreKeyTooLong(txn)) {
+                continue;
             }
 
-            if (ErrorCodes::DuplicateKeyValue == status.code()) {
+            if (status.code() == ErrorCodes::DuplicateKeyValue) {
                 // A document might be indexed multiple times during a background index build
                 // if it moves ahead of the collection scan cursor (e.g. via an update).
                 if (!_btreeState->isReady(txn)) {
