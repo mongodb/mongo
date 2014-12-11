@@ -1098,16 +1098,16 @@ err:	WT_TRET(__clsm_leave(clsm));
 static int
 __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 {
-	WT_CURSOR *c, *larger, *smaller;
+	WT_CURSOR *c, *closest;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
-	WT_ITEM v;
 	WT_SESSION_IMPL *session;
 	u_int i;
-	int cmp, deleted;
+	int cmp, deleted, exact;
 
-	larger = smaller = NULL;
+	closest = NULL;
 	clsm = (WT_CURSOR_LSM *)cursor;
+	deleted = exact = 0;
 
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
@@ -1122,26 +1122,22 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	 * As we search down the chunks, we stop as soon as we find an exact
 	 * match.  Otherwise, we maintain the smallest cursor larger than the
 	 * search key and the largest cursor smaller than the search key.  At
-	 * the bottom, we prefer the larger cursor, but if no record is larger,
-	 * use the smaller cursor, or if no record at all was found,
-	 * WT_NOTFOUND.
+	 * the end, we prefer the larger cursor, but if no record is larger,
+	 * position on the last record in the tree.
 	 */
 	WT_FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
-			F_CLR(c, WT_CURSTD_KEY_SET);
 			ret = 0;
 			continue;
 		} else if (ret != 0)
 			goto err;
 
-		WT_ERR(c->get_value(c, &v));
-		deleted = __clsm_deleted(clsm, &v);
-
-		if (cmp == 0 && !deleted) {
-			clsm->current = c;
-			*exactp = 0;
-			goto done;
+		/* Do we have an exact match? */
+		if (cmp == 0) {
+			closest = c;
+			exact = 1;
+			break;
 		}
 
 		/*
@@ -1151,93 +1147,65 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		 * "closest" result.
 		 */
 		if (cmp < 0) {
-			if ((ret = c->next(c)) == 0)
-				cmp = 1;
-			else if (ret == WT_NOTFOUND)
-				ret = c->prev(c);
-			if (ret != 0)
+			if ((ret = c->next(c)) == WT_NOTFOUND) {
+				ret = 0;
+				continue;
+			} else if (ret != 0)
 				goto err;
 		}
 
 		/*
-		 * If we land on a deleted item, try going forwards or
-		 * backwards to find one that isn't deleted.
-		 */
-		while (deleted && (ret = c->next(c)) == 0) {
-			cmp = 1;
-			WT_ERR(c->get_value(c, &v));
-			deleted = __clsm_deleted(clsm, &v);
-		}
-		WT_ERR_NOTFOUND_OK(ret);
-		while (deleted && (ret = c->prev(c)) == 0) {
-			cmp = -1;
-			WT_ERR(c->get_value(c, &v));
-			deleted = __clsm_deleted(clsm, &v);
-		}
-		WT_ERR_NOTFOUND_OK(ret);
-		if (deleted)
-			continue;
-
-		/*
 		 * We are trying to find the smallest cursor greater than the
-		 * search key, or, if there is no larger key, the largest
-		 * cursor smaller than the search key.
-		 *
-		 * It could happen that one cursor contains both of the closest
-		 * records.  In that case, we will track it in "larger", and it
-		 * will be the one we finally choose.
+		 * search key.
 		 */
-		if (cmp > 0) {
-			if (larger == NULL)
-				larger = c;
-			else {
-				WT_ERR(WT_LSM_CURCMP(session,
-				    clsm->lsm_tree, c, larger, cmp));
-				if (cmp < 0) {
-					WT_ERR(larger->reset(larger));
-					larger = c;
-				}
-			}
-		} else {
-			if (smaller == NULL)
-				smaller = c;
-			else {
-				WT_ERR(WT_LSM_CURCMP(session,
-				    clsm->lsm_tree, c, smaller, cmp));
-				if (cmp > 0) {
-					WT_ERR(smaller->reset(smaller));
-					smaller = c;
-				}
-			}
+		if (closest == NULL)
+			closest = c;
+		else {
+			WT_ERR(WT_LSM_CURCMP(session,
+			    clsm->lsm_tree, c, closest, cmp));
+			if (cmp < 0)
+				closest = c;
 		}
-
-		if (c != smaller && c != larger)
-			WT_ERR(c->reset(c));
 	}
 
-	if (larger != NULL) {
-		clsm->current = larger;
-		larger = NULL;
-		*exactp = 1;
-	} else if (smaller != NULL) {
-		clsm->current = smaller;
-		smaller = NULL;
-		*exactp = -1;
-	} else
-		ret = WT_NOTFOUND;
+	/*
+	 * At this point, we either have an exact match, or closest is the
+	 * smallest cursor larger than the search key, or it is NULL if the
+	 * search key is larger than any record in the tree.
+	 */
+	if (!exact)
+		cmp = 1;
 
-done:
+	/*
+	 * If we land on a deleted item, try going forwards or backwards to
+	 * find one that isn't deleted.  If the whole tree is empty, we'll
+	 * end up with WT_NOTFOUND, as expected.
+	 */
+	if (closest == NULL)
+		deleted = 1;
+	else {
+		WT_ERR(closest->get_key(closest, &cursor->key));
+		WT_ERR(closest->get_value(closest, &cursor->value));
+		clsm->current = closest;
+		closest = NULL;
+		deleted = __clsm_deleted(clsm, &cursor->value);
+		if (deleted && (ret = cursor->next(cursor)) == 0) {
+			cmp = 1;
+			deleted = 0;
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+	}
+	if (deleted) {
+		clsm->current = NULL;
+		if ((ret = cursor->prev(cursor)) == 0)
+			cmp = -1;
+	}
+	*exactp = cmp;
+
 err:	WT_TRET(__clsm_leave(clsm));
 	API_END(session, ret);
-	if (ret == 0) {
-		c = clsm->current;
-		WT_TRET(c->get_key(c, &cursor->key));
-		WT_TRET(c->get_value(c, &cursor->value));
-	}
-	if (smaller != NULL)
-		WT_TRET(smaller->reset(smaller));
-	if (larger != NULL)
-		WT_TRET(larger->reset(larger));
+	if (closest != NULL)
+		WT_TRET(closest->reset(closest));
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if (ret == 0) {
