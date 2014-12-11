@@ -73,6 +73,17 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 
+	// fail fast if connecting to a mongos
+	isMongos, err := sessionProvider.IsMongos()
+	if err != nil {
+		log.Logf(log.Always, "error determining if connected to mongos: %v", err)
+		os.Exit(util.ExitError)
+	}
+	if isMongos {
+		log.Logf(log.Always, "cannot run mongotop against a mongos")
+		os.Exit(util.ExitError)
+	}
+
 	// instantiate a mongotop instance
 	top := &mongotop.MongoTop{
 		Options:         opts,
