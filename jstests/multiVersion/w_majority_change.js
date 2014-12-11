@@ -49,6 +49,7 @@ load("jstests/replsets/rslib.js");
     replTest.stop(1);
     assert.writeOK(primary.getDB(name).foo.insert({x: 3}, writeConcern));
     replTest.restart(1);
+    replTest.waitForState(nodes[1], replTest.SECONDARY);
 
     // reconfig such that a 2.6 node (node 2) will be primary
     config.version++;
@@ -141,6 +142,7 @@ load("jstests/replsets/rslib.js");
     assert.writeOK(primary.getDB(name).foo.insert({x: 12}, writeConcern));
     // take down one voting node. fails because there are insufficient nodes
     replTest.stop(3);
+    replTest.waitForState(nodes[3], replTest.DOWN);
     assert.writeError(primary.getDB(name).foo.insert({x: 13}, writeConcern));
     // bring up both non-voting nodes and take down a voting one
     // passes because only number of nodes matters in 2.6, not voting like in 2.8
