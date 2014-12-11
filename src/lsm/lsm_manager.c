@@ -101,9 +101,9 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 	 * and reconfigure.
 	 */
 	if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
-		FLD_SET(worker_args->type, WT_LSM_WORK_FLUSH);
+		FLD_SET(manager->lsm_worker_cookies[1].type, WT_LSM_WORK_FLUSH);
 	else
-		FLD_CLR(worker_args->type, WT_LSM_WORK_FLUSH);
+		FLD_CLR(manager->lsm_worker_cookies[1].type, WT_LSM_WORK_FLUSH);
 
 	return (0);
 }
@@ -150,7 +150,7 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 	 * is being reduced the field can't already be set.
 	 */
 	if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
-		FLD_SET(worker_args->type, WT_LSM_WORK_FLUSH);
+		FLD_SET(manager->lsm_worker_cookies[1].type, WT_LSM_WORK_FLUSH);
 
 	return (0);
 }
