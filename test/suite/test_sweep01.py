@@ -112,7 +112,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep=0
-        while sleep < 60:
+        while sleep < 90:
             k = k+1
             c.set_key(k)
             c.set_value(1)
