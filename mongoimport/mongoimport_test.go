@@ -157,6 +157,13 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
+		Convey("an error should be thrown if --ignoreBlanks is used with JSON input", func() {
+			mongoImport, err := NewMongoImport()
+			So(err, ShouldBeNil)
+			mongoImport.IngestOptions.IgnoreBlanks = true
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+		})
+
 		Convey("no error should be thrown if --headerline is not supplied "+
 			"but --fieldFile is supplied", func() {
 			mongoImport, err := NewMongoImport()

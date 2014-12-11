@@ -141,6 +141,9 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		if mongoImport.InputOptions.FieldFile != nil {
 			return fmt.Errorf("can not use --fieldFile when input type is JSON")
 		}
+		if mongoImport.IngestOptions.IgnoreBlanks {
+			return fmt.Errorf("can not use --ignoreBlanks when input type is JSON")
+		}
 	}
 
 	if mongoImport.IngestOptions.UpsertFields != "" {
