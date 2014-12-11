@@ -55,7 +55,7 @@ listCollOut.collections.forEach(function(coll) {
     }
 });
 assert.neq(null, fooColl, "foo collection doesn't exist");
-assert.eq(0, fooColl.options.flags, "find namespaces 1");
+assert(!fooColl.options.flags, "find namespaces 1");
 
 t.runTool("dump" , "--out" , t.ext, "--username", "backup", "--password", "password");
 
@@ -81,7 +81,7 @@ listCollOut.collections.forEach(function(coll) {
     }
 });
 assert.neq(null, fooColl, "foo collection doesn't exist");
-assert.eq(0, fooColl.options.flags, "find namespaces 2");
+assert(!fooColl.options.flags, "find namespaces 2");
 
 assert.eq(sysUsers, adminDB.system.users.count());
 
@@ -113,7 +113,7 @@ listCollOut.collections.forEach(function(coll) {
     }
 });
 assert.neq(null, fooColl, "foo collection doesn't exist");
-assert.eq(0, fooColl.options.flags, "find namespaces 3");
+assert(!fooColl.options.flags, "find namespaces 3");
 
 assert.eq(sysUsers, adminDB.system.users.count());
 
