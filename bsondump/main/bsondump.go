@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/bsondump"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
@@ -60,13 +59,22 @@ func main() {
 
 	log.Logf(log.DebugLow, "running bsondump with objcheck: %v", bsonDumpOpts.ObjCheck)
 
+	if len(bsonDumpOpts.Type) != 0 && bsonDumpOpts.Type != "debug" && bsonDumpOpts.Type != "json" {
+		log.Logf(log.Always, "Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
+		os.Exit(util.ExitBadOptions)
+	}
+
+	err = dumper.Open()
+	if err != nil {
+		log.Logf(log.Always, "Failed: %v", err)
+		os.Exit(util.ExitError)
+	}
+
 	var numFound int
 	if bsonDumpOpts.Type == "debug" {
 		numFound, err = dumper.Debug()
-	} else if bsonDumpOpts.Type == "json" || bsonDumpOpts.Type == "" {
-		numFound, err = dumper.Dump()
 	} else {
-		err = fmt.Errorf("Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
+		numFound, err = dumper.Dump()
 	}
 
 	log.Logf(log.Always, "%v objects found", numFound)

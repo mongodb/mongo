@@ -18,14 +18,16 @@ type BSONDump struct {
 	BSONDumpOptions *BSONDumpOptions
 	FileName        string
 	Out             io.Writer
+	bsonSource      *db.BSONSource
 }
 
-func (bd *BSONDump) init() (*db.BSONSource, error) {
+func (bd *BSONDump) Open() error {
 	file, err := os.Open(bd.FileName)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't open BSON file: %v", err)
+		return fmt.Errorf("Couldn't open BSON file: %v", err)
 	}
-	return db.NewBSONSource(file), nil
+	bd.bsonSource = db.NewBSONSource(file)
+	return nil
 }
 
 func dumpDoc(doc *bson.Raw, out io.Writer) error {
@@ -54,12 +56,11 @@ func dumpDoc(doc *bson.Raw, out io.Writer) error {
 func (bd *BSONDump) Dump() (int, error) {
 	numFound := 0
 
-	stream, err := bd.init()
-	if err != nil {
-		return numFound, err
+	if bd.bsonSource == nil {
+		panic("Tried to call Debug() before opening file")
 	}
 
-	decodedStream := db.NewDecodedBSONSource(stream)
+	decodedStream := db.NewDecodedBSONSource(bd.bsonSource)
 	defer decodedStream.Close()
 
 	var result bson.Raw
@@ -93,17 +94,16 @@ func (bd *BSONDump) Dump() (int, error) {
 func (bd *BSONDump) Debug() (int, error) {
 	numFound := 0
 
-	stream, err := bd.init()
-	if err != nil {
-		return numFound, err
+	if bd.bsonSource == nil {
+		panic("Tried to call Debug() before opening file")
 	}
 
-	defer stream.Close()
+	defer bd.bsonSource.Close()
 
 	reusableBuf := make([]byte, db.MaxBSONSize)
 	var result bson.Raw
 	for {
-		hasDoc, docSize := stream.LoadNextInto(reusableBuf)
+		hasDoc, docSize := bd.bsonSource.LoadNextInto(reusableBuf)
 		if !hasDoc {
 			break
 		}
@@ -117,14 +117,14 @@ func (bd *BSONDump) Debug() (int, error) {
 				return numFound, fmt.Errorf("Failed to validate bson during objcheck: %v", err)
 			}
 		}
-		err = debugBSON(result, 0, bd.Out)
+		err := debugBSON(result, 0, bd.Out)
 		if err != nil {
 			log.Logf(log.Always, "Encountered error debugging BSON data: %v", err)
 		}
 		numFound++
 	}
 
-	if err := stream.Err(); err != nil {
+	if err := bd.bsonSource.Err(); err != nil {
 		// This error indicates the BSON document header is corrupted;
 		// either the 4-byte header couldn't be read in full, or
 		// the size in the header would require reading more bytes
