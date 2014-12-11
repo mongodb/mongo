@@ -10,9 +10,9 @@ m = startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName +
 
 pid = startMongoProgramNoConnect("mongostat", "--port", port[0]);
 
-sleep(100);
+sleep(1000);
 
-assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit 2");
+assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit with a 'stopped' code");
 
 pid = startMongoProgramNoConnect("mongostat", "--port", port[0], "--rowcount", 1);
 
@@ -28,17 +28,17 @@ pid = startMongoProgramNoConnect("mongostat", "--rowcount", "-1")
 
 sleep(100);
 
-assert.eq(exitCodeErr, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: negative value")
+assert.eq(exitCodeBadOptions, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: negative value")
 
 pid = startMongoProgramNoConnect("mongostat", "--rowcount", "foobar");
 
 sleep(100);
 
-assert.eq(exitCodeErr, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: non-numeric value");
+assert.eq(exitCodeBadOptions, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: non-numeric value");
 
-pid = startMongoProgramNoConnect("mongostat", "--host", "foobar/127.0.0.1:" + port[0]);
+pid = startMongoProgramNoConnect("mongostat", "--host", "badreplset/127.0.0.1:" + port[0], "--rowcount", 1);
 
-sleep(500);
+sleep(5000);
 
 assert.eq(exitCodeErr, stopMongoProgramByPid(pid), "--host used with a replica set string for nodes not in a replica set");
 

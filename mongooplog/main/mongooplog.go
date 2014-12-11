@@ -5,12 +5,14 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongooplog"
 	"os"
 )
 
 func main() {
+	go signals.Handle()
 
 	// initialize command line options
 	opts := options.New("mongooplog", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: false})

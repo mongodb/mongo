@@ -1,8 +1,8 @@
-var exitCodeErr = _isWindows() ? -1 : 255;
-
 var exitCodeSuccess = 0;
-
-var exitCodeStopped = 2;
+var exitCodeErr = 1;
+// Go reserves exit code 2 for its own use.
+var exitCodeBadOptions = 3;
+var exitCodeStopped = 4;
 
 var rowRegex = /^sh\d+\|\s/;
 

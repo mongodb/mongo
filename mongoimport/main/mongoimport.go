@@ -5,12 +5,14 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport"
 	"os"
 )
 
 func main() {
+	go signals.Handle()
 	// initialize command-line opts
 	usageStr := " --host myhost --db my_cms --collection docs < mydocfile." +
 		"json \n\nImport CSV, TSV or JSON data into MongoDB.\n\nWhen importing " +

@@ -4,11 +4,13 @@ import (
 	"github.com/mongodb/mongo-tools/bsondump"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 )
 
 func main() {
+	go signals.Handle()
 	// initialize command-line opts
 	opts := options.New("bsondump", "<file>", options.EnabledOptions{})
 	bsonDumpOpts := &bsondump.BSONDumpOptions{}
