@@ -36,16 +36,11 @@ type IngestOptions struct {
 	IgnoreBlanks bool `long:"ignoreBlanks" description:"if given, empty fields in CSV and TSV will be ignored"`
 
 	// Modifies the import process to update existing objects in the database if
-	// they match an imported object, while inserting all other objects.
-	// If you do not specify a field or fields using the --upsertFields
-	// mongoimport will upsert on the basis of the _id field.
-	Upsert bool `long:"upsert" description:"insert or update objects that already exist"`
-
-	// Specifies a list of fields for the query portion of the upsert.
+	// they match the list of fields specified, while inserting all other objects.
 	// Use this option if the _id fields in the existing documents don’t match
 	// the field in the document, but another field or field combination can
 	// uniquely identify documents as a basis for performing upsert operations.
-	UpsertFields string `long:"upsertFields" description:"comma-separated fields for the query part of the upsert. You should make sure this is indexed"`
+	UpsertFields string `long:"upsertFields" description:"comma-separated fields for query in upsert operations"`
 
 	// Forces mongoimport to halt the import operation at the first error
 	// rather than continuing the operation despite errors.

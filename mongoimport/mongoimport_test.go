@@ -431,14 +431,14 @@ func TestImportDocuments(t *testing.T) {
 			}
 			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
-		Convey("no error should be thrown for CSV import on test data with --upsert", func() {
+		Convey("no error should be thrown for CSV import on test data with --upsertFields", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			fields := "_id,b,c"
 			mongoImport.InputOptions.Fields = &fields
-			mongoImport.IngestOptions.Upsert = true
+			mongoImport.IngestOptions.UpsertFields = "b,c"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
@@ -549,7 +549,6 @@ func TestImportDocuments(t *testing.T) {
 			mongoImport.InputOptions.File = "testdata/test.csv"
 			fields := "_id,c,b"
 			mongoImport.InputOptions.Fields = &fields
-			mongoImport.IngestOptions.Upsert = true
 			mongoImport.IngestOptions.UpsertFields = "_id"
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			numImported, err := mongoImport.ImportDocuments()
@@ -570,7 +569,6 @@ func TestImportDocuments(t *testing.T) {
 			mongoImport.InputOptions.File = "testdata/test_duplicate.csv"
 			fields := "_id,b,c"
 			mongoImport.InputOptions.Fields = &fields
-			mongoImport.IngestOptions.Upsert = true
 			mongoImport.upsertFields = []string{"_id"}
 			numImported, err := mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)

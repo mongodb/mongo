@@ -147,6 +147,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		if err := validateFields(mongoImport.upsertFields); err != nil {
 			return fmt.Errorf("invalid --upsertFields argument: %v", err)
 		}
+		log.Logf(log.Info, "using upsert fields: %v", mongoImport.upsertFields)
 	}
 
 	// set the number of decoding workers to use for imports
@@ -480,7 +481,7 @@ func (mongoImport *MongoImport) ingester(documents []bson.Raw, collection *mgo.C
 		mongoImport.insertionLock.Unlock()
 	}()
 
-	if mongoImport.IngestOptions.Upsert {
+	if len(mongoImport.upsertFields) != 0 {
 		numInserted, err = mongoImport.handleUpsert(documents, collection)
 		return err
 	} else {
