@@ -39,10 +39,12 @@ listCollOut.collections.forEach(function(coll) {
 assert.neq(null, barColl, "bar collection doesn't exist");
 
 //make sure it has no index except _id
-assert.eq(foo.bar.getIndexes().length, 2);
+assert.eq(foo.bar.getIndexes().length, 1);
+assert.eq(foo.baz.getIndexes().length, 1);
 
 foo.bar.createIndex({x:1});
-assert.eq(foo.bar.getIndexes().length, 3);
+assert.eq(foo.bar.getIndexes().length, 2);
+assert.eq(foo.baz.getIndexes().length, 1);
 
 // get data dump
 var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
