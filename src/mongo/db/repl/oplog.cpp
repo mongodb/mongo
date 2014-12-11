@@ -579,8 +579,15 @@ namespace repl {
 
         bool valueB = fieldB.booleanSafe();
 
-        txn->lockState()->assertWriteLocked(ns);
-
+        if (supportsDocLocking()) {
+            // WiredTiger, and others requires MODE_IX since the applier threads driving this allow
+            // writes to the same collection on any thread.
+            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_IX));
+        } else {
+            // mmapV1 ensures that all operations to the same collection are executed from
+            // the same worker thread, so it takes an exclusive lock (MODE_X)
+            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        }
         Collection* collection = db->getCollection( txn, ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
