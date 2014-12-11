@@ -215,14 +215,6 @@ namespace {
         }
 
         StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
-        OpTime lastOpTime(0, 0);
-        if (!lastOpTimeStatus.isOK()) {
-            warning() << "Failed to load timestamp of most recently applied operation; " <<
-                lastOpTimeStatus.getStatus();
-        }
-        else {
-            lastOpTime = lastOpTimeStatus.getValue();
-        }
 
         // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
         // that the server's networking layer be up and running and accepting connections, which
@@ -232,14 +224,14 @@ namespace {
                            this,
                            stdx::placeholders::_1,
                            localConfig,
-                           lastOpTime));
+                           lastOpTimeStatus));
         return false;
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& localConfig,
-            OpTime lastOpTime) {
+            const StatusWith<OpTime>& lastOpTimeStatus) {
         if (!cbData.status.isOK()) {
             LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
             return;
@@ -270,6 +262,20 @@ namespace {
                 localConfig.getReplSetName() << ", but command line reports " <<
                 _settings.ourSetName() << "; waitng for reconfig or remote heartbeat";
             myIndex = StatusWith<int>(-1);
+        }
+
+        // Do not check optime, if this node is an arbiter.
+        bool isArbiter = myIndex.getValue() != -1 &&
+            localConfig.getMemberAt(myIndex.getValue()).isArbiter();
+        OpTime lastOpTime(0, 0);
+        if (!isArbiter) {
+            if (!lastOpTimeStatus.isOK()) {
+                warning() << "Failed to load timestamp of most recently applied operation; " <<
+                    lastOpTimeStatus.getStatus();
+            }
+            else {
+                lastOpTime = lastOpTimeStatus.getValue();
+            }
         }
 
         boost::unique_lock<boost::mutex> lk(_mutex);

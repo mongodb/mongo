@@ -574,7 +574,7 @@ namespace repl {
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
                                     const ReplicaSetConfig& localConfig,
-                                    OpTime lastOpTime);
+                                    const StatusWith<OpTime>& lastOpTimeStatus);
 
         /**
          * Callback that finishes the work of processReplSetInitiate() inside the replication
