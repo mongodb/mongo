@@ -32,7 +32,7 @@
 import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
 class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
@@ -81,8 +81,22 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     txn3s = [('t3c', dict(txn3='commit')), ('t3r', dict(txn3='rollback'))]
     txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types,
-            op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s))
+    all_scenarios = multiply_scenarios('.', types,
+        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)
+
+    # This test generates thousands of potential scenarios.
+    # For long runs (when --long is set) we'll use all of them, up to
+    # a large limit, and a small number for default runs.
+    max_scen = 5000 if wttest.islongtest() else 20
+
+    # Each check_log() call takes a second, so we don't call it for
+    # every scenario, we'll limit it to the value of checklog_calls.
+    checklog_calls = 100 if wttest.islongtest() else 2
+
+    # Make the list of scenarios that will actually be used
+    scenarios = number_scenarios(prune_scenarios(all_scenarios, max_scen))
+    checklog_mod = (len(scenarios) / checklog_calls + 1)
+
     # scenarios = number_scenarios(multiply_scenarios('.', types,
     # op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)) [:3]
     # Overrides WiredTigerTestCase
@@ -253,10 +267,8 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
 
-        # Check the log state after the entire op completes and run recovery.
-        # check_log() takes over a second to run, so we don't want to run it
-        # for all scenarios, rather, we run it about 100 times overall.
-        if self.scenario_number % (len(test_txn02.scenarios) / 100 + 1) == 0:
+        # check_log() is slow, we don't run it on every scenario.
+        if self.scenario_number % test_txn02.checklog_mod == 0:
             self.check_log(committed)
 
 if __name__ == '__main__':

@@ -141,7 +141,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
-                    gdbSub = False, verbose = 1, dirarg = None):
+                    gdbSub = False, verbose = 1, dirarg = None,
+                    longtest = False):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -152,6 +153,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._origcwd = os.getcwd()
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
+        WiredTigerTestCase._longtest = longtest
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
         WiredTigerTestCase._stdout = sys.stdout
@@ -430,6 +432,23 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def className(self):
         return self.__class__.__name__
+
+
+def longtest(description):
+    """
+    Used as a function decorator, for example, @wttest.longtest("description").
+    The decorator indicates that this test function should only be included
+    when running the test suite with the --long option.
+    """
+    def runit_decorator(func):
+        return func
+    if not WiredTigerTestCase._longtest:
+        return unittest.skip(description + ' (enable with --long)')
+    else:
+        return runit_decorator
+
+def islongtest():
+    return WiredTigerTestCase._longtest
 
 def runsuite(suite, parallel):
     suite_to_run = suite

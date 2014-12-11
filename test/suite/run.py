@@ -82,6 +82,7 @@ Options:\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
+  -l      | --long               run the entire test suite\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
@@ -219,7 +220,7 @@ if __name__ == '__main__':
     tests = unittest.TestSuite()
 
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = gdbSub = False
+    preserve = timestamp = debug = gdbSub = longtest = False
     parallel = 0
     configfile = None
     configwrite = False
@@ -243,6 +244,15 @@ if __name__ == '__main__':
             if option == '-debug' or option == 'd':
                 debug = True
                 continue
+            if option == '-gdb' or option == 'g':
+                gdbSub = True
+                continue
+            if option == '-help' or option == 'h':
+                usage()
+                sys.exit(True)
+            if option == '-long' or option == 'l':
+                longtest = True
+                continue
             if option == '-parallel' or option == 'j':
                 if parallel != 0 or len(args) == 0:
                     usage()
@@ -255,12 +265,6 @@ if __name__ == '__main__':
             if option == '-timestamp' or option == 't':
                 timestamp = True
                 continue
-            if option == '-gdb' or option == 'g':
-                gdbSub = True
-                continue
-            if option == '-help' or option == 'h':
-                usage()
-                sys.exit(True)
             if option == '-verbose' or option == 'v':
                 if len(args) == 0:
                     usage()
@@ -292,7 +296,7 @@ if __name__ == '__main__':
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub,
-                                          verbose, dirarg)
+                                          verbose, dirarg, longtest)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
