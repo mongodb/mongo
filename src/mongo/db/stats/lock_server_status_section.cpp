@@ -68,24 +68,18 @@ namespace mongo {
                     const OperationContext* opCtx = client->getOperationContext();
                     if (opCtx == NULL) continue;
 
-                    if (opCtx->lockState()->getWaitingResource().isValid()) {
-                        // Count client as blocked
-                        if (opCtx->lockState()->isWriteLocked()) {
+                    if (opCtx->lockState()->isWriteLocked()) {
+                        numWriteLocked++;
+
+                        if (opCtx->lockState()->getWaitingResource().isValid()) {
                             numWaitingWrite++;
-                            numWriteLocked++;
-                        }
-                        else {
-                            numWaitingRead++;
-                            numReadLocked++;
                         }
                     }
-                    else {
-                        // Count client as not blocked
-                        if (opCtx->lockState()->isWriteLocked()) {
-                            numWriteLocked++;
-                        }
-                        else {
-                            numReadLocked++;
+                    else if (opCtx->lockState()->isReadLocked()) {
+                        numReadLocked++;
+
+                        if (opCtx->lockState()->getWaitingResource().isValid()) {
+                            numWaitingRead++;
                         }
                     }
                 }
