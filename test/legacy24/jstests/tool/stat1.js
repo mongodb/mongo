@@ -16,8 +16,8 @@ db.addUser( "eliot" , "eliot" );
 
 assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
 
-x = runMongoProgram( "mongostat", "--host", "127.0.0.1:"+port, "--username", "eliot", "--password", "eliot", "--rowcount", "1" );
+x = runMongoProgram( "mongostat", "--host", "127.0.0.1:"+port, "--username", "eliot", "--password", "eliot", "--rowcount", "1", "--authenticationDatabase", "admin");
 assert.eq(x, 0, "mongostat should exit successfully with eliot:eliot");
 
-x = runMongoProgram( "mongostat", "--host", "127.0.0.1:"+port, "--username", "eliot", "--password", "wrong", "--rowcount", "1" );
+x = runMongoProgram( "mongostat", "--host", "127.0.0.1:"+port, "--username", "eliot", "--password", "wrong", "--rowcount", "1", "--authenticationDatabase", "admin");
 assert.eq(x, _isWindows() ? -1 : 255, "mongostat should exit with -1 with eliot:wrong");
