@@ -69,15 +69,8 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 		 */
 		if (manager->lsm_workers == 1)
 
-			/*
-			 * If there are only two threads handling work units
-			 * let them both do flushes otherwise a single merge
-			 * can lead to switched chunks filling up the cache.
-			 */
 			worker_args->type =
 			    WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
-			if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
-				worker_args->type |= WT_LSM_WORK_FLUSH;
 		else {
 			worker_args->type =
 			    WT_LSM_WORK_BLOOM |
@@ -99,6 +92,18 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 		F_SET(worker_args, WT_LSM_WORKER_RUN);
 		WT_RET(__wt_lsm_worker_start(session, worker_args));
 	}
+
+	/*
+	 * Setup the first worker properly - if there are only a minimal
+	 * number of workers allow the first worker to flush. Otherwise a
+	 * single merge can lead to switched chunks filling up the cache.
+	 * This is separate to the main loop so that it is applied on startup
+	 * and reconfigure.
+	 */
+	if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
+		FLD_SET(worker_args->type, WT_LSM_WORK_FLUSH);
+	else
+		FLD_CLR(worker_args->type, WT_LSM_WORK_FLUSH);
 
 	return (0);
 }
@@ -138,6 +143,15 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 		 * statically when the connection was opened.
 		 */
 	}
+
+	/*
+	 * Setup the first worker properly - if there are only a minimal
+	 * number of workers it should flush. Since the number of threads
+	 * is being reduced the field can't already be set.
+	 */
+	if (manager->lsm_workers_max == WT_LSM_MIN_WORKERS)
+		FLD_SET(worker_args->type, WT_LSM_WORK_FLUSH);
+
 	return (0);
 }
 
