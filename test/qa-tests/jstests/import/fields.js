@@ -65,6 +65,17 @@
         )
       assert.eq(c.findOne({a:"bob"}).b, undefined)
       reset(c)
+
+      // when --fieldFile, --fields, and --headerline are all omitted,
+      // import should fail
+      var ret = toolTest.runTool("import", "--file",
+        "jstests/import/testdata/" + format + "_noheader." + format,
+        "--type=" + format,
+        "--db", format + "testdb",
+        "--collection", format + "testcoll")
+      assert.neq(ret, 0)
+      reset(c)
+
     }
 
 

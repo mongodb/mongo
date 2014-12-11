@@ -1,0 +1,5 @@
+{_id:"one", a:1234,b:4567}
+{_id:"two", a:"xxx",b:"yyy"}
+{_id:"one", a:"foo",b:"blah"}
+{_id:"one", a:"test",b:"test"}
+{_id:"one", a:"unicorns",b:"zebras"}
