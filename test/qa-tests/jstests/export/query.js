@@ -98,7 +98,7 @@
 
     // make sure the query was applied correctly
     assert.eq(1, destColl.count());
-    assert.eq(1, destColl.count({ a: 2, x: { b: '1', c: '2' } }));
+    assert.eq(1, destColl.count({ a: 2, 'x.b': '1', 'x.c': '2' }));
 
     // remove the export, clear the destination collection
     removeFile(exportTarget);
