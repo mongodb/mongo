@@ -37,11 +37,13 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/operation_context.h"
@@ -106,7 +108,10 @@ namespace mongo {
           _path(path.toString()),
           _directoryPerDB(directoryPerDB),
           _rid(RESOURCE_METADATA, dbname) {
-
+        StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
+        invariant(engine->isMmapV1());
+        MMAPV1Engine* mmapEngine = static_cast<MMAPV1Engine*>(engine);
+        _recordAccessTracker = &mmapEngine->getRecordAccessTracker();
     }
 
     boost::filesystem::path MmapV1ExtentManager::fileName( int n ) const {
@@ -261,7 +266,7 @@ namespace mongo {
 
     Record* MmapV1ExtentManager::recordForV1( const DiskLoc& loc ) const {
         Record* record = _recordForV1( loc );
-        _recordAccessTracker.markAccessed( record );
+        _recordAccessTracker->markAccessed( record );
         return record;
     }
 
@@ -277,7 +282,7 @@ namespace mongo {
             }
         }
 
-        if ( !_recordAccessTracker.checkAccessedAndMark( record ) ) {
+        if ( !_recordAccessTracker->checkAccessedAndMark( record ) ) {
             return new MmapV1RecordFetcher( record );
         }
 
@@ -300,7 +305,7 @@ namespace mongo {
         if ( doSanityCheck )
             e->assertOk();
 
-        _recordAccessTracker.markAccessed( e );
+        _recordAccessTracker->markAccessed( e );
 
         return e;
     }

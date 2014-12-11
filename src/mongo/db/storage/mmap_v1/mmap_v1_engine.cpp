@@ -403,6 +403,10 @@ namespace {
         return getDur().isDurable();
     }
 
+    RecordAccessTracker& MMAPV1Engine::getRecordAccessTracker() {
+        return _recordAccessTracker;
+    }
+
     void MMAPV1Engine::cleanShutdown() {
         // wait until file preallocation finishes
         // we would only hang here if the file_allocator code generates a

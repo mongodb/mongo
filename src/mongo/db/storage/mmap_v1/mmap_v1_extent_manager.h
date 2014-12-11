@@ -196,7 +196,10 @@ namespace mongo {
         const std::string _path; // i.e. "/data/db"
         const bool _directoryPerDB;
         const ResourceId _rid;
-        mutable RecordAccessTracker _recordAccessTracker;
+
+        // This reference points into the MMAPv1 engine and is only valid as long as the
+        // engine is valid. Not owned here.
+        RecordAccessTracker* _recordAccessTracker;
 
         /**
          * Simple wrapper around an array object to allow append-only modification of the array,
