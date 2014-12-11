@@ -188,6 +188,8 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
+	WT_STATS dh_conn_handles;
+	WT_STATS dh_conn_sweeps;
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
 	WT_STATS file_open;

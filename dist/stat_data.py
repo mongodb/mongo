@@ -185,6 +185,8 @@ connection_stats = [
     ##########################################
     # Dhandle statistics
     ##########################################
+    DhandleStat('dh_conn_handles', 'connection dhandles swept'),
+    DhandleStat('dh_conn_sweeps', 'connection sweeps'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
 

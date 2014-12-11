@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+#
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+# test_sweep01.py
+# Test lots of tables, number of open files and sweeping.  Run both
+# with and without checkpoints.
+#
+
+import fnmatch, os, shutil, run, time
+from suite_subprocess import suite_subprocess
+from wiredtiger import wiredtiger_open, stat
+from wtscenario import multiply_scenarios, number_scenarios
+import wttest
+
+class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
+    tablebase = 'test_sweep01'
+    uri = 'table:' + tablebase
+    numfiles = 500
+    numkv = 100
+    ckpt_list = [
+        ('off', dict(ckpt=0)),
+        ('on', dict(ckpt=20)),
+    ]
+
+    types = [
+        ('row', dict(tabletype='row',
+                    create_params = 'key_format=i,value_format=i')),
+        ('var', dict(tabletype='var',
+                    create_params = 'key_format=r,value_format=i')),
+        ('fix', dict(tabletype='fix',
+                    create_params = 'key_format=r,value_format=8t')),
+    ]
+
+    scenarios = number_scenarios(multiply_scenarios('.', types, ckpt_list))
+
+    # Overrides WiredTigerTestCase
+    def setUpConnectionOpen(self, dir):
+        self.home = dir
+        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
+        conn_params = \
+                ',create,error_prefix="%s: ",' % self.shortid() + \
+                'checkpoint=(wait=%d),' % self.ckpt + \
+                'statistics=(fast),'
+        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
+        try:
+            conn = wiredtiger_open(dir, conn_params)
+        except wiredtiger.WiredTigerError as e:
+            print "Failed conn at '%s' with config '%s'" % (dir, conn_params)
+        self.pr(`conn`)
+        self.session2 = conn.open_session()
+        return conn
+
+    def test_ops(self):
+
+        #
+        # Set up numfiles with numkv entries.  We just want some data in there
+        # we don't care what it is.
+        #
+        for f in range(self.numfiles):
+            uri = '%s.%d' % (self.uri, f)
+            # print "Creating %s with config '%s'" % (uri, self.create_params)
+            self.session.create(uri, self.create_params)
+            c = self.session.open_cursor(uri, None)
+            c.set_value(1)
+            for k in range(self.numkv):
+                c.set_key(k+1)
+                c.insert()
+            c.close()
+            if f % 20 == 0:
+                time.sleep(1)
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        nfile1 = stat_cursor[stat.conn.file_open][2]
+        stat_cursor.close()
+        # Inactive time on a handle must be a minute or more.
+        # At some point the sweep thread will run and set the time of death
+        # to be a minute later.  So sleep 2 minutes to make sure it has run
+        # enough times to timeout the handles.
+        uri = '%s.test' % self.uri
+        self.session.create(uri, self.create_params)
+        #
+        # Keep inserting data to keep at least one handle active and give
+        # checkpoint something to do.  Make sure checkpoint doesn't adjust
+        # the time of death for inactive handles.
+        #
+        c = self.session.open_cursor(uri, None)
+        k = 0
+        sleep=0
+        while sleep < 100:
+            k = k+1
+            c.set_key(k)
+            c.set_value(1)
+            c.insert()
+            sleep += 10
+            time.sleep(10)
+        c.close()
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
+        sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        nfile2 = stat_cursor[stat.conn.file_open][2]
+        stat_cursor.close()
+        # print "checkpoint: " + str(self.ckpt)
+        # print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
+        # print "close1: " + str(close1) + " close2: " + str(close2)
+        # print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+
+        # 
+        # The files are all closed.  Check that sweep did its work even
+        # in the presence of recent checkpoints.
+        #
+        self.assertEqual(close1 < close2, True)
+        self.assertEqual(sweep1 < sweep2, True)
+        self.assertEqual(nfile2 < nfile1, True)
+        # The only files that should be left is the metadata and the active one.
+        self.assertEqual(nfile2 == 2, True)
+
+if __name__ == '__main__':
+    wttest.run()

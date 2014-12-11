@@ -25,6 +25,7 @@ __sweep(WT_SESSION_IMPL *session)
 	/* Don't discard handles that have been open recently. */
 	WT_RET(__wt_seconds(session, &now));
 
+	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	dhandle = SLIST_FIRST(&conn->dhlh);
 	for (; dhandle != NULL; dhandle = dhandle_next) {
 		dhandle_next = SLIST_NEXT(dhandle, l);
@@ -85,6 +86,7 @@ __sweep(WT_SESSION_IMPL *session)
 		 * don't do any special handling of EBUSY returns above.
 		 */
 		if (ret == 0 && dhandle->session_ref == 0) {
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_dhandle_discard_single(session, 0));
 
