@@ -39,8 +39,12 @@
 
 namespace mongo {
 
-    WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn, int epoch )
-        : _epoch( epoch ), _session( NULL ), _cursorsOut( 0 ) {
+    WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, int cachePartition, int epoch)
+        : _cachePartition(cachePartition),
+          _epoch(epoch),
+          _session(NULL),
+          _cursorsOut(0) {
+
         int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
         invariantWTOK(ret);
     }
@@ -49,7 +53,6 @@ namespace mongo {
         if (_session) {
             int ret = _session->close(_session, NULL);
             invariantWTOK(ret);
-            _session = NULL;
         }
     }
 
@@ -103,6 +106,7 @@ namespace mongo {
 
     namespace {
         AtomicUInt64 nextCursorId(1);
+        AtomicUInt64 cachePartitionGen(0);
     }
     // static
     uint64_t WiredTigerSession::genCursorId() {
@@ -113,10 +117,12 @@ namespace mongo {
 
     WiredTigerSessionCache::WiredTigerSessionCache( WiredTigerKVEngine* engine )
         : _engine( engine ), _conn( engine->getConnection() ), _shuttingDown(0) {
+
     }
 
     WiredTigerSessionCache::WiredTigerSessionCache( WT_CONNECTION* conn )
         : _engine( NULL ), _conn( conn ), _shuttingDown(0) {
+
     }
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
@@ -135,22 +141,25 @@ namespace mongo {
         }
 
         closeAll();
-        invariant(_sessionPool.empty());
     }
 
     void WiredTigerSessionCache::closeAll() {
-        SessionPool swapPool;
-        {
-            boost::mutex::scoped_lock lk(_sessionLock);
-            _sessionPool.swap(swapPool);
-        }
+        for (int i = 0; i < NumSessionCachePartitions; i++) {
+            SessionPool swapPool;
 
-        // New sessions will be created if need be outside of the lock
-        for (size_t i = 0; i < swapPool.size(); i++) {
-            delete swapPool[i];
-        }
+            {
+                boost::unique_lock<SpinLock> scopedLock(_cache[i].lock);
+                _cache[i].pool.swap(swapPool);
+                _cache[i].epoch++;
+            }
 
-        swapPool.clear();
+            // New sessions will be created if need be outside of the lock
+            for (size_t i = 0; i < swapPool.size(); i++) {
+                delete swapPool[i];
+            }
+
+            swapPool.clear();
+        }
     }
 
     WiredTigerSession* WiredTigerSessionCache::getSession() {
@@ -160,18 +169,25 @@ namespace mongo {
         // operations should be allowed to start.
         invariant(!_shuttingDown.loadRelaxed());
 
-        {
-            boost::mutex::scoped_lock lk( _sessionLock );
+        // Spread sessions uniformly across the cache partitions
+        const int cachePartition = cachePartitionGen.addAndFetch(1) % NumSessionCachePartitions;
 
-            if (!_sessionPool.empty()) {
-                WiredTigerSession* cachedSession = _sessionPool.back();
-                _sessionPool.pop_back();
+        int epoch;
+
+        {
+            boost::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
+            epoch = _cache[cachePartition].epoch;
+
+            if (!_cache[cachePartition].pool.empty()) {
+                WiredTigerSession* cachedSession = _cache[cachePartition].pool.back();
+                _cache[cachePartition].pool.pop_back();
 
                 return cachedSession;
             }
         }
 
-        return new WiredTigerSession( _conn, _engine ? _engine->currentEpoch() : -1 );
+        // Outside of the cache partition lock, but on release will be put back on the cache
+        return new WiredTigerSession(_conn, cachePartition, epoch);
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
@@ -196,21 +212,27 @@ namespace mongo {
             invariant(range == 0);
         }
 
-        if (_engine && _engine->haveDropsQueued() && session->epoch() < _engine->currentEpoch()) {
-            delete session;
-            _engine->dropAllQueued();
-            return;
+        const int cachePartition = session->_getCachePartition();
+        bool returnedToCache = false;
+
+        if (cachePartition >= 0) {
+            boost::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
+
+            invariant(session->_getEpoch() <= _cache[cachePartition].epoch);
+
+            if (session->_getEpoch() == _cache[cachePartition].epoch) {
+                _cache[cachePartition].pool.push_back(session);
+                returnedToCache = true;
+            }
         }
 
-        boost::mutex::scoped_lock lk(_sessionLock);
-        _sessionPool.push_back( session );
-    }
+        // Do all cleanup outside of the cache partition spinlock.
+        if (!returnedToCache) {
+            delete session;
 
-    bool WiredTigerSessionCache::_shouldBeClosed( WiredTigerSession* session ) const {
-        if ( !_engine )
-            return false;
-        if ( !_engine->haveDropsQueued() )
-            return false;
-        return session->epoch() < _engine->currentEpoch();
+            if (_engine && _engine->haveDropsQueued()) {
+                _engine->dropAllQueued();
+            }
+        }
     }
 }

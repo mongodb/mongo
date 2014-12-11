@@ -98,7 +98,6 @@ namespace mongo {
                                             bool repair )
         : _path( path ),
           _durable( durable ),
-          _epoch( 0 ),
           _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
 
         _eventHandler.handle_error = mdb_handle_error;
@@ -157,7 +156,7 @@ namespace mongo {
 
         _sizeStorerUri = "table:sizeStorer";
         {
-            WiredTigerSession session( _conn, -1 );
+            WiredTigerSession session(_conn);
             if (repair && _hasUri(session.getSession(), _sizeStorerUri)) {
                 log() << "Repairing size cache";
                 fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
@@ -177,7 +176,6 @@ namespace mongo {
         _sizeStorer.reset( NULL );
 
         _sessionCache.reset( NULL );
-
     }
 
     void WiredTigerKVEngine::cleanShutdown() {
@@ -221,9 +219,8 @@ namespace mongo {
 
     Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
         // Using a side session to avoid transactional issues
-        WiredTigerSession* sessionWrapper = _sessionCache->getSession();
-        ON_BLOCK_EXIT(&WiredTigerSessionCache::releaseSession, _sessionCache.get(), sessionWrapper);
-        WT_SESSION* session = sessionWrapper->getSession();
+        WiredTigerSession sessionWrapper(_conn);
+        WT_SESSION* session = sessionWrapper.getSession();
 
         int rc = (session->verify)(session, uri, NULL);
         if (rc == 0) {
@@ -248,7 +245,7 @@ namespace mongo {
         LOG(1) << "WiredTigerKVEngine::flushAllFiles";
         syncSizeInfo(true);
 
-        WiredTigerSession session( _conn, -1 );
+        WiredTigerSession session(_conn);
         WT_SESSION* s = session.getSession();
         invariantWTOK( s->checkpoint(s, NULL ) );
 
@@ -260,7 +257,7 @@ namespace mongo {
             return;
 
         try {
-            WiredTigerSession session( _conn, -1 );
+            WiredTigerSession session(_conn);
             WT_SESSION* s = session.getSession();
             invariantWTOK( s->begin_transaction( s, sync ? "sync=true" : NULL ) );
             _sizeStorer->storeInto( &session, _sizeStorerUri );
@@ -288,7 +285,7 @@ namespace mongo {
                                                   const StringData& ident,
                                                   const CollectionOptions& options ) {
         _checkIdentPath( ident );
-        WiredTigerSession session( _conn, -1 );
+        WiredTigerSession session(_conn);
 
         StatusWith<std::string> result =
             WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
@@ -354,7 +351,7 @@ namespace mongo {
     bool WiredTigerKVEngine::_drop( const StringData& ident ) {
         string uri = _uri( ident );
 
-        WiredTigerSession session( _conn, -1 );
+        WiredTigerSession session(_conn);
 
         int ret = session.getSession()->drop( session.getSession(), uri.c_str(), "force" );
         LOG(1) << "WT drop of  " << uri << " res " << ret;
@@ -369,7 +366,6 @@ namespace mongo {
             {
                 boost::mutex::scoped_lock lk( _identToDropMutex );
                 _identToDrop.insert( uri );
-                _epoch++;
             }
             _sessionCache->closeAll();
             return false;
@@ -398,7 +394,7 @@ namespace mongo {
         set<string> deleted;
 
         {
-            WiredTigerSession session( _conn, -1 );
+            WiredTigerSession session(_conn);
             for ( set<string>::const_iterator it = mine.begin(); it != mine.end(); ++it ) {
                 string uri = *it;
                 int ret = session.getSession()->drop( session.getSession(), uri.c_str(), "force" );
