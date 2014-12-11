@@ -14,8 +14,8 @@ import (
 type JSONExportOutput struct {
 	// ArrayOutput when set to true indicates that the output should be written
 	// as a JSON array, where each document is an element in the array.
-	// Pretty when set to true indicates that the output will be written in pretty() mode
 	ArrayOutput bool
+	// Pretty when set to true indicates that the output will be written in pretty() mode
 	PrettyOutput bool
 	Encoder     *json.Encoder
 	Out         io.Writer
@@ -56,6 +56,9 @@ func (jsonExporter *JSONExportOutput) WriteFooter() error {
 		if err != nil {
 			return err
 		}
+	}
+	if jsonExporter.PrettyOutput {
+		jsonExporter.Out.Write([]byte("\n"))
 	}
 	return nil
 }
