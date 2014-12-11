@@ -64,7 +64,9 @@ namespace {
     void truncateAndResetOplog(OperationContext* txn, 
                                ReplicationCoordinator* replCoord,
                                BackgroundSync* bgsync) {
-        Client::WriteContext ctx(txn, rsoplog);
+        AutoGetDb autoDb(txn, "local", MODE_X);
+        massert(28584, "no local database found", autoDb.getDb());
+        invariant(txn->lockState()->isCollectionLockedForMode(rsoplog, MODE_X));
         // Note: the following order is important.
         // The bgsync thread uses an empty optime as a sentinel to know to wait
         // for initial sync; thus, we must
@@ -77,7 +79,7 @@ namespace {
         replCoord->clearSyncSourceBlacklist();
 
         // Truncate the oplog in case there was a prior initial sync that failed.
-        Collection* collection = ctx.getCollection();
+        Collection* collection = autoDb.getDb()->getCollection(txn, rsoplog);
         fassert(28565, collection);
         WriteUnitOfWork wunit(txn);
         Status status = collection->truncate(txn);
