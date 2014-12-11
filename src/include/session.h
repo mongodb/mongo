@@ -67,8 +67,8 @@ struct __wt_session_impl {
 	 */
 					/* Session handle reference list */
 	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
-#define	WT_DHANDLE_SWEEP_WAIT	60	/* Wait before discarding */
-#define	WT_DHANDLE_SWEEP_PERIOD	20	/* Only sweep every 20 seconds */
+#define	WT_DHANDLE_SWEEP_WAIT	30	/* Idle wait before discarding */
+#define	WT_DHANDLE_SWEEP_PERIOD	10	/* Sweep interim */
 	time_t last_sweep;		/* Last sweep for dead handles */
 
 	WT_CURSOR *cursor;		/* Current cursor */
