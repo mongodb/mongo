@@ -63,7 +63,7 @@ namespace mongo {
                 kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
                 // Intentionally leaked.
                 new WiredTigerServerStatusSection(kv);
-                new WiredTigerEngineRuntimeConfigSetting(kv);
+                new WiredTigerEngineRuntimeConfigParameter(kv);
 
                 KVStorageEngineOptions options;
                 options.directoryPerDB = params.directoryperdb;

@@ -37,30 +37,30 @@
 
 namespace mongo {
 
-WiredTigerEngineRuntimeConfigSetting::WiredTigerEngineRuntimeConfigSetting(
+WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
     WiredTigerKVEngine* engine)
     : ServerParameter(ServerParameterSet::getGlobal(),
-        "wiredTigerEngineRuntimeConfigSetting", false, true),
+        "wiredTigerEngineRuntimeConfig", false, true),
         _engine(engine) {}
 
 
-void WiredTigerEngineRuntimeConfigSetting::append(OperationContext* txn, BSONObjBuilder& b,
+void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* txn, BSONObjBuilder& b,
                     const std::string& name) {
     b << name << "";
 }
 
-Status WiredTigerEngineRuntimeConfigSetting::set(const BSONElement& newValueElement) {
+Status WiredTigerEngineRuntimeConfigParameter::set(const BSONElement& newValueElement) {
     try {
         return setFromString(newValueElement.String());
     }
     catch (MsgAssertionException msg) {
         return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                "Invalid value for wiredTigerEngineRuntimeConfigSetting via setParameter command: "
+                "Invalid value for wiredTigerEngineRuntimeConfig via setParameter command: "
                 << newValueElement);
     }
 }
 
-Status WiredTigerEngineRuntimeConfigSetting::setFromString(const std::string& str) {
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& str) {
     size_t pos = str.find('\0');
     if (pos != std::string::npos) {
         return Status(ErrorCodes::BadValue, (str::stream() <<
