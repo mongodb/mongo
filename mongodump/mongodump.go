@@ -501,7 +501,6 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	if err != nil {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
-
 	usersQuery := session.DB("admin").C("system.users").Find(dbQuery)
 	err = dump.dumpQueryToWriter(
 		usersQuery, &intents.Intent{DB: "system", C: "users"}, usersFile)
@@ -513,12 +512,22 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	if err != nil {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
-
 	rolesQuery := session.DB("admin").C("system.roles").Find(dbQuery)
 	err = dump.dumpQueryToWriter(
 		rolesQuery, &intents.Intent{DB: "system", C: "roles"}, rolesFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
+	}
+
+	versionFile, err := os.Create(filepath.Join(outDir, "$admin.system.version.bson"))
+	if err != nil {
+		return fmt.Errorf("error creating file for db auth version: %v", err)
+	}
+	versionQuery := session.DB("admin").C("system.version").Find(nil)
+	err = dump.dumpQueryToWriter(
+		versionQuery, &intents.Intent{DB: "system", C: "version"}, versionFile)
+	if err != nil {
+		return fmt.Errorf("error dumping db auth version: %v", err)
 	}
 
 	return nil
