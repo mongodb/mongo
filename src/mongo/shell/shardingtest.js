@@ -60,8 +60,9 @@
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
  *          Can be used to specify options that are common all mongos.
- *       enableBalancer  {boolean} : if true, enable the balancer
- * 
+ *       enableBalancer {boolean} : if true, enable the balancer
+ *       manualAddShard {boolean}: shards will not be added if true.
+ *
  *       // replica Set only:
  *       rsOptions {Object}: same as the rs property above. Can be used to
  *         specify options that are common all replica members.

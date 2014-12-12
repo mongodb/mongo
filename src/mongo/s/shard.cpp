@@ -350,12 +350,12 @@ namespace mongo {
 
     Shard::Shard(const std::string& name,
             const std::string& addr,
-            long long maxSize,
+            long long maxSizeMB,
             bool isDraining,
             const BSONArray& tags):
                 _name(name),
                 _addr(addr),
-                _maxSize(maxSize),
+                _maxSizeMB(maxSizeMB),
                 _isDraining(isDraining) {
         _setAddr(addr);
 
@@ -368,13 +368,13 @@ namespace mongo {
 
     Shard::Shard(const std::string& name,
             const ConnectionString& connStr,
-            long long maxSize,
+            long long maxSizeMB,
             bool isDraining,
             const set<string>& tags):
                 _name(name),
                 _addr(connStr.toString()),
                 _cs(connStr),
-                _maxSize(maxSize),
+                _maxSizeMB(maxSizeMB),
                 _isDraining(isDraining),
                 _tags(tags) {
     }
@@ -450,7 +450,21 @@ namespace mongo {
     }
 
     ShardStatus Shard::getStatus() const {
-        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
+        BSONObj serverStatus = runCommand("admin", BSON("serverStatus" << 1));
+        BSONElement versionElement = serverStatus["version"];
+
+        uassert(28589, "version field not found in serverStatus",
+                versionElement.type() == String);
+        string version = serverStatus["version"].String();
+
+        BSONObj listDatabases = runCommand("admin", BSON("listDatabases" << 1));
+        BSONElement totalSizeElem = listDatabases["totalSize"];
+
+        uassert(28590, "totalSize field not found in listDatabases",
+                totalSizeElem.isNumber());
+        long long dataSizeBytes = listDatabases["totalSize"].numberLong();
+
+        return ShardStatus(*this, dataSizeBytes, version);
     }
 
     void Shard::reloadShardInfo() {
@@ -492,11 +506,8 @@ namespace mongo {
         staticShardInfo.set(name, shard, true, false);
     }
 
-    ShardStatus::ShardStatus( const Shard& shard , const BSONObj& obj )
-        : _shard( shard ) {
-        _mapped = obj.getFieldDotted( "mem.mapped" ).numberLong();
-        _writeLock = 0; // TODO
-        _mongoVersion = obj["version"].String();
+    ShardStatus::ShardStatus(const Shard& shard, long long dataSizeBytes, const string& version):
+            _shard(shard), _dataSizeBytes(dataSizeBytes), _mongoVersion(version) {
     }
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {

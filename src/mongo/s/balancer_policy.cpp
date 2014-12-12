@@ -239,8 +239,8 @@ namespace mongo {
             const Shard& shard = *it;
             ShardStatus status = shard.getStatus();
             shardInfo->insert(make_pair(shard.getName(),
-                                        ShardInfo(shard.getMaxSize(),
-                                                  status.mapped(),
+                                        ShardInfo(shard.getMaxSizeMB(),
+                                                  status.dataSizeBytes() * 1024 * 1024,
                                                   shard.isDraining(),
                                                   shard.tags(),
                                                   status.mongoVersion())));
@@ -494,21 +494,22 @@ namespace mongo {
     }
 
 
-    ShardInfo::ShardInfo( long long maxSize, long long currSize,
-                          bool draining,
-                          const set<string>& tags, 
-                          const string& mongoVersion )
-        : _maxSize( maxSize ),
-          _currSize( currSize ),
-          _draining( draining ),
-          _tags( tags ),
-          _mongoVersion( mongoVersion ) {
+    ShardInfo::ShardInfo(long long maxSizeMB,
+                         long long currSizeMB,
+                         bool draining,
+                         const set<string>& tags,
+                         const string& mongoVersion):
+        _maxSizeMB(maxSizeMB),
+        _currSizeMB(currSizeMB),
+        _draining(draining),
+        _tags(tags),
+        _mongoVersion(mongoVersion) {
     }
 
     ShardInfo::ShardInfo()
-        : _maxSize( 0 ),
-          _currSize( 0 ),
-          _draining( false ) {
+        : _maxSizeMB(0),
+          _currSizeMB(0),
+          _draining(false) {
     }
 
     void ShardInfo::addTag( const string& tag ) {
@@ -517,10 +518,10 @@ namespace mongo {
 
 
     bool ShardInfo::isSizeMaxed() const {
-        if ( _maxSize == 0 || _currSize == 0 )
+        if (_maxSizeMB == 0 || _currSizeMB == 0)
             return false;
 
-        return _currSize >= _maxSize;
+        return _currSizeMB >= _maxSizeMB;
     }
 
     bool ShardInfo::hasTag( const string& tag ) const {
@@ -531,8 +532,8 @@ namespace mongo {
 
     string ShardInfo::toString() const {
         StringBuilder ss;
-        ss << " maxSize: " << _maxSize;
-        ss << " currSize: " << _currSize;
+        ss << " maxSizeMB: " << _maxSizeMB;
+        ss << " currSizeMB: " << _currSizeMB;
         ss << " draining: " << _draining;
         if ( _tags.size() > 0 ) {
             ss << "tags : ";

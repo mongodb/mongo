@@ -835,7 +835,7 @@ namespace mongo {
         joinStringDelim( configHosts, &fullString, ',' );
         _primary = Shard(_primary.getName(),
                          ConnectionString(fullString, ConnectionString::SYNC),
-                         _primary.getMaxSize(),
+                         _primary.getMaxSizeMB(),
                          _primary.isDraining(),
                          _primary.tags());
         Shard::installShard(_primary.getName(), _primary);

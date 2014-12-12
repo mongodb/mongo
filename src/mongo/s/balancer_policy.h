@@ -71,10 +71,11 @@ namespace mongo {
     class ShardInfo {
     public:
         ShardInfo();
-        ShardInfo( long long maxSize, long long currSize, 
-                   bool draining,
-                   const std::set<std::string>& tags = std::set<std::string>(),
-                   const std::string& _mongoVersion = std::string("") );
+        ShardInfo(long long maxSizeMB,
+                  long long currSizeMB,
+                  bool draining,
+                  const std::set<std::string>& tags = std::set<std::string>(),
+                  const std::string& _mongoVersion = std::string(""));
 
         void addTag( const std::string& tag );
 
@@ -93,18 +94,18 @@ namespace mongo {
          * "isDraining" on 'shrdLimits'.
          */
         bool isDraining() const { return _draining; }
-        
-        long long getMaxSize() const { return _maxSize; }
 
-        long long getCurrSize() const { return _currSize; }
+        long long getMaxSizeMB() const { return _maxSizeMB; }
+
+        long long getCurrSizeMB() const { return _currSizeMB; }
 
         std::string getMongoVersion() const { return _mongoVersion; }
 
         std::string toString() const;
         
     private:
-        long long _maxSize;
-        long long _currSize;
+        long long _maxSizeMB;
+        long long _currSizeMB;
         bool _draining;
         std::set<std::string> _tags;
         std::string _mongoVersion;
