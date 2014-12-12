@@ -326,6 +326,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	full = logging = tracking = 0;
 
+	/* Ensure the metadata table is open before taking any locks. */
+	WT_RET(__wt_metadata_open(session));
+
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
 	 * kind of checkpoint this is.
@@ -408,12 +411,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
-
-	/*
-	 * Checkpoint has already opened other handles - so the metadata
-	 * handle is open as well.
-	 */
-	WT_ASSERT(session, session->meta_dhandle != NULL);
 
 	/*
 	 * Disable metadata tracking during the metadata checkpoint.
