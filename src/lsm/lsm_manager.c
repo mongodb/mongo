@@ -68,7 +68,6 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 		 * throttling stalls.
 		 */
 		if (manager->lsm_workers == 1)
-
 			worker_args->type =
 			    WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
 		else {
