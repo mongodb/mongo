@@ -972,16 +972,19 @@ tasks:
         tool: mongodump
     - func: "fetch tool"
       vars:
-        tool: mongostat
+        tool: mongorestore
     - func: "fetch tool"
       vars:
-        tool: mongorestore
+        tool: mongostat
     - func: "fetch tool"
       vars:
         tool: mongooplog
     - func: "fetch tool"
       vars:
         tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
     - command: shell.exec
       params:
         working_dir: src
@@ -992,6 +995,7 @@ tasks:
           mv ./mongodb/mongos${extension} .
           mv test/qa-tests/* .
           chmod +x mongo*
+          chmod +x bsondump*
           rm -rf /data/install /data/multiversion
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.4" "2.6"
           chmod 400 jstests/libs/key*
@@ -1021,16 +1025,19 @@ tasks:
         tool: mongodump
     - func: "fetch tool"
       vars:
-        tool: mongostat
+        tool: mongorestore
     - func: "fetch tool"
       vars:
-        tool: mongorestore
+        tool: mongostat
     - func: "fetch tool"
       vars:
         tool: mongooplog
     - func: "fetch tool"
       vars:
         tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
     - command: shell.exec
       params:
         working_dir: src
@@ -1039,7 +1046,8 @@ tasks:
           mv ./mongodb/mongo${extension} .
           mv ./mongodb/mongos${extension} .
           mv test/qa-tests/* .
-          chmod +x mongo*
+          chmod +x mongo*.
+          chmod +x bsondump*
           rm -rf /data/install /data/multiversion
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.4" "2.6"
           chmod 400 jstests/libs/key*
