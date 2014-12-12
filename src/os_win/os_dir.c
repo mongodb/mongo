@@ -38,7 +38,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 		path[pathlen - 1] = '\0';
 	}
 
-	WT_ERR(__wt_scr_alloc(session, 0, &pathbuf));
+	WT_ERR(__wt_scr_alloc(session, pathlen + 3, &pathbuf));
 	WT_ERR(__wt_buf_fmt(session, pathbuf, "%s\\*", path));
 
 	dirallocsz = 0;
@@ -96,7 +96,7 @@ err:
 	if (findhandle != INVALID_HANDLE_VALUE)
 		(void)FindClose(findhandle);
 	__wt_free(session, path);
-	__wt_buf_free(session, pathbuf);
+	__wt_scr_free(&pathbuf);
 
 	if (ret == 0)
 		return (0);
