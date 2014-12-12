@@ -144,19 +144,17 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		}
 	}
 
-	if !mongoImport.IngestOptions.Upsert && mongoImport.IngestOptions.UpsertFields != "" {
-		return fmt.Errorf("can not use --upsertFields without --upsert")
+	if mongoImport.IngestOptions.UpsertFields != "" {
+		mongoImport.IngestOptions.Upsert = true
+		mongoImport.upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
+		if err := validateFields(mongoImport.upsertFields); err != nil {
+			return fmt.Errorf("invalid --upsertFields argument: %v", err)
+		}
+	} else if mongoImport.IngestOptions.Upsert {
+		mongoImport.upsertFields = []string{"_id"}
 	}
 
 	if mongoImport.IngestOptions.Upsert {
-		if mongoImport.IngestOptions.UpsertFields == "" {
-			mongoImport.upsertFields = []string{"_id"}
-		} else {
-			mongoImport.upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
-			if err := validateFields(mongoImport.upsertFields); err != nil {
-				return fmt.Errorf("invalid --upsertFields argument: %v", err)
-			}
-		}
 		log.Logf(log.Info, "using upsert fields: %v", mongoImport.upsertFields)
 	}
 

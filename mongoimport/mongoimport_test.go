@@ -206,14 +206,14 @@ func TestMongoImportValidateSettings(t *testing.T) {
 			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
-		Convey("an error should be thrown if --upsertFields is supplied without "+
+		Convey("no error should be thrown if --upsertFields is supplied without "+
 			"--upsert", func() {
 			mongoImport, err := NewMongoImport()
 			So(err, ShouldBeNil)
 			mongoImport.InputOptions.HeaderLine = true
 			mongoImport.InputOptions.Type = CSV
 			mongoImport.IngestOptions.UpsertFields = "a,b,c"
-			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("if --upsert is used without --upsertFields, _id should be set as "+
