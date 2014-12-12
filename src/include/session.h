@@ -78,7 +78,7 @@ struct __wt_session_impl {
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
 	WT_COMPACT	 *compact;	/* Compact state */
 
-	WT_BTREE *metafile;		/* Metadata file */
+	WT_DATA_HANDLE *meta_dhandle;	/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
 	void	*meta_track_next;	/* Current position */
 	void	*meta_track_sub;	/* Child transaction / save point */

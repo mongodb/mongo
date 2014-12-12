@@ -220,9 +220,9 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	 * If the operation succeeded and we aren't relying on the log for
 	 * durability, checkpoint the metadata.
 	 */
-	if (!unroll && ret == 0 && session->metafile != NULL &&
+	if (!unroll && ret == 0 && session->meta_dhandle != NULL &&
 	    !FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
-		WT_WITH_BTREE(session, session->metafile,
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint(session, NULL));
 
 	return (ret);
