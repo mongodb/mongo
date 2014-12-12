@@ -101,10 +101,19 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 			log.Logf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
 				filepath.Join(fullpath, entry.Name()))
 		} else {
-			//TODO handle user/roles?
 			collection, fileType := GetInfoFromFilename(entry.Name())
 			switch fileType {
 			case BSONFileType:
+				// Dumps of a single database (i.e. with the -d flag) may contain special 
+				// db-specific collections that start with a "$" (for example, $admin.system.users
+				// holds the users for a database that was dumped with --dumpDbUsersAndRoles enabled).
+				// If these special files manage to be included in a dump directory during a full
+				// (multi-db) restore, we should ignore them.
+				if restore.ToolOptions.DB == "" && strings.HasPrefix(collection, "$") {
+					log.Logf(log.DebugLow,
+						"not restoring special collection %v.%v", db, collection)
+					continue
+				}
 				// skip restoring the indexes collection if we are using metadata
 				// files to store index information, to eliminate redundancy
 				if collection == "system.indexes" && usesMetadataFiles {

@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
 	. "github.com/smartystreets/goconvey/convey"
@@ -44,6 +45,7 @@ func TestCreateAllIntents(t *testing.T) {
 		mr = &MongoRestore{
 			manager:      intents.NewCategorizingIntentManager(),
 			InputOptions: &InputOptions{},
+			ToolOptions:  &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 		log.SetWriter(&buff)
 
@@ -51,7 +53,6 @@ func TestCreateAllIntents(t *testing.T) {
 			So(mr.CreateAllIntents("testdata/testdirs/"), ShouldBeNil)
 			mr.manager.Finalize(intents.Legacy)
 
-			//TODO handle oplog!
 			Convey("and reading the intents should show alphabetical order", func() {
 				i0 := mr.manager.Pop()
 				So(i0.DB, ShouldEqual, "db1")
@@ -108,7 +109,8 @@ func TestCreateIntentsForDB(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: intents.NewCategorizingIntentManager(),
+			manager:     intents.NewCategorizingIntentManager(),
+			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 		log.SetWriter(&buff)
 
@@ -160,7 +162,8 @@ func TestCreateIntentsForCollection(t *testing.T) {
 	Convey("With a test MongoRestore", t, func() {
 		buff = bytes.Buffer{}
 		mr = &MongoRestore{
-			manager: intents.NewCategorizingIntentManager(),
+			manager:     intents.NewCategorizingIntentManager(),
+			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
 		}
 		log.SetWriter(&buff)
 
