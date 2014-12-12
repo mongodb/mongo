@@ -140,7 +140,7 @@ namespace mongo {
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(all),";
         if ( _durable ) {
-            ss << "log=(enabled=true,archive=true,path=journal),";
+            ss << "log=(enabled=true,archive=true,path=journal,compressor=snappy),";
         }
         ss << "checkpoint=(wait=60,log_size=2GB),";
         ss << extraOpenOptions;
