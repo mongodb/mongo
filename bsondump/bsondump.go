@@ -57,7 +57,7 @@ func (bd *BSONDump) Dump() (int, error) {
 	numFound := 0
 
 	if bd.bsonSource == nil {
-		panic("Tried to call Debug() before opening file")
+		panic("Tried to call Dump() before opening file")
 	}
 
 	decodedStream := db.NewDecodedBSONSource(bd.bsonSource)
