@@ -1173,8 +1173,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	 * smallest cursor larger than the search key, or it is NULL if the
 	 * search key is larger than any record in the tree.
 	 */
-	if (!exact)
-		cmp = 1;
+	cmp = exact ? 0 : 1;
 
 	/*
 	 * If we land on a deleted item, try going forwards or backwards to
@@ -1197,8 +1196,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	}
 	if (deleted) {
 		clsm->current = NULL;
-		if ((ret = cursor->prev(cursor)) == 0)
-			cmp = -1;
+		WT_ERR(cursor->prev(cursor));
+		cmp = -1;
 	}
 	*exactp = cmp;
 
