@@ -37,7 +37,7 @@ except ImportError:
 
 from contextlib import contextmanager
 import os, re, shutil, sys, time, traceback
-
+import wtscenario
 import wiredtiger
 
 def shortenWithEllipsis(s, maxlen):
@@ -149,6 +149,7 @@ class WiredTigerTestCase(unittest.TestCase):
             d += '.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
+        wtscenario.set_long_run(longtest)
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._origcwd = os.getcwd()
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
@@ -184,8 +185,9 @@ class WiredTigerTestCase(unittest.TestCase):
         # is used, then each scenario is given a number, which can
         # help distinguish tests.
         scen = ''
-        if hasattr(self, 'scenario_number'):
-            scen = '(scenario ' + str(self.scenario_number) + ')'
+        if hasattr(self, 'scenario_number') and hasattr(self, 'scenario_name'):
+            scen = '(scenario ' + str(self.scenario_number) + \
+                   ': ' + self.scenario_name + ')'
         return self.simpleName() + scen
 
     def simpleName(self):
@@ -285,7 +287,7 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
 
         if not passed and not skipped:
-            print "ERROR in " + self.testsubdir
+            print "ERROR in " + str(self)
             self.pr('FAIL')
             self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
