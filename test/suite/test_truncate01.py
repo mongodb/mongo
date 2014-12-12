@@ -32,7 +32,7 @@
 import wiredtiger, wttest
 from helper import confirm_empty,\
     key_populate, value_populate, simple_populate,\
-    value_populate_complex, complex_populate
+    complex_populate, complex_value_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test truncation arguments.
@@ -441,7 +441,8 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(uri, None)
             expected = {}
             for i in range(1, self.nentries + 1):
-                expected[key_populate(cursor, i)] = value_populate_complex(i)
+                expected[key_populate(cursor, i)] = \
+                    complex_value_populate(cursor, i)
             cursor.close()
 
             # Optionally close and re-open the object to get a disk image

@@ -416,12 +416,14 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __curmetadata_insert,	/* insert */
 	    __curmetadata_update,	/* update */
 	    __curmetadata_remove,	/* remove */
+	    __wt_cursor_notsup,		/* reconfigure */
 	    __curmetadata_close);	/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_CURSOR_METADATA), &mdc));
+	WT_RET(__wt_calloc_def(session, 1, &mdc));
 
 	cursor = &mdc->iface;
 	*cursor = iface;
@@ -434,8 +436,13 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
-	/* Metadata cursors default to read only. */
-	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
+	/* Metadata cursors default to readonly. */
+	WT_ERR(__wt_config_gets_def(session, cfg, "readonly", 1, &cval));
+	if (cval.val != 0) {
+		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
+		cursor->update = cursor->update_orig = __wt_cursor_notsup;
+		cursor->remove = cursor->remove_orig = __wt_cursor_notsup;
+	}
 
 	if (0) {
 err:		__wt_free(session, mdc);

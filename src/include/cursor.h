@@ -22,6 +22,7 @@
 	insert,								\
 	update,								\
 	remove,								\
+	reconfigure,							\
 	close)								\
 	static const WT_CURSOR n = {					\
 	NULL,				/* session */			\
@@ -41,6 +42,7 @@
 	insert,								\
 	update,								\
 	remove,								\
+	(int (*)(WT_CURSOR *, const char *))(reconfigure),		\
 	close,								\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
@@ -51,6 +53,9 @@
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
 	NULL,				/* internal_uri */		\
+	insert,				/* original insert */		\
+	update,				/* original update */		\
+	remove,				/* original remove */		\
 	0				/* uint32_t flags */		\
 }
 
