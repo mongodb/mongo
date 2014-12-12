@@ -172,6 +172,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	q := session.DB(exp.ToolOptions.Namespace.DB).
 		C(exp.ToolOptions.Namespace.Collection).Find(query).Sort(sortFields...).
 		Skip(skip).Limit(limit)
+
 	q = db.ApplyFlags(q, session, flags)
 
 	return q.Iter(), session, nil
@@ -266,7 +267,7 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 		}
 		return NewCSVExportOutput(fields, out), nil
 	}
-	return NewJSONExportOutput(exp.OutputOpts.JSONArray, out), nil
+	return NewJSONExportOutput(exp.OutputOpts.JSONArray, exp.OutputOpts.Pretty, out), nil
 }
 
 // getObjectFromArg takes an object in extended JSON, and converts it to an object that
