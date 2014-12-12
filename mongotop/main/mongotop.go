@@ -73,6 +73,10 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 
+	if setName == "" {
+		sessionProvider.SetFlags(db.Monotonic)
+	}
+
 	// fail fast if connecting to a mongos
 	isMongos, err := sessionProvider.IsMongos()
 	if err != nil {
