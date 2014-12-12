@@ -159,7 +159,7 @@ namespace {
         ASSERT(sorts.find(fromjson("{d: 1}")) != sorts.end());
 
         // There should be 9 total sorts: make sure no other ones snuck their way in.
-        ASSERT_EQ(9, sorts.size());
+        ASSERT_EQ(9U, sorts.size());
     }
 
 }  // namespace
