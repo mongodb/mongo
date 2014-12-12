@@ -125,7 +125,7 @@ compare_backups(int i)
  * That way we can compare the full and incremental each time through.
  */
 static int
-setup_directories()
+setup_directories(void)
 {
 	int i, ret;
 	char buf[1024];
