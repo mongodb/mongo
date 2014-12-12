@@ -65,7 +65,7 @@ namespace {
                                ReplicationCoordinator* replCoord,
                                BackgroundSync* bgsync) {
         AutoGetDb autoDb(txn, "local", MODE_X);
-        massert(28584, "no local database found", autoDb.getDb());
+        massert(28585, "no local database found", autoDb.getDb());
         invariant(txn->lockState()->isCollectionLockedForMode(rsoplog, MODE_X));
         // Note: the following order is important.
         // The bgsync thread uses an empty optime as a sentinel to know to wait
