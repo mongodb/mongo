@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"bytes"
 )
 
 type BSONDump struct {
@@ -28,7 +29,7 @@ func (bd *BSONDump) init() (*db.BSONSource, error) {
 	return db.NewBSONSource(file), nil
 }
 
-func dumpDoc(doc *bson.Raw, out io.Writer) error {
+func dumpDoc(doc *bson.Raw, out io.Writer, pretty bool) error {
 	decodedDoc := bson.M{}
 	err := bson.Unmarshal(doc.Data, &decodedDoc)
 	if err != nil {
@@ -40,6 +41,11 @@ func dumpDoc(doc *bson.Raw, out io.Writer) error {
 		return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
 	}
 	jsonBytes, err := json.Marshal(extendedDoc)
+	if pretty {
+		var jsonFormatted bytes.Buffer
+		json.Indent(&jsonFormatted, jsonBytes, "", "\t")
+		jsonBytes = jsonFormatted.Bytes()
+	}
 	if err != nil {
 		return fmt.Errorf("Error converting doc to JSON: %v", err)
 	}
@@ -64,7 +70,7 @@ func (bd *BSONDump) Dump() (int, error) {
 
 	var result bson.Raw
 	for decodedStream.Next(&result) {
-		if err := dumpDoc(&result, bd.Out); err != nil {
+		if err := dumpDoc(&result, bd.Out, bd.BSONDumpOptions.Pretty); err != nil {
 			log.Logf(log.Always, "unable to dump document %v: %v", numFound+1, err)
 
 			//if objcheck is turned on, stop now. otherwise keep on dumpin'
