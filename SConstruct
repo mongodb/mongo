@@ -1746,6 +1746,39 @@ def doConfigure(myenv):
             # and link lines.
             if AddToCCFLAGSIfSupported(myenv, '-flto'):
                 myenv.Append(LINKFLAGS=['-flto'])
+
+                def LinkHelloWorld(context, adornment = None):
+                    test_body = """
+                    #include <iostream>
+                    int main() {
+                        std::cout << "Hello, World!" << std::endl;
+                        return 0;
+                    }
+                    """
+                    message = "Trying to link with LTO"
+                    if adornment:
+                        message = message + " " + adornment
+                    message = message + "..."
+                    context.Message(message)
+                    ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+                    context.Result(ret)
+                    return ret
+
+                conf = Configure(myenv, help=False, custom_tests = {
+                    'LinkHelloWorld' : LinkHelloWorld,
+                })
+
+                # Some systems (clang, on a system with the BFD linker by default) may need to
+                # explicitly request the gold linker for LTO to work. If we can't LTO link a
+                # simple program, see if -fuse=ld=gold helps.
+                if not conf.LinkHelloWorld():
+                    conf.env.Append(LINKFLAGS=["-fuse-ld=gold"])
+                    if not conf.LinkHelloWorld("(with -fuse-ld=gold)"):
+                        print("Error: Couldn't link with LTO")
+                        Exit(1)
+
+                myenv = conf.Finish()
+
             else:
                 print( "Link time optimization requested, " +
                        "but selected compiler does not honor -flto" )
