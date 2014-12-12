@@ -161,11 +161,6 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::hasAnyReadLock() const {
-        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
-    }
-
-    template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isLocked() const {
         return getLockMode(resourceIdGlobal) != MODE_NONE;
     }
@@ -176,24 +171,8 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isWriteLocked(const StringData& ns) const {
-        if (isWriteLocked()) {
-            return true;
-        }
-
-        const StringData db = nsToDatabaseSubstring(ns);
-        const ResourceId resIdNs(RESOURCE_DATABASE, db);
-
-        return isLockHeldForMode(resIdNs, MODE_X);
-    }
-
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::assertWriteLocked(const StringData& ns) const {
-        if (!isWriteLocked(ns)) {
-            dump();
-            msgasserted(
-                16105, mongoutils::str::stream() << "expected to be write locked for " << ns);
-        }
+    bool LockerImpl<IsForMMAPV1>::isReadLocked() const {
+        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
     }
 
     template<bool IsForMMAPV1>
@@ -774,8 +753,7 @@ namespace {
 
 
     AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
-        : _locker(static_cast<MMAPV1LockerImpl*>(locker)),
-          _isReleased(false) {
+        : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
 
         invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_S));
     }
@@ -784,19 +762,16 @@ namespace {
         invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X));
 
         // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
-        // complain
+        // complain.
         invariant(!_locker->unlock(resourceIdMMAPV1Flush));
     }
 
     void AutoAcquireFlushLockForMMAPV1Commit::release() {
         invariant(_locker->unlock(resourceIdMMAPV1Flush));
-        _isReleased = true;
     }
 
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
-        if (!_isReleased) {
-            invariant(_locker->unlock(resourceIdMMAPV1Flush));
-        }
+        invariant(_locker->unlock(resourceIdMMAPV1Flush));
     }
 
 

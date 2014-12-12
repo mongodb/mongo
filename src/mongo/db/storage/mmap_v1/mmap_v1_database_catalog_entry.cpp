@@ -227,7 +227,7 @@ namespace mongo {
     }
 
     Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, const StringData& ns) {
-        invariant(txn->lockState()->isWriteLocked(ns));
+        invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
         _removeFromCache(txn->recoveryUnit(), ns);
 
         NamespaceDetails* details = _namespaceIndex.details( ns );

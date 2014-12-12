@@ -477,11 +477,9 @@ namespace {
             createCollection( &txn, nss );
 
             ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
-            Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
+            AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Client::Context ctx( &txn, ns );
-            Collection* coll = ctx.db()->getCollection( &txn, ns );
+            Collection* coll = autoDb.getDb()->getCollection( &txn, ns );
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -520,11 +518,9 @@ namespace {
             createCollection( &txn, nss );
 
             ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
-            Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
+            AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Client::Context ctx( &txn, ns );
-            Collection* coll = ctx.db()->getCollection( &txn, ns );
+            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -575,11 +571,9 @@ namespace {
             createCollection( &txn, nss );
 
             ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
-            Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
+            AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Client::Context ctx( &txn, ns );
-            Collection* coll = ctx.db()->getCollection( &txn, ns );
+            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -620,11 +614,9 @@ namespace {
             createCollection( &txn, nss );
 
             ScopedTransaction transaction(&txn, MODE_IX);
-            Lock::DBLock dbIXLock( txn.lockState(), nss.db(), MODE_IX );
-            Lock::CollectionLock collXLock( txn.lockState(), ns, MODE_X );
+            AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Client::Context ctx( &txn, ns );
-            Collection* coll = ctx.db()->getCollection( &txn, ns );
+            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -682,9 +674,11 @@ namespace {
             OperationContextImpl txn;
             NamespaceString nss( ns );
             dropDatabase( &txn, nss );
+
             ScopedTransaction transaction(&txn, MODE_IX);
             Lock::DBLock dbXLock( txn.lockState(), nss.db(), MODE_X );
             Client::Context ctx( &txn, nss.ns() );
+
             string idxNameA = "indexA";
             string idxNameB = "indexB";
             string idxNameC = "indexC";

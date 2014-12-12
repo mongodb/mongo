@@ -213,13 +213,10 @@ namespace mongo {
 
         virtual bool isW() const;
         virtual bool isR() const;
-        virtual bool hasAnyReadLock() const;
 
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
-        virtual bool isWriteLocked(const StringData& ns) const;
-
-        virtual void assertWriteLocked(const StringData& ns) const;
+        virtual bool isReadLocked() const;
 
         virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
 
@@ -252,7 +249,7 @@ namespace mongo {
         ~AutoYieldFlushLockForMMAPV1Commit();
 
     private:
-        MMAPV1LockerImpl* _locker;
+        MMAPV1LockerImpl* const _locker;
     };
 
 
@@ -296,8 +293,7 @@ namespace mongo {
         void release();
 
     private:
-        MMAPV1LockerImpl* _locker;
-        bool _isReleased;;
+        MMAPV1LockerImpl* const _locker;
     };
 
 

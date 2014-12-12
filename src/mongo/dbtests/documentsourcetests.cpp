@@ -205,11 +205,11 @@ namespace DocumentSourceTests {
             void run() {
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 // The collection is empty, so the source produces no results.
                 ASSERT( !source()->getNext() );
                 // Exhausting the source releases the read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
             }
         };
 
@@ -220,7 +220,7 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << 1 ) );
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 // The cursor will produce the expected result.
                 boost::optional<Document> next = source()->getNext();
                 ASSERT(bool(next));
@@ -228,7 +228,7 @@ namespace DocumentSourceTests {
                 // There are no more results.
                 ASSERT( !source()->getNext() );
                 // Exhausting the source releases the read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );                
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
             }
         };
 
@@ -238,10 +238,10 @@ namespace DocumentSourceTests {
             void run() {
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 source()->dispose();
                 // Releasing the cursor releases the read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 // The source is marked as exhausted.
                 ASSERT( !source()->getNext() );
             }
@@ -264,10 +264,10 @@ namespace DocumentSourceTests {
                 ASSERT(bool(next));
                 ASSERT_EQUALS(Value(2), next->getField("a"));
                 // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 source()->dispose();
                 // Disposing of the source releases the lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 // The source cannot be advanced further.
                 ASSERT( !source()->getNext() );
             }
@@ -356,7 +356,7 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << 2 ) );
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
                 createLimit( 1 );
                 limit()->setSource( source() );
                 // The limit's result is as expected.
@@ -366,7 +366,7 @@ namespace DocumentSourceTests {
                 // The limit is exhausted.
                 ASSERT( !limit()->getNext() );
                 // The limit disposes the source, releasing the read lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
             }
         };
 
@@ -395,7 +395,7 @@ namespace DocumentSourceTests {
                 ASSERT( !limit()->getNext() );
                 // The limit disposes the match, which disposes the source and releases the read
                 // lock.
-                ASSERT( !_opCtx.lockState()->hasAnyReadLock() );
+                ASSERT( !_opCtx.lockState()->isReadLocked() );
             }
         };
 

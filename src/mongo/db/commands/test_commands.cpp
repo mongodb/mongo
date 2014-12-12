@@ -199,27 +199,36 @@ namespace mongo {
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string coll = cmdObj[ "emptycapped" ].valuestrsafe();
+            const std::string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
-            NamespaceString nss( dbname, coll );
 
-            Client::WriteContext ctx(txn,  nss.ns() );
-            WriteUnitOfWork wuow(txn);
-            Database* db = ctx.db();
-            Collection* collection = ctx.getCollection();
-            massert( 13429, "emptycapped no such collection", collection );
+            const NamespaceString nss( dbname, coll );
+
+            AutoGetDb autoDb(txn, dbname, MODE_X);
+
+            Database* db = autoDb.getDb();
+            massert(13429, "no such database", db);
+
+            Collection* collection = db->getCollection(txn, nss.ns());
+            massert(28584, "no such collection", collection);
 
             std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);
 
+            WriteUnitOfWork wuow(txn);
+
             Status status = collection->truncate(txn);
-            if ( !status.isOK() )
-                return appendCommandStatus( result, status );
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
 
             IndexBuilder::restoreIndexes(indexes);
 
-            if (!fromRepl)
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+            if (!fromRepl) {
+                repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+            }
+
             wuow.commit();
+
             return true;
         }
     };

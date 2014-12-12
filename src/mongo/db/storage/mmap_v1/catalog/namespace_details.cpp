@@ -53,9 +53,6 @@
 
 namespace mongo {
 
-
-    BSONObj idKeyPattern = fromjson("{\"_id\":1}");
-
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails::Extra) <= sizeof(NamespaceDetails) );
 
@@ -91,7 +88,10 @@ namespace mongo {
                                                            const StringData& ns,
                                                            NamespaceIndex& ni,
                                                            int nindexessofar) {
-        txn->lockState()->assertWriteLocked(ns);
+
+        // Namespace details must always be changed under an exclusive DB lock
+        const NamespaceString nss(ns);
+        invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
         int i = (nindexessofar - NIndexesBase) / NIndexesExtra;
         verify( i >= 0 && i <= 1 );
