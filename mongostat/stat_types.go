@@ -17,6 +17,16 @@ const (
 	MongosProcess = "mongos"
 )
 
+//Flags to determine cases when to activate/deactivate columns for output
+const (
+	Always   = 1 << iota // always activate the column
+	Discover             // only active when mongostat is in discover mode
+	Repl                 // only active if one of the nodes being monitored is in a replset
+	Locks                // only active if node is capable of calculating lock info
+	AllOnly              // only active if mongostat was run with --all option
+	MMAPOnly             // only active if node has mmap-specific fields
+)
+
 type StatLines []StatLine
 
 func (slice StatLines) Len() int {
@@ -51,7 +61,7 @@ type ServerStatus struct {
 	Dur                *DurStats              `bson:"dur"`
 	GlobalLock         *GlobalLockStats       `bson:"globalLock"`
 	IndexCounter       *IndexCounterStats     `bson:"indexCounters"`
-	Locks              map[string]LockStats   `bson:"locks"`
+	Locks              map[string]LockStats   `bson:"locks,omitempty"`
 	Network            *NetworkStats          `bson:"network"`
 	Opcounters         *OpcountStats          `bson:"opcounters"`
 	OpcountersRepl     *OpcountStats          `bson:"opcountersRepl"`
@@ -188,43 +198,34 @@ type StatHeader struct {
 	//The text to appear in the column's header cell
 	HeaderText string
 
-	//Indicates that the column should only appear when mongostat
-	//is being used with --discover.
-	DiscoverOnly bool
-
-	//Indicates that the column should only appear when some of the nodes being
-	//monitored are members of a replicaset.
-	ReplOnly bool
-
-	//Indicates that the column should only be displayed when the "all" option
-	//is provided
-	Optional bool
+	//Bitmask containing flags to determine if this header is active or not
+	ActivateFlags int
 }
 
 var StatHeaders = []StatHeader{
-	{"", true, false, false}, //placeholder for hostname column (blank header text)
-	{"insert", false, false, false},
-	{"query", false, false, false},
-	{"update", false, false, false},
-	{"delete", false, false, false},
-	{"getmore", false, false, false},
-	{"command", false, false, false},
-	{"flushes", false, false, false},
-	{"mapped", false, false, false},
-	{"vsize", false, false, false},
-	{"res", false, false, false},
-	{"non-mapped", false, false, true},
-	{"faults", false, false, false},
-	{"    locked db", false, false, false},
-	{"idx miss %", false, false, false},
-	{"qr|qw", false, false, false},
-	{"ar|aw", false, false, false},
-	{"netIn", false, false, false},
-	{"netOut", false, false, false},
-	{"conn", false, false, false},
-	{"set", true, true, false},
-	{"repl", true, true, false},
-	{"time", false, false, false},
+	{"", Always}, //placeholder for hostname column (blank header text)
+	{"insert", Always},
+	{"query", Always},
+	{"update", Always},
+	{"delete", Always},
+	{"getmore", Always},
+	{"command", Always},
+	{"flushes", MMAPOnly},
+	{"mapped", MMAPOnly},
+	{"vsize", Always},
+	{"res", Always},
+	{"non-mapped", MMAPOnly | AllOnly},
+	{"faults", MMAPOnly},
+	{"    locked db", Locks},
+	{"idx miss %", MMAPOnly},
+	{"qr|qw", Always},
+	{"ar|aw", Always},
+	{"netIn", Always},
+	{"netOut", Always},
+	{"conn", Always},
+	{"set", Repl},
+	{"repl", Repl},
+	{"time", Always},
 }
 
 type NamespacedLocks map[string]LockStatus
@@ -389,7 +390,7 @@ type JSONLineFormatter struct{}
 // Satisfy the LineFormatter interface. Formats the StatLines as json.
 func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover bool) string {
 
-	repl, all := checkLineAttributes(lines)
+	lineFlags := getLineFlags(lines)
 
 	// middle ground b/t the StatLines and the json string to be returned
 	jsonFormat := map[string]interface{}{}
@@ -423,7 +424,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		lineJson["res"] = formatMegs(int64(line.Resident))
 
 		// add mmapv1-specific fields
-		if line.StorageEngine == "mmapv1" {
+		if lineFlags&MMAPOnly > 0 {
 			lineJson["flushes"] = fmt.Sprintf("%v", line.Flushes)
 			lineJson["idx miss %"] = fmt.Sprintf("%v", line.IndexMissPercent)
 			lineJson["qr|qw"] = fmt.Sprintf("%v|%v", line.QueuedReaders,
@@ -437,13 +438,11 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			}
 			lineJson["mapped"] = mappedVal
 
-			if all {
-				nonMappedVal := ""       // empty for mongos
-				if line.NonMapped >= 0 { // not mongos, update accordingly
-					nonMappedVal = formatMegs(int64(line.NonMapped))
-				}
-				lineJson["non-mapped"] = nonMappedVal
+			nonMappedVal := ""       // empty for mongos
+			if line.NonMapped >= 0 { // not mongos, update accordingly
+				nonMappedVal = formatMegs(int64(line.NonMapped))
 			}
+			lineJson["non-mapped"] = nonMappedVal
 
 			lineJson["faults"] = fmt.Sprintf("%v", line.Faults)
 
@@ -455,7 +454,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			lineJson["locked"] = highestLockedVal
 		}
 
-		if discover || repl {
+		if lineFlags&Repl > 0 {
 			lineJson["set"] = line.ReplSetName
 			lineJson["repl"] = line.NodeType
 		}
@@ -483,18 +482,30 @@ type GridLineFormatter struct {
 	HeaderInterval int
 }
 
-func checkLineAttributes(lines []StatLine) (hasRepl, hasAll bool) {
-	// if any of the nodes being monitored are part of a replset,
-	// enable the printing of replset-specific columns
+//describes which sets of columns are printable in a StatLine
+type lineAttributes struct {
+	hasRepl  bool
+	hasAll   bool
+	hasLocks bool
+}
+
+func getLineFlags(lines []StatLine) int {
+	flags := Always
 	for _, line := range lines {
 		if line.ReplSetName != "" || line.NodeType == "RTR" {
-			hasRepl = true
+			flags |= Repl
 		}
 		if line.NonMapped >= 0 {
-			hasAll = true
+			flags |= AllOnly
+		}
+		if line.HighestLocked != nil {
+			flags |= Locks
+		}
+		if line.StorageEngine == "mmapv1" {
+			flags |= MMAPOnly
 		}
 	}
-	return
+	return flags
 }
 
 // Satisfy the LineFormatter interface. Formats the StatLines as a grid.
@@ -510,7 +521,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		out.WriteCell(" ")
 	}
 
-	repl, all := checkLineAttributes(lines)
+	lineFlags := getLineFlags(lines)
 
 	// Sort the stat lines by hostname, so that we see the output
 	// in the same order for each snapshot
@@ -518,15 +529,16 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 
 	//Print the columns that are enabled
 	for _, header := range StatHeaders {
-		if header.Optional && !all {
+		maskedAttrs := lineFlags & header.ActivateFlags
+		// Only show the header if this column has the "Always" flag, or all
+		// other flags for this column are matched
+		if (maskedAttrs&Always == 0) && maskedAttrs != header.ActivateFlags {
 			continue
 		}
-		if (!header.ReplOnly && !header.DiscoverOnly) || //Always enabled?
-			(repl && header.ReplOnly) || //Only show for repl, and in repl mode?
-			(discover && header.DiscoverOnly) {
-			if len(header.HeaderText) > 0 {
-				out.WriteCell(header.HeaderText)
-			}
+
+		// Don't write any cell content for blank headers, since they act as placeholders
+		if len(header.HeaderText) > 0 {
+			out.WriteCell(header.HeaderText)
 		}
 	}
 	out.EndRow()
@@ -543,6 +555,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			continue
 		}
 
+		// Write the opcount columns (always active)
 		out.WriteCell(formatOpcount(line.Insert, line.InsertR, false))
 		out.WriteCell(formatOpcount(line.Query, line.QueryR, false))
 		out.WriteCell(formatOpcount(line.Update, line.UpdateR, false))
@@ -550,30 +563,43 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
 		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
 
-		if mmap {
-			out.WriteCell(fmt.Sprintf("%v", line.Flushes))
-		} else {
-			out.WriteCell("n/a")
-		}
+		// Columns for flushes + mapped only show up if mmap columns are active
+		if lineFlags&MMAPOnly > 0 {
+			if mmap {
+				out.WriteCell(fmt.Sprintf("%v", line.Flushes))
+			} else {
+				out.WriteCell("n/a")
+			}
 
-		// mmap-specific fields
-		if mmap {
 			if line.Mapped > 0 {
 				out.WriteCell(formatMegs(int64(line.Mapped)))
 			} else {
 				//for mongos nodes, Mapped is empty, so write a blank cell.
 				out.WriteCell("")
 			}
-			out.WriteCell(formatMegs(int64(line.Virtual)))
-			out.WriteCell(formatMegs(int64(line.Resident)))
-			if all {
-				if line.NonMapped >= 0 {
-					out.WriteCell(formatMegs(int64(line.NonMapped)))
-				} else {
-					out.WriteCell("")
+		}
+
+		// Columns for Virtual and Resident are always active
+		out.WriteCell(formatMegs(int64(line.Virtual)))
+		out.WriteCell(formatMegs(int64(line.Resident)))
+
+		if lineFlags&MMAPOnly > 0 {
+			if lineFlags&AllOnly > 0 {
+				nonMappedVal := ""
+				if line.NonMapped >= 0 { // not mongos, update accordingly
+					nonMappedVal = formatMegs(int64(line.NonMapped))
 				}
+				out.WriteCell(nonMappedVal)
 			}
-			out.WriteCell(fmt.Sprintf("%v", line.Faults))
+			if mmap {
+				out.WriteCell(fmt.Sprintf("%v", line.Faults))
+			} else {
+				out.WriteCell("n/a")
+			}
+		}
+
+		// Write columns related to lock % if activated
+		if lineFlags&Locks > 0 {
 			if line.HighestLocked != nil && !line.IsMongos {
 				lockCell := fmt.Sprintf("%v:%.1f", line.HighestLocked.DBName,
 					line.HighestLocked.Percentage) + "%"
@@ -582,26 +608,22 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 				//don't write any lock status for mongos nodes
 				out.WriteCell("")
 			}
-			out.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
-			out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
-			out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
-		} else {
-			// 6 empties for wiredtiger
-			out.WriteCell("n/a")
-			out.WriteCell(formatMegs(int64(line.Virtual)))
-			out.WriteCell(formatMegs(int64(line.Resident)))
-			out.WriteCell("n/a")
-			out.WriteCell("n/a")
-			out.WriteCell("n/a")
-			out.WriteCell("n/a")
-			out.WriteCell("n/a")
 		}
+		if lineFlags&MMAPOnly > 0 {
+			if mmap {
+				out.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
+			} else {
+				out.WriteCell("n/a")
+			}
+		}
+		out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
+		out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
 
 		out.WriteCell(formatNet(line.NetIn))
 		out.WriteCell(formatNet(line.NetOut))
 
 		out.WriteCell(fmt.Sprintf("%v", line.NumConnections))
-		if discover || repl { //only show these fields when in discover or repl mode.
+		if discover || lineFlags&Repl > 0 { //only show these fields when in discover or repl mode.
 			out.WriteCell(line.ReplSetName)
 			out.WriteCell(line.NodeType)
 		}
@@ -717,7 +739,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 		oldStat.ExtraInfo.PageFaults != nil && newStat.ExtraInfo.PageFaults != nil {
 		returnVal.Faults = diff(*(newStat.ExtraInfo.PageFaults), *(oldStat.ExtraInfo.PageFaults), sampleSecs)
 	}
-	if !returnVal.IsMongos {
+	if !returnVal.IsMongos && oldStat.Locks != nil && oldStat.Locks != nil {
 		prevLocks := parseLocks(oldStat)
 		curLocks := parseLocks(newStat)
 		lockdiffs := computeLockDiffs(prevLocks, curLocks)

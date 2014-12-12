@@ -22,7 +22,7 @@ type FormattableDiff interface {
 // the raw BSON format of the serverStatus() command, from which the diffs
 // are calculated when using --locks
 type ServerStatus struct {
-	Locks map[string]LockStats `bson:"locks"`
+	Locks map[string]LockStats `bson:"locks,omitempty"`
 }
 
 type LockStats struct {
