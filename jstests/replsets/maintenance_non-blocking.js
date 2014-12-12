@@ -12,20 +12,7 @@ doTest = function() {
     var sColl = sDB.maint;
 
     var status = assert.commandWorked(sDB.adminCommand("replSetGetStatus"));
-    var legacy = status.replCoord == "legacy";
     printjson(status);
-    // Legacy mode must stop since it isn't non-blocking like the new code
-    if (legacy) {
-        print("***************************************************")
-        print("***************************************************")
-        print("***************************************************")
-        print("***************************************************")
-        print("aborting additional testing due to replica set legacy mode")
-        print("***************************************************")
-        print("***************************************************")
-        print("***************************************************")
-        return;
-    }
 
     print("******* fsyncLock'n secondary ************* ")
     s.getDB("admin").fsyncLock();

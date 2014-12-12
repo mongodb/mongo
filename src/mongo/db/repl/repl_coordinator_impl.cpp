@@ -1401,9 +1401,6 @@ namespace {
         fassert(18640, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
 
-        // TODO: Remove after legacy replication coordinator is deleted
-        response->append("replCoord", "impl");
-
         return result;
     }
 
