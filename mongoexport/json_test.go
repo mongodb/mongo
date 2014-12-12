@@ -18,7 +18,7 @@ func TestWriteJSON(t *testing.T) {
 		Convey("Special types should serialize as extended JSON", func() {
 
 			Convey("ObjectId should have an extended JSON format", func() {
-				jsonExporter := NewJSONExportOutput(false, out)
+				jsonExporter := NewJSONExportOutput(false, false, out)
 				objId := bson.NewObjectId()
 				err := jsonExporter.WriteHeader()
 				So(err, ShouldBeNil)
@@ -43,7 +43,7 @@ func TestJSONArray(t *testing.T) {
 	Convey("With a JSON export output in array mode", t, func() {
 		out := &bytes.Buffer{}
 		Convey("exporting a bunch of documents should produce valid json", func() {
-			jsonExporter := NewJSONExportOutput(true, out)
+			jsonExporter := NewJSONExportOutput(true, false, out)
 			err := jsonExporter.WriteHeader()
 			So(err, ShouldBeNil)
 
