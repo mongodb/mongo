@@ -107,6 +107,7 @@ files.forEach(function(x) {
         'fsync2|' +
         'geo.*|' +
         'indexh|' +
+        'index_bigkeys_nofail|' +
         'remove5|' +
         'update4|' +
         'loglong|' +
