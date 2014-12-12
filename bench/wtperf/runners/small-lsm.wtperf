@@ -1,6 +1,6 @@
 # wtperf options file: small lsm configuration
 conn_config="cache_size=500MB"
-table_config="lsm=(chunk_size=5MB),type=lsm,os_cache_dirty_max=16MB"
+table_config="lsm=(chunk_size=10MB),type=lsm"
 icount=500000
 report_interval=5
 run_time=120
