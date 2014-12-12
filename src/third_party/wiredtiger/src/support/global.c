@@ -57,6 +57,10 @@ __wt_global_once(void)
 	TAILQ_INIT(&__wt_process.connqh);
 
 #ifdef HAVE_DIAGNOSTIC
+	/* Verify the pre-computed metadata hash. */
+	WT_ASSERT(NULL, WT_METAFILE_NAME_HASH ==
+	    __wt_hash_city64(WT_METAFILE_URI, strlen(WT_METAFILE_URI)));
+
 	/* Load debugging code the compiler might optimize out. */
 	(void)__wt_breakpoint();
 #endif

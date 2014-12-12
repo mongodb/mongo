@@ -20,8 +20,15 @@
 
 #define	WT_METADATA_URI		"metadata:"		/* Metadata alias */
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata file URI */
+/*
+ * Pre computed hash for the metadata file. Used to optimize comparisons
+ * against the metafile URI. The validity is checked on connection open
+ * when diagnostic is enabled.
+ */
+#define	WT_METAFILE_NAME_HASH	1045034099109282882LLU	/* Metadata file hash */
 #define	WT_IS_METADATA(dh)						\
-	(strcmp((dh)->name, WT_METAFILE_URI) == 0)
+	((dh)->name_hash == WT_METAFILE_NAME_HASH &&			\
+	strcmp((dh)->name, WT_METAFILE_URI) == 0)
 #define	WT_METAFILE_ID		0			/* Metadata file ID */
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */

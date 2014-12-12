@@ -408,6 +408,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "cursor: cursor search calls";
 	stats->cursor_search_near.desc = "cursor: cursor search near calls";
 	stats->cursor_update.desc = "cursor: cursor update calls";
+	stats->dh_conn_handles.desc = "data-handle: connection dhandles swept";
+	stats->dh_conn_sweeps.desc = "data-handle: connection sweeps";
 	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
 	stats->log_slot_closes.desc = "log: consolidated slot closures";
@@ -421,6 +423,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_bytes_payload.desc = "log: log bytes of payload data";
 	stats->log_bytes_written.desc = "log: log bytes written";
 	stats->log_reads.desc = "log: log read operations";
+	stats->log_compress_writes.desc = "log: log records compressed";
+	stats->log_compress_write_fails.desc =
+	    "log: log records not compressed";
+	stats->log_compress_small.desc =
+	    "log: log records too small to compress";
 	stats->log_scans.desc = "log: log scan operations";
 	stats->log_scan_rereads.desc =
 	    "log: log scan records requiring two reads";
@@ -428,11 +435,19 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_writes.desc = "log: log write operations";
 	stats->log_slot_consolidated.desc = "log: logging bytes consolidated";
 	stats->log_max_filesize.desc = "log: maximum log file size";
+	stats->log_prealloc_max.desc =
+	    "log: number of pre-allocated log files to create";
+	stats->log_prealloc_files.desc =
+	    "log: pre-allocated log files prepared";
+	stats->log_prealloc_used.desc = "log: pre-allocated log files used";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
 	stats->log_scan_records.desc = "log: records processed by log scan";
 	stats->log_slot_switch_fails.desc =
 	    "log: slots selected for switching that were unavailable";
+	stats->log_compress_mem.desc =
+	    "log: total in-memory size of compressed records";
 	stats->log_buffer_size.desc = "log: total log buffer size";
+	stats->log_compress_len.desc = "log: total size of compressed records";
 	stats->log_close_yields.desc =
 	    "log: yields waiting for previous log file close";
 	stats->lsm_work_queue_app.desc =
@@ -548,6 +563,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->dh_conn_handles.v = 0;
+	stats->dh_conn_sweeps.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_session_sweeps.v = 0;
 	stats->log_slot_closes.v = 0;
@@ -559,14 +576,22 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_bytes_payload.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;
+	stats->log_compress_writes.v = 0;
+	stats->log_compress_write_fails.v = 0;
+	stats->log_compress_small.v = 0;
 	stats->log_scans.v = 0;
 	stats->log_scan_rereads.v = 0;
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;
 	stats->log_slot_consolidated.v = 0;
+	stats->log_prealloc_max.v = 0;
+	stats->log_prealloc_files.v = 0;
+	stats->log_prealloc_used.v = 0;
 	stats->log_slot_toobig.v = 0;
 	stats->log_scan_records.v = 0;
 	stats->log_slot_switch_fails.v = 0;
+	stats->log_compress_mem.v = 0;
+	stats->log_compress_len.v = 0;
 	stats->log_close_yields.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->lsm_checkpoint_throttle.v = 0;

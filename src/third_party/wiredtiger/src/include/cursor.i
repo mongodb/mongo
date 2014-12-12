@@ -117,6 +117,15 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	}
 
 	/*
+	 * If we were scanning and saw a lot of deleted records on this page,
+	 * try to evict the page when we release it.
+	 */
+	if (cbt->ref != NULL &&
+	    cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD)
+		__wt_page_evict_soon(cbt->ref->page);
+	cbt->page_deleted_count = 0;
+
+	/*
 	 * Release any page references we're holding.  This can trigger
 	 * eviction (e.g., forced eviction of big pages), so it is important to
 	 * do it after releasing our snapshot above.
@@ -124,6 +133,38 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	WT_RET(__wt_page_release(session, cbt->ref, 0));
 	cbt->ref = NULL;
 	return (0);
+}
+
+/*
+ * __wt_cursor_dhandle_incr_use --
+ *	Increment the in-use counter in cursor's data source.
+ */
+static inline void
+__wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+
+	/* If we open a handle with a time of death set, clear it. */
+	if (WT_ATOMIC_ADD4(dhandle->session_inuse, 1) == 1 &&
+	    dhandle->timeofdeath != 0)
+		dhandle->timeofdeath = 0;
+}
+
+/*
+ * __wt_cursor_dhandle_decr_use --
+ *	Decrement the in-use counter in cursor's data source.
+ */
+static inline void
+__wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+
+	WT_ASSERT(session, dhandle->session_inuse > 0);
+	(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
 }
 
 /*

@@ -188,6 +188,8 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
+	WT_STATS dh_conn_handles;
+	WT_STATS dh_conn_sweeps;
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
 	WT_STATS file_open;
@@ -196,7 +198,15 @@ struct __wt_connection_stats {
 	WT_STATS log_bytes_payload;
 	WT_STATS log_bytes_written;
 	WT_STATS log_close_yields;
+	WT_STATS log_compress_len;
+	WT_STATS log_compress_mem;
+	WT_STATS log_compress_small;
+	WT_STATS log_compress_write_fails;
+	WT_STATS log_compress_writes;
 	WT_STATS log_max_filesize;
+	WT_STATS log_prealloc_files;
+	WT_STATS log_prealloc_max;
+	WT_STATS log_prealloc_used;
 	WT_STATS log_reads;
 	WT_STATS log_scan_records;
 	WT_STATS log_scan_rereads;

@@ -247,7 +247,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			 * the underlying data source.
 			 */
 			WT_RET(__wt_schema_get_colgroup(
-			    session, uri, NULL, &colgroup));
+			    session, uri, 0, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
 		} else if (WT_PREFIX_MATCH(uri, "config:"))
@@ -953,6 +953,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 {
 	static const WT_SESSION stds = {
 		NULL,
+		NULL,
 		__session_close,
 		__session_reconfigure,
 		__session_open_cursor,
@@ -1022,6 +1023,20 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	TAILQ_INIT(&session_ret->cursors);
 	SLIST_INIT(&session_ret->dhandles);
+	/*
+	 * If we don't have one, allocate the dhandle hash array.
+	 * Allocate the table hash array as well.
+	 */
+	if (session_ret->dhhash == NULL)
+		WT_ERR(__wt_calloc(session_ret, WT_HASH_ARRAY_SIZE,
+		    sizeof(struct __dhandles_hash), &session_ret->dhhash));
+	if (session_ret->tablehash == NULL)
+		WT_ERR(__wt_calloc(session_ret, WT_HASH_ARRAY_SIZE,
+		    sizeof(struct __tables_hash), &session_ret->tablehash));
+	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
+		SLIST_INIT(&session_ret->dhhash[i]);
+		SLIST_INIT(&session_ret->tablehash[i]);
+	}
 
 	/* Initialize transaction support: default to read-committed. */
 	session_ret->isolation = TXN_ISO_READ_COMMITTED;

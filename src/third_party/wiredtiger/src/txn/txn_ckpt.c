@@ -156,7 +156,7 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 		}
 		WT_ERR(ckpt_closed ?
 		    __wt_meta_btree_apply(session, op, cfg) :
-		    __wt_conn_btree_apply(session, 0, op, cfg));
+		    __wt_conn_btree_apply(session, 0, NULL, op, cfg));
 	}
 
 	if (fullp != NULL)
@@ -376,7 +376,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Tell logging that we are about to start a database checkpoint. */
-	if (conn->logging && full)
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
@@ -392,7 +392,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Tell logging that we have started a database checkpoint. */
-	if (conn->logging && full) {
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full) {
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
 		logging = 1;
@@ -877,7 +877,7 @@ __checkpoint_worker(
 	WT_FULL_BARRIER();
 
 	/* Tell logging that a file checkpoint is starting. */
-	if (conn->logging)
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
@@ -914,7 +914,7 @@ fake:	/* Update the object's metadata. */
 	}
 
 	/* Tell logging that the checkpoint is complete. */
-	if (conn->logging)
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 

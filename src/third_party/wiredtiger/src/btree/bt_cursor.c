@@ -968,7 +968,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 	 * the logging code) disabling writing of the in-memory remove records
 	 * to disk.
 	 */
-	if (S2C(session)->logging)
+	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 		WT_RET(__wt_txn_truncate_log(session, start, stop));
 
 	switch (btree->type) {
@@ -1000,7 +1000,7 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		break;
 	}
 
-err:	if (S2C(session)->logging)
+err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 		WT_TRET(__wt_txn_truncate_end(session));
 	return (ret);
 }

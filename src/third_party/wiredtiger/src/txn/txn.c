@@ -357,8 +357,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		    (WT_SESSION *)session, txn->id, 1));
 
 	/* If we are logging, write a commit log record. */
-	if (ret == 0 &&
-	    txn->mod_count > 0 && S2C(session)->logging &&
+	if (ret == 0 && txn->mod_count > 0 &&
+	    FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING))
 		ret = __wt_txn_log_commit(session, cfg);
 

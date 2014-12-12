@@ -223,6 +223,16 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_page_evict_soon --
+ *      Set a page to be evicted as soon as possible.
+ */
+static inline void
+__wt_page_evict_soon(WT_PAGE *page)
+{
+	page->read_gen = WT_READGEN_OLDEST;
+}
+
+/*
  * __wt_page_refp --
  *      Return the page's index and slot for a reference.
  */

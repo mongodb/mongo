@@ -35,7 +35,8 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	conn->ckpt_logsize = (wt_off_t)cval.val;
 	__wt_log_written_reset(session);
 	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
-	    (conn->ckpt_logsize && !conn->logging && conn->ckpt_usecs == 0)) {
+	    (conn->ckpt_logsize && conn->ckpt_usecs == 0 &&
+	     !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
 		*startp = 0;
 		return (0);
 	}
