@@ -85,16 +85,13 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)
 
     # This test generates thousands of potential scenarios.
-    # For long runs (when --long is set) we'll use all of them, up to
-    # a large limit, and a small number for default runs.
-    max_scen = 5000 if wttest.islongtest() else 20
+    # For default runs, we'll use a small subset of them, for
+    # long runs (when --long is set) we'll set a much larger limit.
+    scenarios = number_scenarios(prune_scenarios(all_scenarios, 20, 5000))
 
     # Each check_log() call takes a second, so we don't call it for
     # every scenario, we'll limit it to the value of checklog_calls.
     checklog_calls = 100 if wttest.islongtest() else 2
-
-    # Make the list of scenarios that will actually be used
-    scenarios = number_scenarios(prune_scenarios(all_scenarios, max_scen))
     checklog_mod = (len(scenarios) / checklog_calls + 1)
 
     # scenarios = number_scenarios(multiply_scenarios('.', types,
