@@ -102,17 +102,29 @@ def prune_sorter_key(scene):
         p = scene[1]['P']
     return p * scene[1]['_rand']
 
-def prune_scenarios(scenes, count = -1):
+def prune_resort_key(scene):
+    """
+    Used by prune_scenerios to extract the original ordering key for sorting.
+    """
+    return scene[1]['_order']
+
+def set_long_run(islong):
+    global _is_long_run
+    _is_long_run = islong
+
+def prune_scenarios(scenes, default_count = -1, long_count = -1):
     """
     Use listed probabilities for pruning the list of scenarios.
     That is, the highest probability (value of P in the scendario)
-    are chosen more often.  With a second argument, only the
-    given number of scenarios are returned.  With no second argument,
-    only scenarios with P > .5 are returned half the time, etc.
+    are chosen more often.  With just one argument, only scenarios
+    with P > .5 are returned half the time, etc. A second argument
+    limits the number of scenarios. When a third argument is present,
+    it is a separate limit for a long run.
     """
+    global _is_long_run
     r = suite_random.suite_random()
     result = []
-    if count == -1:
+    if default_count == -1:
         # Missing second arg - return those with P == .3 at
         # 30% probability, for example.
         for scene in scenes:
@@ -123,25 +135,41 @@ def prune_scenarios(scenes, count = -1):
             result.append(scene)
         return result
     else:
-        # With second arg, we want exactly 'count' items
-        # returned.  So we'll sort them all and choose
+        # With at least a second arg present, we'll want a specific count
+        # of items returned.  So we'll sort them all and choose
         # the top number.  Not the most efficient solution,
         # but it's easy.
+        if _is_long_run and long_count != -1:
+            count = long_count
+        else:
+            count = default_count
+
+        l = len(scenes)
+        if l <= count:
+            return scenes
+        if count == 0:
+            return []
+        order = 0
         for scene in scenes:
             scene[1]['_rand'] = r.rand_float()
-        scenes = sorted(scenes, key=prune_sorter_key)
+            scene[1]['_order'] = order
+            order += 1
+        scenes = sorted(scenes, key=prune_sorter_key) # random sort driven by P
+        scenes = scenes[l-count:l]                    # truncate to get best
+        scenes = sorted(scenes, key=prune_resort_key) # original order
         for scene in scenes:
             del scene[1]['_rand']
-        l = len(scenes)
-        return scenes[l-count:l]
+            del scene[1]['_order']
+        return scenes
 
 def number_scenarios(scenes):
     """
-    Add a 'scenario_number' variable to each scenario.
+    Add a 'scenario_number' and 'scenario_name' variable to each scenario.
     The hash table for each scenario is altered!
     """
     count = 0
     for scene in scenes:
+        scene[1]['scenario_name'] = scene[0]
         scene[1]['scenario_number'] = count
         count += 1
     return scenes
