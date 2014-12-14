@@ -212,10 +212,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * Find the right hash bucket to insert into as well.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
-	if (WT_IS_METADATA(dhandle) || !WT_PREFIX_MATCH(dhandle->name, "file:"))
-		bucket = WT_METAFILE_BUCKET;
-	else
-		bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket);
 
 	session->dhandle = dhandle;
