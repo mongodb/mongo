@@ -1900,7 +1900,8 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
 	WT_RET(__wt_buf_grow(session, &r->dsk, corrected_page_size));
 	r->first_free = (uint8_t *)r->dsk.mem + len;
-	r->space_avail = r->dsk.memsize - len;
+	WT_ASSERT(session, corrected_page_size >= len);
+	r->space_avail = corrected_page_size - len;
 	WT_ASSERT(session, r->space_avail >= add_len);
 	return (0);
 }
@@ -1976,9 +1977,12 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		if (len + r->split_size <= r->page_size)
 			r->space_avail =
 			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
-		else
+		else {
+			WT_ASSERT(session, r->page_size >=
+			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + len));
 			r->space_avail = r->page_size -
 			    (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
+		}
 
 		/* If the next object fits into this page, we're good to go. */
 		if (r->space_avail >= next_len)
@@ -2363,15 +2367,16 @@ no_slots:
 		 * Note use of memmove, the source and destination buffers can
 		 * overlap.
 		 */
-		len = WT_PTRDIFF(r->first_free, (uint8_t *)dsk +
-		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP);
+		len = WT_PTRDIFF(
+		    r->first_free, (uint8_t *)dsk + dsk_dst->mem_size);
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 		(void)memmove(dsk_start, (uint8_t *)r->first_free - len, len);
 
 		r->entries -= r->raw_entries[result_slots - 1];
 		r->first_free = dsk_start + len;
-		r->space_avail =
-		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
+		r->space_avail += r->raw_offsets[result_slots];
+		WT_ASSERT(session, r->first_free + r->space_avail <=
+		    (uint8_t *)r->dsk.mem + r->dsk.memsize);
 
 		/*
 		 * Set the key for the next block (before writing the block, a
@@ -2660,8 +2665,10 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
 	r->entries -= r->total_entries;
 	r->first_free = dsk_start + len;
+	WT_ASSERT(session,
+	    r->page_size >= (WT_PAGE_HEADER_BYTE_SIZE(btree) + len));
 	r->space_avail =
-	    (r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree)) - len;
+	    r->split_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
