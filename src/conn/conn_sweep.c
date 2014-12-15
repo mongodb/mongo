@@ -33,6 +33,7 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 		if (dhandle->session_inuse == 0 && dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
 			continue;
 		}
 		if (dhandle->session_inuse != 0 ||
@@ -93,7 +94,8 @@ __sweep(WT_SESSION_IMPL *session)
 			/* If the handle was discarded, it isn't locked. */
 			if (ret == 0)
 				locked = 0;
-		}
+		} else
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 
 		if (locked)
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
