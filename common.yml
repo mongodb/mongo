@@ -1360,5 +1360,5 @@ buildvariants:
     arch: "LINUX/x86_64"
     args: "-race"
     integration_test_args: integration
-  tasks: &ubuntu1204_race_tasks
+  tasks: *ubuntu1204_race_tasks
 
