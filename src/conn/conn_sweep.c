@@ -76,9 +76,12 @@ __sweep(WT_SESSION_IMPL *session)
 		locked = 1;
 
 		/* If the handle is open, try to close it. */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_btree_sync_and_close(session, 0));
+			if (ret == 0)
+				WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+		}
 
 		/*
 		 * If there are no longer any references to the handle in any
@@ -87,7 +90,6 @@ __sweep(WT_SESSION_IMPL *session)
 		 * don't do any special handling of EBUSY returns above.
 		 */
 		if (ret == 0 && dhandle->session_ref == 0) {
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_dhandle_discard_single(session, 0));
 
