@@ -74,9 +74,17 @@ def tearDown():
     """ tear down fixture, removing all html files """
     helper_cleanup()
 
+
 def setUp():
     """ set up fixture, removing all html files """
     helper_cleanup()
+
+
+@with_setup(setUp, tearDown)
+def test_helper_runner():
+    """ helper runner should work as expected """
+    helper_run_with_fixture()
+    assert os.path.exists(os.path.join(tool_dir, 'test', '_test_wtstats.html'))
 
 
 def test_help_working():
@@ -97,21 +105,12 @@ def test_help_working():
 
 
 @with_setup(setUp, tearDown)
-def test_helper_runner():
-    """ helper runner should work as expected """
-    helper_run_with_fixture()
-    assert os.path.exists(os.path.join(tool_dir, 'test', '_test_wtstats.html'))
-
-@with_setup(setUp, tearDown)
 def test_create_html_file_basic():
     """ wtstats should create an html file from the fixture stats """
 
     outfile = os.path.join(test_dir, 'wtstats_test.html')
     statsfile = os.path.join(test_dir, 'WiredTigerStat.fixture')
     
-    # delete existing html file if exists
-    helper_delete_file(outfile)
-
     sys.argv = ['./wtstats', statsfile, '--output', outfile]
     try:
         main()
@@ -119,6 +118,32 @@ def test_create_html_file_basic():
         pass
 
     assert os.path.exists(outfile)
+
+
+@with_setup(setUp, tearDown)
+def test_output_default():
+    """ wtstats should choose default output if not specified """
+
+    statsfile = os.path.join(test_dir, 'WiredTigerStat.fixture')
+    
+    sys.argv = ['./wtstats', statsfile]
+    try:
+        main()
+    except SystemExit:
+        pass
+
+    assert os.path.exists(os.path.join('./wtstats.html'))
+    helper_delete_file('./wtstats.html')
+
+
+@with_setup(setUp, tearDown)
+def test_output_option():
+    """ wtstats should use the specified filename with --output """
+
+    outfile = '_foo_bar_baz.html'
+    helper_run_with_fixture({'--output': outfile, '--abstime': None})
+    assert os.path.exists(os.path.join(test_dir, outfile))
+    
 
 @with_setup(setUp, tearDown)
 def test_add_ext_if_missing():
@@ -152,7 +177,7 @@ def test_replace_data_in_template():
 
 @with_setup(setUp, tearDown)
 def test_data_with_options():
-    """ wtstats outputs the data as expected to the html file """
+    """ wtstats should output the data as expected to the html file """
 
     outfile = '_test_output_file.html'
     helper_run_with_fixture({'--output': outfile})
@@ -218,7 +243,7 @@ def test_include_option():
 
 @with_setup(setUp, tearDown)
 def test_include_skip_prefix():
-    """ wtstats removes the common prefix from titles """ 
+    """ wtstats should remove the common prefix from titles """ 
 
     outfile = '_test_output_file.html'
     helper_run_with_fixture({'--output': outfile, '--include': 'cache'})
@@ -231,20 +256,18 @@ def test_include_skip_prefix():
 
 @with_setup(setUp, tearDown)
 def test_list_option():
-    """ wtstats only outputs list of series titles with --list """
+    """ wtstats should only output list of series titles with --list """
 
     outfile = '_test_output_file.html'
-    helper_cleanup()
     helper_run_with_fixture({'--output': outfile, '--list': None})
-
-    # capture stdout
-    output = sys.stdout.getvalue().splitlines()
 
     # no html file created
     assert not os.path.exists(os.path.join(test_dir, outfile))
 
-    # find an example output line
+    # find one expected output line
+    output = sys.stdout.getvalue().splitlines()
     assert next((l for l in output if 'log: total log buffer size' in l), None) != None
+
 
 
 
