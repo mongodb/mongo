@@ -36,13 +36,6 @@ import json
 import pprint
 from datetime import datetime
 
-# Make sure Python can find files in the tools directory
-# tool_dir = os.path.split(sys.argv[0])[0]
-
-# Make sure Python finds the NVD3 in our third party directory.
-# To avoid compatability issues, prepend it to the system path.
-# sys.path = [ os.path.join(tool_dir, "3rdparty") ] + sys.path
-
 try:
     from stat_data \
         import groups, no_scale_per_second_list, no_clear_list, prefix_list
@@ -57,20 +50,6 @@ except ImportError:
     print >>sys.stderr, "Could not import wtperf_stats.py, it should be\
         in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
-
-# try:
-#     from wt_nvd3_util import multiChart, parsetime
-# except ImportError:
-#     print >>sys.stderr, "Could not import wt_nvd3_util.py, it should be\
-#             in the same directory as %s" % sys.argv[0]
-#     sys.exit(-1)
-
-# try:
-#     from nvd3 import lineChart, lineWithFocusChart
-# except ImportError:
-#     print >>sys.stderr, "Could not import nvd3 it should be installed locally"
-#     sys.exit(-1)
-
 
 thisyear = datetime.today().year
 def parsetime(s):
@@ -248,9 +227,6 @@ def main():
         if args.abstime:
             chart_extra['x_axis_format'] = '%H:%M:%S'
 
-        # Create the chart, add the series
-        # chart = charttype(name='statlog', height=450+10*len(this_series), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
-
         json_output = {
             "chart": {
                 "type": charttype,
@@ -287,13 +263,6 @@ def main():
         dstfile.close()
 
         print "copying %s to %s" % (srcfile.name, dstfile.name)
-
-        # chart.buildhtml()
-        # output_file = open(outputname, 'w')
-        # output_file.write(chart.htmlcontent)
-
-        # #close Html file
-        # output_file.close()
 
     # Split out the data, convert timestamps
     results = []
