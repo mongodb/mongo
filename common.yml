@@ -132,7 +132,6 @@ mongo_tools_variables:
       - name: legacy24
       - name: log
       - name: pool
-      - name: progress
       - name: qa-tests
       - name: qa-tests-wt
       - name: text

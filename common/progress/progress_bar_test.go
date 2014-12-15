@@ -1,4 +1,5 @@
 // +build !race
+
 // Disable race detector since these tests are inherently racy
 package progress
 
