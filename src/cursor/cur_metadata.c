@@ -438,7 +438,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
 
 	if (0) {
-err:		__wt_free(session, mdc);
+err:		if (mdc->file_cursor != NULL)
+			WT_TRET(mdc->file_cursor->close(mdc->file_cursor));
+		__wt_free(session, mdc);
 	}
 	return (ret);
 }
