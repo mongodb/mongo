@@ -232,7 +232,7 @@ __async_start(WT_SESSION_IMPL *session)
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_ASYNC), &conn->async));
+	WT_RET(__wt_calloc_def(session, 1, &conn->async));
 	async = conn->async;
 	STAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));

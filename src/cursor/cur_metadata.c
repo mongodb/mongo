@@ -421,7 +421,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_CURSOR_METADATA), &mdc));
+	WT_RET(__wt_calloc_def(session, 1, &mdc));
 
 	cursor = &mdc->iface;
 	*cursor = iface;

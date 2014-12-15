@@ -341,7 +341,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Logging is on, allocate the WT_LOG structure and open the log file.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_LOG), &conn->log));
+	WT_RET(__wt_calloc_def(session, 1, &conn->log));
 	log = conn->log;
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));

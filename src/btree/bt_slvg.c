@@ -1181,7 +1181,7 @@ __slvg_col_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		WT_ERR(__wt_calloc_def(session, 1, &addr));
 		WT_ERR(__wt_strndup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
@@ -1826,7 +1826,7 @@ __slvg_row_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		WT_ERR(__wt_calloc_def(session, 1, &addr));
 		WT_ERR(__wt_strndup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
