@@ -407,6 +407,12 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 	case authVersionPair{5, 5}:
 		log.Log(log.Info,
 			"restoring users and roles of auth version 5 to a server of auth version 5")
+	case authVersionPair{3, 3}:
+		log.Log(log.Info,
+			"restoring users and roles of auth version 3 to a server of auth version 3")
+	case authVersionPair{1, 1}:
+		log.Log(log.Info,
+			"restoring users and roles of auth version 1 to a server of auth version 1")
 	case authVersionPair{1, 5}:
 		return fmt.Errorf("cannot restore users of auth version 1 to a server of auth version 5")
 	case authVersionPair{5, 3}:
