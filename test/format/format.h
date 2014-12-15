@@ -166,7 +166,8 @@ typedef struct {
 
 	char *config_open;			/* Command-line configuration */
 
-	uint32_t c_auto_throttle;		/* Config values */
+	uint32_t c_abort;			/* Config values */
+	uint32_t c_auto_throttle;
 	uint32_t c_backups;
 	uint32_t c_bitcnt;
 	uint32_t c_bloom;

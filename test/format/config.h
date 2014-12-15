@@ -66,6 +66,10 @@ typedef struct {
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
+	{ "abort",
+	  "if timed run should drop core",			/* 0% */
+	  C_BOOL, 0, 0, 0, &g.c_abort, NULL },
+
 	{ "auto_throttle",
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
