@@ -1900,7 +1900,8 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
 	WT_RET(__wt_buf_grow(session, &r->dsk, corrected_page_size));
 	r->first_free = (uint8_t *)r->dsk.mem + len;
-	r->space_avail += add_len;
+	r->space_avail = r->dsk.memsize - len;
+	WT_ASSERT(session, r->space_avail >= add_len);
 	return (0);
 }
 
