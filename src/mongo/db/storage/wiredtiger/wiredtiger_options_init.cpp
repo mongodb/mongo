@@ -27,7 +27,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
- 
+
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
@@ -35,20 +35,22 @@
 
 namespace mongo {
 
-    // Interface to MongoDB option parsing.
-    WiredTigerGlobalOptions wiredTigerGlobalOptions;
-
     MONGO_MODULE_STARTUP_OPTIONS_REGISTER(WiredTigerOptions)(InitializerContext* context) {
         return wiredTigerGlobalOptions.add(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(WiredTigerOptions)(InitializerContext* context) {
-        if (!wiredTigerGlobalOptions.handlePreValidation(moe::startupOptionsParsed)) {
-            ::_exit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
+
+        // Make --syncdelay (syncPeriodSecs in mmapv1) an alias for checkpointDelaySecs in WT
+        moe::Value syncdelayVal;
+        if (moe::startupOptionsParsed.get("storage.mmapv1.syncPeriodSecs", &syncdelayVal).isOK()) {
+            // syncdelay is a double but checkpointDelaySecs is an int.
+            moe::Value newVal(static_cast<int>(syncdelayVal.as<double>()));
+            Status ret = moe::startupOptionsParsed.set(
+                "storage.wiredTiger.engineConfig.checkpointDelaySecs", newVal);
+            if (!ret.isOK()) {
+                return ret;
+            }
         }
         return Status::OK();
     }

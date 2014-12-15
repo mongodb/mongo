@@ -38,6 +38,7 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -105,14 +106,14 @@ namespace mongo {
         _eventHandler.handle_progress = mdb_handle_progress;
         _eventHandler.handle_close = mdb_handle_close;
 
-        int cacheSizeGB = 1;
-
-        {
+        size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
+        if (cacheSizeGB == 0) {
+            // Since the user didn't provide a cache size, choose a reasonable default value.
             ProcessInfo pi;
             unsigned long long memSizeMB  = pi.getMemSizeMB();
             if ( memSizeMB  > 0 ) {
                 double cacheMB = memSizeMB / 2;
-                cacheSizeGB = static_cast<int>( cacheMB / 1024 );
+                cacheSizeGB = static_cast<size_t>( cacheMB / 1024 );
                 if ( cacheSizeGB < 1 )
                     cacheSizeGB = 1;
             }
@@ -139,9 +140,21 @@ namespace mongo {
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(all),";
         if ( _durable ) {
-            ss << "log=(enabled=true,archive=true,path=journal,compressor=snappy),";
+            ss << "log=(enabled=true,archive=true,path=journal,compressor=";
+
+            // TODO: remove this; SERVER-16568
+            std::string localJournalCompressor;
+            if (wiredTigerGlobalOptions.journalCompressor == "none") {
+                localJournalCompressor = "";
+            }
+            else {
+                localJournalCompressor = wiredTigerGlobalOptions.journalCompressor;
+            }
+            ss << localJournalCompressor << "),";
         }
-        ss << "checkpoint=(wait=60,log_size=2GB),";
+        ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
+        ss << ",log_size=2GB),";
+        ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
         ss << extraOpenOptions;
         string config = ss.str();
         log() << "wiredtiger_open config: " << config;
@@ -296,7 +309,7 @@ namespace mongo {
 
         string uri = _uri( ident );
         WT_SESSION* s = session.getSession();
-        LOG(1) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
+        LOG(2) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
         return wtRCToStatus( s->create( s, uri.c_str(), config.c_str() ) );
     }
 
@@ -331,7 +344,12 @@ namespace mongo {
         if (!result.isOK()) {
             return result.getStatus();
         }
-        return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), result.getValue()));
+
+        std::string config = result.getValue();
+
+        LOG(2) << "WiredTigerKVEngine::createSortedDataInterface ident: " << ident
+               << " config: " << config;
+        return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
     }
 
     SortedDataInterface* WiredTigerKVEngine::getSortedDataInterface( OperationContext* opCtx,

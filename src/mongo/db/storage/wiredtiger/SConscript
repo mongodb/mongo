@@ -8,8 +8,9 @@ if wiredtiger:
 
     # This is the smallest possible set of files that wraps WT
     wtEnv.Library(
-        target= 'storage_wiredtiger_core',
+        target='storage_wiredtiger_core',
         source= [
+            'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',
             'wiredtiger_record_store.cpp',
@@ -37,7 +38,6 @@ if wiredtiger:
     wtEnv.Library(
         target='storage_wiredtiger',
         source=[
-            'wiredtiger_global_options.cpp',
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
             'wiredtiger_parameters.cpp',
@@ -86,4 +86,3 @@ if wiredtiger:
             'storage_wiredtiger_core',
             ],
         )
-

@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -150,7 +151,7 @@ namespace {
                                 const WT_ITEM *b,
                                 int *cmp) {
 
-                try { 
+                try {
                     WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
                     *cmp = c->Compare(s, a, b);
                     return 0;
@@ -283,8 +284,21 @@ namespace {
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        ss << "type=file,leaf_page_max=16k,prefix_compression,";
+        ss << "type=file,leaf_page_max=16k,";
+        if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
+            ss << "prefix_compression,";
+        }
 
+        // TODO: remove this; SERVER-16568
+        std::string localIndexBlockCompressor;
+        if (wiredTigerGlobalOptions.indexBlockCompressor == "none") {
+            localIndexBlockCompressor = "";
+        }
+        else {
+            localIndexBlockCompressor = wiredTigerGlobalOptions.indexBlockCompressor;
+        }
+
+        ss << "block_compressor=" << localIndexBlockCompressor << ",";
         ss << extraConfig;
 
         // Validate configuration object.
@@ -316,7 +330,7 @@ namespace {
                 << "infoObj=" << desc.infoObj().jsonString()
             << "),";
 
-
+        LOG(3) << "index create string: " << ss.ss.str();
         return StatusWith<std::string>(ss);
     }
 

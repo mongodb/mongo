@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
@@ -109,7 +110,20 @@ namespace {
         ss << "type=file,";
         ss << "memory_page_max=100m,";
         ss << "leaf_value_max=1MB,";
-        ss << "block_compressor=snappy,";
+        if (wiredTigerGlobalOptions.useCollectionPrefixCompression) {
+            ss << "prefix_compression,";
+        }
+
+        // TODO: remove this; SERVER-16568
+        std::string localCollectionBlockCompressor;
+        if (wiredTigerGlobalOptions.collectionBlockCompressor == "none") {
+            localCollectionBlockCompressor = "";
+        }
+        else {
+            localCollectionBlockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
+        }
+
+        ss << "block_compressor=" << localCollectionBlockCompressor << ",";
 
         ss << extraStrings << ",";
 
