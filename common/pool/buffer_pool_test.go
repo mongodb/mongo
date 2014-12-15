@@ -6,37 +6,6 @@ import (
 	"testing"
 )
 
-func TestBufferPoolRecycling(t *testing.T) {
-
-	testutil.VerifyTestType(t, "unit")
-
-	Convey("With a BufferPool of size 1", t, func() {
-		bp := NewBufferPool(1)
-		So(bp, ShouldNotBeNil)
-
-		Convey("get a buffer from the pool and then return it", func() {
-			a := bp.Get()
-			So(len(a), ShouldEqual, 1)
-			a[0] = 'a'
-			bp.Put(a)
-
-			Convey("so now getting a buffer should recycle the previous buffer", func() {
-				newA := bp.Get()
-				So(newA[0], ShouldEqual, 'a')
-
-				newA[0] = 'X'
-				So(a[0], ShouldEqual, 'X') //assure both point to the same thing
-
-				Convey("but getting a second new buffer should be clean", func() {
-					newB := bp.Get()
-					So(newB[0], ShouldNotEqual, 'a')
-					So(newB[0], ShouldNotEqual, 'X')
-				})
-			})
-		})
-	})
-}
-
 func TestBufferPoolAllocation(t *testing.T) {
 
 	testutil.VerifyTestType(t, "unit")
