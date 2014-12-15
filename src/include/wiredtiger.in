@@ -745,6 +745,18 @@ struct __wt_session {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
+	/*
+	 * Don't expose app_private to non-C language bindings - they have
+	 * their own way to attach data to an operation.
+	 */
+#if !defined(SWIG)
+	/*!
+	 * A location for applications to store information that will be
+	 * available in callbacks taking a WT_SESSION handle.
+	 */
+	void *app_private;
+#endif
+
 	/*!
 	 * Close the session handle.
 	 *
@@ -2043,6 +2055,11 @@ struct __wt_event_handler {
 	 * Callback to handle error messages; by default, error messages are
 	 * written to the stderr stream.
 	 *
+	 * Errors that require the application to exit and restart will have
+	 * their \c error value set to \c WT_PANIC. The application can exit
+	 * immediately when \c WT_PANIC is passed to an error handler, there
+	 * is no reason to return into WiredTiger.
+	 *
 	 * Error handler returns are not ignored: if the handler returns
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
@@ -2513,7 +2530,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*!
  * WiredTiger library panic.
  * This error indicates an underlying problem that requires the application exit
- * and restart.
+ * and restart. The application can exit immediately when \c WT_PANIC is
+ * returned from a WiredTiger interface, no further WiredTiger calls are
+ * required.
  */
 #define	WT_PANIC	-31804
 /*! @cond internal */

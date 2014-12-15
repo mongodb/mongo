@@ -33,7 +33,7 @@
 import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open, stat
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
@@ -55,7 +55,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, ckpt_list))
+    scenarios = number_scenarios(prune_scenarios(multiply_scenarios('.', types, ckpt_list), 1, 100))
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
