@@ -71,61 +71,62 @@ except ImportError:
 #     print >>sys.stderr, "Could not import nvd3 it should be installed locally"
 #     sys.exit(-1)
 
-def main():   
-    thisyear = datetime.today().year
-    def parsetime(s):
-        return datetime.strptime(s, "%b %d %H:%M:%S").replace(year=thisyear)
 
-    if sys.version_info<(2,7,0):
-        print >>sys.stderr, "You need python 2.7 or later to run this script"
-        sys.exit(-1)
+thisyear = datetime.today().year
+def parsetime(s):
+    return datetime.strptime(s, "%b %d %H:%M:%S").replace(year=thisyear)
 
-    # Plot a set of entries for a title.
-    def munge(title, values):
-        t0, v0 = values[0]
-        start_time = parsetime(t0)
+if sys.version_info<(2,7,0):
+    print >>sys.stderr, "You need python 2.7 or later to run this script"
+    sys.exit(-1)
 
-        ylabel = ' '.join(title.split(' ')).lower()
-        if title.split(' ')[1] != 'spinlock' and \
-          title.split(' ', 1)[1] in no_scale_per_second_list:
+# Plot a set of entries for a title.
+def munge(args, title, values):
+    t0, v0 = values[0]
+    start_time = parsetime(t0)
+
+    ylabel = ' '.join(title.split(' ')).lower()
+    if title.split(' ')[1] != 'spinlock' and \
+      title.split(' ', 1)[1] in no_scale_per_second_list:
+        seconds = 1
+    else:
+        t1, v1 = values[1]
+        seconds = (parsetime(t1) - start_time).seconds
+        ylabel += ' per second'
+        if seconds == 0:
             seconds = 1
+
+    stats_cleared = False
+    if args.clear or title.split(' ', 1)[1] in no_clear_list:
+        stats_cleared = True
+
+    # Split the values into a dictionary of y-axis values keyed by the x axis
+    ydata = {}
+    last_value = 0.0
+    for t, v in sorted(values):
+        if args.abstime:
+            # Build the time series, milliseconds since the epoch
+            x = int(mktime(parsetime(t).timetuple())) * 1000
         else:
-            t1, v1 = values[1]
-            seconds = (parsetime(t1) - start_time).seconds
-            ylabel += ' per second'
-            if seconds == 0:
-                seconds = 1
+            # Build the time series as seconds since the start of the data
+            x = (parsetime(t) - start_time).seconds
 
-        stats_cleared = False
-        if args.clear or title.split(' ', 1)[1] in no_clear_list:
-            stats_cleared = True
+        float_v = float(v)
+        if not stats_cleared:
+            float_v = float_v - last_value
+            # Sometimes WiredTiger stats go backwards without clear, assume
+            # that means nothing happened
+            if float_v < 0:
+                float_v = 0.0
+            last_value = float(v)
+        ydata[x] = float_v / seconds
 
-        # Split the values into a dictionary of y-axis values keyed by the x axis
-        ydata = {}
-        last_value = 0.0
-        for t, v in sorted(values):
-            if args.abstime:
-                # Build the time series, milliseconds since the epoch
-                x = int(mktime(parsetime(t).timetuple())) * 1000
-            else:
-                # Build the time series as seconds since the start of the data
-                x = (parsetime(t) - start_time).seconds
+    return ylabel, ydata
 
-            float_v = float(v)
-            if not stats_cleared:
-                float_v = float_v - last_value
-                # Sometimes WiredTiger stats go backwards without clear, assume
-                # that means nothing happened
-                if float_v < 0:
-                    float_v = 0.0
-                last_value = float(v)
-            ydata[x] = float_v / seconds
+# Parse the command line
+import argparse
 
-        return ylabel, ydata
-
-    # Parse the command line
-    import argparse
-
+def main():   
     parser = argparse.ArgumentParser(description='Create graphs from WiredTiger statistics.')
     parser.add_argument('--abstime', action='store_true',
         help='use absolute time on the x axis')
@@ -202,13 +203,15 @@ def main():
         return b
 
     def output_series(results, prefix=None, grouplist=[]):
+        # add .html ending if not present
+        extension = '' if args.output.endswith('.html') else '.html'
         # open the output file based on prefix
         if prefix == None:
-            outputname = args.output + '.html'
+            outputname = args.output + extension
         elif len(grouplist) == 0:
-            outputname = args.output +'.' + prefix + '.html'
+            outputname = args.output +'.' + prefix + extension
         else:
-            outputname = args.output +'.group.' + prefix + '.html'
+            outputname = args.output +'.group.' + prefix + extension
 
         if prefix != None and len(grouplist) == 0:
             this_series = []
@@ -295,7 +298,7 @@ def main():
     # Split out the data, convert timestamps
     results = []
     for title, values in sorted(d.iteritems()):
-        title, ydata = munge(title, values)
+        title, ydata = munge(args, title, values)
         # Ignore entries if a list of regular expressions was given
         if args.include and not [r for r in args.include if r.search(title)]:
                 continue
