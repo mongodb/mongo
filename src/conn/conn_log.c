@@ -54,12 +54,11 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	*runp = cval.val != 0;
-	if (*runp == 0)
-		return (0);
 
-	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
-	if (cval.val != 0)
-		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
+	/*
+	 * Setup a log path and compression even if logging is disabled in
+	 * case we are going to print a log.
+	 */
 
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets(session, cfg, "log.compressor", &cval));
@@ -75,12 +74,20 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 			    (int)cval.len, cval.str);
 	}
 
+	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
+
+	/* We are don if logging isn't enabled. */
+	if (*runp == 0)
+		return (0);
+
+	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
+
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (wt_off_t)cval.val;
 	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
-
-	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	/*
