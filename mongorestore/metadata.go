@@ -428,3 +428,20 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 	return nil
 
 }
+
+// ShouldRestoreUsersAndRoles returns whether or not MongoRestore should
+// go through the process of handling auth collections.
+func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
+	// If the user has done anything that would indicate the restoration
+	// of users and roles (i.e. used --restoreDbUsersAndRoles, -d admin, or
+	// is doing a full restore), then we check if users or roles BSON files
+	// actually exist in the dump dir. If they do, return true.
+	if restore.InputOptions.RestoreDBUsersAndRoles ||
+		restore.ToolOptions.DB == "" ||
+		restore.ToolOptions.DB == "admin" {
+		if restore.manager.Users() != nil || restore.manager.Roles() != nil {
+			return true
+		}
+	}
+	return false
+}

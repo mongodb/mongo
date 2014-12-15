@@ -165,9 +165,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// If restoring users and roles, make sure we validate auth versions
-	restoreAuthCollections := restore.InputOptions.RestoreDBUsersAndRoles ||
-		restore.ToolOptions.DB == "" || restore.ToolOptions.DB == "admin"
-	if restoreAuthCollections {
+	if restore.ShouldRestoreUsersAndRoles() {
 		log.Log(log.Info, "comparing auth version of the dump directory and target server")
 		restore.authVersions.Dump, err = restore.GetDumpAuthVersion()
 		if err != nil {
@@ -198,7 +196,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// Restore users/roles
-	if restoreAuthCollections {
+	if restore.ShouldRestoreUsersAndRoles() {
 		if restore.manager.Users() != nil {
 			err = restore.RestoreUsersOrRoles(Users, restore.manager.Users())
 			if err != nil {
