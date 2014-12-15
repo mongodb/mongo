@@ -48,14 +48,14 @@ try:
         import groups, no_scale_per_second_list, no_clear_list, prefix_list
 except ImportError:
     print >>sys.stderr, "Could not import stat_data.py, it should be\
-            in the same directory as %s" % sys.argv[0]
+        in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
 
 try:
     from wtperf_stats import addPlotsToStatsChart
 except ImportError:
     print >>sys.stderr, "Could not import wtperf_stats.py, it should be\
-            in the same directory as %s" % sys.argv[0]
+        in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
 
 # try:
@@ -246,7 +246,7 @@ def main():
         chart_extra = {}
         # Add in the x axis if the user wants time.
         if args.abstime:
-                chart_extra['x_axis_format'] = '%H:%M:%S'
+            chart_extra['x_axis_format'] = '%H:%M:%S'
 
         # Create the chart, add the series
         # chart = charttype(name='statlog', height=450+10*len(this_series), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
