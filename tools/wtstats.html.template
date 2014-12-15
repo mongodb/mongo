@@ -35,8 +35,13 @@
         chart.margin({top: 30, right: 60, bottom: 20, left: 60})
         chart.xAxis
             .tickFormat(xFormat);
-        chart.yAxis
-            .tickFormat(d3.format(',g'));
+
+        if (chartType === 'multiChart') {
+            chart.yAxis1.tickFormat(d3.format(',g'));
+            chart.yAxis2.tickFormat(d3.format(',g'));
+        } else {
+            chart.yAxis.tickFormat(d3.format(',g'));
+        }
         chart.showLegend(true);
 
         console.log(data_statlog);
