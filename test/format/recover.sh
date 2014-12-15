@@ -21,7 +21,7 @@ while true; do
 		echo "recovery test: $count of $runs"
 	fi
 
-	./t $config -q abort=1 timer=$timer
+	./t $config -q abort=1 logging=1 timer=$timer
 
 	uri='file:wt'
 	if `wt -h RUNDIR list | egrep table > /dev/null`; then

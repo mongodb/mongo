@@ -200,6 +200,18 @@ static CONFIG c[] = {
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
 
+	{ "logging_archive",
+	  "if log file archival configured",			/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging_archive, NULL },
+
+	{ "logging_prealloc",
+	  "if log file pre-allocation configured",		/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL },
+
+	{ "logging",
+	  "if logging configured",				/* 30% */
+	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+
 	{ "lsm_worker_threads",
 	  "the number of LSM worker threads",
 	  0x0, 3, 4, 20, &g.c_lsm_worker_threads, NULL },
