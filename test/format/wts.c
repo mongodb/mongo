@@ -173,11 +173,14 @@ wts_create(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
+	uint32_t maxintlpage, maxintlkey, maxleafpage, maxleafkey, maxleafvalue;
 	int ret;
 	char config[4096], *end, *p;
 
 	conn = g.wts_conn;
+
+	p = config;
+	end = config + sizeof(config);
 
 	/*
 	 * Ensure that we can service at least one operation per-thread
@@ -197,23 +200,30 @@ wts_create(void)
 		if (maxleafpage > 512)
 			maxleafpage >>= 1;
 	}
-	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
-	if (maxintlitem < 40)
-		maxintlitem = 40;
-	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
-	if (maxleafitem < 40)
-		maxleafitem = 40;
-
-	p = config;
-	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
 	    "allocation_size=512,%s"
-	    "internal_page_max=%d,internal_item_max=%d,"
-	    "leaf_page_max=%d,leaf_item_max=%d",
+	    "internal_page_max=%d,leaf_page_max=%d",
 	    (g.type == ROW) ? "u" : "r",
 	    g.c_firstfit ? "block_allocation=first," : "",
-	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
+	    maxintlpage, maxleafpage);
+
+	/*
+	 * Configure the maximum key/value sizes, but leave it as the default
+	 * if we come up with something crazy.
+	 */
+	maxintlkey = MMRAND(maxintlpage / 50, maxintlpage / 40);
+	if (maxintlkey > 20)
+		p += snprintf(p, (size_t)(end - p),
+		    ",internal_key_max=%d", maxintlkey);
+	maxleafkey = MMRAND(maxleafpage / 50, maxleafpage / 40);
+	if (maxleafkey > 20)
+		p += snprintf(p, (size_t)(end - p),
+		    ",leaf_key_max=%d", maxleafkey);
+	maxleafvalue = MMRAND(maxleafpage * 10, maxleafpage / 40);
+	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
+		p += snprintf(p, (size_t)(end - p),
+		    ",leaf_value_max=%d", maxleafvalue);
 
 	switch (g.type) {
 	case FIX:

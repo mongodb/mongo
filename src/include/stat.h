@@ -287,10 +287,11 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_entries;
 	WT_STATS btree_fixed_len;
 	WT_STATS btree_maximum_depth;
-	WT_STATS btree_maxintlitem;
+	WT_STATS btree_maxintlkey;
 	WT_STATS btree_maxintlpage;
-	WT_STATS btree_maxleafitem;
+	WT_STATS btree_maxleafkey;
 	WT_STATS btree_maxleafpage;
+	WT_STATS btree_maxleafvalue;
 	WT_STATS btree_overflow;
 	WT_STATS btree_row_internal;
 	WT_STATS btree_row_leaf;

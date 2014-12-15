@@ -996,12 +996,12 @@ struct __wt_session {
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
 	 * boolean flag; default \c false.}
-	 * @config{internal_item_max, the largest key stored within an internal
-	 * node\, in bytes.  If non-zero\, any key larger than the specified
-	 * size will be stored as an overflow item (which may require additional
-	 * I/O to access). If zero\, a default size is chosen that permits at
-	 * least 8 keys per internal page., an integer greater than or equal to
-	 * 0; default \c 0.}
+	 * @config{internal_key_max, the largest key stored in an internal
+	 * node\, in bytes.  If set\, keys larger than the specified size are
+	 * stored as overflow items (which may require additional I/O to
+	 * access). The default and the maximum allowed value are both one-tenth
+	 * the size of a newly split internal page., an integer greater than or
+	 * equal to 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
 	 * discarding unnecessary trailing bytes on internal keys (ignored for
 	 * custom collators)., a boolean flag; default \c true.}
@@ -1019,12 +1019,11 @@ struct __wt_session {
 	 * row-store files: keys of type \c 'r' are record numbers and records
 	 * referenced by record number are stored in column-store files., a
 	 * format string; default \c u.}
-	 * @config{leaf_item_max, the largest key or value stored within a leaf
-	 * node\, in bytes.  If non-zero\, any key or value larger than the
-	 * specified size will be stored as an overflow item (which may require
-	 * additional I/O to access). If zero\, a default size is chosen that
-	 * permits at least 4 key and value pairs per leaf page., an integer
-	 * greater than or equal to 0; default \c 0.}
+	 * @config{leaf_key_max, the largest key stored in a leaf node\, in
+	 * bytes.  If set\, keys larger than the specified size are stored as
+	 * overflow items (which may require additional I/O to access). The
+	 * default value is one-tenth the size of a newly split leaf page., an
+	 * integer greater than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size\, and is
 	 * significant for applications wanting to maximize sequential data
@@ -1032,6 +1031,13 @@ struct __wt_session {
 	 * uncompressed data\, that is\, the limit is applied before any block
 	 * compression is done., an integer between 512B and 512MB; default \c
 	 * 32KB.}
+	 * @config{leaf_value_max, the largest value stored in a leaf node\, in
+	 * bytes.  If set\, values larger than the specified size are stored as
+	 * overflow items (which may require additional I/O to access). If the
+	 * size is larger than the maximum leaf page size\, the page size is
+	 * temporarily ignored when large values are written.  The default is
+	 * one-half the size of a newly split leaf page., an integer greater
+	 * than or equal to 0; default \c 0.}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
@@ -2648,7 +2654,7 @@ struct __wt_compressor {
 	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
 	 * the destination buffer will be at least the size returned by that
 	 * method; otherwise, the destination buffer will be at least as large
-	 * as \c src_len.
+	 * as the length of the data to compress.
 	 *
 	 * If compression would not shrink the data or the \c dst buffer is not
 	 * large enough to hold the compressed data, the callback should set
@@ -2718,10 +2724,8 @@ struct __wt_compressor {
 	 * On entry, \c dst points to the destination buffer with a length
 	 * of \c dst_len.  If the WT_COMPRESSOR::pre_size method is specified,
 	 * the destination buffer will be at least the size returned by that
-	 * method; otherwise, the destination buffer will be at least the
-	 * maximum size for the page being written (that is, when writing a
-	 * row-store leaf page, the destination buffer will be at least as
-	 * large as the \c leaf_page_max configuration value).
+	 * method; otherwise, the destination buffer will be at least as large
+	 * as the length of the data to compress.
 	 *
 	 * After successful completion, the callback should return \c 0, and
 	 * set \c result_slotsp to the number of byte strings encoded and
@@ -3384,130 +3388,132 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_FIXED_LEN			2023
 /*! btree: maximum tree depth */
 #define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		2024
-/*! btree: maximum internal page item size */
-#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			2025
+/*! btree: maximum internal page key size */
+#define	WT_STAT_DSRC_BTREE_MAXINTLKEY			2025
 /*! btree: maximum internal page size */
 #define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			2026
-/*! btree: maximum leaf page item size */
-#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			2027
+/*! btree: maximum leaf page key size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFKEY			2027
 /*! btree: maximum leaf page size */
 #define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			2028
+/*! btree: maximum leaf page value size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFVALUE			2029
 /*! btree: overflow pages */
-#define	WT_STAT_DSRC_BTREE_OVERFLOW			2029
+#define	WT_STAT_DSRC_BTREE_OVERFLOW			2030
 /*! btree: row-store internal pages */
-#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			2030
+#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			2031
 /*! btree: row-store leaf pages */
-#define	WT_STAT_DSRC_BTREE_ROW_LEAF			2031
+#define	WT_STAT_DSRC_BTREE_ROW_LEAF			2032
 /*! cache: bytes read into cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_READ			2032
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			2033
 /*! cache: bytes written from cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			2033
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			2034
 /*! cache: checkpoint blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		2034
+#define	WT_STAT_DSRC_CACHE_EVICTION_CHECKPOINT		2035
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2035
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2036
 /*! cache: modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2036
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2037
 /*! cache: data source pages selected for eviction unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2037
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		2038
 /*! cache: hazard pointer blocked page eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2038
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		2039
 /*! cache: internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2039
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2040
 /*! cache: in-memory page splits */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2040
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2041
 /*! cache: overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2041
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		2042
 /*! cache: pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				2042
+#define	WT_STAT_DSRC_CACHE_READ				2043
 /*! cache: overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2043
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2044
 /*! cache: pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			2044
+#define	WT_STAT_DSRC_CACHE_WRITE			2045
 /*! compression: raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2045
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2046
 /*! compression: raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2046
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2047
 /*! compression: raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2047
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2048
 /*! compression: compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			2048
+#define	WT_STAT_DSRC_COMPRESS_READ			2049
 /*! compression: compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			2049
+#define	WT_STAT_DSRC_COMPRESS_WRITE			2050
 /*! compression: page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2050
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2051
 /*! compression: page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2051
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2052
 /*! cursor: create calls */
-#define	WT_STAT_DSRC_CURSOR_CREATE			2052
+#define	WT_STAT_DSRC_CURSOR_CREATE			2053
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2053
+#define	WT_STAT_DSRC_CURSOR_INSERT			2054
 /*! cursor: bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2054
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2055
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2055
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2056
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2056
+#define	WT_STAT_DSRC_CURSOR_NEXT			2057
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2057
+#define	WT_STAT_DSRC_CURSOR_PREV			2058
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2058
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2059
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2059
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2060
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2060
+#define	WT_STAT_DSRC_CURSOR_RESET			2061
 /*! cursor: search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			2061
+#define	WT_STAT_DSRC_CURSOR_SEARCH			2062
 /*! cursor: search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2062
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2063
 /*! cursor: update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			2063
+#define	WT_STAT_DSRC_CURSOR_UPDATE			2064
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2064
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2065
 /*! LSM: sleep for LSM checkpoint throttle */
-#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2065
+#define	WT_STAT_DSRC_LSM_CHECKPOINT_THROTTLE		2066
 /*! LSM: chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2066
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			2067
 /*! LSM: highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2067
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			2068
 /*! LSM: queries that could have benefited from a Bloom filter that did
  * not exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2068
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		2069
 /*! LSM: sleep for LSM merge throttle */
-#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2069
+#define	WT_STAT_DSRC_LSM_MERGE_THROTTLE			2070
 /*! reconciliation: dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2070
+#define	WT_STAT_DSRC_REC_DICTIONARY			2071
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2071
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2072
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2072
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2073
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2073
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2074
 /*! reconciliation: internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2074
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2075
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2075
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2076
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2076
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2077
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2077
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2078
 /*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2078
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2079
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2079
+#define	WT_STAT_DSRC_REC_PAGES				2080
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2080
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2081
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2081
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2082
 /*! reconciliation: internal page key bytes discarded using suffix
  * compression */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2082
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2083
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2083
+#define	WT_STAT_DSRC_SESSION_COMPACT			2084
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2084
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2085
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2085
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2086
 /*! @} */
 /*
  * Statistics section: END
