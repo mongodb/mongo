@@ -1,4 +1,5 @@
 import os, sys, glob
+import json
 
 # adding wtstats tool path to path for import
 test_dir = os.path.realpath(os.path.dirname(__file__))
@@ -41,6 +42,16 @@ def helper_run_with_fixture(output=None):
         main()
     except SystemExit:
         pass
+
+def helper_parse_json_data(html):
+    substr = 'var data = '
+    lines = html.splitlines()
+
+    # find data line and parse json string
+    data_line = next(l for l in lines if substr in l)
+    data = json.loads(data_line[data_line.find(substr) + len(substr):data_line.rfind(';')])
+    
+    return data
 
 
 def tearDown():
@@ -119,7 +130,32 @@ def test_replace_data_in_template():
     htmlfile.close()
 
 
+def test_data_with_options():
+    """ wstats outputs the data as expected to the html file """
 
+    output = '_test_output_file.html'
+    helper_run_with_fixture(output)
 
+    htmlfile = open(os.path.join(test_dir, output), 'r')
+    data = helper_parse_json_data(htmlfile.read())
+
+    htmlfile.close()
+
+    assert 'series' in data
+    assert 'chart' in data
+    assert 'xdata' in data
+
+    chart = data['chart']
+
+    assert 'extra' in chart
+    assert 'x_is_date' in chart
+    assert 'type' in chart
+    assert 'height' in chart
+
+    serie = data['series'][0]
+
+    assert 'values' in serie
+    assert 'key' in serie
+    assert 'yAxis' in serie
 
 
