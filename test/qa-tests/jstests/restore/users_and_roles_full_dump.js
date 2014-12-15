@@ -141,8 +141,7 @@
     runTest('2.6', '2.6', undefined, '2.6');
     runTest('2.6', '2.6', undefined, undefined);
     runTest('2.6', undefined, undefined, undefined);
-    runTest(undefined, '2.6', undefined, '2.6');
-    runTest(undefined, undefined, undefined, '2.6');
+    runTest('2.6', undefined, undefined, '2.6');
     runTest(undefined, undefined, undefined, undefined);
 
 }());
