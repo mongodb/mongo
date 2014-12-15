@@ -382,7 +382,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		namesize = (size_t)(columns - idxname);
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize, &idx));
-	WT_RET(__wt_calloc_def(session, 1, &cindex));
+	WT_RET(__wt_calloc_one(session, &cindex));
 
 	cursor = &cindex->iface;
 	*cursor = iface;

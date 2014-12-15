@@ -21,7 +21,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &cond));
+	WT_RET(__wt_calloc_one(session, &cond));
 
 	InitializeCriticalSection(&cond->mtx);
 

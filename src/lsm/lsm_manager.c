@@ -645,7 +645,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
 
-	WT_RET(__wt_calloc_def(session, 1, &entry));
+	WT_RET(__wt_calloc_one(session, &entry));
 	entry->type = type;
 	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;

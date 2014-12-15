@@ -589,7 +589,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	page = ref->page;
 
 	if ((r = *(WT_RECONCILE **)reconcilep) == NULL) {
-		WT_RET(__wt_calloc_def(session, 1, &r));
+		WT_RET(__wt_calloc_one(session, &r));
 
 		*(WT_RECONCILE **)reconcilep = r;
 		session->reconcile_cleanup = __rec_destroy_session;

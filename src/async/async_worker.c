@@ -150,7 +150,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	 * We didn't find one in our cache.  Open one and cache it.
 	 * Insert it at the head expecting LRU usage.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &ac));
+	WT_RET(__wt_calloc_one(session, &ac));
 	WT_ERR(wt_session->open_cursor(
 	    wt_session, op->format->uri, NULL, op->format->config, &c));
 	ac->cfg_hash = op->format->cfg_hash;

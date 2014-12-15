@@ -30,7 +30,7 @@ wiredtiger_pack_start(WT_SESSION *wt_session,
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	WT_RET(__wt_calloc_def(session, 1, &ps));
+	WT_RET(__wt_calloc_one(session, &ps));
 	WT_ERR(__pack_init(session, &ps->pack, format));
 	ps->p = ps->start = buffer;
 	ps->end = ps->p + len;

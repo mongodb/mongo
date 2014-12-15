@@ -335,12 +335,12 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	log = conn->log;
 	cl = NULL;
-	WT_RET(__wt_calloc_def(session, 1, &cl));
+	WT_RET(__wt_calloc_one(session, &cl));
 	cursor = &cl->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	WT_ERR(__wt_calloc_def(session, 1, &cl->cur_lsn));
-	WT_ERR(__wt_calloc_def(session, 1, &cl->next_lsn));
+	WT_ERR(__wt_calloc_one(session, &cl->cur_lsn));
+	WT_ERR(__wt_calloc_one(session, &cl->next_lsn));
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->logrec));
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->opkey));
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->opvalue));

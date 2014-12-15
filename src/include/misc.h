@@ -65,11 +65,13 @@
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
 /*
- * __wt_calloc_def --
- *	Simple calls don't need separate sizeof arguments.
+ * __wt_calloc_def, __wt_calloc_one --
+ *	Most calloc calls don't need separate count or sizeof arguments.
  */
 #define	__wt_calloc_def(session, number, addr)				\
 	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
+#define	__wt_calloc_one(session, addr)					\
+	__wt_calloc(session, (size_t)1, sizeof(**(addr)), addr)
 
 /*
  * __wt_realloc_def --

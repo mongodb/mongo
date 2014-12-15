@@ -20,7 +20,7 @@ __session_add_dhandle(
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	uint64_t bucket;
 
-	WT_RET(__wt_calloc_def(session, 1, &dhandle_cache));
+	WT_RET(__wt_calloc_one(session, &dhandle_cache));
 	dhandle_cache->dhandle = session->dhandle;
 
 	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;

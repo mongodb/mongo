@@ -130,7 +130,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		    "open failed for secondary handle: %s", path);
 
 setupfh:
-	WT_ERR(__wt_calloc_def(session, 1, &fh));
+	WT_ERR(__wt_calloc_one(session, &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->filehandle = filehandle;
 	fh->filehandle_secondary = filehandle_secondary;
