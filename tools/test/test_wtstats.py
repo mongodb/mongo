@@ -16,7 +16,7 @@ def helper_delete_file(filename):
 def helper_cleanup():
     # delete all html files in test directory
     for f in glob.glob('./test/*.html'):
-        os.remove(f)
+        helper_delete_file(f)
 
 
 def helper_run_with_fixture(output=None):
@@ -44,6 +44,9 @@ def helper_run_with_fixture(output=None):
 
 
 def tearDown():
+    helper_cleanup()
+
+def setUp():
     helper_cleanup()
 
 
@@ -106,11 +109,11 @@ def test_replace_data_in_template():
     output = '_test_output_file.html'
     helper_run_with_fixture(output)
 
-    templfile = open(os.path.join(tool_dir, 'wtstats.html.template'), 'r').read()
-    htmlfile = open(os.path.join(test_dir, output), 'r').read()
+    templfile = open(os.path.join(tool_dir, 'wtstats.html.template'), 'r')
+    htmlfile = open(os.path.join(test_dir, output), 'r')
     
-    assert "### INSERT DATA HERE ###" in templfile
-    assert "### INSERT DATA HERE ###" not in htmlfile
+    assert "### INSERT DATA HERE ###" in templfile.read()
+    assert "### INSERT DATA HERE ###" not in htmlfile.read()
 
     templfile.close()
     htmlfile.close()
