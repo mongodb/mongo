@@ -304,6 +304,7 @@ functions:
     params:
       working_dir: src
       script: |
+        set -o errexit
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
