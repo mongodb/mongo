@@ -1,20 +1,54 @@
-import sys
-import os
+import os, sys, glob
 
 # adding wtstats tool path to path for import
-tool_dir = os.path.split(sys.argv[0])[0]
+test_dir = os.path.realpath(os.path.dirname(__file__))
+tool_dir = os.path.join(os.path.realpath(os.path.dirname(__file__)), '..')
 sys.path.append(tool_dir)
 
 from wtstats import main
 
-def silent_delete_file(filename):
+def helper_delete_file(filename):
     try:
         os.remove(filename)
     except OSError:
         pass
 
+def helper_cleanup():
+    # delete all html files in test directory
+    for f in glob.glob('./test/*.html'):
+        os.remove(f)
+
+
+def helper_run_with_fixture(output=None):
+    """ run tool with `output` as value for --output """
+    
+    # set output default value
+    if output == None:
+        output = '_test_wtstats.html'
+
+    # delete existing html files if exists
+    helper_delete_file(output)
+    helper_delete_file(output + '.html')
+
+    outputfile = os.path.join(test_dir, output)
+    statsfile = os.path.join(test_dir, 'WiredTigerStat.fixture')
+    
+    # delete existing html file if exists
+    helper_delete_file(outputfile)
+
+    sys.argv = ['./wtstats', statsfile, '--output', outputfile]
+    try:
+        main()
+    except SystemExit:
+        pass
+
+
+def tearDown():
+    helper_cleanup()
+
+
 def test_help_working():
-    """ should output the help screen when using --help argument """
+    """ wtstast should output the help screen when using --help argument """
     sys.argv = ['./wtstats.py', '--help']
     try:
         main()
@@ -29,17 +63,60 @@ def test_help_working():
     assert 'optional arguments' in output
     assert 'show this help message and exit' in output
 
-def test_create_html_file():
-    """ should create an html file from the fixture stats """
 
-    outputfile = os.path.join(tool_dir, 'test/', './wtstats_test.html')
+def test_helper_runner():
+    """ helper runner should work as expected """
+    helper_run_with_fixture()
+    assert os.path.exists(os.path.join(tool_dir, 'test', '_test_wtstats.html'))
+
+
+def test_create_html_file_basic():
+    """ wtstats should create an html file from the fixture stats """
+
+    outputfile = os.path.join(test_dir, 'wtstats_test.html')
+    statsfile = os.path.join(test_dir, 'WiredTigerStat.fixture')
     
     # delete existing html file if exists
-    silent_delete_file(outputfile)
+    helper_delete_file(outputfile)
 
-    sys.argv = ['./wtstats', './WiredTigerStat.fixture', '--output', outputfile]
+    sys.argv = ['./wtstats', statsfile, '--output', outputfile]
     try:
         main()
     except SystemExit:
         pass
+
+    assert os.path.exists(outputfile)
+
+
+def test_add_ext_if_missing():
+    """ wtstats should only add ".html" extension if it's missing in the --output value """
+
+    helper_run_with_fixture('_test_output_file.html')
+    assert os.path.exists(os.path.join(test_dir, '_test_output_file.html'))
+
+    helper_run_with_fixture('_test_output_file')
+    assert os.path.exists(os.path.join(test_dir, '_test_output_file.html'))
+
+    helper_delete_file(os.path.join(test_dir, '_test_output_file.html'))
+
+
+def test_replace_data_in_template():
+    """ wtstats should replace the placeholder with real data """
+
+    output = '_test_output_file.html'
+    helper_run_with_fixture(output)
+
+    templfile = open(os.path.join(tool_dir, 'wtstats.html.template'), 'r').read()
+    htmlfile = open(os.path.join(test_dir, output), 'r').read()
+    
+    assert "### INSERT DATA HERE ###" in templfile
+    assert "### INSERT DATA HERE ###" not in htmlfile
+
+    templfile.close()
+    htmlfile.close()
+
+
+
+
+
 
