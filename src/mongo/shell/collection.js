@@ -993,7 +993,7 @@ DBCollection.prototype._getIndexesSystemIndexes = function(){
 }
 
 DBCollection.prototype._getIndexesCommand = function(){
-    var res = this.runCommand( "listIndexes" );
+    var res = this.runCommand( "listIndexes", { cursor: {} } );
 
     if ( !res.ok ) {
 
@@ -1014,7 +1014,7 @@ DBCollection.prototype._getIndexesCommand = function(){
         throw Error( "listIndexes failed: " + tojson( res ) );
     }
 
-    return res.indexes;
+    return new DBCommandCursor(this._mongo, res).toArray();
 }
 
 DBCollection.prototype.getIndexes = function(){
