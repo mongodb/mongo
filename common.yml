@@ -1047,7 +1047,7 @@ tasks:
           mv ./mongodb/mongo${extension} .
           mv ./mongodb/mongos${extension} .
           mv test/qa-tests/* .
-          chmod +x mongo*.
+          chmod +x mongo*
           chmod +x bsondump*
           rm -rf /data/install /data/multiversion
           python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.4" "2.6"
