@@ -43,7 +43,7 @@ namespace mongo {
      */
     class WriteConflictException : public DBException {
     public:
-        WriteConflictException() : DBException( "WriteConflict", ErrorCodes::WriteConflict ){}
+        WriteConflictException();
 
         /**
          * Will log a message if sensible and will do an exponential backoff to make sure
@@ -54,6 +54,12 @@ namespace mongo {
         static void logAndBackoff(int attempt,
                                   const StringData& operation,
                                   const StringData& ns);
+
+        /**
+         * If true, will call printStackTrace on every WriteConflictException created.
+         * Can be set via setParameter named traceWriteConflictExceptions.
+         */
+        static bool trace;
     };
 
 }

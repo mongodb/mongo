@@ -32,8 +32,20 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+    bool WriteConflictException::trace = false;
+
+    WriteConflictException::WriteConflictException()
+        : DBException( "WriteConflict", ErrorCodes::WriteConflict ) {
+
+        if ( trace ) {
+            printStackTrace();
+        }
+
+    }
 
     void WriteConflictException::logAndBackoff(int attempt,
                                                const StringData& operation,

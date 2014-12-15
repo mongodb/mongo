@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/logger/parse_log_component_settings.h"
@@ -586,6 +587,14 @@ namespace mongo {
                                                              &DBException::traceExceptions,
                                                              false, // allowedToChangeAtStartup
                                                              true); // allowedToChangeAtRuntime
+
+        // for WriteConflictException
+        ExportedServerParameter<bool> TraceWCExceptionsSetting(ServerParameterSet::getGlobal(),
+                                                               "traceWriteConflictExceptions",
+                                                               &WriteConflictException::trace,
+                                                               false, // allowedToChangeAtStartup
+                                                               true); // allowedToChangeAtRuntime
+
     }
 
 }
