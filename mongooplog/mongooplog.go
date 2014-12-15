@@ -45,6 +45,7 @@ func (self *MongoOplog) Run() error {
 		return fmt.Errorf("error connecting to destination db: %v", err)
 	}
 	defer toSession.Close()
+	toSession.SetSocketTimeout(0)
 
 	// connect to the source server
 	fromSession, err := self.SessionProviderFrom.GetSession()
@@ -52,6 +53,7 @@ func (self *MongoOplog) Run() error {
 		return fmt.Errorf("error connecting to source db: %v", err)
 	}
 	defer fromSession.Close()
+	fromSession.SetSocketTimeout(0)
 
 	// set slave ok
 	fromSession.SetMode(mgo.Eventual, true)
