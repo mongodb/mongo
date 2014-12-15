@@ -269,5 +269,14 @@ def test_list_option():
     assert next((l for l in output if 'log: total log buffer size' in l), None) != None
 
 
+@with_setup(setUp, tearDown)
+def test_right_option():
+    """ wtstats should create a multiChart with --right """
+
+    outfile = '_test_output_file.html'
+    helper_run_with_fixture({'--output': outfile, '--include': 'cache', '--right': 'conn'})
+
+    data = helper_parse_json_data(outfile)
+    assert data['chart']['type'] == 'multiChart'
 
 
