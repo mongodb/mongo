@@ -183,14 +183,17 @@ def main():
 
     def output_series(results, prefix=None, grouplist=[]):
         # add .html ending if not present
-        extension = '' if args.output.endswith('.html') else '.html'
+        filename, ext = os.path.splitext(args.output)
+        if ext == '':
+            ext = '.html'
+
         # open the output file based on prefix
         if prefix == None:
-            outputname = args.output + extension
+            outputname = filename + ext
         elif len(grouplist) == 0:
-            outputname = args.output +'.' + prefix + extension
+            outputname = filename +'.' + prefix + ext
         else:
-            outputname = args.output +'.group.' + prefix + extension
+            outputname = filename +'.group.' + prefix + ext
 
         if prefix != None and len(grouplist) == 0:
             this_series = []

@@ -280,3 +280,24 @@ def test_right_option():
     assert data['chart']['type'] == 'multiChart'
 
 
+@with_setup(setUp, tearDown)
+def test_all_option():
+    """ wtstats should create grouped html files with --all """
+
+    outfile = 'mystats.html'
+    helper_run_with_fixture({'--output': outfile, '--all': None})
+
+    files = glob.glob('./test/*.html')
+    
+    # test some expected files
+    assert len(files) > 1
+    assert './test/mystats.transaction.html' in files
+    assert './test/mystats.group.system.html' in files
+    assert './test/mystats.html' in files
+
+
+    data = helper_parse_json_data('mystats.transaction.html')
+    series_keys = map(lambda x: x['key'], data['series'])
+    for key in series_keys:
+        assert key.startswith('transaction:')
+
