@@ -30,13 +30,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/database_holder.h"
+
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -44,11 +46,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    static DatabaseHolder _dbHolder;
-
 namespace {
-    static StringData _todb(const StringData& ns) {
+
+    StringData _todb(const StringData& ns) {
         size_t i = ns.find('.');
         if (i == std::string::npos) {
             uassert(13074, "db name can't be empty", ns.size());
@@ -62,11 +62,17 @@ namespace {
 
         return d;
     }
-}
+
+
+    DatabaseHolder _dbHolder;
+
+} // namespace
+
 
     DatabaseHolder& dbHolder() {
         return _dbHolder;
     }
+
 
     Database* DatabaseHolder::get(OperationContext* txn,
                                   const StringData& ns) const {
