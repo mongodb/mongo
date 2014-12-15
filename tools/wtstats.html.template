@@ -28,8 +28,10 @@
         function (d) { return d3.time.format('%H:%M:%S')(new Date(parseInt(d))); } : 
         d3.format(',r');
 
+    var chartType = data.chart.type;
+
     nv.addGraph(function() {
-        var chart = nv.models.lineChart();
+        var chart = nv.models[chartType]();
         chart.margin({top: 30, right: 60, bottom: 20, left: 60})
         chart.xAxis
             .tickFormat(xFormat);
