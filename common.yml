@@ -119,6 +119,25 @@ mongo_tools_variables:
       - name: text
       - name: util
       - name: vet
+    ubuntu1204_race_task_list: &ubuntu1204_race_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: integration
+      - name: integration-auth
+      - name: json
+      - name: legacy28
+      - name: legacy28-wt
+      - name: legacy26
+      - name: legacy24
+      - name: log
+      - name: pool
+      - name: progress
+      - name: qa-tests
+      - name: qa-tests-wt
+      - name: text
+      - name: unit
+      - name: util
     windows_32_task_list: &windows_32_tasks
       - name: db
         distros:
@@ -1323,3 +1342,23 @@ buildvariants:
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration"
   tasks: *windows_64_enterprise_tasks
+
+#######################################
+#     Experimental Buildvariants      #
+#######################################
+
+- name: ubuntu-race
+  stepback: false
+  batchtime: 1440 # daily
+  display_name: z Race Detector Linux 64-bit
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_default_startup_args
+    build_tags: -tags "ssl"
+    arch: "LINUX/x86_64"
+    args: "-race"
+    integration_test_args: integration
+  tasks: &ubuntu1204_race_tasks
+
