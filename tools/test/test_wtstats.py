@@ -1,3 +1,7 @@
+""" To run this test suite, install nose with `pip install nose` and then
+    run `nosetests -v` from the `./tools` directory.
+"""
+
 import os, sys, glob
 import json
 import types
