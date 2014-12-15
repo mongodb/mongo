@@ -24,11 +24,15 @@
     });
     var data_statlog = data.series;
 
+    var xFormat = data.chart.x_is_date ? 
+        function (d) { return d3.time.format('%H:%M:%S')(new Date(parseInt(d))); } : 
+        d3.format(',r');
+
     nv.addGraph(function() {
         var chart = nv.models.lineChart();
         chart.margin({top: 30, right: 60, bottom: 20, left: 60})
         chart.xAxis
-            .tickFormat(d3.format(',r'));
+            .tickFormat(xFormat);
         chart.yAxis
             .tickFormat(d3.format(',g'));
         chart.showLegend(true);
