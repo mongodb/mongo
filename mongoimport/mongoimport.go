@@ -49,7 +49,7 @@ type MongoImport struct {
 
 	// insertionLock is used to prevent race conditions in incrementing
 	// the insertion count
-	insertionLock *sync.Mutex
+	insertionLock sync.Mutex
 
 	// insertionCount keeps track of how many documents have successfully
 	// been inserted into the database
@@ -57,7 +57,7 @@ type MongoImport struct {
 
 	// the tomb is used to synchronize ingestion goroutines and causes
 	// other sibling goroutines to terminate immediately if one errors out
-	tomb *tomb.Tomb
+	tomb.Tomb
 
 	// fields to use for upsert operations
 	upsertFields []string
@@ -324,9 +324,6 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	// handle all input reads in a separate goroutine
 	go inputReader.StreamDocument(ordered, readDocChan, readErrChan)
 
-	// initialize insertion lock
-	mongoImport.insertionLock = &sync.Mutex{}
-
 	// return immediately on ingest errors - these will be triggered
 	// either by an issue ingesting data or if the read channel is
 	// closed so we can block here while reads happen in a goroutine
@@ -338,29 +335,34 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 
 // IngestDocuments takes a slice of documents and either inserts/upserts them -
 // based on whether an upsert is requested - into the given collection
-func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (err error) {
-	// initialize the tomb where all goroutines go to die
-	mongoImport.tomb = &tomb.Tomb{}
-
+func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (retErr error) {
 	numInsertionWorkers := mongoImport.ToolOptions.NumInsertionWorkers
 	if numInsertionWorkers <= 0 {
 		numInsertionWorkers = 1
 	}
 
-	// spawn all the worker goroutines, each in its own goroutine
+	// Each ingest worker will return an error which will
+	// be set in the following cases:
+	//
+	// 1. There is a problem connecting with the server
+	// 2. The server becomes unreachable
+	// 3. There is an insertion/update error - e.g. duplicate key
+	//    error - and stopOnError is set to true
+
+	wg := &sync.WaitGroup{}
 	for i := 0; i < numInsertionWorkers; i++ {
-		mongoImport.tomb.Go(func() error {
-			// Each ingest worker will return an error which may
-			// be nil or not. It will be not nil in any of this cases:
-			//
-			// 1. There is a problem connecting with the server
-			// 2. The server becomes unreachable
-			// 3. There is an insertion/update error - e.g. duplicate key
-			//    error - and stopOnError is set to true
-			return mongoImport.runInsertionWorker(readDocChan)
-		})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// only set the first insertion error and cause sibling goroutines to terminate immediately
+			if err := mongoImport.runInsertionWorker(readDocChan); err != nil && retErr == nil {
+				retErr = err
+				mongoImport.Kill(err)
+			}
+		}()
 	}
-	return mongoImport.tomb.Wait()
+	wg.Wait()
+	return
 }
 
 // configureSession takes in a session and modifies it with properly configured
@@ -432,7 +434,7 @@ readLoop:
 			}
 			numMessageBytes += len(documentBytes)
 			documents = append(documents, bson.Raw{3, documentBytes})
-		case <-mongoImport.tomb.Dying():
+		case <-mongoImport.Dying():
 			return nil
 		}
 	}

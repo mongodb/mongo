@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // ConvertibleDoc is an interface that adds the basic Convert method.
@@ -195,14 +196,13 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // channel in parallel and then sends over the processed data to the outputChan
 // channel - either in sequence or concurrently (depending on the value of
 // ordered) - in which the data was received
-func streamDocuments(ordered bool, numDecoders int, readDocChan chan ConvertibleDoc, outputChan chan bson.D) error {
+func streamDocuments(ordered bool, numDecoders int, readDocChan chan ConvertibleDoc, outputChan chan bson.D) (retErr error) {
 	if numDecoders == 0 {
 		numDecoders = 1
 	}
 	var importWorkers []*ImportWorker
-
+	wg := &sync.WaitGroup{}
 	importTomb := &tomb.Tomb{}
-
 	inChan := readDocChan
 	outChan := outputChan
 	for i := 0; i < numDecoders; i++ {
@@ -216,9 +216,15 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 			tomb: importTomb,
 		}
 		importWorkers = append(importWorkers, importWorker)
-		importTomb.Go(func() error {
-			return importWorker.processDocuments(ordered)
-		})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// only set the first worker error and cause sibling goroutines to terminate immediately
+			if err := importWorker.processDocuments(ordered); err != nil && retErr == nil {
+				retErr = err
+				importWorker.tomb.Kill(err)
+			}
+		}()
 	}
 
 	// if ordered, we have to coordinate the sequence in which processed
@@ -226,9 +232,9 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 	if ordered {
 		doSequentialStreaming(importWorkers, readDocChan, outputChan)
 	}
-	err := importTomb.Wait()
+	wg.Wait()
 	close(outputChan)
-	return err
+	return
 }
 
 // tokensToBSON reads in slice of records - along with ordered fields names -
