@@ -59,7 +59,6 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 * Setup a log path and compression even if logging is disabled in
 	 * case we are going to print a log.
 	 */
-
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets(session, cfg, "log.compressor", &cval));
 	if (cval.len > 0) {
@@ -77,7 +76,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
-	/* We are don if logging isn't enabled. */
+	/* We are done if logging isn't enabled. */
 	if (*runp == 0)
 		return (0);
 
@@ -422,6 +421,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
+	/*
+	 * We always set up the log_path so that printlog can work without
+	 * recovery.  Therefore, always free it, even if logging isn't on.
+	 */
+	__wt_free(session, conn->log_path);
+
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		return (0);
 	if (conn->log_tid_set) {
@@ -432,8 +437,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
 
 	WT_TRET(__wt_log_close(session));
-
-	__wt_free(session, conn->log_path);
 
 	/* Close the server thread's session. */
 	if (conn->log_session != NULL) {
