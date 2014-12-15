@@ -330,7 +330,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	defer session.Close()
 	session.SetSocketTimeout(0)
 
-	log.Logf(log.DebugLow, "merging %v from temp collection", collectionType)
+	log.Logf(log.DebugLow, "merging %v from temp collection '%v'", collectionType, tempCol)
 	res := bson.M{}
 	err = session.Run(command, &res)
 	if err != nil {

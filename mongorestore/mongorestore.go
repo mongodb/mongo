@@ -107,11 +107,16 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		return fmt.Errorf("error parsing write concern: %v", err)
 	}
 
-	if restore.tempUsersCol == "" {
+	// handle the hidden auth collection flags
+	if restore.ToolOptions.HiddenOptions.TempUsersColl == nil {
 		restore.tempUsersCol = "tempusers"
+	} else {
+		restore.tempUsersCol = *restore.ToolOptions.HiddenOptions.TempUsersColl
 	}
-	if restore.tempRolesCol == "" {
+	if restore.ToolOptions.HiddenOptions.TempRolesColl == nil {
 		restore.tempRolesCol = "temproles"
+	} else {
+		restore.tempRolesCol = *restore.ToolOptions.HiddenOptions.TempRolesColl
 	}
 
 	if restore.ToolOptions.HiddenOptions.BulkWriters < 0 {
