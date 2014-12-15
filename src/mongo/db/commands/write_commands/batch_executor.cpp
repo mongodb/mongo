@@ -1306,12 +1306,12 @@ namespace mongo {
                     throw;
                 }
 
-                WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
-
                 createCollection = false;
                 // RESTART LOOP
                 fakeLoop = -1;
                 txn->recoveryUnit()->commitAndRestart();
+
+                WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
             }
             catch (const DBException& ex) {
                 Status status = ex.toStatus();
