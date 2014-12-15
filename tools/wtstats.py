@@ -32,13 +32,16 @@ from collections import defaultdict
 from glob import glob
 from time import mktime
 from subprocess import call
+import json
+import pprint
+from datetime import datetime
 
 # Make sure Python can find files in the tools directory
-tool_dir = os.path.split(sys.argv[0])[0]
+# tool_dir = os.path.split(sys.argv[0])[0]
 
 # Make sure Python finds the NVD3 in our third party directory.
 # To avoid compatability issues, prepend it to the system path.
-sys.path = [ os.path.join(tool_dir, "3rdparty") ] + sys.path
+# sys.path = [ os.path.join(tool_dir, "3rdparty") ] + sys.path
 
 try:
     from stat_data \
@@ -55,18 +58,22 @@ except ImportError:
             in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
 
-try:
-    from wt_nvd3_util import multiChart, parsetime
-except ImportError:
-    print >>sys.stderr, "Could not import wt_nvd3_util.py, it should be\
-            in the same directory as %s" % sys.argv[0]
-    sys.exit(-1)
+# try:
+#     from wt_nvd3_util import multiChart, parsetime
+# except ImportError:
+#     print >>sys.stderr, "Could not import wt_nvd3_util.py, it should be\
+#             in the same directory as %s" % sys.argv[0]
+#     sys.exit(-1)
 
-try:
-    from nvd3 import lineChart, lineWithFocusChart
-except ImportError:
-    print >>sys.stderr, "Could not import nvd3 it should be installed locally"
-    sys.exit(-1)
+# try:
+#     from nvd3 import lineChart, lineWithFocusChart
+# except ImportError:
+#     print >>sys.stderr, "Could not import nvd3 it should be installed locally"
+#     sys.exit(-1)
+    
+thisyear = datetime.today().year
+def parsetime(s):
+    return datetime.strptime(s, "%b %d %H:%M:%S").replace(year=thisyear)
 
 if sys.version_info<(2,7,0):
     print >>sys.stderr, "You need python 2.7 or later to run this script"
@@ -226,11 +233,11 @@ def output_series(results, prefix=None, grouplist=[]):
 
     #---------------------------------------
     if args.right:
-            charttype = multiChart
+        charttype = "multiChart"
     elif args.focus:
-            charttype = lineWithFocusChart
+        charttype = "lineWithFocusChart"
     else:
-            charttype = lineChart
+        charttype = "lineChart"
 
     chart_extra = {}
     # Add in the x axis if the user wants time.
@@ -238,22 +245,51 @@ def output_series(results, prefix=None, grouplist=[]):
             chart_extra['x_axis_format'] = '%H:%M:%S'
 
     # Create the chart, add the series
-    chart = charttype(name='statlog', height=450+10*len(this_series), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
+    # chart = charttype(name='statlog', height=450+10*len(this_series), resize=True, x_is_date=args.abstime, y_axis_format='g', assets_directory='http://source.wiredtiger.com/graphs/', **chart_extra)
+
+    json_output = {
+        "chart": {
+            "type": charttype,
+            "height": 450+10*len(this_series),
+            "x_is_date": args.abstime,
+            "extra": chart_extra
+        },
+        "xdata": xdata,
+        "series": []
+    }
 
     for title, yaxis, ydata in this_series:
-            chart.add_serie(x=xdata, y=(ydata.get(x, 0) for x in xdata), name=title,
-                            type="line", yaxis="2" if yaxis else "1")
+        json_output["series"].append({
+            "key": title,
+            "values": ydata,
+            "yAxis": "2" if yaxis else "1"
+        });
 
-            if args.wtperf:
-                    addPlotsToStatsChart(chart, os.path.dirname(args.files[0]), args.abstime)
+    # @todo put that into javascript implementation?
+    #     if args.wtperf:
+    #         addPlotsToStatsChart(chart, os.path.dirname(args.files[0]), args.abstime)
+    
+    # load template
+    this_path = os.path.dirname(os.path.realpath(__file__))
+    srcfile = os.path.join(this_path, 'wtstats.html.template')
+    srcfile = open(srcfile)
+    contents = srcfile.read()
+    srcfile.close()
 
-    chart.buildhtml()
-    output_file = open(outputname, 'w')
-    output_file.write(chart.htmlcontent)
+    # write output file
+    dstfile = open(outputname, 'wt')
+    replaced_contents = contents.replace('"### INSERT DATA HERE ###"', json.dumps(json_output))
+    dstfile.write(replaced_contents)
+    dstfile.close()
 
-    #close Html file
-    output_file.close()
+    print "copying %s to %s" % (srcfile.name, dstfile.name)
 
+    # chart.buildhtml()
+    # output_file = open(outputname, 'w')
+    # output_file.write(chart.htmlcontent)
+
+    # #close Html file
+    # output_file.close()
 
 # Split out the data, convert timestamps
 results = []

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link href="http://source.wiredtiger.com/graphs/nvd3/src/nv.d3.css" rel="stylesheet">
+<script src="http://source.wiredtiger.com/graphs/d3/d3.min.js"></script>
+<script src="http://source.wiredtiger.com/graphs/nvd3/nv.d3.js"></script>
+
+</head>
+<body>
+
+<div id="statlog"><svg style="height:700px;"></svg></div>
+
+<script>
+
+    var data = "### INSERT DATA HERE ###";
+    var xdata = data.xdata;
+    data.series.forEach(function (serie) {
+        // zip xdata, ydata, replace with 0.0 where non-existant
+        y = serie.values;
+        serie.values = xdata.map(function (x) {
+            return {x:x, y:(x in y) ? y[x] : 0.0};
+        });
+        serie.type = 'line';
+    });
+    var data_statlog = data.series;
+
+    nv.addGraph(function() {
+        var chart = nv.models.lineChart();
+        chart.margin({top: 30, right: 60, bottom: 20, left: 60})
+        chart.xAxis
+            .tickFormat(d3.format(',r'));
+        chart.yAxis
+            .tickFormat(d3.format(',g'));
+        chart.showLegend(true);
+
+        console.log(data_statlog);
+
+        d3.select('#statlog svg')
+            .datum(data_statlog)
+            .transition().duration(500)
+            .attr('height', 700)
+            .call(chart);
+
+    nv.utils.windowResize(chart.update);
+    return chart;
+});
+</script>
+
+</body>
+</html>
