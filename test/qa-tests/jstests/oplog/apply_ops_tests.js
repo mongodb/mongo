@@ -26,7 +26,7 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
 
   tracks.forEach(function(track, index) {
     db.rs_test.insert({
-      ts: new Timestamp(TEST_START + index, 1),
+      ts: new Timestamp(TEST_START - index * 10000 - 1, 1),
       h: index,
       v: CURRENT_OPLOG_VERSION,
       op: OPLOG_INSERT_CODE,
@@ -39,7 +39,7 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
 
   tracks.forEach(function(track, index) {
     db.rs_test.insert({
-      ts: new Timestamp(TEST_START + index, 1),
+      ts: new Timestamp(TEST_START - index * 10000 - 1, 2),
       h: index,
       v: CURRENT_OPLOG_VERSION,
       op: OPLOG_UPDATE_CODE,
@@ -74,6 +74,7 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
     assert.eq(0, db.greatest_hits.count({}),
       'mongooplog should not have applied any operations');
   } else {
+    // Running with default --seconds should apply all operations
     assert.eq(toolTest.runTool.apply(toolTest, args), 0,
       'mongooplog should succeed');
 
@@ -84,6 +85,32 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
         'mongooplog should have inserted a doc with _id="' + track + '" and ' +
         'updated it to have index=' + index);
     });
+
+    db.greatest_hits.drop();
+
+    // Running with `--seconds 25000` should apply last 3 operations, which
+    // have timestamps T - 1, T - 10001, and T - 20001 (roughly)
+    var last3Seconds = args.concat(['--seconds', 25000]);
+    assert.eq(toolTest.runTool.apply(toolTest, last3Seconds), 0,
+      'mongooplog should succeed');
+
+    assert.eq(3, db.greatest_hits.count({}),
+      '`mongooplog --seconds 3` should apply 3 operations');
+    tracks.slice(0, 3).forEach(function(track, index) {
+      assert.eq(1, db.greatest_hits.count({ _id: track, index: index }),
+        'mongooplog should have inserted a doc with _id="' + track + '" and ' +
+        'updated it to have index=' + index);
+    });
+
+    db.greatest_hits.drop();
+
+    // Running with `--seconds 0` should apply no operations
+    var noOpsArgs = args.concat(['--seconds', 0]);
+    assert.eq(toolTest.runTool.apply(toolTest, noOpsArgs), 0,
+      'mongooplog should succeed');
+
+    assert.eq(0, db.greatest_hits.count({}),
+      '`mongooplog --seconds 0` should apply 0 operations');
   }
 
   toolTest.stop();
