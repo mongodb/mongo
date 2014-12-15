@@ -54,7 +54,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_RET(
 	    __wt_open_internal_session(conn, "async-cursor", 1, 1, &session));
 	__wt_spin_lock(session, &async->ops_lock);
-	WT_ERR(__wt_calloc_def(session, 1, &af));
+	WT_ERR(__wt_calloc_one(session, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
 	WT_ERR(__wt_strdup(session, config, &af->config));
 	af->uri_hash = uri_hash;
@@ -232,7 +232,7 @@ __async_start(WT_SESSION_IMPL *session)
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_ASYNC), &conn->async));
+	WT_RET(__wt_calloc_one(session, &conn->async));
 	async = conn->async;
 	STAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));

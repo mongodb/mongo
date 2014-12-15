@@ -207,17 +207,26 @@ file_config = format_meta + [
         block compression is done''',
         min='512B', max='512MB'),
     Config('internal_item_max', '0', r'''
-        the largest key stored within an internal node, in bytes.  If
-        non-zero, any key larger than the specified size will be
-        stored as an overflow item (which may require additional I/O
-        to access).  If zero, a default size is chosen that permits at
-        least 8 keys per internal page''',
-        min=0),
+        historic term for internal_key_max''',
+        min=0, undoc=True),
+    Config('internal_key_max', '0', r'''
+        the largest key stored in an internal node, in bytes.  If set, keys
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access).  The default and the maximum
+        allowed value are both one-tenth the size of a newly split internal
+        page''',
+        min='0'),
     Config('key_gap', '10', r'''
         the maximum gap between instantiated keys in a Btree leaf page,
         constraining the number of keys processed to instantiate a
         random Btree leaf page key''',
         min='0', undoc=True),
+    Config('leaf_key_max', '0', r'''
+        the largest key stored in a leaf node, in bytes.  If set, keys
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access).  The default value is
+        one-tenth the size of a newly split leaf page''',
+        min='0'),
     Config('leaf_page_max', '32KB', r'''
         the maximum page size for leaf nodes, in bytes; the size must
         be a multiple of the allocation size, and is significant for
@@ -226,13 +235,17 @@ file_config = format_meta + [
         data, that is, the limit is applied before any block compression
         is done''',
         min='512B', max='512MB'),
+    Config('leaf_value_max', '0', r'''
+        the largest value stored in a leaf node, in bytes.  If set, values
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access). If the size is larger than
+        the maximum leaf page size, the page size is temporarily ignored
+        when large values are written. The default is one-half the size of
+        a newly split leaf page''',
+        min='0'),
     Config('leaf_item_max', '0', r'''
-        the largest key or value stored within a leaf node, in bytes.
-        If non-zero, any key or value larger than the specified size
-        will be stored as an overflow item (which may require additional
-        I/O to access).  If zero, a default size is chosen that permits
-        at least 4 key and value pairs per leaf page''',
-        min=0),
+        historic term for leaf_key_max and leaf_value_max''',
+        min=0, undoc=True),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower

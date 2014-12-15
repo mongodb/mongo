@@ -81,7 +81,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (__wt_process.cache_pool == NULL) {
 		WT_ASSERT(session, !reconfiguring);
 		/* Create a cache pool. */
-		WT_ERR(__wt_calloc_def(session, 1, &cp));
+		WT_ERR(__wt_calloc_one(session, &cp));
 		created = 1;
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */

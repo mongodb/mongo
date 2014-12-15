@@ -37,7 +37,7 @@ except ImportError:
 
 from contextlib import contextmanager
 import os, re, shutil, sys, time, traceback
-
+import wtscenario
 import wiredtiger
 
 def shortenWithEllipsis(s, maxlen):
@@ -141,17 +141,20 @@ class WiredTigerTestCase(unittest.TestCase):
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
-                    gdbSub = False, verbose = 1, dirarg = None):
+                    gdbSub = False, verbose = 1, dirarg = None,
+                    longtest = False):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
             d += '.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
+        wtscenario.set_long_run(longtest)
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._origcwd = os.getcwd()
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
+        WiredTigerTestCase._longtest = longtest
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._dupout = os.dup(sys.stdout.fileno())
         WiredTigerTestCase._stdout = sys.stdout
@@ -182,8 +185,9 @@ class WiredTigerTestCase(unittest.TestCase):
         # is used, then each scenario is given a number, which can
         # help distinguish tests.
         scen = ''
-        if hasattr(self, 'scenario_number'):
-            scen = '(scenario ' + str(self.scenario_number) + ')'
+        if hasattr(self, 'scenario_number') and hasattr(self, 'scenario_name'):
+            scen = '(scenario ' + str(self.scenario_number) + \
+                   ': ' + self.scenario_name + ')'
         return self.simpleName() + scen
 
     def simpleName(self):
@@ -283,7 +287,7 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
 
         if not passed and not skipped:
-            print "ERROR in " + self.testsubdir
+            print "ERROR in " + str(self)
             self.pr('FAIL')
             self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
@@ -430,6 +434,23 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def className(self):
         return self.__class__.__name__
+
+
+def longtest(description):
+    """
+    Used as a function decorator, for example, @wttest.longtest("description").
+    The decorator indicates that this test function should only be included
+    when running the test suite with the --long option.
+    """
+    def runit_decorator(func):
+        return func
+    if not WiredTigerTestCase._longtest:
+        return unittest.skip(description + ' (enable with --long)')
+    else:
+        return runit_decorator
+
+def islongtest():
+    return WiredTigerTestCase._longtest
 
 def runsuite(suite, parallel):
     suite_to_run = suite

@@ -54,9 +54,12 @@ class test_lsm02(wttest.WiredTigerTestCase):
         v = '\x14\x14'
         self.add_key(self.uri, 'k1', v)
         self.verify_key_exists(self.uri, 'k1', v)
-        v += 'a' * 1000
+        v = '\x14\x14\0\0\0\0\0\0'
         self.add_key(self.uri, 'k2', v)
         self.verify_key_exists(self.uri, 'k2', v)
+        v += 'a' * 1000
+        self.add_key(self.uri, 'k3', v)
+        self.verify_key_exists(self.uri, 'k3', v)
 
     def test_lsm_rename01(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')

@@ -423,7 +423,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_CONFIG_ITEM cval;
 
-	WT_RET(__wt_calloc_def(session, 1, &mdc));
+	WT_RET(__wt_calloc_one(session, &mdc));
 
 	cursor = &mdc->iface;
 	*cursor = iface;
@@ -445,7 +445,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		__wt_free(session, mdc);
+err:		if (mdc->file_cursor != NULL)
+			WT_TRET(mdc->file_cursor->close(mdc->file_cursor));
+		__wt_free(session, mdc);
 	}
 	return (ret);
 }

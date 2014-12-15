@@ -953,6 +953,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 {
 	static const WT_SESSION stds = {
 		NULL,
+		NULL,
 		__session_close,
 		__session_reconfigure,
 		__session_open_cursor,

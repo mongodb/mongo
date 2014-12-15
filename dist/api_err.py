@@ -42,7 +42,9 @@ errors = [
     Error('WT_PANIC', -31804,
         'WiredTiger library panic', '''
         This error indicates an underlying problem that requires the
-        application exit and restart.'''),
+        application exit and restart. The application can exit
+        immediately when \c WT_PANIC is returned from a WiredTiger
+        interface, no further WiredTiger calls are required.'''),
     Error('WT_RESTART', -31805,
         'restart the operation (internal)', undoc=True),
 ]

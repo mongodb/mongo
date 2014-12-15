@@ -22,7 +22,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
+	WT_RET(__wt_calloc_one(session, &cond));
 
 	WT_ERR(pthread_mutex_init(&cond->mtx, NULL));
 

@@ -117,7 +117,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * Record the change in the transaction structure and set the change's
 	 * transaction ID.
 	 */
-	WT_ERR(__wt_calloc_def(session, 1, &ref->page_del));
+	WT_ERR(__wt_calloc_one(session, &ref->page_del));
 	ref->page_del->txnid = session->txn.id;
 
 	WT_ERR(__wt_txn_modify_ref(session, ref));
@@ -306,7 +306,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * deleted items.
 	 */
 	for (i = 0; i < page->pg_row_entries; ++i) {
-		WT_ERR(__wt_calloc_def(session, 1, &upd));
+		WT_ERR(__wt_calloc_one(session, &upd));
 		WT_UPDATE_DELETED_SET(upd);
 
 		if (page_del == NULL)

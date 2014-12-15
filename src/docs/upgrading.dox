@@ -17,6 +17,14 @@ Collators, compressors and extractors can now be disabled with an explicit
 using the name \c "none" for a collator, compressor or extractor will need to
 be updated.
 </dd>
+
+<dt>maximum keys and value sizes
+<dd>
+The WT_SESSION::create \c internal_item_max and \c leaf_item_max
+configuration strings are now deprecated in favor of the
+\c internal_key_max, \c leaf_key_max, and \c leaf_value_max
+configuration strings. See @ref tune_page_sizes for more information.
+</dd>
 </dl>
 
 @section version_241 Upgrading to Version 2.4.1

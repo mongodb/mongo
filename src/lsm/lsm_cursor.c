@@ -322,14 +322,15 @@ __clsm_deleted_encode(WT_SESSION_IMPL *session,
  *	Decode values that start with the tombstone.
  */
 static inline void
-__clsm_deleted_decode(WT_ITEM *value)
+__clsm_deleted_decode(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 {
 	/*
 	 * Take care with this check: when an LSM cursor is used for a merge,
 	 * and/or to create a Bloom filter, it is valid to return the tombstone
 	 * value.
 	 */
-	if (value->size > __tombstone.size &&
+	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
+	    value->size > __tombstone.size &&
 	    memcmp(value->data, __tombstone.data, __tombstone.size) == 0)
 		--value->size;
 }
@@ -840,7 +841,7 @@ retry:		/*
 err:	WT_TRET(__clsm_leave(clsm));
 	API_END(session, ret);
 	if (ret == 0)
-		__clsm_deleted_decode(&cursor->value);
+		__clsm_deleted_decode(clsm, &cursor->value);
 	return (ret);
 }
 
@@ -928,7 +929,7 @@ retry:		/*
 err:	WT_TRET(__clsm_leave(clsm));
 	API_END(session, ret);
 	if (ret == 0)
-		__clsm_deleted_decode(&cursor->value);
+		__clsm_deleted_decode(clsm, &cursor->value);
 	return (ret);
 }
 
@@ -1087,7 +1088,7 @@ __clsm_search(WT_CURSOR *cursor)
 err:	WT_TRET(__clsm_leave(clsm));
 	API_END(session, ret);
 	if (ret == 0)
-		__clsm_deleted_decode(&cursor->value);
+		__clsm_deleted_decode(clsm, &cursor->value);
 	return (ret);
 }
 
@@ -1173,8 +1174,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	 * smallest cursor larger than the search key, or it is NULL if the
 	 * search key is larger than any record in the tree.
 	 */
-	if (!exact)
-		cmp = 1;
+	cmp = exact ? 0 : 1;
 
 	/*
 	 * If we land on a deleted item, try going forwards or backwards to
@@ -1189,7 +1189,9 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		clsm->current = closest;
 		closest = NULL;
 		deleted = __clsm_deleted(clsm, &cursor->value);
-		if (deleted && (ret = cursor->next(cursor)) == 0) {
+		if (!deleted)
+			__clsm_deleted_decode(clsm, &cursor->value);
+		else if ((ret = cursor->next(cursor)) == 0) {
 			cmp = 1;
 			deleted = 0;
 		}
@@ -1197,8 +1199,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	}
 	if (deleted) {
 		clsm->current = NULL;
-		if ((ret = cursor->prev(cursor)) == 0)
-			cmp = -1;
+		WT_ERR(cursor->prev(cursor));
+		cmp = -1;
 	}
 	*exactp = cmp;
 
@@ -1210,7 +1212,6 @@ err:	WT_TRET(__clsm_leave(clsm));
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if (ret == 0) {
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-		__clsm_deleted_decode(&cursor->value);
 	} else
 		clsm->current = NULL;
 
@@ -1460,7 +1461,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 
-	WT_ERR(__wt_calloc_def(session, 1, &clsm));
+	WT_ERR(__wt_calloc_one(session, &clsm));
 
 	cursor = &clsm->iface;
 	*cursor = iface;
