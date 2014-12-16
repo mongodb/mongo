@@ -367,8 +367,8 @@ __create_index(WT_SESSION_IMPL *session,
 		    ",source=\"%s\"", source));
 	}
 
-	if (__wt_config_getones(session, config, "extractor", &cval) == 0 &&
-	    cval.len != 0) {
+	if (__wt_config_getones_none(
+	    session, config, "extractor", &cval) == 0 && cval.len != 0) {
 		have_extractor = 1;
 		/* Custom extractors must supply a key format. */
 		if ((ret = __wt_config_getones(
