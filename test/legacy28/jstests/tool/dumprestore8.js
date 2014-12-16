@@ -22,7 +22,7 @@ assert.eq( 1 , db.foo.count() , "setup2" );
 
 
 assert.eq( 0 , db.bar.count() , "setup3" );
-db.createCollection("bar", {capped:true, size:1000});
+db.createCollection("bar", {capped:true, size:1000, max:10});
 
 for (var i = 0; i < 1000; i++) {
     db.bar.save( { x : i } );
