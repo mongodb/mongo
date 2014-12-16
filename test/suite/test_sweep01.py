@@ -163,7 +163,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
             print "tod1: " + str(tod1) + " tod2: " + str(tod2)
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
-            print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(sweep1 < sweep2, True)
         if (nfile2 >= nfile1):
             print "close1: " + str(close1) + " close2: " + str(close2)

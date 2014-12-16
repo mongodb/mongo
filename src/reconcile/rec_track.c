@@ -21,7 +21,7 @@
 static int
 __ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	return (__wt_calloc_def(session, 1, &page->modify->ovfl_track));
+	return (__wt_calloc_one(session, &page->modify->ovfl_track));
 }
 
 /*

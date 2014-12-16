@@ -128,7 +128,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 		}
 
 	/* Basic structure allocation, initialization. */
-	WT_ERR(__wt_calloc_def(session, 1, &block));
+	WT_ERR(__wt_calloc_one(session, &block));
 	block->ref = 1;
 	TAILQ_INSERT_HEAD(&conn->blockqh, block, q);
 

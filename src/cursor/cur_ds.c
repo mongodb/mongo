@@ -473,7 +473,7 @@ __wt_curds_open(
 	data_source = NULL;
 	metaconf = NULL;
 
-	WT_RET(__wt_calloc_def(session, 1, &data_source));
+	WT_RET(__wt_calloc_one(session, &data_source));
 	cursor = &data_source->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;

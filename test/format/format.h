@@ -89,6 +89,8 @@ extern WT_EXTENSION_API *wt_api;
 
 #undef	M
 #define	M(v)		((v) * 1000000)		/* Million */
+#undef	KILOBYTE
+#define	KILOBYTE(v)	((v) * 1024)
 #undef	MEGABYTE
 #define	MEGABYTE(v)	((v) * 1048576)
 #undef	GIGABYTE

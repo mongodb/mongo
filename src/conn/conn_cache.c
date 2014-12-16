@@ -83,7 +83,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, conn->cache == NULL ||
 	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
 
-	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+	WT_RET(__wt_calloc_one(session, &conn->cache));
 
 	cache = conn->cache;
 

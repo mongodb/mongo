@@ -235,10 +235,8 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Add unreferenced overflow page blocks to the free list so they are
 	 * reused immediately.
 	 */
-	if (ss->ovfl_next != 0) {
-		WT_ERR(__slvg_ovfl_reconcile(session, ss));
-		WT_ERR(__slvg_ovfl_discard(session, ss));
-	}
+	WT_ERR(__slvg_ovfl_reconcile(session, ss));
+	WT_ERR(__slvg_ovfl_discard(session, ss));
 
 	/*
 	 * Step 5:
@@ -491,8 +489,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TRACK *trk;
 
-	WT_RET(__wt_calloc_def(session, 1, &trk));
-	WT_ERR(__wt_calloc_def(session, 1, &trk->shared));
+	WT_RET(__wt_calloc_one(session, &trk));
+	WT_ERR(__wt_calloc_one(session, &trk->shared));
 	trk->shared->ref = 1;
 
 	trk->ss = ss;
@@ -519,7 +517,7 @@ __slvg_trk_split(WT_SESSION_IMPL *session, WT_TRACK *orig, WT_TRACK **newp)
 {
 	WT_TRACK *trk;
 
-	WT_RET(__wt_calloc_def(session, 1, &trk));
+	WT_RET(__wt_calloc_one(session, &trk));
 
 	trk->shared = orig->shared;
 	trk->ss = orig->ss;
@@ -1181,7 +1179,7 @@ __slvg_col_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		WT_ERR(__wt_calloc_one(session, &addr));
 		WT_ERR(__wt_strndup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;
@@ -1826,7 +1824,7 @@ __slvg_row_build_internal(
 		ref->home = page;
 		ref->page = NULL;
 
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		WT_ERR(__wt_calloc_one(session, &addr));
 		WT_ERR(__wt_strndup(
 		    session, trk->trk_addr, trk->trk_addr_size, &addr->addr));
 		addr->size = trk->trk_addr_size;

@@ -19,7 +19,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	conn = S2C(session);
 
-	WT_RET(__wt_calloc_def(session, 1, &modify));
+	WT_RET(__wt_calloc_one(session, &modify));
 
 	/*
 	 * Select a spinlock for the page; let the barrier immediately below

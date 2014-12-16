@@ -187,7 +187,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * then initialize the data handle.  Exclusively lock the data handle
 	 * before inserting it in the list.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &dhandle));
+	WT_RET(__wt_calloc_one(session, &dhandle));
 
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
 
@@ -196,7 +196,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	if (ckpt != NULL)
 		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
 
-	WT_ERR(__wt_calloc_def(session, 1, &btree));
+	WT_ERR(__wt_calloc_one(session, &btree));
 	dhandle->handle = btree;
 	btree->dhandle = dhandle;
 

@@ -125,7 +125,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	cb = NULL;
 
-	WT_RET(__wt_calloc_def(session, 1, &cb));
+	WT_RET(__wt_calloc_one(session, &cb));
 	cursor = &cb->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;

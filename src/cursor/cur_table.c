@@ -876,7 +876,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		return (ret);
 	}
 
-	WT_RET(__wt_calloc_def(session, 1, &ctable));
+	WT_RET(__wt_calloc_one(session, &ctable));
 
 	cursor = &ctable->iface;
 	*cursor = iface;

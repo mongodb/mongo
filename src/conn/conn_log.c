@@ -54,13 +54,11 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	*runp = cval.val != 0;
-	if (*runp == 0)
-		return (0);
 
-	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
-	if (cval.val != 0)
-		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
-
+	/*
+	 * Setup a log path and compression even if logging is disabled in
+	 * case we are going to print a log.
+	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets(session, cfg, "log.compressor", &cval));
 	if (cval.len > 0) {
@@ -75,12 +73,20 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 			    (int)cval.len, cval.str);
 	}
 
+	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
+
+	/* We are done if logging isn't enabled. */
+	if (*runp == 0)
+		return (0);
+
+	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
+
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (wt_off_t)cval.val;
 	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
-
-	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	/*
@@ -341,7 +347,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Logging is on, allocate the WT_LOG structure and open the log file.
 	 */
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_LOG), &conn->log));
+	WT_RET(__wt_calloc_one(session, &conn->log));
 	log = conn->log;
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
@@ -415,8 +421,15 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
+		/*
+		 * We always set up the log_path so printlog can work without
+		 * recovery. Therefore, always free it, even if logging isn't
+		 * on.
+		 */
+		__wt_free(session, conn->log_path);
 		return (0);
+	}
 	if (conn->log_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_tid));
@@ -425,8 +438,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
 
 	WT_TRET(__wt_log_close(session));
-
-	__wt_free(session, conn->log_path);
 
 	/* Close the server thread's session. */
 	if (conn->log_session != NULL) {
@@ -441,6 +452,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
+	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
 
 	return (ret);

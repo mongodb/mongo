@@ -122,7 +122,7 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	 * The new base value is the previous base value, a separator and the
 	 * new configuration string.
 	 */
-	WT_ERR(__wt_calloc_def(session, 1, &entry));
+	WT_ERR(__wt_calloc_one(session, &entry));
 	entry->method = (*epp)->method;
 	WT_ERR(__wt_calloc_def(session,
 	    strlen((*epp)->base) + strlen(",") + strlen(config) + 1, &p));

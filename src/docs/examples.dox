@@ -22,9 +22,6 @@ extractors and cursor types.
 @example ex_extractor.c
 Shows how to extend WiredTiger with a more complex custom extractor.
 
-@example ex_file.c
-Shows how to use file objects.
-
 @example ex_hello.c
 This is an example of how to create and open a database.
 
