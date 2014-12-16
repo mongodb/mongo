@@ -421,7 +421,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
 		/*
 		 * We always set up the log_path so printlog can work without
