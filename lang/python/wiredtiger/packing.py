@@ -30,7 +30,7 @@
 """Packing and unpacking functions
 The format string uses the following conversions:
 Format  Python  Notes
-  x     N/A   	pad byte, no associated value
+  x     N/A     pad byte, no associated value
   b     int     signed byte
   B     int     unsigned byte
   h     int     signed 16-bit
