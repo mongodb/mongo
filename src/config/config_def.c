@@ -571,8 +571,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_file_meta
 	},
 	{ "index.meta",
-	  "app_metadata=,columns=,extractor=,immutable=0,index_key_columns="
-	  ",key_format=u,source=,type=file,value_format=u",
+	  "app_metadata=,columns=,extractor=none,immutable=0,"
+	  "index_key_columns=,key_format=u,source=,type=file,value_format=u",
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
@@ -599,7 +599,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
 	  "block_compressor=,cache_resident=0,checksum=uncompressed,"
 	  "colgroups=,collator=,columns=,dictionary=0,exclusive=0,"
-	  "extractor=,format=btree,huffman_key=none,huffman_value=none,"
+	  "extractor=none,format=btree,huffman_key=none,huffman_value=none,"
 	  "immutable=0,internal_item_max=0,internal_key_max=0,"
 	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,"
 	  "key_gap=10,leaf_item_max=0,leaf_key_max=0,leaf_page_max=32KB,"

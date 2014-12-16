@@ -304,7 +304,7 @@ table_only_config = [
 ]
 
 index_only_config = [
-    Config('extractor', '', r'''
+    Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
         WT_CONNECTION::add_extractor'''),

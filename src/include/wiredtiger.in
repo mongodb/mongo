@@ -982,7 +982,7 @@ struct __wt_session {
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Permitted
 	 * values are \c "none" or an extractor name created with
-	 * WT_CONNECTION::add_extractor., a string; default empty.}
+	 * WT_CONNECTION::add_extractor., a string; default \c none.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
