@@ -2,6 +2,11 @@ if (typeof getToolTest === 'undefined') {
   load('jstests/configs/plain_28.config.js');
 }
 
+/*
+ * Tests that we provide helpful output when user tries to use flags that were
+ * deprecated in 2.7.x
+ */
+
 (function() {
   var toolTest = getToolTest('oplogDeprecatedFlagTest');
   var commonToolArgs = getCommonToolArguments();

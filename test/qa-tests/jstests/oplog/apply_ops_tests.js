@@ -2,6 +2,11 @@ if (typeof getToolTest === 'undefined') {
   load('jstests/configs/plain_28.config.js');
 }
 
+/*
+ * This test creates a fake oplog and uses it to test correct behavior of
+ * --oplogns and --seconds
+ */
+
 (function() {
   var OPLOG_INSERT_CODE = 'i';
   var OPLOG_UPDATE_CODE = 'u';

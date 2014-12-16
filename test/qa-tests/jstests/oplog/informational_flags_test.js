@@ -2,6 +2,11 @@ if (typeof getToolTest === 'undefined') {
   load('jstests/configs/plain_28.config.js');
 }
 
+/*
+ * Tests that the informational flags --version and --help give reasonable
+ * output.
+ */
+
 (function() {
   var CURRENT_MONGOD_RELEASE = '2.8';
 

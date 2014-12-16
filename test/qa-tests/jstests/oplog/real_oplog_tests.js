@@ -2,6 +2,10 @@ if (typeof getToolTest === 'undefined') {
   load('jstests/configs/plain_28.config.js');
 }
 
+/*
+ * Tests correct behavior when operating against a live oplog
+ */
+
 (function() {
   var toolTest = getToolTest('oplogRealOplogTest');
   var commonToolArgs = getCommonToolArguments();

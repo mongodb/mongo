@@ -12,6 +12,8 @@ var getToolTest;
     var toolTest = new ToolTest(name, TOOLS_TEST_CONFIG);
     toolTest.startDB();
 
+    toolTest.usesSSL = true;
+
     return toolTest;
   };
 })();
