@@ -80,7 +80,8 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_btree_sync_and_close(session, 0));
 			if (ret == 0)
-				WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+				WT_STAT_FAST_CONN_INCR(
+				    session, dh_conn_handles);
 		}
 
 		/*
