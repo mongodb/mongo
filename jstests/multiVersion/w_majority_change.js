@@ -41,12 +41,15 @@ load("jstests/replsets/rslib.js");
     // w: majority on node 0 (2.8) will need both voting, non-arbiter nodes in this configuration
     // take down one voting, non-arbiter node. fails because we are missing a voter
     replTest.stop(2);
+    replTest.waitForState(nodes[2], replTest.DOWN);
     assert.writeError(primary.getDB(name).foo.insert({x: 1}, writeConcern));
     // bring it back
     replTest.restart(2);
+    replTest.waitForState(nodes[2], replTest.SECONDARY);
     assert.writeOK(primary.getDB(name).foo.insert({x: 2}, writeConcern));
     // take down one non-voting, non-arbiter node. passes because the non-voter does not matter
     replTest.stop(1);
+    replTest.waitForState(nodes[1], replTest.DOWN);
     assert.writeOK(primary.getDB(name).foo.insert({x: 3}, writeConcern));
     replTest.restart(1);
     replTest.waitForState(nodes[1], replTest.SECONDARY);
@@ -64,12 +67,15 @@ load("jstests/replsets/rslib.js");
     // w: majority on 2.6 will need all non-arbiter nodes in this configuration
     // take down one voting, non-arbiter node. fails because all nodes are needed
     replTest.stop(0);
+    replTest.waitForState(nodes[0], replTest.DOWN);
     assert.writeError(primary.getDB(name).foo.insert({x: 4}, writeConcern));
     // bring it back
     replTest.restart(0);
+    replTest.waitForState(nodes[0], replTest.SECONDARY);
     assert.writeOK(primary.getDB(name).foo.insert({x: 5}, writeConcern));
     // take down one non-voting, non-arbiter node. fails because all nodes are needed
     replTest.stop(1);
+    replTest.waitForState(nodes[1], replTest.DOWN);
     assert.writeError(primary.getDB(name).foo.insert({x: 6}, writeConcern));
 
     replTest.stopSet();
@@ -108,21 +114,29 @@ load("jstests/replsets/rslib.js");
     // take down both non-voting nodes. passes because non-voting nodes do not matter
     replTest.stop(5);
     replTest.stop(4);
+    replTest.waitForState(nodes[4], replTest.DOWN);
+    replTest.waitForState(nodes[5], replTest.DOWN);
     assert.writeOK(primary.getDB(name).foo.insert({x: 7}, writeConcern));
     // take down one voting node. passes because we still have sufficient voting nodes
     replTest.stop(3);
+    replTest.waitForState(nodes[3], replTest.DOWN);
     assert.writeOK(primary.getDB(name).foo.insert({x: 8}, writeConcern));
     // take down another voting node. fails because we have insufficient voting nodes
     replTest.stop(2);
+    replTest.waitForState(nodes[2], replTest.DOWN);
     assert.writeError(primary.getDB(name).foo.insert({x: 9}, writeConcern));
     // bring back both non-voting nodes. fails because non-voters still do not matter
     replTest.restart(5);
     replTest.restart(4);
+    replTest.waitForState(nodes[4], replTest.SECONDARY);
+    replTest.waitForState(nodes[5], replTest.SECONDARY);
     assert.writeError(primary.getDB(name).foo.insert({x: 10}, writeConcern));
     // bring back a voting node. passes because we have sufficient voting nodes
     replTest.restart(3);
+    replTest.waitForState(nodes[3], replTest.SECONDARY);
     assert.writeOK(primary.getDB(name).foo.insert({x: 11}, writeConcern));
     replTest.restart(2);
+    replTest.waitForState(nodes[2], replTest.SECONDARY);
 
 
     // reconfig such that a 2.6 node (node 2) will be primary
@@ -139,6 +153,8 @@ load("jstests/replsets/rslib.js");
     // take down both non-voting nodes. passes because there are still sufficient nodes
     replTest.stop(5);
     replTest.stop(4);
+    replTest.waitForState(nodes[4], replTest.DOWN);
+    replTest.waitForState(nodes[5], replTest.DOWN);
     assert.writeOK(primary.getDB(name).foo.insert({x: 12}, writeConcern));
     // take down one voting node. fails because there are insufficient nodes
     replTest.stop(3);
@@ -149,6 +165,9 @@ load("jstests/replsets/rslib.js");
     replTest.restart(5);
     replTest.restart(4);
     replTest.stop(1);
+    replTest.waitForState(nodes[4], replTest.SECONDARY);
+    replTest.waitForState(nodes[5], replTest.SECONDARY);
+    replTest.waitForState(nodes[1], replTest.DOWN);
     assert.writeOK(primary.getDB(name).foo.insert({x: 15}, writeConcern));
 
     replTest.stopSet();

@@ -156,7 +156,9 @@ namespace {
         if (action.getAction() == HeartbeatResponseAction::NoAction &&
                 hbStatusResponse.isOK() &&
                 hbStatusResponse.getValue().hasOpTime() &&
-                targetIndex >= 0) {
+                targetIndex >= 0 &&
+                hbStatusResponse.getValue().hasState() &&
+                hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
             boost::lock_guard<boost::mutex> lk(_mutex);
             if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
                 _updateOpTimeFromHeartbeat_inlock(targetIndex,
