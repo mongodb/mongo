@@ -7,7 +7,9 @@ env.Library(
     source=[
         'write_conflict_exception.cpp'
         ],
-    LIBDEPS=[]
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/server_parameters'
+        ]
 )
 
 env.Library(
