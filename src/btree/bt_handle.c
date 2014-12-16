@@ -304,7 +304,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		break;
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "block_compressor", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q)
 			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
