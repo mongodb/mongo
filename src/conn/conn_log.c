@@ -421,14 +421,16 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	/*
-	 * We always set up the log_path so that printlog can work without
-	 * recovery.  Therefore, always free it, even if logging isn't on.
-	 */
-	__wt_free(session, conn->log_path);
 
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
+		/*
+		 * We always set up the log_path so printlog can work without
+		 * recovery. Therefore, always free it, even if logging isn't
+		 * on.
+		 */
+		__wt_free(session, conn->log_path);
 		return (0);
+	}
 	if (conn->log_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_tid));
@@ -451,6 +453,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
+	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
 
 	return (ret);
