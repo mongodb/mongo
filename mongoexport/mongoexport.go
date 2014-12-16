@@ -118,6 +118,20 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	return os.Stdout, nil
 }
 
+// Take a comma-delimited set of field names and build a selector doc for query projection.
+// e.g. "a,b,c.d" -> {a:1, b:1, "c.d":1}
+func makeFieldSelector(fields string) bson.M {
+	r := bson.M{"_id": 1}
+	if fields == "" {
+		return r
+	}
+	f := strings.Split(fields, ",")
+	for _, v := range f {
+		r[v] = 1
+	}
+	return r
+}
+
 // getCursor returns a cursor that can be iterated over to get all the documents
 // to export, based on the options given to mongoexport. Also returns the
 // associated session, so that it can be closed once the cursor is used up.
@@ -172,6 +186,10 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	q := session.DB(exp.ToolOptions.Namespace.DB).
 		C(exp.ToolOptions.Namespace.Collection).Find(query).Sort(sortFields...).
 		Skip(skip).Limit(limit)
+
+	if len(exp.OutputOpts.Fields) > 0 {
+		q.Select(makeFieldSelector(exp.OutputOpts.Fields))
+	}
 
 	q = db.ApplyFlags(q, session, flags)
 

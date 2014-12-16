@@ -32,3 +32,13 @@ func TestExtendedJSON(t *testing.T) {
 		jsonEncoder.Encode(out)
 	})
 }
+
+func TestFieldSelect(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
+	Convey("Using makeFieldSelector should return correct projection doc", t, func() {
+		So(makeFieldSelector("a,b"), ShouldResemble, bson.M{"_id": 1, "a": 1, "b": 1})
+		So(makeFieldSelector(""), ShouldResemble, bson.M{"_id": 1})
+		So(makeFieldSelector("x,foo.baz"), ShouldResemble, bson.M{"_id": 1, "foo.baz": 1, "x": 1})
+	})
+}

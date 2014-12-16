@@ -70,8 +70,7 @@
     ret = toolTest.runTool.apply(
         toolTest,
         ['import', '--file', exportTarget, '--db', 'test',
-            '--collection', 'dest', '--type', 'json',
-            '--fields', 'a,b,c'].
+            '--collection', 'dest', '--type', 'json'].
             concat(commonToolArgs)
     );
     assert.eq(0, ret);
