@@ -93,6 +93,9 @@ namespace mongo {
                     continue;
                 }
 
+                // Count it as active from the moment the TTL thread wakes up
+                OperationContextImpl txn;
+
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
                 if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet &&
@@ -108,15 +111,11 @@ namespace mongo {
                     string db = *i;
 
                     vector<BSONObj> indexes;
-                    {
-                        OperationContextImpl txn;
-                        getTTLIndexesForDB( &txn, db, &indexes );
-                    }
+                    getTTLIndexesForDB(&txn, db, &indexes);
 
                     for ( vector<BSONObj>::const_iterator it = indexes.begin();
                           it != indexes.end(); ++it ) {
 
-                        OperationContextImpl txn;
                         if ( !doTTLForIndex( &txn, db, *it ) ) {
                             break;  // stop processing TTL indexes on this database
                         }
