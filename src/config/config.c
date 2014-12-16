@@ -708,7 +708,7 @@ int
 __wt_config_getones_none(WT_SESSION_IMPL *session,
     const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_RET(__wt_config_getones_none(session, config, key, value));
+	WT_RET(__wt_config_getones(session, config, key, value));
 	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
 		value->len = 0;
 	return (0);
