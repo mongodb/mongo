@@ -23,6 +23,14 @@ dbname2 = "NOT_"+dbname;
 
 db.dropDatabase();
 
+// MMapV1 always sets newcollectionsusepowerof2sizes, WT does not
+defaultFlags = { "flags" : 1 }
+var ss = db.serverStatus();
+
+if (ss.storageEngine.name != "mmapv1") {
+    defaultFlags = {};
+}
+
 var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
 assert.eq( 1, db.capped.getIndexes().length, "auto index not created" );
@@ -45,7 +53,7 @@ t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert.eq( {}, db.capped.exists().options,
+assert.eq( defaultFlags, db.capped.exists().options,
        "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single DB
@@ -74,7 +82,7 @@ db = db.getSiblingDB(dbname2);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert.eq( {}, db.capped.exists().options, 
+assert.eq( defaultFlags, db.capped.exists().options, 
           "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single collection
@@ -106,7 +114,7 @@ db = db.getSiblingDB(dbname);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert( true !== db.capped.stats().capped, "restore options were not ignored" );
-assert.eq( {}, db.capped.exists().options, 
+assert.eq( defaultFlags, db.capped.exists().options, 
           "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 t.stop();
