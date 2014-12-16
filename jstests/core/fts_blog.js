@@ -9,14 +9,14 @@ t.save( { _id : 3 , title : "knives are Fun" , text : "this is a new blog i am w
 // specify weights if you want a field to be more meaningull
 t.ensureIndex( { "title" : "text" , text : "text" } , { weights : { title : 10 } } );
 
-res = t.runCommand( "text" , { search : "blog" } )
-assert.eq( 3, res.results.length );
-assert.eq( 1, res.results[0].obj._id );
+res = t.find( { "$text" : { "$search" : "blog" } } ,  { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 3, res.length());
+assert.eq( 1, res[0]._id );
 
-res = t.runCommand( "text" , { search : "write" } )
-assert.eq( 3, res.results.length );
-assert.eq( res.results[0].score, res.results[1].score );
-assert.eq( res.results[0].score, res.results[2].score );
+res = t.find( { "$text" : { "$search" : "write" } }, { score: { "$meta" : "textScore" } } );
+assert.eq( 3, res.length() );
+assert.eq( res[0].score, res[1].score );
+assert.eq( res[0].score, res[2].score );
 
 
 

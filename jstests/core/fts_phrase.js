@@ -8,15 +8,15 @@ t.save( { _id : 3 , title : "knives are Fun" , text : "this is a new blog i am w
 
 t.ensureIndex( { "title" : "text" , text : "text" } , { weights : { title : 10 } } );
 
-res = t.runCommand( "text" , { search : "blog write" } );
-assert.eq( 3, res.results.length );
-assert.eq( 1, res.results[0].obj._id );
-assert( res.results[0].score > (res.results[1].score*2), tojson(res) );
+res = t.find( { "$text" : { "$search" : "blog write" } }, { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 3, res.length() );
+assert.eq( 1, res[0]._id );
+assert( res[0].score > (res[1].score*2), tojson(res.toArray()));
 
-res = t.runCommand( "text" , { search : "write blog" } );
-assert.eq( 3, res.results.length );
-assert.eq( 1, res.results[0].obj._id );
-assert( res.results[0].score > (res.results[1].score*2), tojson(res) );
+res = t.find( { "$text" : { "$search" : "write blog" } }, { score: { "$meta" : "textScore" } }  ).sort( { score: { "$meta" : "textScore" } });
+assert.eq( 3, res.length() );
+assert.eq( 1, res[0]._id );
+assert( res[0].score > (res[1].score*2), tojson(res.toArray()));
 
 
 

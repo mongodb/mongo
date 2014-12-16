@@ -10,14 +10,13 @@ t.insert( { _id : 4 , x : 2 , y : "bar" } );
 
 t.ensureIndex( { x : 1, y : "text" } );
 
-res = t.runCommand( "text", { search : "foo" } );
-assert.eq( 0, res.ok, tojson(res) );
+assert.throws(t.find( { "$text": { "$search" : "foo" } } ));
 
 assert.eq( [ 1 ], queryIDS( t, "foo" , { x : 1 } ) );
 
-res = t.runCommand( "text", { search : "foo" , filter : { x : 1 } } );
-assert( res.results[0].score > 0, tojson( res ) )
+res = t.find( { "$text": { "$search" : "foo" }, x : 1 }, { score: { "$meta" : "textScore" } } );
+assert( res[0].score > 0, tojson(res.toArray()));
 
-// repeat search with "language" specified, SERVER-8999
-res = t.runCommand( "text", { search : "foo" , filter : { x : 1 } , language : "english" } );
-assert( res.results[0].score > 0, tojson( res ) )
+// repeat "search" with "language" specified, SERVER-8999
+res = t.find( { "$text": { "$search" : "foo" , "$language" : "english" }, x : 1 }, { score: { "$meta" : "textScore" } } );
+assert( res[0].score > 0, tojson(res.toArray()));

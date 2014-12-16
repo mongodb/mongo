@@ -26,9 +26,9 @@ tc.save( { _id: 10, title: "Mallacoota, Victoria", text: "Mallacoota is a small 
 tc.ensureIndex( { "title": "text" } );
 
 // test the single result case..
-res = tc.runCommand( "text", { search: "Victoria" } );
-assert.eq( 1, res.results.length );
-assert.eq( 10, res.results[0].obj._id );
+res = tc.find( { "$text": { "$search": "Victoria" } } );
+assert.eq( 1, res.length() );
+assert.eq( 10, res[0]._id );
 
 tc.dropIndexes();
 
@@ -50,68 +50,66 @@ assert.eq( [7,5], queryIDS( tc, "Olympic Games gold medal" ) );
 
 tc.dropIndexes();
 
-// -------------------------------------------- SEARCHING ------------------------------------------
+// -------------------------------------------- "search"ING ------------------------------------------
 
-// go back to "$**": 1, "title": 10.. and test more specific search functionality!
+// go back to "$**": 1, "title": 10.. and test more specific "search" functionality!
 tc.ensureIndex( { "$**": "text" }, { weights: { "title": 10 } } );
 
 // -------------------------------------------- STEMMING -------------------------------------------
 
 // tests stemming for basic plural case
-res = tc.runCommand( "text", { search: "member" } );
-res2 = tc.runCommand( "text", { search: "members" } );
+res = tc.find( { "$text": { "$search": "member" } } );
+res2 = tc.find( { "$text": { "$search": "members" } } );
 assert.eq( getIDS( res ), getIDS( res2 ) );
 
-// search for something with potential 's bug.
-res = tc.runCommand( "text", { search: "magazine's" } );
-res2 = tc.runCommand( "text", { search: "magazine" } );
+// "search" for something with potential 's bug.
+res = tc.find( { "$text": { "$search": "magazine's" } } );
+res2 = tc.find( { "$text": { "$search": "magazine" } } );
 assert.eq( getIDS( res ), getIDS( res2 ) );
 
 // -------------------------------------------- LANGUAGE -------------------------------------------
 
-res = tc.runCommand( "text", { search: "member", language: "spanglish" } );
-assert.commandFailed( res );
-res = tc.runCommand( "text", { search: "member", language: "english" } );
-assert.commandWorked( res );
+assert.throws(tc.find( { "$text": { "$search": "member", $language: "spanglish" } } ));
+assert.doesNotThrow(function() {tc.find( { "$text": { "$search": "member", $language: "english" } })} );
 
 // -------------------------------------------- LIMIT RESULTS --------------------------------------
 
 // ensure limit limits results
-assert.eq( [2], queryIDS( tc, "rural river dam", null , { limit : 1 } ) );
+assert.eq( [2], queryIDS( tc, "rural river dam", null, null, 1) );
 
 // ensure top results are the same regardless of limit
 // make sure that this uses a case where it wouldn't be otherwise..
-res = tc.runCommand( "text", { search: "united kingdom british princes", limit: 1 } );
-res2 = tc.runCommand( "text", { search: "united kingdom british princes" } );
-assert.eq( 1, res.results.length );
-assert.eq( 4, res2.results.length );
-assert.eq( res.results[0].obj._id, res2.results[0].obj._id );
+res = tc.find( { "$text": { "$search": "united kingdom british princes" }}).limit(1);
+res2 = tc.find( { "$text": { "$search": "united kingdom british princes" } } );
+assert.eq( 1, res.length() );
+assert.eq( 4, res2.length() );
+assert.eq( res[0]._id, res2[0]._id );
 
 // -------------------------------------------- PROJECTION -----------------------------------------
 
 // test projection.. show just title and id
-res = tc.runCommand( "text", { search: "Morten Jensen", project: { title: 1 } } );
-assert.eq( 1, res.results.length );
-assert.eq( 5, res.results[0].obj._id );
-assert.eq( null, res.results[0].obj.text );
-assert.neq( null, res.results[0].obj.title );
-assert.neq( null, res.results[0].obj._id );
+res = tc.find( { "$text": { "$search": "Morten Jensen" }}, { title: 1 } );
+assert.eq( 1, res.length() );
+assert.eq( 5, res[0]._id );
+assert.eq( null, res[0].text );
+assert.neq( null, res[0].title );
+assert.neq( null, res[0]._id );
 
 // test negative projection, ie. show everything but text
-res = tc.runCommand( "text", { search: "handball", project: { text: 0 } } );
-assert.eq( 1, res.results.length );
-assert.eq( 4, res.results[0].obj._id );
-assert.eq( null, res.results[0].obj.text );
-assert.neq( null, res.results[0].obj.title );
-assert.neq( null, res.results[0].obj._id );
+res = tc.find( { "$text": { "$search": "handball" }}, { text: 0 } );
+assert.eq( 1, res.length() );
+assert.eq( 4, res[0]._id );
+assert.eq( null, res[0].text );
+assert.neq( null, res[0].title );
+assert.neq( null, res[0]._id );
 
 // test projection only title, no id
-res = tc.runCommand( "text", { search: "Mahim Bora", project: { _id: 0, title: 1 } } );
-assert.eq( 1, res.results.length );
-assert.eq( "Mahim Bora", res.results[0].obj.title );
-assert.eq( null, res.results[0].obj.text );
-assert.neq( null, res.results[0].obj.title );
-assert.eq( null, res.results[0].obj._id );
+res = tc.find( { "$text": { "$search": "Mahim Bora" }}, { _id: 0, title: 1 } );
+assert.eq( 1, res.length() );
+assert.eq( "Mahim Bora", res[0].title );
+assert.eq( null, res[0].text );
+assert.neq( null, res[0].title );
+assert.eq( null, res[0]._id );
 
 // -------------------------------------------- NEGATION -------------------------------------------
 
@@ -136,12 +134,12 @@ assert.eq( [3], queryIDS( tc, "\"industry\" -Melbourne -Physics" ) );
 // -------------------------------------------- EDGE CASES -----------------------------------------
 
 // test empty string
-res = tc.runCommand( "text", { search: "" } );
-assert.eq( 0, res.ok )
+res = tc.find( { "$text": { "$search": "" } } );
+assert.eq( 0, res.length() );
 
 // test string with a space in it
-res = tc.runCommand( "text", { search: " " } );
-assert.eq( 0, res.results.length );
+res = tc.find( { "$text": { "$search": " " } } );
+assert.eq( 0, res.length() );
 
 // -------------------------------------------- FILTERING ------------------------------------------
 
