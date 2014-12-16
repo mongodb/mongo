@@ -7,10 +7,11 @@ mydb.foo.insert( { x : 5 } );
 
 mydb.runCommand( { create : "bar", temp : true } );
 
-res = mydb.runCommand( "listCollections" );
+res = mydb.runCommand( "listCollections", { cursor : {} } );
+collections = new DBCommandCursor( db.getMongo(), res ).toArray();
 
-bar = res.collections.filter( function(x){ return x.name == "bar"; } )[0];
-foo = res.collections.filter( function(x){ return x.name == "foo" ; } )[0];
+bar = collections.filter( function(x){ return x.name == "bar"; } )[0];
+foo = collections.filter( function(x){ return x.name == "foo" ; } )[0];
 
 assert( bar );
 assert( foo );
@@ -20,10 +21,12 @@ assert.eq( foo.name, mydb.foo.getName() );
 
 assert( mydb.bar.temp, tojson( bar ) );
 
-assert.eq( mydb._getCollectionNamesSystemNamespaces(),
-           mydb._getCollectionNamesCommand() );
+getCollectionName = function(infoObj) { return infoObj.name; }
 
-assert.eq( mydb.getCollectionNames(),
-           mydb._getCollectionNamesCommand() );
+assert.eq( mydb._getCollectionInfosSystemNamespaces().map(getCollectionName),
+           mydb._getCollectionInfosCommand().map(getCollectionName) );
+
+assert.eq( mydb.getCollectionInfos().map(getCollectionName),
+           mydb._getCollectionInfosCommand().map(getCollectionName) );
 
 mydb.dropDatabase();

@@ -155,11 +155,8 @@ namespace mongo {
             exec->saveState();
         }
 
-        BSONObjBuilder cursorObj(result.subobjStart("cursor"));
-        cursorObj.append("id", cursor ? cursor->cursorid() : 0LL);
-        cursorObj.append("ns", ns);
-        cursorObj.append("firstBatch", resultsArray.arr());
-        cursorObj.done();
+        const long long cursorId = cursor ? cursor->cursorid() : 0LL;
+        Command::appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
     }
 
 

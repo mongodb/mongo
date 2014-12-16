@@ -90,8 +90,13 @@ namespace mongo {
                 matcher.reset( parsed.getValue() );
             }
 
-            BSONArrayBuilder arr;
+            // TODO: Handle options specified in the command request object under the "cursor"
+            // field.
 
+            // TODO: If the full result set does not fit in one batch, allocate a cursor to store
+            // the remainder of the results.
+
+            BSONArrayBuilder arr;
             for ( list<string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
                 string ns = *i;
 
@@ -115,7 +120,19 @@ namespace mongo {
                 arr.append( maybe );
             }
 
-            result.append( "collections", arr.arr() );
+            // TODO: As a temporary compatibility measure for drivers that have not yet been updated
+            // to handle the new cursor response object, we maintain the legacy command format if
+            // the field "cursor" is not present in the request object.  This compatibility layer
+            // should be eventually removed.
+            if ( jsobj["cursor"].type() == mongo::Object ) {
+                const long long cursorId = 0LL;
+                std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
+                Command::appendCursorResponseObject( cursorId, cursorNamespace, arr.arr(),
+                                                     &result );
+            }
+            else {
+                result.append( "collections", arr.arr() );
+            }
 
             return true;
         }

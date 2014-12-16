@@ -900,12 +900,20 @@ namespace mongo {
         // TODO(spencer): remove fallback behavior after 2.8
 
         {
+            // TODO: This implementation only reads the first batch of results from the
+            // listCollections command, and masserts if there are multiple batches to read.  A
+            // correct implementation needs to instantiate a command cursor from the command
+            // response object, and use it to read in all of the command results.
             BSONObj res;
             if (runCommand(db,
-                           BSON("listCollections" << 1 << "filter" << filter),
+                           BSON("listCollections" << 1 << "filter" << filter
+                                                       << "cursor" << BSONObj()),
                            res,
                            QueryOption_SlaveOk)) {
-                BSONObj collections = res["collections"].Obj();
+                BSONObj cursorObj = res["cursor"].Obj();
+                massert(28586, "reading multiple batches from listCollections not implemented",
+                        cursorObj["id"].numberInt() == 0);
+                BSONObj collections = cursorObj["firstBatch"].Obj();
                 BSONObjIterator it( collections );
                 while ( it.more() ) {
                     BSONElement e = it.next();

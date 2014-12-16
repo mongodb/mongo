@@ -283,6 +283,18 @@ namespace mutablebson {
         // not look like the result of a command.
         static Status getStatusFromCommandResult(const BSONObj& result);
 
+        /**
+         * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
+         * and appends the response object to the provided builder under the field name "cursor".
+         *
+         * The response object has the following format:
+         *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
+         */
+        static void appendCursorResponseObject(long long cursorId,
+                                               StringData cursorNamespace,
+                                               BSONArray firstBatch,
+                                               BSONObjBuilder* builder);
+
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
 

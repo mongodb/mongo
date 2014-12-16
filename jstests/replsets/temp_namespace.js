@@ -34,13 +34,17 @@ assert.writeOK(masterDB.keep4.insert({}, { writeConcern: { w: 2 }}));
 
 // make sure they exist on primary and secondary
 function countCollection( mydb, nameFilter ) {
-    return mydb.runCommand( "listCollections",
-                            { filter : { name : nameFilter } } ).collections.length;
+    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter },
+                                                       cursor : {} } );
+    assert.commandWorked( result );
+    return new DBCommandCursor( mydb.getMongo(), result ).itcount();
 }
 
-function coundIndexesFor( mydb, nameFilter ) {
-    var arr = mydb.runCommand( "listCollections",
-                               { filter : { name : nameFilter } } ).collections;
+function countIndexesFor( mydb, nameFilter ) {
+    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter },
+                                                       cursor : {} } );
+    assert.commandWorked( result );
+    var arr = new DBCommandCursor( mydb.getMongo(), result ).toArray();
     var total = 0;
     for ( var i = 0; i < arr.length; i++ ) {
         var coll = arr[i];
@@ -50,11 +54,11 @@ function coundIndexesFor( mydb, nameFilter ) {
 }
 
 assert.eq(countCollection(masterDB,/temp\d$/), 2); // collections
-assert.eq(coundIndexesFor(masterDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
+assert.eq(countIndexesFor(masterDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
 assert.eq(countCollection(masterDB,/keep\d$/), 4); 
 
 assert.eq(countCollection(secondDB,/temp\d$/), 2); // collections
-assert.eq(coundIndexesFor(secondDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
+assert.eq(countIndexesFor(secondDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondDB,/keep\d$/), 4); 
 
 // restart secondary and reconnect
@@ -73,7 +77,7 @@ assert.soon(function () {
 
 // make sure restarting secondary didn't drop collections
 assert.eq(countCollection(secondDB,/temp\d$/), 2); // collections
-assert.eq(coundIndexesFor(secondDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
+assert.eq(countIndexesFor(secondDB,/temp\d$/), 4); // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondDB,/keep\d$/), 4); 
 
 // step down primary and make sure former secondary (now primary) drops collections
@@ -90,13 +94,13 @@ assert.soon(function() {
 }, '',  75*1000); // must wait for secondary to be willing to promote self
 
 assert.eq(countCollection(secondDB,/temp\d$/), 0); // collections
-assert.eq(coundIndexesFor(secondDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
+assert.eq(countIndexesFor(secondDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
 assert.eq(countCollection(secondDB,/keep\d$/), 4); 
 
 // check that former primary dropped collections
 replTest.awaitReplication()
 assert.eq(countCollection(masterDB,/temp\d$/), 0); // collections
-assert.eq(coundIndexesFor(masterDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
+assert.eq(countIndexesFor(masterDB,/temp\d$/), 0); // indexes (2 _id + 2 x)
 assert.eq(countCollection(masterDB,/keep\d$/), 4); 
 
 replTest.stopSet();
