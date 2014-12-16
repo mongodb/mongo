@@ -356,17 +356,15 @@ namespace {
         return false;
     }
 
-namespace {
-    int oplogCounter = 0;
-}
-
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
                                                      const RecordId& justInserted ) {
 
-        if ( _isOplog ) {
-            if ( oplogCounter++ % 100 > 0 )
-                return;
-        }
+        // We only want to do the checks occasionally as they are expensive.
+        // This variable isn't thread safe, but has loose semantics anyway.
+        dassert( !_isOplog || _cappedMaxDocs == -1 );
+        if ( _cappedMaxDocs == -1 && // Max docs has to be exact, so have to check every time.
+             _cappedDeleteCheckCount++ % 100 > 0 )
+            return;
 
         if (!cappedAndNeedDelete())
             return;
@@ -376,14 +374,12 @@ namespace {
         if ( !lock )
             return;
 
-        WiredTigerRecoveryUnit* realRecoveryUnit = NULL;
-        if ( _isOplog ) {
-            // we do this is a sub transaction in case it aborts
-            realRecoveryUnit = dynamic_cast<WiredTigerRecoveryUnit*>( txn->releaseRecoveryUnit() );
-            invariant( realRecoveryUnit );
-            WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
-            txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
-        }
+        // we do this is a sub transaction in case it aborts
+        WiredTigerRecoveryUnit* realRecoveryUnit =
+            dynamic_cast<WiredTigerRecoveryUnit*>( txn->releaseRecoveryUnit() );
+        invariant( realRecoveryUnit );
+        WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
+        txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
 
         try {
             WiredTigerCursor curwrap( _uri, _instanceId, txn);
@@ -418,26 +414,19 @@ namespace {
 
         }
         catch ( const WriteConflictException& wce ) {
-            if ( _isOplog ) {
-                delete txn->releaseRecoveryUnit();
-                txn->setRecoveryUnit( realRecoveryUnit );
-                log() << "got conflict purging oplog, ignoring";
-                return;
-            }
-            throw;
+            delete txn->releaseRecoveryUnit();
+            txn->setRecoveryUnit( realRecoveryUnit );
+            log() << "got conflict truncating capped, ignoring";
+            return;
         }
         catch ( ... ) {
-            if ( _isOplog ) {
-                delete txn->releaseRecoveryUnit();
-                txn->setRecoveryUnit( realRecoveryUnit );
-            }
+            delete txn->releaseRecoveryUnit();
+            txn->setRecoveryUnit( realRecoveryUnit );
             throw;
         }
 
-        if ( _isOplog ) {
-            delete txn->releaseRecoveryUnit();
-            txn->setRecoveryUnit( realRecoveryUnit );
-        }
+        delete txn->releaseRecoveryUnit();
+        txn->setRecoveryUnit( realRecoveryUnit );
     }
 
     StatusWith<RecordId> WiredTigerRecordStore::extractAndCheckLocForOplog(const char* data,
