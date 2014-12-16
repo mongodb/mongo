@@ -31,11 +31,8 @@
     assert.docEq(doc2_2, {a:4567,b:"asdf", c:222})
 
 
-    /*
-
-
-
     // Verify that --upsert without --upsertFields works by applying the update using _id
+    db.c.drop()
     db.c.insert({_id:"one", a: "original value"})
     db.c.insert({_id:"two", a: "original value 2"})
     assert.eq(db.c.count(), 2, "collection count should be 2 at setup")
@@ -49,9 +46,8 @@
     // check that the upsert got applied
     assert.eq(ret, 0)
     assert.eq(db.c.count(), 2)
+
     assert.docEq(db.c.findOne({_id:"one"}),{_id:"one", a:"unicorns",b:"zebras"})
-    assert.docEq(db.c.findOne({_id:"two"}), {_id:"two", a:"xxx",b:"yyy"})
-    */
 
     toolTest.stop();
 }());
