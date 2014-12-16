@@ -31,20 +31,20 @@ __metadata_turtle(const char *key)
 
 /*
  * __wt_metadata_open --
- *	Opens the metadata file, sets session->metafile.
+ *	Opens the metadata file, sets session->meta_dhandle.
  */
 int
 __wt_metadata_open(WT_SESSION_IMPL *session)
 {
-	if (session->metafile != NULL)
+	if (session->meta_dhandle != NULL)
 		return (0);
 
 	WT_RET(__wt_session_get_btree(session, WT_METAFILE_URI, NULL, NULL, 0));
 
-	session->metafile = S2BT(session);
-	WT_ASSERT(session, session->metafile != NULL);
+	session->meta_dhandle = session->dhandle;
+	WT_ASSERT(session, session->meta_dhandle != NULL);
 
-	/* The metafile doesn't need to stay locked -- release it. */
+	/* The meta_dhandle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
 }
 
@@ -64,7 +64,7 @@ __wt_metadata_cursor(
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));
 
-	WT_SET_BTREE_IN_SESSION(session, session->metafile);
+	session->dhandle = session->meta_dhandle;
 
 	/* 
 	 * We use the metadata a lot, so we have a handle cached; lock it and
