@@ -18,11 +18,11 @@ db.createUser({
 
 assert(db.auth("foobar", "foobar"), "auth failed");
 
-x = runMongoProgram("mongostat", "--host", "127.0.0.1:" + port[0], "--username", "foobar", "--password", "foobar", "--rowcount", "1");
+x = runMongoProgram("mongostat", "--host", "127.0.0.1:" + port[0], "--username", "foobar", "--password", "foobar", "--rowcount", "1", "--authenticationDatabase", "admin");
 
 assert.eq(x, 0, "mongostat should exit successfully with foobar:foobar");
 
-x = runMongoProgram("mongostat", "--host", "127.0.0.1:" + port[0], "--username", "foobar", "--password", "wrong", "--rowcount", "1");
+x = runMongoProgram("mongostat", "--host", "127.0.0.1:" + port[0], "--username", "foobar", "--password", "wrong", "--rowcount", "1", "--authenticationDatabase", "admin");
 
 assert.eq(x, exitCodeErr, "mongostat should exit with an error exit code with foobar:wrong");
 
