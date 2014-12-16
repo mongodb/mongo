@@ -2,18 +2,17 @@ if (typeof getToolTest === 'undefined') {
   load('jstests/configs/plain_28.config.js');
 }
 
-var OPLOG_INSERT_CODE = 'i';
-var OPLOG_UPDATE_CODE = 'u';
-var CURRENT_OPLOG_VERSION = 2;
-
-// Oplog TS is in seconds since unix epoch
-var TEST_START = Math.floor(new Date().getTime() / 1000);
-
 (function() {
+  var OPLOG_INSERT_CODE = 'i';
+  var OPLOG_UPDATE_CODE = 'u';
+  var CURRENT_OPLOG_VERSION = 2;
+
+  // Oplog TS is in seconds since unix epoch
+  var TEST_START = Math.floor(new Date().getTime() / 1000);
   var toolTest = getToolTest('oplogSuccessTest');
   var commonToolArgs = getCommonToolArguments();
 
-  // Get local db so we can insert into a fake oplog
+  // Get the db that we'll insert the fake oplog into
   var db = toolTest.db.getSiblingDB('gnr');
   db.dropDatabase();
 
@@ -69,7 +68,7 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
     var expectedError =
       'error applying ops: applyOps not allowed through mongos';
     assert(output.indexOf(expectedError) !== -1,
-      'mongodump crash should output the correct error message');
+      'mongooplog crash should output the correct error message');
 
     assert.eq(0, db.greatest_hits.count({}),
       'mongooplog should not have applied any operations');
@@ -95,7 +94,7 @@ var TEST_START = Math.floor(new Date().getTime() / 1000);
       'mongooplog should succeed');
 
     assert.eq(3, db.greatest_hits.count({}),
-      '`mongooplog --seconds 3` should apply 3 operations');
+      '`mongooplog --seconds 25000` should apply 3 operations');
     tracks.slice(0, 3).forEach(function(track, index) {
       assert.eq(1, db.greatest_hits.count({ _id: track, index: index }),
         'mongooplog should have inserted a doc with _id="' + track + '" and ' +
