@@ -402,7 +402,7 @@ connection_runtime_config = [
                 vary depending on the current eviction load''',
                 min=1, max=20),
             ]),
-    Config('shared_cache', '', r'''
+    Config('shared_cache', 'none', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both''',
         type='category', subconfig=[
@@ -413,8 +413,9 @@ connection_runtime_config = [
             amount of cache this database is guaranteed to have
             available from the shared cache. This setting is per
             database. Defaults to the chunk size''', type='int'),
-        Config('name', '', r'''
-            name of a cache that is shared between databases'''),
+        Config('name', 'none', r'''
+            the name of a cache that is shared between databases or
+            \c "none" when no shared cache is configured'''),
         Config('size', '500MB', r'''
             maximum memory to allocate for the shared cache. Setting
             this will update the value if one is already set''',
