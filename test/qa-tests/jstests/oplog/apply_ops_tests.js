@@ -85,6 +85,17 @@ if (typeof getToolTest === 'undefined') {
         'updated it to have index=' + index);
     });
 
+    // Running a second time should have no effect
+    assert.eq(toolTest.runTool.apply(toolTest, args), 0,
+      'mongooplog should succeed');
+    assert.eq(6, db.greatest_hits.count({}),
+      'mongooplog should apply all operations');
+    tracks.forEach(function(track, index) {
+      assert.eq(1, db.greatest_hits.count({ _id: track, index: index }),
+        'mongooplog should have inserted a doc with _id="' + track + '" and ' +
+        'updated it to have index=' + index);
+    });
+
     db.greatest_hits.drop();
 
     // Running with `--seconds 25000` should apply last 3 operations, which
