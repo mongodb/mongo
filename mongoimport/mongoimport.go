@@ -156,6 +156,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	}
 
 	if mongoImport.IngestOptions.Upsert {
+		mongoImport.IngestOptions.MaintainInsertionOrder = true
 		log.Logf(log.Info, "using upsert fields: %v", mongoImport.upsertFields)
 	}
 
