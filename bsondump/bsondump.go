@@ -1,6 +1,7 @@
 package bsondump
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
@@ -11,7 +12,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"bytes"
 )
 
 type BSONDump struct {
