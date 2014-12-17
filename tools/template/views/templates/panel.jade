@@ -1,0 +1,11 @@
+.panel.panel-default
+  .panel-heading
+    h4.panel-title
+      a(data-toggle='collapse', data-parent='#panel-accordion')
+        = title
+      .pull-right
+        i(data-hook='caret', class='fa')
+
+  div.panel-collapse.collapse
+    .panel-body
+      ul(data-hook='stats').stats

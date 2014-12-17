@@ -1,0 +1,17 @@
+#app
+  nav#navbar(role='navigation').navbar.navbar-default
+    .container-fluid
+      .navbar-header
+        a(href='#').navbar-brand WTstats
+      .navbar-text.navbar-right
+        i#menubtn.fa.fa-bars.fa-lg
+        
+  #wrapper
+    #sidebar-wrapper
+      .sidebar-nav
+        div(data-hook='sidebar')
+      
+    .container-fluid
+      .row
+        div.col-md-12
+          div(data-hook='chart')

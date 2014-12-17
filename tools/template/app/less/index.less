@@ -1,0 +1,82 @@
+@import url(http://fonts.googleapis.com/css?family=Source+Code+Pro);
+@import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro);
+@import "bootstrap";
+@import "font-awesome";
+
+@sidebar-width: 300px;
+
+#navbar {
+  margin-bottom: 0px;
+}
+
+#wrapper {
+  padding-left: @sidebar-width;
+  transition: all 0.4s ease 0s;
+}
+
+#sidebar-wrapper {
+  margin-left: -@sidebar-width;
+  left: @sidebar-width;
+  width: @sidebar-width;
+  position: fixed;
+  background: #ddd;
+  height: 100%;
+  overflow-y: auto;
+  z-index: 1000;
+  transition: all 0.4s ease 0s;
+}
+
+#page-content-wrapper {
+  width: 100%;
+}
+
+@media (max-width:767px) {
+  #wrapper {
+    padding-left: 0;
+  }
+
+  #sidebar-wrapper {
+    left: 0;
+  }
+
+  #wrapper.active {
+    position: relative;
+    left: @sidebar-width;
+  }
+
+  #wrapper.active #sidebar-wrapper {
+    left: @sidebar-width;
+    width: @sidebar-width;
+    transition: all 0.4s ease 0s;
+  }
+}
+
+.sidebar-nav {
+  position: absolute;
+  top: 0;
+  width: calc(@sidebar-width - 10);
+  margin: 0;
+  padding: 0 5px;
+  list-style: none;
+}
+
+.sidebar-nav li {
+  margin: 10px 0;
+}
+
+.caret a {
+  color: black;
+}
+
+ul.stats {
+  list-style-type: none;
+  padding: 0;  
+}
+
+li.stat {
+  cursor: pointer;
+  font-size: 12px;
+  i {
+    margin-right: 4px;
+  }
+}
