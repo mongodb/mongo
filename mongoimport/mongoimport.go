@@ -98,7 +98,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		if !(mongoImport.InputOptions.Type == TSV ||
 			mongoImport.InputOptions.Type == JSON ||
 			mongoImport.InputOptions.Type == CSV) {
-			return fmt.Errorf("don't know what type [\"%v\"] is", mongoImport.InputOptions.Type)
+			return fmt.Errorf("unknown type %v", mongoImport.InputOptions.Type)
 		}
 	}
 
@@ -191,12 +191,11 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		return fmt.Errorf("incompatible options: --file and positional argument(s)")
 	}
 
-	if mongoImport.InputOptions.File == "" && len(args) == 0 {
-		return fmt.Errorf("must specify either --file or a positional argument")
-	}
-
-	// if --file is not supplied, use the positional argument supplied
 	if mongoImport.InputOptions.File == "" {
+		if len(args) == 0 {
+			return fmt.Errorf("no filename specified")
+		}
+		// if --file is not supplied, use the positional argument supplied
 		mongoImport.InputOptions.File = args[0]
 	}
 
