@@ -502,7 +502,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_ERR(__wt_calloc_def(session, 1, &cst));
+	WT_ERR(__wt_calloc_one(session, &cst));
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;

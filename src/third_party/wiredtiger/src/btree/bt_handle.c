@@ -13,9 +13,6 @@ static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int, int);
 
-static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
-static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, int);
-
 /*
  * __wt_btree_open --
  *	Open a Btree.
@@ -307,7 +304,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		break;
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "block_compressor", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q)
 			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
@@ -623,43 +620,24 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
+	/*
+	 * Get the allocation size.  Allocation sizes must be a power-of-two,
+	 * nothing else makes sense.
+	 */
 	WT_RET(__wt_direct_io_size_check(
 	    session, cfg, "allocation_size", &btree->allocsize));
-	WT_RET(__wt_direct_io_size_check(
-	    session, cfg, "internal_page_max", &btree->maxintlpage));
-	WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
-	btree->maxintlitem = (uint32_t)cval.val;
-	WT_RET(__wt_direct_io_size_check(
-	    session, cfg, "leaf_page_max", &btree->maxleafpage));
-	WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
-	btree->maxleafitem = (uint32_t)cval.val;
-
-	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (int)cval.val;
-
-	/*
-	 * When a page is forced to split, we want at least 50 entries on its
-	 * parent.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
-	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
-
-	/*
-	 * Don't let pages grow to more than half the cache size.  Otherwise,
-	 * with very small caches, we can end up in a situation where nothing
-	 * can be evicted.  Take care getting the cache size: with a shared
-	 * cache, it may not have been set.
-	 */
-	cache_size = S2C(session)->cache_size;
-	if (cache_size > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
-
-	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
 		WT_RET_MSG(session,
 		    EINVAL, "the allocation size must be a power of two");
 
-	/* All page sizes must be in units of the allocation size. */
+	/*
+	 * Get the internal/leaf page sizes.
+	 * All page sizes must be in units of the allocation size.
+	 */
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "internal_page_max", &btree->maxintlpage));
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "leaf_page_max", &btree->maxleafpage));
 	if (btree->maxintlpage < btree->allocsize ||
 	    btree->maxintlpage % btree->allocsize != 0 ||
 	    btree->maxleafpage < btree->allocsize ||
@@ -669,107 +647,71 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 		    "size (%" PRIu32 "B)", btree->allocsize);
 
 	/*
-	 * Set the split percentage: reconciliation splits to a smaller-than-
-	 * maximum page size so we don't split every time a new entry is added.
+	 * When a page is forced to split, we want at least 50 entries on its
+	 * parent.
+	 *
+	 * Don't let pages grow to more than half the cache size.  Otherwise,
+	 * with very small caches, we can end up in a situation where nothing
+	 * can be evicted.  Take care getting the cache size: with a shared
+	 * cache, it may not have been set.
 	 */
+	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
+	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+	cache_size = S2C(session)->cache_size;
+	if (cache_size > 0)
+		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);
+
+	/*
+	 * Get the split percentage (reconciliation splits pages into smaller
+	 * than the maximum page size chunks so we don't split every time a
+	 * new entry is added). Determine how large newly split pages will be.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
+	btree->split_pct = (int)cval.val;
 	intl_split_size = __wt_split_page_size(btree, btree->maxintlpage);
 	leaf_split_size = __wt_split_page_size(btree, btree->maxleafpage);
 
 	/*
-	 * Default values for internal and leaf page items: make sure at least
-	 * 8 items fit on split pages.
-	 */
-	if (btree->maxintlitem == 0)
-		    btree->maxintlitem = intl_split_size / 8;
-	if (btree->maxleafitem == 0)
-		    btree->maxleafitem = leaf_split_size / 8;
-
-	/*
-	 * If raw compression is configured, the application owns page layout,
-	 * it's not our problem.   Hopefully the application chose well.
-	 */
-	if (btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL)
-		return (0);
-
-	/* Check we can fit at least 2 items on a page. */
-	if (btree->maxintlitem > btree->maxintlpage / 2)
-		return (pse1(session, "internal",
-		    btree->maxintlpage, btree->maxintlitem));
-	if (btree->maxleafitem > btree->maxleafpage / 2)
-		return (pse1(session, "leaf",
-		    btree->maxleafpage, btree->maxleafitem));
-
-	/*
-	 * Take into account the size of a split page:
+	 * Get the maximum internal/leaf page key/value sizes.
 	 *
-	 * Make it a separate error message so it's clear what went wrong.
+	 * In historic versions of WiredTiger, the maximum internal/leaf page
+	 * key/value sizes were set by the internal_item_max and leaf_item_max
+	 * configuration strings. Look for those strings if we don't find the
+	 * newer ones.
 	 */
-	if (btree->maxintlitem > intl_split_size / 2)
-		return (pse2(session, "internal",
-		    btree->maxintlpage, btree->maxintlitem, btree->split_pct));
-	if (btree->maxleafitem > leaf_split_size / 2)
-		return (pse2(session, "leaf",
-		    btree->maxleafpage, btree->maxleafitem, btree->split_pct));
+	WT_RET(__wt_config_gets(session, cfg, "internal_key_max", &cval));
+	btree->maxintlkey = (uint32_t)cval.val;
+	if (btree->maxintlkey == 0) {
+		WT_RET(
+		    __wt_config_gets(session, cfg, "internal_item_max", &cval));
+		btree->maxintlkey = (uint32_t)cval.val;
+	}
+	WT_RET(__wt_config_gets(session, cfg, "leaf_key_max", &cval));
+	btree->maxleafkey = (uint32_t)cval.val;
+	WT_RET(__wt_config_gets(session, cfg, "leaf_value_max", &cval));
+	btree->maxleafvalue = (uint32_t)cval.val;
+	if (btree->maxleafkey == 0 && btree->maxleafvalue == 0) {
+		WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
+		btree->maxleafkey = (uint32_t)cval.val;
+		btree->maxleafvalue = (uint32_t)cval.val;
+	}
+
+	/*
+	 * Default/maximum for internal and leaf page keys: split-page / 10.
+	 * Default for leaf page values: split-page / 2.
+	 *
+	 * It's difficult for applications to configure this in any exact way as
+	 * they have to duplicate our calculation of how many keys must fit on a
+	 * page, and given a split-percentage and page header, that isn't easy
+	 * to do. If the maximum internal key value is too large for the page,
+	 * reset it to the default.
+	 */
+	if (btree->maxintlkey == 0 || btree->maxintlkey > intl_split_size / 10)
+		    btree->maxintlkey = intl_split_size / 10;
+	if (btree->maxleafkey == 0)
+		    btree->maxleafkey = leaf_split_size / 10;
+	if (btree->maxleafvalue == 0)
+		    btree->maxleafvalue = leaf_split_size / 2;
 
 	return (0);
-}
-
-/*
- * __wt_split_page_size --
- *	Split page size calculation: we don't want to repeatedly split every
- * time a new entry is added, so we split to a smaller-than-maximum page size.
- */
-uint32_t
-__wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
-{
-	uintmax_t a;
-	uint32_t split_size;
-
-	/*
-	 * Ideally, the split page size is some percentage of the maximum page
-	 * size rounded to an allocation unit (round to an allocation unit so
-	 * we don't waste space when we write).
-	 */
-	a = maxpagesize;			/* Don't overflow. */
-	split_size = (uint32_t)
-	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
-
-	/*
-	 * If the result of that calculation is the same as the allocation unit
-	 * (that happens if the maximum size is the same size as an allocation
-	 * unit, use a percentage of the maximum page size).
-	 */
-	if (split_size == btree->allocsize)
-		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
-
-	return (split_size);
-}
-
-/*
- * pse1 --
- *	Page size error message 1.
- */
-static int
-pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
-{
-	WT_RET_MSG(session, EINVAL,
-	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B); the page must be able to hold at least 2 items",
-	    type, max, ovfl);
-}
-
-/*
- * pse2 --
- *	Page size error message 2.
- */
-static int
-pse2(WT_SESSION_IMPL *session,
-    const char *type, uint32_t max, uint32_t ovfl, int pct)
-{
-	WT_RET_MSG(session, EINVAL,
-	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B), because of the split percentage (%d %%); a split "
-	    "page must be able to hold at least 2 items",
-	    type, max, ovfl, pct);
 }

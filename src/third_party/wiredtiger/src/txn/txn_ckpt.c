@@ -311,7 +311,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	struct timespec start, stop;
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
@@ -326,6 +325,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	saved_isolation = session->isolation;
 	txn = &session->txn;
 	full = logging = tracking = 0;
+
+	/* Ensure the metadata table is open before taking any locks. */
+	WT_RET(__wt_metadata_open(session));
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
@@ -410,16 +412,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
-	/* Checkpoint the metadata file. */
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
-		if (WT_IS_METADATA(dhandle) ||
-		    !WT_PREFIX_MATCH(dhandle->name, "file:"))
-			break;
-	}
-	if (dhandle == NULL)
-		WT_ERR_MSG(session, EINVAL,
-		    "checkpoint unable to find open meta-data handle");
-
 	/*
 	 * Disable metadata tracking during the metadata checkpoint.
 	 *
@@ -430,11 +422,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
+	WT_WITH_DHANDLE(session,
+	    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC)) {
-		WT_WITH_DHANDLE(session, dhandle,
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_ERR(ret);
 	}

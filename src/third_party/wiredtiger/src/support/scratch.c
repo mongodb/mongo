@@ -216,7 +216,7 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
 		WT_ASSERT(session, slot != NULL);
 		best = slot;
 
-		WT_ERR(__wt_calloc_def(session, 1, best));
+		WT_ERR(__wt_calloc_one(session, best));
 
 		/* Scratch buffers must be aligned. */
 		F_SET(*best, WT_ITEM_ALIGNED);

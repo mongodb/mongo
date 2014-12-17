@@ -32,10 +32,11 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 
 	WT_STAT_SET(stats, btree_fixed_len, btree->bitcnt);
 	WT_STAT_SET(stats, btree_maximum_depth, btree->maximum_depth);
-	WT_STAT_SET(stats, btree_maxintlitem, btree->maxintlitem);
 	WT_STAT_SET(stats, btree_maxintlpage, btree->maxintlpage);
-	WT_STAT_SET(stats, btree_maxleafitem, btree->maxleafitem);
+	WT_STAT_SET(stats, btree_maxintlkey, btree->maxintlkey);
 	WT_STAT_SET(stats, btree_maxleafpage, btree->maxleafpage);
+	WT_STAT_SET(stats, btree_maxleafkey, btree->maxleafkey);
+	WT_STAT_SET(stats, btree_maxleafvalue, btree->maxleafvalue);
 
 	/* Everything else is really, really expensive. */
 	if (!F_ISSET(cst, WT_CONN_STAT_ALL))

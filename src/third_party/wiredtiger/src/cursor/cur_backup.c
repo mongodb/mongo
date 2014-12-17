@@ -125,7 +125,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	cb = NULL;
 
-	WT_RET(__wt_calloc_def(session, 1, &cb));
+	WT_RET(__wt_calloc_one(session, &cb));
 	cursor = &cb->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
@@ -412,7 +412,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	 * If we find a non-empty target configuration string, we have a job,
 	 * otherwise it's not our problem.
 	 */
-	WT_RET(__wt_config_gets_none(session, cfg, "target", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
 	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
 	for (cb->list_next = 0, target_list = 0;
 	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++target_list) {

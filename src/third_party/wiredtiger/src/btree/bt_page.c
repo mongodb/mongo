@@ -227,8 +227,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 		WT_INTL_INDEX_SET(page, pindex);
 		if (alloc_refs)
 			for (i = 0; i < pindex->entries; ++i) {
-				WT_ERR(__wt_calloc_def(
-				    session, 1, &pindex->index[i]));
+				WT_ERR(__wt_calloc_one(
+				    session, &pindex->index[i]));
 				size += sizeof(WT_REF);
 			}
 		if (0) {

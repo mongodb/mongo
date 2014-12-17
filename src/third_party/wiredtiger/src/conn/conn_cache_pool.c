@@ -51,16 +51,17 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    session, cfg, "shared_cache.name", &cval));
 		if (cval.len == 0) {
 			/*
-			 * Tell the user if they configured some shared cache
-			 * settings, but didn't enable it by naming it.
+			 * Tell the user if they configured a cache pool
+			 * size but didn't enable it by naming the pool.
 			 */
-			if (__wt_config_gets(session,
-			    &cfg[1], "shared_cache", &cval) != WT_NOTFOUND)
+			if (__wt_config_gets(session, &cfg[1],
+			    "shared_cache.size", &cval) != WT_NOTFOUND)
 				WT_RET_MSG(session, EINVAL,
 				    "Shared cache configuration requires a "
 				    "pool name");
 			return (0);
 		}
+
 		if (__wt_config_gets(session,
 		    &cfg[1], "cache_size", &cval) != WT_NOTFOUND)
 			WT_RET_MSG(session, EINVAL,
@@ -81,7 +82,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (__wt_process.cache_pool == NULL) {
 		WT_ASSERT(session, !reconfiguring);
 		/* Create a cache pool. */
-		WT_ERR(__wt_calloc_def(session, 1, &cp));
+		WT_ERR(__wt_calloc_one(session, &cp));
 		created = 1;
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */

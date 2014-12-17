@@ -505,6 +505,34 @@ err:	if (ret == WT_RESTART)
 }
 
 /*
+ * __curfile_update_check --
+ *	Check whether an update would conflict.
+ *
+ *	This function expects the cursor to already be positioned.  It should
+ *	be called before deciding whether to skip an update operation based on
+ *	existence of a visible update for a key -- even if there is no value
+ *	visible to the transaction, an update could still conflict.
+ */
+static int
+__curfile_update_check(WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
+
+	btree = cbt->btree;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	if (cbt->compare != 0)
+		return (0);
+	if (cbt->ins != NULL)
+		return (__wt_txn_update_check(session, cbt->ins->upd));
+	if (btree->type == BTREE_ROW && cbt->ref->page->pg_row_upd != NULL)
+		return (__wt_txn_update_check(
+		    session, cbt->ref->page->pg_row_upd[cbt->slot]));
+	return (0);
+}
+
+/*
  * __wt_btcur_update_check --
  *	Check whether an update would conflict.
  *
@@ -532,10 +560,9 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__cursor_row_search(session, cbt, 1));
 
 		/*
-		 * We are only interested in checking for conflicts.
+		 * Just check for conflicts.
 		 */
-		if (cbt->compare == 0 && cbt->ins != NULL)
-			ret = __wt_txn_update_check(session, cbt->ins->upd);
+		ret = __curfile_update_check(cbt);
 		break;
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
@@ -580,6 +607,13 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	case BTREE_COL_VAR:
 		WT_ERR(__cursor_col_search(session, cbt));
 
+		/*
+		 * If we find a matching record, check whether an update would
+		 * conflict.  Do this before checking if the update is visible
+		 * in __cursor_valid, or we can miss conflict.
+		 */
+		WT_ERR(__curfile_update_check(cbt));
+
 		/* Remove the record if it exists. */
 		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL)) {
 			if (!__cursor_fix_implicit(btree, cbt))
@@ -601,6 +635,10 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
 		WT_ERR(__cursor_row_search(session, cbt, 0));
+
+		/* Check whether an update would conflict. */
+		WT_ERR(__curfile_update_check(cbt));
+
 		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
 			WT_ERR(WT_NOTFOUND);
 
@@ -666,26 +704,32 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__cursor_col_search(session, cbt));
 
 		/*
-		 * If not overwriting, fail if the key doesn't exist.  Update
-		 * the record if it exists.  Creating a record past the end of
-		 * the tree in a fixed-length column-store implicitly fills the
-		 * gap with empty records.  Update the record in that case, the
+		 * If not overwriting, fail if the key doesn't exist.  If we
+		 * find an update for the key, check for conflicts.  Update the
+		 * record if it exists.  Creating a record past the end of the
+		 * tree in a fixed-length column-store implicitly fills the gap
+		 * with empty records.  Update the record in that case, the
 		 * record exists.
 		 */
-		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    (cbt->compare != 0 || !__cursor_valid(cbt, NULL)) &&
-		    !__cursor_fix_implicit(btree, cbt))
-			WT_ERR(WT_NOTFOUND);
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+			WT_ERR(__curfile_update_check(cbt));
+			if ((cbt->compare != 0 || !__cursor_valid(cbt, NULL)) &&
+			    !__cursor_fix_implicit(btree, cbt))
+				WT_ERR(WT_NOTFOUND);
+		}
 		ret = __cursor_col_modify(session, cbt, 0);
 		break;
 	case BTREE_ROW:
 		WT_ERR(__cursor_row_search(session, cbt, 1));
 		/*
-		 * If not overwriting, fail if the key does not exist.
+		 * If not overwriting, check for conflicts and fail if the key
+		 * does not exist.
 		 */
-		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    (cbt->compare != 0 || !__cursor_valid(cbt, NULL)))
-			WT_ERR(WT_NOTFOUND);
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+			WT_ERR(__curfile_update_check(cbt));
+			if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
+				WT_ERR(WT_NOTFOUND);
+		}
 		ret = __cursor_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);

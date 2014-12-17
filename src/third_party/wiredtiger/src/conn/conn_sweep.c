@@ -33,6 +33,7 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 		if (dhandle->session_inuse == 0 && dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
 			continue;
 		}
 		if (dhandle->session_inuse != 0 ||
@@ -75,9 +76,13 @@ __sweep(WT_SESSION_IMPL *session)
 		locked = 1;
 
 		/* If the handle is open, try to close it. */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_btree_sync_and_close(session, 0));
+			if (ret == 0)
+				WT_STAT_FAST_CONN_INCR(
+				    session, dh_conn_handles);
+		}
 
 		/*
 		 * If there are no longer any references to the handle in any
@@ -86,14 +91,14 @@ __sweep(WT_SESSION_IMPL *session)
 		 * don't do any special handling of EBUSY returns above.
 		 */
 		if (ret == 0 && dhandle->session_ref == 0) {
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_dhandle_discard_single(session, 0));
 
 			/* If the handle was discarded, it isn't locked. */
 			if (ret == 0)
 				locked = 0;
-		}
+		} else
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 
 		if (locked)
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
@@ -124,8 +129,8 @@ __sweep_server(void *arg)
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 
 		/* Wait until the next event. */
-		WT_ERR(
-		    __wt_cond_wait(session, conn->sweep_cond, 30 * WT_MILLION));
+		WT_ERR(__wt_cond_wait(session,
+		    conn->sweep_cond, WT_DHANDLE_SWEEP_PERIOD * WT_MILLION));
 
 		/* Sweep the handles. */
 		WT_ERR(__sweep(session));

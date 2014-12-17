@@ -189,7 +189,9 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
 	WT_STATS dh_conn_handles;
+	WT_STATS dh_conn_ref;
 	WT_STATS dh_conn_sweeps;
+	WT_STATS dh_conn_tod;
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
 	WT_STATS file_open;
@@ -287,10 +289,11 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_entries;
 	WT_STATS btree_fixed_len;
 	WT_STATS btree_maximum_depth;
-	WT_STATS btree_maxintlitem;
+	WT_STATS btree_maxintlkey;
 	WT_STATS btree_maxintlpage;
-	WT_STATS btree_maxleafitem;
+	WT_STATS btree_maxleafkey;
 	WT_STATS btree_maxleafpage;
+	WT_STATS btree_maxleafvalue;
 	WT_STATS btree_overflow;
 	WT_STATS btree_row_internal;
 	WT_STATS btree_row_leaf;

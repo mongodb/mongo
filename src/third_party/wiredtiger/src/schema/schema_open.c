@@ -83,7 +83,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			goto err;
 		}
 
-		WT_ERR(__wt_calloc_def(session, 1, &colgroup));
+		WT_ERR(__wt_calloc_one(session, &colgroup));
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &colgroup->name));
 		colgroup->config = cgconfig;
@@ -319,7 +319,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 		if (table->indices[i] == NULL) {
 			WT_ERR(cursor->get_value(cursor, &idxconf));
-			WT_ERR(__wt_calloc_def(session, 1, &idx));
+			WT_ERR(__wt_calloc_one(session, &idx));
 			WT_ERR(__wt_strdup(session, uri, &idx->name));
 			WT_ERR(__wt_strdup(session, idxconf, &idx->config));
 			WT_ERR(__open_index(session, table, idx));
@@ -392,7 +392,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));
 
-	WT_ERR(__wt_calloc_def(session, 1, &table));
+	WT_ERR(__wt_calloc_one(session, &table));
 	table->name = tablename;
 	tablename = NULL;
 	table->name_hash = __wt_hash_city64(name, namelen);

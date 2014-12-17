@@ -206,7 +206,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		WT_RET(__wt_calloc_one(session, &addr));
 		*addr = mod->mod_replace;
 		mod->mod_replace.addr = NULL;
 		mod->mod_replace.size = 0;

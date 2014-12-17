@@ -310,7 +310,7 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 		    sizeof(WT_ADDR) + addr->size);
 	else {
 		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
-		WT_RET(__wt_calloc_def(session, 1, &addr));
+		WT_RET(__wt_calloc_one(session, &addr));
 		if ((ret = __wt_strndup(
 		    session, unpack.data, unpack.size, &addr->addr)) != 0) {
 			__wt_free(session, addr);
@@ -444,7 +444,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    pindex->index[pindex->entries - 1];
 	for (alloc_refp = alloc_index->index + SPLIT_CORRECT_1,
 	    i = 0; i < children; ++alloc_refp, ++i) {
-		WT_ERR(__wt_calloc_def(session, 1, alloc_refp));
+		WT_ERR(__wt_calloc_one(session, alloc_refp));
 		WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
 	}
 
@@ -747,7 +747,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 	/* In some cases, the underlying WT_REF has not yet been allocated. */
 	if (*refp == NULL) {
-		WT_RET(__wt_calloc_def(session, 1, refp));
+		WT_RET(__wt_calloc_one(session, refp));
 		WT_MEMSIZE_ADD(incr, sizeof(WT_REF));
 	}
 	ref = *refp;
@@ -768,7 +768,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		 * would have to avoid freeing the memory, and it's not worth
 		 * the confusion.
 		 */
-		WT_RET(__wt_calloc_def(session, 1, &addr));
+		WT_RET(__wt_calloc_one(session, &addr));
 		WT_MEMSIZE_ADD(incr, sizeof(WT_ADDR));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
@@ -1081,7 +1081,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 *
 	 * The new reference is visible to readers once the split completes.
 	 */
-	WT_ERR(__wt_calloc_def(session, 1, &split_ref[0]));
+	WT_ERR(__wt_calloc_one(session, &split_ref[0]));
 	child = split_ref[0];
 	*child = *ref;
 	child->state = WT_REF_MEM;
@@ -1112,12 +1112,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * The second page in the split is a new WT_REF/page pair.
 	 */
 	WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 0, &right));
-	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins));
-	WT_ERR(__wt_calloc_def(session, 1, &right->pg_row_ins[0]));
+	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
+	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
 	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD));
 	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD *));
 
-	WT_ERR(__wt_calloc_def(session, 1, &split_ref[1]));
+	WT_ERR(__wt_calloc_one(session, &split_ref[1]));
 	child = split_ref[1];
 	child->page = right;
 	child->state = WT_REF_MEM;

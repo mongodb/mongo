@@ -30,11 +30,11 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->btree_column_variable.desc =
 	    "btree: column-store variable-size leaf pages";
 	stats->btree_fixed_len.desc = "btree: fixed-record size";
-	stats->btree_maxintlitem.desc =
-	    "btree: maximum internal page item size";
+	stats->btree_maxintlkey.desc = "btree: maximum internal page key size";
 	stats->btree_maxintlpage.desc = "btree: maximum internal page size";
-	stats->btree_maxleafitem.desc = "btree: maximum leaf page item size";
+	stats->btree_maxleafkey.desc = "btree: maximum leaf page key size";
 	stats->btree_maxleafpage.desc = "btree: maximum leaf page size";
+	stats->btree_maxleafvalue.desc = "btree: maximum leaf page value size";
 	stats->btree_maximum_depth.desc = "btree: maximum tree depth";
 	stats->btree_entries.desc = "btree: number of key/value pairs";
 	stats->btree_overflow.desc = "btree: overflow pages";
@@ -154,10 +154,11 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->btree_column_deleted.v = 0;
 	stats->btree_column_variable.v = 0;
 	stats->btree_fixed_len.v = 0;
-	stats->btree_maxintlitem.v = 0;
+	stats->btree_maxintlkey.v = 0;
 	stats->btree_maxintlpage.v = 0;
-	stats->btree_maxleafitem.v = 0;
+	stats->btree_maxleafkey.v = 0;
 	stats->btree_maxleafpage.v = 0;
+	stats->btree_maxleafvalue.v = 0;
 	stats->btree_maximum_depth.v = 0;
 	stats->btree_entries.v = 0;
 	stats->btree_overflow.v = 0;
@@ -408,8 +409,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "cursor: cursor search calls";
 	stats->cursor_search_near.desc = "cursor: cursor search near calls";
 	stats->cursor_update.desc = "cursor: cursor update calls";
+	stats->dh_conn_ref.desc =
+	    "data-handle: connection candidate referenced";
 	stats->dh_conn_handles.desc = "data-handle: connection dhandles swept";
 	stats->dh_conn_sweeps.desc = "data-handle: connection sweeps";
+	stats->dh_conn_tod.desc = "data-handle: connection time-of-death sets";
 	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
 	stats->log_slot_closes.desc = "log: consolidated slot closures";
@@ -563,8 +567,10 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->dh_conn_ref.v = 0;
 	stats->dh_conn_handles.v = 0;
 	stats->dh_conn_sweeps.v = 0;
+	stats->dh_conn_tod.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_session_sweeps.v = 0;
 	stats->log_slot_closes.v = 0;

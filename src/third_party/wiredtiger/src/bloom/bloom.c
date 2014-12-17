@@ -28,7 +28,7 @@ __bloom_init(WT_SESSION_IMPL *session,
 
 	*bloomp = NULL;
 
-	WT_RET(__wt_calloc_def(session, 1, &bloom));
+	WT_RET(__wt_calloc_one(session, &bloom));
 
 	WT_ERR(__wt_strdup(session, uri, &bloom->uri));
 	len = strlen(WT_BLOOM_TABLE_CONFIG) + 2;

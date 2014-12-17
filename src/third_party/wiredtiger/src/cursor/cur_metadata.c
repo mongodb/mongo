@@ -421,7 +421,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_CURSOR_METADATA), &mdc));
+	WT_RET(__wt_calloc_one(session, &mdc));
 
 	cursor = &mdc->iface;
 	*cursor = iface;
@@ -438,7 +438,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
 
 	if (0) {
-err:		__wt_free(session, mdc);
+err:		if (mdc->file_cursor != NULL)
+			WT_TRET(mdc->file_cursor->close(mdc->file_cursor));
+		__wt_free(session, mdc);
 	}
 	return (ret);
 }

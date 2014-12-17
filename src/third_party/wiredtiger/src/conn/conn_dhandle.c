@@ -187,7 +187,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * then initialize the data handle.  Exclusively lock the data handle
 	 * before inserting it in the list.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &dhandle));
+	WT_RET(__wt_calloc_one(session, &dhandle));
 
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
 
@@ -196,7 +196,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	if (ckpt != NULL)
 		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
 
-	WT_ERR(__wt_calloc_def(session, 1, &btree));
+	WT_ERR(__wt_calloc_one(session, &btree));
 	dhandle->handle = btree;
 	btree->dhandle = dhandle;
 
@@ -600,13 +600,15 @@ __wt_conn_dhandle_close_all(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	uint64_t bucket;
 
 	conn = S2C(session);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	WT_ASSERT(session, session->dhandle == NULL);
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	bucket = __wt_hash_city64(name, strlen(name)) % WT_HASH_ARRAY_SIZE;
+	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], l) {
 		if (strcmp(dhandle->name, name) != 0)
 			continue;
 

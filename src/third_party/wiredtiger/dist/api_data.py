@@ -1,36 +1,5 @@
 # This file is a python script that describes the WiredTiger API.
 
-class Error:
-    def __init__(self, name, desc, long_desc=None, **flags):
-        self.name = name
-        self.desc = desc
-        self.long_desc = long_desc
-        self.flags = flags
-
-errors = [
-    Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
-        This error is generated when the application attempts to insert
-        a record with the same key as an existing record without the
-        'overwrite' configuration to WT_SESSION::open_cursor.'''),
-    Error('WT_ERROR', 'non-specific WiredTiger error', '''
-        This error is returned when an error is not covered by a
-        specific error return.'''),
-    Error('WT_NOTFOUND', 'item not found', '''
-        This error indicates an operation did not find a value to
-        return.  This includes cursor search and other operations
-        where no record matched the cursor's search key such as
-        WT_CURSOR::update or WT_CURSOR::remove.'''),
-    Error('WT_PANIC', 'WiredTiger library panic', '''
-        This error indicates an underlying problem that requires the
-        application exit and restart.'''),
-    Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
-    Error('WT_ROLLBACK', 'conflict between concurrent operations', '''
-        This error is generated when an operation cannot be completed
-        due to a conflict with concurrent operations.  The operation
-        may be retried; if a transaction is in progress, it should be
-        rolled back and the operation retried in a new transaction.'''),
-]
-
 class Method:
     def __init__(self, config, **flags):
         self.config = config
@@ -207,17 +176,26 @@ file_config = format_meta + [
         block compression is done''',
         min='512B', max='512MB'),
     Config('internal_item_max', '0', r'''
-        the largest key stored within an internal node, in bytes.  If
-        non-zero, any key larger than the specified size will be
-        stored as an overflow item (which may require additional I/O
-        to access).  If zero, a default size is chosen that permits at
-        least 8 keys per internal page''',
-        min=0),
+        historic term for internal_key_max''',
+        min=0, undoc=True),
+    Config('internal_key_max', '0', r'''
+        the largest key stored in an internal node, in bytes.  If set, keys
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access).  The default and the maximum
+        allowed value are both one-tenth the size of a newly split internal
+        page''',
+        min='0'),
     Config('key_gap', '10', r'''
         the maximum gap between instantiated keys in a Btree leaf page,
         constraining the number of keys processed to instantiate a
         random Btree leaf page key''',
         min='0', undoc=True),
+    Config('leaf_key_max', '0', r'''
+        the largest key stored in a leaf node, in bytes.  If set, keys
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access).  The default value is
+        one-tenth the size of a newly split leaf page''',
+        min='0'),
     Config('leaf_page_max', '32KB', r'''
         the maximum page size for leaf nodes, in bytes; the size must
         be a multiple of the allocation size, and is significant for
@@ -226,13 +204,17 @@ file_config = format_meta + [
         data, that is, the limit is applied before any block compression
         is done''',
         min='512B', max='512MB'),
+    Config('leaf_value_max', '0', r'''
+        the largest value stored in a leaf node, in bytes.  If set, values
+        larger than the specified size are stored as overflow items (which
+        may require additional I/O to access). If the size is larger than
+        the maximum leaf page size, the page size is temporarily ignored
+        when large values are written. The default is one-half the size of
+        a newly split leaf page''',
+        min='0'),
     Config('leaf_item_max', '0', r'''
-        the largest key or value stored within a leaf node, in bytes.
-        If non-zero, any key or value larger than the specified size
-        will be stored as an overflow item (which may require additional
-        I/O to access).  If zero, a default size is chosen that permits
-        at least 4 key and value pairs per leaf page''',
-        min=0),
+        historic term for leaf_key_max and leaf_value_max''',
+        min=0, undoc=True),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
@@ -366,7 +348,8 @@ connection_runtime_config = [
         Config('worker_thread_max', '4', r'''
             Configure a set of threads to manage merging LSM trees in
             the database.''',
-            min='3', max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
+            min='3',     # !!! Must match WT_LSM_MIN_WORKERS
+            max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
         Config('merge', 'true', r'''
             merge LSM chunks where possible''',
             type='boolean')
@@ -399,8 +382,9 @@ connection_runtime_config = [
             amount of cache this database is guaranteed to have
             available from the shared cache. This setting is per
             database. Defaults to the chunk size''', type='int'),
-        Config('name', '', r'''
-            name of a cache that is shared between databases'''),
+        Config('name', 'none', r'''
+            the name of a cache that is shared between databases or
+            \c "none" when no shared cache is configured'''),
         Config('size', '500MB', r'''
             maximum memory to allocate for the shared cache. Setting
             this will update the value if one is already set''',
@@ -527,7 +511,7 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', '', r'''
             configure a compressor for log records.  Permitted values are
-            empty (off) or \c "bzip2", \c "snappy" or custom compression
+            \c "none" or \c "bzip2", \c "snappy" or custom compression
             engine \c "name" created with WT_CONNECTION::add_compressor.
             See @ref compression for more information'''),
         Config('enabled', 'false', r'''
@@ -536,7 +520,7 @@ common_wiredtiger_open = [
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
-        Config('path', '""', r'''
+        Config('path', '', r'''
             the path to a directory into which the log files are written.
             If the value is not an absolute path name, the files are created
             relative to the database home'''),

@@ -1460,7 +1460,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 
-	WT_ERR(__wt_calloc_def(session, 1, &clsm));
+	WT_ERR(__wt_calloc_one(session, &clsm));
 
 	cursor = &clsm->iface;
 	*cursor = iface;

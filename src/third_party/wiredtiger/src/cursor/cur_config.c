@@ -48,7 +48,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(uri);
 
-	WT_RET(__wt_calloc_def(session, 1, &cconfig));
+	WT_RET(__wt_calloc_one(session, &cconfig));
 
 	cursor = &cconfig->iface;
 	*cursor = iface;

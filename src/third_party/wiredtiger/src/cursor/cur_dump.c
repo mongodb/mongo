@@ -371,7 +371,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 
 	session = (WT_SESSION_IMPL *)child->session;
 
-	WT_RET(__wt_calloc_def(session, 1, &cdump));
+	WT_RET(__wt_calloc_one(session, &cdump));
 	cursor = &cdump->iface;
 	*cursor = iface;
 	cursor->session = child->session;
@@ -384,7 +384,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	F_SET(cursor, F_ISSET(child,
 	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRINT));
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
-		WT_ERR(__wt_calloc_def(session, 1, &json));
+		WT_ERR(__wt_calloc_one(session, &json));
 		cursor->json_private = child->json_private = json;
 	}
 
