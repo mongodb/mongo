@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 
@@ -56,7 +55,7 @@ namespace mongo {
     */
     class Database {
     public:
-        Database(const StringData& name, DatabaseCatalogEntry* dbEntry);
+        Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry);
 
         // must call close first
         ~Database();
@@ -72,16 +71,6 @@ namespace mongo {
          * @return true if success.  false if bad level or error creating profile ns
          */
         bool setProfilingLevel( OperationContext* txn, int newLevel , std::string& errmsg );
-
-        /**
-         * @return true if ns is part of the database
-         *         ns=foo.bar, db=foo returns true
-         */
-        bool ownsNS( const std::string& ns ) const {
-            if ( ! mongoutils::str::startsWith( ns , _name ) )
-                return false;
-            return ns[_name.size()] == '.';
-        }
 
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }
@@ -128,9 +117,16 @@ namespace mongo {
         const std::string& getSystemIndexesName() const { return _indexesName; }
     private:
 
-        void _clearCollectionCache(OperationContext* txn, const StringData& fullns );
+        /**
+         * Gets or creates collection instance from existing metadata,
+         * Returns NULL if invalid
+         *
+         * Note: This does not add the collection to _collections map, that must be done
+         * by the caller, who takes onership of the Collection*
+         */
+        Collection* _getOrCreateCollectionInstance(OperationContext* txn, const StringData& fullns);
 
-        void _clearCollectionCache_inlock(OperationContext* txn, const StringData& fullns );
+        void _clearCollectionCache(OperationContext* txn, const StringData& fullns );
 
         class AddCollectionChange;
         class RemoveCollectionChange;
@@ -149,7 +145,6 @@ namespace mongo {
         // but it points to a much more useful data structure
         typedef StringMap< Collection* > CollectionMap;
         CollectionMap _collections;
-        mongo::mutex _collectionLock;
 
         friend class Collection;
         friend class NamespaceDetails;

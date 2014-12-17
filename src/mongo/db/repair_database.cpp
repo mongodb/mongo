@@ -55,7 +55,7 @@ namespace {
                                       DatabaseCatalogEntry* dbce,
                                       const std::string& collectionName) {
 
-        Database db(dbce->name(), dbce);
+        Database db(txn, dbce->name(), dbce);
         CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(txn, collectionName);
 
         std::vector<string> indexNames;

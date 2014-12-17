@@ -130,7 +130,7 @@ namespace {
         // databases for the same name.
         SimpleMutex::scoped_lock lk(_m);
 
-        db = new Database(dbname, entry);
+        db = new Database(txn, dbname, entry);
         _dbs[dbname] = db;
 
         return db;

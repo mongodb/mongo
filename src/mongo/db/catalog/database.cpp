@@ -78,7 +78,6 @@ namespace mongo {
 
         virtual void commit() {}
         virtual void rollback() {
-            scoped_lock lk( _db->_collectionLock );
             CollectionMap::const_iterator it = _db->_collections.find(_ns);
             if ( it == _db->_collections.end() )
                 return;
@@ -104,7 +103,6 @@ namespace mongo {
         }
 
         virtual void rollback() {
-            mongo::mutex::scoped_lock lk(_db->_collectionLock);
             Collection*& inMap = _db->_collections[_coll->ns().ns()];
             invariant(!inMap);
             inMap = _coll;
@@ -165,12 +163,29 @@ namespace mongo {
         return Status::OK();
     }
 
-    Database::Database(const StringData& name, DatabaseCatalogEntry* dbEntry)
+    Collection* Database::_getOrCreateCollectionInstance(OperationContext* txn,
+                                                         const StringData& fullns) {
+        Collection* collection = getCollection( txn, fullns );
+        if (collection) {
+            return collection;
+        }
+
+        auto_ptr<CollectionCatalogEntry> cce( _dbEntry->getCollectionCatalogEntry( txn, fullns ) );
+        invariant( cce.get() );
+
+        auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( txn, fullns ) );
+        invariant( rs.get() ); // if cce exists, so should this
+
+        // Not registering AddCollectionChange since this is for collections that already exist.
+        Collection* c = new Collection( txn, fullns, cce.release(), rs.release(), this );
+        return c;
+    }
+
+    Database::Database(OperationContext* txn, const StringData& name, DatabaseCatalogEntry* dbEntry)
         : _name(name.toString()),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
-          _indexesName(_name + ".system.indexes"),
-          _collectionLock( "Database::_collectionLock" )
+          _indexesName(_name + ".system.indexes")
     {
         Status status = validateDBName( _name );
         if ( !status.isOK() ) {
@@ -314,6 +329,8 @@ namespace mongo {
     }
 
     Status Database::dropCollection( OperationContext* txn, const StringData& fullns ) {
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+
         LOG(1) << "dropCollection: " << fullns << endl;
         massertNamespaceNotIndex( fullns, "dropCollection" );
 
@@ -374,7 +391,6 @@ namespace mongo {
         DEV {
             // check all index collection entries are gone
             string nstocheck = fullns.toString() + ".$";
-            scoped_lock lk( _collectionLock );
             for ( CollectionMap::const_iterator i = _collections.begin();
                   i != _collections.end();
                   ++i ) {
@@ -391,11 +407,6 @@ namespace mongo {
     }
 
     void Database::_clearCollectionCache(OperationContext* txn, const StringData& fullns ) {
-        scoped_lock lk( _collectionLock );
-        _clearCollectionCache_inlock( txn, fullns );
-    }
-
-    void Database::_clearCollectionCache_inlock(OperationContext* txn, const StringData& fullns ) {
         verify( _name == nsToDatabaseSubstring( fullns ) );
         CollectionMap::const_iterator it = _collections.find( fullns.toString() );
         if ( it == _collections.end() )
@@ -410,9 +421,6 @@ namespace mongo {
 
     Collection* Database::getCollection( OperationContext* txn, const StringData& ns ) {
         invariant( _name == nsToDatabaseSubstring( ns ) );
-
-        scoped_lock lk( _collectionLock );
-
         CollectionMap::const_iterator it = _collections.find( ns );
         if ( it != _collections.end() && it->second ) {
             return it->second;
@@ -439,6 +447,7 @@ namespace mongo {
                                        bool stayTemp ) {
 
         audit::logRenameCollection( currentClient.get(), fromNS, toNS );
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         { // remove anything cached
             Collection* coll = getCollection( txn, fromNS );
@@ -450,17 +459,16 @@ namespace mongo {
                 _clearCollectionCache( txn, desc->indexNamespace() );
             }
 
-            {
-                scoped_lock lk( _collectionLock );
-                _clearCollectionCache_inlock( txn, fromNS );
-                _clearCollectionCache_inlock( txn, toNS );
-            }
+            _clearCollectionCache( txn, fromNS );
+            _clearCollectionCache( txn, toNS );
 
             Top::global.collectionDropped( fromNS.toString() );
         }
 
         txn->recoveryUnit()->registerChange( new AddCollectionChange(this, toNS) );
-        return _dbEntry->renameCollection( txn, fromNS, toNS, stayTemp );
+        Status s =  _dbEntry->renameCollection( txn, fromNS, toNS, stayTemp );
+        _collections[toNS] =  _getOrCreateCollectionInstance(txn, toNS);
+        return s;
     }
 
     Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
@@ -478,6 +486,7 @@ namespace mongo {
                                             bool createIdIndex ) {
         massert( 17399, "collection already exists", getCollection( txn, ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         if ( serverGlobalParams.configsvr &&
              !( ns.startsWith( "config." ) ||
@@ -503,8 +512,10 @@ namespace mongo {
         Status status = _dbEntry->createCollection(txn, ns, options, allocateDefaultSpace);
         massertNoTraceStatusOK(status);
 
-        Collection* collection = getCollection(txn, ns);
+
+        Collection* collection = _getOrCreateCollectionInstance(txn, ns);
         invariant(collection);
+        _collections[ns] = collection;
 
         if ( createIdIndex ) {
             if ( collection->requiresIdIndex() ) {
