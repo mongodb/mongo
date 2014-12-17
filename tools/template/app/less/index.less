@@ -5,6 +5,14 @@
 
 @sidebar-width: 300px;
 
+// making bootstraps collapse transitions faster (.35s original) 
+.collapsing {
+  position: relative;
+  height: 0;
+  overflow: hidden;
+  .transition(height .2s ease);
+}
+
 #navbar {
   margin-bottom: 0px;
 }
