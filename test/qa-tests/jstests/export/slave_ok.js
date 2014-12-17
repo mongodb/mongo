@@ -26,6 +26,7 @@
     var testDB = primary.getDB('test');
     for (var i = 0; i < 10; i++) {
         testDB.data.insert({ _id: i });
+        testDB.getLastError('majority');
     }
     // sanity check the insertion worked
     assert.eq(10, testDB.data.count());
