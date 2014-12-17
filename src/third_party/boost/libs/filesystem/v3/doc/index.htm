@@ -1,0 +1,495 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Filesystem Home</title>
+<link rel="stylesheet" type="text/css" href="../../../../doc/src/minimal.css">
+</head>
+
+<body>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td width="277">
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" width="300" height="86" border="0"></a></td>
+    <td align="middle">
+    <font size="7">Filesystem Library<br>
+    Version 3</font>
+    </td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="index.htm">Filesystem Home</a> &nbsp;&nbsp;
+    <a href="release_history.html">Releases</a> &nbsp;&nbsp;
+    <a href="reference.html">Reference</a> &nbsp;&nbsp;
+    <a href="tutorial.html">Tutorial</a> &nbsp;&nbsp;
+    <a href="faq.htm">FAQ</a> &nbsp;&nbsp;
+    <a href="portability_guide.htm">Portability</a> &nbsp;&nbsp;
+    <a href="v3.html">V3 Intro</a> &nbsp;&nbsp;
+    <a href="v3_design.html">V3 Design</a> &nbsp;&nbsp;
+    <a href="deprecated.html">Deprecated</a> &nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" align="right">
+  <tr>
+    <td width="100%" bgcolor="#D7EEFF" align="center">
+      <i><b>Contents</b></i></td>
+  </tr>
+  <tr>
+    <td width="100%" bgcolor="#E8F5FF">
+    <a href="#Introduction">Introduction</a><br>
+    <a href="#Documentation">Documentation</a><br>
+    <a href="#Using">Using the library</a><br>
+    <a href="#Coding-guidelines">Coding guidelines</a><br>
+    <a href="#Cautions">Cautions</a><br>
+    <a href="#Headers">Headers</a><br>
+    <a href="#Examples">Example programs</a><br>
+    <a href="#Implementation">Implementation</a><br>
+    <a href="#Macros">Macros</a><br>
+    <a href="#Building">Building the object-library</a><br>
+    <a href="#Cgywin">Notes for Cygwin users</a><br>
+    <a href="#Change-history">Version history<br>
+&nbsp; with acknowledgements</a></td>
+  </tr>
+  </table>
+
+<div align="center">
+  <center>
+  <table border="1" cellpadding="10" cellspacing="1" style="border-collapse: collapse" bordercolor="#111111">
+    <tr>
+      <td>
+      <p align="center"><b>This is the home page for Version 3 of the Filesystem library.</b></p>
+      <p align="left">Version 3 is a major revision with many new and improved 
+      features. It may, however, break some user code written for Version 2.</p>
+      <p align="left">To ease the transition, Boost releases 1.44 through 1.47 
+      will supply both V2 and V3. <a href="../../v2/doc/index.htm">Version 2</a> 
+      is the default version for Boost release 1.44 
+      and 1.45. Version 3 will be the default starting with release 1.46.</p>
+      <p align="left"><b>Define macro BOOST_FILESYSTEM_VERSION as 3 to use 
+      Version 3. This will be the default for release 1.46 and later.</b></p>
+      <p align="left"><b>Define macro BOOST_FILESYSTEM_VERSION as 2 to use 
+      Version 2. This is the default for release 1.44 and 1.45.</b></p>
+      <p align="left"><b>You may define the BOOST_FILESYSTEM_VERSION macro:</b></p>
+      <ul>
+        <li>
+      <p align="left"><b>On the build command line; the exact format depends on 
+      your compiler or IDE</b></p>
+        </li>
+        <li>
+      <p align="left"><b>In your code, before including any filesystem header, 
+      #define BOOST_FILESYSTEM_VERSION <i>n</i></b></p>
+        </li>
+        <li>
+      <p align="left"><b>#define BOOST_FILESYSTEM_VERSION <i>n </i>in boost/config/user.hpp. 
+      Note that this approach applies to all uses of Boost.Filesystem.</b></p>
+        </li>
+      </ul>
+      <p align="left">Existing code should be moved to Version 3 as soon as 
+      convenient. New code should be written for Version 3.</p>
+      <p align="left">Version 2 is deprecated, and will not be included in Boost 
+      releases 1.48 and later.</p>
+      <p align="left"><b>Building the library</b></p>
+      <p align="left">By default, the Boost build system creates libraries that 
+      support both version 2 and version 3. To support only a single version, 
+      include <code>--disable-filesystem2</code> or <code>--disable-filesystem3</code> 
+      on the <code>bjam</code> command line.</p>
+      </td>
+    </tr>
+  </table>
+  </center>
+</div>
+
+<h2><a name="Introduction">Introduction</a></h2>
+<p>The Boost.Filesystem library provides facilities to manipulate files and directories, 
+and the paths that identify them.</p>
+
+<p>The features of the library include:</p>
+
+<ul>
+  <li><b>A modern C++ interface, highly compatible with the C++ standard 
+  library.</b></li>
+</ul>
+<blockquote>
+  <blockquote>
+
+<p>Many users say the interface is their primary motivation for using 
+Boost.Filesystem. They like its use of familiar idioms based on standard library 
+containers, iterators, and algorithms. They like having errors reported by 
+throwing exceptions.</p>
+
+  </blockquote>
+</blockquote>
+<ul>
+  <li><b>Portability between operating systems.</b><br>
+&nbsp;<ul>
+    <li>At the C++ syntax level, it is convenient to learn and use one interface 
+    regardless of the operating system.</li>
+    <li>At the semantic level, behavior of code is reasonably portable across 
+    operating systems.</li>
+    <li>Dual generic or native path format support encourages program 
+    portability, yet still allows communication with users in system specific 
+    formats.<br>
+&nbsp;</li>
+  </ul>
+  </li>
+  <li><b>Error handling and reporting via C++ exceptions (the default) or error 
+  codes.</b><br>
+&nbsp;<ul>
+    <li>C++ exceptions are the preferred error reporting mechanism for most 
+    applications. The exception thrown includes the detailed error code 
+    information important for diagnosing the exact cause of file system errors.</li>
+    <li>Error reporting via error code allows user code that provides detailed 
+    error recovery to avoid becoming so littered with try-catch blocks as to be 
+    unmaintainable. <br>
+&nbsp;</li>
+  </ul>
+  </li>
+  <li><b>Suitable for a broad spectrum of applications, ranging from simple 
+  script-like operations to extremely complex production code.</b><br>
+&nbsp;<ul>
+    <li>At the simple script-like end of the spectrum, the intent is not to 
+    compete with Python, Perl, or shell languages, but rather to provide 
+    filesystem operations when C++ is already the language of choice.</li>
+    <li>Finer grained control over operations and error handling is available to 
+    support more complex applications or other cases where throwing exceptions 
+    isn't desired.</li>
+  </ul>
+  </li>
+</ul>
+
+<p>A proposal,
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n1975.html">
+N1975</a>, to include Boost.Filesystem in Technical Report 2 has been accepted 
+by the C++ Standards Committee. That proposal was based on version 2 of 
+Boost.Filesystem; presumably the final TR2 form will be based on version 3.</p>
+
+<h2><a name="Documentation">Documentation</a></h2>
+
+<p><b><a href="tutorial.html">Tutorial</a></b> - A gentle introduction to 
+the library, with example programs provided for you to experiment with.</p>
+
+<p><b><a href="reference.html">Reference</a></b> - Formal documentation in the 
+style of the C++ standard for 
+every component of the library.</p>
+
+<p><b><a href="faq.htm">FAQ</a></b> - Frequently asked questions.</p>
+
+<p><b><a href="portability_guide.htm">Portability Guide</a></b> - Help for those 
+concerned with writing code to run on multiple operating systems.</p>
+
+<p><b><a href="deprecated.html">Deprecated Features</a></b> - Identifies 
+deprecated features and their replacements.</p>
+
+<p><b><a href="v3.html">Version 3 Introduction</a></b> - Aimed at users of prior 
+Boost.Filesystem versions.</p>
+
+<p><b><a href="v3_design.html">Version 3 Design</a></b> - Historical document 
+from the start of the Version 3 design process.</p>
+
+<p><b><a href="design.htm">Original Design</a></b> - Historical document from 
+the start of the Version 1 design process.</p>
+
+<p><b><a href="do_list.html">Do List</a></b> - Boost.Filesystem development work 
+in the pipeline.</p>
+
+<h2><a name="Using">Using</a> the library</h2>
+<p>Boost.Filesystem is implemented as a separately compiled library, so  you must install 
+binaries in a location that can be found by your linker. If you followed the 
+<a href="http://www.boost.org/doc/libs/release/more/getting_started/index.html">Boost Getting Started</a> instructions, that's already been done for you.</p>
+<h2><a name="Coding-guidelines">Coding guidelines</a></h2>
+<p>For new code, defining <code>BOOST_FILESYSTEM_NO_DEPRECATED</code> before 
+including filesystem headers is strongly recommended. This prevents inadvertent 
+use of old features, particularly legacy function names, that have been replaced 
+and are going to go away in the future.</p>
+<h2><a name="Cautions">Cautions</a></h2>
+<p>After reading the tutorial you can dive right into  simple, 
+script-like programs using the Filesystem Library! Before doing any serious 
+work, however, there a few cautions to be aware of:</p>
+<h4><b>Effects and Postconditions not guaranteed in the presence of race-conditions</b></h4>
+<p>Filesystem function specifications follow the C++ Standard Library form, specifying behavior in terms of 
+effects and postconditions. If 
+a <a href="reference.html#Race-condition">race-condition</a> exists, a function's 
+postconditions may no longer be true by the time the function returns to the 
+caller.</p>
+<blockquote>
+<p><b><i>Explanation: </i></b>The state of files and directories is often
+globally shared, and thus may be changed unexpectedly by other threads, 
+processes, or even other computers having network access to the filesystem. As an 
+example of the difficulties this can cause, note that the following asserts 
+may fail:</p>
+<blockquote>
+<p><code>assert( exists( &quot;foo&quot; ) == exists( &quot;foo&quot; ) );&nbsp; // 
+(1)<br>
+<br>
+remove_all( &quot;foo&quot; );<br>
+assert( !exists( &quot;foo&quot; ) );&nbsp; // (2)<br>
+<br>
+assert( is_directory( &quot;foo&quot; ) == is_directory( &quot;foo&quot; ) ); // 
+(3)</code></p>
+</blockquote>
+<p>(1) will fail if a non-existent &quot;foo&quot; comes into existence, or an 
+existent &quot;foo&quot; is removed, between the first and second call to <i>exists()</i>. 
+This could happen if, during the execution of the example code, another thread, 
+process, or computer is also performing operations in the same directory.</p>
+<p>(2) will fail if between the call to <i>remove_all()</i> and the call to
+<i>exists()</i> a new file or directory named &quot;foo&quot; is created by another 
+thread, process, or computer.</p>
+<p>(3) will fail if another thread, process, or computer removes an 
+existing file &quot;foo&quot; and then creates a directory named &quot;foo&quot;, between the 
+example code's two calls to <i>is_directory()</i>.</p>
+</blockquote>
+<h4><b>May throw exceptions</b></h4>
+<p>Unless otherwise specified, Boost.Filesystem functions throw <i>
+<a href="reference.html#basic_filesystem_error-constructors">basic_filesystem_error</a></i> 
+exceptions if they cannot successfully complete their operational 
+specifications. Also, implementations may use C++ Standard Library functions, 
+which may throw <i>std::bad_alloc</i>. These exceptions may be thrown even 
+though the error condition leading to the exception is not explicitly specified 
+in the function's &quot;Throws&quot; paragraph.</p>
+<p>All exceptions thrown by the Filesystem 
+Library are implemented by calling <a href="../../../utility/throw_exception.html">
+boost::throw_exception()</a>. Thus exact behavior may differ depending on 
+BOOST_NO_EXCEPTIONS at the time the filesystem source files are compiled.</p>
+<p>Non-throwing versions are provided of several functions that are often used 
+in contexts where error codes may be the preferred way to report an error.</p>
+
+<h2><a name="Headers">Headers</a></h2>
+
+<p>The Boost.Filesystem library provides several&nbsp;headers:</p>
+
+<ul>
+  <li>Header &lt;<a href="../../../../boost/filesystem.hpp">boost/filesystem.hpp</a>&gt; 
+  provides access to all features of the library, except file streams.<br>
+&nbsp;</li>
+  <li>Header &lt;<a href="../../../../boost/filesystem/fstream.hpp">boost/filesystem<i>/</i>fstream.hpp</a>&gt; 
+  inherits the same components as the C++ Standard 
+  Library's <i>fstream</i> header, but files are identified by <code>const path&amp;</code> 
+  arguments rather that <code>const char*</code> arguments.</li>
+</ul>
+<h2><a name="Examples">Example programs</a></h2>
+<p>See the <a href="tutorial.html">tutorial</a> for example programs.</p>
+<h3>Other examples</h3>
+<p>The programs used to generate the Boost regression test status tables use the 
+Filesystem Library extensively.&nbsp; See:</p>
+<ul>
+  <li><a href="../../../../tools/regression/src/process_jam_log.cpp">process_jam_log.cpp</a></li>
+  <li><a href="../../../../tools/regression/src/compiler_status.cpp">compiler_status.cpp</a></li>
+</ul>
+<h2><a name="Implementation">Implementation</a></h2>
+<p>The current implementation supports operating systems which provide 
+the POSIX or Windows API's.</p>
+<p>The library is in regular use on Apple  OS X, HP-UX, IBM AIX, Linux, 
+Microsoft Windows, SGI IRIX, and Sun Solaris operating systems using a variety 
+of compilers.</p>
+<h2><a name="Macros">Macros</a></h2>
+<p>Users may defined the following macros if desired. Sensible defaults are 
+provided, so users can ignore these macros unless they have special needs.</p>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td><b><i>Macro Name</i></b></td>
+    <td><b><i>Default</i></b></td>
+    <td><b><i>Effect if defined</i></b></td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_NO_DEPRECATED</code></td>
+    <td valign="top">Not defined.</td>
+    <td valign="top">Deprecated features are excluded from headers.</td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_DYN_LINK</code></td>
+    <td valign="top">Defined if <code>BOOST_ALL_DYN_LINK</code> is defined, 
+    otherwise not defined.</td>
+    <td valign="top">The Boost.Filesystem library is dynamically linked. If not defined, 
+    static linking is assumed.</td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_NO_LIB</code></td>
+    <td valign="top">Defined if <code>BOOST_ALL_NO_LIB</code> is defined, 
+    otherwise not defined.</td>
+    <td valign="top">Boost.Filesystem library does not use the Boost auto-link 
+    facility.</td>
+  </tr>
+  </table>
+<p>User-defined BOOST_POSIX_API and BOOST_WINDOWS_API macros are no longer 
+supported.</p>
+<h2><a name="Building">Building</a> the object-library</h2>
+<p>The object-library will  be built automatically if you are using the Boost 
+build system. See
+<a href="../../../../more/getting_started.html">Getting Started</a>. It can also be 
+built manually using a <a href="../build/Jamfile.v2">Jamfile</a> 
+supplied in directory libs/filesystem/build, or the user can construct an IDE 
+project or make file which includes the object-library source files.</p>
+<p>The object-library source files are 
+supplied in directory <a href="../src">libs/filesystem/src</a>. These source files implement the 
+library for POSIX or Windows compatible operating systems; no implementation is 
+supplied for other operating systems. Note that many operating systems not 
+normally thought of as POSIX  systems, such as mainframe legacy 
+operating systems or embedded operating systems, support POSIX compatible file 
+systems and so will work with the Filesystem Library.</p>
+<p>The object-library can be built for static or dynamic (shared/dll) linking. 
+This is controlled by the BOOST_ALL_DYN_LINK or BOOST_FILESYSTEM_DYN_LINK 
+macros. See the <a href="http://www.boost.org/development/separate_compilation.html">Separate 
+Compilation</a> page for a description of the techniques used.</p>
+<h3>Note for <a name="Cgywin">Cygwin</a> users</h3>
+<p> <a href="http://www.cygwin.com/">Cygwin</a> version 1.7 or later is 
+required because only versions of GCC with wide character strings are supported.</p>
+
+<p> The library's implementation code treats Cygwin as a Windows platform, and 
+thus uses the Windows API and uses Windows path syntax as the native path 
+syntax.</p>
+
+<h2><a name="Change-history">Version history</a></h2>
+
+<h3>Version 3</h3>
+
+<p>Boost <span style="background-color: #FFFF00">1.??.0 - ???, 2010</span> - Internationalization via single class <code>path</code>. 
+More uniform error handling.</p>
+
+<p>Peter Dimov suggested use of a single path class rather than a <code>basic_path</code> 
+class template. That idea was the basis for the Version 3 redesign.</p>
+
+<p>Thanks for comments from Robert Stewart, Zach Laine, Peter Dimov, Gregory 
+Peele, Scott McMurray, John Bytheway, Jeff Flinn, Jeffery Bosboom.</p>
+
+<h3>Version 2</h3>
+
+<p>Boost 1.34.0 - May, 2007 - Internationalization via <code>basic_path</code> 
+template.</p>
+
+<p>So many people have contributed comments and bug reports that it isn't any 
+longer possible to acknowledge them individually. That said, Peter Dimov and Rob 
+Stewart need to be specially thanked for their many constructive criticisms and 
+suggestions. Terence 
+Wilson and Chris Frey contributed timing programs which helped illuminate 
+performance issues.</p>
+
+<h3>Version 1</h3>
+
+<p>Boost 1.30.0 - March, 2003 - Initial official Boost release.</p>
+
+<p>The Filesystem Library was designed and implemented by Beman Dawes. The 
+original <i>directory_iterator</i> and <i>filesystem_error</i> classes were 
+based on prior work from Dietmar Kuehl, as modified by Jan Langer. Thomas Witt 
+was a particular help in later stages of initial development. Peter Dimov and 
+Rob Stewart made many useful suggestions and comments over a long period of 
+time. Howard Hinnant helped with internationalization issues.</p>
+
+<p>Key <a href="design.htm#Requirements">design requirements</a> and
+<a href="design.htm#Realities">design realities</a> were developed during 
+extensive discussions on the Boost mailing list, followed by comments on the 
+initial implementation. Numerous helpful comments were then received during the 
+Formal Review.<p>Participants included 
+Aaron Brashears,
+Alan Bellingham,
+Aleksey Gurtovoy,
+Alex Rosenberg,
+Alisdair Meredith,
+Andy Glew,
+Anthony Williams,
+Baptiste Lepilleur, 
+Beman Dawes,
+Bill Kempf,
+Bill Seymour, 
+Carl Daniel,
+Chris Little,
+Chuck Allison,
+Craig Henderson, 
+Dan Nuffer,
+Dan'l Miller,
+Daniel Frey, 
+Darin Adler, 
+David Abrahams,
+David Held, 
+Davlet Panech,
+Dietmar Kuehl,
+Douglas Gregor, 
+Dylan Nicholson,
+Ed Brey, 
+Eric Jensen,
+Eric Woodruff,
+Fedder Skovgaard,
+Gary Powell,
+Gennaro Prota,
+Geoff Leyland, 
+George Heintzelman, 
+Giovanni Bajo,
+Glen Knowles,
+Hillel Sims,
+Howard Hinnant,
+Jaap Suter,
+James Dennett, 
+Jan Langer, 
+Jani Kajala, 
+Jason Stewart, 
+Jeff Garland,
+Jens Maurer,
+Jesse Jones,
+Jim Hyslop,
+Joel de Guzman,
+Joel Young,
+John Levon, 
+John Maddock,
+John Williston,
+Jonathan Caves,
+Jonathan Biggar,
+Jurko,
+Justus Schwartz,
+Keith Burton, 
+Ken Hagen,
+Kostya Altukhov, 
+Mark Rodgers,
+Martin Schuerch, 
+Matt Austern,
+Matthias Troyer, 
+Mattias Flodin, 
+Michiel Salters,
+Mickael Pointier,
+Misha Bergal,
+Neal Becker,
+Noel Yap,
+Parksie,
+Patrick Hartling, Pavel Vozenilek,
+Pete Becker, 
+Peter Dimov,
+Rainer Deyke,
+Rene Rivera,
+Rob Lievaart,
+Rob Stewart,
+Ron Garcia,
+Ross Smith,
+Sashan,
+Steve Robbins, 
+Thomas Witt, 
+Tom Harris, 
+Toon Knapen,
+Victor Wagner,
+Vincent Finn,
+Vladimir Prus, and
+Yitzhak Sapir
+ 
+<p>A lengthy discussion on the C++ committee's library reflector illuminated the &quot;illusion 
+of portability&quot; problem, particularly in postings by PJ Plauger and Pete Becker.</p>
+
+<p>Walter Landry provided much help illuminating symbolic link use cases for 
+version 1.31.0.&nbsp;</p>
+
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->20 February, 2011<!--webbot bot="Timestamp" endspan i-checksum="40524" --></p>
+
+<p>&copy; Copyright Beman Dawes, 2002-2005</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. See <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a></p>
+
+</body>
+
+</html>

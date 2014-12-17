@@ -1,0 +1,42 @@
+<title>Boost Filesystem Do-list</title>
+<h1>
+<img border="0" src="../../../../boost.png" align="center" width="277" height="86">Filesystem 
+Do-list</h1>
+<h2>Current</h2>
+<ul>
+  <li>Add test cases and docs for Windows \\?\ and \\?\UNC\ naming conventions.</li>
+  <li>Should operations.cpp assert or BOOST_ASSERT on more preconditions?</li>
+  <li>Apply PJP's Wide/Narrow conversion proposal to traits, once he stabilizes it.</li>
+  <li>Glob syntax -&gt; regex syntax converter. See 
+  Rich Johnson's <a href="http://lists.boost.org/boost-users/2004/01/5770.php">
+  lists.boost.org/boost-users/2004/01/5770.php</a>, and John Maddock's
+  <a href="http://lists.boost.org/boost-users/2004/01/5770.php">lists.boost.org/boost-users/2004/01/5770.php</a></li>
+  <li>Issue (Adrian Martin): &gt;Comparison between paths doesn't use locale.<br>
+  &gt;<br>
+  &gt;The paths are not treated as plain characters since a lexicographical <br>
+  &gt;compare is made. But the individual elements are treated<br>
+  &gt;as plain characters and the internal string type's operator&lt; is used. This
+  <br>
+  &gt;is a bit contradicting. <br>
+  &gt;<br>
+  &gt;I think the comparison operators should compare the elements in a locale <br>
+  &gt;dependent way.<br>
+  <br>
+  I've opened this as an issue. It needs to be answered in the context of what 
+  comparison is used for. Remember that equivalence should be determined by the 
+  equivalent() function. An important use of operator&lt; is when path is used as a 
+  map or set key. Not sure how locale impacts that.</li>
+  <li>Move canonize() and normalize() to convenience.hpp?</li>
+  <li>Need wording to the effect that basic_path::iterators are invalidated in 
+  the basic_path object's lifetime ends.</li>
+  <li>Move name checks to convenience.hpp?</li>
+  <li>Move rename_all to convenience.hpp?</li>
+</ul>
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->18 March, 2008<!--webbot bot="Timestamp" endspan i-checksum="29005" --></p>
+<p>&copy; Copyright Beman Dawes, 2002</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>

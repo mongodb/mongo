@@ -1,0 +1,471 @@
+#! /bin/sh
+
+# Run pcregrep tests. The assumption is that the PCRE tests check the library
+# itself. What we are checking here is the file handling and options that are
+# supported by pcregrep.
+
+# Set the C locale, so that sort(1) behaves predictably.
+
+LC_ALL=C
+export LC_ALL
+
+# Remove any non-default colouring and aliases that the caller may have set.
+
+unset PCREGREP_COLOUR PCREGREP_COLOR
+unset cp ls mv rm
+
+# Set the program to be tested, and valgrind settings when requested.
+
+pcregrep=`pwd`/pcregrep
+
+valgrind=
+while [ $# -gt 0 ] ; do
+  case $1 in
+    valgrind) valgrind="valgrind -q --leak-check=no --smc-check=all";;
+    *) echo "RunGrepTest: Unknown argument $1"; exit 1;;
+  esac
+  shift
+done
+
+echo " "
+if [ "$valgrind" = "" ] ; then
+  echo "Testing pcregrep"
+else
+  echo "Testing pcregrep using valgrind"
+fi
+
+$pcregrep -V
+
+# Set up a suitable "diff" command for comparison. Some systems have a diff
+# that lacks a -u option. Try to deal with this; better do the test for the -b
+# option as well.
+
+cf="diff -ub"
+if diff -u /dev/null /dev/null; then
+  if diff -ub /dev/null /dev/null; then cf="diff -ub"; else cf="diff -u"; fi
+else
+  if diff -b /dev/null /dev/null; then cf="diff -b"; else cf="diff"; fi
+fi
+
+# If PCRE has been built in a directory other than the source directory, and
+# this test is being run from "make check" as usual, then $srcdir will be
+# set. If not, set it to the current or parent directory, whichever one
+# contains the test data. We then arrange to run the pcregrep command in the
+# source directory so that the file names that appear in the output are always
+# the same.
+
+if [ -z "$srcdir" -o ! -d "$srcdir/testdata" ] ; then
+  if [ -d "./testdata" ] ; then
+    srcdir=.
+  elif [ -d "../testdata" ] ; then
+    srcdir=..
+  else
+    echo "Cannot find the testdata directory"
+    exit 1
+  fi
+fi
+
+# Check for the availability of UTF-8 support
+
+./pcretest -C utf >/dev/null
+utf8=$?
+
+echo "---------------------------- Test 1 ------------------------------" >testtry
+(cd $srcdir; $valgrind $pcregrep PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 2 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep '^PATTERN' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 3 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -in PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 4 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -ic PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 5 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -in PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 6 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -inh PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 7 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -il PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 8 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -l PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 9 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -q PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 10 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -q NEVER-PATTERN ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 11 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -vn pattern ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 12 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -ix pattern ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 13 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -f./testdata/greplist ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 14 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -w pat ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 15 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep 'abc^*' ./testdata/grepinput) 2>>testtry >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 16 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep abc ./testdata/grepinput ./testdata/nonexistfile) 2>>testtry >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 17 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -M 'the\noutput' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 18 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -Mn '(the\noutput|dog\.\n--)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 19 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -Mix 'Pattern' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 20 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -Mixn 'complete pair\nof lines' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 21 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -nA3 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 22 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -nB3 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 23 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -C3 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 24 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -A9 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 25 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -nB9 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 26 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -A9 -B9 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 27 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -A10 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 28 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -nB10 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 29 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -C12 -B10 'four' ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 30 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -inB3 'pattern' ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 31 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -inA3 'pattern' ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 32 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -L 'fox' ./testdata/grepinput ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 33 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep 'fox' ./testdata/grepnonexist) >>testtry 2>&1
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 34 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -s 'fox' ./testdata/grepnonexist) >>testtry 2>&1
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 35 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -L -r --include=grepinputx --exclude-dir='^\.' 'fox' ./testdata) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 36 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -L -r --include=grepinput --exclude 'grepinput$' --exclude_dir='^\.' 'fox' ./testdata | sort) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 37 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep  '^(a+)*\d' ./testdata/grepinput) >>testtry 2>teststderr
+echo "RC=$?" >>testtry
+echo "======== STDERR ========" >>testtry
+cat teststderr >>testtry
+
+echo "---------------------------- Test 38 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep '>\x00<' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 39 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -A1 'before the binary zero' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 40 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -B1 'after the binary zero' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 41 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -B1 -o '\w+ the binary zero' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 42 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -B1 -onH '\w+ the binary zero' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 43 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -on 'before|zero|after' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 44 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -on -e before -ezero -e after ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 45 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -on -f ./testdata/greplist -e binary ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 46 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -eabc -e '(unclosed' ./testdata/grepinput) 2>>testtry >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 47 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -Fx "AB.VE
+elephant" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 48 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -F "AB.VE
+elephant" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 49 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -F -e DATA -e "AB.VE
+elephant" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 50 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep "^(abc|def|ghi|jkl)" ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 51 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -Mv "brown\sfox" ./testdata/grepinputv) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 52 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --colour=always jumps ./testdata/grepinputv) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 53 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --file-offsets 'before|zero|after' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 54 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --line-offsets 'before|zero|after' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 55 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -f./testdata/greplist --color=always ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 56 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -c lazy ./testdata/grepinput*) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 57 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -c -l lazy ./testdata/grepinput*) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 58 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --regex=PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 59 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --regexp=PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 60 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --regex PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 61 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --regexp PATTERN ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 62 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --match-limit=1000 --no-jit -M 'This is a file(.|\R)*file.' ./testdata/grepinput) >>testtry 2>&1
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 63 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --recursion-limit=1000 --no-jit -M 'This is a file(.|\R)*file.' ./testdata/grepinput) >>testtry 2>&1
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 64 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o1 '(?<=PAT)TERN (ap(pear)s)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 65 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o2 '(?<=PAT)TERN (ap(pear)s)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 66 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o3 '(?<=PAT)TERN (ap(pear)s)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 67 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o12 '(?<=PAT)TERN (ap(pear)s)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 68 ------------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --only-matching=2 '(?<=PAT)TERN (ap(pear)s)' ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 69 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -vn --colour=always pattern ./testdata/grepinputx) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 70 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --color=always -M "triple:\t.*\n\n" ./testdata/grepinput3) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 71 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o "^01|^02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 72 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --color=always "^01|^02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 73 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o --colour=always "^01|^02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 74 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o "^01|02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 75 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --color=always "^01|02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 76 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o --colour=always "^01|02|^03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 77 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o "^01|^02|03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 78 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --color=always "^01|^02|03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 79 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o --colour=always "^01|^02|03" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 80 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o "\b01|\b02" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 81 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --color=always "\\b01|\\b02" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 82 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep -o --colour=always "\\b01|\\b02" ./testdata/grepinput) >>testtry
+echo "RC=$?" >>testtry
+
+echo "---------------------------- Test 83 -----------------------------" >>testtry
+(cd $srcdir; $valgrind $pcregrep --buffer-size=100 "^a" ./testdata/grepinput3) >>testtry 2>&1
+echo "RC=$?" >>testtry
+
+# Now compare the results.
+
+$cf $srcdir/testdata/grepoutput testtry
+if [ $? != 0 ] ; then exit 1; fi
+
+
+# These tests require UTF-8 support
+
+if [ $utf8 -ne 0 ] ; then
+  echo "Testing pcregrep UTF-8 features"
+
+  echo "---------------------------- Test U1 ------------------------------" >testtry
+  (cd $srcdir; $valgrind $pcregrep -n -u --newline=any "^X" ./testdata/grepinput8) >>testtry
+  echo "RC=$?" >>testtry
+
+  echo "---------------------------- Test U2 ------------------------------" >>testtry
+  (cd $srcdir; $valgrind $pcregrep -n -u -C 3 --newline=any "Match" ./testdata/grepinput8) >>testtry
+  echo "RC=$?" >>testtry
+
+  $cf $srcdir/testdata/grepoutput8 testtry
+  if [ $? != 0 ] ; then exit 1; fi
+
+else
+  echo "Skipping pcregrep UTF-8 tests: no UTF-8 support in PCRE library"
+fi
+
+
+# We go to some contortions to try to ensure that the tests for the various
+# newline settings will work in environments where the normal newline sequence
+# is not \n. Do not use exported files, whose line endings might be changed.
+# Instead, create an input file using printf so that its contents are exactly
+# what we want. Note the messy fudge to get printf to write a string that
+# starts with a hyphen.
+
+echo "Testing pcregrep newline settings"
+printf "abc\rdef\r\nghi\njkl" >testNinput
+
+printf "%c--------------------------- Test N1 ------------------------------\r\n" - >testtry
+$valgrind $pcregrep -n -N CR "^(abc|def|ghi|jkl)" testNinput >>testtry
+
+printf "%c--------------------------- Test N2 ------------------------------\r\n" - >>testtry
+$valgrind $pcregrep -n --newline=crlf "^(abc|def|ghi|jkl)" testNinput >>testtry
+
+printf "%c--------------------------- Test N3 ------------------------------\r\n" - >>testtry
+pattern=`printf 'def\rjkl'`
+$valgrind $pcregrep -n --newline=cr -F "$pattern" testNinput >>testtry
+
+printf "%c--------------------------- Test N4 ------------------------------\r\n" - >>testtry
+$valgrind $pcregrep -n --newline=crlf -F -f $srcdir/testdata/greppatN4 testNinput >>testtry
+
+printf "%c--------------------------- Test N5 ------------------------------\r\n" - >>testtry
+$valgrind $pcregrep -n --newline=any "^(abc|def|ghi|jkl)" testNinput >>testtry
+
+printf "%c--------------------------- Test N6 ------------------------------\r\n" - >>testtry
+$valgrind $pcregrep -n --newline=anycrlf "^(abc|def|ghi|jkl)" testNinput >>testtry
+
+$cf $srcdir/testdata/grepoutputN testtry
+if [ $? != 0 ] ; then exit 1; fi
+
+exit 0
+
+# End

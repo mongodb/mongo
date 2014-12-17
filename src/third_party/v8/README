@@ -1,0 +1,31 @@
+This directory contains (as of writing) the latest version of V8 on
+the 3.12 branch.  See src/version.cc for the full version number.
+
+Use the following to generate the base tree:
+
+    git clone -b 3.12 git://github.com/v8/v8
+
+These V8 files have been removed from the base tree for cleanliness
+and to satisfy space constraints:
+
+    benchmarks/
+    build/
+    DEPS
+    Makefile
+    Makefile.android
+    preparser/
+    samples/
+    SConstruct
+    src/SConscript
+    src/arm/
+    src/mips/
+    test/
+
+And these files have been added to complete the integration with the
+MongoDB build system:
+
+    README
+    SConscript [1]
+
+[1] The contents of this file are heavily borrowed from V8's
+    src/SConscript.

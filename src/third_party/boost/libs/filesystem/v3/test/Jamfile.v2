@@ -1,0 +1,35 @@
+# Boost Filesystem Library test Jamfile
+
+# (C) Copyright Beman Dawes 2002-2006
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or www.boost.org/LICENSE_1_0.txt)
+
+project 
+    : requirements
+      <library>/boost/filesystem//boost_filesystem
+      <library>/boost/system//boost_system
+      <toolset>msvc:<asynch-exceptions>on
+    ;
+    
+# Some tests are run both statically and as shared libraries since it is helpful
+# to know if failures in shared library tests are related to sharing or not.
+
+   test-suite "filesystem" :
+       [ run path_unit_test.cpp :  :  : <link>shared ]                  
+       [ run path_unit_test.cpp :  :  : <link>static : path_unit_test_static ]                  
+       [ run path_test.cpp :  :  : <link>shared ]                  
+       [ run path_test.cpp :  :  : <link>static : path_test_static ]                  
+       [ run operations_unit_test.cpp :  :  : <link>shared ]
+       [ run operations_unit_test.cpp :  :  : <link>static : operations_unit_test_static ]
+       [ run operations_test.cpp :  :  : <link>shared ]
+       [ run operations_test.cpp :  :  : <link>static : operations_test_static ]
+       [ run fstream_test.cpp ]
+       [ run convenience_test.cpp ]
+       [ run large_file_support_test.cpp ]
+       [ run deprecated_test.cpp ]                  
+       [ run ../example/simple_ls.cpp ]
+       [ run ../example/file_status.cpp ]
+ 
+#       [ compile ../example/mbcopy.cpp ]
+#       [ compile ../example/mbpath.cpp ]
+       ;

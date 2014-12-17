@@ -1,0 +1,7 @@
+"BSON" stands for "binary JSON" - a binary storage format that is JSON inspired 
+(and adds a couple extra types such as Date).
+
+This is the C++ implementation.  Implementations which translate BSON<->JSON 
+are available for most languages at bsonspec.org.
+
+

@@ -1,0 +1,804 @@
+#! /bin/sh
+
+# Run the PCRE tests using the pcretest program. The appropriate tests are
+# selected, depending on which build-time options were used.
+
+# All tests are now run both with and without -s, to ensure that everything is
+# tested with and without studying. However, there are some tests that produce
+# different output after studying, typically when we are tracing the actual
+# matching process (for example, using auto-callouts). In these few cases, the
+# tests are duplicated in the files, one with /S to force studying always, and
+# one with /SS to force *not* studying always. The use of -s doesn't then make
+# any difference to their output. There is also one test which compiles invalid
+# UTF-8 with the UTF-8 check turned off; for this, studying must also be
+# disabled with /SS.
+
+# When JIT support is available, all the tests are also run with -s+ to test
+# (again, almost) everything with studying and the JIT option. There are also
+# two tests for JIT-specific features, one to be run when JIT support is
+# available, and one when it is not.
+
+# Whichever of the 8-bit and 16-bit libraries exist are tested. It is also
+# possible to select which to test by the arguments -8 or -16.
+
+# Other arguments for this script can be individual test numbers, or the word
+# "valgrind", or "sim" followed by an argument to run cross-compiled
+# executables under a simulator, for example:
+#
+# RunTest 3 sim "qemu-arm -s 8388608"
+
+valgrind=
+sim=
+arg8=
+arg16=
+
+# This is in case the caller has set aliases (as I do - PH)
+unset cp ls mv rm
+
+# Select which tests to run; for those that are explicitly requested, check
+# that the necessary optional facilities are available.
+
+do1=no
+do2=no
+do3=no
+do4=no
+do5=no
+do6=no
+do7=no
+do8=no
+do9=no
+do10=no
+do11=no
+do12=no
+do13=no
+do14=no
+do15=no
+do16=no
+do17=no
+do18=no
+do19=no
+do20=no
+do21=no
+do22=no
+
+while [ $# -gt 0 ] ; do
+  case $1 in
+    1) do1=yes;;
+    2) do2=yes;;
+    3) do3=yes;;
+    4) do4=yes;;
+    5) do5=yes;;
+    6) do6=yes;;
+    7) do7=yes;;
+    8) do8=yes;;
+    9) do9=yes;;
+   10) do10=yes;;
+   11) do11=yes;;
+   12) do12=yes;;
+   13) do13=yes;;
+   14) do14=yes;;
+   15) do15=yes;;
+   16) do16=yes;;
+   17) do17=yes;;
+   18) do18=yes;;
+   19) do19=yes;;
+   20) do20=yes;;
+   21) do21=yes;;
+   22) do22=yes;;
+   -8) arg8=yes;;
+  -16) arg16=yes;;
+   valgrind) valgrind="valgrind -q --smc-check=all";;
+   sim) shift; sim=$1;;
+    *) echo "Unknown test number $1"; exit 1;;
+  esac
+  shift
+done
+
+# Set up a suitable "diff" command for comparison. Some systems
+# have a diff that lacks a -u option. Try to deal with this.
+
+if diff -u /dev/null /dev/null; then cf="diff -u"; else cf="diff"; fi
+
+# Find the test data
+
+if [ -n "$srcdir" -a -d "$srcdir" ] ; then
+  testdata="$srcdir/testdata"
+elif [ -d "./testdata" ] ; then
+  testdata=./testdata
+elif [ -d "../testdata" ] ; then
+  testdata=../testdata
+else
+  echo "Cannot find the testdata directory"
+  exit 1
+fi
+
+# Find which optional facilities are available. In some Windows environments
+# the output of pcretest -C has CRLF at the end of each line, but the shell
+# strips only linefeeds from the output of a `backquoted` command. Hence the
+# alternative patterns.
+
+$sim ./pcretest -C linksize >/dev/null
+link_size=$?
+if [ $link_size -lt 2 ] ; then
+  echo "Failed to find internal link size"
+  exit 1
+fi
+if [ $link_size -gt 4 ] ; then
+  echo "Failed to find internal link size"
+  exit 1
+fi
+
+# Both 8-bit and 16-bit character strings may be supported, but only one
+# need be.
+
+$sim ./pcretest -C pcre8 >/dev/null
+support8=$?
+$sim ./pcretest -C pcre16 >/dev/null
+support16=$?
+if [ $(( $support8 + $support16 )) -eq 2 ] ; then
+  test8=
+  test16=-16
+  if [ "$arg8" = yes -a "$arg16" != yes ] ; then
+    test16=skip
+  fi
+  if [ "$arg16" = yes -a "$arg8" != yes ] ; then
+    test8=skip
+  fi
+else
+  if [ $support8 -ne 0 ] ; then
+    if [ "$arg16" = yes ] ; then
+      echo "Cannot run 16-bit library tests: 16-bit library not compiled"
+      exit 1
+    fi
+    test8=
+    test16=skip
+  else
+    if [ "$arg8" = yes ] ; then
+      echo "Cannot run 8-bit library tests: 8-bit library not compiled"
+      exit 1
+    fi
+    test8=skip
+    test16=-16
+  fi
+fi
+
+# UTF support always applies to both bit sizes if both are supported; we can't
+# have UTF-8 support without UTF-16 support (for example).
+
+$sim ./pcretest -C utf >/dev/null
+utf=$?
+
+$sim ./pcretest -C ucp >/dev/null
+ucp=$?
+
+jitopt=
+$sim ./pcretest -C jit >/dev/null
+jit=$?
+if [ $jit -ne 0 ] ; then
+  jitopt=-s+
+fi
+
+if [ $utf -eq 0 ] ; then
+  if [ $do4 = yes ] ; then
+    echo "Can't run test 4 because UTF support is not configured"
+    exit 1
+  fi
+  if [ $do5 = yes ] ; then
+    echo "Can't run test 5 because UTF support is not configured"
+    exit 1
+  fi
+  if [ $do9 = yes ] ; then
+    echo "Can't run test 8 because UTF support is not configured"
+    exit 1
+  fi
+  if [ $do15 = yes ] ; then
+    echo "Can't run test 15 because UTF support is not configured"
+    exit 1
+  fi
+  if [ $do18 = yes ] ; then
+    echo "Can't run test 18 because UTF support is not configured"
+  fi
+  if [ $do22 = yes ] ; then
+    echo "Can't run test 22 because UTF support is not configured"
+  fi
+fi
+
+if [ $ucp -eq 0 ] ; then
+  if [ $do6 = yes ] ; then
+    echo "Can't run test 6 because Unicode property support is not configured"
+    exit 1
+  fi
+  if [ $do7 = yes ] ; then
+    echo "Can't run test 7 because Unicode property support is not configured"
+    exit 1
+  fi
+  if [ $do10 = yes ] ; then
+    echo "Can't run test 10 because Unicode property support is not configured"
+    exit 1
+  fi
+  if [ $do16 = yes ] ; then
+    echo "Can't run test 16 because Unicode property support is not configured"
+    exit 1
+  fi
+  if [ $do19 = yes ] ; then
+    echo "Can't run test 19 because Unicode property support is not configured"
+    exit 1
+  fi
+fi
+
+if [ $link_size -ne 2 ] ; then
+  if [ $do11 = yes ] ; then
+    echo "Can't run test 11 because the link size ($link_size) is not 2"
+    exit 1
+  fi
+fi
+
+if [ $jit -eq 0 ] ; then
+  if [ $do12 = "yes" ] ; then
+    echo "Can't run test 12 because JIT support is not configured"
+    exit 1
+  fi
+else
+  if [ $do13 = "yes" ] ; then
+    echo "Can't run test 13 because JIT support is configured"
+    exit 1
+  fi
+fi
+
+# If no specific tests were requested, select all. Those that are not
+# relevant will be skipped.
+
+if [ $do1  = no -a $do2  = no -a $do3  = no -a $do4  = no -a \
+     $do5  = no -a $do6  = no -a $do7  = no -a $do8  = no -a \
+     $do9  = no -a $do10 = no -a $do11 = no -a $do12 = no -a \
+     $do13 = no -a $do14 = no -a $do15 = no -a $do16 = no -a \
+     $do17 = no -a $do18 = no -a $do19 = no -a $do20 = no -a \
+     $do21 = no -a $do22 = no ] ; then
+  do1=yes
+  do2=yes
+  do3=yes
+  do4=yes
+  do5=yes
+  do6=yes
+  do7=yes
+  do8=yes
+  do9=yes
+  do10=yes
+  do11=yes
+  do12=yes
+  do13=yes
+  do14=yes
+  do15=yes
+  do16=yes
+  do17=yes
+  do18=yes
+  do19=yes
+  do20=yes
+  do21=yes
+  do22=yes
+fi
+
+# Show which release and which test data
+
+echo ""
+echo PCRE C library tests using test data from $testdata
+$sim ./pcretest /dev/null
+
+for bmode in "$test8" "$test16"; do
+  case "$bmode" in
+    skip) continue;;
+    -16)  if [ "$test8" != "skip" ] ; then echo ""; fi
+          bits=16; echo "---- Testing 16-bit library ----"; echo "";;
+    *)    bits=8; echo "---- Testing 8-bit library ----"; echo "";;
+  esac
+
+# Primary test, compatible with JIT and all versions of Perl >= 5.8
+
+if [ $do1 = yes ] ; then
+  echo "Test 1: main functionality (Compatible with Perl >= 5.10)"
+  for opt in "" "-s" $jitopt; do
+    $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput1 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput1 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    if [ "$opt" = "-s" ] ; then echo "  OK with study"
+    elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+    else echo "  OK"
+    fi
+  done
+fi
+
+# PCRE tests that are not JIT or Perl-compatible: API, errors, internals
+
+if [ $do2 = yes ] ; then
+  echo "Test 2: API, errors, internals, and non-Perl stuff (not UTF-$bits)"
+  for opt in "" "-s" $jitopt; do
+    $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput2 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput2 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else
+      echo " "
+      echo "** Test 2 requires a lot of stack. If it has crashed with a"
+      echo "** segmentation fault, it may be that you do not have enough"
+      echo "** stack available by default. Please see the 'pcrestack' man"
+      echo "** page for a discussion of PCRE's stack usage."
+      echo " "
+      exit 1
+    fi
+    if [ "$opt" = "-s" ] ; then echo "  OK with study"
+    elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+    else echo "  OK"
+    fi
+  done
+fi
+
+# Locale-specific tests, provided that either the "fr_FR" or the "french"
+# locale is available. The former is the Unix-like standard; the latter is
+# for Windows. Another possibility is "fr", which needs to be run against
+# the Windows-specific input and output files.
+
+if [ $do3 = yes ] ; then
+  locale -a | grep '^fr_FR$' >/dev/null
+  if [ $? -eq 0 ] ; then
+    locale=fr_FR
+    infile=$testdata/testinput3
+    outfile=$testdata/testoutput3
+  else
+    infile=test3input
+    outfile=test3output
+    locale -a | grep '^french$' >/dev/null
+    if [ $? -eq 0 ] ; then
+      locale=french
+      sed 's/fr_FR/french/' $testdata/testinput3 >test3input
+      sed 's/fr_FR/french/' $testdata/testoutput3 >test3output
+    else
+      locale -a | grep '^fr$' >/dev/null
+      if [ $? -eq 0 ] ; then
+        locale=fr
+        sed 's/fr_FR/fr/' $testdata/wintestinput3 >test3input
+        sed 's/fr_FR/fr/' $testdata/wintestoutput3 >test3output
+      else
+        locale=
+      fi
+    fi
+  fi
+
+  if [ "$locale" != "" ] ; then
+    echo "Test 3: locale-specific features (using '$locale' locale)"
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $infile testtry
+      if [ $? = 0 ] ; then
+        $cf $outfile testtry
+        if [ $? != 0 ] ; then
+          echo " "
+          echo "Locale test did not run entirely successfully."
+          echo "This usually means that there is a problem with the locale"
+          echo "settings rather than a bug in PCRE."
+          break;
+        else
+          if [ "$opt" = "-s" ] ; then echo "  OK with study"
+          elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+          else echo "  OK"
+          fi
+        fi
+      else exit 1
+      fi
+    done
+  else
+    echo "Cannot test locale-specific features - none of the 'fr_FR', 'fr' or"
+    echo "'french' locales exist, or the \"locale\" command is not available"
+    echo "to check for them."
+    echo " "
+  fi
+fi
+
+# Additional tests for UTF support
+
+if [ $do4 = yes ] ; then
+  echo "Test 4: UTF-$bits support (Compatible with Perl >= 5.10)"
+  if [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput4 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput4 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+if [ $do5 = yes ] ; then
+  echo "Test 5: API, internals, and non-Perl stuff for UTF-$bits support"
+  if [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput5 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput5 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+if [ $do6 = yes ] ; then
+  echo "Test 6: Unicode property support (Compatible with Perl >= 5.10)"
+  if [ $utf -eq 0 -o $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput6 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput6 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Test non-Perl-compatible Unicode property support
+
+if [ $do7 = yes ] ; then
+  echo "Test 7: API, internals, and non-Perl stuff for Unicode property support"
+  if [ $utf -eq 0 -o $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput7 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput7 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for DFA matching support
+
+if [ $do8 = yes ] ; then
+  echo "Test 8: DFA matching main functionality"
+  for opt in "" "-s"; do
+    $sim $valgrind ./pcretest -q $bmode $opt -dfa $testdata/testinput8 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput8 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    if [ "$opt" = "-s" ] ; then echo "  OK with study" ; else echo "  OK"; fi
+  done
+fi
+
+if [ $do9 = yes ] ; then
+  echo "Test 9: DFA matching with UTF-$bits"
+  if [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  else
+    for opt in "" "-s"; do
+      $sim $valgrind ./pcretest -q $bmode $opt -dfa $testdata/testinput9 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput9 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study" ; else echo "  OK"; fi
+    done
+  fi
+fi
+
+if [ $do10 = yes ] ; then
+  echo "Test 10: DFA matching with Unicode properties"
+  if [ $utf -eq 0 -o $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s"; do
+      $sim $valgrind ./pcretest -q $bmode $opt -dfa $testdata/testinput10 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput10 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study" ; else echo "  OK"; fi
+    done
+  fi
+fi
+
+# Test of internal offsets and code sizes. This test is run only when there
+# is Unicode property support and the link size is 2. The actual tests are
+# mostly the same as in some of the above, but in this test we inspect some
+# offsets and sizes that require a known link size. This is a doublecheck for
+# the maintainer, just in case something changes unexpectely. The output from
+# this test is not the same in 8-bit and 16-bit modes.
+
+if [ $do11 = yes ] ; then
+  echo "Test 11: Internal offsets and code size tests"
+  if [ $link_size -ne 2 ] ; then
+    echo "  Skipped because link size is not 2"
+  elif [ $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s"; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput11 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput11-$bits testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study" ; else echo "  OK"; fi
+    done
+  fi
+fi
+
+# Test JIT-specific features when JIT is available
+
+if [ $do12 = yes ] ; then
+  echo "Test 12: JIT-specific features (JIT available)"
+  if [ $jit -eq 0 ] ; then
+    echo "  Skipped because JIT is not available or not usable"
+  else
+    $sim $valgrind ./pcretest -q $bmode $testdata/testinput12 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput12 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    echo "  OK"
+  fi
+fi
+
+# Test JIT-specific features when JIT is not available
+
+if [ $do13 = yes ] ; then
+  echo "Test 13: JIT-specific features (JIT not available)"
+  if [ $jit -ne 0 ] ; then
+    echo "  Skipped because JIT is available"
+  else
+    $sim $valgrind ./pcretest -q $bmode $testdata/testinput13 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput13 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    echo "  OK"
+  fi
+fi
+
+# Tests for 8-bit-specific features
+
+if [ "$do14" = yes ] ; then
+  echo "Test 14: specials for the basic 8-bit library"
+  if [ "$bits" = "16" ] ; then
+    echo "  Skipped when running 16-bit tests"
+  else
+    cp -f $testdata/saved16 testsaved16
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput14 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput14 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 8-bit-specific features (needs UTF-8 support)
+
+if [ "$do15" = yes ] ; then
+  echo "Test 15: specials for the 8-bit library with UTF-8 support"
+  if [ "$bits" = "16" ] ; then
+    echo "  Skipped when running 16-bit tests"
+  elif [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput15 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput15 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 8-bit-specific features (Unicode property support)
+
+if [ $do16 = yes ] ; then
+  echo "Test 16: specials for the 8-bit library with Unicode propery support"
+  if [ "$bits" = "16" ] ; then
+    echo "  Skipped when running 16-bit tests"
+  elif [ $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput16 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput16 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 16-bit-specific features
+
+if [ $do17 = yes ] ; then
+  echo "Test 17: specials for the basic 16-bit library"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput17 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput17 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 16-bit-specific features (UTF-16 support)
+
+if [ $do18 = yes ] ; then
+  echo "Test 18: specials for the 16-bit library with UTF-16 support"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  elif [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput18 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput18 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 16-bit-specific features (Unicode property support)
+
+if [ $do19 = yes ] ; then
+  echo "Test 19: specials for the 16-bit library with Unicode propery support"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  elif [ $ucp -eq 0 ] ; then
+    echo "  Skipped because Unicode property support is not available"
+  else
+    for opt in "" "-s" $jitopt; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput19 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput19 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      elif [ "$opt" = "-s+" ] ; then echo "  OK with JIT study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for 16-bit-specific features in DFA non-UTF-16 mode
+
+if [ $do20 = yes ] ; then
+  echo "Test 20: DFA specials for the basic 16-bit library"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  else
+    for opt in "" "-s"; do
+      $sim $valgrind ./pcretest -q $bmode $opt $testdata/testinput20 testtry
+      if [ $? = 0 ] ; then
+        $cf $testdata/testoutput20 testtry
+        if [ $? != 0 ] ; then exit 1; fi
+      else exit 1
+      fi
+      if [ "$opt" = "-s" ] ; then echo "  OK with study"
+      else echo "  OK"
+      fi
+    done
+  fi
+fi
+
+# Tests for reloads with 16-bit library
+
+if [ $do21 = yes ] ; then
+  echo "Test 21: reloads for the basic 16-bit library"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  elif [ $link_size -ne 2 ] ; then
+    echo "  Skipped because link size is not 2"
+  else
+    cp -f $testdata/saved8 testsaved8
+    cp -f $testdata/saved16LE-1 testsaved16LE-1
+    cp -f $testdata/saved16BE-1 testsaved16BE-1
+    $sim $valgrind ./pcretest -q $bmode $testdata/testinput21 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput21 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    echo "  OK"
+  fi
+fi
+
+# Tests for reloads with 16-bit library (UTF-16 support)
+
+if [ $do22 = yes ] ; then
+  echo "Test 22: reloads for the 16-bit library with UTF-16 support"
+  if [ "$bits" = "8" ] ; then
+    echo "  Skipped when running 8-bit tests"
+  elif [ $utf -eq 0 ] ; then
+    echo "  Skipped because UTF-$bits support is not available"
+  elif [ $link_size -ne 2 ] ; then
+    echo "  Skipped because link size is not 2"
+  else
+    cp -f $testdata/saved16LE-2 testsaved16LE-2
+    cp -f $testdata/saved16BE-2 testsaved16BE-2
+    $sim $valgrind ./pcretest -q $bmode $testdata/testinput22 testtry
+    if [ $? = 0 ] ; then
+      $cf $testdata/testoutput22 testtry
+      if [ $? != 0 ] ; then exit 1; fi
+    else exit 1
+    fi
+    echo "  OK"
+  fi
+fi
+
+# End of loop for 8-bit/16-bit tests
+done
+
+# Clean up local working files
+rm -f test3input test3output testNinput testsaved* teststderr teststdout testtry
+
+# End

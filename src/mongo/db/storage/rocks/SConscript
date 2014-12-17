@@ -1,0 +1,72 @@
+Import("env")
+Import("has_option")
+
+if has_option("rocksdb"):
+
+    env.Library(
+        target= 'storage_rocks_base',
+        source= [
+            'rocks_engine.cpp',
+            'rocks_record_store.cpp',
+            'rocks_recovery_unit.cpp',
+            'rocks_sorted_data_impl.cpp',
+            'rocks_transaction.cpp',
+            ],
+        LIBDEPS= [
+            '$BUILD_DIR/mongo/bson',
+            '$BUILD_DIR/mongo/db/catalog/collection_options',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
+            '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+            '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/mongo/db/storage/oplog_hack',
+            '$BUILD_DIR/mongo/foundation',
+            '$BUILD_DIR/third_party/shim_snappy',
+            ],
+        SYSLIBDEPS=["rocksdb",
+                    "z",
+                    "bz2"] #z and bz2 are dependencies for rocks
+        )
+
+    env.Library(
+        target= 'storage_rocks',
+        source= [
+            'rocks_init.cpp'
+            ],
+        LIBDEPS= [
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+            ]
+        )
+
+
+    env.CppUnitTest(
+       target='storage_rocks_sorted_data_impl_test',
+       source=['rocks_sorted_data_impl_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+            ]
+       )
+
+
+    env.CppUnitTest(
+       target='storage_rocks_record_store_test',
+       source=['rocks_record_store_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
+            ]
+       )
+
+    env.CppUnitTest(
+       target='storage_rocks_engine_test',
+       source=['rocks_engine_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_base',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness'
+            ]
+       )
+

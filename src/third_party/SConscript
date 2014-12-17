@@ -1,0 +1,294 @@
+# -*- mode: python -*-
+
+Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
+Import("wiredtiger")
+
+snappySuffix = '-1.1.2'
+zlibSuffix = '-1.2.8'
+
+thirdPartyIncludePathList = [
+    ('s2', '#/src/third_party/s2'),
+    ('tz', '#/src/third_party/tz'),
+]
+
+if not use_system_version_of_library('tcmalloc'):
+    thirdPartyIncludePathList.append(
+        ('gperftools', '#/src/third_party/gperftools-2.2'))
+
+if not use_system_version_of_library('pcre'):
+    thirdPartyIncludePathList.append(
+        ('pcre', '#/src/third_party/pcre-${PCRE_VERSION}'))
+
+if not use_system_version_of_library('boost'):
+    thirdPartyIncludePathList.append(
+        ('boost', '#/src/third_party/boost' + boostSuffix))
+
+if not use_system_version_of_library('snappy'):
+    thirdPartyIncludePathList.append(
+        ('snappy', '#/src/third_party/snappy' + snappySuffix))
+
+if not use_system_version_of_library('zlib'):
+    thirdPartyIncludePathList.append(
+        ('zlib', '#/src/third_party/zlib' + zlibSuffix))
+
+if not use_system_version_of_library('v8'):
+    thirdPartyIncludePathList.append(
+        ('v8', '#/src/third_party/v8' + v8suffix + '/include'))
+
+if not use_system_version_of_library('stemmer'):
+    thirdPartyIncludePathList.append(
+        ('stemmer', '#/src/third_party/libstemmer_c/include'))
+
+# Note that the wiredtiger header is generated, so
+# we want to look for it in the build directory not
+# the source directory.
+if wiredtiger and not use_system_version_of_library('wiredtiger'):
+    thirdPartyIncludePathList.append(
+        ('wiredtiger', '$BUILD_DIR/third_party/wiredtiger'))
+
+if not use_system_version_of_library('yaml'):
+    thirdPartyIncludePathList.append(
+        ('yaml', '#/src/third_party/yaml-cpp-0.5.1/include'))
+
+def injectAllThirdPartyIncludePaths(thisEnv):
+    thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
+
+def injectThirdPartyIncludePaths(thisEnv, libraries):
+    thisEnv.AppendUnique(CPPPATH=[
+        entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
+
+env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
+env.AddMethod(injectThirdPartyIncludePaths, 'InjectThirdPartyIncludePaths')
+
+
+murmurEnv = env.Clone()
+murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
+
+
+s2Env = env.Clone()
+s2Env.InjectThirdPartyIncludePaths(libraries=['s2', 'boost'])
+s2Env.InjectMongoIncludePaths()
+s2Env.SConscript('s2/SConscript', exports={'env' : s2Env})
+
+
+if use_system_version_of_library("pcre"):
+    pcreEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_PCRE_SYSLIBDEP'],
+            env['LIBDEPS_PCRECPP_SYSLIBDEP'],
+        ])
+else:
+    pcreEnv = env.Clone()
+    pcreEnv.InjectThirdPartyIncludePaths(libraries=['pcre'])
+    pcreEnv.SConscript('pcre-${PCRE_VERSION}/SConscript', exports={ 'env' : pcreEnv })
+    pcreEnv = pcreEnv.Clone(
+        LIBDEPS=[
+            'pcre-${PCRE_VERSION}/pcrecpp',
+        ])
+
+pcreEnv.Library(
+    target="shim_pcrecpp",
+    source=[
+        'shim_pcrecpp.cc',
+    ])
+
+
+boostEnv = env
+if use_system_version_of_library("boost"):
+    # On windows, we don't need the syslibdeps because autolib will select the right libraries
+    # for us automatically.
+    if not windows:
+        boostEnv = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_BOOST_PROGRAM_OPTIONS_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_FILESYSTEM_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_THREAD_SYSLIBDEP'],
+                env['LIBDEPS_BOOST_SYSTEM_SYSLIBDEP'],
+            ])
+else:
+    boostDirectory = 'boost' + boostSuffix
+    boostEnv = env.Clone()
+    boostEnv.InjectThirdPartyIncludePaths(libraries=['boost'])
+    boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })
+    boostEnv = boostEnv.Clone(
+        LIBDEPS=[
+            boostDirectory + '/boost_program_options',
+            boostDirectory + '/boost_filesystem',
+            boostDirectory + '/boost_thread',
+            boostDirectory + '/boost_system',
+        ])
+
+boostEnv.Library(
+    target="shim_boost",
+    source=[
+        'shim_boost.cpp',
+    ])
+
+
+if use_system_version_of_library("snappy"):
+    snappyEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_SNAPPY_SYSLIBDEP'],
+        ])
+else:
+    snappyEnv = env.Clone()
+    snappyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+    snappyEnv.InjectMongoIncludePaths()
+    snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
+    snappyEnv = snappyEnv.Clone(
+        LIBDEPS=[
+            'snappy' + snappySuffix + '/snappy',
+        ])
+
+snappyEnv.Library(
+    target="shim_snappy",
+    source=[
+        'shim_snappy.cpp',
+    ])
+
+if use_system_version_of_library("zlib"):
+    zlibEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_ZLIB_SYSLIBDEP'],
+        ])
+else:
+    zlibEnv = env.Clone()
+    zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+    zlibEnv.InjectMongoIncludePaths()
+    zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
+    zlibEnv = zlibEnv.Clone(
+        LIBDEPS=[
+            'zlib' + zlibSuffix + '/zlib',
+        ])
+
+zlibEnv.Library(
+    target="shim_zlib",
+    source=[
+        'shim_zlib.cpp',
+    ])
+
+if usev8:
+    if use_system_version_of_library("v8"):
+        v8Env = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_v8_SYSLIBDEP'],
+            ])
+    else:
+        v8Env = env.Clone()
+        v8Env.InjectThirdPartyIncludePaths(libraries=['v8'])
+        v8Env.SConscript('v8' + v8suffix + '/SConscript', exports={'env' : v8Env })
+        v8Env = v8Env.Clone(
+            LIBDEPS=[
+                'v8' + v8suffix + '/v8'
+            ])
+
+    v8Env.Library(
+        target="shim_v8",
+        source=[
+            'shim_v8.cpp',
+        ])
+
+
+gperftoolsEnv = env
+if (GetOption("allocator") == "tcmalloc"):
+    if use_system_version_of_library("tcmalloc"):
+        gperftoolsEnv = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_TCMALLOC_SYSLIBDEP'],
+            ])
+    else:
+        gperftoolsEnv = env.Clone()
+        gperftoolsEnv.InjectThirdPartyIncludePaths(libraries=['gperftools'])
+        gperftoolsEnv.InjectMongoIncludePaths()
+        gperftoolsEnv.SConscript('gperftools-2.2/SConscript', exports={ 'env' : gperftoolsEnv })
+        gperftoolsEnv = gperftoolsEnv.Clone(
+            LIBDEPS=[
+                'gperftools-2.2/tcmalloc_minimal',
+            ])
+
+gperftoolsEnv.Library(
+    target="shim_allocator",
+    source=[
+        "shim_allocator.cpp",
+    ])
+
+
+if use_system_version_of_library("stemmer"):
+    stemmerEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_STEMMER_SYSLIBDEP'],
+        ])
+else:
+    stemmerEnv = env.Clone()
+    stemmerEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
+    stemmerEnv.SConscript('libstemmer_c/SConscript', exports={ 'env' : stemmerEnv })
+    stemmerEnv = stemmerEnv.Clone(
+        LIBDEPS=[
+            'libstemmer_c/stemmer',
+        ])
+
+stemmerEnv.Library(
+    target="shim_stemmer",
+    source=[
+        'shim_stemmer.cpp'
+    ])
+
+
+if use_system_version_of_library("yaml"):
+    yamlEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_YAML_SYSLIBDEP'],
+        ])
+else:
+    yamlEnv = env.Clone()
+    yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml', 'boost'])
+    yamlEnv.SConscript('yaml-cpp-0.5.1/SConscript', exports={ 'env' : yamlEnv })
+    yamlEnv = yamlEnv.Clone(
+        LIBDEPS=[
+            'yaml-cpp-0.5.1/yaml',
+        ])
+
+yamlEnv.Library(
+    target="shim_yaml",
+    source=[
+        'shim_yaml.cpp',
+    ])
+
+
+tzEnv = env.Clone()
+if solaris:
+    tzEnv.InjectThirdPartyIncludePaths(libraries=['tz'])
+    tzEnv.SConscript('tz/SConscript', exports={ 'env' : tzEnv })
+    tzEnv = tzEnv.Clone(
+        LIBDEPS=[
+            'tz/tz',
+        ])
+
+tzEnv.Library(
+    target='shim_tz',
+    source=[
+        'shim_tz.cpp',
+    ])
+
+
+if wiredtiger:
+    if use_system_version_of_library("wiredtiger"):
+        wiredtigerEnv = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_WIREDTIGER_SYSLIBDEP'],
+            ])
+    else:
+        wiredtigerEnv = env.Clone()
+        wiredtigerEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
+        wiredtigerEnv.SConscript('wiredtiger/SConscript', exports={ 'env' : wiredtigerEnv })
+        wiredtigerEnv = wiredtigerEnv.Clone(
+            LIBDEPS=[
+                'wiredtiger/wiredtiger',
+            ])
+
+    wiredtigerEnv.Library(
+        target="shim_wiredtiger",
+        source=[
+            'shim_wiredtiger.cpp'
+        ])
+

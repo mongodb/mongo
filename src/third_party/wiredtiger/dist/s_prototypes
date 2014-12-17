@@ -1,0 +1,41 @@
+#! /bin/sh
+
+# Build a list of internal function and variable prototypes.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+(
+cat <<EOF
+/* DO NOT EDIT: automatically built by dist/s_prototypes. */
+
+EOF
+
+for i in `sed -e '/^[a-z]/!d' filelist`; do
+	sed -n \
+	    -e '/^__wt_[a-z]/!{' \
+		-e h \
+		-e d \
+	    -e '}' \
+	    -e x \
+	    -e '/^static/d' \
+	    -e x \
+	    -e ': loop' \
+	    -e H \
+	    -e n \
+	    -e '/;/b end' \
+	    -e '/^{/!b loop' \
+	    -e ': end' \
+	    -e x \
+	    -e 's/ =.*$//' \
+	    -e '/#/!s/\n/ /g' \
+	    -e 's/\* /\*/g' \
+	    -e 's/  */ /g' \
+	    -e 's/^/extern /' \
+	    -e 's/WT_GCC_FUNC_/WT_GCC_/' \
+	    -e 's/$/;/p' \
+	    < ../$i
+done) > $t
+
+f=../src/include/extern.h
+cmp $t $f > /dev/null 2>&1 ||
+    (echo "Building $f" && rm -f $f && cp $t $f)

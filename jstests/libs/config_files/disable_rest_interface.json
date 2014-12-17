@@ -1,0 +1,7 @@
+{
+    "net" : {
+        "http" : {
+            "RESTInterfaceEnabled" : false
+        }
+    }
+}

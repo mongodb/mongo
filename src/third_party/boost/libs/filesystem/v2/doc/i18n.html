@@ -1,0 +1,426 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>1.34 (Internationalization) Changes</title>
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<h1>1.34 (Internationalization) Changes</h1>
+<h2>Introduction</h2>
+<p>This release is a major upgrade for the Filesystem Library, in preparation 
+for submission to the C++ Standards Committee. Features of this release 
+include:</p>
+<ul>
+  <li><a href="#Internationalization">Internationalization</a>, provided by 
+  class templates <i>basic_path</i>, <i>basic_filesystem_error</i>, <i>
+  basic_directory_iterator</i>, and <i>basic_directory_entry</i>.<br>
+&nbsp;</li>
+  <li><a href="#Simplification">Simplification</a> of the path interface, 
+  including elimination of distinction between native and generic formats, 
+  and separation of name checking functionality from general path functionality. 
+  Also simplification of <i>basic_filesystem_error</i>.<br>
+&nbsp;</li>
+  <li><a href="#Rationalization">Rationalization</a> of predicate function 
+  design, including the addition of several new functions.<br>
+&nbsp;</li>
+  <li>Clearer specification by reference to [<a href="design.htm#POSIX-01">POSIX-01</a>], 
+  the ISO/IEEE Single Unix Standard, with provisions for Windows and other 
+  operating systems.<br>
+&nbsp;</li>
+  <li><a href="#Preservation">Preservation</a> of existing user code whenever 
+  possible.<br>
+&nbsp;</li>
+  <li><a href="#More_efficient">More efficient operations</a> when iterating over directories.<br>
+&nbsp;</li>
+  <li>A <a href="reference.html#recursive_directory_iterator">recursive 
+  directory iterator</a> is now provided. </li>
+</ul>
+<p><a href="#Rationale">Rationale</a> for some of the changes is also provided.</p>
+<h2><a name="Internationalization">Internationalization</a></h2>
+<p>Cass templates <i>basic_path</i>, <i>basic_filesystem_error</i>, and <i>
+basic_directory_iterator</i> provide the basic mechanisms for 
+internationalization, in ways very similar to the C++ Standard Library's <i>
+basic_string</i> and similar class templates. The following typedefs are also 
+provided:</p>
+<blockquote>
+  <pre>typedef basic_path&lt;std::string, ...&gt; path;
+typedef basic_path&lt;std::wstring, ...&gt; wpath;
+
+typedef basic_filesystem_error&lt;path&gt; filesystem_error;
+typedef basic_filesystem_error&lt;wpath&gt; wfilesystem_error;
+
+typedef basic_directory_iterator&lt;path&gt; directory_iterator;
+typedef basic_directory_iterator&lt;wpath&gt; wdirectory_iterator;</pre>
+</blockquote>
+<p>The string type used by Boost.Filesystem <i>basic_path</i> (std::string, 
+std::wstring, or whatever) is called the <i>internal</i> string type. The string 
+type used by the operating system for paths (often char*, sometimes wchar_t*) is 
+called the <i>external</i> string type. Conversion between internal and external 
+types is performed by path traits classes. The specific conversions for <i>path</i> 
+and <i>wpath</i> is implementation defined, with normative encouragement to use 
+the operating system's preferred file system encoding. For many modern POSIX-based 
+file systems the <i>wpath</i> external encoding is <a href="design.htm#Kuhn">
+UTF-8</a>, while for modern Windows file systems such as NTFS it is
+<a href="http://en.wikipedia.org/wiki/UTF-16">UTF-16</a>.</p>
+<p>The <a href="reference.html#Operations-functions">operational functions</a> in
+<a href="../../../../boost/filesystem/operations.hpp">operations.hpp</a> are provided with overloads for
+<i>path</i>, <i>wpath</i>, and user-defined <i>basic_path</i>'s. A
+<a href="reference.html#Requirements-on-implementations">&quot;do-the-right-thing&quot; rule</a> 
+applies to implementations, ensuring that the correct overload will be chosen.</p>
+<h2><a name="Simplification">Simplification</a> of path interface</h2>
+<p>Prior versions of the library required users of class <i>path</i> to identify 
+the format (native or generic) and name error-checking policy, either via a 
+second constructor argument or via a default mechanism. That approach caused 
+complaints, particularly from users not needing the name checking features. The 
+interface has now been simplified:</p>
+<ul>
+  <li>The distinction between native and generic formats has been eliminated. 
+  See <a href="#distinction">rationale</a>. Two argument forms of path 
+  constructors are now deprecated, with the second argument having no effect. 
+  These constructors are only provided to ease the transition of existing code.<br>
+&nbsp;</li>
+  <li>Path name checking functionality has been moved out of class path and into 
+  separate free-functions. This still provides name checking for those who need 
+  it, but with much less impact on those who don't need it.</li>
+</ul>
+<p>Additionally,
+<a href="reference.html#Class-template-basic_filesystem_error">basic_filesystem_error</a> has been put 
+on a diet and generally simplified.</p>
+<p>Error codes have been moved to a separate library,
+<a href="../../../system/doc/index.html">Boost.System</a>.</p>
+<p><code>&quot;//:&quot;</code> has been introduced as a path escape prefix to identify 
+native paths. Rationale: simplifies basic_path constructor interfaces, easier 
+use for platforms needing explicit native format identification.</p>
+<h2><a name="Rationalization">Rationalization</a> of predicate functions</h2>
+<p>In discussions and bug reports on the Boost developers mailing list, it 
+became obvious that Boost.Filesystem's exists(), symbolic_link_exists(), and 
+is_directory() predicate functions were poorly specified. There were suggestions 
+to add an is_accessible() function, but Peter Dimov argued that this amounted to 
+papering over the lack of a clear specification and would likely lead to future 
+problems.</p>
+<p>Peter suggested that an interesting way to analyze the problem was to ask 
+what the expectations were for true and false values of the various predicates. 
+See the <a href="#table">table</a> below.</p>
+<h3>status()</h3>
+<p>As part of the predicate discussions, particularly with Rob Stewart, it 
+became obvious that sometimes applications need access to raw status information 
+without any possibility of an exception being thrown. The
+<a href="reference.html#Status-functions">status()</a> function was added to meet this 
+need. It also proved clearer to specify the semantics of predicate functions in 
+terms of status().</p>
+<h3><a name="is_file">is_file</a>()</h3>
+<p>About the same time, Jeff Garland suggested that an
+<a href="reference.html#Predicate-functions">is_file()</a> predicate would 
+compliment <a href="reference.html#Predicate-functions">is_directory()</a>. In working on the analysis below, it became obvious 
+that the expectations for is_file() were different from the expectations for !is_directory(), 
+so is_file() was added. </p>
+<h3><a name="is_other">is_other</a>()</h3>
+<p>On some operating systems, it is possible to have a directory entry which is 
+not for either a directory or a file. The
+<a href="reference.html#Predicate-functions">is_other()</a> 
+function identifies such cases.</p>
+<h3>Should predicates throw on errors?</h3>
+<p>Some conditions reported by operating systems as errors (see
+<a href="#Footnote">footnote</a>) clearly simply indicate that the predicate is 
+false, rather than indicating serious failure. But other errors represent 
+serious hardware or network problems, or permissions problems.</p>
+<p>Some people, particularly Rob Stewart, argue that in a function like
+<a href="reference.html#Predicate-functions">is_directory()</a>, any error should simply cause the function to return false. If 
+there is actually an underlying problem, it will be detected it due course when 
+a directory_iterator or fstream operation is attempted.</p>
+<p>That view is was rejected because of the following considerations:</p>
+<ul>
+  <li>As a general principle, the earlier errors can be reported, the better. 
+  The rationale being that it is often much cheaper to fix errors sooner rather 
+  than later. I've also had a lot of negative experiences where failure to 
+  detect errors early caused a lot of pain and unhappy customers. Some of these 
+  were directly caused by ignoring error returns from file system operations.<br>
+  &nbsp;</li>
+  <li>Analysis of existing programs indicated that as much as 30% of the use of 
+  a predicate was not followed by directory_iterator or fstream operations on 
+  the path in question. Instead, the applications performed reporting or 
+  fall-back operations that would not fail, and thus were either misleading or 
+  completely wrong if the <i>false</i> return value was in fact caused by 
+  hardware or network failure, or permissions problems.</li>
+</ul>
+<p>However, the discussion did identify that there are valid cases where 
+non-throwing behavior is a requirement, and a programmer may prefer to deal with 
+file or directory attributes and errors at a very low, bit-mask, level. Function <a href="#status">status()</a> 
+was proposed to meet those needs.</p>
+<h3><a name="Expectations">Expectations</a> <a name="table">table</a></h3>
+<p>In the table below, <i>p</i> is a non-empty path.</p>
+<p>Unless otherwise specified, all functions throw on hardware or general 
+failure errors, permission or access errors, symbolic link loop errors, and 
+invalid path errors. If an O/S fails to distinguish between error types, 
+predicate operations return false on such ambiguous errors.</p>
+<p><i><b>Expectations</b></i> identify operations that are expected to succeed 
+or fail, assuming no hardware, permission, or access right errors, and no race 
+conditions.</p>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" width="100%">
+  <tr>
+    <td width="22%" align="center"><b><i>Expression</i></b></td>
+    <td width="48%" align="center"><b><i>Expectations</i></b></td>
+    <td width="108%" align="center"><b><i>Semantics</i></b></td>
+  </tr>
+  <tr>
+    <td width="22%">is_directory(p)</td>
+    <td width="48%">Returns true if p is found and is a directory, else false.<br>
+    If true, then directory_iterator(p) would succeed.<br>
+    If false, then directory_iterator(p) would fail.</td>
+    <td width="108%">Throws: if <a href="#status">status()</a> &amp; error_flag<br>
+    Returns: status() &amp; directory_flag</td>
+  </tr>
+  <tr>
+    <td width="22%">is_file(p)</td>
+    <td width="48%">Returns true if p is found and is not a directory, else 
+    false.<br>
+    If true, then ifstream(p) would succeed.<br>
+    False, however, does not imply ifstream(p) would fail (because some 
+    operating systems allow directories to be opened as files, but stat() does 
+    set the &quot;regular file&quot; flag.)</td>
+    <td width="108%">Throws: if status() &amp; error_flag<br>
+    Returns: status() &amp; file_flag</td>
+  </tr>
+  <tr>
+    <td width="22%">exists(p) </td>
+    <td width="48%">Returns is_directory(p) || is_file(p) || is_other(p)</td>
+    <td width="108%">Throws: if status() &amp; error_flag<br>
+    Returns: status() &amp;&nbsp;&nbsp; (directory_flag|file_flag|other_flag)</td>
+  </tr>
+  <tr>
+    <td width="22%">is_symlink(p)</td>
+    <td width="48%">Returns true if p is found by shallow (non-transitive) 
+    search, and is a symbolic link, else false.<br>
+    If true, and p points to q, then for any filesystem function f except those 
+    specified as working shallowly on symlinks themselves, f(p) calls f(q), and 
+    returns any value returned by f(q).</td>
+    <td width="108%">Throws: if <a href="#status">symlink_status</a>() &amp; 
+    error_flag<br>
+    Returns: symlink_status() &amp; symlink_flag</td>
+  </tr>
+  <tr>
+    <td width="22%">!exists(p) &amp;&amp; ((p.has_branch_path() &amp;&amp; exists( p.branch_path()) 
+    || (!p.has_branch_path() &amp;&amp; !p.has_root_path()))<br>
+    <i>In other words, if the path does not exist, and (the branch does exist, 
+    or (there is no branch and no root)).</i></td>
+    <td width="48%">If true, create_directory(p) would succeed.<br>
+    If true, ofstream(p) would succeed.<br>
+    &nbsp;</td>
+    <td width="108%">&nbsp;</td>
+  </tr>
+  <tr>
+    <td width="22%">directory_iterator it(p)</td>
+    <td width="48%">If it != directory_iterator(), assert(exists(*it)||is_symlink(*it)). 
+    Note: exists(*it) may throw, and likewise status(*it) may return error_flag 
+    - there is no guarantee of accessibility.</td>
+    <td width="108%">&nbsp;</td>
+  </tr>
+</table>
+<h3><a name="Conclusion">Conclusion</a></h3>
+<p>Predicate operations is_directory(), is_file(), is_symlink(), and exists() 
+with the indicated semantics form a self-consistent set that meets expectations.</p>
+<h2><a name="Preservation">Preservation</a> of existing user code</h2>
+<p>Although the change to a template based approach required a complete overhaul 
+of the implementation code, the  interface as used by existing applications is mostly unchanged. 
+Conversion problems which would 
+otherwise affect user code have been reduced by providing deprecated 
+functions to ease transition. The deprecated functions are:</p>
+<blockquote>
+  <pre>// class basic_path - 2nd constructor argument ignored:
+basic_path( const string_type &amp; str, name_check );
+basic_path( const typename string_type::value_type * s, name_check );
+
+// class basic_path - old names provided for renamed functions:
+string_type native_file_string() const;
+string_type native_directory_string() const;
+
+// class basic_path - now defined such that these no longer have any real effect:
+static bool default_name_check_writable() { return false; } 
+static void default_name_check( name_check ) {}
+static name_check default_name_check() { return 0; }
+
+// non-deducible operations functions assume class path
+inline path current_path()
+inline const path &amp; initial_path()
+
+// the new basic_directory_entry provides leaf()
+// to cover the common existing use case itr-&gt;leaf()
+typename Path::string_type leaf() const;</pre>
+</blockquote>
+<p>If you do not want  the deprecated functions to be included, define the macro BOOST_FILESYSTEM_NO_DEPRECATED.</p>
+<p>The greatest impact on existing code is the change of directory iterator 
+value type from <code>path</code> to <code>directory_entry</code>. To ease the 
+most common directory iterator use case, <code>basic_directory_entry</code> 
+provides an automatic conversion to <code>basic_path</code>, and this also 
+serves to prevent breakage of a lot of existing code. See the
+<a href="#More_efficient">next section</a> for discussion of rationale.</p>
+<blockquote>
+  <pre>// the new basic_directory_entry provides:
+operator const path_type &amp;() const;</pre>
+  </blockquote>
+<h2><a name="More_efficient">More efficient</a> operations when iterating over 
+directories</h2>
+<p>Several common real-world operating systems (BSD derivatives, Linux, Windows) 
+provide status information during directory iteration. Caching of this status 
+information results in three to six times faster operation for typical predicate 
+operations. (For a directory containing 15,047 files, iteration in 1 second vs 6 
+seconds on a freshly booted system, and 0.3 seconds vs 0.9 seconds after prior use of 
+the directory.</p>
+<p>The efficiency gains from caching such status information were considered too 
+significant to ignore. Because the possibility of race-conditions differs 
+depending on whether the cached information is used or an actual system call is 
+performed, it was considered necessary to provide explicit functions utilizing 
+the cached information, rather than implicitly using the cache behind the 
+scenes.</p>
+<p>Three options were explored for exposing the cached status information, with 
+full implementations of each. After initial implementation of option 1 exposed 
+the problems noted below, option 2 was tested as a possible engineering 
+tradeoff. Option 3 
+was finally chosen as the cleanest design.</p>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" width="100%">
+  <tr>
+    <td width="8%" align="center"><b><i>Option</i></b></td>
+    <td width="25%" align="center"><i><b>How cache accessed</b></i></td>
+    <td width="94%" align="center"><i><b>Pros and Cons</b></i></td>
+  </tr>
+  <tr>
+    <td width="8%" valign="top" align="center"><i><b>1</b></i></td>
+    <td width="25%" valign="top">Predicate function overloads<br>
+    (basic_directory_iterator value_type is path)</td>
+    <td width="94%">
+    <ul>
+      <li>Very Questionable design (friendship abuse, overload abuse, etc)</li>
+      <li>User cannot reuse cache</li>
+      <li>Readability problem; easy to miss difference between f(*it) and f(it)</li>
+      <li>Write-ability problem (error prone?)</li>
+      <li>Most common iterator use is brief: *it</li>
+      <li>Preserves existing code</li>
+    </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="8%" valign="top" align="center"><b><i>2</i></b></td>
+    <td width="25%" valign="top">Predicate member functions of basic_directory_<span style="background-color: #FFFF00">iterator</span><br>
+    (basic_directory_iterator value_type is path)</td>
+    <td width="94%">
+    <ul>
+      <li>Somewhat cleaner design (although added iterator functions is unusual)</li>
+      <li>User cannot reuse cache</li>
+      <li>Readability and write-ability is OK: f(*it) and it.f() sufficiently 
+      different</li>
+      <li>Most common iterator use is brief: *it</li>
+      <li>Preserves existing code</li>
+    </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="8%" valign="top" align="center"><b><i>3</i></b></td>
+    <td width="25%" valign="top">Predicate member functions of basic_directory_<span style="background-color: #FFFF00">entry</span><br>
+    (basic_directory_iterator value_type is basic_directory_entry)<br>
+&nbsp;</td>
+    <td width="94%">
+    <ul>
+      <li>Cleanest design.</li>
+      <li>User can reuse cache.</li>
+      <li>Readability and write-ability is OK: f(*it) and it-&gt;f() sufficiently 
+      different.</li>
+      <li>Most common iterator use is longer: it-&gt;path(), but by providing 
+      &quot;operator const basic_path &amp;&quot; it is still possible to write a bare *it.</li>
+      <li>Breaks some existing code. The &quot;operator const basic_path &amp;&quot; 
+      conversion eliminates breakage of the most common use case, while 
+      providing a (deprecated) leaf() prevents breakage of the second most 
+      common use case.</li>
+    </ul>
+    </td>
+  </tr>
+  </table>
+<h2><a name="Rationale">Rationale</a></h2>
+<h3>Elimination of the native versus generic <a name="distinction">distinction</a></h3>
+<p>Elimination of user confusion and general design simplification was the 
+original motivation for elimination of the distinction between native and 
+generic paths.</p>
+<p>During design work, a further technical argument was discovered. Consider the 
+path <code>&quot;c:foo/bar&quot;</code>. On many POSIX systems, <code>&quot;c:foo&quot;</code> is a 
+valid directory name, so we have a two element path and there is no issue of 
+native versus generic format. On Windows system, however, <code>&quot;c:&quot;</code> is a 
+drive specification, so we have a three element path. All calls to the operating 
+system will result in <code>&quot;c:&quot;</code> being considered a drive specification; 
+there is no way that fact-of-life can be changed by claiming the format is 
+generic. The native versus generic distinction is thus useless and misleading 
+for POSIX, Windows, and probably most other operating systems.</p>
+<p>If paths for a particular operating system did require a distinction be made, 
+it could be done by requiring that native paths be prefixed with some unique 
+implementation-defined identification. For example, <code>&quot;native-path:&quot;</code>. 
+This would only be required for operating systems where (1) the distinction 
+mattered, and (2) there was no lexical way to distinguish the two forms. For 
+example, a native operating system that used the same syntax as the Filesystem 
+Library's generic POSIX-like format, but processed the elements right-to-left 
+instead of left-to-right.</p>
+<h3>Preservation of <a name="existing-code">existing code</a></h3>
+<p>Allowing existing user code to continue to work with the updated version of 
+the library has obvious benefits in terms of preserving the effort users have 
+applied to both learning the library and writing code which uses the library.</p>
+<p>There is an additional motivation; other than the name checking portion of 
+class path,&nbsp; the existing interface has proven to be useful and robust, so 
+there is no reason to fiddle with it.</p>
+<h3><a name="Single_path_design">Single path design</a></h3>
+<p>During preliminary internationalization discussion on the Boost developer's 
+list, a design was considered for a single path class which could hold either 
+narrow or wide character based paths. That design was rejected because:</p>
+<ul>
+  <li>The design was, for many applications, an over-generalization with runtime 
+  memory and speed costs which would have to be paid for even when not needed.<br>
+&nbsp;</li>
+  <li>There was concern that the design would be confusing to users, given that 
+  the standard library already uses single-value-type strings, rather than 
+  strings which morph value types as needed.<br>
+&nbsp;</li>
+  <li>There were technical issues with conversions when a narrow path was 
+  appended to a wide path, and visa versa. The concern was that double 
+  conversions could cause incorrect results, that conversions best left to the 
+  operating system would be performed, and that the technical complexity was too 
+  great in relation to perceived benefits. User-defined types would only make 
+  the problem worse.<br>
+&nbsp;</li>
+</ul>
+<h3>No versions of <a href="reference.html#Status-functions">status()</a> which throw exceptions on 
+errors</h3>
+<p>The rationale for not including versions of status() 
+which throw exceptions on errors is that (1) the primary purpose of this 
+function is to perform queries at a very low-level, where exceptions are usually 
+unwanted, and (2) exceptions on errors are already provided by the predicate 
+functions. There would be little or no efficiency gain from providing a throwing 
+version of status().</p>
+<h3>Symlink identifying version of <a href="reference.html#Status-functions">status()</a> function</h3>
+<p>A symlink identifying version of the status() function is distinguished by a 
+second argument. Often separately named functions are more appropriate than 
+overloading when behavior 
+differs, which is the case here, while overloads are more appropriate when 
+behavior is the same but argument types differ (Iain Hanson). Overloading was 
+chosen in this particular case because a subjective judgment that a single 
+function name with an optional &quot;symlink&quot; second argument produced more 
+understandable code. The original implementation of the function used the name &quot;symlink_status&quot;, 
+but that just didn't read right in real code.</p>
+<h3>POSIX wpath_traits defaults to locale(&quot;&quot;), but allows imbuing of locale</h3>
+<p>Vladimir Prus pointed out that for Linux (and presumably other POSIX 
+operating systems) that need to convert wide character paths to narrow 
+characters, the default conversion should not depend on the operating system 
+alone, but on the std::locale(&quot;&quot;) default. For example, the usual encoding 
+for Russian on Linux (and Russian web sites) is KOI8-R (RFC1489). The ability to safely specify a different locale 
+is also provided, to meet unforeseen needs.</p>
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->18 March, 2008<!--webbot bot="Timestamp" endspan i-checksum="29005" --></p>
+<p>© Copyright Beman Dawes, 2005</p>
+<p>Distributed under the Boost Software License, Version 1.0.
+(See accompanying file <a href="../../../../LICENSE_1_0.txt">LICENSE_1_0.txt</a> or
+copy at <a href="http://www.boost.org/LICENSE_1_0.txt">www.boost.org/LICENSE_1_0.txt</a>)</p>
+
+</body>
+
+</html>

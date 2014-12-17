@@ -1,0 +1,192 @@
+// wiredtiger_util.cpp
+
+/**
+ *    Copyright (C) 2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+
+#include <limits>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
+
+namespace mongo {
+
+    using std::string;
+
+    Status wtRCToStatus_slow(int retCode, const char* prefix ) {
+        if (retCode == 0)
+            return Status::OK();
+
+        if ( retCode == WT_ROLLBACK ) {
+            throw WriteConflictException();
+        }
+
+        fassert( 28559, retCode != WT_PANIC );
+
+        str::stream s;
+        if ( prefix )
+            s << prefix << " ";
+        s << retCode << ": " << wiredtiger_strerror(retCode);
+
+        if (retCode == EINVAL) {
+            return Status(ErrorCodes::BadValue, s);
+        }
+
+        // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
+        return Status(ErrorCodes::UnknownError, s);
+    }
+
+    // static
+    StatusWith<uint64_t> WiredTigerUtil::getStatisticsValue(WT_SESSION* session,
+                                                            const std::string& uri,
+                                                            const std::string& config,
+                                                            int statisticsKey) {
+        invariant(session);
+        WT_CURSOR* cursor = NULL;
+        const char* cursorConfig = config.empty() ? NULL : config.c_str();
+        int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &cursor);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::CursorNotFound, str::stream()
+                << "unable to open cursor at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+        invariant(cursor);
+        ON_BLOCK_EXIT(cursor->close, cursor);
+
+        cursor->set_key(cursor, statisticsKey);
+        ret = cursor->search(cursor);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::NoSuchKey, str::stream()
+                << "unable to find key " << statisticsKey << " at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+
+        uint64_t value;
+        ret = cursor->get_value(cursor, NULL, NULL, &value);
+        if (ret != 0) {
+            return StatusWith<uint64_t>(ErrorCodes::BadValue, str::stream()
+                << "unable to get value for key " << statisticsKey << " at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+
+        return StatusWith<uint64_t>(value);
+    }
+
+    int64_t WiredTigerUtil::getIdentSize(WT_SESSION* s,
+                                         const std::string& uri ) {
+        StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
+            s,
+            "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+        const Status& status = result.getStatus();
+        if ( !status.isOK() ) {
+            if ( status.code() == ErrorCodes::CursorNotFound ) {
+                // ident gone, so its 0
+                return 0;
+            }
+            uassertStatusOK( status );
+        }
+        return result.getValue();
+    }
+
+
+    Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
+                                             const std::string& uri, const std::string& config,
+                                             BSONObjBuilder* bob) {
+        invariant(session);
+        invariant(bob);
+        WT_CURSOR* c = NULL;
+        const char* cursorConfig = config.empty() ? NULL : config.c_str();
+        int ret = session->open_cursor(session, uri.c_str(), NULL, cursorConfig, &c);
+        if (ret != 0) {
+            return Status(ErrorCodes::CursorNotFound, str::stream()
+                << "unable to open cursor at URI " << uri
+                << ". reason: " << wiredtiger_strerror(ret));
+        }
+        bob->append("uri", uri);
+        invariant(c);
+        ON_BLOCK_EXIT(c->close, c);
+
+        std::map<string,BSONObjBuilder*> subs;
+        const char* desc;
+        uint64_t value;
+        while (c->next(c) == 0 && c->get_value(c, &desc, NULL, &value) == 0) {
+            StringData key( desc );
+
+            StringData prefix;
+            StringData suffix;
+
+            size_t idx = key.find( ':' );
+            if ( idx != string::npos ) {
+                prefix = key.substr( 0, idx );
+                suffix = key.substr( idx + 1 );
+            }
+            else {
+                idx = key.find( ' ' );
+            }
+
+            if ( idx != string::npos ) {
+                prefix = key.substr( 0, idx );
+                suffix = key.substr( idx + 1 );
+            }
+            else {
+                prefix = key;
+                suffix = "num";
+            }
+
+            long long v = _castStatisticsValue<long long>(value);
+
+            if ( prefix.size() == 0 ) {
+                bob->appendNumber(desc, v);
+            }
+            else {
+                BSONObjBuilder*& sub = subs[prefix.toString()];
+                if ( !sub )
+                    sub = new BSONObjBuilder();
+                sub->appendNumber(mongoutils::str::ltrim(suffix.toString()), v);
+            }
+        }
+
+        for ( std::map<string,BSONObjBuilder*>::const_iterator it = subs.begin();
+              it != subs.end(); ++it ) {
+            const std::string& s = it->first;
+            bob->append( s, it->second->obj() );
+            delete it->second;
+        }
+        return Status::OK();
+    }
+
+}  // namespace mongo

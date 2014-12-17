@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Product Id="$(var.ProductId)" 
+           Name="!(wix.ProductName)" 
+           Language="1033" 
+           Version="$(var.MongoDBVersion)" 
+           Manufacturer="MongoDB" 
+           UpgradeCode="$(var.UpgradeCode)">
+
+    <Package InstallerVersion="200" Compressed="yes" />
+    <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion)" />
+    <WixVariable Id="ProductMajorName" Value="MongoDB $(var.MongoDBMajorVersion)" />
+    <WixVariable Id="InstallFolder" Value="$(var.MongoDBMajorVersion)"/>
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+        <Directory Id="ProgramFilesFolder">
+            <Directory Id="MongoDB" Name="MongoDB">
+                <Directory Id="Server" Name="Server">
+                    <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
+                      <Directory Id="BIN" Name="bin" />
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+    </Directory>
+
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
+    <WixVariable Id="WixUIInfoIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+    <WixVariable Id="WixUIExclamationIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+    <!--
+    <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
+    <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
+  More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
+    -->
+
+    <Property Id="ARPPRODUCTICON" Value="MongoDBIcon" />
+    <Property Id="ARPHELPLINK" Value="http://www.mongodb.org/" />
+    <Property Id="ARPURLINFOABOUT" Value="http://www.mongodb.org/" />
+
+    <Icon Id="MongoDBIcon" SourceFile="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+
+    <FeatureGroupRef Id="fg_MongoDBAll" />
+
+    <UIRef Id="MongoWixUI" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
+
+    <Property Id="MONGO_MULTIPLE_SKU" >
+        <RegistrySearch Id="Mongo_Multiple_Sku"
+            Root="HKLM"
+            Key="Software\MongoDB\Server\$(var.MongoDBMajorVersion)"
+            Name="Edition"
+            Type="raw" />
+    </Property>
+
+    <Condition Message="You cannot install multple editions for the same version of MongoDB. Already installed product '[MONGO_MULTIPLE_SKU]' conflicts with this product.">
+        Installed OR (NOT MONGO_MULTIPLE_SKU OR MONGO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
+    </Condition>
+  </Product>
+</Wix>

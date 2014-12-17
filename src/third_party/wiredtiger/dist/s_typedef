@@ -1,0 +1,80 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# Insulate against locale-specific sort order and IFS from the user's env
+LC_ALL=C
+export LC_ALL
+IFS=' ''	''
+'
+export IFS
+
+build() {
+	# Build the standard typedefs.
+	f=../src/include/wt_internal.h
+	(sed -e '/Forward type declarations .*: BEGIN/{' \
+	    -e 'n' \
+	    -e 'q' \
+	    -e '}' < $f
+
+	l=`ls ../src/include/*.[hi] ../src/include/*.in |
+	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
+	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{' $l | \
+	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
+	while read t n; do
+		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
+		echo "$t $n;"
+		echo "    typedef $t $n $upper;"
+	done
+
+	echo '/*'
+	sed -e '/Forward type declarations .*: END/,${' \
+	    -e 'p' \
+	    -e '}' \
+	    -e 'd' < $f) > $t
+	cmp $t $f > /dev/null 2>&1 ||
+	    (echo "Building $f" && rm -f $f && cp $t $f)
+}
+
+check() {
+	# Complain about unused #typedefs.
+	# List of files to search.
+	l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
+	l="$l `echo ../src/utilities/*.c`"
+
+	(
+	# Get the list of typedefs
+	search=`cat ../src/include/*.h ../src/include/*.in |
+	    sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' \
+	        -e 's/^union.*typedef.* \(.*\);$/\1/p' \
+	        -e d |
+	    sort -u`
+	echo "$search"
+	fgrep -who "$search" $l
+	) | sort | uniq -u > $t
+
+	test -s $t && cat $t
+}
+
+usage()
+{
+	echo 'usage: s_typedef [-bc]' >&2
+	exit 1
+}
+test "$#" -eq 1 || usage
+while :
+	do case "$1" in
+	-b)				# -b builds the typedefs
+		build
+		shift;;
+	-c)				# -c checks the typedefs
+		check
+		shift;;
+	*)
+		test "$#" -eq 0 || usage
+		break;;
+	esac
+done
+
+exit 0

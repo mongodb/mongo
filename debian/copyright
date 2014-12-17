@@ -1,0 +1,23 @@
+This package was debianized by Kristina Chodorow <kristina@10gen.com> on
+Tue, 07 Apr 2009 10:18:58 -0400.
+
+It was downloaded from http://www.mongodb.org
+
+Upstream Authors:
+
+    Eliot Horowitz
+    Dwight Merriman
+    Aaron Staple
+    Michael Dirolf
+    Kristina Chodorow
+
+Copyright:
+
+    2009 10gen
+
+License:
+
+    AGPL
+
+The Debian packaging is (C) 2009, Kristina Chodorow <kristina@10gen.com> and
+is licensed under the AGPL, see `http://www.fsf.org/licensing/licenses/agpl-3.0.html'.

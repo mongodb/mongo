@@ -1,30 +1,56 @@
 // Test resync command
 
-var baseName = "jstests_repl2test";
+soonCount = function( count ) {
+    assert.soon( function() {
+//                print( "check count" );
+//                print( "count: " + s.getDB( baseName ).z.find().count() );
+                return s.getDB("foo").a.find().count() == count;
+                } );
+}
 
-// spec small oplog to make slave get out of sync
-m = startMongod( "--port", "27018", "--dbpath", "/data/db/" + baseName + "-master", "--master", "--oplogSize", "1" );
-s = startMongod( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
+doTest = function(signal, extraOpts) {
+    print("signal: "+signal);
 
-am = m.getDB( baseName ).a
-as = s.getDB( baseName ).a
+    var rt = new ReplTest( "repl2tests" );
 
-am.save( { _id: new ObjectId() } );
-assert.soon( function() { return as.find().count() == 1; } );
-assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
-stopMongod( 27019 );
+    // implicit small oplog makes slave get out of sync
+    m = rt.start( true, { oplogSize : "1" } );
+    s = rt.start(false, extraOpts);
 
-big = new Array( 2000 ).toString();
-for( i = 0; i < 1000; ++i )
-    am.save( { _id: new ObjectId(), i: i, b: big } );
+    am = m.getDB("foo").a
 
-s = startMongodNoReset( "--port", "27019", "--dbpath", "/data/db/" + baseName + "-slave", "--slave", "--source", "127.0.0.1:27018" );
-assert.soon( function() { return 1 == s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok; } );
+    am.save( { _id: new ObjectId() } );
+    soonCount( 1 );
+    assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+    rt.stop( false , signal );
 
-assert.soon( function() { return s.getDBNames().indexOf( baseName ) != -1; } );
-as = s.getDB( baseName ).a
-assert.soon( function() { return 1001 == as.find().count(); } );
-assert.eq( 1, as.find( { i: 0 } ).count() );
-assert.eq( 1, as.find( { i: 999 } ).count() );
+    big = new Array( 2000 ).toString();
+    for( i = 0; i < 1000; ++i )
+        am.save( { _id: new ObjectId(), i: i, b: big } );
 
-assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+    s = rt.start(false, extraOpts, true);
+
+    print("earliest op in master: "+tojson(m.getDB("local").oplog.$main.find().sort({$natural:1}).limit(1).next()));
+    print("latest op on slave: "+tojson(s.getDB("local").sources.findOne()));
+
+    assert.soon( function() {
+        var result = s.getDB( "admin" ).runCommand( { "resync" : 1 } );
+        print("resync says: "+tojson(result));
+        return result.ok == 1;
+    } );
+
+    soonCount( 1001 );
+    assert.automsg( "m.getDB( 'local' ).getCollection( 'oplog.$main' ).stats().size > 0" );
+
+    as = s.getDB("foo").a
+    assert.eq( 1, as.find( { i: 0 } ).count() );
+    assert.eq( 1, as.find( { i: 999 } ).count() );
+
+    assert.eq( 0, s.getDB( "admin" ).runCommand( { "resync" : 1 } ).ok );
+
+    rt.stop();
+
+}
+
+doTest(15, {"vv": null}); // SIGTERM
+doTest(9,  {"vv": null, journal: null });  // SIGKILL

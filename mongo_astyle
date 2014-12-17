@@ -1,0 +1,16 @@
+--indent=spaces=4
+--convert-tabs
+--lineend=linux
+
+--indent-namespaces
+--indent-preprocessor
+
+
+--keep-one-line-statements
+--keep-one-line-blocks
+
+--break-closing-brackets
+--brackets=attach
+
+
+

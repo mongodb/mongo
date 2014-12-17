@@ -1,0 +1,20 @@
+suite: {}
+executor:
+  fail_fast: false
+  fixtures:
+    shell_globals:
+      fixture_class: smoke.GlobalShellFixture
+  testers:
+    db_test: {}
+    exe_test: {}
+    js_test: {}
+logging:
+  handlers:
+    default:
+      class: logging.NullHandler
+  loggers:
+    ? ''
+    : handlers:
+      - default
+  version: 1
+

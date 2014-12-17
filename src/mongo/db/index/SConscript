@@ -1,0 +1,50 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+        target='index_descriptor',
+        source=[
+            'index_descriptor.cpp',
+        ],
+        LIBDEPS=[
+        ],
+)
+
+env.Library(
+        target='key_generator',
+        source=[
+            'btree_key_generator.cpp',
+            'expression_keys_private.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/bson',
+            '$BUILD_DIR/mongo/db/fts/base',
+            '$BUILD_DIR/mongo/db/geo/geometry',
+            '$BUILD_DIR/mongo/db/geo/geoparser',
+            '$BUILD_DIR/mongo/index_names',
+            '$BUILD_DIR/third_party/s2/s2',
+        ],
+)
+
+env.Library(
+        target='external_key_generator',
+        source=[
+            'external_key_generator.cpp',
+        ],
+        LIBDEPS=[
+            'key_generator',
+            '$BUILD_DIR/mongo/bson',
+        ],
+)
+
+env.CppUnitTest(
+        target='btree_key_generator_test',
+        source=[
+            'btree_key_generator_test.cpp',
+        ],
+        LIBDEPS=[
+            'key_generator',
+            '$BUILD_DIR/mongo/mongohasher',
+        ],
+)

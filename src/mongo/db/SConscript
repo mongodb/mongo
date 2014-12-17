@@ -1,0 +1,81 @@
+# -*- mode: python -*-
+
+Import("env")
+
+#
+# The db/'common' lib has the abstractions that are shared by components of the
+# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
+# get resolved.
+#
+
+env.Library(
+    target= 'common',
+    source= [
+        'field_ref.cpp',
+        'field_ref_set.cpp',
+        'field_parser.cpp',
+        'get_status_from_command_result.cpp',
+        'keypattern.cpp',
+        'write_concern_options.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/index_names'
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_ref_test',
+    source= 'field_ref_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_ref_set_test',
+    source = 'field_ref_set_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_parser_test',
+    source= 'field_parser_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'hasher_test',
+    source= [
+        'hasher_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+        '$BUILD_DIR/mongo/mongohasher',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'keypattern_test',
+    source= 'keypattern_test.cpp',
+    LIBDEPS=[
+        'common'
+    ],
+)
+
+env.CppUnitTest(
+    target="dbmessage_test",
+    source=[
+        "dbmessage_test.cpp"
+    ],
+    LIBDEPS=[
+        "common",
+        "$BUILD_DIR/mongo/clientdriver",
+    ],
+)
+env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])

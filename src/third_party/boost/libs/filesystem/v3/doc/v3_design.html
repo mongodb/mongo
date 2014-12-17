@@ -1,0 +1,192 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Filesystem V3 Design</title>
+<link rel="stylesheet" type="text/css" href="../../../../doc/src/minimal.css">
+</head>
+
+<body>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td>
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" border="0" width="300" height="86"></a></td>
+    <td align="middle">
+    <font size="7">Filesystem Version 3<br>
+    Design</font></td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="index.htm">Filesystem Home</a> &nbsp;&nbsp;
+    <a href="release_history.html">Releases</a> &nbsp;&nbsp;
+    <a href="reference.html">Reference</a> &nbsp;&nbsp;
+    <a href="tutorial.html">Tutorial</a> &nbsp;&nbsp;
+    <a href="faq.htm">FAQ</a> &nbsp;&nbsp;
+    <a href="portability_guide.htm">Portability</a> &nbsp;&nbsp;
+    <a href="v3.html">V3 Intro</a> &nbsp;&nbsp;
+    <a href="v3_design.html">V3 Design</a> &nbsp;&nbsp;
+    <a href="deprecated.html">Deprecated</a> &nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" align="right">
+  <tr>
+    <td width="100%" bgcolor="#D7EEFF" align="center">
+      <i><b>Contents</b></i></td>
+  </tr>
+  <tr>
+    <td width="100%" bgcolor="#E8F5FF">
+    <a href="#Introduction">Introduction</a><br>
+    <a href="#Problem">Problem</a><br>
+    <a href="#Solution">Solution</a><br>
+    <a href="#Details">Details</a><br>
+    <a href="#Other-changes">Other changes</a><br>
+    <a href="#Acknowledgements">Acknowledgements</a></td>
+  </tr>
+  </table>
+
+<p><b>Caution:</b> This page documents thinking early in the V3 development 
+process, and is intended to serve historical purposes. It is not updated to 
+reflect the current state of the library.</p>
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>During the review of Boost.Filesystem.V2 (Internationalization), Peter Dimov 
+suggested that the<code> basic_path</code> class template was unwieldy, and that a single 
+path type that accommodated multiple character types and encodings would be more 
+flexible. Although I wasn't willing to stop development at that time to 
+explore how this idea might be implemented, or to break from the pattern for 
+Internationalization used the C++ standard library, I've often thought about 
+Peter's suggestion. With the advent of C++0x <code>char16_t</code> and <code>char32_t</code> character 
+types, the <code>basic_path</code> class template approach becomes even more unwieldy, so it 
+is time to revisit the problem in light of Peter's suggestion.</p>
+
+<h2><b><a name="Problem">Problem</a></b></h2>
+
+<p>With Filesystem.V2, a path argument to a user defined function that is to 
+accommodate multiple character types and encodings must be written as a 
+template. Do-the-right-thing overloads or template metaprogramming must be 
+employed to allow arguments to be written as string literals. Here's what it 
+looks like:</p>
+
+<blockquote>
+  <pre>template&lt;class Path&gt;
+void foo( const Path &amp; p );</pre>
+  <pre>inline void foo( const path &amp; p )
+{
+  return foo&lt;path&gt;( p );
+}
+inline void foo( const wpath &amp; p )
+{
+  return foo&lt;wpath&gt;( p );
+}</pre>
+</blockquote>
+<p>That's really ugly for such a simple need, and there would be a combinatorial 
+explosion if the function took multiple Path arguments and each could be either 
+narrow or wide. It gets even worse if the C++0x <code>char16_t</code> and <code>
+char32_t</code> types are to be supported.</p>
+
+<h2><a name="Solution">Solution</a></h2>
+
+<p>Overview:</p>
+
+<ul>
+  <li>A single, non-template, <code>class path</code>.</li>
+  <li>Each member function is a template accommodating the various 
+  applicable character types, including user-defined character types.</li>
+  <li>Hold the path internally in a string of the type used by the operating 
+  system API; <code>std::string</code> for POSIX, <code>std::wstring</code> for Windows.</li>
+</ul>
+
+<p>The signatures presented in <a href="#Problem">Problem</a> collapse to 
+simply:</p>
+<blockquote>
+  <pre>void foo( const path &amp; p );</pre>
+</blockquote>
+
+<p>That's a signification reduction in code complexity. Specification becomes 
+simpler, too. I believe it will be far easier to teach, and result in much more 
+flexible user code.</p>
+
+<p>Other benefits:</p>
+<ul>
+  <li>All the polymorphism still occurs at compile time.</li>
+  <li>Efficiency is increased, in that conversions of the encoding, if required, 
+  only occur once at the time of creation, not each time the path is used.</li>
+  <li>The size of the implementation code drops approximately in half and 
+  becomes much more readable.</li>
+</ul>
+  <p>Possible problems:</p>
+<ul>
+  <li>The combination of member function templates and implicit constructors can 
+  result in unclear error messages when the user makes simple commonplace coding 
+  errors. This should be much less of a problem with C++ concepts, but in the 
+  meantime work continues to restrict over aggressive templates via enable_if/disable_if.</li>
+</ul>
+  <h2><a name="Details">Details</a></h2>
+
+<table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" width="100%">
+  <tr>
+    <td width="33%" colspan="3">
+    <p align="center"><b><i>Encoding </i></b><i><b>Conversions</b></i></td>
+  </tr>
+  <tr>
+    <td width="33%">
+    <p align="center"><i><b>Host system</b></i></td>
+    <td width="33%">
+    <p align="center"><i><b>char string path arguments</b></i></td>
+    <td width="34%">
+    <p align="center"><i><b>wide string path arguments</b></i></td>
+  </tr>
+  <tr>
+    <td width="33%">Systems with <code>char</code> as the native API path character type (i.e. 
+    POSIX-like systems)</td>
+    <td width="33%">No conversion.</td>
+    <td width="34%">Conversion occurs, performed by the current path locale's 
+    <code>codecvt</code> facet.</td>
+  </tr>
+  <tr>
+    <td width="33%">Systems with <code>wchar_t</code> as the native API path character type 
+    (i.e. Windows-like systems).</td>
+    <td width="33%">Conversion occurs, performed by the current path locale's 
+    <code>codecvt</code> facet.</td>
+    <td width="34%">No conversion.</td>
+  </tr>
+</table>
+
+<p>When a class path function argument type matches the the operating system's 
+API argument type for paths, no conversion is performed rather than conversion 
+to a specified encoding such as one of the Unicode encodings. This avoids 
+unintended consequences, etc.</p>
+
+<h2><a name="Other-changes">Other changes</a></h2>
+
+<p><b>Uniform hybrid error handling: </b>The hybrid error handling idiom has 
+been consistently applied to all applicable functions.</p>
+
+<h2><a name="Acknowledgements">Acknowledgements</a></h2>
+
+<p>Peter Dimov suggested the idea of a single path class that could cope with 
+multiple character types and encodings. Walter Landry contributed both the design and implementation of the copy_any, 
+copy_directory, copy_symlink, and read_symlink functions.</p>
+
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->20 February, 2011<!--webbot bot="Timestamp" endspan i-checksum="40524" --></p>
+
+<p>© Copyright Beman Dawes, 2008</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. See <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a></p>
+
+</body>
+
+</html>

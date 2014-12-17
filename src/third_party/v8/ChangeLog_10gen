@@ -1,0 +1,14 @@
+10gen v8 changelog
+------------------
+
+12/19/12:
+    - SERVER-7990: Use real_climit() in StackLimitCheck::HasOverflowed (backport of chromium cr 11362007)
+
+12/18/12:
+    - SERVER-7989: Fixed issue with ContextSwitcher::PreemptionReceived always checking the default isolate
+
+10/25/12:
+    - SERVER-2407:
+        - Retrieved base version of v8: 3.12.19.11 via git
+        - Removed files unused by mongodb
+        - SCons integration

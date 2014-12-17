@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='server_status_core',
+    source=[
+        'server_status_internal.cpp',
+        'server_status_metric.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson'
+        ]
+    )

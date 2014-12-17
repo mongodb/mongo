@@ -1,0 +1,77 @@
+Import("env")
+
+env.Library(
+    target='kv_engine_core',
+    source=[
+        'kv_catalog.cpp',
+        'kv_collection_catalog_entry.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        ]
+    )
+
+# Should not be referenced outside this SConscript file.
+env.Library(
+    target='kv_database_catalog_entry_core',
+    source=['kv_database_catalog_entry.cpp'],
+    LIBDEPS=[]
+    )
+
+# Should not be referenced outside this SConscript file.
+env.Library(
+    target='kv_storage_engine',
+    source=['kv_storage_engine.cpp'],
+    LIBDEPS=[]
+    )
+
+# KVDatabaseCatalogEntry::getIndex() depends on index access methods
+# in $BUILD_DIR/mongo/serveronly.
+env.Library(
+    target='kv_engine',
+    source=[
+        'kv_database_catalog_entry_get_index.cpp',
+        ],
+    LIBDEPS=[
+        'kv_database_catalog_entry_core',
+        'kv_engine_core',
+        'kv_storage_engine',
+        ]
+    )
+
+# Stubs out KVDatabaseCatalogEntry::getIndex() for testing.
+# Should not be referenced outside this SConscript file.
+env.Library(
+    target='kv_engine_mock',
+    source=[
+        'kv_database_catalog_entry_get_index_mock.cpp'
+        ],
+    LIBDEPS=[
+        'kv_database_catalog_entry_core',
+        'kv_engine_core',
+        'kv_storage_engine',
+        ]
+    )
+
+env.Library(
+    target='kv_engine_test_harness',
+    source=[
+        'kv_engine_test_harness.cpp',
+        ],
+    LIBDEPS=['kv_engine_core']
+    )
+
+env.CppUnitTest(
+    target='kv_database_catalog_entry_test',
+    source=[
+        'kv_database_catalog_entry_test.cpp',
+        ],
+    LIBDEPS=[
+        'kv_engine_mock',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull',
+        '$BUILD_DIR/mongo/db/storage/in_memory/in_memory_record_store',
+        ]
+    )

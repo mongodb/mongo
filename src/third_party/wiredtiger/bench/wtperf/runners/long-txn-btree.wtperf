@@ -1,0 +1,9 @@
+# wtperf options file: run autocommit and long transactions in parallel.
+conn_config="cache_size=500MB"
+table_config="type=file"
+icount=5000000
+report_interval=5
+run_time=120
+populate_threads=1
+# Have a long running reader, throttled to a max of 5000 ops per second.
+threads=((count=4,reads=1,updates=1),(count=1,reads=1,ops_per_txn=100000,throttle=5000))
