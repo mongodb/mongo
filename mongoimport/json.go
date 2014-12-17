@@ -14,12 +14,12 @@ import (
 // JSONInputReader is an implementation of InputReader that reads documents
 // in JSON format.
 type JSONInputReader struct {
-	// IsArray indicates if the JSON import is an array of JSON documents
+	// isArray indicates if the JSON import is an array of JSON documents
 	// or not
-	IsArray bool
+	isArray bool
 
-	// Decoder is used to read the 	next valid JSON documents from the input source
-	Decoder *json.Decoder
+	// decoder is used to read the 	next valid JSON documents from the input source
+	decoder *json.Decoder
 
 	// numProcessed indicates the number of JSON documents processed
 	numProcessed uint64
@@ -78,9 +78,9 @@ var (
 func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
 	szCount := &sizeTrackingReader{in, 0}
 	return &JSONInputReader{
-		IsArray:            isArray,
+		isArray:            isArray,
 		sizeTracker:        szCount,
-		Decoder:            json.NewDecoder(szCount),
+		decoder:            json.NewDecoder(szCount),
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
 		numDecoders:        numDecoders,
@@ -102,7 +102,7 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 	go func() {
 		var err error
 		for {
-			if jsonInputReader.IsArray {
+			if jsonInputReader.isArray {
 				if err = jsonInputReader.readJSONArraySeparator(); err != nil {
 					if err != io.EOF {
 						jsonInputReader.numProcessed++
@@ -112,7 +112,7 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 					return
 				}
 			}
-			rawBytes, err := jsonInputReader.Decoder.ScanObject()
+			rawBytes, err := jsonInputReader.decoder.ScanObject()
 			if err != nil {
 				if err != io.EOF {
 					jsonInputReader.numProcessed++
@@ -169,8 +169,8 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 	scanp := 0
 
 	separatorReader := io.MultiReader(
-		jsonInputReader.Decoder.Buffered(),
-		jsonInputReader.Decoder.R,
+		jsonInputReader.decoder.Buffered(),
+		jsonInputReader.decoder.R,
 	)
 	for readByte != jsonInputReader.expectedByte {
 		n, err := separatorReader.Read(jsonInputReader.bytesFromReader)
@@ -218,10 +218,10 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 		}
 	}
 	// adjust the buffer to account for read bytes
-	if scanp < len(jsonInputReader.Decoder.Buf) {
-		jsonInputReader.Decoder.Buf = jsonInputReader.Decoder.Buf[scanp:]
+	if scanp < len(jsonInputReader.decoder.Buf) {
+		jsonInputReader.decoder.Buf = jsonInputReader.decoder.Buf[scanp:]
 	} else {
-		jsonInputReader.Decoder.Buf = []byte{}
+		jsonInputReader.decoder.Buf = []byte{}
 	}
 	jsonInputReader.readOpeningBracket = true
 	return nil

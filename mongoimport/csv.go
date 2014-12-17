@@ -11,8 +11,8 @@ import (
 // CSV input source
 type CSVInputReader struct {
 
-	// Fields is a list of field names in the BSON documents to be imported
-	Fields []string
+	// fields is a list of field names in the BSON documents to be imported
+	fields []string
 
 	// csvReader is the underlying reader used to read data in from the CSV or CSV file
 	csvReader *csv.Reader
@@ -45,7 +45,7 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 	csvReader.FieldsPerRecord = -1
 	csvReader.TrimLeadingSpace = true
 	return &CSVInputReader{
-		Fields:       fields,
+		fields:       fields,
 		csvReader:    csvReader,
 		numProcessed: uint64(0),
 		numDecoders:  numDecoders,
@@ -59,8 +59,8 @@ func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
 	if err != nil {
 		return err
 	}
-	csvInputReader.Fields = fields
-	return validateReaderFields(csvInputReader.Fields)
+	csvInputReader.fields = fields
+	return validateReaderFields(csvInputReader.fields)
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
@@ -83,7 +83,7 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 				return
 			}
 			csvRecordChan <- CSVConvertibleDoc{
-				fields: csvInputReader.Fields,
+				fields: csvInputReader.fields,
 				data:   csvInputReader.csvRecord,
 				index:  csvInputReader.numProcessed,
 			}

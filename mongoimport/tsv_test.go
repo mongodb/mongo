@@ -150,7 +150,7 @@ func TestTSVReadAndValidateHeader(t *testing.T) {
 			fields := []string{}
 			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(tsvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(tsvInputReader.Fields), ShouldEqual, 3)
+			So(len(tsvInputReader.fields), ShouldEqual, 3)
 		})
 	})
 }

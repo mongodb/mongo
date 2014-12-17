@@ -16,8 +16,8 @@ const (
 // TSVInputReader is a struct that implements the InputReader interface for a
 // TSV input source
 type TSVInputReader struct {
-	// Fields is a list of field names in the BSON documents to be imported
-	Fields []string
+	// fields is a list of field names in the BSON documents to be imported
+	fields []string
 
 	// tsvReader is the underlying reader used to read data in from the TSV
 	// or TSV file
@@ -48,7 +48,7 @@ type TSVConvertibleDoc struct {
 func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInputReader {
 	szCount := &sizeTrackingReader{in, 0}
 	return &TSVInputReader{
-		Fields:       fields,
+		fields:       fields,
 		tsvReader:    bufio.NewReader(in),
 		numProcessed: uint64(0),
 		numDecoders:  numDecoders,
@@ -63,9 +63,9 @@ func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
 		return err
 	}
 	for _, field := range strings.Split(header, tokenSeparator) {
-		tsvInputReader.Fields = append(tsvInputReader.Fields, strings.TrimRight(field, "\r\n"))
+		tsvInputReader.fields = append(tsvInputReader.fields, strings.TrimRight(field, "\r\n"))
 	}
-	return validateReaderFields(tsvInputReader.Fields)
+	return validateReaderFields(tsvInputReader.fields)
 }
 
 // StreamDocument takes in two channels: it sends processed documents on the
@@ -88,7 +88,7 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 				return
 			}
 			tsvRecordChan <- TSVConvertibleDoc{
-				fields: tsvInputReader.Fields,
+				fields: tsvInputReader.fields,
 				data:   tsvInputReader.tsvRecord,
 				index:  tsvInputReader.numProcessed,
 			}

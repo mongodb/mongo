@@ -161,7 +161,7 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(csvInputReader.Fields), ShouldEqual, 3)
+			So(len(csvInputReader.fields), ShouldEqual, 3)
 		})
 
 		Convey("setting non-colliding nested CSV headers should not raise an error", func() {
@@ -169,24 +169,24 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(csvInputReader.Fields), ShouldEqual, 3)
+			So(len(csvInputReader.fields), ShouldEqual, 3)
 			contents = "a.b.c, a.b.d, c"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(csvInputReader.Fields), ShouldEqual, 3)
+			So(len(csvInputReader.fields), ShouldEqual, 3)
 
 			contents = "a.b, ab, a.c"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(csvInputReader.Fields), ShouldEqual, 3)
+			So(len(csvInputReader.fields), ShouldEqual, 3)
 
 			contents = "a, ab, ac, dd"
 			fields = []string{}
 			csvInputReader = NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(csvInputReader.Fields), ShouldEqual, 4)
+			So(len(csvInputReader.fields), ShouldEqual, 4)
 		})
 
 		Convey("setting colliding nested CSV headers should raise an error", func() {
@@ -234,7 +234,7 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 			fields := []string{}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			So(csvInputReader.ReadAndValidateHeader(), ShouldEqual, io.EOF)
-			So(len(csvInputReader.Fields), ShouldEqual, 0)
+			So(len(csvInputReader.fields), ShouldEqual, 0)
 		})
 		Convey("setting the header with fields already set, should "+
 			"the header line with the existing fields", func() {
@@ -244,8 +244,8 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 			So(csvInputReader.ReadAndValidateHeader(), ShouldBeNil)
 			// if ReadAndValidateHeader() is called with fields already passed in,
 			// the header should be replaced with the read header line
-			So(len(csvInputReader.Fields), ShouldEqual, 3)
-			So(csvInputReader.Fields, ShouldResemble, strings.Split(contents, ","))
+			So(len(csvInputReader.fields), ShouldEqual, 3)
+			So(csvInputReader.fields, ShouldResemble, strings.Split(contents, ","))
 		})
 		Convey("plain CSV input file sources should be parsed correctly and "+
 			"subsequent imports should parse correctly", func() {
