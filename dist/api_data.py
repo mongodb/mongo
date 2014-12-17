@@ -511,7 +511,7 @@ common_wiredtiger_open = [
             type='boolean'),
         Config('compressor', '', r'''
             configure a compressor for log records.  Permitted values are
-            empty (off) or \c "bzip2", \c "snappy" or custom compression
+            \c "none" or \c "bzip2", \c "snappy" or custom compression
             engine \c "name" created with WT_CONNECTION::add_compressor.
             See @ref compression for more information'''),
         Config('enabled', 'false', r'''

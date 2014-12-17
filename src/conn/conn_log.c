@@ -60,7 +60,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 * case we are going to print a log.
 	 */
 	conn->log_compressor = NULL;
-	WT_RET(__wt_config_gets(session, cfg, "log.compressor", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q)
 			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
