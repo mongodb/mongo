@@ -159,11 +159,10 @@ func TestTSVConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("calling convert on a TSVConvertibleDoc should return the expected BSON document", func() {
-			numProcessed := uint64(0)
 			tsvConvertibleDoc := TSVConvertibleDoc{
-				fields:       []string{"field1", "field2", "field3"},
-				data:         "a\tb\tc",
-				numProcessed: &numProcessed,
+				fields: []string{"field1", "field2", "field3"},
+				data:   "a\tb\tc",
+				index:  uint64(0),
 			}
 			expectedDocument := bson.D{
 				bson.DocElem{"field1", "a"},

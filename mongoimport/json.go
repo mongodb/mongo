@@ -51,8 +51,8 @@ type JSONInputReader struct {
 
 // JSONConvertibleDoc implements the ConvertibleDoc interface for JSON input
 type JSONConvertibleDoc struct {
-	data         []byte
-	numProcessed uint64
+	data  []byte
+	index uint64
 }
 
 const (
@@ -122,8 +122,8 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 				return
 			}
 			rawChan <- JSONConvertibleDoc{
-				data:         rawBytes,
-				numProcessed: jsonInputReader.numProcessed,
+				data:  rawBytes,
+				index: jsonInputReader.numProcessed,
 			}
 			jsonInputReader.numProcessed++
 		}
@@ -136,13 +136,13 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
 	document, err := json.UnmarshalBsonD(jsonConvertibleDoc.data)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", jsonConvertibleDoc.numProcessed, err)
+		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", jsonConvertibleDoc.index, err)
 	}
 	log.Logf(log.DebugHigh, "got line: %v", document)
 
 	bsonD, err := bsonutil.GetExtendedBsonD(document)
 	if err != nil {
-		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", jsonConvertibleDoc.numProcessed, err)
+		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", jsonConvertibleDoc.index, err)
 	}
 	log.Logf(log.DebugHigh, "got extended line: %#v", bsonD)
 	return bsonD, nil

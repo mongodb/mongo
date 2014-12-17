@@ -192,11 +192,10 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	}
 
 	if mongoImport.InputOptions.File == "" {
-		if len(args) == 0 {
-			return fmt.Errorf("no filename specified")
+		if len(args) != 0 {
+			// if --file is not supplied, use the positional argument supplied
+			mongoImport.InputOptions.File = args[0]
 		}
-		// if --file is not supplied, use the positional argument supplied
-		mongoImport.InputOptions.File = args[0]
 	}
 
 	// ensure we have a valid string to use for the collection

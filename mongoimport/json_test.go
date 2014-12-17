@@ -257,7 +257,10 @@ func TestJSONConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a JSON input reader", t, func() {
 		Convey("calling convert on a JSONConvertibleDoc should return the expected BSON document", func() {
-			jsonConvertibleDoc := JSONConvertibleDoc([]byte(`{field1:"a",field2:"b",field3:"c"}`))
+			jsonConvertibleDoc := JSONConvertibleDoc{
+				data:  []byte(`{field1:"a",field2:"b",field3:"c"}`),
+				index: uint64(0),
+			}
 			expectedDocument := bson.D{
 				bson.DocElem{"field1", "a"},
 				bson.DocElem{"field2", "b"},

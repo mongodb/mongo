@@ -20,32 +20,32 @@ func init() {
 }
 
 var (
-	numProcessed       = uint64(0)
+	index              = uint64(0)
 	csvConvertibleDocs = []CSVConvertibleDoc{
 		CSVConvertibleDoc{
-			fields:       []string{"field1", "field2", "field3"},
-			data:         []string{"a", "b", "c"},
-			numProcessed: &numProcessed,
+			fields: []string{"field1", "field2", "field3"},
+			data:   []string{"a", "b", "c"},
+			index:  index,
 		},
 		CSVConvertibleDoc{
-			fields:       []string{"field4", "field5", "field6"},
-			data:         []string{"d", "e", "f"},
-			numProcessed: &numProcessed,
+			fields: []string{"field4", "field5", "field6"},
+			data:   []string{"d", "e", "f"},
+			index:  index,
 		},
 		CSVConvertibleDoc{
-			fields:       []string{"field7", "field8", "field9"},
-			data:         []string{"d", "e", "f"},
-			numProcessed: &numProcessed,
+			fields: []string{"field7", "field8", "field9"},
+			data:   []string{"d", "e", "f"},
+			index:  index,
 		},
 		CSVConvertibleDoc{
-			fields:       []string{"field10", "field11", "field12"},
-			data:         []string{"d", "e", "f"},
-			numProcessed: &numProcessed,
+			fields: []string{"field10", "field11", "field12"},
+			data:   []string{"d", "e", "f"},
+			index:  index,
 		},
 		CSVConvertibleDoc{
-			fields:       []string{"field13", "field14", "field15"},
-			data:         []string{"d", "e", "f"},
-			numProcessed: &numProcessed,
+			fields: []string{"field13", "field14", "field15"},
+			data:   []string{"d", "e", "f"},
+			index:  index,
 		},
 	}
 	expectedDocuments = []bson.D{
@@ -267,12 +267,11 @@ func TestRemoveBlankFields(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an unordered BSON document", t, func() {
-		Convey("the same document should be returned if there are no blanks",
-			func() {
-				bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", "hello"}}
-				newDocument := removeBlankFields(bsonDocument)
-				So(bsonDocument, ShouldResemble, newDocument)
-			})
+		Convey("the same document should be returned if there are no blanks", func() {
+			bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", "hello"}}
+			newDocument := removeBlankFields(bsonDocument)
+			So(bsonDocument, ShouldResemble, newDocument)
+		})
 		Convey("a new document without blanks should be returned if there are "+
 			" blanks", func() {
 			bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", ""}}
@@ -290,13 +289,12 @@ func TestTokensToBSON(t *testing.T) {
 		Convey("the expected ordered BSON should be produced for the fields/tokens given", func() {
 			fields := []string{"a", "b", "c"}
 			tokens := []string{"1", "2", "hello"}
-			numProcessed := uint64(0)
 			expectedDocument := bson.D{
 				bson.DocElem{"a", 1},
 				bson.DocElem{"b", 2},
 				bson.DocElem{"c", "hello"},
 			}
-			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			bsonD, err := tokensToBSON(fields, tokens, uint64(0))
 			So(err, ShouldBeNil)
 			So(bsonD, ShouldResemble, expectedDocument)
 		})
@@ -304,7 +302,6 @@ func TestTokensToBSON(t *testing.T) {
 			" with 'fields' and an index indicating the header number", func() {
 			fields := []string{"a", "b", "c"}
 			tokens := []string{"1", "2", "hello", "mongodb", "user"}
-			numProcessed := uint64(0)
 			expectedDocument := bson.D{
 				bson.DocElem{"a", 1},
 				bson.DocElem{"b", 2},
@@ -312,21 +309,19 @@ func TestTokensToBSON(t *testing.T) {
 				bson.DocElem{"field3", "mongodb"},
 				bson.DocElem{"field4", "user"},
 			}
-			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			bsonD, err := tokensToBSON(fields, tokens, uint64(0))
 			So(err, ShouldBeNil)
 			So(bsonD, ShouldResemble, expectedDocument)
 		})
 		Convey("an error should be thrown if duplicate headers are found", func() {
 			fields := []string{"a", "b", "field3"}
 			tokens := []string{"1", "2", "hello", "mongodb", "user"}
-			numProcessed := uint64(0)
-			_, err := tokensToBSON(fields, tokens, numProcessed)
+			_, err := tokensToBSON(fields, tokens, uint64(0))
 			So(err, ShouldNotBeNil)
 		})
 		Convey("fields with nested values should be set appropriately", func() {
 			fields := []string{"a", "b", "c.a"}
 			tokens := []string{"1", "2", "hello"}
-			numProcessed := uint64(0)
 			expectedDocument := bson.D{
 				bson.DocElem{"a", 1},
 				bson.DocElem{"b", 2},
@@ -334,7 +329,7 @@ func TestTokensToBSON(t *testing.T) {
 					bson.DocElem{"a", "hello"},
 				}},
 			}
-			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			bsonD, err := tokensToBSON(fields, tokens, uint64(0))
 			So(err, ShouldBeNil)
 			So(expectedDocument[0].Name, ShouldResemble, bsonD[0].Name)
 			So(expectedDocument[0].Value, ShouldResemble, bsonD[0].Value)
@@ -350,17 +345,17 @@ func TestProcessDocuments(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an import worker", t, func() {
-		numProcessed := uint64(0)
+		index := uint64(0)
 		csvConvertibleDocs := []CSVConvertibleDoc{
 			CSVConvertibleDoc{
-				fields:       []string{"field1", "field2", "field3"},
-				data:         []string{"a", "b", "c"},
-				numProcessed: &numProcessed,
+				fields: []string{"field1", "field2", "field3"},
+				data:   []string{"a", "b", "c"},
+				index:  index,
 			},
 			CSVConvertibleDoc{
-				fields:       []string{"field4", "field5", "field6"},
-				data:         []string{"d", "e", "f"},
-				numProcessed: &numProcessed,
+				fields: []string{"field4", "field5", "field6"},
+				data:   []string{"d", "e", "f"},
+				index:  index,
 			},
 		}
 		expectedDocuments := []bson.D{
@@ -491,11 +486,10 @@ func TestStreamDocuments(t *testing.T) {
 		})
 		Convey("the entire pipeline should complete with error if an error is encountered", func() {
 			// stream in some documents - create duplicate headers to simulate an error
-			numProcessed := uint64(0)
 			csvConvertibleDoc := CSVConvertibleDoc{
-				fields:       []string{"field1", "field2"},
-				data:         []string{"a", "b", "c"},
-				numProcessed: &numProcessed,
+				fields: []string{"field1", "field2"},
+				data:   []string{"a", "b", "c"},
+				index:  uint64(0),
 			}
 			inputChannel <- csvConvertibleDoc
 			close(inputChannel)

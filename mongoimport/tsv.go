@@ -38,9 +38,9 @@ type TSVInputReader struct {
 
 // TSVConvertibleDoc implements the ConvertibleDoc interface for TSV input
 type TSVConvertibleDoc struct {
-	fields       []string
-	data         string
-	numProcessed uint64
+	fields []string
+	data   string
+	index  uint64
 }
 
 // NewTSVInputReader returns a TSVInputReader configured to read input from the
@@ -88,9 +88,9 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 				return
 			}
 			tsvRecordChan <- TSVConvertibleDoc{
-				fields:       tsvInputReader.Fields,
-				data:         tsvInputReader.tsvRecord,
-				numProcessed: tsvInputReader.numProcessed,
+				fields: tsvInputReader.Fields,
+				data:   tsvInputReader.tsvRecord,
+				index:  tsvInputReader.numProcessed,
 			}
 			tsvInputReader.numProcessed++
 		}
@@ -108,6 +108,6 @@ func (tsvConvertibleDoc TSVConvertibleDoc) Convert() (bson.D, error) {
 	return tokensToBSON(
 		tsvConvertibleDoc.fields,
 		tsvTokens,
-		tsvConvertibleDoc.numProcessed,
+		tsvConvertibleDoc.index,
 	)
 }

@@ -278,11 +278,10 @@ func TestCSVConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("calling convert on a CSVConvertibleDoc should return the expected BSON document", func() {
-			numProcessed := uint64(0)
 			csvConvertibleDoc := CSVConvertibleDoc{
-				fields:       []string{"field1", "field2", "field3"},
-				data:         []string{"a", "b", "c"},
-				numProcessed: &numProcessed,
+				fields: []string{"field1", "field2", "field3"},
+				data:   []string{"a", "b", "c"},
+				index:  uint64(0),
 			}
 			expectedDocument := bson.D{
 				bson.DocElem{"field1", "a"},

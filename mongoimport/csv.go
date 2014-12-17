@@ -33,7 +33,7 @@ type CSVInputReader struct {
 // CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
 type CSVConvertibleDoc struct {
 	fields, data []string
-	numProcessed uint64
+	index        uint64
 }
 
 // NewCSVInputReader returns a CSVInputReader configured to read input from the
@@ -75,17 +75,17 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 		for {
 			csvInputReader.csvRecord, err = csvInputReader.csvReader.Read()
 			if err != nil {
-				close(csvRecordChan)
 				if err != io.EOF {
 					csvInputReader.numProcessed++
 					errChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
 				}
+				close(csvRecordChan)
 				return
 			}
 			csvRecordChan <- CSVConvertibleDoc{
-				fields:       csvInputReader.Fields,
-				data:         csvInputReader.csvRecord,
-				numProcessed: csvInputReader.numProcessed,
+				fields: csvInputReader.Fields,
+				data:   csvInputReader.csvRecord,
+				index:  csvInputReader.numProcessed,
 			}
 			csvInputReader.numProcessed++
 		}
@@ -99,6 +99,6 @@ func (csvConvertibleDoc CSVConvertibleDoc) Convert() (bson.D, error) {
 	return tokensToBSON(
 		csvConvertibleDoc.fields,
 		csvConvertibleDoc.data,
-		csvConvertibleDoc.numProcessed,
+		csvConvertibleDoc.index,
 	)
 }
