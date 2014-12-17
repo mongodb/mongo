@@ -95,7 +95,7 @@
         desc:"using --type=json with invalid json should fail"},
 
       {args:["--db", "test", "-c", "test", "--file", toolTest.extFile, "--type=csv", "--fields=a,b,c"],
-        desc:"using --type=csv with invalid csv should fail"},*/
+        desc:"using --type=csv with invalid csv should fail"},
 
       {args:["--db", "test", "-c", "test", "--file", toolTest.extFile, "--type=json", "--headerline"],
         desc:"using --type=json with headerline should fail"},
