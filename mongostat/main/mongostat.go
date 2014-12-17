@@ -70,7 +70,7 @@ func main() {
 		formatter = &mongostat.JSONLineFormatter{}
 	}
 
-	seedHosts, setName := util.ParseConnectionString(opts.Host)
+	seedHosts := util.CreateConnectionAddrs(opts.Host, opts.Port)
 	var cluster mongostat.ClusterMonitor
 	if statOpts.Discover || len(seedHosts) > 1 {
 		cluster = &mongostat.AsyncClusterMonitor{
@@ -91,6 +91,7 @@ func main() {
 	}
 
 	opts.Direct = true
+	_, setName := util.ParseConnectionString(opts.Host)
 	opts.ReplicaSetName = setName
 	stat := &mongostat.MongoStat{
 		Options:       opts,
