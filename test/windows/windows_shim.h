@@ -43,7 +43,14 @@ typedef int u_int;
 #define	X_OK R_OK
 
 /* snprintf does not exist on <= VS 2013 */
-#define	snprintf _snprintf
+#if _MSC_VER < 1900
+#define	snprintf _wt_snprintf
+
+_Check_return_opt_ int __cdecl _wt_snprintf(
+    _Out_writes_(_MaxCount) char * _DstBuf,
+    _In_ size_t _MaxCount,
+    _In_z_ _Printf_format_string_ const char * _Format, ...);
+#endif
 
 /*
  * Emulate <sys/stat.h>

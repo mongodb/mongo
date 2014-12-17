@@ -30,9 +30,14 @@ typedef uint32_t	u_int;
 typedef unsigned char	u_char;
 typedef unsigned long	u_long;
 
-/* < VS 2013 is not C99 compat */
+/* <= VS 2013 is not C99 compat */
 #if _MSC_VER < 1900
-#define	snprintf _snprintf
+#define	snprintf _wt_snprintf
+
+_Check_return_opt_ int __cdecl _wt_snprintf(
+    _Out_writes_(_MaxCount) char * _DstBuf,
+    _In_ size_t _MaxCount,
+    _In_z_ _Printf_format_string_ const char * _Format, ...);
 #endif
 
 /*
