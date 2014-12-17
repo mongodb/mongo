@@ -243,6 +243,14 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *intents.Intent) error {
 	log.Logf(log.Always, "restoring %v from %v", collectionType, intent.BSONPath)
 
+	if intent.Size == 0 {
+		// MongoDB complains if we try and remove a non-existent collection, so we should
+		// just skip auth collections with empty .bson files to avoid gnarly logic later on.
+		log.Logf(log.Always, "%v file '%v' is empty; skipping %v restoration",
+			collectionType, intent.BSONPath, collectionType)
+		return nil
+	}
+
 	var tempCol, tempColCommandField string
 	switch collectionType {
 	case Users:
