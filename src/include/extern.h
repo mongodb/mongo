@@ -182,6 +182,7 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session, const char **cfg, const ch
 extern int __wt_config_gets_none(WT_SESSION_IMPL *session, const char **cfg, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_getone(WT_SESSION_IMPL *session, const char *config, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_getones(WT_SESSION_IMPL *session, const char *config, const char *key, WT_CONFIG_ITEM *value);
+extern int __wt_config_getones_none(WT_SESSION_IMPL *session, const char *config, const char *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_gets_def(WT_SESSION_IMPL *session, const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value);
 extern int __wt_config_subgetraw(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value);
 extern int __wt_config_subgets(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cfg, const char *key, WT_CONFIG_ITEM *value);

@@ -533,8 +533,8 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 	conn = S2C(session);
 
 	if ((ret =
-	    __wt_config_getones(session, config, "extractor", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	    __wt_config_getones_none(session, config, "extractor", &cval)) != 0)
+		return (ret == WT_NOTFOUND || cval.len == 0 ? 0 : ret);
 
 	if (cval.len > 0) {
 		TAILQ_FOREACH(nextractor, &conn->extractorqh, q)

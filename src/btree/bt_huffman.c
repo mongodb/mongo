@@ -144,8 +144,9 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_gets(session, cfg, "huffman_key", &key_conf));
-	WT_RET(__wt_config_gets(session, cfg, "huffman_value", &value_conf));
+	WT_RET(__wt_config_gets_none(session, cfg, "huffman_key", &key_conf));
+	WT_RET(
+	    __wt_config_gets_none(session, cfg, "huffman_value", &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
 
@@ -153,6 +154,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	case BTREE_COL_FIX:
 		WT_RET_MSG(session, EINVAL,
 		    "fixed-size column-store files may not be Huffman encoded");
+		/* NOTREACHED */
 	case BTREE_COL_VAR:
 		if (key_conf.len != 0)
 			WT_RET_MSG(session, EINVAL,
@@ -163,18 +165,20 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 		break;
 	}
 
-	if (strncasecmp(key_conf.str, "english", key_conf.len) == 0) {
+	if (key_conf.len == 0) {
+		;
+	} else if (strncasecmp(key_conf.str, "english", key_conf.len) == 0) {
 		struct __wt_huffman_table
 		    copy[WT_ELEMENTS(__wt_huffman_nytenglish)];
 
 		memcpy(copy,
 		    __wt_huffman_nytenglish, sizeof(__wt_huffman_nytenglish));
-		WT_RET(__wt_huffman_open(session, copy,
-		    WT_ELEMENTS(__wt_huffman_nytenglish),
+		WT_RET(__wt_huffman_open(
+		    session, copy, WT_ELEMENTS(__wt_huffman_nytenglish),
 		    1, &btree->huffman_key));
 
 		/* Check for a shared key/value table. */
-		if (strncasecmp(
+		if (value_conf.len != 0 && strncasecmp(
 		    value_conf.str, "english", value_conf.len) == 0) {
 			btree->huffman_value = btree->huffman_key;
 			return (0);
@@ -182,8 +186,8 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	} else {
 		WT_RET(__wt_huffman_read(
 		    session, &key_conf, &table, &entries, &numbytes));
-		ret = __wt_huffman_open(session, table,
-		    entries, numbytes, &btree->huffman_key);
+		ret = __wt_huffman_open(
+		    session, table, entries, numbytes, &btree->huffman_key);
 		__wt_free(session, table);
 		if (ret != 0)
 			return (ret);
@@ -195,20 +199,24 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 			return (0);
 		}
 	}
-	if (strncasecmp(value_conf.str, "english", value_conf.len) == 0) {
+
+	if (value_conf.len == 0) {
+		;
+	} else if (
+	    strncasecmp(value_conf.str, "english", value_conf.len) == 0) {
 		struct __wt_huffman_table
 		    copy[WT_ELEMENTS(__wt_huffman_nytenglish)];
 
 		memcpy(copy,
 		    __wt_huffman_nytenglish, sizeof(__wt_huffman_nytenglish));
-		WT_RET(__wt_huffman_open(session, copy,
-		    WT_ELEMENTS(__wt_huffman_nytenglish),
+		WT_RET(__wt_huffman_open(
+		    session, copy, WT_ELEMENTS(__wt_huffman_nytenglish),
 		    1, &btree->huffman_value));
 	} else {
 		WT_RET(__wt_huffman_read(
 		    session, &value_conf, &table, &entries, &numbytes));
-		ret = __wt_huffman_open(session, table,
-		    entries, numbytes, &btree->huffman_value);
+		ret = __wt_huffman_open(
+		    session, table, entries, numbytes, &btree->huffman_value);
 		__wt_free(session, table);
 		if (ret != 0)
 			return (ret);

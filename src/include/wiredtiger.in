@@ -982,17 +982,17 @@ struct __wt_session {
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Permitted
 	 * values are \c "none" or an extractor name created with
-	 * WT_CONNECTION::add_extractor., a string; default empty.}
+	 * WT_CONNECTION::add_extractor., a string; default \c none.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default empty.}
+	 * default \c none.}
 	 * @config{huffman_value, configure Huffman encoding for values.
 	 * Permitted values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default empty.}
+	 * default \c none.}
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
 	 * boolean flag; default \c false.}
@@ -1555,8 +1555,9 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is
-	 * shared between databases., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that
+	 * is shared between databases or \c "none" when no shared cache is
+	 * configured., a string; default \c none.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this
 	 * database is guaranteed to have available from the shared cache.  This
 	 * setting is per database.  Defaults to the chunk size., an integer;
@@ -1936,11 +1937,13 @@ struct __wt_connection {
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared between
- * databases., a string; default empty.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
- * guaranteed to have available from the shared cache.  This setting is per
- * database.  Defaults to the chunk size., an integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that is shared
+ * between databases or \c "none" when no shared cache is configured., a string;
+ * default \c none.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache
+ * this database is guaranteed to have available from the shared cache.  This
+ * setting is per database.  Defaults to the chunk size., an integer; default \c
+ * 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the
  * shared cache.  Setting this will update the value if one is already set., an
  * integer between 1MB and 10TB; default \c 500MB.}

@@ -343,7 +343,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->value_format));
 
-	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->collator_name));
 

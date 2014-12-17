@@ -700,6 +700,21 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_config_getones_none --
+ *	Get the value for a given string key from a single config string.
+ * Treat "none" as empty.
+ */
+int
+__wt_config_getones_none(WT_SESSION_IMPL *session,
+    const char *config, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_RET(__wt_config_getones(session, config, key, value));
+	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+		value->len = 0;
+	return (0);
+}
+
+/*
  * __wt_config_gets_def --
  *	Performance hack: skip parsing config strings by hard-coding defaults.
  *
