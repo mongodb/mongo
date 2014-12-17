@@ -489,12 +489,17 @@ namespace {
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
-            if (lockedForWriting()) {
+            // performance profiling is on
+            if (txn->lockState()->isReadLocked()) {
+                MONGO_LOG_COMPONENT(1, logComponentForOp(op))
+                        << "note: not profiling because recursive read lock" << endl;
+            }
+            else if ( lockedForWriting() ) {
                 MONGO_LOG_COMPONENT(1, logComponentForOp(op))
                         << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                profile(txn, op);
+                profile(txn, c, op, currentOp);
             }
         }
 

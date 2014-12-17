@@ -249,28 +249,25 @@ namespace mongo {
         }
     }
 
-    Status Database::setProfilingLevel(OperationContext* txn, int newLevel) {
-        if (_profile == newLevel) {
-            return Status::OK();
+    bool Database::setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg ) {
+        if ( _profile == newLevel )
+            return true;
+
+        if ( newLevel < 0 || newLevel > 2 ) {
+            errmsg = "profiling level has to be >=0 and <= 2";
+            return false;
         }
 
-        if (newLevel == 0) {
+        if ( newLevel == 0 ) {
             _profile = 0;
-            return Status::OK();
+            return true;
         }
 
-        if (newLevel < 0 || newLevel > 2) {
-            return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
-        }
-
-        Status status = createProfileCollection(txn, this);
-        if (!status.isOK()) {
-            return status;
-        }
+        if (!getOrCreateProfileCollection(txn, this, true, &errmsg))
+            return false;
 
         _profile = newLevel;
-
-        return Status::OK();
+        return true;
     }
 
     void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {

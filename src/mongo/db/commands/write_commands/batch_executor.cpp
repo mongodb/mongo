@@ -638,8 +638,8 @@ namespace mongo {
             LOG(0) << currentOp->debug().report( *currentOp ) << endl;
         }
 
-        if (currentOp->shouldDBProfile(executionTime)) {
-            profile(txn, txn->getCurOp()->getOp());
+        if ( currentOp->shouldDBProfile( executionTime ) ) {
+            profile( txn, *txn->getClient(), currentOp->getOp(), *currentOp );
         }
     }
 

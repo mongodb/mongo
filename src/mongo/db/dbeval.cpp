@@ -32,16 +32,16 @@
 
 #include "mongo/platform/basic.h"
 
+#include <time.h>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
 
@@ -153,7 +153,6 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-
             // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
             Client::Context ctx(txn,  dbname );
 
