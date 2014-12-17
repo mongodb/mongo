@@ -53,7 +53,7 @@ assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
 
 // Insert some large documents to force the oplog to roll over
 var largeString = new Array(1024*10).toString();
-for (var i = 0; i < 1000; i++) {
+for (var i = 0; i < 2000; i++) {
     master.getDB('test').foo.insert({ largeString: largeString }, options);
 }
 assert(optimesAreEqual(replTest));
