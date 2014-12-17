@@ -125,6 +125,7 @@ src/os_win/os_rw.c
 src/os_win/os_sleep.c
 src/os_win/os_thread.c
 src/os_win/os_time.c
+src/os_win/os_snprintf.c
 src/os_win/os_vsnprintf.c
 src/os_win/os_yield.c
 src/packing/pack_api.c
