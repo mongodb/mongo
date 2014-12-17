@@ -22,7 +22,7 @@ type JSONInputReader struct {
 	Decoder *json.Decoder
 
 	// numProcessed indicates the number of JSON documents processed
-	numProcessed int64
+	numProcessed uint64
 
 	// readOpeningBracket indicates if the underlying io.Reader has consumed
 	// an opening bracket from the input source. Used to prevent errors when
@@ -50,7 +50,10 @@ type JSONInputReader struct {
 }
 
 // JSONConvertibleDoc implements the ConvertibleDoc interface for JSON input
-type JSONConvertibleDoc []byte
+type JSONConvertibleDoc struct {
+	data         []byte
+	numProcessed uint64
+}
 
 const (
 	JSON_ARRAY_START = '['
@@ -73,7 +76,6 @@ var (
 // NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader
 func NewJSONInputReader(isArray bool, in io.Reader, numDecoders int) *JSONInputReader {
-
 	szCount := &sizeTrackingReader{in, 0}
 	return &JSONInputReader{
 		IsArray:            isArray,
@@ -102,24 +104,27 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 		for {
 			if jsonInputReader.IsArray {
 				if err = jsonInputReader.readJSONArraySeparator(); err != nil {
-					close(rawChan)
 					if err != io.EOF {
 						jsonInputReader.numProcessed++
 						errChan <- fmt.Errorf("error reading separator after document #%v: %v", jsonInputReader.numProcessed, err)
 					}
+					close(rawChan)
 					return
 				}
 			}
 			rawBytes, err := jsonInputReader.Decoder.ScanObject()
 			if err != nil {
-				close(rawChan)
 				if err != io.EOF {
 					jsonInputReader.numProcessed++
 					errChan <- fmt.Errorf("error processing document #%v: %v", jsonInputReader.numProcessed, err)
 				}
+				close(rawChan)
 				return
 			}
-			rawChan <- JSONConvertibleDoc(rawBytes)
+			rawChan <- JSONConvertibleDoc{
+				data:         rawBytes,
+				numProcessed: jsonInputReader.numProcessed,
+			}
 			jsonInputReader.numProcessed++
 		}
 	}()
@@ -129,15 +134,15 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 // This is required to satisfy the ConvertibleDoc interface for JSON input. It
 // does JSON-specific processing to convert the JSONConvertibleDoc to a bson.D
 func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
-	document, err := json.UnmarshalBsonD(jsonConvertibleDoc)
+	document, err := json.UnmarshalBsonD(jsonConvertibleDoc.data)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", 1, err)
+		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", jsonConvertibleDoc.numProcessed, err)
 	}
 	log.Logf(log.DebugHigh, "got line: %v", document)
-	// TODO: perhaps move this to decode.go
+
 	bsonD, err := bsonutil.GetExtendedBsonD(document)
 	if err != nil {
-		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", 1, err)
+		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", jsonConvertibleDoc.numProcessed, err)
 	}
 	log.Logf(log.DebugHigh, "got extended line: %#v", bsonD)
 	return bsonD, nil

@@ -27,13 +27,13 @@ type CSVInputReader struct {
 	numDecoders int
 
 	// embedded sizeTracker exposes the Size() method to check the number of bytes read so far
-	sizeTracker 
+	sizeTracker
 }
 
 // CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
 type CSVConvertibleDoc struct {
 	fields, data []string
-	numProcessed *uint64
+	numProcessed uint64
 }
 
 // NewCSVInputReader returns a CSVInputReader configured to read input from the
@@ -85,7 +85,7 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 			csvRecordChan <- CSVConvertibleDoc{
 				fields:       csvInputReader.Fields,
 				data:         csvInputReader.csvRecord,
-				numProcessed: &csvInputReader.numProcessed,
+				numProcessed: csvInputReader.numProcessed,
 			}
 			csvInputReader.numProcessed++
 		}
@@ -99,6 +99,6 @@ func (csvConvertibleDoc CSVConvertibleDoc) Convert() (bson.D, error) {
 	return tokensToBSON(
 		csvConvertibleDoc.fields,
 		csvConvertibleDoc.data,
-		*csvConvertibleDoc.numProcessed,
+		csvConvertibleDoc.numProcessed,
 	)
 }

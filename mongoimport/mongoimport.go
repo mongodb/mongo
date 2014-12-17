@@ -334,9 +334,8 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 
 	readDocChan := make(chan bson.D, workerBufferSize)
 
-	// any read errors should cause mongoimport to stop ingestion and immediately
-	// terminate; thus, we leave this channel unbuffered
-	readErrChan := make(chan error)
+	// any read errors should cause mongoimport to stop ingestion immediately
+	readErrChan := make(chan error, 1)
 
 	// whether or not documents should be streamed in read order
 	ordered := mongoImport.IngestOptions.MaintainInsertionOrder

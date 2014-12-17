@@ -40,7 +40,7 @@ type TSVInputReader struct {
 type TSVConvertibleDoc struct {
 	fields       []string
 	data         string
-	numProcessed *uint64
+	numProcessed uint64
 }
 
 // NewTSVInputReader returns a TSVInputReader configured to read input from the
@@ -80,17 +80,17 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 		for {
 			tsvInputReader.tsvRecord, err = tsvInputReader.tsvReader.ReadString(entryDelimiter)
 			if err != nil {
-				close(tsvRecordChan)
 				if err != io.EOF {
 					tsvInputReader.numProcessed++
 					errChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
 				}
+				close(tsvRecordChan)
 				return
 			}
 			tsvRecordChan <- TSVConvertibleDoc{
 				fields:       tsvInputReader.Fields,
 				data:         tsvInputReader.tsvRecord,
-				numProcessed: &tsvInputReader.numProcessed,
+				numProcessed: tsvInputReader.numProcessed,
 			}
 			tsvInputReader.numProcessed++
 		}
@@ -108,6 +108,6 @@ func (tsvConvertibleDoc TSVConvertibleDoc) Convert() (bson.D, error) {
 	return tokensToBSON(
 		tsvConvertibleDoc.fields,
 		tsvTokens,
-		*tsvConvertibleDoc.numProcessed,
+		tsvConvertibleDoc.numProcessed,
 	)
 }
