@@ -283,7 +283,6 @@ examples = [
     "ex_cursor",
     "ex_data_source",
     "ex_extending",
-    "ex_file",
     "ex_hello",
     "ex_log",
     "ex_pack",
