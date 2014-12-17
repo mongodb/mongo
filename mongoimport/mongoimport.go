@@ -82,15 +82,13 @@ type InputReader interface {
 // ValidateSettings ensures that the tool specific options supplied for
 // MongoImport are valid
 func (mongoImport *MongoImport) ValidateSettings(args []string) error {
-	// Namespace must have a valid database if none is specified,
-	// use 'test'
-	if mongoImport.ToolOptions.Namespace.DB == "" {
-		mongoImport.ToolOptions.Namespace.DB = "test"
-	} else {
-		err := util.ValidateDBName(mongoImport.ToolOptions.Namespace.DB)
-		if err != nil {
-			return err
-		}
+	// namespace must have a valid database; if none is specified, use 'test'
+	if mongoImport.ToolOptions.DB == "" {
+		mongoImport.ToolOptions.DB = "test"
+	}
+	err := util.ValidateDBName(mongoImport.ToolOptions.DB)
+	if err != nil {
+		return fmt.Errorf("invalid database name: %v", err)
 	}
 
 	// use JSON as default input type
@@ -100,8 +98,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		if !(mongoImport.InputOptions.Type == TSV ||
 			mongoImport.InputOptions.Type == JSON ||
 			mongoImport.InputOptions.Type == CSV) {
-			return fmt.Errorf("don't know what type [\"%v\"] is",
-				mongoImport.InputOptions.Type)
+			return fmt.Errorf("don't know what type [\"%v\"] is", mongoImport.InputOptions.Type)
 		}
 	}
 
@@ -164,14 +161,14 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	if mongoImport.ToolOptions.NumDecodingWorkers <= 0 {
 		mongoImport.ToolOptions.NumDecodingWorkers = mongoImport.ToolOptions.MaxProcs
 	}
-	log.Logf(log.DebugLow, "Using %v decoding workers", mongoImport.ToolOptions.NumDecodingWorkers)
+	log.Logf(log.DebugLow, "using %v decoding workers", mongoImport.ToolOptions.NumDecodingWorkers)
 
 	// set the number of insertion workers to use for imports
 	if mongoImport.ToolOptions.NumInsertionWorkers <= 0 {
 		mongoImport.ToolOptions.NumInsertionWorkers = 1
 	}
 
-	log.Logf(log.DebugLow, "Using %v insert workers", mongoImport.ToolOptions.NumInsertionWorkers)
+	log.Logf(log.DebugLow, "using %v insert workers", mongoImport.ToolOptions.NumInsertionWorkers)
 
 	// if --maintainInsertionOrder is set, we can only allow 1 insertion worker
 	if mongoImport.IngestOptions.MaintainInsertionOrder {
@@ -194,33 +191,29 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		return fmt.Errorf("incompatible options: --file and positional argument(s)")
 	}
 
-	var fileBaseName string
+	if mongoImport.InputOptions.File == "" && len(args) == 0 {
+		return fmt.Errorf("must specify either --file or a positional argument")
+	}
 
-	if mongoImport.InputOptions.File != "" {
-		fileBaseName = mongoImport.InputOptions.File
-	} else {
-		if len(args) != 0 {
-			fileBaseName = args[0]
-			mongoImport.InputOptions.File = fileBaseName
-		}
+	// if --file is not supplied, use the positional argument supplied
+	if mongoImport.InputOptions.File == "" {
+		mongoImport.InputOptions.File = args[0]
 	}
 
 	// ensure we have a valid string to use for the collection
-	if mongoImport.ToolOptions.Namespace.Collection == "" {
-		if fileBaseName == "" {
-			return fmt.Errorf("no collection specified")
-		}
-		fileBaseName = filepath.Base(fileBaseName)
-		if lastDotIndex := strings.LastIndex(fileBaseName, "."); lastDotIndex != -1 {
+	if mongoImport.ToolOptions.Collection == "" {
+		log.Logf(log.Always, "no collection specified")
+		fileBaseName := filepath.Base(mongoImport.InputOptions.File)
+		lastDotIndex := strings.LastIndex(fileBaseName, ".")
+		if lastDotIndex != -1 {
 			fileBaseName = fileBaseName[0:lastDotIndex]
 		}
-		if err := util.ValidateCollectionName(fileBaseName); err != nil {
-			return err
-		}
-		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
-		log.Logf(log.Always, "no collection specified")
-		log.Logf(log.Always, "using filename '%v' as collection",
-			mongoImport.ToolOptions.Namespace.Collection)
+		log.Logf(log.Always, "using filename '%v' as collection", fileBaseName)
+		mongoImport.ToolOptions.Collection = fileBaseName
+	}
+	err = util.ValidateCollectionName(mongoImport.ToolOptions.Collection)
+	if err != nil {
+		return fmt.Errorf("invalid collection name: %v", err)
 	}
 	return nil
 }
