@@ -1456,6 +1456,12 @@ namespace mongo {
         _done = true;
     }
 
+    void ParallelSortClusteredCursor::setBatchSize(int newBatchSize) {
+        for ( int i=0; i<_numServers; i++ ) {
+            _cursors[i].setBatchSize(newBatchSize);
+        }
+    }
+
     bool ParallelSortClusteredCursor::more() {
 
         if ( _needToSkip > 0 ) {

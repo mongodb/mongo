@@ -192,6 +192,11 @@ namespace mongo {
         bool isExplain(){ return _qSpec.isExplain(); }
         bool isVersioned(){ return _qShards.size() == 0; }
 
+        /**
+         * Sets the batch size on all underlying cursors to 'newBatchSize'.
+         */
+        void setBatchSize(int newBatchSize);
+
         bool isSharded();
         ShardPtr getPrimary();
         void getQueryShards( set<Shard>& shards );
@@ -272,6 +277,8 @@ namespace mongo {
         BSONObj next();
 
         BSONObj peek();
+
+        void setBatchSize(int newBatchSize) { _cursor->setBatchSize(newBatchSize); }
 
         DBClientCursor* raw() { return _cursor.get(); }
         ParallelConnectionMetadata* rawMData(){ return _pcmData; }
