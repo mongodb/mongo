@@ -982,17 +982,17 @@ struct __wt_session {
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Permitted
 	 * values are \c "none" or an extractor name created with
-	 * WT_CONNECTION::add_extractor., a string; default \c none.}
+	 * WT_CONNECTION::add_extractor., a string; default empty.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default \c none.}
+	 * default empty.}
 	 * @config{huffman_value, configure Huffman encoding for values.
 	 * Permitted values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default \c none.}
+	 * default empty.}
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
 	 * boolean flag; default \c false.}

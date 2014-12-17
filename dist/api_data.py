@@ -154,11 +154,11 @@ file_config = format_meta + [
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
-    Config('huffman_key', 'none', r'''
+    Config('huffman_key', '', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
-    Config('huffman_value', 'none', r'''
+    Config('huffman_value', '', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
@@ -273,7 +273,7 @@ table_only_config = [
 ]
 
 index_only_config = [
-    Config('extractor', 'none', r'''
+    Config('extractor', '', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
         WT_CONNECTION::add_extractor'''),
@@ -371,7 +371,7 @@ connection_runtime_config = [
                 vary depending on the current eviction load''',
                 min=1, max=20),
             ]),
-    Config('shared_cache', 'none', r'''
+    Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both''',
         type='category', subconfig=[
