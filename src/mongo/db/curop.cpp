@@ -89,6 +89,7 @@ namespace mongo {
         _reset();
         _start = 0;
         _opNum = _nextOpNum.fetchAndAdd(1);
+        _ns = "";
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
