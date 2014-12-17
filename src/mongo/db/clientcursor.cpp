@@ -248,7 +248,18 @@ namespace mongo {
 
     void ClientCursorPin::deleteUnderlying() {
         invariant( _cursor->isPinned() );
-        _cursor->unsetPinned(); // ClientCursor objects must be unpinned before destruction.
+        // Note the following subtleties of this method's implementation:
+        // - We must unpin the cursor before destruction, since it is an error to destroy a pinned
+        //   cursor.
+        // - In addition, we must deregister the cursor before unpinning, since it is an
+        //   error to unpin a registered cursor without holding the cursor cache lock (note that we
+        //   can't simply unpin with the cursor cache lock here, since we need to guarantee
+        //   exclusive ownership of the cursor when we are deleting it).
+        if ( _cursor->collection() ) {
+            _cursor->collection()->cursorCache()->deregisterCursor( _cursor );
+            _cursor->kill();
+        }
+        _cursor->unsetPinned();
         delete _cursor;
         _cursor = NULL;
     }
