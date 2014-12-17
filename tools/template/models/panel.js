@@ -29,23 +29,13 @@ var Panel = module.exports = AmpersandState.extend({
       deps: ['stats'],
       cache: false,
       fn: function () {
-        var selected = stats.filter(function (stat) {
+        var selected = this.stats.filter(function (stat) {
           return stat.selected;
         });
-        if (selected.length === stats.length) return 'all';
+        if (selected.length === this.stats.length) return 'all';
         if (selected.length === 0) return 'none';
         return 'some';
       }
     }
-  },
-  selectAll: function () {
-    stats.each(function (stat) {
-      stat.selected = true;
-    });
-  },
-  deselectAll: function () {
-    stats.each(function (stat) {
-      stat.selected = false;
-    });
   }
 });

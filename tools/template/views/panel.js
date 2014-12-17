@@ -2,18 +2,37 @@ var AmpersandView = require('ampersand-view'),
     AmpersandSubCollection = require('ampersand-subcollection'),
     StatView = require('./stat'),
     $ = require('jquery'),
+    _ = require('lodash'),
     debug = require('debug')('view:panel');
 
 var PanelView = module.exports = AmpersandView.extend({
   props: {
+    indicator: {
+      type: 'string',
+      default: 'none',
+      values: ['none', 'some', 'all']
+    },
     statViews: 'object',
     filteredStats: 'object'
   },
   template: require('./templates/panel.jade'),
   events: {
-    'click a': 'collapsibleToggle'
+    'click a': 'collapsibleToggle',
+    'click [data-hook=indicator]': 'indicatorClicked'
   },
   bindings: {
+    'indicator': {
+      type: function (el, val, prev) {
+        $el = $(el);
+        $el.removeClass();
+        switch (this.model.selected) {
+          case 'all' : $el.addClass('fa fa-circle'); break;
+          case 'some': $el.addClass('fa fa-adjust'); break;
+          case 'none': $el.addClass('fa fa-circle-o'); break;
+        }
+      },
+      hook: 'indicator'
+    },
     'model.open': {
       type: 'booleanClass',
       hook: 'caret',
@@ -29,6 +48,18 @@ var PanelView = module.exports = AmpersandView.extend({
   render: function () {
     this.renderWithTemplate(this.model);
     this.statViews = this.renderCollection(this.filteredStats, StatView, this.queryByHook('stats'));
+  },
+  indicatorClicked: function (event) {
+    this.collapsibleOpen();
+    var all = this.model.selected !== 'all';
+    this.filteredStats.each(function (stat) {
+      stat.selected = all;
+    });
+    this.statChanged();
+  },
+  statChanged: function (stat) {
+    // mirroring model.selected here to use for bindings
+    this.indicator = this.model.selected;
   },
   collapsibleToggle: function (event) {
     $(this.query('.collapse')).collapse('toggle');

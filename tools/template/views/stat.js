@@ -19,5 +19,6 @@ var StatView = module.exports = AmpersandView.extend({
   },
   clicked: function () {
     this.model.toggle('selected');
+    this.parent.parent.statChanged(this);
   }
 });
