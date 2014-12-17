@@ -60,7 +60,7 @@ assert.eq(duration, 9, "sleep time affects the total time to produce a number or
 clearRawMongoProgramOutput();
 pid = startMongoProgramNoConnect("mongostat", "--host", rs.liveNodes.slaves[1].host, "--discover");
 
-sleep(10000);
+sleep(20000);
 
 assert(statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "specified host is seen");
 
