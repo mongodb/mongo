@@ -34,13 +34,14 @@ func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
-		Addrs:     connectionAddrs,
-		Timeout:   DefaultDialTimeout,
-		Direct:    opts.Direct,
-		Username:  opts.Auth.Username,
-		Password:  opts.Auth.Password,
-		Source:    opts.GetAuthenticationDatabase(),
-		Mechanism: opts.Auth.Mechanism,
+		Addrs:          connectionAddrs,
+		Timeout:        DefaultDialTimeout,
+		Direct:         opts.Direct,
+		ReplicaSetName: opts.ReplicaSetName,
+		Username:       opts.Auth.Username,
+		Password:       opts.Auth.Password,
+		Source:         opts.GetAuthenticationDatabase(),
+		Mechanism:      opts.Auth.Mechanism,
 	}
 
 	return nil

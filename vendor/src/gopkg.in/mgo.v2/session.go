@@ -122,7 +122,7 @@ type Iter struct {
 
 var (
 	ErrNotFound = errors.New("not found")
-	ErrCursor = errors.New("invalid cursor")
+	ErrCursor   = errors.New("invalid cursor")
 )
 
 const defaultPrefetch = 0.25
@@ -226,6 +226,7 @@ func DialWithTimeout(url string, timeout time.Duration) (*Session, error) {
 	mechanism := ""
 	service := ""
 	source := ""
+	setName := ""
 	poolLimit := 0
 	for k, v := range uinfo.options {
 		switch k {
@@ -235,6 +236,8 @@ func DialWithTimeout(url string, timeout time.Duration) (*Session, error) {
 			mechanism = v
 		case "gssapiServiceName":
 			service = v
+		case "replicaSet":
+			setName = v
 		case "maxPoolSize":
 			poolLimit, err = strconv.Atoi(v)
 			if err != nil {
@@ -254,16 +257,17 @@ func DialWithTimeout(url string, timeout time.Duration) (*Session, error) {
 		}
 	}
 	info := DialInfo{
-		Addrs:     uinfo.addrs,
-		Direct:    direct,
-		Timeout:   timeout,
-		Database:  uinfo.db,
-		Username:  uinfo.user,
-		Password:  uinfo.pass,
-		Mechanism: mechanism,
-		Service:   service,
-		Source:    source,
-		PoolLimit: poolLimit,
+		Addrs:          uinfo.addrs,
+		Direct:         direct,
+		Timeout:        timeout,
+		Database:       uinfo.db,
+		Username:       uinfo.user,
+		Password:       uinfo.pass,
+		Mechanism:      mechanism,
+		Service:        service,
+		Source:         source,
+		PoolLimit:      poolLimit,
+		ReplicaSetName: setName,
 	}
 	return DialWithInfo(&info)
 }
@@ -294,8 +298,14 @@ type DialInfo struct {
 
 	// Database is the default database name used when the Session.DB method
 	// is called with an empty name, and is also used during the intial
-	// authenticatoin if Source is unset.
+	// authentication if Source is unset.
 	Database string
+
+	// ReplicaSetName, if specified, will prevent the obtained session from
+	// communicating with any server which is not part of a replica set
+	// with the given name. The default is to communicate with any server
+	// specified or discovered via the servers contacted.
+	ReplicaSetName string
 
 	// Source is the database used to establish credentials and privileges
 	// with a MongoDB server. Defaults to the value of Database, if that is
@@ -360,7 +370,7 @@ func DialWithInfo(info *DialInfo) (*Session, error) {
 		}
 		addrs[i] = addr
 	}
-	cluster := newCluster(addrs, info.Direct, info.FailFast, dialer{info.Dial, info.DialServer})
+	cluster := newCluster(addrs, info.Direct, info.FailFast, dialer{info.Dial, info.DialServer}, info.ReplicaSetName)
 	session := newSession(Eventual, cluster, info.Timeout)
 	session.defaultdb = info.Database
 	if session.defaultdb == "" {

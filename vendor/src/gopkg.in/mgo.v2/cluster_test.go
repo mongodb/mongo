@@ -907,6 +907,69 @@ func (s *S) TestSocketTimeoutOnInactiveSocket(c *C) {
 	c.Assert(session.Ping(), IsNil)
 }
 
+func (s *S) TestDialWithReplicaSetName(c *C) {
+	seedLists := [][]string{
+		// rs1 primary and rs2 primary
+		[]string{"localhost:40011", "localhost:40021"},
+		// rs1 primary and rs2 secondary
+		[]string{"localhost:40011", "localhost:40022"},
+		// rs1 secondary and rs2 primary
+		[]string{"localhost:40012", "localhost:40021"},
+		// rs1 secondary and rs2 secondary
+		[]string{"localhost:40012", "localhost:40022"},
+	}
+
+	rs2Members := []string{":40021", ":40022", ":40023"}
+
+	verifySyncedServers := func(session *mgo.Session, numServers int) {
+		// wait for the server(s) to be synced
+		for len(session.LiveServers()) != numServers {
+			c.Log("Waiting for cluster sync to finish...")
+			time.Sleep(5e8)
+		}
+
+		// ensure none of the rs2 set members are communicated with
+		for _, addr := range session.LiveServers() {
+			for _, rs2Member := range rs2Members {
+				c.Assert(strings.HasSuffix(addr, rs2Member), Equals, false)
+			}
+		}
+	}
+
+	// only communication with rs1 members is expected
+	for _, seedList := range seedLists {
+		info := mgo.DialInfo{
+			Addrs:          seedList,
+			Timeout:        5 * time.Second,
+			ReplicaSetName: "rs1",
+		}
+
+		session, err := mgo.DialWithInfo(&info)
+		c.Assert(err, IsNil)
+		verifySyncedServers(session, 3)
+		session.Close()
+
+		info.Direct = true
+		session, err = mgo.DialWithInfo(&info)
+		c.Assert(err, IsNil)
+		verifySyncedServers(session, 1)
+		session.Close()
+
+		connectionUrl := fmt.Sprintf("mongodb://%v/?replicaSet=rs1", strings.Join(seedList, ","))
+		session, err = mgo.Dial(connectionUrl)
+		c.Assert(err, IsNil)
+		verifySyncedServers(session, 3)
+		session.Close()
+
+		connectionUrl += "&connect=direct"
+		session, err = mgo.Dial(connectionUrl)
+		c.Assert(err, IsNil)
+		verifySyncedServers(session, 1)
+		session.Close()
+	}
+
+}
+
 func (s *S) TestDirect(c *C) {
 	session, err := mgo.Dial("localhost:40012?connect=direct")
 	c.Assert(err, IsNil)

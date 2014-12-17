@@ -8,7 +8,6 @@ import (
 	"github.com/mongodb/mongo-tools/mongostat"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -71,15 +70,7 @@ func main() {
 		formatter = &mongostat.JSONLineFormatter{}
 	}
 
-	seedHosts := []string{}
-	hostOption := strings.Split(opts.Host, ",")
-	for _, seedHost := range hostOption {
-		if opts.Port != "" {
-			seedHost = fmt.Sprintf("%s:%s", seedHost, opts.Port)
-		}
-		seedHosts = append(seedHosts, seedHost)
-	}
-
+	seedHosts, setName := util.ParseConnectionString(opts.Host)
 	var cluster mongostat.ClusterMonitor
 	if statOpts.Discover || len(seedHosts) > 1 {
 		cluster = &mongostat.AsyncClusterMonitor{
@@ -100,6 +91,7 @@ func main() {
 	}
 
 	opts.Direct = true
+	opts.ReplicaSetName = setName
 	stat := &mongostat.MongoStat{
 		Options:       opts,
 		StatOptions:   statOpts,

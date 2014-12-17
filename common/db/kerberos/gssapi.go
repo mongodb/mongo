@@ -28,9 +28,10 @@ func (self *KerberosDBConnector) Configure(opts options.ToolOptions) error {
 
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
-		Addrs:   connectionAddrs,
-		Timeout: KERBEROS_DIAL_TIMEOUT,
-		Direct:  opts.Direct,
+		Addrs:          connectionAddrs,
+		Timeout:        KERBEROS_DIAL_TIMEOUT,
+		Direct:         opts.Direct,
+		ReplicaSetName: opts.ReplicaSetName,
 
 		// Kerberos principal
 		Username: opts.Auth.Username,

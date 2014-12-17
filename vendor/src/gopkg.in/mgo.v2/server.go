@@ -71,6 +71,7 @@ type mongoServerInfo struct {
 	Mongos         bool
 	Tags           bson.D
 	MaxWireVersion int
+	SetName        string
 }
 
 var defaultServerInfo mongoServerInfo

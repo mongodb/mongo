@@ -43,6 +43,7 @@ func main() {
 	// connect directly, unless a replica set name is explicitly specified
 	_, setName := util.ParseConnectionString(opts.Host)
 	opts.Direct = (setName == "")
+	opts.ReplicaSetName = setName
 
 	// validate the mongooplog options
 	if err := sourceOpts.Validate(); err != nil {

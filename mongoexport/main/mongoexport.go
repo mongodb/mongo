@@ -44,6 +44,7 @@ func main() {
 	// connect directly, unless a replica set name is explicitly specified
 	_, setName := util.ParseConnectionString(opts.Host)
 	opts.Direct = (setName == "")
+	opts.ReplicaSetName = setName
 
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {

@@ -52,14 +52,15 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
-		Addrs:      connectionAddrs,
-		Timeout:    DefaultSSLDialTimeout,
-		Direct:     opts.Direct,
-		DialServer: dialer,
-		Username:   opts.Auth.Username,
-		Password:   opts.Auth.Password,
-		Source:     opts.GetAuthenticationDatabase(),
-		Mechanism:  opts.Auth.Mechanism,
+		Addrs:          connectionAddrs,
+		Timeout:        DefaultSSLDialTimeout,
+		Direct:         opts.Direct,
+		ReplicaSetName: opts.ReplicaSetName,
+		DialServer:     dialer,
+		Username:       opts.Auth.Username,
+		Password:       opts.Auth.Password,
+		Source:         opts.GetAuthenticationDatabase(),
+		Mechanism:      opts.Auth.Mechanism,
 	}
 
 	return nil

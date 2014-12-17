@@ -35,9 +35,15 @@ type ToolOptions struct {
 	*Namespace
 	*HiddenOptions
 
-	//Force direct connection to the server and disable the
-	//drivers automatic repl set discovery logic.
+	// Force direct connection to the server and disable the
+	// drivers automatic repl set discovery logic.
 	Direct bool
+
+	// ReplicaSetName, if specified, will prevent the obtained session from
+	// communicating with any server which is not part of a replica set
+	// with the given name. The default is to communicate with any server
+	// specified or discovered via the servers contacted.
+	ReplicaSetName string
 
 	// for caching the parser
 	parser *flags.Parser
