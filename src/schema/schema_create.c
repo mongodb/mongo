@@ -586,7 +586,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 	/*
 	 * User-specified collators aren't supported for data-source objects.
 	 */
-	if (__wt_config_getones(
+	if (__wt_config_getones_none(
 	    session, config, "collator", &cval) != WT_NOTFOUND && cval.len != 0)
 		WT_RET_MSG(session, EINVAL,
 		    "WT_DATA_SOURCE objects do not support WT_COLLATOR "
