@@ -108,6 +108,7 @@ namespace {
         str::stream ss;
         ss << "type=file,";
         ss << "memory_page_max=100m,";
+        ss << "leaf_value_max=1MB,";
         ss << "block_compressor=snappy,";
 
         ss << extraStrings << ",";
