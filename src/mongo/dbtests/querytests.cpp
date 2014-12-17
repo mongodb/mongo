@@ -1216,7 +1216,7 @@ namespace QueryTests {
             {
                 WriteUnitOfWork wunit(&_txn);
                 ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
-                                     fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+                                     fromjson( "{ capped : true, size : 2000, max: 10000 }" ), false ).isOK() );
                 wunit.commit();
             }
 
@@ -1356,9 +1356,19 @@ namespace QueryTests {
             ASSERT( _client.runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
             int i = 0;
-            for( int oldCount = -1;
-                    count() != oldCount;
-                    oldCount = count(), _client.insert( ns(), BSON( "ts" << i++ ) ) );
+            int max = 1;
+
+            while ( 1 ) {
+                int oldCount = count();
+                _client.insert( ns(), BSON( "ts" << i++ ) );
+                int newCount = count();
+                if ( oldCount == newCount ||
+                     newCount < max )
+                    break;
+
+                if ( newCount > max )
+                    max = newCount;
+            }
 
             for( int k = 0; k < 5; ++k ) {
                 _client.insert( ns(), BSON( "ts" << i++ ) );
