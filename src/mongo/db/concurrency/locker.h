@@ -76,16 +76,18 @@ namespace mongo {
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX) = 0;
 
         /**
-         * Requests *only* the global lock to be acquired in the specified mode. Does not do the
-         * full MMAP V1 concurrency control functionality, which acquires the flush lock as well.
-         *
-         * Should only be used for cases, where no data reads or writes will be performed, such as
-         * replication step-down.
+         * Requests the global lock to be acquired in the specified mode.
          *
          * See the comments for lockBegin/Complete for more information on the semantics.
          */
         virtual LockResult lockGlobalBegin(LockMode mode) = 0;
         virtual LockResult lockGlobalComplete(unsigned timeoutMs) = 0;
+
+        /**
+         * This method is used only in the MMAP V1 storage engine, otherwise it is a no-op. See the
+         * comments in the implementation for more details on how MMAP V1 journaling works.
+         */
+        virtual void lockMMAPV1Flush() = 0;
 
         /**
          * Decrements the reference count on the global lock.  If the reference count on the

@@ -80,15 +80,15 @@ namespace {
     TEST(LockerImpl, ConflictWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1;
+        DefaultLockerImpl locker1;
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IX));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_X));
 
-        MMAPV1LockerImpl locker2;
+        DefaultLockerImpl locker2;
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IX));
         ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
 
-        ASSERT(locker2.isLockHeldForMode(resId, MODE_NONE));
+        ASSERT(locker2.getLockMode(resId) == MODE_NONE);
 
         ASSERT(locker1.unlock(resId));
 
@@ -99,11 +99,11 @@ namespace {
     TEST(LockerImpl, ConflictUpgradeWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        MMAPV1LockerImpl locker1;
+        DefaultLockerImpl locker1;
         ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_S));
 
-        MMAPV1LockerImpl locker2;
+        DefaultLockerImpl locker2;
         ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IS));
         ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
 
@@ -115,7 +115,7 @@ namespace {
     }
 
     TEST(LockerImpl, ReadTransaction) {
-        MMAPV1LockerImpl locker;
+        DefaultLockerImpl locker;
 
         locker.lockGlobal(MODE_IS);
         locker.unlockAll();
@@ -135,7 +135,7 @@ namespace {
     TEST(LockerImpl, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker;
+        DefaultLockerImpl locker;
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -162,7 +162,7 @@ namespace {
     TEST(LockerImpl, saveAndRestoreGlobalAcquiredTwice) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker;
+        DefaultLockerImpl locker;
 
         // No lock requests made, no locks held.
         locker.saveLockStateAndUnlock(&lockInfo);
@@ -188,29 +188,66 @@ namespace {
     TEST(LockerImpl, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
 
-        MMAPV1LockerImpl locker;
+        DefaultLockerImpl locker;
 
         const ResourceId resIdDatabase(RESOURCE_DATABASE, std::string("TestDB"));
         const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
         // Lock some stuff.
         locker.lockGlobal(MODE_IX);
-        ASSERT(LOCK_OK == locker.lock(resIdDatabase, MODE_IX));
-        ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_X));
+        ASSERT_EQUALS(LOCK_OK, locker.lock(resIdDatabase, MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, locker.lock(resIdCollection, MODE_X));
         locker.saveLockStateAndUnlock(&lockInfo);
 
         // Things shouldn't be locked anymore.
-        ASSERT(locker.getLockMode(resIdDatabase) == MODE_NONE);
-        ASSERT(locker.getLockMode(resIdCollection) == MODE_NONE);
+        ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdDatabase));
+        ASSERT_EQUALS(MODE_NONE, locker.getLockMode(resIdCollection));
 
         // Restore lock state.
         locker.restoreLockState(lockInfo);
 
         // Make sure things were re-locked.
-        ASSERT(locker.getLockMode(resIdDatabase) == MODE_IX);
-        ASSERT(locker.getLockMode(resIdCollection) == MODE_X);
+        ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
+        ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
 
-        locker.unlockAll();
+        ASSERT(locker.unlockAll());
+    }
+
+    TEST(LockerImpl, DefaultLocker) {
+        const ResourceId resId(RESOURCE_DATABASE, std::string("TestDB"));
+
+        DefaultLockerImpl locker;
+        ASSERT_EQUALS(LOCK_OK, locker.lockGlobal(MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, locker.lock(resId, MODE_X));
+
+        // Make sure the flush lock IS NOT held
+        Locker::LockerInfo info;
+        locker.getLockerInfo(&info);
+        ASSERT(!info.waitingResource.isValid());
+        ASSERT_EQUALS(2, info.locks.size());
+        ASSERT_EQUALS(RESOURCE_GLOBAL, info.locks[0].resourceId.getType());
+        ASSERT_EQUALS(resId, info.locks[1].resourceId);
+
+        ASSERT(locker.unlockAll());
+    }
+
+    TEST(LockerImpl, MMAPV1Locker) {
+        const ResourceId resId(RESOURCE_DATABASE, std::string("TestDB"));
+
+        MMAPV1LockerImpl locker;
+        ASSERT_EQUALS(LOCK_OK, locker.lockGlobal(MODE_IX));
+        ASSERT_EQUALS(LOCK_OK, locker.lock(resId, MODE_X));
+
+        // Make sure the flush lock IS held
+        Locker::LockerInfo info;
+        locker.getLockerInfo(&info);
+        ASSERT(!info.waitingResource.isValid());
+        ASSERT_EQUALS(3, info.locks.size());
+        ASSERT_EQUALS(RESOURCE_GLOBAL, info.locks[0].resourceId.getType());
+        ASSERT_EQUALS(RESOURCE_MMAPV1_FLUSH, info.locks[1].resourceId.getType());
+        ASSERT_EQUALS(resId, info.locks[2].resourceId);
+
+        ASSERT(locker.unlockAll());
     }
 
 
@@ -251,7 +288,7 @@ namespace {
                 lockers[i].reset(new LockerForTests());
             }
 
-            LockerImpl<true> locker;
+            DefaultLockerImpl locker;
 
             // Do some warm-up loops
             for (int i = 0; i < 1000; i++) {

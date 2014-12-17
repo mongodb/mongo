@@ -98,6 +98,7 @@ namespace mongo {
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
         virtual LockResult lockGlobalBegin(LockMode mode);
         virtual LockResult lockGlobalComplete(unsigned timeoutMs);
+        virtual void lockMMAPV1Flush();
 
         virtual void downgradeGlobalXtoSForMMAPV1();
         virtual bool unlockAll();
