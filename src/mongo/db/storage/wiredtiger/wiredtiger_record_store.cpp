@@ -170,6 +170,7 @@ namespace {
               _cappedMaxSize( cappedMaxSize ),
               _cappedMaxDocs( cappedMaxDocs ),
               _cappedDeleteCallback( cappedDeleteCallback ),
+              _cappedDeleteCheckCount(0),
               _useOplogHack(shouldUseOplogHack(ctx, _uri)),
               _sizeStorer( sizeStorer ),
               _sizeStorerCounter(0)
