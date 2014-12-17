@@ -1,5 +1,5 @@
 # filelist --
-#	List of source files for WiredTiger POSIX library.
+#	List of source files for WiredTiger library.
 
 src/async/async_api.c
 src/async/async_op.c

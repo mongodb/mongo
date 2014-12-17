@@ -157,7 +157,7 @@ env.Substfile(
 #
 # WiredTiger library
 #
-filelistfile = r'dist\filelist.win'
+filelistfile = r'build_win\filelist.win'
 filelist = open(filelistfile)
 wtsources = [line.strip()
              for line in filelist

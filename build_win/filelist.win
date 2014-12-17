@@ -1,6 +1,6 @@
-# filelist --
-#	List of source files for WiredTiger Windows library.
 
+#	List of source files for WiredTiger library.
+# filelist --
 src/async/async_api.c
 src/async/async_op.c
 src/async/async_worker.c
@@ -32,8 +32,8 @@ src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
-src/btree/bt_split.c
 src/btree/bt_slvg.c
+src/btree/bt_split.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
 src/btree/bt_upgrade.c
@@ -125,7 +125,6 @@ src/os_win/os_rw.c
 src/os_win/os_sleep.c
 src/os_win/os_thread.c
 src/os_win/os_time.c
-src/os_win/os_snprintf.c
 src/os_win/os_vsnprintf.c
 src/os_win/os_yield.c
 src/packing/pack_api.c
