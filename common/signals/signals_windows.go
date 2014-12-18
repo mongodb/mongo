@@ -1,6 +1,7 @@
 package signals
 
 import (
+	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 	"os/signal"
 )
