@@ -15,7 +15,10 @@ function collectionExists(coll) {
 }
 
 function getOutputIndexes() {
-    return db.system.indexes.find({ns: output.getFullName()}).sort({"key":1}).toArray();
+    return output.getIndexes().sort(function(a, b) {
+            if (a.name < b.name) { return -1; }
+            else { return 1; }
+        });
 }
 
 function test(input, pipeline, expected) {
@@ -26,10 +29,19 @@ function test(input, pipeline, expected) {
 
     assert.eq(cursor.itcount(), 0); // empty cursor returned
     assert.eq(output.find().toArray(), expected); // correct results
-    assert.eq(getOutputIndexes(), indexes); // number of indexes maintained
+    var outputIndexes = getOutputIndexes();
+    assert.eq(outputIndexes.length, indexes.length); // number of indexes maintained
+    for (var i = 0; i < outputIndexes.length; i++) {
+        assert.docEq(outputIndexes[i], indexes[i]);
+    }
+
     assert(collectionExists(output));
 }
 
+function listCollections(name) {
+    var collectionInfosCursor = db.runCommand("listCollections",  {filter: { name: name}});
+    return new DBCommandCursor(db.getMongo(), collectionInfosCursor).toArray();
+}
 
 input.insert({_id:1});
 input.insert({_id:2});
@@ -39,7 +51,7 @@ input.insert({_id:3});
 output.insert({_id:1});
 
 // ensure there are no tmp agg_out collections before we begin
-assert.eq([], db.system.namespaces.find({name: /tmp\.agg_out/}).toArray());
+assert.eq([], listCollections(/tmp\.agg_out/));
 
 // basic test
 test(input,
@@ -90,4 +102,4 @@ assertErrorCode(input, {$out: outputInSystem.getName()}, 17385);
 assert(!collectionExists(outputInSystem));
 
 // shoudn't leave temp collections laying around
-assert.eq([], db.system.namespaces.find({name: /tmp\.agg_out/}).toArray());
+assert.eq([], listCollections(/tmp\.agg_out/));

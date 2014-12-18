@@ -21,11 +21,12 @@ assert.writeError(adminDB.exploit.system.indexes.insert({ ns: "admin.system.user
                                                           unique: true,
                                                           dropDups: true }));
 // Make sure that no indexes were built.
-assert.eq(null,
-          adminDB.system.namespaces.findOne(
+var collectionInfosCursor = adminDB.runCommand("listCollections", { filter:
               {$and : [{name : /^admin\.system\.users\.\$/},
                        {name : {$ne : "admin.system.users.$_id_"}},
-                       {name : {$ne : "admin.system.users.$user_1_db_1"}} ]}));
+                       {name : {$ne : "admin.system.users.$user_1_db_1"}} ]}});
+
+assert.eq([], new DBCommandCursor(adminDB.getMongo(), collectionInfosCursor).toArray());
 adminDB.logout();
 
 adminDB.auth('admin','x');

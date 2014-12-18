@@ -27,16 +27,16 @@ dd( "c" );
 /*
  * test createCollection
  */
- 
+
 db.getCollection( "test" ).drop();
 db.getCollectionNames().forEach( function(x) { assert(x != "test"); });
 
 dd( "d" );
- 
+
 db.createCollection("test");
 var found = false;
 db.getCollectionNames().forEach( function(x) { if (x == "test") found = true; });
-assert(found, "found test.test in system.namespaces");
+assert(found, "found test.test in collection infos");
 
 // storageEngine in collection options must:
 // - be a document

@@ -1145,7 +1145,6 @@ ReplSetTest.prototype.bridge = function( opts ) {
         
         if (!config) {
             print("ReplSetTest bridge couldn't find config for "+this.nodes[i]);
-            printjson(this.nodes[i].getDB("local").system.namespaces.find().toArray());
             assert(false);
         }
 

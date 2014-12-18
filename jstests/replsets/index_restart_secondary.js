@@ -59,8 +59,8 @@ if (conns[0].getDB('test').serverBuildInfo().bits !== 32) {
     // Make sure secondary comes back
     assert.soon( function() { 
         try {
-            secondDB.system.namespaces.count(); // trigger a reconnect if needed
-            return true; 
+            secondDB.isMaster(); // trigger a reconnect if needed
+            return true;
         } catch (e) {
             return false; 
         }

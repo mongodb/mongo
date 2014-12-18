@@ -81,7 +81,7 @@ for (var idx = 0; idx < dropAction.length; idx++) {
         return 2 == secondDB.getCollection(collection).getIndexes().length;
     }, "index not created on secondary", 240000 );
 
-    jsTest.log("Index created and system.indexes entry exists on secondary");
+    jsTest.log("Index created and index info exists on secondary");
 
     jsTest.log("running command " + JSON.stringify(dc));
     assert.commandWorked(masterDB.runCommand( dc ));
