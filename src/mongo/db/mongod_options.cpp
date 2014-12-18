@@ -226,6 +226,8 @@ namespace mongo {
                 moe::Double,
                 "seconds between disk syncs (0=never, but not recommended)",
                 "storage.syncPeriodSecs")
+            // Note: this default is used by checkpointDelaySecs in WiredTiger options.
+            // Be careful changing this value.
                                          .setDefault(moe::Value(60.0));
 
         // Upgrade and repair are disallowed in JSON configs since they trigger very heavyweight

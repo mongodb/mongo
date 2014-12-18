@@ -43,14 +43,19 @@ namespace mongo {
 
         // Make --syncdelay (syncPeriodSecs in mmapv1) an alias for checkpointDelaySecs in WT
         moe::Value syncdelayVal;
-        if (moe::startupOptionsParsed.get("storage.mmapv1.syncPeriodSecs", &syncdelayVal).isOK()) {
-            // syncdelay is a double but checkpointDelaySecs is an int.
-            moe::Value newVal(static_cast<int>(syncdelayVal.as<double>()));
-            Status ret = moe::startupOptionsParsed.set(
-                "storage.wiredTiger.engineConfig.checkpointDelaySecs", newVal);
-            if (!ret.isOK()) {
-                return ret;
-            }
+        // syncPeriodSecs is always set since it has a default.
+        invariant(moe::startupOptionsParsed.get("storage.mmapv1.syncPeriodSecs",
+                                                &syncdelayVal).isOK());
+        // Ignore override if set to default of 60.
+        if (syncdelayVal.equal(moe::Value(60.0))) {
+            return Status::OK();
+        }
+        // syncdelay is a double but checkpointDelaySecs is an int.
+        moe::Value newVal(static_cast<int>(syncdelayVal.as<double>()));
+        Status ret = moe::startupOptionsParsed.set(
+            "storage.wiredTiger.engineConfig.checkpointDelaySecs", newVal);
+        if (!ret.isOK()) {
+            return ret;
         }
         return Status::OK();
     }
