@@ -43,7 +43,7 @@ function createErrorNotifier(titlePrefix) {
   };
 }
 
-gulp.task('default', ['templates', 'styles', 'fonts', 'js']);
+gulp.task('default', ['templates', 'styles', 'fonts', 'static', 'js']);
 
 gulp.task('js', function() {
   var b = browserify({
@@ -57,7 +57,7 @@ gulp.task('js', function() {
   // Uglify for compression if not in DEBUG.
   if (!DEBUG) {
     return b.pipe(buffer())
-      .pipe(uglify())
+      .pipe(uglify({mangle: { except: ["$super"] }}))
       .pipe(gulp.dest(BUILD));
   } else {
     return b.pipe(gulp.dest(BUILD));
@@ -126,5 +126,17 @@ gulp.task('styles', function() {
   };
   return gulp.src('./app/less/index.less')
     .pipe(less(opts))
+    .pipe(gulp.dest(BUILD + '/css'));
+});
+
+/**
+ * @task assets Copies all static asset files into `BUILD`.
+ */
+gulp.task('static', [
+  'copy rickshaw css'
+]);
+
+gulp.task('copy rickshaw css', function() {
+  return gulp.src('node_modules/rickshaw/rickshaw.min.css')
     .pipe(gulp.dest(BUILD + '/css'));
 });

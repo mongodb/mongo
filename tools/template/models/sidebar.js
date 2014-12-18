@@ -2,10 +2,11 @@ var AmpersandState = require('ampersand-state'),
     AmpersandCollection = require('ampersand-collection'),
     Search = require('./search'),
     Panel = require('./panel'),
+    _ = require('lodash'),
     debug = require('debug')('model:sidebar');
 
-
 var PanelCollection = AmpersandCollection.extend({
+  mainIndex: 'title',
   model: Panel
 });
 

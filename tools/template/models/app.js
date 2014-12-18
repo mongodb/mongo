@@ -1,42 +1,52 @@
 var AmpersandState = require('ampersand-state'),
-    Sidebar = require('./sidebar'),
     Chart = require('./chart'),
+    StatCollection = require('./stat-collection'),
+    Sidebar = require('./sidebar'),
     _ = require('lodash'),
     debug = require('debug')('model:app');
+
 
 var App = module.exports = AmpersandState.extend({
   children: {
     sidebar: Sidebar,
     chart: Chart
   },
+  collections: {
+    stats: StatCollection
+  },
   parse: function (attrs, options) {
+    var groups = {};
+    var stats = _.map(attrs.series, function (serie) {
+      var tokens = serie.key.split(':');
+      var group = tokens[0].trim();
+      var name = tokens[1].trim();
+      var data = _.map(serie.values, function (v, k) {
+        return {x: parseInt(k), y: v};
+      });
 
-    // parse series data to extract panel titles and stat names
-    var panels = _.chain(attrs.series)
-      // get keys
-      .map(function (serie) { return serie.key; })
-      // split at : and group by first token
-      .groupBy(function (key) { return key.split(':')[0]; })
-      // create panel documents with group title
-      .map(function (value, key) { 
-        // split at : and use second token as stat name
-        var stats = _.map(value, function (stat) {
-          return { name: stat.split(':')[1].trim() };
-        });
-        return { title: key, stats: stats }; 
-      })
-      .value();
+      groups[group] = true;
+      return { group: group, name: name, data: data };
+    });
+
+    groups = _.keys(groups).map(function (title) {
+      return {title: title};
+    });
 
     var ret = {
+      stats: stats,
       // provide information that sidebar needs
       sidebar: {
-        panels: panels,
-      },
-      // pass attrs to chart to do its own parsing
-      chart: attrs
+        panels: groups,
+      }
     };
-
     return ret;
+  },
+  initialize: function (attrs, options) {
+    // tell the panels what stats they're managing
+    var panels = this.sidebar.panels;
+    this.stats.each(function (stat) {
+      panels.get(stat.group).stats.add(stat);
+    });
   }
 });
 

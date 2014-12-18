@@ -12,6 +12,10 @@ var Stat = module.exports = AmpersandState.extend({
       type: 'string',
       default: ''
     },
+    group: {
+      type: 'string',
+      default: ''
+    },
     selected: {
       type: 'boolean',
       default: false
@@ -19,6 +23,9 @@ var Stat = module.exports = AmpersandState.extend({
     visible: {
       type: 'boolean',
       default: true
+    },
+    data: {
+      type: 'object'
     }
   },
   derived: {

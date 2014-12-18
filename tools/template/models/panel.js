@@ -1,17 +1,10 @@
 var AmpersandState = require('ampersand-state'),
-    UnderscoreMixin = require('ampersand-collection-underscore-mixin'),
-    AmpersandCollection = require('ampersand-collection'),
-    Stat = require('./stat'),
+    StatCollection = require('./stat-collection'),
     debug = require('debug')('model:panel');
-
-var StatCollection = AmpersandCollection.extend(UnderscoreMixin, {
-  comparator: 'name',
-  model: Stat
-});
 
 var Panel = module.exports = AmpersandState.extend({
   collections: {
-    stats: StatCollection
+    stats: StatCollection,
   },
   props: {
     title: {
@@ -21,7 +14,7 @@ var Panel = module.exports = AmpersandState.extend({
     open: {
       type: 'boolean',
       default: false
-    }
+    },
   },
   derived: {
     selected: {
