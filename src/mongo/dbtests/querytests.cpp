@@ -1352,6 +1352,7 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "1 SFDSDF" << endl;
             BSONObj info;
             ASSERT( _client.runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
@@ -1380,7 +1381,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
-                //cout << k << endl;
+                cout << k << endl;
             }
         }
     };
@@ -1391,6 +1392,7 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "2 ;kljsdf" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             BSONObj info;
@@ -1409,6 +1411,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
+                cout << k << endl;
             }
 
             ASSERT_EQUALS( startNumCursors, numCursorsOpen() );
@@ -1424,6 +1427,7 @@ namespace QueryTests {
         FindingStartStale() : CollectionBase( "findingstart" ) {}
 
         void run() {
+    cout << "3 xcxcv" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             // Check OplogReplay mode with missing collection.
