@@ -94,13 +94,22 @@ li.stat {
 }
 
 #graph {
-  position: relative;
-  left: 50px;
-}
+  font-size: 12px;
 
-#y-axis {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50px;
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+  }
+
+  .x.axis path {
+    display: none;
+  }
+
+  .line {
+    fill: none;
+    stroke: steelblue;
+    stroke-width: 1.5px;
+  }
 }

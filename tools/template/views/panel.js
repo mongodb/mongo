@@ -60,6 +60,7 @@ var PanelView = module.exports = AmpersandView.extend({
   statChanged: function (stat) {
     // mirroring model.selected here to use for bindings
     this.indicator = this.model.selected;
+    this.parent.parent.statChanged(stat);
   },
   collapsibleToggle: function (event) {
     $(this.query('.collapse')).collapse('toggle');

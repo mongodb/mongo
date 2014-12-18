@@ -37,6 +37,9 @@ var SidebarView = module.exports = AmpersandView.extend({
       view.filterStats(search);
     });
   },
+  statChanged: function(stat) {
+    this.parent.statChanged(stat);
+  },
   inputChanged: _.debounce(function () {
     var content = this.queryByHook('input').value;
     this.model.search.content = content;

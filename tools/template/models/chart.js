@@ -9,9 +9,14 @@ var Chart = module.exports = AmpersandState.extend({
       deps: ['parent'],
       cache: false,
       fn: function () {
-        var series = this.parent.stats.map(function (stat) {
-          return _.pick(stat, ['color', 'data', 'name']);
-        })
+        var series = this.parent.stats
+          .filter(function (stat) {
+            return stat.visible;
+          })
+          .map(function (stat) {
+            return _.pick(stat, ['color', 'data', 'name', 'cid', 'visible', 'selected']);
+          })
+
         return series;
       }
     }
