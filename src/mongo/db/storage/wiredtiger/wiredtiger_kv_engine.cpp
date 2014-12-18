@@ -49,6 +49,10 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 namespace mongo {
 
     namespace {
@@ -198,8 +202,12 @@ namespace mongo {
             // this must be the last thing we do before _conn->close();
             _sessionCache->shuttingDown();
 
-            // TODO consider passing "leak_memory=true" to close() when not running a leak checker.
-            invariantWTOK( _conn->close(_conn, NULL) );
+#if !__has_feature(address_sanitizer)
+            const char* config = "leak_memory=true";
+#else
+            const char* config = NULL;
+#endif
+            invariantWTOK( _conn->close(_conn, config) );
             _conn = NULL;
         }
     }
