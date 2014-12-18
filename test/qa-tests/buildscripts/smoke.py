@@ -900,6 +900,7 @@ suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "top": ("top/*.js", False),
                         "bson": ("bson/*.js", False),
                         "export": ("export/*.js", False),
+                        "oplog": ("oplog/*.js", False),
                         "import": ("import/*.js", False),
                     }
 
