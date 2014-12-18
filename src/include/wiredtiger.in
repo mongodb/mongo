@@ -1600,8 +1600,8 @@ struct __wt_connection {
 	 * prepended to each log record\, may contain strftime conversion
 	 * specifications., a string; default \c "%b %d %H:%M:%S".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
-	 * write of the log records., an integer between 0 and 100000; default
-	 * \c 0.}
+	 * write of the log records; setting this value above 0 configures
+	 * statistics logging., an integer between 0 and 100000; default \c 0.}
 	 * @config{ ),,}
 	 * @config{verbose, enable messages for various events.  Only available
 	 * if WiredTiger is configured with --enable-verbose.  Options are given
@@ -1979,9 +1979,10 @@ struct __wt_connection {
  * record\, may contain strftime conversion specifications., a string; default
  * \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
- * between each write of the log records., an integer between 0 and 100000;
- * default \c 0.}
- * @config{ ),,}
+ * between each write of the log records; setting this value above 0 configures
+ * statistics logging., an integer between 0 and 100000; default \c 0.}
+ * @config{
+ * ),,}
  * @config{transaction_sync = (, how to sync log records when the transaction
  * commits., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to sync the log on every

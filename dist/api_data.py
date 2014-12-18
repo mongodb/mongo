@@ -426,7 +426,8 @@ connection_runtime_config = [
             a timestamp prepended to each log record, may contain strftime
             conversion specifications'''),
         Config('wait', '0', r'''
-            seconds to wait between each write of the log records''',
+            seconds to wait between each write of the log records; setting
+            this value above 0 configures statistics logging''',
             min='0', max='100000'),
         ]),
     Config('verbose', '', r'''
