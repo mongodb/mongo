@@ -224,7 +224,7 @@ namespace {
         Locker::LockerInfo info;
         locker.getLockerInfo(&info);
         ASSERT(!info.waitingResource.isValid());
-        ASSERT_EQUALS(2, info.locks.size());
+        ASSERT_EQUALS(2U, info.locks.size());
         ASSERT_EQUALS(RESOURCE_GLOBAL, info.locks[0].resourceId.getType());
         ASSERT_EQUALS(resId, info.locks[1].resourceId);
 
@@ -242,7 +242,7 @@ namespace {
         Locker::LockerInfo info;
         locker.getLockerInfo(&info);
         ASSERT(!info.waitingResource.isValid());
-        ASSERT_EQUALS(3, info.locks.size());
+        ASSERT_EQUALS(3U, info.locks.size());
         ASSERT_EQUALS(RESOURCE_GLOBAL, info.locks[0].resourceId.getType());
         ASSERT_EQUALS(RESOURCE_MMAPV1_FLUSH, info.locks[1].resourceId.getType());
         ASSERT_EQUALS(resId, info.locks[2].resourceId);
