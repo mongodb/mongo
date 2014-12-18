@@ -978,7 +978,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * are holding it locked.
 	 */
 	if (ret == 0 && !exclusive && __split_should_deepen(session, parent))
-		ret = __split_deepen(session, parent);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __split_deepen(session, parent));
 
 err:	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);

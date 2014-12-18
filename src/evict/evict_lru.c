@@ -941,9 +941,11 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * Re-check the "no eviction" flag -- it is used to enforce
 		 * exclusive access when a handle is being closed.
 		 */
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_WITH_BTREE(session, btree,
 			    ret = __evict_walk_file(session, &slot, flags));
+			WT_ASSERT(session, session->split_gen == 0);
+		}
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
@@ -1281,6 +1283,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
+	WT_ASSERT(session, is_app || session->split_gen == 0);
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
