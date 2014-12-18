@@ -120,8 +120,9 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         found = matchpos = 0
         match = self.unique
         matchlen = len(match)
+        flen = os.fstat(fp.fileno()).st_size
         c = fp.read(1)
-        while c:
+        while fp.tell() != flen:
             if match[matchpos] == c:
                 matchpos += 1
                 if matchpos == matchlen:
