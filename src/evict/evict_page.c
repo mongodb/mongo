@@ -75,7 +75,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/* Discard any subtree rooted in this page. */
 	if (istree)
-		__evict_discard_tree(session, ref, exclusive, 1);
+		WT_WITH_PAGE_INDEX(session,
+		    __evict_discard_tree(session, ref, exclusive, 1));
 
 	/* Update the reference and discard the page. */
 	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -253,6 +254,45 @@ __evict_discard_tree(
 }
 
 /*
+ * __evict_review_subtree --
+ *	Review a subtree for conditions that would block its eviction.
+ */
+static int
+__evict_review_subtree(WT_SESSION_IMPL *session,
+    WT_REF *ref, int exclusive, int *inmem_splitp, int *istreep)
+{
+	WT_PAGE *page;
+	WT_REF *child;
+
+	page = ref->page;
+
+	WT_INTL_FOREACH_BEGIN(session, page, child) {
+		switch (child->state) {
+		case WT_REF_DISK:		/* On-disk */
+		case WT_REF_DELETED:		/* On-disk, deleted */
+			break;
+		case WT_REF_MEM:		/* In-memory */
+			/*
+			 * Tell our caller if there's a subtree so we
+			 * know to do a full walk when discarding the
+			 * page.
+			 */
+			*istreep = 1;
+			WT_RET(__evict_review(session, child, exclusive,
+			    0, inmem_splitp, istreep));
+			break;
+		case WT_REF_LOCKED:		/* Being evicted */
+		case WT_REF_READING:		/* Being read */
+		case WT_REF_SPLIT:		/* Being split */
+			return (EBUSY);
+		WT_ILLEGAL_VALUE(session);
+		}
+	} WT_INTL_FOREACH_END;
+
+	return (0);
+}
+
+/*
  * __evict_review --
  *	Get exclusive access to the page and review the page and its subtree
  *	for conditions that would block its eviction.
@@ -262,9 +302,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
     int exclusive, int top, int *inmem_splitp, int *istreep)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *child;
 	uint32_t flags;
 
 	btree = S2BT(session);
@@ -292,29 +332,11 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * have to write pages in depth-first order, otherwise we'll dirty
 	 * pages after we've written them.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page))
-		WT_INTL_FOREACH_BEGIN(session, page, child) {
-			switch (child->state) {
-			case WT_REF_DISK:		/* On-disk */
-			case WT_REF_DELETED:		/* On-disk, deleted */
-				break;
-			case WT_REF_MEM:		/* In-memory */
-				/*
-				 * Tell our caller if there's a subtree so we
-				 * know to do a full walk when discarding the
-				 * page.
-				 */
-				*istreep = 1;
-				WT_RET(__evict_review(session, child, exclusive,
-				    0, inmem_splitp, istreep));
-				break;
-			case WT_REF_LOCKED:		/* Being evicted */
-			case WT_REF_READING:		/* Being read */
-			case WT_REF_SPLIT:		/* Being split */
-				return (EBUSY);
-			WT_ILLEGAL_VALUE(session);
-			}
-		} WT_INTL_FOREACH_END;
+	if (WT_PAGE_IS_INTERNAL(page)) {
+		WT_WITH_PAGE_INDEX(session, ret = __evict_review_subtree(
+		    session, ref, exclusive, inmem_splitp, istreep));
+		WT_RET(ret);
+	}
 
 	mod = page->modify;
 

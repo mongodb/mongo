@@ -453,7 +453,8 @@ __wt_debug_tree_shape(
 	if (page == NULL)
 		page = S2BT(session)->root.page;
 
-	__debug_tree_shape_worker(ds, page, 0);
+	WT_WITH_PAGE_INDEX(session,
+	    __debug_tree_shape_worker(ds, page, 0));
 
 	__dmsg_wrapup(ds);
 	return (0);
@@ -535,6 +536,7 @@ __debug_tree(
 static int
 __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = ds->session;
@@ -549,14 +551,18 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 			__debug_page_col_fix(ds, page);
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__debug_page_col_int(ds, page, flags));
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __debug_page_col_int(ds, page, flags));
+		WT_RET(ret);
 		break;
 	case WT_PAGE_COL_VAR:
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
 			WT_RET(__debug_page_col_var(ds, page));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__debug_page_row_int(ds, page, flags));
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __debug_page_row_int(ds, page, flags));
+		WT_RET(ret);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))

@@ -397,13 +397,15 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 			ret = __rec_col_fix(session, r, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret = __rec_col_int(session, r, page);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __rec_col_int(session, r, page));
 		break;
 	case WT_PAGE_COL_VAR:
 		ret = __rec_col_var(session, r, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		ret = __rec_row_int(session, r, page);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __rec_row_int(session, r, page));
 		break;
 	case WT_PAGE_ROW_LEAF:
 		ret = __rec_row_leaf(session, r, page, salvage);
