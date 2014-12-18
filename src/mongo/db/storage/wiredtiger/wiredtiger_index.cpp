@@ -410,6 +410,21 @@ namespace {
                 metadata.append("reason", status.reason());
             }
         }
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(txn, _uri, &type, &sourceURI);
+        StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadata(txn, sourceURI);
+        StringData creationStringName("creationString");
+        if (!metadataResult.isOK()) {
+            BSONObjBuilder creationString(output->subobjStart(creationStringName));
+            creationString.append("error", "unable to retrieve creation config");
+            creationString.append("code", static_cast<int>(metadataResult.getStatus().code()));
+            creationString.append("reason", metadataResult.getStatus().reason());
+        }
+        else {
+            output->append(creationStringName, metadataResult.getValue());
+            // Type can be "lsm" or "file"
+            output->append("type", type);
+        }
 
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();

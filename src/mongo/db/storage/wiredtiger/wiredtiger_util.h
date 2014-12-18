@@ -92,11 +92,21 @@ namespace mongo {
     public:
 
         /**
+         * Fetch the type and source fields out of the colgroup metadata.  'tableUri' must be a
+         * valid table: uri.
+         */
+        static void fetchTypeAndSourceURI(OperationContext* opCtx,
+                                          const std::string& tableUri,
+                                          std::string* type,
+                                          std::string* source);
+
+        /**
          * Reads contents of table using URI and exports all keys to BSON as string elements.
          * Additional, adds 'uri' field to output document.
          */
         static Status exportTableToBSON(WT_SESSION* s,
-                                        const std::string& uri, const std::string& config,
+                                        const std::string& uri,
+                                        const std::string& config,
                                         BSONObjBuilder* bob);
 
         /**

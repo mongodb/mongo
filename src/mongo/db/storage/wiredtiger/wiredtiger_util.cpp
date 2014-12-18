@@ -73,6 +73,29 @@ namespace mongo {
         return Status(ErrorCodes::UnknownError, s);
     }
 
+    void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
+                                               const std::string& tableUri,
+                                               std::string* type,
+                                               std::string* source) {
+        std::string colgroupUri = "colgroup";
+        const size_t colon = tableUri.find(':');
+        invariant(colon != string::npos);
+        colgroupUri += tableUri.substr(colon);
+        StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
+        invariant(colgroupResult.isOK());
+        WiredTigerConfigParser parser(colgroupResult.getValue());
+
+        WT_CONFIG_ITEM typeItem;
+        invariant(parser.get("type", &typeItem) == 0);
+        invariant(typeItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID);
+        *type = std::string(typeItem.str, typeItem.len);
+
+        WT_CONFIG_ITEM sourceItem;
+        invariant(parser.get("source", &sourceItem) == 0);
+        invariant(sourceItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
+        *source = std::string(sourceItem.str, sourceItem.len);
+    }
+
     StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx,
                                                         const StringData& uri) {
         invariant(opCtx);
@@ -106,7 +129,7 @@ namespace mongo {
         WiredTigerConfigParser topParser(metadataResult.getValue());
         WT_CONFIG_ITEM appMetadata;
         if (topParser.get("app_metadata", &appMetadata) != 0) {
-            Status::OK();
+            return Status::OK();
         }
         if (appMetadata.len == 0) {
             return Status::OK();

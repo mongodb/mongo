@@ -274,7 +274,7 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
             session->getSession(),
-            "statistics:" + GetURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+            "statistics:" + getURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
         uassertStatusOK(result.getStatus());
 
         int64_t size = result.getValue();
@@ -644,7 +644,7 @@ namespace {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
         WiredTigerSession* session = cache->getSession();
         WT_SESSION *s = session->getSession();
-        int ret = s->compact(s, GetURI().c_str(), NULL);
+        int ret = s->compact(s, getURI().c_str(), NULL);
         invariantWTOK(ret);
         cache->releaseSession(session);
         return Status::OK();
@@ -680,7 +680,7 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(output->subobjStart(kWiredTigerEngineName));
-        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
@@ -703,14 +703,31 @@ namespace {
         BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
         {
             BSONObjBuilder metadata(bob.subobjStart("metadata"));
-            Status status = WiredTigerUtil::getApplicationMetadata(txn, GetURI(), &metadata);
+            Status status = WiredTigerUtil::getApplicationMetadata(txn, getURI(), &metadata);
             if (!status.isOK()) {
                 metadata.append("error", "unable to retrieve metadata");
                 metadata.append("code", static_cast<int>(status.code()));
                 metadata.append("reason", status.reason());
             }
         }
-        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(txn, _uri, &type, &sourceURI);
+        StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadata(txn, sourceURI);
+        StringData creationStringName("creationString");
+        if (!metadataResult.isOK()) {
+            BSONObjBuilder creationString(bob.subobjStart(creationStringName));
+            creationString.append("error", "unable to retrieve creation config");
+            creationString.append("code", static_cast<int>(metadataResult.getStatus().code()));
+            creationString.append("reason", metadataResult.getStatus().reason());
+        }
+        else {
+            bob.append("creationString", metadataResult.getValue());
+            // Type can be "lsm" or "file"
+            bob.append("type", type);
+        }
+
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
@@ -898,7 +915,7 @@ namespace {
           _txn( txn ),
           _forward( dir == CollectionScanParams::FORWARD ),
           _forParallelCollectionScan( forParallelCollectionScan ),
-          _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ),
+          _cursor( new WiredTigerCursor( rs.getURI(), rs.instanceId(), txn ) ),
           _eof(false),
           _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
         RS_ITERATOR_TRACE("start");
@@ -1067,7 +1084,7 @@ namespace {
             // parallel collection scan or something
             needRestore = true;
             _savedRecoveryUnit = txn->recoveryUnit();
-            _cursor.reset( new WiredTigerCursor( _rs.GetURI(), _rs.instanceId(), txn ) );
+            _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), txn ) );
             _forParallelCollectionScan = false; // we only do this the first time
         }
 

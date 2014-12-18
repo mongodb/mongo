@@ -273,7 +273,7 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        string uri = dynamic_cast<WiredTigerRecordStore*>( rs.get() )->GetURI();
+        string uri = dynamic_cast<WiredTigerRecordStore*>( rs.get() )->getURI();
 
         WiredTigerSizeStorer ss;
         dynamic_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
@@ -654,6 +654,9 @@ namespace mongo {
         BSONElement versionElement = metadata.getField("formatVersion");
         ASSERT_TRUE(versionElement.isNumber());
 
+        BSONElement creationStringElement = wiredTiger.getField("creationString");
+        ASSERT_EQUALS(creationStringElement.type(), String);
     }
+
 
 }  // namespace mongo

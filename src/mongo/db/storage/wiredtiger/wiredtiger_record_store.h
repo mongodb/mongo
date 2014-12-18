@@ -174,7 +174,7 @@ namespace mongo {
         int64_t cappedMaxDocs() const;
         int64_t cappedMaxSize() const;
 
-        const std::string& GetURI() const { return _uri; }
+        const std::string& getURI() const { return _uri; }
         uint64_t instanceId() const { return _instanceId; }
 
         void setSizeStorer( WiredTigerSizeStorer* ss ) { _sizeStorer = ss; }
