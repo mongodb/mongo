@@ -39,6 +39,9 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -68,6 +71,139 @@ namespace mongo {
 
         // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
         return Status(ErrorCodes::UnknownError, s);
+    }
+
+    StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx,
+                                                        const StringData& uri) {
+        invariant(opCtx);
+        WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, opCtx);
+        WT_CURSOR* cursor = curwrap.get();
+        cursor->set_key(cursor, uri);
+        int ret = cursor->search(cursor);
+        if (ret == WT_NOTFOUND) {
+            return StatusWith<std::string>(ErrorCodes::NoSuchKey, str::stream()
+                << "Unable to find metadata for " << uri);
+        }
+        else if (ret != 0) {
+            return StatusWith<std::string>(wtRCToStatus(ret));
+        }
+        const char* metadata = NULL;
+        ret = cursor->get_value(cursor, &metadata);
+        if (ret != 0) {
+            return StatusWith<std::string>(wtRCToStatus(ret));
+        }
+        invariant(metadata);
+        return StatusWith<std::string>(metadata);
+    }
+
+    Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
+                                                  const StringData& uri,
+                                                  BSONObjBuilder* bob) {
+        StatusWith<std::string> metadataResult = getMetadata(opCtx, uri);
+        if (!metadataResult.isOK()) {
+            return metadataResult.getStatus();
+        }
+        WiredTigerConfigParser topParser(metadataResult.getValue());
+        WT_CONFIG_ITEM appMetadata;
+        if (topParser.get("app_metadata", &appMetadata) != 0) {
+            Status::OK();
+        }
+        if (appMetadata.len == 0) {
+            return Status::OK();
+        }
+        if (appMetadata.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
+            return Status(ErrorCodes::FailedToParse, str::stream()
+                << "app_metadata must be a nested struct. Actual value: "
+                << StringData(appMetadata.str, appMetadata.len));
+        }
+
+        WiredTigerConfigParser parser(appMetadata);
+        WT_CONFIG_ITEM keyItem;
+        WT_CONFIG_ITEM valueItem;
+        int ret;
+        unordered_set<StringData, StringData::Hasher> keysSeen;
+        while ((ret = parser.next(&keyItem, &valueItem)) == 0) {
+            const StringData key(keyItem.str, keyItem.len);
+            if (keysSeen.count(key)) {
+                return Status(ErrorCodes::DuplicateKey, str::stream()
+                    << "app_metadata must not contain duplicate keys. "
+                    << "Found multiple instances of key '" << key << "'.");
+            }
+            keysSeen.insert(key);
+
+            switch (valueItem.type) {
+            case WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL:
+                bob->appendBool(key, valueItem.val);
+                break;
+            case WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM:
+                bob->appendIntOrLL(key, valueItem.val);
+                break;
+            default:
+                bob->append(key, StringData(valueItem.str, valueItem.len));
+                break;
+            }
+        }
+        if (ret != WT_NOTFOUND) {
+            return wtRCToStatus(ret);
+        }
+
+        return Status::OK();
+    }
+
+    StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
+                                                               const StringData& uri) {
+        BSONObjBuilder bob;
+        Status status = getApplicationMetadata(opCtx, uri, &bob);
+        if (!status.isOK()) {
+            return StatusWith<BSONObj>(status);
+        }
+        return StatusWith<BSONObj>(bob.obj());
+    }
+
+    Status WiredTigerUtil::checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                                 const StringData& uri,
+                                                                 int64_t minimumVersion,
+                                                                 int64_t maximumVersion) {
+
+        StatusWith<std::string> result = getMetadata(opCtx, uri);
+        if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
+            return result.getStatus();
+        }
+        invariantOK(result.getStatus());
+
+        WiredTigerConfigParser topParser(result.getValue());
+        WT_CONFIG_ITEM metadata;
+        if (topParser.get("app_metadata", &metadata) != 0)
+            return Status(ErrorCodes::UnsupportedFormat, str::stream()
+                          << "application metadata for " << uri
+                          << " is missing ");
+
+        WiredTigerConfigParser parser(metadata);
+
+        int64_t version = 0;
+        WT_CONFIG_ITEM versionItem;
+        if (parser.get("formatVersion", &versionItem) != 0) {
+            // If 'formatVersion' is missing, this metadata was introduced by
+            // one of the RC versions (where the format version is 1).
+            version = 1;
+        }
+        else if (versionItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM) {
+            version = versionItem.val;
+        }
+        else {
+            return Status(ErrorCodes::UnsupportedFormat, str::stream()
+                << "'formatVersion' in application metadata for " << uri
+                << " must be a number. Current value: "
+                << StringData(versionItem.str, versionItem.len));
+        }
+
+        if (version < minimumVersion || version > maximumVersion) {
+            return Status(ErrorCodes::UnsupportedFormat, str::stream()
+                << "Application metadata for " << uri
+                << " has unsupported format version " << version);
+        }
+
+        return Status::OK();
     }
 
     // static

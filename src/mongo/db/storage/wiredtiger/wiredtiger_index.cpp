@@ -400,6 +400,17 @@ namespace {
         }
 
         invariant(output);
+
+        {
+            BSONObjBuilder metadata(output->subobjStart("metadata"));
+            Status status = WiredTigerUtil::getApplicationMetadata(txn, uri(), &metadata);
+            if (!status.isOK()) {
+                metadata.append("error", "unable to retrieve metadata");
+                metadata.append("code", static_cast<int>(status.code()));
+                metadata.append("reason", status.reason());
+            }
+        }
+
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),

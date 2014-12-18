@@ -30,10 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <sstream>
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
@@ -48,6 +50,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using std::string;
     using std::stringstream;
 
@@ -629,6 +632,28 @@ namespace mongo {
 
         scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
         ASSERT_THROWS(rs->storageSize(opCtx.get()), UserException);
+    }
+
+    TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
+        WiredTigerHarnessHelper harnessHelper;
+        scoped_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("a.b"));
+
+        scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+        BSONObjBuilder builder;
+        rs->appendCustomStats(opCtx.get(), &builder, 1.0);
+        BSONObj customStats = builder.obj();
+
+        BSONElement wiredTigerElement = customStats.getField(kWiredTigerEngineName);
+        ASSERT_TRUE(wiredTigerElement.isABSONObj());
+        BSONObj wiredTiger = wiredTigerElement.Obj();
+
+        BSONElement metadataElement = wiredTiger.getField("metadata");
+        ASSERT_TRUE(metadataElement.isABSONObj());
+        BSONObj metadata = metadataElement.Obj();
+
+        BSONElement versionElement = metadata.getField("formatVersion");
+        ASSERT_TRUE(versionElement.isNumber());
+
     }
 
 }  // namespace mongo

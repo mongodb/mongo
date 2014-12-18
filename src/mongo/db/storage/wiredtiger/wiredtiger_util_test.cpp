@@ -30,10 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <sstream>
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -76,11 +78,186 @@ namespace mongo {
             return &_sessionCache;
         }
 
+        OperationContext* newOperationContext() {
+            return new OperationContextNoop(new WiredTigerRecoveryUnit(getSessionCache()));
+        }
+
     private:
         unittest::TempDir _dbpath;
         WiredTigerConnection _connection;
         WiredTigerSessionCache _sessionCache;
     };
+
+    class WiredTigerUtilMetadataTest : public mongo::unittest::Test {
+    public:
+        virtual void setUp() {
+            _harnessHelper.reset(new WiredTigerUtilHarnessHelper(""));
+            _opCtx.reset(_harnessHelper->newOperationContext());
+        }
+
+        virtual void tearDown() {
+            _opCtx.reset(NULL);
+            _harnessHelper.reset(NULL);
+        }
+
+    protected:
+        const char* getURI() const {
+            return "table:mytable";
+        }
+
+        OperationContext* getOperationContext() const {
+            ASSERT(_opCtx.get());
+            return _opCtx.get();
+        }
+
+        void createSession(const char* config) {
+            WT_SESSION* wtSession =
+                WiredTigerRecoveryUnit::get(_opCtx.get())->getSession()->getSession();
+            ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config)));
+        }
+    private:
+        boost::scoped_ptr<WiredTigerUtilHarnessHelper> _harnessHelper;
+        boost::scoped_ptr<OperationContext> _opCtx;
+    };
+
+    TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {
+        StatusWith<std::string> result =
+            WiredTigerUtil::getMetadata(getOperationContext(), getURI());
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringNull) {
+        const char* config = NULL;
+        createSession(config);
+        StatusWith<std::string> result =
+            WiredTigerUtil::getMetadata(getOperationContext(), getURI());
+        ASSERT_OK(result.getStatus());
+        ASSERT_FALSE(result.getValue().empty());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringSimple) {
+        const char* config = "app_metadata=(abc=123)";
+        createSession(config);
+        StatusWith<std::string> result =
+            WiredTigerUtil::getMetadata(getOperationContext(), getURI());
+        ASSERT_OK(result.getStatus());
+        ASSERT_STRING_CONTAINS(result.getValue(), config);
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataInvalidURI) {
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataNull) {
+        const char* config = NULL;
+        createSession(config);
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_OK(result.getStatus());
+        ASSERT_TRUE(result.getValue().isEmpty());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataString) {
+        const char* config = "app_metadata=\"abc\"";
+        createSession(config);
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataInvalidMetadata) {
+        const char* config = "app_metadata=(abc=def=ghi)";
+        createSession(config);
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataDuplicateKeys) {
+        const char* config = "app_metadata=(abc=123,abc=456)";
+        createSession(config);
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, result.getStatus().code());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
+        const char* config = "app_metadata=(stringkey=\"abc\",boolkey1=true,boolkey2=false,"
+                             "idkey=def,numkey=123,"
+                             "structkey=(k1=v2,k2=v2))";
+        createSession(config);
+        StatusWith<BSONObj> result =
+            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
+        ASSERT_OK(result.getStatus());
+        const BSONObj& obj = result.getValue();
+
+        BSONElement stringElement = obj.getField("stringkey");
+        ASSERT_EQUALS(mongo::String, stringElement.type());
+        ASSERT_EQUALS("abc", stringElement.String());
+
+        BSONElement boolElement1 = obj.getField("boolkey1");
+        ASSERT_TRUE(boolElement1.isBoolean());
+        ASSERT_TRUE(boolElement1.boolean());
+
+        BSONElement boolElement2 = obj.getField("boolkey2");
+        ASSERT_TRUE(boolElement2.isBoolean());
+        ASSERT_FALSE(boolElement2.boolean());
+
+        BSONElement identifierElement = obj.getField("idkey");
+        ASSERT_EQUALS(mongo::String, identifierElement.type());
+        ASSERT_EQUALS("def", identifierElement.String());
+
+        BSONElement numberElement = obj.getField("numkey");
+        ASSERT_TRUE(numberElement.isNumber());
+        ASSERT_EQUALS(123, numberElement.numberInt());
+
+        BSONElement structElement = obj.getField("structkey");
+        ASSERT_EQUALS(mongo::String, structElement.type());
+        ASSERT_EQUALS("(k1=v2,k2=v2)", structElement.String());
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionMissingKey) {
+        createSession("app_metadata=(abc=123)");
+        ASSERT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                        getURI(),
+                                                                        1,
+                                                                        1));
+        ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                            getURI(),
+                                                                            2,
+                                                                            2));
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionString) {
+        createSession("app_metadata=(formatVersion=\"bar\")");
+        ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                            getURI(),
+                                                                            1,
+                                                                            1));
+    }
+
+    TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatVersionNumber) {
+        createSession("app_metadata=(formatVersion=2)");
+        ASSERT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                        getURI(),
+                                                                        2,
+                                                                        3));
+        ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                            getURI(),
+                                                                            1,
+                                                                            1));
+        ASSERT_NOT_OK(WiredTigerUtil::checkApplicationMetadataFormatVersion(getOperationContext(),
+                                                                            getURI(),
+                                                                            3,
+                                                                            3));
+    }
 
     TEST(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
         WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");

@@ -36,11 +36,14 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
     class BSONObjBuilder;
+    class OperationContext;
+    class WiredTigerConfigParser;
 
     inline bool wt_keeptxnopen() {
         return false;
@@ -96,6 +99,31 @@ namespace mongo {
                                         const std::string& uri, const std::string& config,
                                         BSONObjBuilder* bob);
 
+        /**
+         * Gets entire metadata string for collection/index at URI.
+         */
+        static StatusWith<std::string> getMetadata(OperationContext* opCtx,
+                                                   const StringData& uri);
+
+        /**
+         * Reads app_metadata for collection/index at URI as a BSON document.
+         */
+        static Status getApplicationMetadata(OperationContext* opCtx,
+                                             const StringData& uri,
+                                             BSONObjBuilder* bob);
+
+        static StatusWith<BSONObj> getApplicationMetadata(OperationContext* opCtx,
+                                                          const StringData& uri);
+
+        /**
+         * Validates formatVersion in application metadata for 'uri'.
+         * Version must be numeric and be in the range [minimumVersion, maximumVersion].
+         * URI is used in error messages only.
+         */
+        static Status checkApplicationMetadataFormatVersion(OperationContext* opCtx,
+                                                            const StringData& uri,
+                                                            int64_t minimumVersion,
+                                                            int64_t maximumVersion);
         /**
          * Reads individual statistics using URI.
          * List of statistics keys WT_STAT_* can be found in wiredtiger.h.

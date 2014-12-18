@@ -56,43 +56,19 @@
 
 namespace mongo {
 namespace {
+    static const int kMinimumRecordStoreVersion = 1;
+    static const int kCurrentRecordStoreVersion = 1; // New record stores use this by default.
+    static const int kMaximumRecordStoreVersion = 1;
+    BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
+    BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
+
     bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
-        WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, opCtx);
-        WT_CURSOR* c = curwrap.get();
-        c->set_key(c, uri.c_str());
-        int ret = c->search(c);
-        if (ret == WT_NOTFOUND)
+        StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
+        if (!appMetadata.isOK()) {
             return false;
-        invariantWTOK(ret);
-
-        const char* config = NULL;
-        c->get_value(c, &config);
-        invariant(config);
-
-        WiredTigerConfigParser topParser(config);
-        WT_CONFIG_ITEM metadata;
-        if (topParser.get("app_metadata", &metadata) != 0)
-            return false;
-
-        if (metadata.len == 0)
-            return false;
-
-        WiredTigerConfigParser parser(metadata);
-        WT_CONFIG_ITEM keyItem;
-        WT_CONFIG_ITEM value;
-        while (parser.next(&keyItem, &value) == 0) {
-            const StringData key(keyItem.str, keyItem.len);
-            if (key == "oplogKeyExtractionVersion") {
-                if (value.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM &&  value.val == 1)
-                    return true;
-            }
-
-            // This prevents downgrades with unsupported metadata settings.
-            severe() << "Unrecognized WiredTiger metadata setting: " << key << '=' << value.str;
-            fassertFailedNoTrace(28548);
         }
 
-        return false;
+        return (appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
     }
 } // namespace
 
@@ -155,16 +131,22 @@ namespace {
         if ( NamespaceString::oplog(ns) ) {
             // force file for oplog
             ss << "type=file,";
-            ss << "app_metadata=(oplogKeyExtractionVersion=1),";
             // Tune down to 10m.  See SERVER-16247
             ss << "memory_page_max=10m,";
         }
-        else {
-            // Force this to be empty since users shouldn't be allowed to change it.
-            ss << "app_metadata=(),";
-        }
+
+        // WARNING: No user-specified config can appear below this line. These options are required
+        // for correct behavior of the server.
 
         ss << "key_format=q,value_format=u";
+
+        // Record store metadata
+        ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
+        if (NamespaceString::oplog(ns)) {
+            ss << ",oplogKeyExtractionVersion=1";
+        }
+        ss << ")";
+
         return StatusWith<std::string>(ss);
     }
 
@@ -189,6 +171,11 @@ namespace {
               _sizeStorer( sizeStorer ),
               _sizeStorerCounter(0)
     {
+        Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+            ctx, uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion);
+        if (!versionStatus.isOK()) {
+            fassertFailedWithStatusNoTrace(28548, versionStatus);
+        }
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -714,6 +701,15 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
+        {
+            BSONObjBuilder metadata(bob.subobjStart("metadata"));
+            Status status = WiredTigerUtil::getApplicationMetadata(txn, GetURI(), &metadata);
+            if (!status.isOK()) {
+                metadata.append("error", "unable to retrieve metadata");
+                metadata.append("code", static_cast<int>(status.code()));
+                metadata.append("reason", status.reason());
+            }
+        }
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
