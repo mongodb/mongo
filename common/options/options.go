@@ -12,7 +12,12 @@ import (
 )
 
 const (
-	VersionStr = "2.8.0-rc3"
+	VersionStr = "2.8.0-rc4-pre-"
+)
+
+// Gitspec that the tool was built with. Needs to be set using -ldflags
+var (
+	Gitspec = "not-built-with-ldflags"
 )
 
 // Struct encompassing all of the options that are reused across tools: "help",
@@ -212,6 +217,7 @@ func (self *ToolOptions) PrintHelp(force bool) bool {
 func (self *ToolOptions) PrintVersion() bool {
 	if self.Version {
 		fmt.Printf("%v version: %v\n", self.AppName, self.VersionStr)
+		fmt.Printf("git version: %v\n", Gitspec)
 	}
 	return self.Version
 }
