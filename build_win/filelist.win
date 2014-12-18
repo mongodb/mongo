@@ -123,6 +123,7 @@ src/os_win/os_remove.c
 src/os_win/os_rename.c
 src/os_win/os_rw.c
 src/os_win/os_sleep.c
+src/os_win/os_snprintf.c
 src/os_win/os_thread.c
 src/os_win/os_time.c
 src/os_win/os_vsnprintf.c
