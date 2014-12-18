@@ -11,7 +11,7 @@ if (typeof getToolTest === 'undefined') {
  */
 
 (function() {
-  var toolTest = getToolTest('oplogDeprecatedFlagTest');
+  var toolTest = getToolTest('oplogAsymmetricSSLTest');
   var commonToolArgs = getCommonToolArguments();
   var sslOpts = [
     '--ssl',
@@ -21,7 +21,7 @@ if (typeof getToolTest === 'undefined') {
   if (toolTest.usesSSL) {
     var port = 26999;
     var mongod = startMongod('--auth', '--port', port,
-      '--dbpath', MongoRunner.dataPath + 'oplogDeprecatedFlagTest2');
+      '--dbpath', MongoRunner.dataPath + 'oplogAsymmetricSSLTest2');
 
     /** Overwrite so toolTest.runTool doesn't append --host */
     toolTest.runTool = function() {
