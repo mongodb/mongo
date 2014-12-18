@@ -762,19 +762,13 @@ namespace {
              ++it) {
             try {
                 if (!st->syncApply(&txn, *it)) {
-                    bool status;
-                    {
-                        ScopedTransaction transaction(&txn, MODE_X);
-                        Lock::GlobalWrite lk(txn.lockState());
-                        status = st->shouldRetry(&txn, *it);
-                    }
 
-                    if (status) {
-                        // retry
+                    if (st->shouldRetry(&txn, *it)) {
                         if (!st->syncApply(&txn, *it)) {
                             fassertFailedNoTrace(15915);
                         }
                     }
+
                     // If shouldRetry() returns false, fall through.
                     // This can happen if the document that was moved and missed by Cloner
                     // subsequently got deleted and no longer exists on the Sync Target at all

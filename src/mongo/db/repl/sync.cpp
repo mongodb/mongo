@@ -110,16 +110,17 @@ namespace repl {
     }
 
     bool Sync::shouldRetry(OperationContext* txn, const BSONObj& o) {
-        invariant(txn->lockState()->isWriteLocked());
+        const NamespaceString nss(o.getStringField("ns"));
 
-        // should already have write lock
-        const char *ns = o.getStringField("ns");
-        Client::Context ctx(txn, ns);
+        // Take an X lock on the database in order to preclude other modifications. Also, the
+        // database might not exist yet, so create it.
+        AutoGetOrCreateDb autoDb(txn, nss.db(), MODE_X);
+        Database* const db = autoDb.getDb();
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
 
-        BSONObj missingObj = getMissingDoc(txn, ctx.db(), o);
+        BSONObj missingObj = getMissingDoc(txn, db, o);
 
         if( missingObj.isEmpty() ) {
             log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
@@ -130,8 +131,9 @@ namespace repl {
         }
         else {
             WriteUnitOfWork wunit(txn);
-            Collection* collection = ctx.db()->getOrCreateCollection(txn, ns);
-            invariant(collection != NULL); // should never happen
+
+            Collection* const collection = db->getOrCreateCollection(txn, nss.toString());
+            invariant(collection);
 
             StatusWith<RecordId> result = collection->insertDocument(txn, missingObj, true);
             uassert(15917,
@@ -139,9 +141,11 @@ namespace repl {
                     result.isOK() );
 
             LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
+
             wunit.commit();
             return true;
         }
     }
+
 } // namespace repl
 } // namespace mongo
