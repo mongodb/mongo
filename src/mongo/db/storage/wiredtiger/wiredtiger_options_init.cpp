@@ -43,9 +43,11 @@ namespace mongo {
 
         // Make --syncdelay (syncPeriodSecs in mmapv1) an alias for checkpointDelaySecs in WT
         moe::Value syncdelayVal;
-        // syncPeriodSecs is always set since it has a default.
-        invariant(moe::startupOptionsParsed.get("storage.mmapv1.syncPeriodSecs",
-                                                &syncdelayVal).isOK());
+        // syncPeriodSecs is always set since it has a default, for mongod.
+        if (!moe::startupOptionsParsed.get("storage.mmapv1.syncPeriodSecs",
+                                           &syncdelayVal).isOK()) {
+            return Status::OK();
+        }
         // Ignore override if set to default of 60.
         if (syncdelayVal.equal(moe::Value(60.0))) {
             return Status::OK();
