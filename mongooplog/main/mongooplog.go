@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
@@ -22,10 +21,16 @@ func main() {
 	opts.AddOptions(sourceOpts)
 
 	// parse the command line options
-	_, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
-		fmt.Printf("error parsing command line: %v\n\n", err)
-		fmt.Printf("try 'mongooplog --help' for more information\n")
+		log.Logf(log.Always, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "try 'mongooplog --help' for more information")
+		os.Exit(util.ExitBadOptions)
+	}
+
+	if len(args) != 0 {
+		log.Logf(log.Always, "positional arguments not allowed: %v", args)
+		log.Logf(log.Always, "try 'mongooplog --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -49,14 +54,14 @@ func main() {
 
 	// validate the mongooplog options
 	if err := sourceOpts.Validate(); err != nil {
-		fmt.Printf("command line error: %v\n", err)
+		log.Logf(log.Always, "command line error: %v", err)
 		os.Exit(util.ExitBadOptions)
 	}
 
 	// create a session provider for the destination server
 	sessionProviderTo, err := db.NewSessionProvider(*opts)
 	if err != nil {
-		fmt.Printf("error connecting to destination host: %v", err)
+		log.Logf(log.Always, "error connecting to destination host: %v", err)
 		os.Exit(util.ExitError)
 	}
 
@@ -65,7 +70,7 @@ func main() {
 	opts.Connection.Port = ""
 	sessionProviderFrom, err := db.NewSessionProvider(*opts)
 	if err != nil {
-		fmt.Printf("error connecting to source host: %v\n", err)
+		log.Logf(log.Always, "error connecting to source host: %v", err)
 		os.Exit(util.ExitError)
 	}
 
@@ -79,7 +84,7 @@ func main() {
 
 	// kick it off
 	if err := oplog.Run(); err != nil {
-		fmt.Printf("error: %v\n", err)
+		log.Logf(log.Always, "error: %v", err)
 		os.Exit(util.ExitError)
 	}
 

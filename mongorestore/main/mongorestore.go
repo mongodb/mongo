@@ -22,8 +22,8 @@ func main() {
 
 	extraArgs, err := opts.Parse()
 	if err != nil {
-		fmt.Printf("error parsing command line options: %v\n\n", err)
-		fmt.Printf("try 'mongorestore --help' for more information\n")
+		log.Logf(log.Always, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "try 'mongorestore --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -31,6 +31,7 @@ func main() {
 	if opts.PrintHelp(false) {
 		return
 	}
+
 	if opts.PrintVersion() {
 		return
 	}
@@ -39,7 +40,8 @@ func main() {
 
 	targetDir, err := getTargetDirFromArgs(extraArgs, inputOpts.Directory)
 	if err != nil {
-		fmt.Printf("error parsing command line options: %v\n", err)
+		log.Logf(log.Always, "%v", err)
+		log.Logf(log.Always, "try 'mongorestore --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 	targetDir = util.ToUniversalPath(targetDir)
@@ -51,7 +53,7 @@ func main() {
 
 	provider, err := db.NewSessionProvider(*opts)
 	if err != nil {
-		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
 	restore := mongorestore.MongoRestore{

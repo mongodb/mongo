@@ -24,9 +24,10 @@ func main() {
 	outputOpts := &mongotop.Output{}
 	opts.AddOptions(outputOpts)
 
-	extra, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "try 'mongotop --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -40,22 +41,22 @@ func main() {
 		return
 	}
 
-	if len(extra) > 1 {
+	if len(args) > 1 {
 		log.Logf(log.Always, "too many positional arguments")
-		opts.PrintHelp(true)
+		log.Logf(log.Always, "try 'mongotop --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
 	sleeptime := 1 // default to 1 second sleep time
-	if len(extra) > 0 {
-		sleeptime, err = strconv.Atoi(extra[0])
+	if len(args) > 0 {
+		sleeptime, err = strconv.Atoi(args[0])
 		if err != nil || sleeptime <= 0 {
-			log.Logf(log.Always, "bad sleep time: %v", extra[0])
+			log.Logf(log.Always, "invalid sleep time: %v", args[0])
 			os.Exit(util.ExitBadOptions)
 		}
 	}
 	if outputOpts.RowCount < 0 {
-		log.Logf(log.Always, "invalid value for row count: %v", outputOpts.RowCount)
+		log.Logf(log.Always, "invalid value for --rowcount: %v", outputOpts.RowCount)
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -72,7 +73,7 @@ func main() {
 	// create a session provider to connect to the db
 	sessionProvider, err := db.NewSessionProvider(*opts)
 	if err != nil {
-		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
 

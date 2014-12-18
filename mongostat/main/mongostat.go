@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/signals"
@@ -24,29 +23,29 @@ func main() {
 	statOpts := &mongostat.StatOptions{}
 	opts.AddOptions(statOpts)
 
-	extra, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid options: %v\n", err)
-		opts.PrintHelp(true)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "try 'mongostat --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
 	log.SetVerbosity(opts.Verbosity)
 
 	sleepInterval := 1
-	if len(extra) > 0 {
-		if len(extra) != 1 {
-			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
-			opts.PrintHelp(true)
+	if len(args) > 0 {
+		if len(args) != 1 {
+			log.Logf(log.Always, "too many positional arguments: %v", args)
+			log.Logf(log.Always, "try 'mongostat --help' for more information")
 			os.Exit(util.ExitBadOptions)
 		}
-		sleepInterval, err = strconv.Atoi(extra[0])
+		sleepInterval, err = strconv.Atoi(args[0])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Bad sleep interval: %v\n", extra[0])
+			log.Logf(log.Always, "invalid sleep interval: %v", args[0])
 			os.Exit(util.ExitBadOptions)
 		}
 		if sleepInterval < 1 {
-			fmt.Fprintf(os.Stderr, "Sleep interval must be at least 1 second\n")
+			log.Logf(log.Always, "sleep interval must be at least 1 second")
 			os.Exit(util.ExitBadOptions)
 		}
 	}

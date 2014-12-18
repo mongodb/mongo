@@ -16,10 +16,11 @@ func main() {
 	bsonDumpOpts := &bsondump.BSONDumpOptions{}
 	opts.AddOptions(bsonDumpOpts)
 
-	extra, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
-		os.Exit(util.ExitError)
+		log.Logf(log.Always, "try 'bsondump --help' for more information")
+		os.Exit(util.ExitBadOptions)
 	}
 
 	// print help, if specified
@@ -35,31 +36,24 @@ func main() {
 	log.SetVerbosity(opts.Verbosity)
 
 	// pull out the filename
-	filename := ""
-	if len(extra) == 0 {
-		opts.PrintHelp(true)
-		return
-	} else if len(extra) > 1 {
-		log.Log(log.Always, "Too many positional operators.")
-		opts.PrintHelp(true)
-		os.Exit(util.ExitError)
-	} else {
-		filename = extra[0]
-		if filename == "" {
-			log.Log(log.Always, "Filename must not be blank.")
-			opts.PrintHelp(true)
-			os.Exit(util.ExitError)
-		}
+	if len(args) == 0 {
+		log.Logf(log.Always, "must provide a filename")
+		log.Logf(log.Always, "try 'bsondump --help' for more information")
+		os.Exit(util.ExitBadOptions)
+	} else if len(args) > 1 {
+		log.Logf(log.Always, "too many positional arguments: %v", args)
+		log.Logf(log.Always, "try 'bsondump --help' for more information")
+		os.Exit(util.ExitBadOptions)
 	}
 
 	dumper := bsondump.BSONDump{
 		ToolOptions:     opts,
 		BSONDumpOptions: bsonDumpOpts,
-		FileName:        filename,
+		FileName:        args[0],
 		Out:             os.Stdout,
 	}
 
-	log.Logf(log.DebugLow, "running bsondump with objcheck: %v", bsonDumpOpts.ObjCheck)
+	log.Logf(log.DebugLow, "running bsondump with --objcheck: %v", bsonDumpOpts.ObjCheck)
 
 	if len(bsonDumpOpts.Type) != 0 && bsonDumpOpts.Type != "debug" && bsonDumpOpts.Type != "json" {
 		log.Logf(log.Always, "Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)

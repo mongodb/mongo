@@ -27,7 +27,7 @@ func main() {
 	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(log.Always, "error parsing command line options: %v", err)
-		opts.PrintHelp(true)
+		log.Logf(log.Always, "try 'mongoimport --help' for more information")
 		os.Exit(util.ExitBadOptions)
 	}
 
@@ -51,7 +51,7 @@ func main() {
 	// create a session provider to connect to the db
 	sessionProvider, err := db.NewSessionProvider(*opts)
 	if err != nil {
-		log.Logf(log.Always, "error connecting to host: %v\n", err)
+		log.Logf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
 
@@ -64,7 +64,7 @@ func main() {
 
 	if err = mongoImport.ValidateSettings(args); err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
-		opts.PrintHelp(true)
+		log.Logf(log.Always, "try 'mongoimport --help' for more information")
 		os.Exit(util.ExitError)
 	}
 
