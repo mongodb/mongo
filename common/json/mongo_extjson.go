@@ -15,6 +15,8 @@ type BinData struct {
 // Represents the number of milliseconds since the Unix epoch.
 type Date int64
 
+type ISODate string
+
 // Represents a reference to another document.
 type DBRef struct {
 	Collection string
@@ -74,6 +76,7 @@ var (
 	// object types
 	binDataType     = reflect.TypeOf(BinData{})
 	dateType        = reflect.TypeOf(Date(0))
+	isoDateType		= reflect.TypeOf(ISODate(""))
 	dbRefType       = reflect.TypeOf(DBRef{})
 	maxKeyType      = reflect.TypeOf(MaxKey{})
 	minKeyType      = reflect.TypeOf(MinKey{})
@@ -99,7 +102,7 @@ func stateBeginExtendedValue(s *scanner, c int) int {
 		s.step = stateB
 	case 'D': // beginning of Date
 		s.step = stateD
-	case 'I': // beginning of Infinity
+	case 'I': // beginning of Infinity or ISODate
 		s.step = stateI
 	case 'M': // beginning of MinKey or MaxKey
 		s.step = stateM
@@ -161,6 +164,19 @@ func stateD(s *scanner, c int) int {
 	return scanContinue
 }
 
+// stateI is the state after reading `I`.
+func stateI(s *scanner, c int) int {
+	switch c {
+	case 'n':
+		s.step = stateIn
+	case 'S' :
+		s.step = stateIS
+	default:
+		return s.error(c, "in literal Infinity or ISO (expecting 'n' or 'S')")
+	}
+	return scanContinue
+}
+
 // Decodes a literal stored in item into v.
 func (d *decodeState) storeExtendedLiteral(item []byte, v reflect.Value, fromQuoted bool) bool {
 	switch c := item[0]; c {
@@ -184,6 +200,11 @@ func (d *decodeState) storeExtendedLiteral(item []byte, v reflect.Value, fromQuo
 			d.storeDate(v)
 		case 'B', 'b': // DBRef or Dbref
 			d.storeDBRef(v)
+		}
+	case 'I':
+		switch item[1] {
+		case 'S': //ISODate
+			d.storeISODate(v)
 		}
 
 	case 'M': // MinKey or MaxKey
@@ -289,6 +310,12 @@ func (d *decodeState) getExtendedLiteral(item []byte) (interface{}, bool) {
 
 	case 'T': // Timestamp
 		return d.getTimestamp(), true
+
+	case 'I': // ISO Date
+		switch item[1] {
+		case 'S': // ISODate
+			return d.getDate(), true
+		}
 
 	case '/': // regular expression literal
 		op := d.scanWhile(scanSkipSpace)

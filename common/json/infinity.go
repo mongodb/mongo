@@ -3,11 +3,11 @@ package json
 // Transition functions for recognizing Infinity.
 // Adapted from encoding/json/scanner.go.
 
-// stateI is the state after reading `I`.
-func stateI(s *scanner, c int) int {
-	if c == 'n' {
-		s.step = generateState("Infinity", []byte("finity"), stateEndValue)
+// stateI is the state after reading `In`.
+func stateIn(s *scanner, c int) int {
+	if c == 'f' {
+		s.step = generateState("Infinity", []byte("inity"), stateEndValue)
 		return scanContinue
 	}
-	return s.error(c, "in literal Infinity (expecting 'n')")
+	return s.error(c, "in literal Infinity (expecting 'f')")
 }

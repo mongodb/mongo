@@ -393,7 +393,7 @@ func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (retErr
 func (mongoImport *MongoImport) configureSession(session *mgo.Session) error {
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
-	sessionSafety, err := util.BuildWriteConcern(
+	sessionSafety, err := db.BuildWriteConcern(
 		mongoImport.IngestOptions.WriteConcern,
 		mongoImport.isReplicaSet,
 	)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"reflect"
@@ -52,6 +53,10 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	case json.Date: // Date
 		n := int64(v)
 		return time.Unix(n/1e3, n%1e3*1e6), nil
+
+	case json.ISODate: //ISODate
+		n := string(v)
+		return util.FormatDate(n)
 
 	case json.NumberLong: // NumberLong
 		return int64(v), nil

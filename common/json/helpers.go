@@ -17,10 +17,10 @@ func isNumber(s []byte) bool {
 	if len(s) == 0 {
 		return false
 	}
-	if len(s) > 1 && s[0] == 'N' && s[1] == 'a' { // NaN
+	if len(s) > 1 && (s[0] == 'N' && s[1] == 'a') || (s[0] == 'I' && s[1] == 'n') { // NaN
 		return true
 	}
-	return s[0] == '+' || s[0] == '-' || s[0] == '.' || s[0] == 'I' || (s[0] >= '0' && s[0] <= '9')
+	return s[0] == '+' || s[0] == '-' || s[0] == '.' || (s[0] >= '0' && s[0] <= '9')
 }
 
 // Returns true if the string represents the start of a hexadecimal
@@ -46,6 +46,6 @@ func generateState(name string, x []byte, accept func(*scanner, int) int) func(*
 			s.step = generateState(name, x[1:], accept)
 			return scanContinue
 		}
-		return s.error(c, fmt.Sprintf("in literal %v (expecting '%v')", name, x[0]))
+		return s.error(c, fmt.Sprintf("in literal %v (expecting '%v')", name, string(x[0])))
 	}
 }

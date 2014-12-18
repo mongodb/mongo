@@ -204,7 +204,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 		return "", fmt.Errorf("error determining if connected to replica set: %v", err)
 	}
 
-	safety, err := util.BuildWriteConcern(self.StorageOptions.WriteConcern, isRepl)
+	safety, err := db.BuildWriteConcern(self.StorageOptions.WriteConcern, isRepl)
 	if err != nil {
 		return "", fmt.Errorf("error parsing write concern: %v", err)
 	}

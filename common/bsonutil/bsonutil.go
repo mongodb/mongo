@@ -12,13 +12,6 @@ import (
 	"time"
 )
 
-var (
-	acceptedDateFormats = []string{
-		"2006-01-02T15:04:05.000Z0700",
-		"2006-01-02T15:04:05Z0700",
-		"2006-01-02T15:04Z0700",
-	}
-)
 
 var ErrNoSuchField = errors.New("no such field")
 
@@ -83,19 +76,9 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 	switch len(doc) {
 	case 1: // document has a single field
 		if jsonValue, ok := doc["$date"]; ok {
-			var date time.Time
-			var err error
-
 			switch v := jsonValue.(type) {
 			case string:
-				for _, format := range acceptedDateFormats {
-					date, err = time.Parse(format, v)
-					if err == nil {
-						return date, nil
-					}
-				}
-				return date, err
-
+				return util.FormatDate(v)
 			case map[string]interface{}:
 				if jsonValue, ok := v["$numberLong"]; ok {
 					n, err := parseNumberLongField(jsonValue)
@@ -113,9 +96,11 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			case float64:
 				n := int64(v)
 				return time.Unix(n/1e3, n%1e3*1e6), nil
-
 			case int64:
 				return time.Unix(v/1e3, v%1e3*1e6), nil
+
+			case json.ISODate:
+				return v, nil
 
 			default:
 				return nil, errors.New("Invalid type for $date field")
