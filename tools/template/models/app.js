@@ -7,18 +7,6 @@ var AmpersandState = require('ampersand-state'),
 
 
 var App = module.exports = AmpersandState.extend({
-  props: {
-    xSetting: {
-      type: 'string',
-      default: 'relative',
-      values: ['relative', 'absolute']
-    },
-    ySetting: {
-      type: 'string',
-      default: 'linear',
-      values: ['linear', 'log-scale']
-    }
-  },
   children: {
     sidebar: Sidebar,
     chart: Chart

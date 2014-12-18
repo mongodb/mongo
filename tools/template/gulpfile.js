@@ -12,7 +12,7 @@ var gulp = require('gulp'),
     prettyTime = require('pretty-hrtime'),
     gutil = require('gulp-util');
 
-var DEBUG = true;
+var DEBUG = false;
 var BUILD = './build';
 
 /**
@@ -43,7 +43,7 @@ function createErrorNotifier(titlePrefix) {
   };
 }
 
-gulp.task('default', ['templates', 'styles', 'fonts', 'static', 'js']);
+gulp.task('default', ['templates', 'styles', 'fonts', 'js']);
 
 gulp.task('js', function() {
   var b = browserify({
@@ -132,11 +132,11 @@ gulp.task('styles', function() {
 /**
  * @task assets Copies all static asset files into `BUILD`.
  */
-gulp.task('static', [
-  'copy rickshaw css'
-]);
+// gulp.task('static', [
+//   'copy rickshaw css'
+// ]);
 
-gulp.task('copy rickshaw css', function() {
-  return gulp.src('node_modules/rickshaw/rickshaw.min.css')
-    .pipe(gulp.dest(BUILD + '/css'));
-});
+// gulp.task('copy rickshaw css', function() {
+//   return gulp.src('node_modules/rickshaw/rickshaw.min.css')
+//     .pipe(gulp.dest(BUILD + '/css'));
+// });

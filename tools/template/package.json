@@ -20,8 +20,7 @@
     "d3": "^3.5.2",
     "font-awesome": "https://github.com/FortAwesome/Font-Awesome/archive/v4.2.0.tar.gz",
     "jquery": "^2.1.1",
-    "lodash": "^2.4.1",
-    "rickshaw": "^1.5.1"
+    "lodash": "^2.4.1"
   },
   "devDependencies": {
     "browserify": "^6.3.3",

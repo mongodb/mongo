@@ -13,11 +13,34 @@ module.exports = function(opts) {
     data = opts.data,
     el = opts.el;
 
+    var options = data.options,
+        series = data.series;
+
+    // no data to plot    
+    if (series.length === 0) return;
+
     var x = d3.scale.linear()
       .range([0, width]);
 
-    var y = d3.scale.linear()
-      .range([height, 0]);
+    x.domain([
+      d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.x; }); }),
+      d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.x; }); })
+    ]);
+
+    if (options.ySetting === 'linear') {
+      var y = d3.scale.linear().range([height, 0]);
+      y.domain([
+        d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.y; }); }),
+        d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
+      ]);
+    } else {
+      var y = d3.scale.log().clamp(true).range([height, 0]).nice();
+      y.domain([
+        0.1, d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
+      ]);
+    }
+
+
 
     var xAxis = d3.svg.axis()
       .scale(x)
@@ -38,21 +61,6 @@ module.exports = function(opts) {
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
     
     svg.attr({width: width, height: height});
-
-    var series = data;
-    
-    // no data to plot    
-    if (series.length === 0) return;
-
-    x.domain([
-      d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.x; }); }),
-      d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.x; }); })
-    ]);
-
-    y.domain([
-      d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.y; }); }),
-      d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
-    ]);
 
     svg.append("g")
         .attr("class", "x axis")

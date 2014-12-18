@@ -12,12 +12,15 @@ var ChartView = module.exports = AmpersandView.extend({
 
     this.renderSubview(new VizView({
       width: 'auto',
-      height: 800,
+      height: 600,
       renderMode: 'svg',
       className: 'multiline',
       debounceRender: false,
       vizFn: require('./viz/d3-multiline'),
-      data: this.model.series.filter(function (s) { return s.selected; })
+      data: {
+        series: this.model.series.filter(function (s) { return s.selected; }),
+        options: this.model.serialize()
+      }
     }), '[data-hook=graph]');
 
   },

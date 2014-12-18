@@ -3,6 +3,18 @@ var AmpersandState = require('ampersand-state'),
     debug = require('debug')('model:chart');
 
 var Chart = module.exports = AmpersandState.extend({
+  props: {
+    xSetting: {
+      type: 'string',
+      default: 'relative',
+      values: ['relative', 'absolute']
+    },
+    ySetting: {
+      type: 'string',
+      default: 'linear',
+      values: ['linear', 'log-scale']
+    }
+  },
   derived: {
     // proxy stats from parent
     series: {

@@ -45,7 +45,8 @@ var AppView = module.exports = AmpersandView.extend({
     var $input = $(event.target).find('input');
     var name = $input.attr('name');
     var value = $input.val();
-    this.model[name] = value;
+    this.model.chart[name] = value;
+    this.chartView.redraw();
   }
 
   // navButtonClicked: function (event) {
