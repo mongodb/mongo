@@ -3,9 +3,29 @@
     .container-fluid
       .navbar-header
         a(href='#').navbar-brand WTstats
-      .navbar-text.navbar-right
-        i#menubtn.fa.fa-bars.fa-lg
-        
+      ul.nav.navbar-right
+        li.navbar-text
+          i#menubtn.fa.fa-clock-o
+          span x-axis
+          div(data-toggle='buttons', data-hook='xSetting').btn-group
+            label.btn.btn-default.active
+              input(type='radio', name='xSetting', id='relative', value='relative', checked)
+              | relative
+            label.btn.btn-default
+              input(type='radio', name='xSetting', id='absolute', value='absolute') 
+              | absolute
+
+        li.navbar-text
+          i#menubtn.fa.fa-line-chart
+          span y-axis
+          div(data-toggle='buttons', data-hook='ySetting').btn-group
+            label.btn.btn-default.active
+              input(type='radio', name='ySetting', value='linear', checked)
+              | linear
+            label.btn.btn-default
+              input(type='radio', name='ySetting', value='log-scale') 
+              | log-scale
+
   #wrapper
     #sidebar-wrapper
       .sidebar-nav
@@ -15,3 +35,4 @@
       .row
         div.col-md-12
           div(data-hook='chart')
+

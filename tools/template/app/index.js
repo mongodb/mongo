@@ -7,6 +7,7 @@ var AppView = require('../views/app'),
 require('bootstrap/js/dropdown');
 require('bootstrap/js/collapse');
 require('bootstrap/js/transition');
+require('bootstrap/js/button');
 
 var fixtureData = require('../fixtures/wtstats.fixture.json');
 
