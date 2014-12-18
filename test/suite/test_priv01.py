@@ -48,6 +48,7 @@ class test_priv01(wttest.WiredTigerTestCase):
     def setUp(self):
         if os.name == 'nt':
             self.skipTest('Unix specific test skipped on Windows')
+        super(test_priv01, self).setUp()
 
     # Each test needs to set up its connection in its own way,
     # so override these methods to do nothing
