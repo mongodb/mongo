@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {

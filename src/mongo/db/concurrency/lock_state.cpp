@@ -38,6 +38,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {
@@ -55,7 +56,7 @@ namespace {
     const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
     // How often (in millis) to check for deadlock if a lock has not been granted for some time
-    const unsigned DeadlockTimeoutMs = 100;
+    const unsigned DeadlockTimeoutMs = 500;
 
     // Dispenses unique LockerId identifiers
     AtomicUInt64 idCounter(0);
@@ -105,48 +106,6 @@ namespace {
 
         default:
             invariant(false);
-        }
-    }
-
-    /**
-     * Dumps the contents of the global lock manager to the server log for diagnostics.
-     */
-    enum {
-        LockMgrDumpThrottleMillis = 60000,
-        LockMgrDumpThrottleMicros = LockMgrDumpThrottleMillis * 1000
-    };
-
-    AtomicUInt64 lastDumpTimestampMicros(0);
-
-    void dumpGlobalLockManagerAndCallstackThrottled(const Locker* locker) {
-        const uint64_t lastDumpMicros = lastDumpTimestampMicros.load();
-
-        // Don't print too frequently
-        if (curTimeMicros64() - lastDumpMicros < LockMgrDumpThrottleMicros) return;
-
-        // Only one thread should dump the lock manager in order to not pollute the log
-        if (lastDumpTimestampMicros.compareAndSwap(lastDumpMicros,
-            curTimeMicros64()) == lastDumpMicros) {
-
-            log() << "LockerId " << locker->getId()
-                  << " has been waiting to acquire lock for more than 30 seconds. MongoDB will"
-                  << " print the lock manager state and the stack of the thread that has been"
-                  << " waiting, for diagnostic purposes. This message does not necessary imply"
-                  << " that the server is experiencing an outage, but might be an indication of"
-                  << " an overload.";
-
-            // Dump the lock manager state and the stack trace so we can investigate
-            globalLockManager.dump();
-
-            log() << '\n';
-            printStackTrace();
-
-            // If a deadlock was discovered, the server will never recover from it, so shutdown
-            DeadlockDetector wfg(globalLockManager, locker);
-            if (wfg.check().hasCycle()) {
-                severe() << "Deadlock found during lock acquisition: " << wfg.toString();
-                fassertFailed(28557);
-            }
         }
     }
 
@@ -649,14 +608,25 @@ namespace {
 
             if (result == LOCK_OK) break;
 
-            if (checkDeadlock) {
-                DeadlockDetector wfg(globalLockManager, this);
-                if (wfg.check().hasCycle()) {
-                    log() << "Deadlock found: " << wfg.toString();
+            DeadlockDetector wfg(globalLockManager, this);
+            if (wfg.check().hasCycle()) {
+                // Make sure that the caller actually expects the deadlock return value
+                if (!checkDeadlock) {
+                    severe() << "LockerId " << getId() << " encountered an unexpected deadlock."
+                             << " The server will shut down in order to prevent becoming"
+                             << " unresponsive. The cycle of deadlocked threads is: "
+                             << wfg.toString();
 
-                    result = LOCK_DEADLOCK;
-                    break;
+                    // Dump the lock manager state and the stack trace so we can investigate
+                    globalLockManager.dump();
+
+                    fassertFailed(28589);
                 }
+
+                warning() << "Deadlock found: " << wfg.toString();
+
+                result = LOCK_DEADLOCK;
+                break;
             }
 
             const unsigned elapsedTimeMs = timer.millis();
@@ -665,12 +635,6 @@ namespace {
 
             if (waitTimeMs == 0) {
                 break;
-            }
-
-            // This will occasionally dump the global lock manager in case lock acquisition is
-            // taking too long.
-            if (elapsedTimeMs > LockMgrDumpThrottleMillis) {
-                dumpGlobalLockManagerAndCallstackThrottled(this);
             }
         }
 

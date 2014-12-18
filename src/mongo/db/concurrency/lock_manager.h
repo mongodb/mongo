@@ -40,7 +40,6 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 

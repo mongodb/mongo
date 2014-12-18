@@ -198,9 +198,6 @@ namespace mongo {
         int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
-        // For maintaining locking timing statistics
-        Timer _timer;
-
 
         //////////////////////////////////////////////////////////////////////////////////////////
         //
