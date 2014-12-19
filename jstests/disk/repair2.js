@@ -2,6 +2,16 @@
 
 var baseName = "jstests_disk_repair2";
 
+function check() {
+    files = listFiles( dbpath );
+    for( f in files ) {
+        assert( ! new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ),
+                "backup dir " + files[ f ].name + " in dbpath" );
+    }
+
+    assert.eq.automsg( "1", "db[ baseName ].count()" );
+}
+
 port = allocatePorts( 1 )[ 0 ];
 dbpath = MongoRunner.dataPath + baseName + "/";
 repairpath = dbpath + "repairDir/";
@@ -15,15 +25,21 @@ m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath",
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
 assert.commandWorked( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
-function check() {
-    files = listFiles( dbpath );
-    for( f in files ) {
-        assert( ! new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ),
-                "backup dir " + files[ f ].name + " in dbpath" );
-    }
-    
-    assert.eq.automsg( "1", "db[ baseName ].count()" );
+
+//Check that repair files exist in the repair directory, and nothing else
+db.adminCommand( { fsync : 1 } );
+files = listFiles( repairpath + "/backup_repairDatabase_0/" + baseName );
+var fileCount = 0;
+for( f in files ) {
+    print( files[ f ].name );
+    if ( files[ f ].isDirectory )
+        continue;
+    fileCount += 1;
+    assert( /\.bak$/.test( files[ f ].name ),
+            "In database repair directory, found unexpected file: " + files[ f ].name );
 }
+assert( fileCount > 0, "Expected more than zero nondirectory files in the database directory" );
+
 check();
 stopMongod( port );
 
