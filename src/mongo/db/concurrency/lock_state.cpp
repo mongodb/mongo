@@ -620,7 +620,7 @@ namespace {
                     // Dump the lock manager state and the stack trace so we can investigate
                     globalLockManager.dump();
 
-                    fassertFailed(28589);
+                    fassertFailed(28591);
                 }
 
                 warning() << "Deadlock found: " << wfg.toString();
