@@ -488,8 +488,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "thread-yield: page acquire locked blocked";
 	stats->page_read_blocked.desc =
 	    "thread-yield: page acquire read blocked";
-	stats->page_in_sleep.desc =
-	    "thread-yield: page acquire time sleeping in microseconds";
+	stats->page_sleep.desc =
+	    "thread-yield: page acquire time sleeping (usecs)";
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
@@ -622,7 +622,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->page_forcible_evict_blocked.v = 0;
 	stats->page_locked_blocked.v = 0;
 	stats->page_read_blocked.v = 0;
-	stats->page_in_sleep.v = 0;
+	stats->page_sleep.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_fail_cache.v = 0;

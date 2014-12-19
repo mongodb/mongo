@@ -238,9 +238,9 @@ struct __wt_connection_stats {
 	WT_STATS memory_grow;
 	WT_STATS page_busy_blocked;
 	WT_STATS page_forcible_evict_blocked;
-	WT_STATS page_in_sleep;
 	WT_STATS page_locked_blocked;
 	WT_STATS page_read_blocked;
+	WT_STATS page_sleep;
 	WT_STATS read_io;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;

@@ -3301,12 +3301,12 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1105
 /*! thread-yield: page acquire eviction blocked */
 #define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1106
-/*! thread-yield: page acquire time sleeping in microseconds */
-#define	WT_STAT_CONN_PAGE_IN_SLEEP			1107
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1108
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1107
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1109
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1108
+/*! thread-yield: page acquire time sleeping (usecs) */
+#define	WT_STAT_CONN_PAGE_SLEEP				1109
 /*! connection: total read I/Os */
 #define	WT_STAT_CONN_READ_IO				1110
 /*! reconciliation: page reconciliation calls */

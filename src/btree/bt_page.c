@@ -67,10 +67,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int busy, force_attempts, oldgen, sleep_cnt, wait_cnt;
+	u_int sleep_cnt, wait_cnt;
+	int busy, force_attempts, oldgen;
 
-	wait_cnt = 1;
-	for (force_attempts = oldgen = 0;;) {
+	for (force_attempts = oldgen = 0, wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -157,15 +157,17 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/* We failed to get the page -- yield before retrying. */
-		if (wait_cnt < 5) {
+		/*
+		 * We failed to get the page -- yield before retrying, and if
+		 * we've yielded a few times start sleeping so we don't burn
+		 * CPU to no purpose.
+		 */
+		if (++wait_cnt < 5)
 			__wt_yield();
-			wait_cnt++;
-		 } else {
+		 else {
 			wait_cnt *= 2;
 			sleep_cnt = WT_MAX(wait_cnt, 10000);
-			WT_STAT_FAST_CONN_INCRV(
-			    session, page_in_sleep, sleep_cnt);
+			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
 			__wt_sleep(0, sleep_cnt);
 		}
 	}
