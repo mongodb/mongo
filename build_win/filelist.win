@@ -113,6 +113,7 @@ src/os_win/os_filesize.c
 src/os_win/os_flock.c
 src/os_win/os_fsync.c
 src/os_win/os_ftruncate.c
+src/os_win/os_getenv.c
 src/os_win/os_map.c
 src/os_win/os_mtx_cond.c
 src/os_win/os_once.c
