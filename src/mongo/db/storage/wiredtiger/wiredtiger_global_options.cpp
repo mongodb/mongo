@@ -82,7 +82,7 @@ namespace mongo {
                                             "configuration settings")
             .hidden();
 
-        // WiredTiger collection and index options
+        // WiredTiger collection options
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.collectionConfig.blockCompressor",
                                             "wiredTigerCollectionBlockCompressor",
                                             moe::String,
@@ -90,31 +90,19 @@ namespace mongo {
                                             "[none|snappy|zlib]")
             .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
             .setDefault(moe::Value(std::string("snappy")));
-        wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.blockCompressor",
-                                            "wiredTigerIndexBlockCompressor",
-                                            moe::String,
-                                            "block compression algorithm for index data "
-                                            "[none|snappy|zlib]")
-            .format("(:?none)|(:?snappy)|(:?zlib)", "(none/snappy/zlib)")
-            .setDefault(moe::Value(std::string("none")));
-
-        wiredTigerOptions.addOptionChaining("storage.wiredTiger.collectionConfig.prefixCompression",
-                                            "wiredTigerCollectionPrefixCompression",
-                                            moe::Bool,
-                                            "use prefix compression on row-store leaf pages")
-            .setDefault(moe::Value(false));
-        wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.prefixCompression",
-                                            "wiredTigerIndexPrefixCompression",
-                                            moe::Bool,
-                                            "use prefix compression on row-store leaf pages")
-            .setDefault(moe::Value(true));
-
-
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.collectionConfig.configString",
                                             "wiredTigerCollectionConfigString",
                                             moe::String,
                                             "WiredTiger custom collection configuration settings")
             .hidden();
+
+
+        // WiredTiger index options
+        wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.prefixCompression",
+                                            "wiredTigerIndexPrefixCompression",
+                                            moe::Bool,
+                                            "use prefix compression on row-store leaf pages")
+            .setDefault(moe::Value(true));
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.indexConfig.configString",
                                             "wiredTigerIndexConfigString",
                                             moe::String,
@@ -154,28 +142,21 @@ namespace mongo {
             log() << "Engine custom option: " << wiredTigerGlobalOptions.engineConfig;
         }
 
-        // WiredTiger collection and index options
-
+        // WiredTiger collection options
         if (params.count("storage.wiredTiger.collectionConfig.blockCompressor")) {
             wiredTigerGlobalOptions.collectionBlockCompressor =
                 params["storage.wiredTiger.collectionConfig.blockCompressor"].as<std::string>();
-        }
-        if (params.count("storage.wiredTiger.indexConfig.blockCompressor")) {
-            wiredTigerGlobalOptions.indexBlockCompressor =
-                params["storage.wiredTiger.indexConfig.blockCompressor"].as<std::string>();
-        }
-        if (params.count("storage.wiredTiger.collectionConfig.prefixCompression")) {
-            wiredTigerGlobalOptions.useCollectionPrefixCompression =
-                params["storage.wiredTiger.collectionConfig.prefixCompression"].as<bool>();
-        }
-        if (params.count("storage.wiredTiger.indexConfig.prefixCompression")) {
-            wiredTigerGlobalOptions.useIndexPrefixCompression =
-                params["storage.wiredTiger.indexConfig.prefixCompression"].as<bool>();
         }
         if (params.count("storage.wiredTiger.collectionConfig.configString")) {
             wiredTigerGlobalOptions.collectionConfig =
                 params["storage.wiredTiger.collectionConfig.configString"].as<std::string>();
             log() << "Collection custom option: " << wiredTigerGlobalOptions.collectionConfig;
+        }
+
+        // WiredTiger index options
+        if (params.count("storage.wiredTiger.indexConfig.prefixCompression")) {
+            wiredTigerGlobalOptions.useIndexPrefixCompression =
+                params["storage.wiredTiger.indexConfig.prefixCompression"].as<bool>();
         }
         if (params.count("storage.wiredTiger.indexConfig.configString")) {
             wiredTigerGlobalOptions.indexConfig =
