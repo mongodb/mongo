@@ -142,6 +142,7 @@ namespace mongo {
           _cappedMaxSize(cappedMaxSize),
           _cappedMaxDocs(cappedMaxDocs),
           _cappedDeleteCallback(cappedDeleteCallback),
+          _cappedDeleteCheckCount(0),
           _isOplog(NamespaceString::oplog(ns)),
           _oplogCounter(0),
           _cappedVisibilityManager((_isCapped || _isOplog) ? new CappedVisibilityManager()
@@ -243,8 +244,7 @@ namespace mongo {
 
     bool RocksRecordStore::cappedAndNeedDelete(long long dataSizeDelta,
                                                long long numRecordsDelta) const {
-        if (!_isCapped)
-            return false;
+        invariant(_isCapped);
 
         if (_dataSize.load() + dataSizeDelta > _cappedMaxSize)
             return true;
@@ -257,11 +257,16 @@ namespace mongo {
 
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
                                                 const RecordId& justInserted) {
-        if (_isOplog) {
-            if (_oplogCounter++ % 100 > 0) {
-                return;
-            }
+        if (!_isCapped) {
+          return;
         }
+
+        // We only want to do the checks occasionally as they are expensive.
+        // This variable isn't thread safe, but has loose semantics anyway.
+        dassert( !_isOplog || _cappedMaxDocs == -1 );
+        if ( _cappedMaxDocs == -1 && // Max docs has to be exact, so have to check every time.
+             _cappedDeleteCheckCount++ % 100 > 0 )
+            return;
 
         long long dataSizeDelta = 0, numRecordsDelta = 0;
         if (!_isOplog) {
@@ -320,11 +325,8 @@ namespace mongo {
         catch (const WriteConflictException& wce) {
             delete txn->releaseRecoveryUnit();
             txn->setRecoveryUnit(realRecoveryUnit);
-            if (_isOplog) {
-                log() << "got conflict purging oplog, ignoring";
-                return;
-            }
-            throw;
+            log() << "got conflict truncating capped, ignoring";
+            return;
         }
         catch (...) {
             delete txn->releaseRecoveryUnit();
