@@ -79,7 +79,7 @@ __sweep(WT_SESSION_IMPL *session)
 		 * re-checks that the handle is not in use, which is why we
 		 * don't do any special handling of EBUSY returns above.
 		 */
-		if (dhandle->session_ref == 0) {
+		if (dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_dhandle_discard_single(session, 0));
 			if (ret != 0)
