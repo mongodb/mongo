@@ -51,7 +51,7 @@ assert.eq(2, masterDB.jstests_bgsec.getIndexes().length);
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
     return 2 == secondDB.jstests_bgsec.getIndexes().length; },
-             "index not created on secondary (prior to restart)", 240000 );
+             "index not created on secondary (prior to restart)", 5 * 60 * 1000 );
 
 // restart secondary and reconnect
 jsTest.log("Restarting secondary");
