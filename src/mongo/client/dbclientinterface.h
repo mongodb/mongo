@@ -1309,6 +1309,7 @@ namespace mongo {
         }
 
         string getServerAddress() const { return _serverString; }
+        const HostAndPort& getServerHostAndPort() const { return _server; }
 
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
