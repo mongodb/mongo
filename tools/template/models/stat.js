@@ -20,10 +20,6 @@ var Stat = module.exports = AmpersandState.extend({
       type: 'boolean',
       default: false
     }, 
-    visible: {
-      type: 'boolean',
-      default: true
-    },
     data: {
       type: 'object'
     }

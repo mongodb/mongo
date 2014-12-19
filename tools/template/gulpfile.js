@@ -12,7 +12,7 @@ var gulp = require('gulp'),
     prettyTime = require('pretty-hrtime'),
     gutil = require('gulp-util');
 
-var DEBUG = false;
+var DEBUG = true;
 var BUILD = './build';
 
 /**

@@ -36,7 +36,7 @@ var AppView = module.exports = AmpersandView.extend({
     }
   },
   statChanged: function (stat) {
-    this.chartView.redraw();
+    this.chartView.render();
   },
   render: function () {
     this.renderWithTemplate(this.model);
@@ -46,7 +46,7 @@ var AppView = module.exports = AmpersandView.extend({
     var name = $input.attr('name');
     var value = $input.val();
     this.model.chart[name] = value;
-    this.chartView.redraw();
+    this.chartView.render();
   }
 
   // navButtonClicked: function (event) {

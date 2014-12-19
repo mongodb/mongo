@@ -23,10 +23,10 @@ var Chart = module.exports = AmpersandState.extend({
       fn: function () {
         var series = this.parent.stats
           .filter(function (stat) {
-            return stat.visible;
+            return stat.selected;
           })
           .map(function (stat) {
-            return _.pick(stat, ['color', 'data', 'name', 'cid', 'visible', 'selected']);
+            return _.pick(stat, ['color', 'data', 'name', 'cid', 'selected']);
           })
 
         return series;

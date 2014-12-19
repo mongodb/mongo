@@ -121,7 +121,7 @@ module.exports = AmpersandView.extend({
 
     // call viz function
     if (this.vizFn) {
-      this.vizFn({
+      this.vizFn = this.vizFn({
         width: this.width,
         height: this.height,
         data: this.data,
@@ -129,8 +129,20 @@ module.exports = AmpersandView.extend({
       });
     }
     return this;
+  },
+
+  redraw: function() {
+    if (this.vizFn) {
+      this.vizFn({
+        width: this.width,
+        height: this.height,
+        data: this.data,
+        el: this.el,
+      });
+    }
   }
 });
+
 
 /**
  * Shortcut so you don't have to know anything about ampersand
