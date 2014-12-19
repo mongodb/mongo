@@ -19,6 +19,7 @@
 #define	WT_EVICT_PASS_AGGRESSIVE	0x01
 #define	WT_EVICT_PASS_ALL		0x02
 #define	WT_EVICT_PASS_DIRTY		0x04
+#define	WT_EVICT_PASS_TRICKLE		0x08
 
 /*
  * WT_EVICT_ENTRY --
@@ -113,7 +114,8 @@ struct __wt_cache {
 #define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
 #define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
 #define	WT_EVICT_CLEAR_WALKS	0x08	/* Clear eviction walks */
-#define	WT_EVICT_STUCK		0x10	/* Eviction server is stuck */
+#define	WT_EVICT_EARLY_CANDIDATES	0x10	/* Evict before trigger */
+#define	WT_EVICT_STUCK		0x20	/* Eviction server is stuck */
 	uint32_t flags;
 };
 

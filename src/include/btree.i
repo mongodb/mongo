@@ -227,9 +227,13 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  *      Set a page to be evicted as soon as possible.
  */
 static inline void
-__wt_page_evict_soon(WT_PAGE *page)
+__wt_page_evict_soon(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	page->read_gen = WT_READGEN_OLDEST;
+        if (!F_ISSET(S2C(session)->cache, WT_EVICT_EARLY_CANDIDATES)) {
+                F_SET(S2C(session)->cache, WT_EVICT_EARLY_CANDIDATES);
+                (void)__wt_evict_server_wake(session);
+        }
 }
 
 /*

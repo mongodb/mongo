@@ -570,7 +570,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 		if (page != NULL &&
 		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
 		    (newpage && cbt->page_deleted_count > 0)))
-			__wt_page_evict_soon(page);
+			__wt_page_evict_soon(session, page);
 		cbt->page_deleted_count = 0;
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
