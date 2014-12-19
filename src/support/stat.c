@@ -480,6 +480,14 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "reconciliation: split objects currently awaiting free";
 	stats->session_cursor_open.desc = "session: open cursor count";
 	stats->session_open.desc = "session: open session count";
+	stats->page_busy_yield.desc =
+	    "thread-yield: page acquire busy blocked";
+	stats->page_forcible_evict_yield.desc =
+	    "thread-yield: page acquire eviction blocked";
+	stats->page_locked_yield.desc =
+	    "thread-yield: page acquire locked blocked";
+	stats->page_read_yield.desc =
+	    "thread-yield: page acquire read blocked";
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
@@ -608,6 +616,10 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->lsm_work_queue_max.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
+	stats->page_busy_yield.v = 0;
+	stats->page_forcible_evict_yield.v = 0;
+	stats->page_locked_yield.v = 0;
+	stats->page_read_yield.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_fail_cache.v = 0;

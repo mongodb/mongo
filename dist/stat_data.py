@@ -77,6 +77,10 @@ class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, TxnStat.prefix, desc, flags)
+class YieldStat(Stat):
+    prefix = 'thread-yield'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, YieldStat.prefix, desc, flags)
 
 ##########################################
 # Groupings of useful statistics:
@@ -301,6 +305,14 @@ connection_stats = [
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_update', 'cursor update calls'),
+
+    ##########################################
+    # Yield statistics
+    ##########################################
+    YieldStat('page_locked_yield', 'page acquire locked blocked'),
+    YieldStat('page_read_yield', 'page acquire read blocked'),
+    YieldStat('page_busy_yield', 'page acquire busy blocked'),
+    YieldStat('page_forcible_evict_yield', 'page acquire eviction blocked'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('name'))

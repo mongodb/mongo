@@ -88,11 +88,14 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		case WT_REF_READING:
 			if (LF_ISSET(WT_READ_CACHE))
 				return (WT_NOTFOUND);
-			/* FALLTHROUGH */
+			if (LF_ISSET(WT_READ_NO_WAIT))
+				return (WT_NOTFOUND);
+			WT_STAT_FAST_CONN_INCR(session, page_read_yield);
+			break;
 		case WT_REF_LOCKED:
 			if (LF_ISSET(WT_READ_NO_WAIT))
 				return (WT_NOTFOUND);
-			/* The page is busy -- wait. */
+			WT_STAT_FAST_CONN_INCR(session, page_locked_yield);
 			break;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
@@ -109,8 +112,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #else
 			WT_RET(__wt_hazard_set(session, ref, &busy));
 #endif
-			if (busy)
+			if (busy) {
+				WT_STAT_FAST_CONN_INCR(
+				    session, page_busy_yield);
 				break;
+			}
 
 			page = ref->page;
 			WT_ASSERT(session, page != NULL);
@@ -121,6 +127,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    __evict_force_check(session, page)) {
 				++force_attempts;
 				WT_RET(__wt_page_release(session, ref, flags));
+				WT_STAT_FAST_CONN_INCR(
+				    session, page_forcible_evict_yield);
 				break;
 			}
 
