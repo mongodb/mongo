@@ -194,6 +194,13 @@ namespace {
         return rsm->getServerAddress();
     }
 
+    HostAndPort DBClientReplicaSet::getSuspectedPrimaryHostAndPort() const {
+        if (!_master) {
+            return HostAndPort();
+        }
+        return _master->getServerHostAndPort();
+    }
+
     void DBClientReplicaSet::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
         // Set the hooks in both our sub-connections and in ourselves.
         if (_master) {

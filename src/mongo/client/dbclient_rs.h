@@ -138,6 +138,17 @@ namespace mongo {
 
         // ----- informational ----
 
+        /**
+         * Gets the replica set name of the set we are connected to.
+         */
+        const std::string& getSetName() const { return _setName; }
+
+        /**
+         * Returns the HostAndPort of the server this connection believes belongs to the primary,
+         * or returns an empty HostAndPort if it doesn't know about a current primary.
+         */
+        HostAndPort getSuspectedPrimaryHostAndPort() const;
+
         double getSoTimeout() const { return _so_timeout; }
 
         std::string toString() const { return getServerAddress(); }
