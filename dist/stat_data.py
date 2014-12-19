@@ -309,10 +309,11 @@ connection_stats = [
     ##########################################
     # Yield statistics
     ##########################################
-    YieldStat('page_locked_yield', 'page acquire locked blocked'),
-    YieldStat('page_read_yield', 'page acquire read blocked'),
-    YieldStat('page_busy_yield', 'page acquire busy blocked'),
-    YieldStat('page_forcible_evict_yield', 'page acquire eviction blocked'),
+    YieldStat('page_locked_blocked', 'page acquire locked blocked'),
+    YieldStat('page_read_blocked', 'page acquire read blocked'),
+    YieldStat('page_busy_blocked', 'page acquire busy blocked'),
+    YieldStat('page_forcible_evict_blocked', 'page acquire eviction blocked'),
+    YieldStat('page_in_sleep', 'page acquire time sleeping in seconds'),
 ]
 
 connection_stats = sorted(connection_stats, key=attrgetter('name'))
