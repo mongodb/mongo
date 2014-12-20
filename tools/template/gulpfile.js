@@ -2,17 +2,20 @@ var gulp = require('gulp'),
     jade = require('gulp-jade'),
     less = require('gulp-less'),
     uglify = require('gulp-uglify'),
+    uglifycss = require('gulp-uglifycss'),
     watchify = require('watchify'),
     livereload = require('gulp-livereload'),
     buffer = require('vinyl-buffer'),
     notifier = require('node-notifier'),
     browserify = require('browserify'),
+    packify = require('packify'),
     source = require('vinyl-source-stream'),
     jadeify = require('jadeify'),
     prettyTime = require('pretty-hrtime'),
-    gutil = require('gulp-util');
+    gutil = require('gulp-util'),
+    fs = require('fs');
 
-var DEBUG = true;
+var DEBUG = false;
 var BUILD = './build';
 
 /**
@@ -126,7 +129,19 @@ gulp.task('styles', function() {
   };
   return gulp.src('./app/less/index.less')
     .pipe(less(opts))
+    .pipe(uglifycss())
     .pipe(gulp.dest(BUILD + '/css'));
+});
+
+gulp.task('pack', ['default'], function() {
+  process.chdir('./' + BUILD)
+  var opts = {
+    html: fs.readFileSync('index.html', 'utf8')
+  }
+  packify(opts, function (err, packed) {
+    if (err) return console.error(err);
+    fs.writeFileSync('packed.html', packed);
+  });
 });
 
 /**
