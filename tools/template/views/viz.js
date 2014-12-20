@@ -1,5 +1,6 @@
 var AmpersandView = require('ampersand-view'),
   _ = require('lodash'),
+  $ = require('jquery'),
   debug = require('debug')('view:viz');
 
 module.exports = AmpersandView.extend({
@@ -63,9 +64,9 @@ module.exports = AmpersandView.extend({
 
     if (this._autoWidth || this._autoHeight) {
       if (this.debounceRender) {
-        window.addEventListener('resize', _.debounce(this.render.bind(this), 100));
+        window.addEventListener('resize', _.debounce(this.redraw.bind(this), 100));
       } else {
-        window.addEventListener('resize',this.render.bind(this));        
+        window.addEventListener('resize',this.redraw.bind(this));        
       }
     }
 
@@ -86,10 +87,10 @@ module.exports = AmpersandView.extend({
   _measure: function() {
     if (this.el) {
       if (this._autoWidth) {
-        this.width = window.innerWidth;
+        this.width = $(this.el).parent().width();
       }
       if (this._autoHeight) {
-        this.height = window.innerHeight;
+        this.height = $(this.el).parent().height();
       }
     }
   },
@@ -132,6 +133,11 @@ module.exports = AmpersandView.extend({
   },
 
   redraw: function() {
+    this._chooseDataSource();
+    this.data = this.transform(this.data);
+
+    this._measure();
+
     if (this.vizFn) {
       this.vizFn({
         width: this.width,
@@ -142,7 +148,6 @@ module.exports = AmpersandView.extend({
     }
   }
 });
-
 
 /**
  * Shortcut so you don't have to know anything about ampersand

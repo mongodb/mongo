@@ -20,7 +20,7 @@ var ChartView = module.exports = AmpersandView.extend({
         height: 600,
         renderMode: 'svg',
         className: 'multiline',
-        debounceRender: false,
+        debounceRender: true,
         vizFn: require('./viz/d3-multiline'),
         data: {
           series: this.model.series.filter(function (s) { return s.selected; }),

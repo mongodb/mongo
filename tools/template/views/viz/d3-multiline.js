@@ -4,7 +4,6 @@ var d3 = require('d3'),
 module.exports = function(opts) {
   
   function redraw(opts) {
-
     var transTime = 300;
     // var initial = (initial === undefined) || false;
 
@@ -24,7 +23,14 @@ module.exports = function(opts) {
       svg.style('visibility', 'visible');
     }
 
+    svg.attr({width: width, height: height});
+
+    svg.select(".windshield")
+    .attr("width", width)
+    .attr("height", height);
+
     // update x domain
+    x.range([0, width]);
     x.domain([
       d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.x; }); }),
       d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.x; }); })
@@ -43,9 +49,6 @@ module.exports = function(opts) {
         0.1, d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
       ]);
     }
-
-    // resize svg
-    svg.attr({width: width, height: height});
 
     // redraw x and y axes
     svg.selectAll('.x')
@@ -137,7 +140,7 @@ module.exports = function(opts) {
   // --- initial setup (only called once) ---
   var margin = {
       top: 80,
-      right: 380,
+      right: 20,
       bottom: 60,
       left: 100
     },
@@ -173,6 +176,8 @@ module.exports = function(opts) {
     .append('g')
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   
+  svg.attr({width: width, height: height});
+
   svg.append("g")
     .attr("class", "x axis")
     .attr("transform", "translate(0," + height + ")");
@@ -217,6 +222,7 @@ module.exports = function(opts) {
 
   // rect for mouseover
   svg.append("rect")
+    .attr("class", "windshield")
     .attr("width", width)
     .attr("height", height)
     .style("opacity", 0.)
