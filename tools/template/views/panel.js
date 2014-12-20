@@ -18,6 +18,7 @@ var PanelView = module.exports = AmpersandView.extend({
   template: require('./templates/panel.jade'),
   events: {
     'click a': 'collapsibleToggle',
+    'click [data-hook=caret]': 'collapsibleToggle',
     'click [data-hook=indicator]': 'indicatorClicked'
   },
   bindings: {
@@ -50,11 +51,17 @@ var PanelView = module.exports = AmpersandView.extend({
     this.statViews = this.renderCollection(this.filteredStats, StatView, this.queryByHook('stats'));
   },
   indicatorClicked: function (event) {
-    this.collapsibleOpen();
     var all = this.model.selected !== 'all';
     this.filteredStats.each(function (stat) {
       stat.selected = all;
     });
+    
+    switch (this.model.selected) {
+      case 'all': // fall-through
+      case 'some': this.collapsibleOpen(); break;
+      case 'none': this.collapsibleClose(); break;
+    }
+
     this.statChanged();
   },
   statChanged: function (stat) {

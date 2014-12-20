@@ -31,6 +31,7 @@ var SidebarView = module.exports = AmpersandView.extend({
   clearClicked: function () {
     this.model.search.content = '';
     this.closeAndReset();
+    this.queryByHook('button').blur();
   },
   filterPanels: function (search) {
     _.each(this.panelViews.views, function (view) {

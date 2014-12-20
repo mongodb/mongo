@@ -1,6 +1,15 @@
 var d3 = require('d3'),
     debug = require('debug')('viz:d3-multiline');
 
+/**
+ * helper function to move an element to the front
+ */
+d3.selection.prototype.moveToFront = function() {
+  return this.each(function(){
+  this.parentNode.appendChild(this);
+  });
+};
+
 module.exports = function(opts) {
   
   function redraw(opts) {
@@ -24,10 +33,6 @@ module.exports = function(opts) {
     }
 
     svg.attr({width: width, height: height});
-
-    svg.select(".windshield")
-    .attr("width", width)
-    .attr("height", height);
 
     // update x domain
     x.range([0, width]);
@@ -91,6 +96,17 @@ module.exports = function(opts) {
       .transition().duration(transTime)
       .attr("cx", function (d) { return x(d.x); })
       .attr("cy", function (d) { return y(d.y); })
+
+    crosshairX
+      .attr("x2", width);
+
+    crosshairY
+      .attr("y2", height);
+
+    windshield
+      .attr("width", width)
+      .attr("height", height)
+      .moveToFront();
 
   } // redraw
 
@@ -221,15 +237,13 @@ module.exports = function(opts) {
     .attr("dy", "-1.2em");
 
   // rect for mouseover
-  svg.append("rect")
+  var windshield = svg.append("rect")
     .attr("class", "windshield")
-    .attr("width", width)
-    .attr("height", height)
     .style("opacity", 0.)
     .on("mouseover", function() { 
-      focus.style("display", null); 
-      crosshairX.style("display", null); 
-      crosshairY.style("display", null); 
+      crosshairX.style("display", null);
+      crosshairY.style("display", null);
+      focus.style("display", null);
     })
     .on("mouseout", function() { 
       focus.style("display", "none"); 
