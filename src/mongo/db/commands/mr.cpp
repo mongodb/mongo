@@ -1150,6 +1150,10 @@ namespace mongo {
             return a.objsize() + 16;
         }
 
+        bool State::reduceEmitInMemoryUsageIfNeeded() {
+            return !_jsMode && (_size > _config.maxInMemSize || _dupCount > (_temp->size() * _config.reduceTriggerRatio));
+        }
+
         void State::reduceAndSpillInMemoryStateIfNeeded() {
             // Make sure no DB locks are held, because this method manages its own locking and
             // write units of work.
@@ -1398,7 +1402,7 @@ namespace mongo {
                             // acquire it again.
                             //
                             numInputs++;
-                            if (numInputs % 100 == 0) {
+                            if (numInputs % 100 == 0 || state.reduceEmitInMemoryUsageIfNeeded()) {
                                 Timer t;
 
                                 // TODO: As an optimization, we might want to do the save/restore
