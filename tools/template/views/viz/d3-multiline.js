@@ -131,18 +131,21 @@ module.exports = function(opts) {
     var serie = series[i];
     var d = dArr[i];
 
-    focus.attr("transform", "translate(" + x(d.x) + "," + y(d.y) + ")");
+    focus
+      .attr("transform", "translate(" + x(d.x) + "," + y(d.y) + ")")
+      .moveToFront();
 
     focus.select("circle")
       .attr('stroke', serie.color);
 
     focus.select("text.name")
-      .text(serie.name)
-      .attr('fill', serie.color);
+      .text(serie.name);
     
     focus.select("text.value")
-      .text(d3.format(",")(d.y))
-      .attr('fill', serie.color);
+      .text(d3.format(",")(d.y));
+
+    // focus.select("rect.marker")
+    //   .style("fill", serie.color);
 
     crosshairX
       .attr("y1", y(d.y))
@@ -162,17 +165,13 @@ module.exports = function(opts) {
     },
     width = opts.width - margin.left - margin.right,
     height = opts.height - margin.top - margin.bottom,
-    data = opts.data,
     el = opts.el;
 
   var options, series; // initialized in redraw
 
   var bisect = d3.bisector(function(d) { return d.x; }).left;
 
-  // // no data to plot    
-  // if (series.length === 0) return;
-
-  var x = d3.scale.linear().range([0, width]);
+  var x = d3.scale.linear(); 
   var y; // initialized in redraw
 
   var xAxis = d3.svg.axis()
@@ -192,7 +191,7 @@ module.exports = function(opts) {
     .append('g')
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   
-  svg.attr({width: width, height: height});
+  // svg.attr({width: width, height: height});
 
   svg.append("g")
     .attr("class", "x axis")
@@ -205,15 +204,13 @@ module.exports = function(opts) {
     .style("stroke", "#ddd")
     .style("display", "none")
     .attr("class", 'x')
-    .attr("x1", 0)
-    .attr("x2", width)
+    .attr("x1", 0);
 
   var crosshairY = svg.append("line")
     .style("stroke", "#ddd")
     .style("display", "none")
     .attr("class", 'x')
-    .attr("y1", 0)
-    .attr("y2", height);
+    .attr("y1", 0);
 
   // focus
   var focus = svg.append("g")
@@ -221,19 +218,28 @@ module.exports = function(opts) {
     .style("display", "none");
 
   focus.append("circle")
-    .attr("r", 5)
+    .attr("r", 6)
     .attr("fill", "none")
-    .attr("stroke-width", 1);
+    .attr("stroke-width", 2);
+
+  // focus.append('rect')
+  //   .attr("class", "marker")
+  //   .attr("width", 6)
+  //   .attr("height", 34)
+  //   .attr("x", 9)
+  //   .attr("y", -40);
 
   focus.append("text")
     .attr("class", "name")
+    .attr('fill', 'black')
     .attr("x", 9)
     .attr("dy", "-.8em");
   
   focus.append("text")
     .attr("class", "value")
+    .attr('fill', 'black')
     .attr("font-size", "20px")
-    .attr("x", 9)
+    .attr("x", 8)
     .attr("dy", "-1.2em");
 
   // rect for mouseover
@@ -253,8 +259,6 @@ module.exports = function(opts) {
     .on("mousemove", mousemove);
 
   var paths, circles;  // initialized in redraw
-
-  redraw(opts);    
 
   return redraw;
 }

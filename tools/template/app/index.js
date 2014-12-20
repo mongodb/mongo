@@ -9,8 +9,8 @@ require('bootstrap/js/collapse');
 require('bootstrap/js/transition');
 require('bootstrap/js/button');
 
-// var data = "### INSERT DATA HERE ###";
-var data = require('../fixtures/bigger.fixture.json');
+var data = "### INSERT DATA HERE ###";
+// var data = require('../fixtures/bigger.fixture.json');
 
 var app = window.app = new App(data, {parse: true});
 

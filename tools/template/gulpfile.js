@@ -140,18 +140,19 @@ gulp.task('pack', ['default'], function() {
   }
   packify(opts, function (err, packed) {
     if (err) return console.error(err);
-    fs.writeFileSync('packed.html', packed);
+    fs.writeFileSync('../../wtstats.html.template', packed);
   });
 });
+
 
 /**
  * @task assets Copies all static asset files into `BUILD`.
  */
 // gulp.task('static', [
-//   'copy rickshaw css'
+//   'copy images'
 // ]);
 
-// gulp.task('copy rickshaw css', function() {
-//   return gulp.src('node_modules/rickshaw/rickshaw.min.css')
-//     .pipe(gulp.dest(BUILD + '/css'));
+// gulp.task('copy images', function() {
+//   return gulp.src('./assets/img/*')
+//     .pipe(gulp.dest(BUILD + '/img'));
 // });
