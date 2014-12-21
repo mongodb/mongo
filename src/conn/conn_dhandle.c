@@ -716,7 +716,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final)
 		__wt_spin_destroy(session, &dhandle->close_lock);
 		__wt_overwrite_and_free(session, dhandle);
 
-		WT_CLEAR_BTREE_IN_SESSION(session);
+		session->dhandle = NULL;
 	}
 
 	return (ret);
