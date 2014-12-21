@@ -42,7 +42,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -53,7 +52,6 @@ namespace mongo {
             return Status::OK();
 
         if ( retCode == WT_ROLLBACK ) {
-            //printStackTrace();
             throw WriteConflictException();
         }
 

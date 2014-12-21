@@ -8,6 +8,8 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
 // Clearing the connection pool deterministically is awkward - the actual command may fail due to
 // using the conn pool in order to talk to the config servers
 function clearConnPool(mongos) {
+    "use strict";
+
     assert.soon(function() {
         try {
             return mongos.adminCommand({connPoolSync : true}).ok;
@@ -21,10 +23,13 @@ function clearConnPool(mongos) {
 // Errors are A) currently opaque, and B) wrapped in other error messages, making it awkward to
 // detect different codes
 function isProtocolError(ex) {
+    "use strict";
+
     return /15907/.test(ex.toString());
 }
 
 function testBadUpgrade(isRSCluster) {
+    "use strict";
 
     jsTest.log("Starting " + (isRSCluster ? "(replica set)" : "") + " cluster...");
 
@@ -85,6 +90,5 @@ function testBadUpgrade(isRSCluster) {
     st.stop();
 }
 
-// TODO: SERVER-16321
-//testBadUpgrade(false);
-//testBadUpgrade(true);
+testBadUpgrade(false);
+testBadUpgrade(true);

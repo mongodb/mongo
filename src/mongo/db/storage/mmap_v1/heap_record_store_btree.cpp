@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const DiskLoc& loc) const {
+    RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& loc) const {
         Records::const_iterator it = _records.find(loc);
         invariant(it != _records.end());
         const Record& rec = it->second;
@@ -48,7 +48,7 @@ namespace mongo {
     }
 
     bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
-                                          const DiskLoc& loc, RecordData* out) const {
+                                          const RecordId& loc, RecordData* out) const {
         Records::const_iterator it = _records.find(loc);
         if ( it == _records.end() )
             return false;
@@ -57,46 +57,46 @@ namespace mongo {
         return true;
     }
 
-    void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
+    void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const RecordId& loc) {
         invariant(_records.erase(loc) == 1);
     }
 
-    StatusWith<DiskLoc> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
+    StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
                                                            const char* data,
                                                            int len,
                                                            bool enforceQuota) {
         Record rec(len);
         memcpy(rec.data.get(), data, len);
 
-        const DiskLoc loc = allocateLoc();
+        const RecordId loc = allocateLoc();
         _records[loc] = rec;
 
         HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
 
-        return StatusWith<DiskLoc>(loc);
+        return StatusWith<RecordId>(loc);
     }
 
-    StatusWith<DiskLoc> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
+    StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
                                                            const DocWriter* doc,
                                                            bool enforceQuota) {
         Record rec(doc->documentSize());
         doc->writeDocument(rec.data.get());
 
-        const DiskLoc loc = allocateLoc();
+        const RecordId loc = allocateLoc();
         _records[loc] = rec;
 
         HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
 
-        return StatusWith<DiskLoc>(loc);
+        return StatusWith<RecordId>(loc);
     }
 
-    DiskLoc HeapRecordStoreBtree::allocateLoc() {
+    RecordId HeapRecordStoreBtree::allocateLoc() {
         const int64_t id = _nextId++;
-        // This is a hack, but both the high and low order bits of DiskLoc offset must be 0, and the
+        // This is a hack, but both the high and low order bits of RecordId offset must be 0, and the
         // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
         invariant(id < (1LL << 53));
-        DiskLoc dl(int(id >> 30), int((id << 1) & ~(1<<31)));
-        invariant( (dl.getOfs() & 0x1) == 0 );
+        RecordId dl(int(id >> 30), int((id << 1) & ~(1<<31)));
+        invariant( (dl.repr() & 0x1) == 0 );
         return dl;
     }
 
@@ -141,14 +141,14 @@ namespace mongo {
     }
 
     void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( HeapRecordStoreBtree* rs,
-                                                         const DiskLoc& loc ) {
+                                                         const RecordId& loc ) {
         InsertEntry e = { rs, loc };
         _insertions.push_back( e );
     }
 
     void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( OperationContext* ctx,
                                                          HeapRecordStoreBtree* rs,
-                                                         const DiskLoc& loc ) {
+                                                         const RecordId& loc ) {
         if ( !ctx )
             return;
 

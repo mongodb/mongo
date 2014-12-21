@@ -456,15 +456,6 @@ namespace mongo {
         */
         bool getObjectID(BSONElement& e) const;
 
-        /** @return A hash code for the object */
-        int hash() const {
-            unsigned x = 0;
-            const char *p = objdata();
-            for ( int i = 0; i < objsize(); i++ )
-                x = x * 131 + p[i];
-            return (x & 0x7fffffff) | 0x8000000; // must be > 0
-        }
-
         // Return a version of this object where top level elements of types
         // that are not part of the bson wire protocol are replaced with
         // std::string identifier equivalents.
@@ -477,9 +468,6 @@ namespace mongo {
 
         /** true unless corrupt */
         bool valid() const;
-
-        /** @return an md5 value for this object. */
-        std::string md5() const;
 
         bool operator==( const BSONObj& other ) const { return equal( other ); }
         bool operator!=(const BSONObj& other) const { return !operator==( other); }

@@ -205,6 +205,11 @@ namespace mongo {
         bool isExplain(){ return _qSpec.isExplain(); }
 
         /**
+         * Sets the batch size on all underlying cursors to 'newBatchSize'.
+         */
+        void setBatchSize(int newBatchSize);
+
+        /**
          * Returns whether the collection was sharded when the cursors were established.
          */
         bool isSharded();

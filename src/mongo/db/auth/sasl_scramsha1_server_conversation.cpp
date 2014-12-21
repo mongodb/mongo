@@ -37,11 +37,13 @@
 
 #include "mongo/crypto/crypto.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/sequence_util.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -131,9 +133,6 @@ namespace mongo {
                 "Incorrect SCRAM-SHA-1 client nonce: " << input[2]);
         }
 
-        // add client-first-message-bare to _authMessage
-        _authMessage += input[1] + "," + input[2] + ",";
-
         _user = input[1].substr(2);
         if (!authzId.empty() && _user != authzId) {
             return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
@@ -141,13 +140,27 @@ namespace mongo {
         }
 
         decodeSCRAMUsername(_user);
+
+        // SERVER-16534, SCRAM-SHA-1 must be enabled for authenticating the internal user, so that
+        // cluster members may communicate with each other. Hence ignore disabled auth mechanism
+        // for the internal user.
+        UserName user(_user, _saslAuthSession->getAuthenticationDatabase());
+        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+            user != internalSecurity.user->getName()) {
+            return StatusWith<bool>(ErrorCodes::BadValue,
+                                    "SCRAM-SHA-1 authentication is disabled");
+        }
+
+        // add client-first-message-bare to _authMessage
+        _authMessage += input[1] + "," + input[2] + ",";
+
         std::string clientNonce = input[2].substr(2);
 
         // The authentication database is also the source database for the user.
         User* userObj;
         Status status = _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().
                 acquireUser(_saslAuthSession->getOpCtxt(),
-                            UserName(_user, _saslAuthSession->getAuthenticationDatabase()),
+                            user,
                             &userObj);
 
         if (!status.isOK()) {

@@ -1297,11 +1297,11 @@ namespace mongo {
                     errmsg = "ns doesn't exist";
                     return false;
                 }
-                repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-                if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
-                        && state.isOnDisk()) {
+                if (state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
+                    repl::ReplicationCoordinator* const replCoord =
+                        repl::getGlobalReplicationCoordinator();
                     if (!replCoord->canAcceptWritesForDatabase(dbname)) {
                         errmsg = "not master";
                         return false;
@@ -1341,7 +1341,7 @@ namespace mongo {
                         const NamespaceString nss(config.ns);
 
                         // Need lock and context to use it
-                        scoped_ptr<Lock::DBRead> lock(new Lock::DBRead(txn->lockState(), nss.db()));
+                        scoped_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
                         const WhereCallbackReal whereCallback(txn, nss.db());
 
@@ -1357,7 +1357,7 @@ namespace mongo {
                         }
                         std::auto_ptr<CanonicalQuery> cq(cqRaw);
 
-                        Database* db = dbHolder().get(txn, nss.db());
+                        Database* db = scopedAutoDb->getDb();
                         Collection* coll = state.getCollectionOrUassert(db, config.ns);
                         invariant(coll);
 
@@ -1404,13 +1404,15 @@ namespace mongo {
                                 // TODO: As an optimization, we might want to do the save/restore
                                 // state and yield inside the reduceAndSpillInMemoryState method, so
                                 // it only happens if necessary.
-                                lock.reset();
+                                exec->saveState();
+                                scopedAutoDb.reset();
                                 state.reduceAndSpillInMemoryStateIfNeeded();
-                                lock.reset(new Lock::DBRead(txn->lockState(), nss.db()));
+                                scopedAutoDb.reset(new AutoGetDb(txn, nss.db(), MODE_S));
+                                exec->restoreState(txn);
 
                                 // Need to reload the database, in case it was dropped after we
                                 // released the lock
-                                db = dbHolder().get(txn, nss.db());
+                                db = scopedAutoDb->getDb();
                                 if (db == NULL) {
                                     // Database was deleted after we freed the lock
                                     StringBuilder sb;
@@ -1580,6 +1582,13 @@ namespace mongo {
                 // it would be better to do just one big $or query, but then the sorting would not be efficient
                 string shardName = shardingState.getShardName();
                 DBConfigPtr confOut = grid.getDBConfig( dbname , false );
+
+                if (!confOut) {
+                    log() << "Sharding metadata for output database: " << dbname
+                          << " does not exist";
+                    return false;
+                }
+
                 vector<ChunkPtr> chunks;
                 if ( confOut->isSharded(config.outputOptions.finalNamespace) ) {
                     ChunkManagerPtr cm = confOut->getChunkManager(

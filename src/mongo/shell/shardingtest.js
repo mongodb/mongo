@@ -60,8 +60,9 @@
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
  *          Can be used to specify options that are common all mongos.
- *       enableBalancer  {boolean} : if true, enable the balancer
- * 
+ *       enableBalancer {boolean} : if true, enable the balancer
+ *       manualAddShard {boolean}: shards will not be added if true.
+ *
  *       // replica Set only:
  *       rsOptions {Object}: same as the rs property above. Can be used to
  *         specify options that are common all replica members.
@@ -688,13 +689,13 @@ printShardingStatus = function( configDB , verbose ){
 
         //Output details of the current balancer round
         var balLock = sh.getBalancerLockDetails()
-        if ( balLock != false ) {
+        if ( balLock ) {
             output( "\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who );
         }
 
         //Output the balancer window
         var balSettings = sh.getBalancerWindow()
-        if ( balSettings != false ) {
+        if ( balSettings ) {
             output( "\t\tBalancer active window is set between " +
                 balSettings.start + " and " + balSettings.stop + " server local time");
         }

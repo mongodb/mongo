@@ -177,10 +177,10 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char *msg, const char *file, unsigned line);
-    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantOKFailed(const char *msg, const Status& status, const char *file, unsigned line);
-    MONGO_CLIENT_API void wasserted(const char *msg, const char *file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void verifyFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantFailed(const char* expr, const char* file, unsigned line);
+    MONGO_CLIENT_API MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr, const Status& status, const char *file, unsigned line);
+    MONGO_CLIENT_API void wasserted(const char* expr, const char* file, unsigned line);
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
     MONGO_CLIENT_API MONGO_COMPILER_NORETURN void fassertFailedWithStatus(
@@ -305,7 +305,7 @@ namespace mongo {
 
 #ifdef MONGO_EXPOSE_MACROS
 # define dassert MONGO_dassert
-# define verify MONGO_verify
+# define verify(expression) MONGO_verify(expression)
 # define invariant MONGO_invariant
 # define invariantOK MONGO_invariantOK
 # define uassert MONGO_uassert
@@ -319,13 +319,6 @@ namespace mongo {
     // < 10000 UserException
 
     enum { ASSERT_ID_DUPKEY = 11000 };
-
-    /* throws a uassertion with an appropriate msg */
-    MONGO_COMPILER_NORETURN void streamNotGood( int code, const std::string& msg, std::ios& myios );
-
-    inline void assertStreamGood(unsigned msgid, const std::string& msg, std::ios& myios) {
-        if( !myios.good() ) streamNotGood(msgid, msg, myios);
-    }
 
     std::string demangleName( const std::type_info& typeinfo );
 

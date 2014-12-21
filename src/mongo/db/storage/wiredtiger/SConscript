@@ -8,8 +8,9 @@ if wiredtiger:
 
     # This is the smallest possible set of files that wraps WT
     wtEnv.Library(
-        target= 'storage_wiredtiger_core',
+        target='storage_wiredtiger_core',
         source= [
+            'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',
             'wiredtiger_record_store.cpp',
@@ -21,6 +22,7 @@ if wiredtiger:
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
+            '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
             '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/db/storage/oplog_hack',
@@ -36,7 +38,6 @@ if wiredtiger:
     wtEnv.Library(
         target='storage_wiredtiger',
         source=[
-            'wiredtiger_global_options.cpp',
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
             'wiredtiger_parameters.cpp',
@@ -85,4 +86,3 @@ if wiredtiger:
             'storage_wiredtiger_core',
             ],
         )
-

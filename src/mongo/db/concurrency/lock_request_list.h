@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/lock_mgr_defs.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

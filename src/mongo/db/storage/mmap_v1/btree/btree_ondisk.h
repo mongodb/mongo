@@ -273,6 +273,10 @@ namespace mongo {
         // Type Conversion
         //
 
+        RecordId toRecordId() const {
+            return DiskLoc(*this).toRecordId();
+        }
+
         operator DiskLoc() const {
             // endian
             if( isNull() ) return DiskLoc();

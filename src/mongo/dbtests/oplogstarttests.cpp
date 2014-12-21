@@ -37,7 +37,9 @@ namespace OplogStartTests {
 
     class Base {
     public:
-        Base() : _lk(_txn.lockState()),
+        Base() : _txn(),
+                 _scopedXact(&_txn, MODE_X),
+                 _lk(_txn.lockState()),
                  _wunit(&_txn),
                  _context(&_txn, ns()),
                  _client(&_txn) {
@@ -98,6 +100,7 @@ namespace OplogStartTests {
     private:
         // The order of these is important in order to ensure order of destruction
         OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
         Lock::GlobalWrite _lk;
         WriteUnitOfWork _wunit;
         Client::Context _context;

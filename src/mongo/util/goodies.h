@@ -30,16 +30,16 @@
 
 #pragma once
 
-#include <iostream>
-#include <sstream>
-
 #include <boost/intrusive_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
+#include <iostream>
+#include <sstream>
 
-#include "mongo/bson/util/misc.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

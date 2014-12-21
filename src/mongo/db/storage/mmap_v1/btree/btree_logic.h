@@ -184,7 +184,9 @@ namespace mongo {
                        const DiskLoc& bucketLoc,
                        const int keyOffset) const;
 
-        DiskLoc getHead(OperationContext* txn) const { return _headManager->getHead(txn); }
+        DiskLoc getHead(OperationContext* txn) const {
+            return DiskLoc::fromRecordId(_headManager->getHead(txn));
+        }
 
         Status touch(OperationContext* txn) const;
 
@@ -570,7 +572,10 @@ namespace mongo {
 
         BucketType* childForPos(OperationContext* txn, BucketType* bucket, int pos) const;
 
-        BucketType* getBucket(OperationContext* txn, const DiskLoc dl) const;
+        BucketType* getBucket(OperationContext* txn, const DiskLoc dl) const {
+            return getBucket(txn, dl.toRecordId());
+        }
+        BucketType* getBucket(OperationContext* txn, const RecordId dl) const;
 
         BucketType* getRoot(OperationContext* txn) const;
 

@@ -176,8 +176,9 @@ namespace mongo {
 
             // default impl uses all shards for DB
             virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                conf->getAllShards(shards);
+                vector<Shard> shardList;
+                Shard::getAllShards(shardList);
+                shards.insert(shardList.begin(), shardList.end());
             }
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {}
@@ -296,12 +297,17 @@ namespace mongo {
                 string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                uassert(28588,
+                        str::stream() << "Failed to load db sharding metadata for " << fullns,
+                        conf);
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     shards.insert(conf->getShard(fullns));
                 }
                 else {
-                    conf->getChunkManager(fullns)->getAllShards(shards);
+                    vector<Shard> shardList;
+                    Shard::getAllShards(shardList);
+                    shards.insert(shardList.begin(), shardList.end());
                 }
             }
         };
@@ -318,8 +324,13 @@ namespace mongo {
                 string fullns = getFullNS( dbName , cmdObj );
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , options, result );
                 }
                 errmsg = "can't do command: " + name + " on sharded collection";
@@ -629,10 +640,15 @@ namespace mongo {
             bool run(OperationContext* txn, const string& dbName,
                      BSONObj& cmdObj,
                      int,
-                     string&,
+                     string& errmsg,
                      BSONObjBuilder& result,
                      bool) {
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
                 return passthrough( conf , cmdObj , result );
             }
         } createCmd;
@@ -655,7 +671,12 @@ namespace mongo {
 
                 log() << "DROP: " << fullns << endl;
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     log() << "\tdrop going to do passthrough" << endl;
                     return passthrough( conf , cmdObj , result );
                 }
@@ -1028,8 +1049,12 @@ namespace mongo {
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     result.appendBool("sharded", false);
                     result.append( "primary" , conf->getPrimary().getName() );
                     return passthrough( conf , cmdObj , result);
@@ -1173,8 +1198,12 @@ namespace mongo {
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result);
                 }
 
@@ -1233,8 +1262,12 @@ namespace mongo {
                 string fullns = cmdObj.firstElement().String();
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result);
                 }
 
@@ -1413,8 +1446,12 @@ namespace mongo {
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , options, result );
                 }
 
@@ -1484,8 +1521,12 @@ namespace mongo {
             bool run(OperationContext* txn, const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 const std::string fullns = parseNs(dbName, cmdObj);
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , result );
                 }
 
@@ -1599,8 +1640,12 @@ namespace mongo {
                 string fullns = dbName + "." + collection;
 
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
 
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     return passthrough( conf , cmdObj , options, result );
                 }
 
@@ -1835,6 +1880,12 @@ namespace mongo {
                 }
 
                 DBConfigPtr confIn = grid.getDBConfig( dbName , false );
+                if (!confIn) {
+                    errmsg = str::stream() << "Sharding metadata for input database: " << dbName
+                                           << " does not exist";
+                    return false;
+                }
+
                 DBConfigPtr confOut = confIn;
                 if (customOutDB) {
                     confOut = grid.getDBConfig( outDB , true );
@@ -2207,12 +2258,17 @@ namespace mongo {
             virtual bool run(OperationContext* txn, const string& dbName,
                              BSONObj& cmdObj,
                              int,
-                             string&,
+                             string& errmsg,
                              BSONObjBuilder& result,
                              bool) {
                 // $eval isn't allowed to access sharded collections, but we need to leave the
                 // shard to detect that.
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
                 return passthrough( conf , cmdObj , result );
             }
         } evalCmd;
@@ -2638,10 +2694,15 @@ namespace mongo {
             bool run(OperationContext* txn, const string& dbName,
                      BSONObj& cmdObj,
                      int,
-                     string&,
+                     string& errmsg,
                      BSONObjBuilder& result,
                      bool) {
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
                 return passthrough( conf, cmdObj, result );
             }
         } cmdListCollections;
@@ -2661,10 +2722,15 @@ namespace mongo {
             bool run(OperationContext* txn, const string& dbName,
                      BSONObj& cmdObj,
                      int,
-                     string&,
+                     string& errmsg,
                      BSONObjBuilder& result,
                      bool) {
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
                 return passthrough( conf, cmdObj, result );
             }
         } cmdListIndexes;

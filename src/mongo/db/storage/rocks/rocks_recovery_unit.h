@@ -64,7 +64,7 @@ namespace mongo {
     class RocksRecoveryUnit : public RecoveryUnit {
         MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
     public:
-        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db);
+        RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db, bool durable);
         virtual ~RocksRecoveryUnit();
 
         virtual void beginUnitOfWork();
@@ -85,9 +85,9 @@ namespace mongo {
         rocksdb::WriteBatchWithIndex* writeBatch();
 
         const rocksdb::Snapshot* snapshot();
+        bool hasSnapshot() { return _snapshot != nullptr; }
 
-        // Throws WriteConflictException() if it detects
-        void registerWrite(uint64_t hash);
+        RocksTransaction* transaction() { return &_transaction; }
 
         rocksdb::Status Get(rocksdb::ColumnFamilyHandle* columnFamily, const rocksdb::Slice& key,
                             std::string* value);
@@ -98,6 +98,13 @@ namespace mongo {
                               std::atomic<long long>* counter, long long delta);
 
         long long getDeltaCounter(const rocksdb::Slice& counterKey);
+
+        void setOplogReadTill(const RecordId& loc);
+        RecordId getOplogReadTill() const { return _oplogReadTill; }
+
+        RocksRecoveryUnit* newRocksRecoveryUnit() {
+            return new RocksRecoveryUnit(_transactionEngine, _db, _durable);
+        }
 
         struct Counter {
             std::atomic<long long>* _value;
@@ -119,6 +126,8 @@ namespace mongo {
         RocksTransactionEngine* _transactionEngine;  // not owned
         rocksdb::DB* _db; // not owned
 
+        const bool _durable;
+
         RocksTransaction _transaction;
 
         boost::scoped_ptr<rocksdb::WriteBatchWithIndex> _writeBatch; // owned
@@ -131,8 +140,9 @@ namespace mongo {
         typedef OwnedPointerVector<Change> Changes;
         Changes _changes;
 
-
         int _depth;
+
+        RecordId _oplogReadTill;
     };
 
 }

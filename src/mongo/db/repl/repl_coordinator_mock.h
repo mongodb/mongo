@@ -89,11 +89,9 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptimeForSlave(OperationContext* txn,
-                                             const OID& rid,
-                                             const OpTime& ts);
+        virtual Status setLastOptimeForSlave(const OID& rid, const OpTime& ts);
 
-        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
+        virtual void setMyLastOptime(const OpTime& ts);
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
@@ -113,11 +111,9 @@ namespace repl {
 
         virtual void signalUpstreamUpdater();
 
-        virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
-                                                         BSONObjBuilder* cmdBuilder);
+        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
-                OperationContext* txn,
                 std::vector<BSONObj>* handshakes);
 
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
@@ -128,7 +124,7 @@ namespace repl {
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-        virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
+        virtual Status setMaintenanceMode(bool activate);
 
         virtual bool getMaintenanceMode();
 
@@ -158,11 +154,9 @@ namespace repl {
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
                                            BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetUpdatePosition(OperationContext* txn,
-                                                    const UpdatePositionArgs& updates);
+        virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates);
 
-        virtual Status processHandshake(const OperationContext* txn,
-                                        const HandshakeArgs& handshake);
+        virtual Status processHandshake(OperationContext* txn, const HandshakeArgs& handshake);
 
         virtual bool buildsIndexes();
 

@@ -344,7 +344,8 @@ namespace {
 } // namespace
 
     Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
-        txn->lockState()->assertWriteLocked( _collection->_database->name() );
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().toString(),
+                                                              MODE_X));
         invariant(_collection->numRecords(txn) == 0);
 
         _checkMagic();
@@ -572,9 +573,7 @@ namespace {
         else {
             // for non _id indexes, we check to see if replication has turned off all indexes
             // we _always_ created _id index
-            repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-            if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                    !repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
+            if (!repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
                 // this is not exactly the right error code, but I think will make the most sense
                 return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
@@ -696,7 +695,8 @@ namespace {
     Status IndexCatalog::dropAllIndexes(OperationContext* txn,
                                         bool includingIdIndex) {
 
-        txn->lockState()->assertWriteLocked( _collection->_database->name() );
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().toString(),
+                                                              MODE_X));
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
 
@@ -767,8 +767,8 @@ namespace {
 
     Status IndexCatalog::dropIndex(OperationContext* txn,
                                    IndexDescriptor* desc ) {
-
-        txn->lockState()->assertWriteLocked( _collection->_database->name() );
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().toString(),
+                                                              MODE_X));
         IndexCatalogEntry* entry = _entries.find( desc );
 
         if ( !entry )
@@ -1038,9 +1038,10 @@ namespace {
 
     const IndexDescriptor* IndexCatalog::refreshEntry( OperationContext* txn,
                                                        const IndexDescriptor* oldDesc ) {
-        txn->lockState()->assertWriteLocked( _collection->_database->name() );
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(),
+                                                              MODE_X));
 
-        std::string indexName = oldDesc->indexName();
+        const std::string indexName = oldDesc->indexName();
         invariant( _collection->getCatalogEntry()->isIndexReady( txn, indexName ) );
 
         // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.

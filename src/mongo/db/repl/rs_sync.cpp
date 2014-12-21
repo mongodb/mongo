@@ -89,7 +89,7 @@ namespace repl {
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
             // TODO(spencer): Use a condition variable to await loading a config
-            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+            if (replCoord->getCurrentMemberState().startup()) {
                 log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds ";
                 sleepsecs(5);
                 continue;

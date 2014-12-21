@@ -111,21 +111,83 @@ namespace mongo {
         bool finishOpening();
     };
 
+
+#ifdef _WIN32
+    // Simple array based bitset to track COW chunks in memory mapped files on Windows
+    // A chunk is a 64MB granular region in virtual memory that we mark as COW everytime we need
+    // to write to a memory mapped files on Windows
+    //
+    class MemoryMappedCOWBitset {
+        MONGO_DISALLOW_COPYING(MemoryMappedCOWBitset);
+    public:
+        // Size of the chunks we mark Copy-On-Write with VirtualProtect
+        static const unsigned long long ChunkSize = 64 * 1024 * 1024;
+
+        // Number of chunks we store in our bitset which are really 32-bit ints
+        static const unsigned long long NChunks = 64 * 1024;
+
+        // Total Virtual Memory space we can cover with the bitset
+        static const unsigned long long MaxChunkMemory = ChunkSize * NChunks
+            * sizeof(unsigned int) * 8;
+
+        // Size in bytes of the bitset we allocate
+        static const unsigned long long MaxChunkBytes = NChunks * sizeof(unsigned int);
+
+        // 128 TB Virtual Memory space in Windows 8.1/2012 R2, 8TB before
+        static const unsigned long long MaxWinMemory =
+            128ULL * 1024 * 1024 * 1024 * 1024;
+
+        // Make sure that the chunk memory covers the Max Windows user process VM space
+        static_assert(MaxChunkMemory == MaxWinMemory,
+            "Need a larger bitset to cover max process VM space");
+    public:
+        MemoryMappedCOWBitset() {
+            static_assert(MemoryMappedCOWBitset::MaxChunkBytes == sizeof(bits),
+                "Validate our predicted bitset size is correct");
+        }
+
+        bool get(uintptr_t i) const {
+            uintptr_t x = i / 32;
+            verify(x < MemoryMappedCOWBitset::NChunks);
+            return (bits[x].loadRelaxed() & (1 << (i % 32))) != 0;
+        }
+
+        // Note: assumes caller holds privateViews.mutex
+        void set(uintptr_t i) {
+            uintptr_t x = i / 32;
+            verify(x < MemoryMappedCOWBitset::NChunks);
+            bits[x].store( bits[x].loadRelaxed() | (1 << (i % 32)));
+        }
+
+        // Note: assumes caller holds privateViews.mutex
+        void clear(uintptr_t i) {
+            uintptr_t x = i / 32;
+            verify(x < MemoryMappedCOWBitset::NChunks);
+            bits[x].store(bits[x].loadRelaxed() & ~(1 << (i % 32)));
+        }
+
+    private:
+        // atomic as we are doing double check locking
+        AtomicUInt32 bits[MemoryMappedCOWBitset::NChunks];
+    };
+#endif
+
     /** for durability support we want to be able to map pointers to specific DurableMappedFile objects.
     */
-    class PointerToDurableMappedFile : boost::noncopyable {
+    class PointerToDurableMappedFile {
+        MONGO_DISALLOW_COPYING(PointerToDurableMappedFile);
     public:
         PointerToDurableMappedFile();
 
         /** register view.
-            threadsafe
-            */
-        void add(void *view, DurableMappedFile *f);
+            not-threadsafe, caller must hold _mutex()
+        */
+        void add_inlock(void *view, DurableMappedFile *f);
 
         /** de-register view.
             threadsafe
             */
-        void remove(void *view);
+        void remove(void *view, size_t length);
 
         /** find associated MMF object for a given pointer.
             threadsafe
@@ -136,16 +198,57 @@ namespace mongo {
 
         /** for doing many finds in a row with one lock operation */
         mutex& _mutex() { return _m; }
+
+        /** not-threadsafe, caller must hold _mutex() */
         DurableMappedFile* find_inlock(void *p, /*out*/ size_t& ofs);
 
-        std::map<void*,DurableMappedFile*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
-
+        /** not-threadsafe, caller must hold _mutex() */
         unsigned numberOfViews_inlock() const { return _views.size(); }
 
+        /** make the private map range writable (necessary for our windows implementation) */
+        void makeWritable(void *, unsigned len);
+
+        void clearWritableBits(void *privateView, size_t len);
+
     private:
+        void clearWritableBits_inlock(void *privateView, size_t len);
+
+#ifdef _WIN32
+        void makeChunkWritable(size_t chunkno);
+#endif
+
+    private:
+        // PointerToDurableMappedFile Mutex
+        //
+        // Protects:
+        //  Protects internal consistency of data structure
+        // Lock Ordering:
+        //  Must be taken before MapViewMutex if both are taken to prevent deadlocks
         mutex _m;
         std::map<void*, DurableMappedFile*> _views;
+
+#ifdef _WIN32
+        // Tracks which memory mapped regions are marked as Copy on Write
+        MemoryMappedCOWBitset writable;
+#endif
     };
+
+#ifdef _WIN32
+    inline void PointerToDurableMappedFile::makeWritable(void *privateView, unsigned len) {
+        size_t p = reinterpret_cast<size_t>(privateView);
+        unsigned a = p / MemoryMappedCOWBitset::ChunkSize;
+        unsigned b = (p + len) / MemoryMappedCOWBitset::ChunkSize;
+
+        for (unsigned i = a; i <= b; i++) {
+            if (!writable.get(i)) {
+                makeChunkWritable(i);
+            }
+        }
+    }
+#else
+    inline void PointerToDurableMappedFile::makeWritable(void *_p, unsigned len) {
+    }
+#endif
 
     // allows a pointer into any private view of a DurableMappedFile to be resolved to the DurableMappedFile object
     extern PointerToDurableMappedFile privateViews;

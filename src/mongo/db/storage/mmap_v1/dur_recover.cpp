@@ -290,7 +290,7 @@ namespace mongo {
             //TODO(mathias): look into making some of these dasserts
             verify(entry.e);
             verify(entry.dbName);
-            verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             DurableMappedFile *mmf = last.newEntry(entry, *this);
 
@@ -340,7 +340,7 @@ namespace mongo {
 
         DurableMappedFile* RecoveryJob::getDurableMappedFile(const ParsedJournalEntry& entry) {
             verify(entry.dbName);
-            verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;

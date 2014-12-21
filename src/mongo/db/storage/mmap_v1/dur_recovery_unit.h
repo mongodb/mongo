@@ -36,14 +36,12 @@
 
 namespace mongo {
 
-    class OperationContext;
-
     /**
      * Just pass through to getDur().
      */
     class DurRecoveryUnit : public RecoveryUnit {
     public:
-        DurRecoveryUnit(OperationContext* txn);
+        DurRecoveryUnit();
 
         virtual ~DurRecoveryUnit() { }
 
@@ -75,10 +73,6 @@ namespace mongo {
             return _writes.size() > _startOfUncommittedChangesForLevel.back().writeIndex
                 || _changes.size() > _startOfUncommittedChangesForLevel.back().changeIndex;
         }
-
-        // The parent operation context. This pointer is not owned and it's lifetime must extend
-        // past that of the DurRecoveryUnit
-        OperationContext* _txn;
 
         // Changes are ordered from oldest to newest.
         typedef OwnedPointerVector<Change> Changes;

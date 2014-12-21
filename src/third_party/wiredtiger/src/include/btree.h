@@ -53,6 +53,9 @@
  */
 #define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
 
+/* Evict pages if we see this many consecutive deleted records. */
+#define	WT_BTREE_DELETE_THRESHOLD	1000
+
 /*
  * WT_BTREE --
  *	A btree handle.
@@ -80,9 +83,10 @@ struct __wt_btree {
 
 	uint32_t allocsize;		/* Allocation size */
 	uint32_t maxintlpage;		/* Internal page max size */
-	uint32_t maxintlitem;		/* Internal page max item size */
+	uint32_t maxintlkey;		/* Internal page max key size */
 	uint32_t maxleafpage;		/* Leaf page max size */
-	uint32_t maxleafitem;		/* Leaf page max item size */
+	uint32_t maxleafkey;		/* Leaf page max key size */
+	uint32_t maxleafvalue;		/* Leaf page max value size */
 	uint64_t maxmempage;		/* In memory page max size */
 
 	void *huffman_key;		/* Key huffman encoding */

@@ -139,7 +139,8 @@ namespace mongo {
         long long estSizeBytes;
         {
             // search _id range (0, 10)
-            Lock::DBRead lk(txn.lockState(), ns);
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
 
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
@@ -186,7 +187,8 @@ namespace mongo {
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk(txn.lockState(), ns);
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
 
             // search invalid index range
             KeyRange range( ns,
@@ -231,7 +233,8 @@ namespace mongo {
         long long numDocsFound;
         long long estSizeBytes;
         {
-            Lock::DBRead lk(txn.lockState(), ns);
+            ScopedTransaction transaction(&txn, MODE_IS);
+            Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_S);
 
             KeyRange range( ns,
                             BSON( "_id" << 0 ),

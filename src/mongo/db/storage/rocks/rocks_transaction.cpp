@@ -39,12 +39,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-    RocksTransactionEngine::RocksTransactionEngine() : _latestSeqId(1) {
-        for (size_t i = 0; i < kNumSeqIdShards; ++i) {
-            _seqId[i] = 0;
-            _uncommittedTransactionId[i] = 0;
-        }
-    }
+    RocksTransactionEngine::RocksTransactionEngine() : _latestSeqId(1), _nextTransactionId(1) {}
 
     void RocksTransaction::commit() {
         if (_writeShards.empty()) {
@@ -53,15 +48,15 @@ namespace mongo {
         uint64_t newSeqId = 0;
         {
             boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-            for (auto writeShard : _writeShards) {
+            for (const auto& writeShard : _writeShards) {
                 invariant(_transactionEngine->_seqId[writeShard] <= _snapshotSeqId);
                 invariant(_transactionEngine->_uncommittedTransactionId[writeShard] ==
                           _transactionId);
-                _transactionEngine->_uncommittedTransactionId[writeShard] = 0;
+                _transactionEngine->_uncommittedTransactionId.erase(writeShard);
             }
             newSeqId =
                 _transactionEngine->_latestSeqId.load(std::memory_order::memory_order_relaxed) + 1;
-            for (auto writeShard : _writeShards) {
+            for (const auto& writeShard : _writeShards) {
                 _transactionEngine->_seqId[writeShard] = newSeqId;
             }
             _transactionEngine->_latestSeqId.store(newSeqId);
@@ -71,21 +66,21 @@ namespace mongo {
         _writeShards.clear();
     }
 
-    bool RocksTransaction::registerWrite(uint64_t hash) {
-        uint64_t shard = hash % RocksTransactionEngine::kNumSeqIdShards;
-
+    bool RocksTransaction::registerWrite(const std::string& id) {
         boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-        if (_transactionEngine->_seqId[shard] > _snapshotSeqId) {
+        auto seqIdIter = _transactionEngine->_seqId.find(id);
+        if (seqIdIter != _transactionEngine->_seqId.end() && seqIdIter->second > _snapshotSeqId) {
             // write-committed write conflict
             return false;
         }
-        if (_transactionEngine->_uncommittedTransactionId[shard] != 0 &&
-            _transactionEngine->_uncommittedTransactionId[shard] != _transactionId) {
+        auto uncommittedTransactionIter = _transactionEngine->_uncommittedTransactionId.find(id);
+        if (uncommittedTransactionIter != _transactionEngine->_uncommittedTransactionId.end() &&
+            uncommittedTransactionIter->second != _transactionId) {
             // write-uncommitted write conflict
             return false;
         }
-        _writeShards.insert(shard);
-        _transactionEngine->_uncommittedTransactionId[shard] = _transactionId;
+        _writeShards.insert(id);
+        _transactionEngine->_uncommittedTransactionId[id] = _transactionId;
         return true;
     }
 
@@ -95,8 +90,8 @@ namespace mongo {
         }
         {
             boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-            for (auto writeShard : _writeShards) {
-                _transactionEngine->_uncommittedTransactionId[writeShard] = 0;
+            for (const auto& writeShard : _writeShards) {
+                _transactionEngine->_uncommittedTransactionId.erase(writeShard);
             }
         }
         _writeShards.clear();

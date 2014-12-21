@@ -218,8 +218,10 @@ namespace {
         if (!status.isOK())
             return status;
 
-
-        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, mechanism)) {
+        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, mechanism) &&
+            mechanism != "SCRAM-SHA-1") {
+            // Always allow SCRAM-SHA-1 to pass to the first sasl step since we need to
+            // handle internal user authentication, SERVER-16534
             result->append(saslCommandMechanismListFieldName,
                            saslGlobalParams.authenticationMechanisms);
             return Status(ErrorCodes::BadValue,

@@ -35,7 +35,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			WT_ERR(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH("collator", ck.str, ck.len)) {
-			if (cv.len == 0)
+			if (cv.len == 0 ||
+			    WT_STRING_CASE_MATCH("none", cv.str, cv.len))
 				continue;
 			/*
 			 * Extract the application-supplied metadata (if any)
@@ -90,8 +91,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					WT_ERR(__wt_realloc_def(session,
 					    &lsm_tree->chunk_alloc,
 					    nchunks + 1, &lsm_tree->chunk));
-					WT_ERR(__wt_calloc_def(
-					    session, 1, &chunk));
+					WT_ERR(
+					    __wt_calloc_one(session, &chunk));
 					lsm_tree->chunk[nchunks++] = chunk;
 					chunk->id = (uint32_t)lv.val;
 					WT_ERR(__wt_lsm_tree_chunk_name(session,
@@ -135,7 +136,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				WT_ERR(__wt_realloc_def(session,
 				    &lsm_tree->old_alloc, nchunks + 1,
 				    &lsm_tree->old_chunks));
-				WT_ERR(__wt_calloc_def(session, 1, &chunk));
+				WT_ERR(__wt_calloc_one(session, &chunk));
 				lsm_tree->old_chunks[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));

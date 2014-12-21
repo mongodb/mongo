@@ -187,7 +187,7 @@ namespace repl {
 
             ctx.getClient()->setLastOp( ts );
             
-            replCoord->setMyLastOptime(txn, ts);
+            replCoord->setMyLastOptime(ts);
         }
 
         setNewOptime(ts);
@@ -317,7 +317,7 @@ namespace repl {
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
         ctx.getClient()->setLastOp( slot.first );
-        replCoord->setMyLastOptime(txn, slot.first);
+        replCoord->setMyLastOptime(slot.first);
 
         wunit.commit();
 
@@ -385,7 +385,7 @@ namespace repl {
         ctx.getClient()->setLastOp( slot.first );
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        replCoord->setMyLastOptime(txn, slot.first);
+        replCoord->setMyLastOptime(slot.first);
         wunit.commit();
     }
 
@@ -579,8 +579,15 @@ namespace repl {
 
         bool valueB = fieldB.booleanSafe();
 
-        txn->lockState()->assertWriteLocked(ns);
-
+        if (supportsDocLocking()) {
+            // WiredTiger, and others requires MODE_IX since the applier threads driving this allow
+            // writes to the same collection on any thread.
+            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_IX));
+        } else {
+            // mmapV1 ensures that all operations to the same collection are executed from
+            // the same worker thread, so it takes an exclusive lock (MODE_X)
+            invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        }
         Collection* collection = db->getCollection( txn, ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 

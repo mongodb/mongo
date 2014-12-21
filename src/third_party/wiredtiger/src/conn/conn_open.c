@@ -122,13 +122,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/*
 	 * Now that all data handles are closed, tell logging that a checkpoint
 	 * has completed then shut down the log manager (only after closing
-	 * data handles).
+	 * data handles).  The call to destroy the log manager is outside the
+	 * conditional because we allocate the log path so that printlog can
+	 * run without running logging or recovery.
 	 */
-	if (conn->logging) {
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
-		WT_TRET(__wt_logmgr_destroy(session));
-	}
+	WT_TRET(__wt_logmgr_destroy(session));
 
 	/* Free memory for collators, compressors, data sources. */
 	WT_TRET(__wt_conn_remove_collator(session));
@@ -196,8 +197,17 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	if ((s = conn->sessions) != NULL)
 		for (i = 0; i < conn->session_size; ++s, ++i)
-			if (s != session)
+			if (s != session) {
+				/*
+				 * If hash arrays were allocated,
+				 * free them now.
+				 */
+				if (s->dhhash != NULL)
+					__wt_free(session, s->dhhash);
+				if (s->tablehash != NULL)
+					__wt_free(session, s->tablehash);
 				__wt_free(session, s->hazard);
+			}
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));

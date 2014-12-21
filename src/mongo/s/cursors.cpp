@@ -140,6 +140,11 @@ namespace mongo {
 
             buffer.appendBuf( (void*)o.objdata() , o.objsize() );
             docCount++;
+            // Ensure that the next batch will never wind up requesting more docs from the shard
+            // than are remaining to satisfy the initial ntoreturn.
+            if (ntoreturn != 0) {
+                _cursor->setBatchSize(ntoreturn - docCount);
+            }
 
             if ( buffer.len() > maxSize ) {
                 break;

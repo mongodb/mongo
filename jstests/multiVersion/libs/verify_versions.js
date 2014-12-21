@@ -29,6 +29,7 @@ assert.allBinVersions = function(versionsWanted, versionsFound) {
                                                   versionsFound[j]))
             {
                 found = true;
+                var version = versionsWanted[i];
                 break;
             }
         }

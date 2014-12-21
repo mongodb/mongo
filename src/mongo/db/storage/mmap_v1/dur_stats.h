@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
     namespace dur {
 

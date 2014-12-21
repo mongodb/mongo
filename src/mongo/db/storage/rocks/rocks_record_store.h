@@ -34,6 +34,8 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <vector>
+#include <functional>
 
 #include <rocksdb/options.h>
 
@@ -50,6 +52,29 @@ namespace rocksdb {
 
 namespace mongo {
 
+    class CappedVisibilityManager {
+    public:
+        CappedVisibilityManager() : _oplog_highestSeen(RecordId::min()) {}
+        void dealtWithCappedRecord(const RecordId& record);
+        void updateHighestSeen(const RecordId& record);
+        void addUncommittedRecord(OperationContext* txn, const RecordId& record);
+
+        // a bit hacky function, but does the job
+        RecordId getNextAndAddUncommittedRecord(OperationContext* txn,
+                                                std::function<RecordId()> nextId);
+
+        bool isCappedHidden(const RecordId& record) const;
+        RecordId oplogStartHack() const;
+
+    private:
+        void _addUncommittedRecord_inlock(OperationContext* txn, const RecordId& record);
+
+        // protects the state
+        mutable boost::mutex _lock;
+        std::vector<RecordId> _uncommittedRecords;
+        RecordId _oplog_highestSeen;
+    };
+
     class RocksRecoveryUnit;
 
     class RocksRecordStore : public RecordStore {
@@ -65,7 +90,7 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize( OperationContext* txn ) const { return _dataSize; }
+        virtual long long dataSize(OperationContext* txn) const { return _dataSize.load(); }
 
         virtual long long numRecords( OperationContext* txn ) const;
 
@@ -112,8 +137,6 @@ namespace mongo {
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD ) const;
 
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
-
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
         virtual Status truncate( OperationContext* txn );
@@ -144,27 +167,28 @@ namespace mongo {
                                               RecordId end,
                                               bool inclusive);
 
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const;
+
+        virtual Status oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime);
+
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
           _cappedDeleteCallback = cb;
         }
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
-
-        /**
-         * Drops metadata held by the record store
-         */
-        void dropRsMetaData( OperationContext* opCtx );
+        bool isOplog() const { return _isOplog; }
 
         static rocksdb::Comparator* newRocksCollectionComparator();
 
     private:
-        static uint64_t _hash(uint64_t identHash, const RecordId& loc);
-
-        // NOTE: RecordIterator might outlive the RecordStore
+        // NOTE: RecordIterator might outlive the RecordStore. That's why we use all those
+        // shared_ptrs
         class Iterator : public RecordIterator {
         public:
             Iterator(OperationContext* txn, rocksdb::DB* db,
                      boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+                     boost::shared_ptr<CappedVisibilityManager> cappedVisibilityManager,
                      const CollectionScanParams::Direction& dir, const RecordId& start);
 
             virtual bool isEOF();
@@ -184,8 +208,10 @@ namespace mongo {
             OperationContext* _txn;
             rocksdb::DB* _db; // not owned
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
+            boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
             CollectionScanParams::Direction _dir;
             bool _eof;
+            const RecordId _readUntilForOplog;
             RecordId _curr;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
@@ -202,14 +228,16 @@ namespace mongo {
                                       OperationContext* txn, const RecordId& loc);
 
         RecordId _nextId();
-        bool cappedAndNeedDelete(OperationContext* txn) const;
-        void cappedDeleteAsNeeded(OperationContext* txn);
+        bool cappedAndNeedDelete(long long dataSizeDelta, long long numRecordsDelta) const;
+        void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
 
         // The use of this function requires that the passed in RecordId outlives the returned Slice
         // TODO possibly make this safer in the future
         static rocksdb::Slice _makeKey( const RecordId& loc );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
+
+        std::string _getTransactionID(const RecordId& rid) const;
 
         rocksdb::DB* _db; // not owned
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
@@ -218,16 +246,20 @@ namespace mongo {
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
+        boost::mutex _cappedDeleterMutex; // see commend in ::cappedDeleteAsNeeded
+        int _cappedDeleteCheckCount;      // see comment in ::cappedDeleteAsNeeded
 
-        uint64_t _identHash;
+        const bool _isOplog;
+        int _oplogCounter;
+
+        boost::shared_ptr<CappedVisibilityManager> _cappedVisibilityManager;
+
+        std::string _ident;
         AtomicUInt64 _nextIdNum;
-        long long _dataSize;
+        std::atomic<long long> _dataSize;
         std::atomic<long long> _numRecords;
 
         const string _dataSizeKey;
         const string _numRecordsKey;
-
-        // locks
-        boost::mutex _dataSizeLock;
     };
 }

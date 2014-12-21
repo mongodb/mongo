@@ -58,6 +58,7 @@ namespace mongo {
     class V8ScriptEngine;
     class V8Scope;
     class BSONHolder;
+    class JSThreadConfig;
 
     typedef v8::Handle<v8::Value> (*v8Function)(V8Scope* scope, const v8::Arguments& args);
 
@@ -335,6 +336,7 @@ namespace mongo {
                 : conn(conn), cursor(cursor) { }
         };
         ObjTracker<DBConnectionAndCursor> dbConnectionAndCursor;
+        ObjTracker<JSThreadConfig> jsThreadConfigTracker;
 
         // These are all named after the JS constructor name + FT
         v8::Handle<v8::FunctionTemplate> ObjectIdFT()       const { return _ObjectIdFT; }

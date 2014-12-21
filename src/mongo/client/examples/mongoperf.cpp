@@ -53,6 +53,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/processinfo.h"
 
 
 using namespace std;
@@ -293,6 +294,7 @@ cout <<
             return EXIT_FAILURE;
         }
         cout << "parsed options:\n" << options.toString() << endl;
+        ProcessInfo::initializeSystemInfo();
 
         go();
     } 

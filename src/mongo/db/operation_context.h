@@ -47,6 +47,10 @@ namespace mongo {
      * TODO(HK): clarify what this means.  There's one OperationContext for one user operation...
      *           but is this true for getmore?  Also what about things like fsyncunlock / internal
      *           users / etc.?
+     *
+     * On construction, an OperationContext associates itself with the current client, and only on
+     * destruction it deassociates itself. At any time a client can be associated with at most one
+     * OperationContext.
      */
     class OperationContext  {
         MONGO_DISALLOW_COPYING(OperationContext);

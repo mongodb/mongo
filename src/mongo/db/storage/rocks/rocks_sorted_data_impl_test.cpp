@@ -70,7 +70,7 @@ namespace mongo {
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new RocksRecoveryUnit(&_transactionEngine, _db.get());
+            return new RocksRecoveryUnit(&_transactionEngine, _db.get(), true);
         }
 
     private:
@@ -115,15 +115,8 @@ namespace mongo {
             ASSERT_OK(sorted->insert(t1.get(), key3, loc3, false));
             ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
 
-            try {
-                // this should fail
-                sorted->insert(t2.get(), key3, loc5, false);
-                ASSERT(0);
-            }
-            catch (WriteConflictException& dle) {
-                w2.reset(NULL);
-                t2.reset(NULL);
-            }
+            // this should return duplicate key
+            ASSERT_NOT_OK(sorted->insert(t2.get(), key3, loc5, false));
 
             w1->commit();  // this should succeed
         }
@@ -147,15 +140,8 @@ namespace mongo {
                 w1->commit();
             }
 
-            try {
-                // this should fail because our key5 is too old
-                sorted->insert(t2.get(), key5, loc5, false);
-                ASSERT(0);
-            }
-            catch (WriteConflictException& dle) {
-                w2.reset(NULL);
-                t2.reset(NULL);
-            }
+            // this should return duplicate key
+            ASSERT_NOT_OK(sorted->insert(t2.get(), key5, loc3, false));
         }
     }
 }

@@ -166,7 +166,7 @@ env.Library('replmocks',
                 'repl_coordinator_mock.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/concurrency/lock_mgr',
+                '$BUILD_DIR/mongo/db/concurrency/lock_manager',
                 'repl_coordinator_interface',
                 'replication_executor',
             ])

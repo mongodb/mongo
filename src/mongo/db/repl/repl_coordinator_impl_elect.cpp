@@ -96,6 +96,8 @@ namespace {
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
             LOG(2) << "Not standing for election; processing a configuration change";
+            // Transition out of candidate role.
+            _topCoord->processLoseElection();
             return;
         default:
             severe() << "Entered replica set election code while in illegal config state " <<

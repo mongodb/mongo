@@ -89,7 +89,7 @@ namespace mongo {
          * Instantiates new locker. Must be given a unique identifier for disambiguation. Lockers
          * having the same identifier will not conflict on lock acquisition.
          */
-        LockerImpl(LockerId id);
+        LockerImpl();
 
         virtual ~LockerImpl();
 
@@ -98,6 +98,7 @@ namespace mongo {
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
         virtual LockResult lockGlobalBegin(LockMode mode);
         virtual LockResult lockGlobalComplete(unsigned timeoutMs);
+        virtual void lockMMAPV1Flush();
 
         virtual void downgradeGlobalXtoSForMMAPV1();
         virtual bool unlockAll();
@@ -197,9 +198,6 @@ namespace mongo {
         int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
-        // For maintaining locking timing statistics
-        Timer _timer;
-
 
         //////////////////////////////////////////////////////////////////////////////////////////
         //
@@ -213,13 +211,12 @@ namespace mongo {
 
         virtual bool isW() const;
         virtual bool isR() const;
-        virtual bool hasAnyReadLock() const;
 
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
-        virtual bool isWriteLocked(const StringData& ns) const;
+        virtual bool isReadLocked() const;
 
-        virtual void assertWriteLocked(const StringData& ns) const;
+        virtual void assertEmpty() const;
 
         virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
 
@@ -252,7 +249,7 @@ namespace mongo {
         ~AutoYieldFlushLockForMMAPV1Commit();
 
     private:
-        MMAPV1LockerImpl* _locker;
+        MMAPV1LockerImpl* const _locker;
     };
 
 
@@ -296,8 +293,7 @@ namespace mongo {
         void release();
 
     private:
-        MMAPV1LockerImpl* _locker;
-        bool _isReleased;;
+        MMAPV1LockerImpl* const _locker;
     };
 
 

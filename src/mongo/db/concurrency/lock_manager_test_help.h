@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,43 +26,50 @@
  *    it in the license file.
  */
 
-/** Unit tests for DiskLoc. */
+#pragma once
 
-#include "mongo/db/storage/mmap_v1/diskloc.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/lock_state.h"
 
 namespace mongo {
-namespace {
 
-    TEST( DiskLoc, HashEqual ) {
-        DiskLoc locA( 1, 2 );
-        DiskLoc locB;
-        locB.set( 1, 2 );
-        ASSERT_EQUALS( locA, locB );
-        DiskLoc::Hasher hasher;
-        ASSERT_EQUALS( hasher( locA ), hasher( locB ) );
-    }
+    class LockerForTests : public LockerImpl<false> {
+    public:
+        explicit LockerForTests() {
+            lockGlobal(MODE_S);
+        }
 
-    TEST( DiskLoc, HashNotEqual ) {
-        DiskLoc original( 1, 2 );
-        DiskLoc diffFile( 10, 2 );
-        DiskLoc diffOfs( 1, 20 );
-        DiskLoc diffBoth( 10, 20 );
-        DiskLoc reversed( 2, 1 );
-        ASSERT_NOT_EQUALS( original, diffFile );
-        ASSERT_NOT_EQUALS( original, diffOfs );
-        ASSERT_NOT_EQUALS( original, diffBoth );
-        ASSERT_NOT_EQUALS( original, reversed );
-        
-        // Unequal DiskLocs need not produce unequal hashes.  But unequal hashes are likely, and
-        // assumed here for sanity checking of the custom hash implementation.
-        DiskLoc::Hasher hasher;
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffFile ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffOfs ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffBoth ) );
-        ASSERT_NOT_EQUALS( hasher( original ), hasher( reversed ) );
-    }
-    
-} // namespace
+        ~LockerForTests() {
+            unlockAll();
+        }
+    };
+
+
+    class TrackingLockGrantNotification : public LockGrantNotification {
+    public:
+        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
+
+        }
+
+        virtual void notify(ResourceId resId, LockResult result) {
+            numNotifies++;
+            lastResId = resId;
+            lastResult = result;
+        }
+
+    public:
+        int numNotifies;
+
+        ResourceId lastResId;
+        LockResult lastResult;
+    };
+
+
+    struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
+    public:
+        explicit LockRequestCombo (Locker* locker) {
+            initNew(locker, this);
+        }
+    };
+
 } // namespace mongo

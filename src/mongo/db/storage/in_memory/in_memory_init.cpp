@@ -43,7 +43,10 @@ namespace mongo {
         public:
             virtual ~InMemoryFactory() { }
             virtual StorageEngine* create(const StorageGlobalParams& params) const {
-                return new KVStorageEngine(new InMemoryEngine());
+                KVStorageEngineOptions options;
+                options.directoryPerDB = params.directoryperdb;
+                options.forRepair = params.repair;
+                return new KVStorageEngine(new InMemoryEngine(), options);
             }
 
             virtual StringData getCanonicalName() const {

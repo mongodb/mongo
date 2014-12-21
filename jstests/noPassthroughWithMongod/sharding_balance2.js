@@ -1,31 +1,31 @@
-// sharding_balance2.js
+/**
+ * Test the maxSize setting for the addShard command.
+ */
 
-s = new ShardingTest( "slow_sharding_balance2" , 2 , 1 , 1 , { chunksize : 1 , manualAddShard : true, enableBalancer : 1 } )
+(function() {
+"use strict";
 
-names = s.getConnNames();
-for ( var i=0; i<names.length; i++ ){
-    if ( i==1 ) {
-        // We set maxSize of the shard to something artificially low. That mongod would still 
-        // allocate and mmap storage as usual but the balancing mongos would not ship any chunk
-        // to it.
-        s.adminCommand( { addshard : names[i] , maxSize : 1 } );
-    } else {
-        s.adminCommand( { addshard : names[i] } );
-    }
-}
+var MaxSizeMB = 1;
 
-s.adminCommand( { enablesharding : "test" } );
+var s = new ShardingTest({ shards: 2, other: { chunksize: 1, manualAddShard: true }});
+s.stopBalancer();
 
-s.config.settings.find().forEach( printjson )
+var names = s.getConnNames();
+assert.eq(2, names.length);
+s.adminCommand({ addshard: names[0] });
+s.adminCommand({ addshard: names[1], maxSize: MaxSizeMB });
 
-db = s.getDB( "test" );
+s.adminCommand({ enablesharding: "test" });
+s.adminCommand({ movePrimary: 'test', to: names[0] });
 
-bigString = ""
+var db = s.getDB( "test" );
+
+var bigString = "";
 while ( bigString.length < 10000 )
     bigString += "asdasdasdasdadasdasdasdasdasdasdasdasda";
 
-inserted = 0;
-num = 0;
+var inserted = 0;
+var num = 0;
 var bulk = db.foo.initializeUnorderedBulkOp();
 while ( inserted < ( 40 * 1024 * 1024 ) ){
     bulk.insert({ _id: num++, s: bigString });
@@ -33,22 +33,49 @@ while ( inserted < ( 40 * 1024 * 1024 ) ){
 }
 assert.writeOK(bulk.execute());
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
-assert.lt( 20 , s.config.chunks.count()  , "setup2" );
+assert.gt(s.config.chunks.count(), 10);
 
-function diff1(){
-    var x = s.chunkCounts( "foo" );
-    printjson( x )
-    return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
+var getShardSize = function(conn) {
+    var listDatabases = conn.getDB('admin').runCommand({ listDatabases: 1 });
+    return listDatabases.totalSize;
+};
+
+var shardConn = new Mongo(names[1]);
+
+// Make sure that shard doesn't have any documents.
+assert.eq(0, shardConn.getDB('test').foo.find().itcount());
+
+var maxSizeBytes = MaxSizeMB * 1024 * 1024;
+
+// Fill the shard with documents to exceed the max size so the balancer won't move
+// chunks to this shard.
+var localColl = shardConn.getDB('local').padding;
+while (getShardSize(shardConn) < maxSizeBytes) {
+    var localBulk = localColl.initializeUnorderedBulkOp();
+
+    for (var x = 0; x < 20; x++) {
+        localBulk.insert({ x: x, val: bigString });
+    }
+    assert.writeOK(localBulk.execute());
+
+    // Force the storage engine to flush files to disk so shardSize will get updated.
+    assert.commandWorked(shardConn.getDB('admin').runCommand({ fsync: 1 }));
 }
 
-assert.lt( 10 , diff1() );
-print( diff1() )
+var configDB = s.s.getDB('config');
+var balanceRoundsBefore = configDB.actionlog.find({ what: 'balancer.round' }).count();
 
-var currDiff = diff1();
-assert.repeat( function(){
-    var d = diff1();
-    return d != currDiff;
-} , "balance with maxSize should not have happened" , 1000 * 30 , 5000 );
-    
+s.startBalancer();
+
+// Wait until a balancer finishes at least one round.
+assert.soon(function() {
+    var currentBalanceRound = configDB.actionlog.find({ what: 'balancer.round' }).count();
+    return balanceRoundsBefore < currentBalanceRound;
+});
+
+var chunkCounts = s.chunkCounts('foo', 'test');
+assert.eq(0, chunkCounts.shard0001);
 
 s.stop();
+
+})();

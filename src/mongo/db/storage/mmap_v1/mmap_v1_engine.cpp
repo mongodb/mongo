@@ -314,8 +314,8 @@ namespace {
         _entryMap.clear();
     }
 
-    RecoveryUnit* MMAPV1Engine::newRecoveryUnit( OperationContext* opCtx ) {
-        return new DurRecoveryUnit( opCtx );
+    RecoveryUnit* MMAPV1Engine::newRecoveryUnit() {
+        return new DurRecoveryUnit();
     }
 
     void MMAPV1Engine::listDatabases( std::vector<std::string>* out ) const {
@@ -401,6 +401,10 @@ namespace {
 
     bool MMAPV1Engine::isDurable() const {
         return getDur().isDurable();
+    }
+
+    RecordAccessTracker& MMAPV1Engine::getRecordAccessTracker() {
+        return _recordAccessTracker;
     }
 
     void MMAPV1Engine::cleanShutdown() {

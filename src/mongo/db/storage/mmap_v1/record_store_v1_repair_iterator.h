@@ -47,17 +47,17 @@ namespace mongo {
         virtual ~RecordStoreV1RepairIterator() { }
 
         virtual bool isEOF();
-        virtual DiskLoc getNext();
-        virtual DiskLoc curr();
+        virtual RecordId getNext();
+        virtual RecordId curr();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
         virtual void saveState() { }
         virtual bool restoreState(OperationContext* txn) {
             _txn = txn;
             return true;
         }
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const RecordId& loc ) const;
 
     private:
 

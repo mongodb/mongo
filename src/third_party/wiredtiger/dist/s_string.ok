@@ -372,7 +372,9 @@ WiredTigerCheckpoint
 WiredTigerHome
 WiredTigerInit
 WiredTigerLog
+WiredTigerPreplog
 WiredTigerStat
+WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
 Wmissing
@@ -392,6 +394,7 @@ agc
 alfred
 alloc
 allocator
+allocfile
 allocsize
 amd
 ao

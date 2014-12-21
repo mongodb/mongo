@@ -112,12 +112,26 @@ namespace mongo {
             vector<string> indexNames;
             cce->getAllIndexes( txn, &indexNames );
 
+            // TODO: Handle options specified in the command request object under the "cursor"
+            // field.
+
+            // TODO: If the full result set does not fit in one batch, allocate a cursor to store
+            // the remainder of the results.
+
             BSONArrayBuilder arr;
             for ( size_t i = 0; i < indexNames.size(); i++ ) {
                 arr.append( cce->getIndexSpec( txn, indexNames[i] ) );
             }
 
-            result.append( "indexes", arr.arr() );
+            if ( cmdObj["cursor"].type() == mongo::Object ) {
+                const long long cursorId = 0LL;
+                std::string cursorNamespace = str::stream()
+                    << dbname << ".$cmd." << name << "." << ns.coll();
+                Command::appendCursorResponseObject( cursorId, cursorNamespace, arr.arr(),
+                                                     &result );
+            } else {
+                result.append( "indexes", arr.arr() );
+            }
 
             return true;
         }

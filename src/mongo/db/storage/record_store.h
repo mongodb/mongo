@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -303,11 +305,11 @@ namespace mongo {
          * being higher. If there are no entries <= startingPosition, return RecordId().
          *
          * If you don't implement the oplogStartHack, just use the default implementation which
-         * returns an Invalid RecordId.
+         * returns boost::none.
          */
-        virtual RecordId oplogStartHack(OperationContext* txn,
-                                       const RecordId& startingPosition) const {
-            return RecordId().setInvalid();
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const {
+            return boost::none;
         }
 
         /**

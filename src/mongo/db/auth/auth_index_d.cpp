@@ -78,6 +78,7 @@ namespace {
         const NamespaceString systemUsers = AuthorizationManager::usersCollectionNamespace;
 
         // Make sure the old unique index from v2.4 on system.users doesn't exist.
+        ScopedTransaction scopedXact(txn, MODE_IX);
         AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
         if (!autoDb.getDb()) {
             return Status::OK();

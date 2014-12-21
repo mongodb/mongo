@@ -56,7 +56,6 @@ namespace repl {
             IsMasterResponse isMasterResponse;
             replCoord->fillIsMasterForReplSet(&isMasterResponse);
             result.appendElements(isMasterResponse.toBSON());
-            replCoord->processReplSetGetRBID(&result);
             if (level) {
                 replCoord->appendSlaveInfoData(&result);
             }
@@ -150,6 +149,7 @@ namespace repl {
             
             BSONObjBuilder result;
             appendReplicationInfo(txn, result, level);
+            getGlobalReplicationCoordinator()->processReplSetGetRBID(&result);
 
             return result.obj();
         }

@@ -30,8 +30,4 @@ assert.eq(db.adminCommand({getParameter:1,
           newCollectionsUsePowerOf2Sizes: true}).newCollectionsUsePowerOf2Sizes, true);
 
 test(1);
-assert.commandWorked(db.adminCommand({setParameter:1, newCollectionsUsePowerOf2Sizes: false}));
-test(0);
 
-// reset the server to default value
-assert.commandWorked(db.adminCommand({setParameter:1, newCollectionsUsePowerOf2Sizes: true}));

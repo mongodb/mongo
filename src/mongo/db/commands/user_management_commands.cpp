@@ -421,40 +421,28 @@ namespace mongo {
                 // Must be an external user
                 userObjBuilder.append("credentials", BSON("external" << true));
             }
-            else if (args.mechanism == "SCRAM-SHA-1" ||
-                     args.mechanism == "MONGODB-CR" ||
-                     args.mechanism == "CRAM-MD5" ||
-                     args.mechanism.empty()) {
 
-                // At the moment we are ignoring the mechanism parameter and create
-                // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users.
-                BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
+            BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
 
-                AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-                int authzVersion;
-                Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
-                if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
-                }
-
-                // Add SCRAM credentials for appropriate authSchemaVersions.
-                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                    BSONObj scramCred = scram::generateCredentials(
-                            args.hashedPassword,
-                            saslGlobalParams.scramIterationCount);
-                    credentialsBuilder.append("SCRAM-SHA-1", scramCred);
-                }
-                else { // Otherwise default to MONGODB-CR.
-                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
-                }
-                credentialsBuilder.done();
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            int authzVersion;
+            status = authzManager->getAuthorizationVersion(txn, &authzVersion);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
             }
-            else {
-                return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::BadValue,
-                               "Unsupported password authentication mechanism " + args.mechanism));
+
+            // Add SCRAM credentials for appropriate authSchemaVersions.
+            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                BSONObj scramCred = scram::generateCredentials(
+                        args.hashedPassword,
+                        saslGlobalParams.scramIterationCount);
+                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
             }
+            else { // Otherwise default to MONGODB-CR.
+                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+            }
+            credentialsBuilder.done();
+
             if (args.hasCustomData) {
                 userObjBuilder.append("customData", args.customData);
             }
@@ -467,7 +455,6 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create user")) {
                 return appendCommandStatus(

@@ -64,8 +64,7 @@ namespace {
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
     TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -74,8 +73,7 @@ namespace {
 
     TEST_F(ReplCoordTest, StartupWithConfigMissingSelf) {
         startCapturingLogMessages();
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
@@ -88,7 +86,7 @@ namespace {
     TEST_F(ReplCoordTest, StartupWithLocalConfigSetNameMismatch) {
         init("mySet");
         startCapturingLogMessages();
-        assertStart(ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                     BSON("_id" << "notMySet" <<
                          "version" << 2 <<
                          "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -102,7 +100,7 @@ namespace {
         start();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("Did not find local "));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithEmptyConfig) {
@@ -112,14 +110,14 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         // Starting uninitialized, show that we can perform the initiate behavior.
         BSONObjBuilder result1;
@@ -154,7 +152,7 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         // Having failed to initiate once, show that we can now initiate.
         BSONObjBuilder result1;
@@ -170,8 +168,7 @@ namespace {
 
     TEST_F(ReplCoordTest, InitiateFailsIfAlreadyInitialized) {
         OperationContextNoop txn;
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
@@ -218,7 +215,7 @@ namespace {
     TEST_F(ReplCoordTest, InitiateFailsIfQuorumNotMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -243,13 +240,13 @@ namespace {
         ASSERT_EQUALS(startDate + 10, getNet()->now());
         prsiThread.join();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiatePassesIfQuorumMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -286,7 +283,7 @@ namespace {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -298,14 +295,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
         OperationContextNoop txn;
         init("");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -317,14 +314,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWhileStoringLocalConfigDocument) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
 
         BSONObjBuilder result1;
         getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
@@ -338,7 +335,7 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
@@ -464,7 +461,7 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
 
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
@@ -482,7 +479,7 @@ namespace {
                                              BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         OID client1 = OID::gen();
@@ -509,7 +506,7 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time1));
+        getReplCoord()->setMyLastOptime(time1);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -524,7 +521,7 @@ namespace {
         // 2 nodes waiting for time2
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        getReplCoord()->setMyLastOptime(time2);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(client3, time2));
@@ -570,7 +567,7 @@ namespace {
                                              "multiDCAndRack" << BSON("dc" << 2 << "rack" << 3)))),
                 HostAndPort("node0"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         OID clientRID1 = OID::gen();
@@ -618,7 +615,7 @@ namespace {
 
 
         // Nothing satisfied
-        getReplCoord()->setMyLastOptime(&txn, time1);
+        getReplCoord()->setMyLastOptime(time1);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
@@ -648,7 +645,7 @@ namespace {
         ASSERT_OK(statusAndDur.status);
 
         // multiDC satisfied but not majority or multiRack
-        getReplCoord()->setMyLastOptime(&txn, time2);
+        getReplCoord()->setMyLastOptime(time2);
         getReplCoord()->setLastOptime_forTest(clientRID3, time2);
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, majorityWriteConcern);
@@ -729,7 +726,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -754,7 +751,7 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time1));
+        getReplCoord()->setMyLastOptime(time1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
@@ -763,7 +760,7 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        getReplCoord()->setMyLastOptime(time2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
@@ -789,7 +786,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -810,7 +807,7 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        getReplCoord()->setMyLastOptime(time2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(client, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
@@ -827,7 +824,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -872,7 +869,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -957,7 +954,7 @@ namespace {
                                              BSON("_id" << 2 << "host" << "node3"))),
                 HostAndPort("node1"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -1035,7 +1032,7 @@ namespace {
         OperationContextReplMock txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1048,7 +1045,7 @@ namespace {
         OperationContextReplMock txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1066,7 +1063,7 @@ namespace {
         OperationContextReplMock txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1203,7 +1200,7 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         // No secondary is caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1245,7 +1242,7 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         // No secondary is caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1293,7 +1290,7 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         // No secondary is caught up
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        getReplCoord()->setMyLastOptime(optime2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
@@ -1319,7 +1316,7 @@ namespace {
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
         init();
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeMaster) {
@@ -1341,14 +1338,13 @@ namespace {
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeRepl) {
-        // modeReplSet only once config isInitialized
+        // modeReplSet if the set name was supplied.
         ReplSettings settings;
         settings.replSet = "mySet/node1:12345";
         init(settings);
-        ASSERT_EQUALS(ReplicationCoordinator::modeNone,
-                      getReplCoord()->getReplicationMode());
-        assertStart(
-                ReplicationCoordinator::modeReplSet,
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
@@ -1381,13 +1377,13 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         OpTime optime3(2, 1);
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        getReplCoord()->setMyLastOptime(optime1);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime2));
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime3));
 
         // Check that the proper BSON is generated for the replSetUpdatePositionCommand
         BSONObjBuilder cmdBuilder;
-        getReplCoord()->prepareReplSetUpdatePositionCommand(&txn, &cmdBuilder);
+        getReplCoord()->prepareReplSetUpdatePositionCommand(&cmdBuilder);
         BSONObj cmd = cmdBuilder.done();
 
         ASSERT_EQUALS(2, cmd.nFields());
@@ -1422,7 +1418,7 @@ namespace {
         // Test generating basic handshake with no chaining
         std::vector<BSONObj> handshakes;
         OperationContextNoop txn;
-        getReplCoord()->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
+        getReplCoord()->prepareReplSetUpdatePositionCommandHandshakes(&handshakes);
         ASSERT_EQUALS(1U, handshakes.size());
         BSONObj handshakeCmd = handshakes[0];
         ASSERT_EQUALS(2, handshakeCmd.nFields());
@@ -1446,7 +1442,7 @@ namespace {
         ASSERT_OK(getReplCoord()->processHandshake(&txn, slave1Handshake));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, slave2Handshake));
 
-        getReplCoord()->prepareReplSetUpdatePositionCommandHandshakes(&txn, &handshakes);
+        getReplCoord()->prepareReplSetUpdatePositionCommandHandshakes(&handshakes);
         ASSERT_EQUALS(3U, handshakes.size());
         std::set<OID> rids;
         for (std::vector<BSONObj>::iterator it = handshakes.begin(); it != handshakes.end(); ++it) {
@@ -1481,15 +1477,15 @@ namespace {
                 HostAndPort("test2", 1234));
         OperationContextNoop txn;
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
 
         // Can't unset maintenance mode if it was never set to begin with.
-        Status status = getReplCoord()->setMaintenanceMode(&txn, false);
+        Status status = getReplCoord()->setMaintenanceMode(false);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
 
         // valid set
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
 
         // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
@@ -1501,14 +1497,14 @@ namespace {
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
 
         // Can set multiple times
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
 
         // Need to unset the number of times you set
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
-        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+        status = getReplCoord()->setMaintenanceMode(false);
         // fourth one fails b/c we only set three times
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         // Unsetting maintenance mode changes our state to secondary if maintenance mode was
@@ -1519,19 +1515,19 @@ namespace {
         // state.
         getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
 
         // Rollback is sticky even if entered while in maintenance mode.
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
         getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
@@ -1539,16 +1535,16 @@ namespace {
         // Can't modify maintenance mode when PRIMARY
          simulateSuccessfulElection();
 
-        status = getReplCoord()->setMaintenanceMode(&txn, true);
+        status = getReplCoord()->setMaintenanceMode(true);
         ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
 
         simulateStepDownOnIsolation();
 
-        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        status = getReplCoord()->setMaintenanceMode(false);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
     }
 
     TEST_F(ReplCoordTest, GetHostsWrittenToReplSet) {
@@ -1576,7 +1572,7 @@ namespace {
         ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
 
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        getReplCoord()->setMyLastOptime(time2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
 
         std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
@@ -1611,13 +1607,13 @@ namespace {
         ASSERT_OK(handshake.initialize(BSON("handshake" << client)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
 
-        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
-        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(&txn, client, time1));
+        getReplCoord()->setMyLastOptime(time2);
+        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(client, time1));
 
         std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(0U, caughtUpHosts.size()); // self doesn't get included in master-slave
 
-        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(&txn, client, time2));
+        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(client, time2));
         caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(1U, caughtUpHosts.size());
         ASSERT_EQUALS(clientHost, caughtUpHosts[0]);
@@ -1750,7 +1746,7 @@ namespace {
                                              BSON("host" << "node5:12345" << "_id" << 4))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         OID selfRID = getReplCoord()->getMyRID();
@@ -1761,7 +1757,7 @@ namespace {
         OpTime time1(100, 1);
         OpTime time2(100, 2);
         OpTime staleTime(10, 0);
-        getReplCoord()->setMyLastOptime(&txn, time2);
+        getReplCoord()->setMyLastOptime(time2);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -1775,7 +1771,7 @@ namespace {
                                            BSON("_id" << client2 << "optime" << time1) <<
                                            BSON("_id" << client3 << "optime" << time1)))));
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+                      getReplCoord()->processReplSetUpdatePosition(args));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
 
@@ -1785,7 +1781,7 @@ namespace {
         ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+                      getReplCoord()->processReplSetUpdatePosition(args));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
 
@@ -1795,7 +1791,7 @@ namespace {
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+                      getReplCoord()->processReplSetUpdatePosition(args));
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
         writeConcern.wNumNodes = 3;
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
@@ -1816,7 +1812,7 @@ namespace {
                                             BSON("_id" << selfRID << "optime" << staleTime) <<
                                             BSON("_id" << client3 << "optime" << time2) <<
                                             BSON("_id" << client4 << "optime" << time2)))));
-        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args2));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2));
         // all nodes should have through time1 and three should have through time2
         writeConcern.wNumNodes = 5;
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
@@ -1833,7 +1829,7 @@ namespace {
                                             BSON("_id" << client1 << "optime" << time2) <<
                                             BSON("_id" << client2 << "optime" << time2) <<
                                             BSON("_id" << client3 << "optime" << staleTime)))));
-        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args3));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args3));
         // all nodes should have through time2
         writeConcern.wNumNodes = 5;
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
@@ -1849,13 +1845,13 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(100, 0));
         simulateSuccessfulElection();
 
         OpTime time1(100, 1);
         OpTime time2(100, 2);
         OpTime staleTime(10, 0);
-        getReplCoord()->setMyLastOptime(&txn, time1);
+        getReplCoord()->setMyLastOptime(time1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -1872,7 +1868,7 @@ namespace {
                                                 "memberId" << 0 <<
                                                 "optime" << time2)))));
 
-        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
@@ -1885,7 +1881,7 @@ namespace {
                                                  "optime" << time2)))));
 
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
-                      getReplCoord()->processReplSetUpdatePosition(&txn, args2));
+                      getReplCoord()->processReplSetUpdatePosition(args2));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
@@ -1898,12 +1894,12 @@ namespace {
                                                  "optime" << time2)))));
 
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
-                      getReplCoord()->processReplSetUpdatePosition(&txn, args3));
+                      getReplCoord()->processReplSetUpdatePosition(args3));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         // receive a good update position
-        getReplCoord()->setMyLastOptime(&txn, time2);
+        getReplCoord()->setMyLastOptime(time2);
         UpdatePositionArgs args4;
         ASSERT_OK(args4.initialize(BSON("replSetUpdatePosition" << 1 <<
                                         "optimes" << BSON_ARRAY(
@@ -1914,7 +1910,7 @@ namespace {
                                                  "memberId" << 2 <<
                                                  "optime" << time2)))));
 
-        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args4));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args4));
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         writeConcern.wNumNodes = 3;
@@ -1947,7 +1943,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 2));
+        getReplCoord()->setMyLastOptime(OpTime(100, 2));
         simulateSuccessfulElection();
 
         OID selfRID = getReplCoord()->getMyRID();
@@ -2026,7 +2022,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 2));
+        getReplCoord()->setMyLastOptime(OpTime(100, 2));
         simulateSuccessfulElection();
 
         OID node2 = OID::gen();
@@ -2091,7 +2087,7 @@ namespace {
                                              BSON("host" << "node5:12345" << "_id" << 4))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 1));
+        getReplCoord()->setMyLastOptime(OpTime(100, 1));
         simulateSuccessfulElection();
 
         OID node2 = OID::gen();
@@ -2171,7 +2167,7 @@ namespace {
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         OpTime time(100, 0);
-        getReplCoord()->setMyLastOptime(&txn, time);
+        getReplCoord()->setMyLastOptime(time);
         simulateSuccessfulElection();
 
         WriteConcernOptions majorityWriteConcern;

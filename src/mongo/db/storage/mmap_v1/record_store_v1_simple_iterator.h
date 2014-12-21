@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -44,19 +45,19 @@ namespace mongo {
     public:
         SimpleRecordStoreV1Iterator( OperationContext* txn,
                                      const SimpleRecordStoreV1* records,
-                                     const DiskLoc& start,
+                                     const RecordId& start,
                                      const CollectionScanParams::Direction& dir );
         virtual ~SimpleRecordStoreV1Iterator() { }
 
         virtual bool isEOF();
-        virtual DiskLoc getNext();
-        virtual DiskLoc curr();
+        virtual RecordId getNext();
+        virtual RecordId curr();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
         virtual void saveState();
         virtual bool restoreState(OperationContext* txn);
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const RecordId& loc ) const;
 
     private:
          // for getNext, not owned

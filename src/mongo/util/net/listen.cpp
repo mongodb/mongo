@@ -155,10 +155,10 @@ namespace mongo {
             if (me.getType() == AF_UNIX) {
 #if !defined(_WIN32)
                 if (unlink(me.getAddr().c_str()) == -1) {
-                    int x = errno;
-                    if (x != ENOENT) {
-                        log() << "couldn't unlink socket file " << me << errnoWithDescription(x) << " skipping" << endl;
-                        continue;
+                    if (errno != ENOENT) {
+                        error() << "Failed to unlink socket file " << me << " "
+                                << errnoWithDescription(errno);
+                        fassertFailedNoTrace(28578);
                     }
                 }
 #endif
@@ -189,7 +189,9 @@ namespace mongo {
 #if !defined(_WIN32)
             if (me.getType() == AF_UNIX) {
                 if (chmod(me.getAddr().c_str(), serverGlobalParams.unixSocketPermissions) == -1) {
-                    error() << "couldn't chmod socket file " << me << errnoWithDescription() << endl;
+                    error() << "Failed to chmod socket file " << me << " "
+                            << errnoWithDescription(errno);
+                    fassertFailedNoTrace(28582);
                 }
                 ListeningSockets::get()->addPath( me.getAddr() );
             }

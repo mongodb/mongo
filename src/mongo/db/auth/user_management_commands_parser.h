@@ -45,7 +45,6 @@ namespace auth {
 
     struct CreateOrUpdateUserArgs {
         UserName userName;
-        std::string mechanism;
         bool hasHashedPassword;
         std::string hashedPassword;
         bool hasCustomData;

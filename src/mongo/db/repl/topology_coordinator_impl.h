@@ -37,7 +37,6 @@
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -307,6 +306,14 @@ namespace repl {
         void _stepDownSelfAndReplaceWith(int newPrimary);
 
         MemberState _getMyState() const;
+
+        /**
+         * Looks up the provided member in the blacklist and returns true if the member's blacklist
+         * expire time is after 'now'.  If the member is found but the expire time is before 'now',
+         * the member is removed from _syncSourceBlacklist and the function returns false.
+         * If the member is not found in the blacklist, the function simply returns false.
+         **/
+        bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now);
 
         // This node's role in the replication protocol.
         Role _role;

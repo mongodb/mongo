@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -92,6 +93,9 @@ namespace mongo {
                     continue;
                 }
 
+                // Count it as active from the moment the TTL thread wakes up
+                OperationContextImpl txn;
+
                 // if part of replSet but not in a readable state (e.g. during initial sync), skip.
                 if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                         repl::ReplicationCoordinator::modeReplSet &&
@@ -107,15 +111,11 @@ namespace mongo {
                     string db = *i;
 
                     vector<BSONObj> indexes;
-                    {
-                        OperationContextImpl txn;
-                        getTTLIndexesForDB( &txn, db, &indexes );
-                    }
+                    getTTLIndexesForDB(&txn, db, &indexes);
 
                     for ( vector<BSONObj>::const_iterator it = indexes.begin();
                           it != indexes.end(); ++it ) {
 
-                        OperationContextImpl txn;
                         if ( !doTTLForIndex( &txn, db, *it ) ) {
                             break;  // stop processing TTL indexes on this database
                         }
@@ -205,13 +205,17 @@ namespace mongo {
 
             LOG(1) << "TTL: " << key << " \t " << query << endl;
 
-            long long n = 0;
-            {
+            long long numDeleted = 0;
+            int attempt = 1;
+            while (1) {
                 const string ns = idx["ns"].String();
 
+                ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, dbName, MODE_IX);
                 Database* db = autoDb.getDb();
-                if (!db) return false;
+                if (!db) {
+                    return false;
+                }
 
                 Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
 
@@ -233,11 +237,23 @@ namespace mongo {
                     return true;
                 }
 
-                n = deleteObjects( txn, db, ns, query, PlanExecutor::YIELD_AUTO, false, true );
-                ttlDeletedDocuments.increment( n );
+                try {
+                    numDeleted = deleteObjects(txn,
+                                               db,
+                                               ns,
+                                               query,
+                                               PlanExecutor::YIELD_AUTO,
+                                               false,
+                                               true);
+                    break;
+                }
+                catch (const WriteConflictException& dle) {
+                    WriteConflictException::logAndBackoff(attempt++, "ttl", ns);
+                }
             }
 
-            LOG(1) << "\tTTL deleted: " << n << endl;
+            ttlDeletedDocuments.increment(numDeleted);
+            LOG(1) << "\tTTL deleted: " << numDeleted << endl;
             return true;
         }
     };

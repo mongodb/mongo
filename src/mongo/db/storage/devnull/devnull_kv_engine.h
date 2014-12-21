@@ -88,6 +88,10 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+            return true;
+        }
+
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const {
             return std::vector<std::string>();
         }

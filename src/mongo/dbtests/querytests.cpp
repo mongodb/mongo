@@ -54,17 +54,11 @@ namespace mongo {
 namespace QueryTests {
 
     class Base {
-    protected:
-        OperationContextImpl _txn;
-        Lock::GlobalWrite _lk;
-        Client::Context _context;
-
-        Database* _database;
-        Collection* _collection;
-
     public:
-        Base() : _lk(_txn.lockState()),
+        Base() : _scopedXact(&_txn, MODE_X),
+                 _lk(_txn.lockState()),
                  _context(&_txn, ns()) {
+
             {
                 WriteUnitOfWork wunit(&_txn);
                 _database = _context.db();
@@ -75,8 +69,10 @@ namespace QueryTests {
                 _collection = _database->createCollection( &_txn, ns() );
                 wunit.commit();
             }
+
             addIndex( fromjson( "{\"a\":1}" ) );
         }
+
         ~Base() {
             try {
                 WriteUnitOfWork wunit(&_txn);
@@ -87,16 +83,20 @@ namespace QueryTests {
                 FAIL( "Exception while cleaning up collection" );
             }
         }
+
     protected:
         static const char *ns() {
             return "unittests.querytests";
         }
+
         void addIndex( const BSONObj &key ) {
             Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
+
         void insert( const char *s ) {
             insert( fromjson( s ) );
         }
+
         void insert( const BSONObj &o ) {
             WriteUnitOfWork wunit(&_txn);
             if ( o["_id"].eoo() ) {
@@ -112,6 +112,15 @@ namespace QueryTests {
             }
             wunit.commit();
         }
+
+
+        OperationContextImpl _txn;
+        ScopedTransaction _scopedXact;
+        Lock::GlobalWrite _lk;
+        Client::Context _context;
+
+        Database* _database;
+        Collection* _collection;
     };
 
     class FindOneOr : public Base {
@@ -1207,7 +1216,7 @@ namespace QueryTests {
             {
                 WriteUnitOfWork wunit(&_txn);
                 ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
-                                     fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+                                     fromjson( "{ capped : true, size : 2000, max: 10000 }" ), false ).isOK() );
                 wunit.commit();
             }
 
@@ -1343,13 +1352,24 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "1 SFDSDF" << endl;
             BSONObj info;
             ASSERT( _client.runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
 
             int i = 0;
-            for( int oldCount = -1;
-                    count() != oldCount;
-                    oldCount = count(), _client.insert( ns(), BSON( "ts" << i++ ) ) );
+            int max = 1;
+
+            while ( 1 ) {
+                int oldCount = count();
+                _client.insert( ns(), BSON( "ts" << i++ ) );
+                int newCount = count();
+                if ( oldCount == newCount ||
+                     newCount < max )
+                    break;
+
+                if ( newCount > max )
+                    max = newCount;
+            }
 
             for( int k = 0; k < 5; ++k ) {
                 _client.insert( ns(), BSON( "ts" << i++ ) );
@@ -1361,7 +1381,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
-                //cout << k << endl;
+                cout << k << endl;
             }
         }
     };
@@ -1372,6 +1392,7 @@ namespace QueryTests {
         }
 
         void run() {
+    cout << "2 ;kljsdf" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             BSONObj info;
@@ -1390,6 +1411,7 @@ namespace QueryTests {
                     ASSERT( !next[ "ts" ].eoo() );
                     ASSERT_EQUALS( ( j > min ? j : min ), next[ "ts" ].numberInt() );
                 }
+                cout << k << endl;
             }
 
             ASSERT_EQUALS( startNumCursors, numCursorsOpen() );
@@ -1405,6 +1427,7 @@ namespace QueryTests {
         FindingStartStale() : CollectionBase( "findingstart" ) {}
 
         void run() {
+    cout << "3 xcxcv" << endl;
             size_t startNumCursors = numCursorsOpen();
 
             // Check OplogReplay mode with missing collection.
@@ -1441,13 +1464,16 @@ namespace QueryTests {
     
     class CollectionInternalBase : public CollectionBase {
     public:
-        CollectionInternalBase( const char *nsLeaf ) :
-          CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), "unittests", MODE_X),
-          _ctx(&_txn, ns()) {
+        CollectionInternalBase( const char *nsLeaf )
+                : CollectionBase( nsLeaf ),
+                  _scopedXact(&_txn, MODE_IX),
+                  _lk(_txn.lockState(), "unittests", MODE_X),
+                  _ctx(&_txn, ns()) {
+
         }
 
     private:
+        ScopedTransaction _scopedXact;
         Lock::DBLock _lk;
         Client::Context _ctx;
     };

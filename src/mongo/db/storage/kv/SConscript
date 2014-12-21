@@ -7,7 +7,7 @@ env.Library(
         'kv_collection_catalog_entry.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_mgr',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         ]
     )

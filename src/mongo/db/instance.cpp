@@ -490,7 +490,7 @@ namespace {
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
-            if (txn->lockState()->hasAnyReadLock()) {
+            if (txn->lockState()->isReadLocked()) {
                 MONGO_LOG_COMPONENT(1, logComponentForOp(op))
                         << "note: not profiling because recursive read lock" << endl;
             }
@@ -685,8 +685,11 @@ namespace {
                 ParsedDelete parsedDelete(txn, &request);
                 uassertStatusOK(parsedDelete.parseRequest());
 
+                ScopedTransaction scopedXact(txn, MODE_IX);
                 AutoGetDb autoDb(txn, ns.db(), MODE_IX);
-                if (!autoDb.getDb()) break;
+                if (!autoDb.getDb()) {
+                    break;
+                }
 
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
@@ -1096,7 +1099,7 @@ namespace {
         // operation context, which also instantiates a recovery unit. Also, using the
         // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
         // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
-        DefaultLockerImpl globalLocker(0);
+        DefaultLockerImpl globalLocker;
         LockResult result = globalLocker.lockGlobalBegin(MODE_X);
         if (result == LOCK_WAITING) {
             result = globalLocker.lockGlobalComplete(UINT_MAX);

@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -222,10 +223,15 @@ namespace mongo {
             bool found = false;
             {
                 CanonicalQuery* cq;
+                const BSONObj projection;
+                const long long skip = 0;
+                const long long limit = -1; // 1 document requested; negative indicates hard limit.
                 uassertStatusOK(CanonicalQuery::canonicalize(ns,
                                                              query,
                                                              sort,
-                                                             BSONObj(),  // projection
+                                                             projection,
+                                                             skip,
+                                                             limit,
                                                              &cq,
                                                              whereCallback));
 
@@ -239,8 +245,23 @@ namespace mongo {
 
                 scoped_ptr<PlanExecutor> exec(rawExec);
 
-                if (PlanExecutor::ADVANCED == exec->getNext(&doc, NULL)) {
+                PlanExecutor::ExecState state = exec->getNext(&doc, NULL);
+                if (PlanExecutor::ADVANCED == state) {
                     found = true;
+                }
+                else if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+                    if (PlanExecutor::FAILURE == state &&
+                        WorkingSetCommon::isValidStatusMemberObject(doc)) {
+                        const Status errorStatus = WorkingSetCommon::getMemberObjectStatus(doc);
+                        invariant(!errorStatus.isOK());
+                        uasserted(errorStatus.code(), errorStatus.reason());
+                    }
+                    uasserted(ErrorCodes::OperationFailed,
+                              str::stream() << "executor returned " << PlanExecutor::statestr(state)
+                                            << " while finding document to update");
+                }
+                else {
+                    invariant(PlanExecutor::IS_EOF == state);
                 }
             }
 

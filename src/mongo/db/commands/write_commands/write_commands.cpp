@@ -187,6 +187,8 @@ namespace mongo {
                            "explained write batches must be of size 1" );
         }
 
+        ScopedTransaction scopedXact(txn, MODE_IX);
+
         // Get a reference to the singleton batch item (it's the 0th item in the batch).
         BatchItemRef batchItem( &request, 0 );
 

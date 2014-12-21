@@ -129,4 +129,56 @@ namespace mongo {
         }
     }
 
+    // Insert a single record. Create a repair iterator pointing to that single record.
+    // Then invalidate the record and ensure that the repair iterator responds correctly.
+    // See SERVER-16300.
+    TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
+        scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+        scoped_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            ASSERT_EQ(0, rs->numRecords(opCtx.get()));
+        }
+
+        // Insert one record.
+        RecordId idToInvalidate;
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            WriteUnitOfWork uow(opCtx.get());
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "some data", 10, false);
+            ASSERT_OK(res.getStatus());
+            idToInvalidate = res.getValue();
+            uow.commit();
+        }
+
+        // Double-check that the record store has one record in it now.
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            ASSERT_EQ(1, rs->numRecords(opCtx.get()));
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            scoped_ptr<RecordIterator> it(rs->getIteratorForRepair(opCtx.get()));
+            // Return value of NULL is expected if getIteratorForRepair is not supported.
+            if (!it) {
+                return;
+            }
+
+            // We should be pointing at the only record in the store.
+            ASSERT_EQ(idToInvalidate, it->curr());
+            ASSERT(!it->isEOF());
+
+            // Invalidate the record we're pointing at.
+            it->saveState();
+            it->invalidate(idToInvalidate);
+            it->restoreState(opCtx.get());
+
+            // Iterator should be EOF now because the only thing in the collection got deleted.
+            ASSERT(it->isEOF());
+            ASSERT_EQ(it->getNext(), RecordId());
+        }
+    }
+
 } // namespace mongo

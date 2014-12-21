@@ -208,7 +208,7 @@ namespace mongo {
             return false;
         }
 
-        bool NonDurableImpl::commitIfNeeded(OperationContext* txn) {
+        bool NonDurableImpl::commitIfNeeded() {
             return false;
         }
 
@@ -278,7 +278,7 @@ namespace mongo {
             return p;
         }
 
-        bool DurableImpl::commitIfNeeded(OperationContext* txn) {
+        bool DurableImpl::commitIfNeeded() {
             if (MONGO_likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
             }
@@ -451,7 +451,8 @@ namespace mongo {
                     if( i == e ) i = b;
                 }
             }
-            LOG(2) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo << ' ' << t.millis() << "ms" << endl;
+            LOG(3) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo
+                   << ' ' << t.millis() << "ms" << endl;
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.

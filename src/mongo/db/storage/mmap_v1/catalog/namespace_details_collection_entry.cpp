@@ -68,7 +68,7 @@ namespace mongo {
         NamespaceDetails::IndexIterator i = _details->ii( true );
         while ( i.more() ) {
             const IndexDetails& id = i.next();
-            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info ).toBson();
+            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
             names->push_back( obj.getStringField("name") );
         }
     }
@@ -120,11 +120,11 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc NamespaceDetailsCollectionCatalogEntry::getIndexHead( OperationContext* txn,
-                                                                  const StringData& idxName ) const {
+    RecordId NamespaceDetailsCollectionCatalogEntry::getIndexHead(OperationContext* txn,
+                                                                  const StringData& idxName) const {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
-        return _details->idx( idxNo ).head;
+        return _details->idx( idxNo ).head.toRecordId();
     }
 
     BSONObj NamespaceDetailsCollectionCatalogEntry::getIndexSpec( OperationContext* txn,
@@ -132,15 +132,15 @@ namespace mongo {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
         const IndexDetails& id = _details->idx( idxNo );
-        return _indexRecordStore->dataFor( txn, id.info ).toBson();
+        return _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
     }
 
     void NamespaceDetailsCollectionCatalogEntry::setIndexHead( OperationContext* txn,
                                                                const StringData& idxName,
-                                                               const DiskLoc& newHead ) {
+                                                               const RecordId& newHead ) {
         int idxNo = _findIndexNumber( txn, idxName );
         invariant( idxNo >= 0 );
-        *txn->recoveryUnit()->writing( &_details->idx( idxNo ).head) = newHead;
+        *txn->recoveryUnit()->writing(&_details->idx(idxNo).head) = DiskLoc::fromRecordId(newHead);
     }
 
     bool NamespaceDetailsCollectionCatalogEntry::isIndexReady( OperationContext* txn,
@@ -156,7 +156,7 @@ namespace mongo {
         while ( i.more() ) {
             const IndexDetails& id = i.next();
             int idxNo = i.pos() - 1;
-            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info ).toBson();
+            const BSONObj obj = _indexRecordStore->dataFor( txn, id.info.toRecordId() ).toBson();
             if ( idxName == obj.getStringField("name") )
                 return idxNo;
         }
@@ -193,7 +193,7 @@ namespace mongo {
         if ( idxNo < 0 )
             return Status( ErrorCodes::NamespaceNotFound, "index not found to remove" );
 
-        DiskLoc infoLocation = _details->idx( idxNo ).info;
+        RecordId infoLocation = _details->idx( idxNo ).info.toRecordId();
 
         { // sanity check
             BSONObj info = _indexRecordStore->dataFor( txn, infoLocation ).toBson();
@@ -235,10 +235,10 @@ namespace mongo {
                                                                          const IndexDescriptor* desc ) {
         BSONObj spec = desc->infoObj();
         // 1) entry in system.indexs
-        StatusWith<DiskLoc> systemIndexesEntry = _indexRecordStore->insertRecord( txn,
-                                                                                  spec.objdata(),
-                                                                                  spec.objsize(),
-                                                                                  false );
+        StatusWith<RecordId> systemIndexesEntry = _indexRecordStore->insertRecord( txn,
+                                                                                   spec.objdata(),
+                                                                                   spec.objsize(),
+                                                                                   false );
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
@@ -255,7 +255,8 @@ namespace mongo {
             id = &_details->idx(getTotalIndexCount( txn ), false);
         }
 
-        *txn->recoveryUnit()->writing( &id->info ) = systemIndexesEntry.getValue();
+        const DiskLoc infoLoc = DiskLoc::fromRecordId(systemIndexesEntry.getValue());
+        *txn->recoveryUnit()->writing( &id->info ) = infoLoc;
         *txn->recoveryUnit()->writing( &id->head ) = DiskLoc();
 
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) += 1;
@@ -305,7 +306,7 @@ namespace mongo {
 
         IndexDetails& indexDetails = _details->idx( idx );
 
-        BSONObj obj = _indexRecordStore->dataFor( txn, indexDetails.info ).toBson();
+        BSONObj obj = _indexRecordStore->dataFor( txn, indexDetails.info.toRecordId() ).toBson();
         const BSONElement oldExpireSecs = obj.getField("expireAfterSeconds");
 
         // Important that we set the new value in-place.  We are writing directly to the

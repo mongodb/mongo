@@ -456,7 +456,6 @@ namespace {
             return appendCommandStatus(
                     result,
                     getGlobalReplicationCoordinator()->setMaintenanceMode(
-                            txn,
                             cmdObj["replSetMaintenance"].trueValue()));
         }
     } cmdReplSetMaintenance;
@@ -544,7 +543,7 @@ namespace {
             
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(txn, args));
+                    getGlobalReplicationCoordinator()->processReplSetUpdatePosition(args));
                     
         }
     } cmdReplSetUpdatePosition;

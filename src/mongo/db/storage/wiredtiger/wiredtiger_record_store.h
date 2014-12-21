@@ -119,7 +119,7 @@ namespace mongo {
         virtual Status updateWithDamages( OperationContext* txn,
                                           const RecordId& loc,
                                           const RecordData& oldRec,
-                                          const char* damangeSource,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
@@ -139,9 +139,11 @@ namespace mongo {
                                 CompactStats* stats );
 
         virtual Status validate( OperationContext* txn,
-                                 bool full, bool scanData,
+                                 bool full,
+                                 bool scanData,
                                  ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output ) const;
+                                 ValidateResults* results,
+                                 BSONObjBuilder* output ) const;
 
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
@@ -157,8 +159,8 @@ namespace mongo {
                                               RecordId end,
                                               bool inclusive);
 
-        virtual RecordId oplogStartHack(OperationContext* txn,
-                                       const RecordId& startingPosition) const;
+        virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
+                                                         const RecordId& startingPosition) const;
 
         virtual Status oplogDiskLocRegister( OperationContext* txn,
                                              const OpTime& opTime );
@@ -218,13 +220,14 @@ namespace mongo {
             RecordId _lastLoc; // the last thing returned from getNext()
         };
 
+        class CappedInsertChange;
         class NumRecordsChange;
         class DataSizeChange;
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
 
-        static uint64_t _makeKey(const RecordId &loc);
-        static RecordId _fromKey(uint64_t k);
+        static int64_t _makeKey(const RecordId &loc);
+        static RecordId _fromKey(int64_t k);
 
         void _addUncommitedDiskLoc_inlock( OperationContext* txn, const RecordId& loc );
 
@@ -247,7 +250,8 @@ namespace mongo {
         const int64_t _cappedMaxSize;
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
-        boost::mutex _cappedDeleterMutex; // see commend in ::cappedDeleteAsNeeded
+        int _cappedDeleteCheckCount; // see comment in ::cappedDeleteAsNeeded
+        boost::mutex _cappedDeleterMutex; // see comment in ::cappedDeleteAsNeeded
 
         const bool _useOplogHack;
 
@@ -257,7 +261,7 @@ namespace mongo {
         RecordId _oplog_highestSeen;
         mutable boost::mutex _uncommittedDiskLocsMutex;
 
-        AtomicUInt64 _nextIdNum;
+        AtomicInt64 _nextIdNum;
         AtomicInt64 _dataSize;
         AtomicInt64 _numRecords;
 

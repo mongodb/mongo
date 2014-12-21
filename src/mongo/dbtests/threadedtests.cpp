@@ -37,13 +37,13 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/list.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -113,112 +113,129 @@ namespace ThreadedTests {
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
 
-            MMAPV1LockerImpl lockState(1);
+            OperationContextImpl txn;
 
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
                 int x = std::rand();
                 bool sometimes = (x % 15 == 0);
                 if( i % 7 == 0 ) {
-                    Lock::GlobalRead r(&lockState); // nested test
-                    Lock::GlobalRead r2(&lockState);
+                    Lock::GlobalRead r(txn.lockState()); // nested test
+                    Lock::GlobalRead r2(txn.lockState());
                 }
                 else if( i % 7 == 1 ) {
-                    Lock::GlobalRead r(&lockState);
-                    ASSERT(lockState.hasAnyReadLock());
+                    Lock::GlobalRead r(txn.lockState());
+                    ASSERT(txn.lockState()->isReadLocked());
                 }
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {
-                    Lock::GlobalWrite w(&lockState);
-                    ASSERT( lockState.isW() );
+                    Lock::GlobalWrite w(txn.lockState());
+                    ASSERT( txn.lockState()->isW() );
                     if( i % 7 == 2 ) {
-                        Lock::TempRelease t(&lockState);
+                        Lock::TempRelease t(txn.lockState());
                     }
                 }
                 else if( i % 7 == 2 ) {
-                    Lock::GlobalWrite w(&lockState);
-                    ASSERT( lockState.isW() );
+                    Lock::GlobalWrite w(txn.lockState());
+                    ASSERT( txn.lockState()->isW() );
                     if( sometimes ) {
-                        Lock::TempRelease t(&lockState);
+                        Lock::TempRelease t(txn.lockState());
                     }
                 }
                 else if( i % 7 == 3 ) {
-                    Lock::GlobalWrite w(&lockState);
+                    Lock::GlobalWrite w(txn.lockState());
                     {
-                        Lock::TempRelease t(&lockState);
+                        Lock::TempRelease t(txn.lockState());
                     }
-                    Lock::GlobalRead r(&lockState);
-                    ASSERT( lockState.isW() );
+                    Lock::GlobalRead r(txn.lockState());
+                    ASSERT( txn.lockState()->isW() );
                     if( sometimes ) {
-                        Lock::TempRelease t(&lockState);
+                        Lock::TempRelease t(txn.lockState());
                     }
                 }
                 else if( i % 7 == 5 ) {
                     {
-                        Lock::DBRead r(&lockState, "foo");
+                        ScopedTransaction scopedXact(&txn, MODE_IS);
+                        Lock::DBLock r(txn.lockState(), "foo", MODE_S);
                     }
                     {
-                        Lock::DBRead r(&lockState, "bar");
+                        ScopedTransaction scopedXact(&txn, MODE_IS);
+                        Lock::DBLock r(txn.lockState(), "bar", MODE_S);
                     }
                 }
                 else if( i % 7 == 6 ) {
                     if( i > N/2 ) { 
                         int q = i % 11;
                         if( q == 0 ) { 
-                            Lock::DBRead r(&lockState, "foo");
-                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
+                            ScopedTransaction scopedXact(&txn, MODE_IS);
 
-                            Lock::DBRead r2(&lockState, "foo");
-                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
+                            Lock::DBLock r(txn.lockState(), "foo", MODE_S);
+                            ASSERT(txn.lockState()->isDbLockedForMode("foo", MODE_S));
 
-                            Lock::DBRead r3(&lockState, "local");
-                            ASSERT(lockState.isDbLockedForMode("foo", MODE_S));
-                            ASSERT(lockState.isDbLockedForMode("local", MODE_S));
+                            Lock::DBLock r2(txn.lockState(), "foo", MODE_S);
+                            ASSERT(txn.lockState()->isDbLockedForMode("foo", MODE_S));
+
+                            Lock::DBLock r3(txn.lockState(), "local", MODE_S);
+                            ASSERT(txn.lockState()->isDbLockedForMode("foo", MODE_S));
+                            ASSERT(txn.lockState()->isDbLockedForMode("local", MODE_S));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock
                             { 
-                                Lock::DBRead x(&lockState, "local");
+                                ScopedTransaction scopedXact(&txn, MODE_IS);
+                                Lock::DBLock x(txn.lockState(), "local", MODE_S);
                             }
                             {
-                                Lock::DBLock x(&lockState, "local", MODE_X);
+                                ScopedTransaction scopedXact(&txn, MODE_IX);
+                                Lock::DBLock x(txn.lockState(), "local", MODE_X);
+
                                 //  No actual writing here, so no WriteUnitOfWork
                                 if( sometimes ) {
-                                    Lock::TempRelease t(&lockState);
+                                    Lock::TempRelease t(txn.lockState());
                                 }
                             }
                         } else if( q == 1 ) {
                             {
-                                Lock::DBRead  x(&lockState, "admin");
+                                ScopedTransaction scopedXact(&txn, MODE_IS);
+                                Lock::DBLock  x(txn.lockState(), "admin", MODE_S);
                             }
 
                             { 
-                                Lock::DBLock x(&lockState, "admin", MODE_X);
+                                ScopedTransaction scopedXact(&txn, MODE_IX);
+                                Lock::DBLock x(txn.lockState(), "admin", MODE_X);
                             }
                         }
                         else if( q == 3 ) {
-                            Lock::DBLock x(&lockState, "foo", MODE_X);
-                            Lock::DBRead y(&lockState, "admin");
+                            ScopedTransaction scopedXact(&txn, MODE_IX);
+
+                            Lock::DBLock x(txn.lockState(), "foo", MODE_X);
+                            Lock::DBLock y(txn.lockState(), "admin", MODE_S);
                         }
                         else if( q == 4 ) { 
-                            Lock::DBRead x(&lockState, "foo2");
-                            Lock::DBRead y(&lockState, "admin");
+                            ScopedTransaction scopedXact(&txn, MODE_IS);
+
+                            Lock::DBLock x(txn.lockState(), "foo2", MODE_S);
+                            Lock::DBLock y(txn.lockState(), "admin", MODE_S);
                         }
                         else { 
-                            Lock::DBLock w(&lockState, "foo", MODE_X);
+                            ScopedTransaction scopedXact(&txn, MODE_IX);
+
+                            Lock::DBLock w(txn.lockState(), "foo", MODE_X);
 
                             {
-                                Lock::TempRelease t(&lockState);
+                                Lock::TempRelease t(txn.lockState());
                             }
 
-                            Lock::DBRead r2(&lockState, "foo");
-                            Lock::DBRead r3(&lockState, "local");
+                            Lock::DBLock r2(txn.lockState(), "foo", MODE_S);
+                            Lock::DBLock r3(txn.lockState(), "local", MODE_S);
                         }
                     }
                     else { 
-                        Lock::DBRead r(&lockState, "foo");
-                        Lock::DBRead r2(&lockState, "foo");
-                        Lock::DBRead r3(&lockState, "local");
+                        ScopedTransaction scopedXact(&txn, MODE_IS);
+
+                        Lock::DBLock r(txn.lockState(), "foo", MODE_S);
+                        Lock::DBLock r2(txn.lockState(), "foo", MODE_S);
+                        Lock::DBLock r3(txn.lockState(), "local", MODE_S);
                     }
                 }
                 pm.hit();
@@ -228,11 +245,11 @@ namespace ThreadedTests {
 
         virtual void validate() {
             {
-                MMAPV1LockerImpl ls(1);
+                MMAPV1LockerImpl ls;
                 Lock::GlobalWrite w(&ls);
             }
             {
-                MMAPV1LockerImpl ls(1);
+                MMAPV1LockerImpl ls;
                 Lock::GlobalRead r(&ls);
             }
         }
@@ -454,69 +471,6 @@ namespace ThreadedTests {
             verify( x1.load() == 2 );
             t1.join();
 #endif            
-        }
-    };
-
-    class List1Test2 : public ThreadedTest<> {
-        static const int iterations = 1000; // note: a lot of iterations will use a lot of memory as List1 leaks on purpose
-        class M : public List1<M>::Base {
-        public:
-            M(int x) : _x(x) { }
-            const int _x;
-        };
-        List1<M> l;
-    public:
-        void validate() { }
-        void subthread(int) {
-            for(int i=0; i < iterations; i++) {
-                int r = std::rand() % 256;
-                if( r == 0 ) {
-                    l.orphanAll();
-                }
-                else if( r < 4 ) { 
-                    l.push(new M(r));
-                }
-                else {
-                    M *orph = 0;
-                    for( M *m = l.head(); m; m=m->next() ) { 
-                        ASSERT( m->_x > 0 && m->_x < 4 );
-                        if( r > 192 && std::rand() % 8 == 0 )
-                            orph = m;
-                    }
-                    if( orph ) {
-                        try { 
-                            l.orphan(orph);
-                        }
-                        catch(...) { }
-                    }
-                }
-            }
-        }
-    };
-
-    class List1Test {
-    public:
-        class M : public List1<M>::Base {
-            ~M();
-        public:
-            M( int x ) {
-                num = x;
-            }
-            int num;
-        };
-
-        void run(){
-            List1<M> l;
-            
-            vector<M*> ms;
-            for ( int i=0; i<5; i++ ) {
-                M * m = new M(i);
-                ms.push_back( m );
-                l.push( m );
-            }
-            
-            // must assert as the item is missing
-            ASSERT_THROWS( l.orphan( new M( -3 ) ) , UserException );
         }
     };
 
@@ -871,8 +825,6 @@ namespace ThreadedTests {
             add< CondSlack >();
 
             add< UpgradableTest >();
-            add< List1Test >();
-            add< List1Test2 >();
 
             add< IsAtomicWordAtomic<AtomicUInt32> >();
             add< IsAtomicWordAtomic<AtomicUInt64> >();

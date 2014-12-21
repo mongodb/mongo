@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -471,17 +472,17 @@ namespace mongo {
     }
 
     RecordId InMemoryRecordStore::allocateLoc() {
-        const int64_t id = _data->nextId++;
-        // This is a hack, but both the high and low order bits of RecordId offset must be 0, and the
-        // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
-        invariant(id < (1LL << 53));
-        return RecordId(int(id >> 30), int((id << 1) & ~(1<<31)));
+        RecordId out = RecordId(_data->nextId++);
+        invariant(out < RecordId::max());
+        return out;
     }
 
-    RecordId InMemoryRecordStore::oplogStartHack(OperationContext* txn,
-                                                const RecordId& startingPosition) const {
+    boost::optional<RecordId> InMemoryRecordStore::oplogStartHack(
+            OperationContext* txn,
+            const RecordId& startingPosition) const {
+
         if (!_data->isOplog)
-            return RecordId().setInvalid();
+            return boost::none;
 
         const Records& records = _data->records;
 

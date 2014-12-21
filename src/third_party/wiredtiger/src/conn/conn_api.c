@@ -51,7 +51,8 @@ ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
 		return (0);
 
 	WT_CLEAR(cval);
-	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets_none(session, cfg, "collator", &cval));
 	if (cval.len == 0)
 		return (0);
 
@@ -287,7 +288,11 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_calloc_def(session, 1, &ncoll));
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for a collator: %s", name);
+
+	WT_ERR(__wt_calloc_one(session, &ncoll));
 	WT_ERR(__wt_strdup(session, name, &ncoll->name));
 	ncoll->collator = collator;
 
@@ -354,7 +359,11 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_calloc_def(session, 1, &ncomp));
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for a compressor: %s", name);
+
+	WT_ERR(__wt_calloc_one(session, &ncomp));
 	WT_ERR(__wt_strdup(session, name, &ncomp->name));
 	ncomp->compressor = compressor;
 
@@ -419,7 +428,7 @@ __conn_add_data_source(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_data_source, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_calloc_def(session, 1, &ndsrc));
+	WT_ERR(__wt_calloc_one(session, &ndsrc));
 	WT_ERR(__wt_strdup(session, prefix, &ndsrc->prefix));
 	ndsrc->dsrc = dsrc;
 
@@ -484,7 +493,11 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_calloc_def(session, 1, &nextractor));
+	if (WT_STREQ(name, "none"))
+		WT_ERR_MSG(session, EINVAL,
+		    "invalid name for an extractor: %s", name);
+
+	WT_ERR(__wt_calloc_one(session, &nextractor));
 	WT_ERR(__wt_strdup(session, name, &nextractor->name));
 	nextractor->extractor = extractor;
 
@@ -520,8 +533,8 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 	conn = S2C(session);
 
 	if ((ret =
-	    __wt_config_getones(session, config, "extractor", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	    __wt_config_getones_none(session, config, "extractor", &cval)) != 0)
+		return (ret == WT_NOTFOUND || cval.len == 0 ? 0 : ret);
 
 	if (cval.len > 0) {
 		TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
@@ -1477,7 +1490,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_RET(__wt_library_init());
 
-	WT_RET(__wt_calloc_def(NULL, 1, &conn));
+	WT_RET(__wt_calloc_one(NULL, &conn));
 	conn->iface = stdc;
 
 	/*

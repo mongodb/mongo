@@ -131,6 +131,10 @@ namespace {
                 client->getOperationContext()->lockState()->getLockerInfo(&lockerInfo);
                 fillLockerInfo(lockerInfo, infoBuilder);
             }
+            else {
+                // If no operation context, mark the operation as inactive
+                infoBuilder.append("active", false);
+            }
 
             infoBuilder.done();
 

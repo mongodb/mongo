@@ -60,7 +60,6 @@ namespace mongo {
                 stringstream ss;
                 ss << "couldn't open [" << name << "] " << errnoWithDescription();
                 string s = ss.str();
-                // help the assert# control uasserted( 13538 , s.c_str() );
                 msgassertedNoTrace( 13538 , s.c_str() );
             }
             int found = fscanf(f,

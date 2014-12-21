@@ -169,7 +169,7 @@ namespace mongo {
         }
 
         const StringData fieldNameStringData() const {
-            return StringData(fieldName(), fieldNameSize() - 1);
+            return StringData(fieldName(), eoo() ? 0 : fieldNameSize() - 1);
         }
 
         /** raw data of the element's value (so be careful). */
@@ -473,8 +473,8 @@ namespace mongo {
                 totalSize = -1;
                 fieldNameSize_ = -1;
                 if ( maxLen != -1 ) {
-                    int size = (int) strnlen( fieldName(), maxLen - 1 );
-                    uassert( 10333 ,  "Invalid field name", size != -1 );
+                    size_t size = strnlen( fieldName(), maxLen - 1 );
+                    uassert( 10333 ,  "Invalid field name", size < size_t(maxLen - 1) );
                     fieldNameSize_ = size + 1;
                 }
             }
@@ -647,8 +647,8 @@ namespace mongo {
     }
 
     inline BSONElement::BSONElement() {
-        static char z = 0;
-        data = &z;
+        static const char kEooElement[] = "";
+        data = kEooElement;
         fieldNameSize_ = 0;
         totalSize = 1;
     }

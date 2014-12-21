@@ -48,7 +48,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	/* Trigger eviction on the next page release. */
-	page->read_gen = WT_READGEN_OLDEST;
+	__wt_page_evict_soon(page);
 
 	return (1);
 }
@@ -138,7 +138,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * Otherwise, update the page's read generation.
 			 */
 			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
-				page->read_gen = WT_READGEN_OLDEST;
+				__wt_page_evict_soon(page);
 			else if (!LF_ISSET(WT_READ_NO_GEN) &&
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
@@ -227,8 +227,8 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 		WT_INTL_INDEX_SET(page, pindex);
 		if (alloc_refs)
 			for (i = 0; i < pindex->entries; ++i) {
-				WT_ERR(__wt_calloc_def(
-				    session, 1, &pindex->index[i]));
+				WT_ERR(__wt_calloc_one(
+				    session, &pindex->index[i]));
 				size += sizeof(WT_REF);
 			}
 		if (0) {

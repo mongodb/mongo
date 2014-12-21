@@ -129,6 +129,9 @@ namespace mongo {
 
         virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
+        // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+        bool ignoreKeyTooLong(OperationContext* txn);
+
         IndexCatalogEntry* _btreeState; // owned by IndexCatalogEntry
         const IndexDescriptor* _descriptor;
 

@@ -71,6 +71,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
+#include "mongo/db/repair_database.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -338,7 +339,7 @@ namespace mongo {
                 const string dbName = *i;
                 LOG(1) << "    Repairing database: " << dbName << endl;
 
-                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
+                fassert(18506, repairDatabase(&txn, storageEngine, dbName));
             }
         }
 

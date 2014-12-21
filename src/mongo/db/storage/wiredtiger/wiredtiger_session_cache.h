@@ -41,6 +41,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
 
@@ -53,7 +54,19 @@ namespace mongo {
      */
     class WiredTigerSession {
     public:
-        WiredTigerSession( WT_CONNECTION* conn, int epoch );
+
+        /**
+         * Creates a new WT session on the specified connection.
+         *
+         * @param conn WT connection
+         * @param cachePartition If the session comes from the session cache, this indicates to
+         *          which partition it should be returned. Value of -1 means it doesn't come from
+         *          cache and that it should not be cached, but closed directly.
+         * @param epoch In which session cache cleanup epoch was this session instantiated. Value
+         *          of -1 means that this value is not necessary since the session will not be
+         *          cached.
+         */
+        WiredTigerSession(WT_CONNECTION* conn, int cachePartition = -1, int epoch = -1);
         ~WiredTigerSession();
 
         WT_SESSION* getSession() const { return _session; }
@@ -65,8 +78,6 @@ namespace mongo {
 
         int cursorsOut() const { return _cursorsOut; }
 
-        int epoch() const { return _epoch; }
-
         static uint64_t genCursorId();
 
         /**
@@ -75,10 +86,20 @@ namespace mongo {
         static const uint64_t kMetadataCursorId = 0;
 
     private:
-        int _epoch;
-        WT_SESSION* _session; // owned
+        friend class WiredTigerSessionCache;
+
         typedef std::vector<WT_CURSOR*> Cursors;
         typedef std::map<uint64_t, Cursors> CursorMap;
+
+
+        // Used internally by WiredTigerSessionCache
+        int _getEpoch() const { return _epoch; }
+        int _getCachePartition() const { return _cachePartition; }
+
+
+        const int _cachePartition;
+        const int _epoch;
+        WT_SESSION* _session; // owned
         CursorMap _curmap; // owned
         int _cursorsOut;
     };
@@ -100,16 +121,27 @@ namespace mongo {
     private:
         typedef std::vector<WiredTigerSession*> SessionPool;
 
+        enum { NumSessionCachePartitions = 64 };
 
-        bool _shouldBeClosed( WiredTigerSession* session ) const;
+        struct SessionCachePartition {
+            SessionCachePartition() : epoch(0) { }
+            ~SessionCachePartition() {
+                invariant(pool.empty());
+            }
+
+            SpinLock lock;
+            int epoch;
+            SessionPool pool;
+        };
 
 
         WiredTigerKVEngine* _engine; // not owned, might be NULL
         WT_CONNECTION* _conn; // not owned
 
-        // Session pool and protection around the get/return/cleanup methods
-        mutable boost::mutex _sessionLock;
-        SessionPool _sessionPool;
+        // Partitioned cache of WT sessions. The partition key is not important, but it is
+        // important that sessions be returned to the same partition they were taken from in order
+        // to have some form of balance between the partitions.
+        SessionCachePartition _cache[NumSessionCachePartitions];
 
         // Regular operations take it in shared mode. Shutdown sets the _shuttingDown flag and
         // then takes it in exclusive mode. This ensures that all threads, which would return

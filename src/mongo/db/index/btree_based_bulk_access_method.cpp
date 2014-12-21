@@ -121,11 +121,10 @@ namespace mongo {
 
         scoped_ptr<BSONObjExternalSorter::Iterator> i(_sorter->done());
 
-        // verifies that pm and op refer to the same ProgressMeter
-        ProgressMeter& pm = _txn->getCurOp()->setMessage("Index Bulk Build: (2/3) btree bottom up",
-                                                         "Index: (2/3) BTree Bottom Up Progress",
-                                                         _keysInserted,
-                                                         10);
+        ProgressMeterHolder pm(*_txn->setMessage("Index Bulk Build: (2/3) btree bottom up",
+                                                 "Index: (2/3) BTree Bottom Up Progress",
+                                                 _keysInserted,
+                                                 10));
 
         scoped_ptr<SortedDataBuilderInterface> builder;
 
@@ -152,16 +151,19 @@ namespace mongo {
             Status status = builder->addKey(d.first, d.second);
 
             if (!status.isOK()) {
-                if (ErrorCodes::DuplicateKey != status.code()) {
-                    return status;
+                // Overlong key that's OK to skip?
+                if (status.code() == ErrorCodes::KeyTooLong && _real->ignoreKeyTooLong(_txn)) {
+                    continue;
                 }
 
-                invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
+                // Check if this is a duplicate that's OK to skip
+                if (status.code() == ErrorCodes::DuplicateKey) {
+                    invariant(!dupsAllowed); // shouldn't be getting DupKey errors if dupsAllowed.
 
-                // If we're here it's a duplicate key.
-                if (dupsToDrop) {
-                    dupsToDrop->insert(d.second);
-                    continue;
+                    if (dupsToDrop) {
+                        dupsToDrop->insert(d.second);
+                        continue;
+                    }
                 }
 
                 return status;

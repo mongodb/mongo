@@ -332,7 +332,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, EINVAL,
 		    "LSM trees cannot be configured as column stores");
 
-	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	WT_RET(__wt_calloc_one(session, &lsm_tree));
 
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
@@ -343,7 +343,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->value_format));
 
-	WT_ERR(__wt_config_gets(session, cfg, "collator", &cval));
+	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->collator_name));
 
@@ -551,7 +551,7 @@ __lsm_tree_open(
 		return (ret);
 
 	/* Try to open the tree. */
-	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	WT_RET(__wt_calloc_one(session, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, &lsm_tree->rwlock, "lsm tree"));
 
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
@@ -820,7 +820,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    "merge throttle %ld", lsm_tree->name,
 	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle));
 
-	WT_ERR(__wt_calloc_def(session, 1, &chunk));
+	WT_ERR(__wt_calloc_one(session, &chunk));
 	chunk->id = new_id;
 	chunk->switch_txn = WT_TXN_NONE;
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
@@ -1011,7 +1011,7 @@ __wt_lsm_tree_truncate(
 	locked = 1;
 
 	/* Create the new chunk. */
-	WT_ERR(__wt_calloc_def(session, 1, &chunk));
+	WT_ERR(__wt_calloc_one(session, &chunk));
 	chunk->id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 

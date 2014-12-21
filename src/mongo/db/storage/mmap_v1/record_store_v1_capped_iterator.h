@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -49,21 +50,21 @@ namespace mongo {
     public:
         CappedRecordStoreV1Iterator( OperationContext* txn,
                                      const CappedRecordStoreV1* collection,
-                                     const DiskLoc& start,
+                                     const RecordId& start,
                                      bool tailable,
                                      const CollectionScanParams::Direction& dir );
         virtual ~CappedRecordStoreV1Iterator() { }
 
         // If this is a tailable cursor, isEOF could change its mind after a call to getNext().
         virtual bool isEOF();
-        virtual DiskLoc getNext();
-        virtual DiskLoc curr();
+        virtual RecordId getNext();
+        virtual RecordId curr();
 
-        virtual void invalidate(const DiskLoc& dl);
+        virtual void invalidate(const RecordId& dl);
         virtual void saveState();
         virtual bool restoreState(OperationContext* txn);
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( const RecordId& loc ) const;
     private:
         /**
          * Internal collection navigation helper methods.

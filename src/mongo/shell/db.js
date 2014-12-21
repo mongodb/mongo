@@ -333,6 +333,7 @@ DB.prototype.help = function() {
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
+    print("\tdb.getCollectionInfos()");
     print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
@@ -605,27 +606,30 @@ DB.prototype.getPrevError = function(){
     return this.runCommand( { getpreverror : 1 } );
 }
 
-DB.prototype._getCollectionNamesSystemNamespaces = function(){
+DB.prototype._getCollectionInfosSystemNamespaces = function(){
     var all = [];
 
     var nsLength = this._name.length + 1;
     
     var c = this.getCollection( "system.namespaces" ).find();
     while ( c.hasNext() ){
-        var name = c.next().name;
+        var infoObj = c.next();
         
-        if ( name.indexOf( "$" ) >= 0 && name.indexOf( ".oplog.$" ) < 0 )
+        if ( infoObj.name.indexOf( "$" ) >= 0 && infoObj.name.indexOf( ".oplog.$" ) < 0 )
             continue;
         
-        all.push( name.substring( nsLength ) );
+        infoObj.name = infoObj.name.substring( nsLength );
+
+        all.push( infoObj );
     }
     
-    return all.sort();
+    // Return list of objects sorted by collection name.
+    return all.sort(function(coll1, coll2) { return coll1.name.localeCompare(coll2.name); });
 }
 
 
-DB.prototype._getCollectionNamesCommand = function() {
-    var res = this.runCommand( "listCollections" );
+DB.prototype._getCollectionInfosCommand = function() {
+    var res = this.runCommand( "listCollections", { cursor: {} } );
     if ( res.code == 59 ) {
         // command doesn't exist, old mongod
         return null;
@@ -639,21 +643,27 @@ DB.prototype._getCollectionNamesCommand = function() {
         throw Error( "listCollections failed: " + tojson( res ) );
     }
 
-    var all = [];
-    for ( var i = 0; i < res.collections.length; i++ ) {
-        var name = res.collections[i].name;
-        all.push( name );
-    }
-
-    return all;
+    // The listCollections command returns its results sorted by collection name.  There's no need
+    // to re-sort.
+    return new DBCommandCursor(this._mongo, res).toArray();
 }
 
-DB.prototype.getCollectionNames = function(){
-    var res = this._getCollectionNamesCommand();
+/**
+ * Returns this database's list of collection metadata objects, sorted by collection name.
+ */
+DB.prototype.getCollectionInfos = function() {
+    var res = this._getCollectionInfosCommand();
     if ( res ) {
         return res;
     }
-    return this._getCollectionNamesSystemNamespaces();
+    return this._getCollectionInfosSystemNamespaces();
+}
+
+/**
+ * Returns this database's list of collection names in sorted order.
+ */
+DB.prototype.getCollectionNames = function() {
+    return this.getCollectionInfos().map(function(infoObj) { return infoObj.name; });
 }
 
 DB.prototype.tojson = function(){
@@ -713,10 +723,11 @@ DB.prototype.getReplicationInfo = function() {
 
     var result = { };
     var oplog;
-    if (localdb.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
+    var localCollections = localdb.getCollectionNames();
+    if (localCollections.indexOf('oplog.rs') >= 0) {
         oplog = 'oplog.rs';
     }
-    else if (localdb.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
+    else if (localCollections.indexOf('oplog.$main') >= 0) {
         oplog = 'oplog.$main';
     }
     else {
@@ -724,16 +735,17 @@ DB.prototype.getReplicationInfo = function() {
         return result;
     }
 
-    var ol_entry = localdb.system.namespaces.findOne({name:"local."+oplog});
-    if( ol_entry && ol_entry.options ) {
-        result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
+    var ol = localdb.getCollection(oplog);
+    var ol_stats = ol.stats();
+    if( ol_stats && ol_stats.maxSize ) {
+        result.logSizeMB = ol_stats.maxSize / ( 1024 * 1024 );
     } else {
-        result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
+        result.errmsg  = "Could not get stats for local."+oplog+" collection. " +
+            "collstats returned: " + tojson(ol_stats);
         return result;
     }
-    ol = localdb.getCollection(oplog);
 
-    result.usedMB = ol.stats().size / ( 1024 * 1024 );
+    result.usedMB = ol_stats.size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
 
     var firstc = ol.find().sort({$natural:1}).limit(1);

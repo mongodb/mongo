@@ -42,6 +42,7 @@ namespace mongo {
 
        ** MemoryMapped Record ** (i.e., this is on disk data)
      */
+#pragma pack(1)
     struct IndexDetails {
         /**
          * btree head disk location
@@ -65,5 +66,6 @@ namespace mongo {
         void _reset();
 
     };
+#pragma pack()
 
 } // namespace mongo

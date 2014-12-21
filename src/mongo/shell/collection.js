@@ -993,7 +993,7 @@ DBCollection.prototype._getIndexesSystemIndexes = function(){
 }
 
 DBCollection.prototype._getIndexesCommand = function(){
-    var res = this.runCommand( "listIndexes" );
+    var res = this.runCommand( "listIndexes", { cursor: {} } );
 
     if ( !res.ok ) {
 
@@ -1014,7 +1014,7 @@ DBCollection.prototype._getIndexesCommand = function(){
         throw Error( "listIndexes failed: " + tojson( res ) );
     }
 
-    return res.indexes;
+    return new DBCommandCursor(this._mongo, res).toArray();
 }
 
 DBCollection.prototype.getIndexes = function(){
@@ -1150,11 +1150,12 @@ DBCollection.prototype.convertToCapped = function( bytes ){
 
 DBCollection.prototype.exists = function(){
     var res = this._db.runCommand( "listCollections",
-                                  { filter : { name : this._shortName } } );
+                                  { filter : { name : this._shortName } , cursor : {} } );
     if ( res.ok ) {
-        if ( res.collections.length == 0 )
+        var cursor = new DBCommandCursor( this._mongo, res );
+        if ( !cursor.hasNext() )
             return null;
-        return res.collections[0];
+        return cursor.next();
     }
 
     if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {

@@ -272,15 +272,7 @@ namespace mongo {
                                          const std::string& dbName,
                                          bool preserveClonedFilesOnFailure,
                                          bool backupOriginalFiles ) {
-        // We must hold some form of lock here
-        invariant(txn->lockState()->isLocked());
-        invariant( dbName.find( '.' ) == string::npos );
-
         scoped_ptr<RepairFileDeleter> repairFileDeleter;
-
-        log() << "repairDatabase " << dbName << endl;
-
-        BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
         // Must be done before and after repair
         getDur().syncDataAndTruncateJournal(txn);
@@ -337,11 +329,9 @@ namespace mongo {
                 Client::Context ctx(txn,  ns );
                 Collection* coll = originalDatabase->getCollection( txn, ns );
                 if ( coll ) {
-                    scoped_ptr<RecordIterator> it( coll->getIterator( txn,
-                                                                      DiskLoc(),
-                                                                      CollectionScanParams::FORWARD ) );
+                    scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
                     while ( !it->isEOF() ) {
-                        DiskLoc loc = it->getNext();
+                        RecordId loc = it->getNext();
                         BSONObj obj = coll->docFor( txn, loc );
 
                         string ns = obj["name"].String();
@@ -405,16 +395,16 @@ namespace mongo {
 
                 scoped_ptr<RecordIterator> iterator(originalCollection->getIterator(txn));
                 while ( !iterator->isEOF() ) {
-                    DiskLoc loc = iterator->getNext();
+                    RecordId loc = iterator->getNext();
                     invariant( !loc.isNull() );
 
                     BSONObj doc = originalCollection->docFor( txn, loc );
 
                     WriteUnitOfWork wunit(txn);
-                    StatusWith<DiskLoc> result = tempCollection->insertDocument(txn,
-                                                                                doc,
-                                                                                &indexer,
-                                                                                false);
+                    StatusWith<RecordId> result = tempCollection->insertDocument(txn,
+                                                                                 doc,
+                                                                                 &indexer,
+                                                                                 false);
                     if ( !result.isOK() )
                         return result.getStatus();
 

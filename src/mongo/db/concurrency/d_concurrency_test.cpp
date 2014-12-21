@@ -31,25 +31,25 @@
 #include <string>
 
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_mgr_test_help.h"
+#include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     TEST(DConcurrency, GlobalRead) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
         ASSERT(ls.isR());
     }
 
     TEST(DConcurrency, GlobalWrite) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
         ASSERT(ls.isW());
     }
 
     TEST(DConcurrency, GlobalWriteAndGlobalRead) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::GlobalWrite globalWrite(&ls);
         ASSERT(ls.isW());
@@ -63,71 +63,71 @@ namespace mongo {
     }
 
     TEST(DConcurrency, readlocktryTimeout) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         writelocktry globalWrite(&ls, 0);
         ASSERT(globalWrite.got());
 
         {
-            MMAPV1LockerImpl lsTry(2);
+            MMAPV1LockerImpl lsTry;
             readlocktry lockTry(&lsTry, 1);
             ASSERT(!lockTry.got());
         }
     }
 
     TEST(DConcurrency, writelocktryTimeout) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         writelocktry globalWrite(&ls, 0);
         ASSERT(globalWrite.got());
 
         {
-            MMAPV1LockerImpl lsTry(2);
+            MMAPV1LockerImpl lsTry;
             writelocktry lockTry(&lsTry, 1);
             ASSERT(!lockTry.got());
         }
     }
 
     TEST(DConcurrency, readlocktryNoTimeoutDueToGlobalLockS) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
 
-        MMAPV1LockerImpl lsTry(2);
+        MMAPV1LockerImpl lsTry;
         readlocktry lockTry(&lsTry, 1);
 
         ASSERT(lockTry.got());
     }
 
     TEST(DConcurrency, writelocktryTimeoutDueToGlobalLockS) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
 
-        MMAPV1LockerImpl lsTry(2);
+        MMAPV1LockerImpl lsTry;
         writelocktry lockTry(&lsTry, 1);
 
         ASSERT(!lockTry.got());
     }
 
     TEST(DConcurrency, readlocktryTimeoutDueToGlobalLockX) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
-        MMAPV1LockerImpl lsTry(2);
+        MMAPV1LockerImpl lsTry;
         readlocktry lockTry(&lsTry, 1);
 
         ASSERT(!lockTry.got());
     }
 
     TEST(DConcurrency, writelocktryTimeoutDueToGlobalLockX) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
-        MMAPV1LockerImpl lsTry(2);
+        MMAPV1LockerImpl lsTry;
         writelocktry lockTry(&lsTry, 1);
 
         ASSERT(!lockTry.got());
     }
 
     TEST(DConcurrency, TempReleaseGlobalWrite) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
         {
@@ -139,7 +139,7 @@ namespace mongo {
     }
 
     TEST(DConcurrency, TempReleaseRecursive) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
         Lock::DBLock lk(&ls, "SomeDBName", MODE_X);
 
@@ -152,17 +152,17 @@ namespace mongo {
         ASSERT(ls.isW());
     }
 
-    TEST(DConcurrency, DBReadTakesS) {
-        MMAPV1LockerImpl ls(1);
+    TEST(DConcurrency, DBLockTakesS) {
+        MMAPV1LockerImpl ls;
 
-        Lock::DBRead dbRead(&ls, "db");
+        Lock::DBLock dbRead(&ls, "db", MODE_S);
 
         const ResourceId resIdDb(RESOURCE_DATABASE, string("db"));
         ASSERT(ls.getLockMode(resIdDb) == MODE_S);
     }
 
     TEST(DConcurrency, DBLockTakesX) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock dbWrite(&ls, "db", MODE_X);
 
@@ -171,27 +171,28 @@ namespace mongo {
     }
 
     TEST(DConcurrency, MultipleWriteDBLocksOnSameThread) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock r1(&ls, "db1", MODE_X);
         Lock::DBLock r2(&ls, "db1", MODE_X);
 
-        ASSERT(ls.isWriteLocked("db1"));
+        ASSERT(ls.isDbLockedForMode("db1", MODE_X));
     }
 
     TEST(DConcurrency, MultipleConflictingDBLocksOnSameThread) {
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock r1(&ls, "db1", MODE_X);
-        Lock::DBRead r2(&ls, "db1");
+        Lock::DBLock r2(&ls, "db1", MODE_S);
 
-        ASSERT(ls.isWriteLocked("db1"));
+        ASSERT(ls.isDbLockedForMode("db1", MODE_X));
+        ASSERT(ls.isDbLockedForMode("db1", MODE_S));
     }
 
     TEST(DConcurrency, IsDbLockedForSMode) {
         const std::string dbName("db");
 
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock dbLock(&ls, dbName, MODE_S);
 
@@ -204,7 +205,7 @@ namespace mongo {
     TEST(DConcurrency, IsDbLockedForXMode) {
         const std::string dbName("db");
 
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock dbLock(&ls, dbName, MODE_X);
 
@@ -217,7 +218,7 @@ namespace mongo {
     TEST(DConcurrency, IsCollectionLocked_DB_Locked_IS) {
         const std::string ns("db1.coll");
 
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock dbLock(&ls, "db1", MODE_IS);
 
@@ -246,7 +247,7 @@ namespace mongo {
     TEST(DConcurrency, IsCollectionLocked_DB_Locked_IX) {
         const std::string ns("db1.coll");
 
-        MMAPV1LockerImpl ls(1);
+        MMAPV1LockerImpl ls;
 
         Lock::DBLock dbLock(&ls, "db1", MODE_IX);
 

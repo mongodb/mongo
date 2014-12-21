@@ -148,18 +148,15 @@ namespace mongo {
             // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
             cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
+            txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
             // will be restored in getMore().
             exec->saveState();
         }
 
-        BSONObjBuilder cursorObj(result.subobjStart("cursor"));
-        cursorObj.append("id", cursor ? cursor->cursorid() : 0LL);
-        cursorObj.append("ns", ns);
-        cursorObj.append("firstBatch", resultsArray.arr());
-        cursorObj.done();
+        const long long cursorId = cursor ? cursor->cursorid() : 0LL;
+        Command::appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
     }
 
 

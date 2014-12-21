@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/curop.h"
@@ -37,7 +39,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
-
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -87,6 +89,7 @@ namespace mongo {
         _reset();
         _start = 0;
         _opNum = _nextOpNum.fetchAndAdd(1);
+        _ns = "";
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
@@ -107,7 +110,7 @@ namespace mongo {
                                      int secondsBetween) {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
-                cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
+                error() << "old _message: " << _message << " new message:" << msg;
                 verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );

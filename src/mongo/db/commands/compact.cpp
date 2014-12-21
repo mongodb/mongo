@@ -92,9 +92,7 @@ namespace mongo {
             }
 
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-            if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
-                    && replCoord->getCurrentMemberState().primary()
-                    && !cmdObj["force"].trueValue()) {
+            if (replCoord->getCurrentMemberState().primary() && !cmdObj["force"].trueValue()) {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }

@@ -246,11 +246,15 @@ namespace repl {
                 bool isIndexBuild = opType[0] == 'i' &&
                     nsToCollectionSubstring( ns ) == "system.indexes";
 
-                if(isCommand) {
+                if (isCommand) {
                     // a command may need a global write lock. so we will conservatively go
                     // ahead and grab one here. suboptimal. :-(
                     lk.reset(new Lock::GlobalWrite(txn->lockState()));
-                } else if (isCrudOpType(opType)) {
+                }
+                else if (isIndexBuild) {
+                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                }
+                else if (isCrudOpType(opType)) {
                     LockMode mode = createCollection ? MODE_X : MODE_IX;
                     lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
                     lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
@@ -259,13 +263,9 @@ namespace repl {
                         // need to create database, try again
                         continue;
                     }
-
-                } else if (isIndexBuild) {
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
-                    lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, MODE_X));
-                } else {
-                    // DB level lock for this operation
-                    log() << "non command or crup op: " << op;
+                }
+                else {
+                    // Unknown op?
                     lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
                 }
 
@@ -273,6 +273,7 @@ namespace repl {
                 ctx.getClient()->curop()->reset();
 
                 if ( createCollection == 0 &&
+                     !isIndexBuild &&
                      isCrudOpType(opType) &&
                      ctx.db()->getCollection(txn,ns) == NULL ) {
                     // uh, oh, we need to create collection
@@ -761,19 +762,13 @@ namespace {
              ++it) {
             try {
                 if (!st->syncApply(&txn, *it)) {
-                    bool status;
-                    {
-                        ScopedTransaction transaction(&txn, MODE_X);
-                        Lock::GlobalWrite lk(txn.lockState());
-                        status = st->shouldRetry(&txn, *it);
-                    }
 
-                    if (status) {
-                        // retry
+                    if (st->shouldRetry(&txn, *it)) {
                         if (!st->syncApply(&txn, *it)) {
                             fassertFailedNoTrace(15915);
                         }
                     }
+
                     // If shouldRetry() returns false, fall through.
                     // This can happen if the document that was moved and missed by Cloner
                     // subsequently got deleted and no longer exists on the Sync Target at all

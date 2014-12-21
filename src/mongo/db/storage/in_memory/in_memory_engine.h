@@ -80,6 +80,10 @@ namespace mongo {
 
         virtual void cleanShutdown() {};
 
+        virtual bool hasIdent(OperationContext* opCtx, const StringData& ident) const {
+            return _dataMap.find(ident) != _dataMap.end();;
+        }
+
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
     private:
         typedef StringMap<boost::shared_ptr<void> > DataMap;

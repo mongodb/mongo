@@ -586,6 +586,8 @@ namespace mongo {
                                                              &DBException::traceExceptions,
                                                              false, // allowedToChangeAtStartup
                                                              true); // allowedToChangeAtRuntime
+
+
     }
 
 }

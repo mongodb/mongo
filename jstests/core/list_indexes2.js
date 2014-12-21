@@ -5,18 +5,18 @@ t.drop();
 t.insert({value: "dummy"});
 
 // non-string in argument
-err = db.runCommand({listIndexes: 1});
+err = db.runCommand({listIndexes: 1}, { cursor: {} });
 assert.commandFailed(err);
 assert.eq(err.code, 28528);
 
 // empty string in argument
-err = db.runCommand({listIndexes: ''});
+err = db.runCommand({listIndexes: ''}, { cursor: {} });
 assert.commandFailed(err);
 assert.eq(err.code, 28529);
 
 // non-existing collection in argument
 db.list_listindexes2_no_such_collection.drop();
-err = db.runCommand({listIndexes: 'list_listindexes2_no_such_collection'});
+err = db.runCommand({listIndexes: 'list_listindexes2_no_such_collection'}, { cursor: {} });
 assert.commandFailed(err);
 assert.eq(err.code, 26);
 

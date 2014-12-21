@@ -31,9 +31,22 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+    bool WriteConflictException::trace = false;
+
+    WriteConflictException::WriteConflictException()
+        : DBException( "WriteConflict", ErrorCodes::WriteConflict ) {
+
+        if ( trace ) {
+            printStackTrace();
+        }
+
+    }
 
     void WriteConflictException::logAndBackoff(int attempt,
                                                const StringData& operation,
@@ -58,6 +71,15 @@ namespace mongo {
             sleepmillis(10);
         }
 
+    }
+
+    namespace {
+        // for WriteConflictException
+        ExportedServerParameter<bool> TraceWCExceptionsSetting(ServerParameterSet::getGlobal(),
+                                                               "traceWriteConflictExceptions",
+                                                               &WriteConflictException::trace,
+                                                               false, // allowedToChangeAtStartup
+                                                               true); // allowedToChangeAtRuntime
     }
 
 }

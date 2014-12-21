@@ -161,11 +161,11 @@ namespace mongo {
          *
          * This is a helper for generating explain BSON. It is used by explainStages(...).
          *
-         * @param query -- the query part of the operation being explained.
+         * @param exec -- the stage tree for the operation being explained.
          * @param winnerStats -- the stats tree for the winning plan.
          * @param rejectedStats -- an array of stats trees, one per rejected plan
          */
-        static void generatePlannerInfo(CanonicalQuery* query,
+        static void generatePlannerInfo(PlanExecutor* exec,
                                         PlanStageStats* winnerStats,
                                         const vector<PlanStageStats*>& rejectedStats,
                                         BSONObjBuilder* out);

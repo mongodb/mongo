@@ -304,7 +304,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( n * 2, loc.getOfs() );
+                ASSERT_EQUALS( RecordId(5, n * 2), loc );
                 ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
                 n++;
                 cursor->advance();
@@ -336,7 +336,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( n * 2, loc.getOfs() );
+                ASSERT_EQUALS( RecordId(5, n * 2), loc );
                 ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
                 n++;
                 cursor->advance();
@@ -370,7 +370,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 RecordId loc = cursor->getRecordId();
-                ASSERT_EQUALS( n * 2, loc.getOfs() );
+                ASSERT_EQUALS( RecordId(5, n * 2), loc );
                 n++;
                 cursor->advance();
                 cursor->savePosition();
@@ -433,7 +433,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( BSON( "a" << 2 ), RecordId(0,0) ) );
+            ASSERT( !cursor->locate( BSON( "a" << 2 ), RecordId::min() ) );
             ASSERT( !cursor->isEOF()  );
             ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
             ASSERT_EQUALS( RecordId(1,4), cursor->getRecordId() );
@@ -466,7 +466,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( !cursor->locate( BSONObj(), RecordId(0,0) ) );
+            ASSERT( !cursor->locate( BSONObj(), RecordId::min() ) );
             ASSERT( !cursor->isEOF()  );
             ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
             ASSERT_EQUALS( RecordId(1,2), cursor->getRecordId() );
@@ -475,7 +475,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( !cursor->locate( BSONObj(), RecordId(0,0) ) );
+            ASSERT( !cursor->locate( BSONObj(), RecordId::min() ) );
             ASSERT( cursor->isEOF()  );
         }
 
@@ -499,14 +499,14 @@ namespace mongo {
 
         scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId(0,0) ) );
+        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::min() ) );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
         cursor->advance();
         ASSERT_EQUALS( BSON( "" << 7 ), cursor->getKey() );
 
         cursor.reset( sorted->newCursor( opCtx.get(), -1 ) );
-        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId(0,0) ) );
+        ASSERT( !cursor->locate( BSON( "" << 5 ), RecordId::min() ) );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
 

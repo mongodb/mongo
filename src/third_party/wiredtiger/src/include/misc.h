@@ -65,11 +65,13 @@
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
 /*
- * __wt_calloc_def --
- *	Simple calls don't need separate sizeof arguments.
+ * __wt_calloc_def, __wt_calloc_one --
+ *	Most calloc calls don't need separate count or sizeof arguments.
  */
 #define	__wt_calloc_def(session, number, addr)				\
 	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
+#define	__wt_calloc_one(session, addr)					\
+	__wt_calloc(session, (size_t)1, sizeof(**(addr)), addr)
 
 /*
  * __wt_realloc_def --
@@ -178,6 +180,10 @@
 #define	WT_STRING_MATCH(str, bytes, len)				\
 	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
 	    strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+#define	WT_STRING_CASE_MATCH(str, bytes, len)				\
+	(tolower(((const char *)str)[0]) ==				\
+	    tolower(((const char *)bytes)[0]) &&			\
+	    strncasecmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid

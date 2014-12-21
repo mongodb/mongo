@@ -83,7 +83,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			goto err;
 		}
 
-		WT_ERR(__wt_calloc_def(session, 1, &colgroup));
+		WT_ERR(__wt_calloc_one(session, &colgroup));
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &colgroup->name));
 		colgroup->config = cgconfig;
@@ -319,7 +319,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 		if (table->indices[i] == NULL) {
 			WT_ERR(cursor->get_value(cursor, &idxconf));
-			WT_ERR(__wt_calloc_def(session, 1, &idx));
+			WT_ERR(__wt_calloc_one(session, &idx));
 			WT_ERR(__wt_strdup(session, uri, &idx->name));
 			WT_ERR(__wt_strdup(session, idxconf, &idx->config));
 			WT_ERR(__open_index(session, table, idx));
@@ -392,9 +392,10 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));
 
-	WT_ERR(__wt_calloc_def(session, 1, &table));
+	WT_ERR(__wt_calloc_one(session, &table));
 	table->name = tablename;
 	tablename = NULL;
+	table->name_hash = __wt_hash_city64(name, namelen);
 
 	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
 
@@ -471,7 +472,7 @@ err:		if (table != NULL)
  */
 int
 __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
-    const char *uri, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+    const char *uri, int quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
 {
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
@@ -503,16 +504,18 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	}
 
 	__wt_schema_release_table(session, table);
+	if (quiet)
+		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }
 
 /*
  * __wt_schema_get_index --
- *	Find a column group by URI.
+ *	Find an index by URI.
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
-    const char *uri, WT_TABLE **tablep, WT_INDEX **indexp)
+    const char *uri, int quiet, WT_TABLE **tablep, WT_INDEX **indexp)
 {
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -553,5 +556,7 @@ err:	__wt_schema_release_table(session, table);
 	if (*indexp != NULL)
 		return (0);
 
+	if (quiet)
+		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }

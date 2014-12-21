@@ -77,6 +77,8 @@ namespace mongo {
         return true;
     }
 
+    static const int kTooManySplitPoints = 4;
+
     // -------  Shard --------
 
     long long Chunk::MaxChunkSize = 1024 * 1024 * 64;
@@ -84,10 +86,6 @@ namespace mongo {
 
     // Can be overridden from command line
     bool Chunk::ShouldAutoSplit = true;
-
-    // Maximum number of resulting chunks a chunk will be split into per operation.
-    // Note: this is only temporarily tunable, this can become fixed in the future.
-    MONGO_EXPORT_SERVER_PARAMETER(internalShardingMaxSplitPointsPerOperation, int, 10);
 
     /**
      * Attempts to move the given chunk to another shard.
@@ -349,14 +347,12 @@ namespace mongo {
 
             // Note: One split point for every 1/2 chunk size.
             const int estNumSplitPoints = _dataWritten / chunkSize * 2;
-            if (estNumSplitPoints > internalShardingMaxSplitPointsPerOperation) {
+            if (estNumSplitPoints >= kTooManySplitPoints) {
                 // The current desired chunk size will split the chunk into lots of small chunks
-                // (At the worst case, this can result into thousands of chunks); so use a
-                // bigger value.
+                // (At the worst case, this can result into thousands of chunks); so check and
+                // see if a bigger value can be used.
 
-                const long long newSize = _dataWritten /
-                        (internalShardingMaxSplitPointsPerOperation / 2);
-                chunkSize = min(newSize, Chunk::MaxChunkSize);
+                chunkSize = std::min(_dataWritten, Chunk::MaxChunkSize);
             }
 
             pickSplitVector(*splitPoints, chunkSize, 0, MaxObjectPerChunk);

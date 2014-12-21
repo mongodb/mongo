@@ -50,6 +50,7 @@ namespace mongo {
     protected:
         // These are used by the getKeysImpl(s) below.
         std::vector<const char*> _fieldNames;
+        bool _isIdIndex;
         bool _isSparse;
         BSONObj _nullKey; // a full key with all fields null
         BSONObj _nullObj;     // only used for _nullElt

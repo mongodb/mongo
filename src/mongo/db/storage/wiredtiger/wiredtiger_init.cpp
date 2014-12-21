@@ -57,17 +57,18 @@ namespace mongo {
             virtual StorageEngine* create( const StorageGlobalParams& params ) const {
                 WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
                                                                  wiredTigerGlobalOptions.engineConfig,
-                                                                 params.dur );
+                                                                 params.dur,
+                                                                 params.repair );
                 kv->setRecordStoreExtraOptions( wiredTigerGlobalOptions.collectionConfig );
                 kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
                 // Intentionally leaked.
                 new WiredTigerServerStatusSection(kv);
-                new WiredTigerEngineRuntimeConfigSetting(kv);
+                new WiredTigerEngineRuntimeConfigParameter(kv);
 
                 KVStorageEngineOptions options;
                 options.directoryPerDB = params.directoryperdb;
-                options.directoryForIndexes =
-                    wiredTigerGlobalOptions.directoryForIndexes;
+                options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
+                options.forRepair = params.repair;
                 return new KVStorageEngine( kv, options );
             }
 

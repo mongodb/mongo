@@ -55,10 +55,10 @@ var validStorageEngineOptions = {}
 validStorageEngineOptions[storageEngineName] = {};
 db.getCollection('test').drop();
 assert.commandWorked(db.createCollection('test', {storageEngine: validStorageEngineOptions}));
-var result = assert.commandWorked(db.runCommand('listCollections'));
+var collections = db.getCollectionInfos();
 found  = false;
-for (var i = 0; i < result.collections.length; ++i) {
-    var collection = result.collections[i];
+for (var i = 0; i < collections.length; ++i) {
+    var collection = collections[i];
     if (collection.name != 'test') {
         continue;
     }

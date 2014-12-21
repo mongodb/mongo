@@ -47,9 +47,11 @@
 
 namespace mongo {
 
-    RocksRecoveryUnit::RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db)
+    RocksRecoveryUnit::RocksRecoveryUnit(RocksTransactionEngine* transactionEngine, rocksdb::DB* db,
+                                         bool durable)
         : _transactionEngine(transactionEngine),
           _db(db),
+          _durable(durable),
           _transaction(transactionEngine),
           _writeBatch(),
           _snapshot(NULL),
@@ -110,6 +112,8 @@ namespace mongo {
         return _writeBatch.get();
     }
 
+    void RocksRecoveryUnit::setOplogReadTill(const RecordId& record) { _oplogReadTill = record; }
+
     void RocksRecoveryUnit::registerChange(Change* change) { _changes.push_back(change); }
 
     void RocksRecoveryUnit::_releaseSnapshot() {
@@ -134,6 +138,8 @@ namespace mongo {
         if (_writeBatch->GetWriteBatch()->Count() != 0) {
             // Order of operations here is important. It needs to be synchronized with
             // _transaction.recordSnapshotId() and _db->GetSnapshot() and
+            rocksdb::WriteOptions writeOptions;
+            writeOptions.disableWAL = !_durable;
             auto status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
             if (!status.ok()) {
                 log() << "uh oh: " << status.ToString();
@@ -168,12 +174,6 @@ namespace mongo {
         }
 
         return _snapshot;
-    }
-
-    void RocksRecoveryUnit::registerWrite(uint64_t hash) {
-        if (!_transaction.registerWrite(hash)) {
-            throw WriteConflictException();
-        }
     }
 
     rocksdb::Status RocksRecoveryUnit::Get(rocksdb::ColumnFamilyHandle* columnFamily,

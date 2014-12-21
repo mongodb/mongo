@@ -18,65 +18,65 @@ import sys
 
 class Stat:
     def __init__(self, name, tag, desc, flags=''):
-	self.name = name
-	self.desc = tag + ': ' + desc
-	self.flags = flags
+        self.name = name
+        self.desc = tag + ': ' + desc
+        self.flags = flags
 
     def __cmp__(self, other):
-	return cmp(self.desc.lower(), other.desc.lower())
+        return cmp(self.desc.lower(), other.desc.lower())
 
 class AsyncStat(Stat):
     prefix = 'async'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, AsyncStat.prefix, desc, flags)
+        Stat.__init__(self, name, AsyncStat.prefix, desc, flags)
 class BlockStat(Stat):
     prefix = 'block-manager'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, BlockStat.prefix, desc, flags)
+        Stat.__init__(self, name, BlockStat.prefix, desc, flags)
 class BtreeStat(Stat):
     prefix = 'btree'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, BtreeStat.prefix, desc, flags)
+        Stat.__init__(self, name, BtreeStat.prefix, desc, flags)
 class CacheStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, CacheStat.prefix, desc, flags)
+        Stat.__init__(self, name, CacheStat.prefix, desc, flags)
 class CompressStat(Stat):
     prefix = 'compression'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, CompressStat.prefix, desc, flags)
+        Stat.__init__(self, name, CompressStat.prefix, desc, flags)
 class ConnStat(Stat):
     prefix = 'connection'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, ConnStat.prefix, desc, flags)
+        Stat.__init__(self, name, ConnStat.prefix, desc, flags)
 class CursorStat(Stat):
     prefix = 'cursor'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, CursorStat.prefix, desc, flags)
+        Stat.__init__(self, name, CursorStat.prefix, desc, flags)
 class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
+        Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, LogStat.prefix, desc, flags)
+        Stat.__init__(self, name, LogStat.prefix, desc, flags)
 class LSMStat(Stat):
     prefix = 'LSM'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, LSMStat.prefix, desc, flags)
+        Stat.__init__(self, name, LSMStat.prefix, desc, flags)
 class RecStat(Stat):
     prefix = 'reconciliation'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, RecStat.prefix, desc, flags)
+        Stat.__init__(self, name, RecStat.prefix, desc, flags)
 class SessionStat(Stat):
     prefix = 'session'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, SessionStat.prefix, desc, flags)
+        Stat.__init__(self, name, SessionStat.prefix, desc, flags)
 class TxnStat(Stat):
     prefix = 'transaction'
     def __init__(self, name, desc, flags=''):
-	Stat.__init__(self, name, TxnStat.prefix, desc, flags)
+        Stat.__init__(self, name, TxnStat.prefix, desc, flags)
 
 ##########################################
 # Groupings of useful statistics:
@@ -185,6 +185,10 @@ connection_stats = [
     ##########################################
     # Dhandle statistics
     ##########################################
+    DhandleStat('dh_conn_handles', 'connection dhandles swept'),
+    DhandleStat('dh_conn_ref', 'connection candidate referenced'),
+    DhandleStat('dh_conn_sweeps', 'connection sweeps'),
+    DhandleStat('dh_conn_tod', 'connection time-of-death sets'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
 
@@ -196,7 +200,15 @@ connection_stats = [
     LogStat('log_bytes_payload', 'log bytes of payload data'),
     LogStat('log_bytes_written', 'log bytes written'),
     LogStat('log_close_yields', 'yields waiting for previous log file close'),
-    LogStat('log_max_filesize', 'maximum log file size', 'no_clear'),
+    LogStat('log_compress_len', 'total size of compressed records'),
+    LogStat('log_compress_mem', 'total in-memory size of compressed records'),
+    LogStat('log_compress_small', 'log records too small to compress'),
+    LogStat('log_compress_writes', 'log records compressed'),
+    LogStat('log_compress_write_fails', 'log records not compressed'),
+    LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
+    LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
+    LogStat('log_prealloc_max', 'number of pre-allocated log files to create'),
+    LogStat('log_prealloc_used', 'pre-allocated log files used'),
     LogStat('log_reads', 'log read operations'),
     LogStat('log_scan_records', 'records processed by log scan'),
     LogStat('log_scan_rereads', 'log scan records requiring two reads'),
@@ -338,14 +350,16 @@ dsrc_stats = [
     BtreeStat('btree_fixed_len', 'fixed-record size', 'no_aggregate,no_scale'),
     BtreeStat('btree_maximum_depth',
         'maximum tree depth', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxintlitem',
-        'maximum internal page item size', 'no_aggregate,no_scale'),
+    BtreeStat('btree_maxintlkey',
+        'maximum internal page key size', 'no_aggregate,no_scale'),
     BtreeStat('btree_maxintlpage',
         'maximum internal page size', 'no_aggregate,no_scale'),
-    BtreeStat('btree_maxleafitem',
-        'maximum leaf page item size', 'no_aggregate,no_scale'),
+    BtreeStat('btree_maxleafkey',
+        'maximum leaf page key size', 'no_aggregate,no_scale'),
     BtreeStat('btree_maxleafpage',
         'maximum leaf page size', 'no_aggregate,no_scale'),
+    BtreeStat('btree_maxleafvalue',
+        'maximum leaf page value size', 'no_aggregate,no_scale'),
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale'),

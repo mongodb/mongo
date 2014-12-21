@@ -37,6 +37,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_set.h"
 
@@ -44,16 +45,12 @@ namespace mongo {
 
     template< class Version > class BtreeBucket;
 
-    // TODO make DiskLoc and RecordId different types
-    class RecordId;
-    typedef RecordId DiskLoc;
-
 #pragma pack(1)
     /** represents a disk location/offset on disk in a database.  64 bits.
         it is assumed these will be passed around by value a lot so don't do anything to make them large
         (such as adding a virtual function)
      */
-    class RecordId {
+    class DiskLoc {
         int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
@@ -66,11 +63,14 @@ namespace mongo {
             // Caps the number of files that may be allocated in a database, allowing about 32TB of
             // data per db.  Note that the DiskLoc and DiskLoc56Bit types supports more files than
             // this value, as does the data storage format.
-            MaxFiles=16000
+            MaxFiles=16000,
+
+            // How invalid DiskLocs are represented in RecordIds.
+            InvalidRepr = -2LL,
         };
 
-        RecordId(int a, int Ofs) : _a(a), ofs(Ofs) { }
-        RecordId() { Null(); }
+        DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
+        DiskLoc() { Null(); }
 
         // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
         // headers must precede Records in a file.
@@ -142,22 +142,40 @@ namespace mongo {
             return ofs - b.ofs;
         }
 
-        /**
-         * Hash value for this disk location.  The hash implementation may be modified, and its
-         * behavior may differ across platforms.  Hash values should not be persisted.
-         */
-        struct Hasher {
-            size_t operator()( DiskLoc loc ) const;
-        };
+        static DiskLoc fromRecordId(RecordId id) {
+            if (id.isNormal())
+                return DiskLoc((id.repr() >> 32), uint32_t(id.repr()));
 
-        /// members for Sorter
-        struct SorterDeserializeSettings {}; // unused
-        void serializeForSorter(BufBuilder& buf) const { buf.appendStruct(*this); }
-        static DiskLoc deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
-            return buf.read<DiskLoc>();
+            if (id.isNull())
+                return DiskLoc();
+
+            if (id == RecordId::max())
+                return DiskLoc::max();
+
+            if (id == RecordId::min())
+                return DiskLoc::min();
+
+            dassert(id.repr() == InvalidRepr);
+            return DiskLoc().setInvalid();
         }
-        int memUsageForSorter() const { return sizeof(DiskLoc); }
-        DiskLoc getOwned() const { return *this; }
+
+        RecordId toRecordId() const {
+            if (_a >= 0) {
+                if (*this == DiskLoc::min())
+                    return RecordId::min();
+
+                if (*this == DiskLoc::max())
+                    return RecordId::max();
+
+                return RecordId(uint64_t(_a) << 32 | uint32_t(ofs));
+            }
+
+            if (isNull())
+                return RecordId();
+
+            dassert(!isValid());
+            return RecordId(InvalidRepr);
+        }
     };
 #pragma pack()
 
@@ -165,13 +183,6 @@ namespace mongo {
     inline bool operator<=(const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) <= 0; }
     inline bool operator> (const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) >  0; }
     inline bool operator>=(const DiskLoc& rhs, const DiskLoc& lhs) { return rhs.compare(lhs) >= 0; }
-
-    inline size_t DiskLoc::Hasher::operator()( DiskLoc loc ) const {
-        size_t hash = 0;
-        boost::hash_combine(hash, loc.a());
-        boost::hash_combine(hash, loc.getOfs());
-        return hash;
-    }
 
     inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
         return stream << loc.toString();

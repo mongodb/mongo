@@ -39,19 +39,33 @@ namespace mongo {
 
     class WiredTigerGlobalOptions {
     public:
-        WiredTigerGlobalOptions() : directoryForIndexes(false) {};
+        WiredTigerGlobalOptions() : cacheSizeGB(0),
+                                    checkpointDelaySecs(0),
+                                    statisticsLogDelaySecs(0),
+                                    directoryForIndexes(false),
+                                    useCollectionPrefixCompression(false),
+                                    useIndexPrefixCompression(false)
+        {};
 
         Status add(moe::OptionSection* options);
-        bool handlePreValidation(const moe::Environment& params);
         Status store(const moe::Environment& params, const std::vector<std::string>& args);
 
+        size_t cacheSizeGB;
+        size_t checkpointDelaySecs;
+        size_t statisticsLogDelaySecs;
+        std::string journalCompressor;
+        bool directoryForIndexes;
         std::string engineConfig;
+
+        std::string collectionBlockCompressor;
+        std::string indexBlockCompressor;
+        bool useCollectionPrefixCompression;
+        bool useIndexPrefixCompression;
         std::string collectionConfig;
         std::string indexConfig;
-        bool directoryForIndexes;
+
     };
 
     extern WiredTigerGlobalOptions wiredTigerGlobalOptions;
 
 }
-

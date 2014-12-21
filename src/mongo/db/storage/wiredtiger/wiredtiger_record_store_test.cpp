@@ -469,7 +469,7 @@ namespace mongo {
                                        obj.objsize(), false ).getStatus());
             wuow.commit();
         }
-        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), RecordId().setInvalid());
+        ASSERT_EQ(rs->oplogStartHack(opCtx.get(), RecordId(0,1)), boost::none);
     }
 
     TEST(WiredTigerRecordStoreTest, CappedOrder) {
@@ -555,7 +555,7 @@ namespace mongo {
         scoped_ptr<WiredTigerHarnessHelper> harnessHelper( new WiredTigerHarnessHelper() );
         scoped_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("local.oplog.foo",
                                                                        100000,
-                                                                       10000));
+                                                                       -1));
 
         {
             const WiredTigerRecordStore* wrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());

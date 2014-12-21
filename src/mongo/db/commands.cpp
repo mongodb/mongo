@@ -249,6 +249,17 @@ namespace mongo {
         return mongo::getStatusFromCommandResult(result);
     }
 
+    void Command::appendCursorResponseObject(long long cursorId,
+                                             StringData cursorNamespace,
+                                             BSONArray firstBatch,
+                                             BSONObjBuilder* builder) {
+        BSONObjBuilder cursorObj(builder->subobjStart("cursor"));
+        cursorObj.append("id", cursorId);
+        cursorObj.append("ns", cursorNamespace);
+        cursorObj.append("firstBatch", firstBatch);
+        cursorObj.done();
+    }
+
     Status Command::checkAuthForCommand(ClientBasic* client,
                                         const std::string& dbname,
                                         const BSONObj& cmdObj) {

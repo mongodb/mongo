@@ -499,12 +499,13 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		return (0);
 
 	if (value->type == WT_CONFIG_ITEM_ID) {
-		if (strncasecmp(value->str, "true", value->len) == 0) {
-			value->type = WT_CONFIG_ITEM_BOOL;
-			value->val = 1;
-		} else if (strncasecmp(value->str, "false", value->len) == 0) {
+		if (WT_STRING_CASE_MATCH("false", value->str, value->len)) {
 			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
+		} else if (
+		    WT_STRING_CASE_MATCH("true", value->str, value->len)) {
+			value->type = WT_CONFIG_ITEM_BOOL;
+			value->val = 1;
 		}
 	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
@@ -559,8 +560,7 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 
 	return (0);
 
-range:
-	return (__config_err(conf, "Number out of range", ERANGE));
+range:	return (__config_err(conf, "Number out of range", ERANGE));
 }
 
 /*
@@ -655,6 +655,21 @@ __wt_config_gets(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_config_gets_none --
+ *	Given a NULL-terminated list of configuration strings, find the final
+ *	value for a given string key.  Treat "none" as empty.
+ */
+int
+__wt_config_gets_none(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_RET(__wt_config_gets(session, cfg, key, value));
+	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+		value->len = 0;
+	return (0);
+}
+
+/*
  * __wt_config_getone --
  *	Get the value for a given key from a single config string.
  */
@@ -682,6 +697,21 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_config_init(session, &cparser, config));
 	return (__config_getraw(&cparser, &key_item, value, 1));
+}
+
+/*
+ * __wt_config_getones_none --
+ *	Get the value for a given string key from a single config string.
+ * Treat "none" as empty.
+ */
+int
+__wt_config_getones_none(WT_SESSION_IMPL *session,
+    const char *config, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_RET(__wt_config_getones(session, config, key, value));
+	if (WT_STRING_CASE_MATCH("none", value->str, value->len))
+		value->len = 0;
+	return (0);
 }
 
 /*

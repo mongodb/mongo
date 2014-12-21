@@ -6,6 +6,8 @@
  */
 
 #define	WT_LOG_FILENAME	"WiredTigerLog"		/* Log file name */
+#define	WT_LOG_PREPNAME	"WiredTigerPreplog"	/* Log pre-allocated name */
+#define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
@@ -101,6 +103,8 @@ typedef struct {
 	 * Log file information
 	 */
 	uint32_t	 fileid;	/* Current log file number */
+	uint32_t	 prep_fileid;	/* Pre-allocated file number */
+	uint32_t	 prep_missed;	/* Pre-allocated file misses */
 	WT_FH           *log_fh;	/* Logging file handle */
 	WT_FH           *log_close_fh;	/* Logging file handle to close */
 	WT_FH           *log_dir_fh;	/* Log directory file handle */
@@ -148,7 +152,11 @@ typedef struct {
 typedef struct {
 	uint32_t	len;		/* 00-03: Record length including hdr */
 	uint32_t	checksum;	/* 04-07: Checksum of the record */
-	uint8_t		unused[8];	/* 08-15: Padding */
+
+#define	WT_LOG_RECORD_COMPRESSED	0x01	/* Compressed except hdr */
+	uint16_t	flags;		/* 08-09: Flags */
+	uint8_t		unused[2];	/* 10-11: Padding */
+	uint32_t	mem_len;	/* 12-15: Uncompressed len if needed */
 	uint8_t		record[0];	/* Beginning of actual data */
 } WT_LOG_RECORD;
 

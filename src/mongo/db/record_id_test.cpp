@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,50 +26,43 @@
  *    it in the license file.
  */
 
-#pragma once
+/** Unit tests for RecordId. */
 
-#include "mongo/db/concurrency/lock_mgr_new.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/record_id.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-    class LockerForTests : public LockerImpl<false> {
-    public:
-        explicit LockerForTests(LockerId lockerId) : LockerImpl<false>(lockerId) {
-            lockGlobal(MODE_S);
-        }
+    TEST( RecordId, HashEqual ) {
+        RecordId locA( 1, 2 );
+        RecordId locB;
+        locB = locA;
+        ASSERT_EQUALS( locA, locB );
+        RecordId::Hasher hasher;
+        ASSERT_EQUALS( hasher( locA ), hasher( locB ) );
+    }
 
-        ~LockerForTests() {
-            unlockAll();
-        }
-    };
-
-
-    class TrackingLockGrantNotification : public LockGrantNotification {
-    public:
-        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
-
-        }
-
-        virtual void notify(ResourceId resId, LockResult result) {
-            numNotifies++;
-            lastResId = resId;
-            lastResult = result;
-        }
-
-    public:
-        int numNotifies;
-
-        ResourceId lastResId;
-        LockResult lastResult;
-    };
-
-
-    struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
-    public:
-        explicit LockRequestCombo (Locker* locker) {
-            initNew(locker, this);
-        }
-    };
-
+    TEST( RecordId, HashNotEqual ) {
+        RecordId original( 1, 2 );
+        RecordId diffFile( 10, 2 );
+        RecordId diffOfs( 1, 20 );
+        RecordId diffBoth( 10, 20 );
+        RecordId reversed( 2, 1 );
+        ASSERT_NOT_EQUALS( original, diffFile );
+        ASSERT_NOT_EQUALS( original, diffOfs );
+        ASSERT_NOT_EQUALS( original, diffBoth );
+        ASSERT_NOT_EQUALS( original, reversed );
+        
+        // Unequal DiskLocs need not produce unequal hashes.  But unequal hashes are likely, and
+        // assumed here for sanity checking of the custom hash implementation.
+        RecordId::Hasher hasher;
+        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffFile ) );
+        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffOfs ) );
+        ASSERT_NOT_EQUALS( hasher( original ), hasher( diffBoth ) );
+        ASSERT_NOT_EQUALS( hasher( original ), hasher( reversed ) );
+    }
+    
+} // namespace
 } // namespace mongo

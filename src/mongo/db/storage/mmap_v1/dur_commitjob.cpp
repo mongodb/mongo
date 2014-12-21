@@ -48,7 +48,7 @@ namespace mongo {
         /** base declare write intent function that all the helpers call. */
         /** we batch up our write intents so that we do not have to synchronize too often */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            MemoryMappedFile::makeWritable(p, len);
+            privateViews.makeWritable(p, len);
             SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             commitJob.note(p, len);
         }

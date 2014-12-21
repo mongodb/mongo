@@ -8,6 +8,7 @@
 // database dump/restore and when doing it just for a
 // single db or collection.
 
+
 t = new ToolTest( "dumprestoreWithNoOptions" );
 
 t.startDB( "foo" );
@@ -21,6 +22,14 @@ dbname = db.getName();
 dbname2 = "NOT_"+dbname;
 
 db.dropDatabase();
+
+// MMapV1 always sets newcollectionsusepowerof2sizes, WT does not
+defaultFlags = { "flags" : 1 }
+var ss = db.serverStatus();
+
+if (ss.storageEngine.name != "mmapv1") {
+    defaultFlags = {};
+}
 
 var options = { capped: true, size: 4096, autoIndexId: true };
 db.createCollection('capped', options);
@@ -40,11 +49,11 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore", "--writeConcern=1");
+t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert.eq( {}, db.capped.exists().options,
+assert.eq( defaultFlags, db.capped.exists().options,
        "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single DB
@@ -67,13 +76,13 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore" , "-d", dbname2, "--dir" , dumppath + dbname, "--noOptionsRestore", "--writeConcern=1");
+t.runTool( "restore" , "-d", dbname2, "--dir" , dumppath + dbname, "--noOptionsRestore");
 
 db = db.getSiblingDB(dbname2);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert.eq( {}, db.capped.exists().options, 
+assert.eq( defaultFlags, db.capped.exists().options, 
           "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single collection
@@ -99,13 +108,13 @@ db.dropDatabase();
 assert.eq( 0, db.capped.count(), "capped not dropped");
 assert.eq( 0, db.capped.getIndexes().length, "indexes not dropped" );
 
-t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", dumppath + dbname, "--writeConcern=1");
+t.runTool( "restore", "-d", dbname, "--drop", "--noOptionsRestore", dumppath + dbname );
 
 db = db.getSiblingDB(dbname);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert( true !== db.capped.stats().capped, "restore options were not ignored" );
-assert.eq( {}, db.capped.exists().options, 
+assert.eq( defaultFlags, db.capped.exists().options, 
           "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 t.stop();

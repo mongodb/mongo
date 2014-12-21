@@ -1127,17 +1127,14 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif using_gcc():
-        # TODO: Really, we want GCC 4.8.2 here, but we are admitting 4.8.1
-        # until our Solaris toolchain solution reaches 4.8.2. When our Solaris
-        # toolchain reaches 4.8.2, upgrade this string, and the check below.
-        compiler_minimum_string = "GCC 4.8.1"
+        compiler_minimum_string = "GCC 4.8.2"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(__GNUC__) || defined(__clang__)
         #error
         #endif
 
-        #if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8) || (__GNUC__ == 4 && __GNUC_MINOR__ == 8 && __GNUC_PATCHLEVEL__ < 1)
+        #if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8) || (__GNUC__ == 4 && __GNUC_MINOR__ == 8 && __GNUC_PATCHLEVEL__ < 2)
         #error %s or newer is required to build MongoDB
         #endif
 

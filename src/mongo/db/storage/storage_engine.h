@@ -101,7 +101,7 @@ namespace mongo {
          *
          * Caller owns the returned pointer.
          */
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx ) = 0;
+        virtual RecoveryUnit* newRecoveryUnit() = 0;
 
         /**
          * List the databases stored in this storage engine.
@@ -154,10 +154,16 @@ namespace mongo {
          */
         virtual int flushAllFiles( bool sync ) = 0;
 
-        virtual Status repairDatabase( OperationContext* txn,
-                                       const std::string& dbName,
-                                       bool preserveClonedFilesOnFailure = false,
-                                       bool backupOriginalFiles = false ) = 0;
+        /**
+         * Recover as much data as possible from a potentially corrupt RecordStore.
+         * This only recovers the record data, not indexes or anything else.
+         *
+         * Generally, this method should not be called directly except by the repairDatabase()
+         * free function.
+         *
+         * NOTE: MMAPv1 does not support this method and has its own repairDatabase() method.
+         */
+        virtual Status repairRecordStore(OperationContext* txn, const std::string& ns) = 0;
 
         /**
          * This method will be called before there is a clean shutdown.  Storage engines should

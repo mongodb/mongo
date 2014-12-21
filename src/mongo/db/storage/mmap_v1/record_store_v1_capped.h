@@ -60,10 +60,10 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
+        virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start,
+                                             const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;

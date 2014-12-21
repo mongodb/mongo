@@ -311,7 +311,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id));
 	}
 
-	WT_ERR(__wt_calloc_def(session, 1, &chunk));
+	WT_ERR(__wt_calloc_one(session, &chunk));
 	created_chunk = 1;
 	chunk->id = dest_id;
 
