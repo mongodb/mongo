@@ -2613,7 +2613,8 @@ struct __wt_collator {
 	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_COLLATOR **customp);
 
 	/*!
-	 * If non-NULL, a callback performed when the database is closed.
+	 * If non-NULL a callback performed when the data source is closed
+	 * for customized extractors otherwise when the database is closed.
 	 *
 	 * The WT_COLLATOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.
@@ -3037,7 +3038,9 @@ struct __wt_extractor {
 	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
 
 	/*!
-	 * If non-NULL, a callback performed when the database is closed.
+	 * If non-NULL a callback performed when the index or column group
+	 * is closed for customized extractors otherwise when the database
+	 * is closed.
 	 *
 	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.

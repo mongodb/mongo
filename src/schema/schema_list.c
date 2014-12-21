@@ -139,9 +139,13 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 	WT_DECL_RET;
 
 	/* If there is a custom extractor configured, terminate it. */
-	if (idx->extractor != NULL && idx->extractor->terminate != NULL)
+	if (idx->extractor != NULL &&
+	    idx->extractor_owned && idx->extractor->terminate != NULL) {
 		WT_TRET(idx->extractor->terminate(
 		    idx->extractor, &session->iface));
+		idx->extractor = NULL;
+		idx->extractor_owned = 0;
+	}
 
 	__wt_free(session, idx->name);
 	__wt_free(session, idx->source);
