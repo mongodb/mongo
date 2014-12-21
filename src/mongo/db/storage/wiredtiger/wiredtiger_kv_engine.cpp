@@ -142,7 +142,7 @@ namespace mongo {
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
-        ss << "statistics=(all),";
+        ss << "statistics=(fast),";
         if ( _durable ) {
             ss << "log=(enabled=true,archive=true,path=journal,compressor=";
 
