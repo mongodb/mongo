@@ -25,9 +25,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import resource
+import os
 import suite_random
 import wiredtiger, wtscenario, wttest
+
+try:
+    # Windows does not getrlimit/setrlimit so we must catch the resource
+    # module load
+    import resource
+except:
+    None
 
 # test_schema03.py
 #    Bigger, more 'randomly generated' schemas and data.
@@ -190,7 +197,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     created in various orders as much as the API allows.  On some runs
     the connection will be closed and reopened at a particular point
     to test that the schemas (and data) are saved and read correctly.
-    
+
     The test is run multiple times, using scenarios.
     The test always follows these steps:
     - table:      create tables
@@ -277,6 +284,9 @@ class test_schema03(wttest.WiredTigerTestCase):
     # This test requires a large number of open files.
     # Increase our resource limits before we start
     def setUp(self):
+        if os.name == "nt":
+            self.skipTest('Unix specific test skipped on Windows')
+
         self.origFileLimit = resource.getrlimit(resource.RLIMIT_NOFILE)
         newlimit = (self.OPEN_FILE_LIMIT, self.origFileLimit[1])
         if newlimit[0] > newlimit[1]:
@@ -289,7 +299,7 @@ class test_schema03(wttest.WiredTigerTestCase):
             'create,cache_size=100m,session_max=1000')
         self.pr(`conn`)
         return conn
-        
+
     def tearDown(self):
         super(test_schema03, self).tearDown()
         resource.setrlimit(resource.RLIMIT_NOFILE, self.origFileLimit)
