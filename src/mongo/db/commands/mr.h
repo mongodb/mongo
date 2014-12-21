@@ -260,6 +260,18 @@ namespace mongo {
             void emit( const BSONObj& a );
 
             /**
+             * Checks the emit in-memory usage in mapper. The mapper may generate lots of items 
+             * and each item is kept in-memory at this state. It would be crashed when run out 
+             * of memory.
+             *
+             * NOTE: Skip the checking when using v8 engine (_jsMode: true). The best way is 
+             * checking at emit function and transfers in memory storage to temp collection. 
+             * Current state is checking at each document handled because the framework flow 
+             * designed.
+             */
+            bool reduceEmitInMemoryUsageIfNeeded();
+
+            /**
             * Checks the size of the transient in-memory results accumulated so far and potentially
             * runs reduce in order to compact them. If the data is still too large, it will be 
             * spilled to the output collection.
