@@ -20,10 +20,10 @@ var App = module.exports = AmpersandState.extend({
       var tokens = serie.key.split(':');
       var group = tokens[0].trim();
       var name = tokens[1].trim();
-      var data = _.map(serie.values, function (v, k) {
-        return {x: parseInt(k), y: v};
-      });
-
+      var data = _.sortBy(
+        _.map(serie.values, function (v, k) {
+          return {x: new Date(k), y: v};
+        }), 'x');
       groups[group] = true;
       return { group: group, name: name, data: data };
     });

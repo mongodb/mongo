@@ -1,4 +1,5 @@
 var d3 = require('d3'),
+    _ = require('lodash'),
     debug = require('debug')('viz:d3-multiline');
 
 /**
@@ -22,8 +23,9 @@ module.exports = function(opts) {
     
     // new data and settings
     data = opts.data;
-    options = data.options;
     series = data.series;
+    options = data.options;
+    console.log(data);
 
     if (series.length === 0) {
       svg.style('visibility', 'hidden');
@@ -34,26 +36,37 @@ module.exports = function(opts) {
 
     svg.attr({width: width, height: height});
 
-    // update x domain
+    // switch x-axis and update domain
+    if (options.xSetting === 'relative') {
+      // calculate min date
+      var minDate = d3.min(data.series, function (s) { return d3.min(s.data, function (v) { return v.x; }); });
+      x = x_relative;
+      xAxis.tickFormat(function (d) { return (d-minDate) / 1000 });
+    } else {
+      x = x_absolute;
+      xAxis.tickFormat(customTimeFormat);
+    }
+
     x.range([0, width]);
     x.domain([
       d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.x; }); }),
       d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.x; }); })
     ]);
 
-    // create new y axis and set domain
+    // switch y-axis and update domain
     if (options.ySetting === 'linear') {
-      y = d3.scale.linear().range([height, 0]);
+      y = y_linear;
       y.domain([
         d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.y; }); }),
         d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
       ]);
     } else {
-      y = d3.scale.log().clamp(true).range([height, 0]).nice();
+      y = y_logscale;
       y.domain([
         0.1, d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
       ]);
     }
+    y.range([height, 0]);
 
     // redraw x and y axes
     svg.selectAll('.x')
@@ -115,7 +128,7 @@ module.exports = function(opts) {
     var i = bisect(series.data, mxi);
     var d0 = series.data[i - 1];
     var d1 = series.data[i];
-    return (mxi - d0.x > d1.x - mxi) ? d1 : d0;
+    return (d0 === undefined || (mxi - d0.x > d1.x - mxi)) ? d1 : d0;
   }
 
   function mousemove() {
@@ -165,20 +178,40 @@ module.exports = function(opts) {
     },
     width = opts.width - margin.left - margin.right,
     height = opts.height - margin.top - margin.bottom,
+    data = opts.data,
     el = opts.el;
 
-  var options, series; // initialized in redraw
+  var options = data.options;
+  var series; // initialized in redraw
 
   var bisect = d3.bisector(function(d) { return d.x; }).left;
 
-  var x = d3.scale.linear(); 
-  var y; // initialized in redraw
-
+  // x scale and axis
+  var x_absolute = d3.time.scale();
+  var x_relative = d3.scale.linear();
+  var customTimeFormat = d3.time.format.multi([
+    [".%L", function(d) { return d.getMilliseconds(); }],
+    [":%S", function(d) { return d.getSeconds(); }],
+    ["%b %e %H:%M:%S", function(d) { return d.getMinutes(); }],
+    ["%b %e %H:%M:%S", function(d) { return d.getHours(); }],
+    ["%b %e %Y", function(d) { return d.getDay() && d.getDate() != 1; }],
+    ["%b %e %Y", function(d) { return d.getDate() != 1; }],
+    ["%b %e %Y", function(d) { return d.getMonth(); }],
+    ["%Y", function() { return true; }]
+  ]);
+  var x = (options.xSetting === 'relative') ? x_relative : x_absolute;
+  
   var xAxis = d3.svg.axis()
     .scale(x)
+    .ticks(15)
     .orient("bottom");
 
+  // y scale and axis
+  var y_linear = d3.scale.linear().range([height, 0]);
+  var y_logscale = d3.scale.log().clamp(true).range([height, 0]).nice();
+  var y = (options.ySetting === 'linear') ? y_linear : y_logscale;
   var yAxis = d3.svg.axis()
+    .scale(y)
     .orient("left");
 
   var line = d3.svg.line()
