@@ -31,9 +31,19 @@ for (var i in ports) {
         }
     }
     var result = admin.runCommand({"listDatabases": 1})
-    // Why is the command returning undefined!?
-    while (typeof result.databases == "undefined") {
+    for (var j = 0; j != 100; j++) {
+        if (typeof result.databases != "undefined" || result.errmsg == "not master") {
+            break
+        }
         result = admin.runCommand({"listDatabases": 1})
+    }
+    if (result.errmsg == "not master") {
+        continue
+    }
+    if (typeof result.databases == "undefined") {
+        print("Could not list databases. Command result:")
+        print(JSON.stringify(result))
+        quit(12)
     }
     var dbs = result.databases
     for (var j = 0; j != dbs.length; j++) {

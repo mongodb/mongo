@@ -34,15 +34,26 @@ func buildBsonArray(iter *mgo.Iter) ([]bson.D, error) {
 //GetIndexes is a helper function that gets the raw index info for a particular
 //collection by using the listIndexes command if available, or by falling back
 //to querying against system.indexes (pre-2.8 systems)
-func GetIndexes(coll *mgo.Collection) ([]bson.D, error) {
+func GetIndexes(coll *mgo.Collection) (*mgo.Iter, error) {
 	var cmdResult struct {
-		Indexes []bson.D
+		Cursor struct {
+			FirstBatch []bson.Raw "firstBatch"
+			NS         string
+			Id         int64
+		}
 	}
 
-	err := coll.Database.Run(bson.M{"listIndexes": coll.Name}, &cmdResult)
+	err := coll.Database.Run(bson.D{{"listIndexes", coll.Name}, {"cursor", bson.M{}}}, &cmdResult)
 	switch {
 	case err == nil:
-		return cmdResult.Indexes, nil
+		ns := strings.SplitN(cmdResult.Cursor.NS, ".", 2)
+		if len(ns) < 2 {
+			return nil, fmt.Errorf("server returned invalid cursor.ns `%v` on listIndexes for `%v`: %v",
+				cmdResult.Cursor.NS, coll.FullName, err)
+		}
+
+		ses := coll.Database.Session
+		return ses.DB(ns[0]).C(ns[1]).NewIter(ses, cmdResult.Cursor.FirstBatch, cmdResult.Cursor.Id, nil), nil
 	case IsNoCmd(err):
 		log.Logf(log.DebugLow, "No support for listIndexes command, falling back to querying system.indexes")
 		return getIndexesPre28(coll)
@@ -51,79 +62,85 @@ func GetIndexes(coll *mgo.Collection) ([]bson.D, error) {
 	}
 }
 
-func getIndexesPre28(coll *mgo.Collection) ([]bson.D, error) {
+func getIndexesPre28(coll *mgo.Collection) (*mgo.Iter, error) {
 	indexColl := coll.Database.C("system.indexes")
 	iter := indexColl.Find(&bson.M{"ns": coll.FullName}).Iter()
-	ret, err := buildBsonArray(iter)
-	if err != nil {
-		return nil, fmt.Errorf("error iterating through collection. Collection: `%v` Err: %v",
-			coll.FullName, err)
-	}
-
-	return ret, nil
+	return iter, nil
 }
 
-func GetCollections(database *mgo.Database) ([]bson.D, error) {
+func GetCollections(database *mgo.Database, name string) (*mgo.Iter, bool, error) {
 	var cmdResult struct {
-		Collections []bson.D
+		Cursor struct {
+			FirstBatch []bson.Raw "firstBatch"
+			NS         string
+			Id         int64
+		}
 	}
 
-	err := database.Run(bson.M{"listCollections": 1}, &cmdResult)
+	command := bson.D{{"listCollections", 1}, {"cursor", bson.M{}}}
+	if len(name) > 0 {
+		command = bson.D{{"listCollections", 1}, {"filter", bson.M{"name": name}}, {"cursor", bson.M{}}}
+	}
+
+	err := database.Run(command, &cmdResult)
 	switch {
 	case err == nil:
-		return cmdResult.Collections, nil
+		ns := strings.SplitN(cmdResult.Cursor.NS, ".", 2)
+		if len(ns) < 2 {
+			return nil, false, fmt.Errorf("server returned invalid cursor.ns `%v` on listCollections for `%v`: %v",
+				cmdResult.Cursor.NS, database.Name, err)
+		}
+
+		return database.Session.DB(ns[0]).C(ns[1]).NewIter(database.Session, cmdResult.Cursor.FirstBatch, cmdResult.Cursor.Id, nil), false, nil
 	case IsNoCmd(err):
 		log.Logf(log.DebugLow, "No support for listCollections command, falling back to querying system.namespaces")
-		return getCollectionsPre28(database)
+		iter, err := getCollectionsPre28(database, name)
+		return iter, true, err
 	default:
-		return nil, fmt.Errorf("error running `listCollections`. Database: `%v` Err: %v",
+		return nil, false, fmt.Errorf("error running `listCollections`. Database: `%v` Err: %v",
 			database.Name, err)
 	}
 }
 
-func getCollectionsPre28(database *mgo.Database) ([]bson.D, error) {
+func getCollectionsPre28(database *mgo.Database, name string) (*mgo.Iter, error) {
 	indexColl := database.C("system.namespaces")
-	iter := indexColl.Find(&bson.M{}).Iter()
-	ret, err := buildBsonArray(iter)
-	if err != nil {
-		return nil, fmt.Errorf("error iterating through namespaces. Collection: `%v` Err: %v",
-			indexColl.FullName, err)
+	selector := bson.M{}
+	if len(name) > 0 {
+		selector["name"] = database.Name + "." + name
 	}
-
-	return ret, nil
+	iter := indexColl.Find(selector).Iter()
+	return iter, nil
 }
 
 func GetCollectionOptions(coll *mgo.Collection) (*bson.D, error) {
-	var cmdResult struct {
-		Collections []bson.D
-	}
-	err := coll.Database.Run(bson.M{"listCollections": 1}, &cmdResult)
-	switch {
-	case err == nil:
-		for _, collectionInfo := range cmdResult.Collections {
-			name, err := bsonutil.FindValueByKey("name", &collectionInfo)
-			if err != nil {
-				continue
-			}
-			if nameStr, ok := name.(string); ok {
-				if nameStr == coll.Name {
-					return &collectionInfo, nil
-				}
-			} else {
-				continue
-			}
-		}
-		// The given collection was not found, but no error encountered.
-		return nil, nil
-	case IsNoCmd(err):
-		collInfo := &bson.D{}
-		namespacesColl := coll.Database.C("system.namespaces")
-		err = namespacesColl.Find(&bson.M{"name": coll.FullName}).One(collInfo)
-		if err != nil {
-			return nil, err
-		}
-		return collInfo, nil
-	default:
+	iter, useFullName, err := GetCollections(coll.Database, coll.Name)
+	if err != nil {
 		return nil, err
 	}
+	comparisonName := coll.Name
+	if useFullName {
+		comparisonName = coll.FullName
+	}
+	collInfo := &bson.D{}
+	for iter.Next(collInfo) {
+		name, err := bsonutil.FindValueByKey("name", collInfo)
+		if err != nil {
+			collInfo = nil
+			continue
+		}
+		if nameStr, ok := name.(string); ok {
+			if nameStr == comparisonName {
+				return collInfo, nil
+			}
+		} else {
+			collInfo = nil
+			continue
+		}
+	}
+	err = iter.Err()
+	if err != nil {
+		return nil, err
+	}
+	// The given collection was not found, but no error encountered.
+	return nil, nil
 }

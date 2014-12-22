@@ -55,6 +55,9 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	collection := session.DB(dbName).C(c)
 
 	collectionInfo, err := db.GetCollectionOptions(collection)
+	if err != nil {
+		return fmt.Errorf("failed to get collection options for `%v`: %v", err)
+	}
 	if collectionInfo == nil {
 		//The collection wasn't found, which means it was probably deleted
 		// between now and the time that collections were listed. Skip it.
@@ -78,16 +81,22 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	log.Logf(log.DebugHigh, "\treading indexes for `%v`", nsID)
 
 	//get the indexes
-	indexes, err := db.GetIndexes(collection)
+	indexesIter, err := db.GetIndexes(collection)
 	if err != nil {
 		return err
 	}
-	for _, index := range indexes {
-		convertedIndex, err := bsonutil.ConvertBSONValueToJSON(index)
+
+	indexOpts := &bson.D{}
+	for indexesIter.Next(indexOpts) {
+		convertedIndex, err := bsonutil.ConvertBSONValueToJSON(*indexOpts)
 		if err != nil {
-			return fmt.Errorf("error converting index (%#v): %v", index, err)
+			return fmt.Errorf("error converting index (%#v): %v", convertedIndex, err)
 		}
 		meta.Indexes = append(meta.Indexes, convertedIndex)
+	}
+
+	if err := indexesIter.Err(); err != nil {
+		return fmt.Errorf("error getting indexes for collection `%v`: %v", nsID, err)
 	}
 
 	// Finally, we send the results to the writer as JSON bytes

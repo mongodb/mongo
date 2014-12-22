@@ -282,6 +282,9 @@ func (s *S) TestDatabaseAndCollectionNames(c *C) {
 		c.Assert(names, DeepEquals, []string{"db1", "db2", "local"})
 	}
 
+	// Try to exercise cursor logic. 2.8.0-rc3 still ignores this.
+	session.SetBatch(2)
+
 	names, err = db1.CollectionNames()
 	c.Assert(err, IsNil)
 	c.Assert(names, DeepEquals, []string{"col1", "col2", "system.indexes"})
@@ -1028,9 +1031,13 @@ func (s *S) TestQueryExplain(c *C) {
 	query := coll.Find(nil).Limit(2)
 	err = query.Explain(m)
 	c.Assert(err, IsNil)
-	c.Assert(m["cursor"], Equals, "BasicCursor")
-	c.Assert(m["nscanned"], Equals, 2)
-	c.Assert(m["n"], Equals, 2)
+	if m["queryPlanner"] != nil {
+		c.Assert(m["executionStats"].(M)["totalDocsExamined"], Equals, 2)
+	} else {
+		c.Assert(m["cursor"], Equals, "BasicCursor")
+		c.Assert(m["nscanned"], Equals, 2)
+		c.Assert(m["n"], Equals, 2)
+	}
 
 	n := 0
 	var result M
@@ -1072,8 +1079,16 @@ func (s *S) TestQueryHint(c *C) {
 	m := M{}
 	err = coll.Find(nil).Hint("a").Explain(m)
 	c.Assert(err, IsNil)
-	c.Assert(m["indexBounds"], NotNil)
-	c.Assert(m["indexBounds"].(M)["a"], NotNil)
+
+	if m["queryPlanner"] != nil {
+		m = m["queryPlanner"].(M)
+		m = m["winningPlan"].(M)
+		m = m["inputStage"].(M)
+		c.Assert(m["indexName"], Equals, "a_1")
+	} else {
+		c.Assert(m["indexBounds"], NotNil)
+		c.Assert(m["indexBounds"].(M)["a"], NotNil)
+	}
 }
 
 func (s *S) TestFindOneNotFound(c *C) {
@@ -2401,7 +2416,7 @@ func (s *S) TestSafeParameters(c *C) {
 	// Tweak the safety parameters to something unachievable.
 	session.SetSafe(&mgo.Safe{W: 4, WTimeout: 100})
 	err = coll.Insert(M{"_id": 1})
-	c.Assert(err, ErrorMatches, "timeout|timed out waiting for slaves")
+	c.Assert(err, ErrorMatches, "timeout|timed out waiting for slaves|Not enough data-bearing nodes")
 	if !s.versionAtLeast(2, 6) {
 		// 2.6 turned it into a query error.
 		c.Assert(err.(*mgo.LastError).WTimeout, Equals, true)
@@ -2794,6 +2809,9 @@ func (s *S) TestEnsureIndexGetIndexes(c *C) {
 
 	err = coll.EnsureIndexKey("$2d:d")
 	c.Assert(err, IsNil)
+
+	// Try to exercise cursor logic. 2.8.0-rc3 still ignores this.
+	session.SetBatch(2)
 
 	indexes, err := coll.Indexes()
 	c.Assert(err, IsNil)
