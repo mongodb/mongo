@@ -722,10 +722,10 @@ var nsidedPolys = [
         nI: 3
     },
     {
-        name: "100000 sided polygon centered on 0, 0",
+        name: "25000 sided polygon centered on 0, 0",
         type: "Polygon",
         coordinates: [
-            nGonGenerator(100000, 89.99, true, 0, 0)
+            nGonGenerator(25000, 89.99, true, 0, 0)
         ],
         crs: strictCRS,
         nW: totalObjects - 3,
