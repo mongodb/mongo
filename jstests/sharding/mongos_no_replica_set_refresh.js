@@ -25,7 +25,9 @@ jsTestLog( "Reconfiguring replica set..." );
 var removedNode = rsConfig.members.pop();
 rsConfig.version++;
 
-reconfig(rsObj, rsConfig);
+// Need to force in case the node being removed is the current primary
+reconfig(rsObj, rsConfig, true);
+primary = rsObj.getPrimary();
 
 var numRSHosts = function(){
     var result = primary.getDB("admin").runCommand({ ismaster : 1 });
@@ -60,6 +62,7 @@ jsTestLog( "Now test adding new replica set servers..." );
 config.shards.update({ _id : rsObj.name }, { $set : { host : rsObj.name + "/" + primary.host } });
 printjson( config.shards.find().toArray() );
 
+rsConfig = primary.getDB("local").system.replset.findOne();
 rsConfig.members.push(removedNode);
 rsConfig.version++;
 reconfig(rsObj, rsConfig);
