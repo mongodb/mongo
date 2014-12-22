@@ -753,11 +753,11 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	WT_TABLE *table;
 	WT_CURSOR **cp;
 	/*
-	 * Underlying column groups are always opened without dump, and only
-	 * the primary is opened with next_random.
+	 * Underlying column groups are always opened without dump or readonly,
+	 * and only the primary is opened with next_random.
 	 */
 	const char *cfg[] = {
-		cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL, NULL
+		cfg_arg[0], cfg_arg[1], "dump=\"\",readonly=0", NULL, NULL
 	};
 	u_int i;
 	int complete;
@@ -891,8 +891,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	ctable->plan = table->plan;
 
 	/* Handle projections. */
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
-		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 1, tmp));
 		WT_ERR(__wt_strndup(
@@ -934,22 +934,28 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	/*
-	 * We'll need to squirrel away a copy of the cursor configuration
-	 * for if/when we open indices.
+	 * We'll need to squirrel away a copy of the cursor configuration for
+	 * if/when we open indices.
 	 *
 	 * cfg[0] is the baseline configuration for the cursor open and we can
 	 * acquire another copy from the configuration structures, so it would
 	 * be reasonable not to copy it here: but I'd rather be safe than sorry.
 	 *
-	 * Underlying indices are always opened without dump.
+	 * cfg[1] is the application configuration.
+	 *
+	 * Underlying indices are always opened without dump or readonly; that
+	 * information is appended to cfg[1] so later "fast" configuration calls
+	 * (checking only cfg[0] and cfg[1]) work. I don't expect to see more
+	 * than two configuration strings here, but it's written to compact into
+	 * two configuration strings, a copy of cfg[0] and the rest in cfg[1].
 	 */
-	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
-		;
-	WT_ERR(__wt_calloc_def(session, cfg_cnt + 2, &ctable->cfg));
-	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
-		WT_ERR(
-		    __wt_strdup(session, cfg[cfg_cnt], &ctable->cfg[cfg_cnt]));
-	WT_ERR(__wt_strdup(session, "dump=\"\"", &ctable->cfg[cfg_cnt]));
+	WT_ERR(__wt_calloc_def(session, 3, &ctable->cfg));
+	WT_ERR(__wt_strdup(session, cfg[0], &ctable->cfg[0]));
+	WT_ERR(__wt_buf_set(session, tmp, "", 0));
+	for (cfg_cnt = 1; cfg[cfg_cnt] != NULL; ++cfg_cnt)
+		WT_ERR(__wt_buf_catfmt(session, tmp, "%s,", cfg[cfg_cnt]));
+	WT_ERR(__wt_buf_catfmt(session, tmp, "dump=\"\",readonly=0"));
+	WT_ERR(__wt_strdup(session, tmp->data, &ctable->cfg[1]));
 
 	if (0) {
 err:		WT_TRET(__curtable_close(cursor));
