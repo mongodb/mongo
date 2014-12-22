@@ -64,6 +64,13 @@ namespace mongo {
         // TODO(ERH): consolidate into one ideally
         bool exists() const { return _namespaceIndex.pathExists(); }
         bool isEmpty() const { return !_namespaceIndex.allocated(); }
+        bool hasUserData() const {
+            // The two collections which exist and can't be removed are:
+            //    system.indexes
+            //    system.namespaces
+            return _collections.size() > 2;
+        }
+
 
         virtual int64_t sizeOnDisk( OperationContext* opCtx ) const;
 
@@ -167,6 +174,7 @@ namespace mongo {
 
         void _ensureSystemCollection_inlock( OperationContext* txn,
                                              const StringData& ns );
+        void _init( OperationContext* txn );
 
         void _lazyInit( OperationContext* txn );
 

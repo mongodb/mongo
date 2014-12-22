@@ -158,46 +158,41 @@ namespace mongo {
                 msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
             }
 
-            // If already exists, open.  Otherwise behave as if empty until
-            // there's a write, then open.
+            _namespaceIndex.init( txn );
 
-            if ( _namespaceIndex.pathExists() ) {
-                _namespaceIndex.init( txn );
-
-                // upgrade freelist
-                NamespaceString oldFreeList( name, "$freelist" );
-                NamespaceDetails* details = _namespaceIndex.details( oldFreeList.ns() );
-                if ( details ) {
-                    if ( !details->firstExtent.isNull() ) {
-                        _extentManager.freeExtents(txn,
-                                                   details->firstExtent,
-                                                   details->lastExtent);
-                    }
-                    _namespaceIndex.kill_ns( txn, oldFreeList.ns() );
+            // upgrade freelist
+            NamespaceString oldFreeList( name, "$freelist" );
+            NamespaceDetails* details = _namespaceIndex.details( oldFreeList.ns() );
+            if ( details ) {
+                if ( !details->firstExtent.isNull() ) {
+                    _extentManager.freeExtents(txn,
+                                               details->firstExtent,
+                                               details->lastExtent);
                 }
+                _namespaceIndex.kill_ns( txn, oldFreeList.ns() );
+            }
 
-                _lazyInit( txn );
+            _init( txn );
 
-                std::list<std::string> namespaces;
-                _namespaceIndex.getCollectionNamespaces( &namespaces );
-                for ( std::list<std::string>::const_iterator i = namespaces.begin();
-                      i != namespaces.end(); // we add to the list in the loop so can't cache end().
-                      ++i ) {
-                    const std::string& ns = *i;
-                    Entry*& entry = _collections[ns];
-                    // entry was already loaded for system.indexes and system.namespaces in
-                    // _lazyInit. That is ok, since they can't have indexes on them anyway.
-                    if (!entry) {
-                        entry = new Entry();
-                        _insertInCache_inlock(txn, ns, entry);
+            std::list<std::string> namespaces;
+            _namespaceIndex.getCollectionNamespaces( &namespaces );
+            for ( std::list<std::string>::const_iterator i = namespaces.begin();
+                  i != namespaces.end(); // we add to the list in the loop so can't cache end().
+                  ++i ) {
+                const std::string& ns = *i;
+                Entry*& entry = _collections[ns];
+                // entry was already loaded for system.indexes and system.namespaces in
+                // _init. That is ok, since they can't have indexes on them anyway.
+                if (!entry) {
+                    entry = new Entry();
+                    _insertInCache_inlock(txn, ns, entry);
 
-                        // Add the indexes on this namespace to the list of namespaces to load.
-                        std::vector<std::string> indexNames;
-                        entry->catalogEntry->getAllIndexes(txn, &indexNames);
-                        for (size_t i = 0; i < indexNames.size(); i++) {
-                            namespaces.push_back(
-                                IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
-                        }
+                    // Add the indexes on this namespace to the list of namespaces to load.
+                    std::vector<std::string> indexNames;
+                    entry->catalogEntry->getAllIndexes(txn, &indexNames);
+                    for (size_t i = 0; i < indexNames.size(); i++) {
+                        namespaces.push_back(
+                            IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
                     }
                 }
 
@@ -540,7 +535,7 @@ namespace mongo {
         _namespaceIndex.add_ns( txn, ns, DiskLoc(), false );
     }
 
-    void MMAPV1DatabaseCatalogEntry::_lazyInit( OperationContext* txn ) {
+    void MMAPV1DatabaseCatalogEntry::_init( OperationContext* txn ) {
         // this is sort of insane
         // it's because the whole storage/mmap_v1 is highly recursive
 
@@ -627,8 +622,6 @@ namespace mongo {
                                                         const StringData& ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
-        _lazyInit( txn );
-
         if ( _namespaceIndex.details( ns ) ) {
             return Status( ErrorCodes::NamespaceExists,
                            str::stream() << "namespace already exists: " << ns );
@@ -705,7 +698,6 @@ namespace mongo {
     void MMAPV1DatabaseCatalogEntry::createNamespaceForIndex(OperationContext* txn,
                                                              const StringData& name) {
         // This is a simplified form of createCollection.
-        _lazyInit(txn);
         invariant(!_namespaceIndex.details(name));
 
         _addNamespaceToNamespaceCollection(txn, name, NULL);

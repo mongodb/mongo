@@ -50,6 +50,7 @@ namespace mongo {
 
         virtual bool exists() const;
         virtual bool isEmpty() const;
+        virtual bool hasUserData() const;
 
         virtual int64_t sizeOnDisk( OperationContext* opCtx ) const;
 

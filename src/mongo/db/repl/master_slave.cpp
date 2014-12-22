@@ -680,7 +680,7 @@ namespace repl {
         Client::Context ctx(txn, ns, false);
         ctx.getClient()->curop()->reset();
 
-        bool empty = ctx.db()->getDatabaseCatalogEntry()->isEmpty();
+        bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         LOG(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;

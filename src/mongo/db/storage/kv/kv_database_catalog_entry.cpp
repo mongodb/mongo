@@ -127,6 +127,10 @@ namespace mongo {
         return _collections.empty();
     }
 
+    bool KVDatabaseCatalogEntry::hasUserData() const {
+        return !isEmpty();
+    }
+
     int64_t KVDatabaseCatalogEntry::sizeOnDisk( OperationContext* opCtx ) const {
         int64_t size = 0;
 
