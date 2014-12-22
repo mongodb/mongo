@@ -1013,9 +1013,11 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	ret = __wt_getenv(session, "WIREDTIGER_CONFIG", &env_config);
 	if (ret == WT_NOTFOUND)
 		return (0);
+	WT_ERR(ret);
+
 	len = strlen(env_config);
 	if (len == 0)
-		goto err; /* Free the memory */
+		goto err;			/* Free the memory. */
 	WT_ERR(__wt_buf_set(session, cbuf, env_config, len + 1));
 
 	/*
