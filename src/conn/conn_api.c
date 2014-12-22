@@ -1015,7 +1015,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 		return (0);
 	len = strlen(env_config);
 	if (len == 0)
-		return (0);
+		goto err; /* Free the memory */
 	WT_ERR(__wt_buf_set(session, cbuf, env_config, len + 1));
 
 	/*
@@ -1043,8 +1043,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	/* Append it to the stack. */
 	__conn_config_append(cfg, cbuf->data);
 
-err:	if (env_config != NULL)
-		__wt_free(session, env_config);
+err:	__wt_free(session, env_config);
 
       return (ret);
 }
