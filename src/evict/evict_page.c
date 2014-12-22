@@ -315,7 +315,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	uint32_t flags;
 
 	btree = S2BT(session);
-	page = ref->page;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -334,6 +333,10 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		__wt_evict_list_clear_page(session, ref);
 	}
 
+	/* Now that we have exclusive access, review the page. */
+	page = ref->page;
+	mod = page->modify;
+
 	/*
 	 * Recurse through the page's subtree: this happens first because we
 	 * have to write pages in depth-first order, otherwise we'll dirty
@@ -344,8 +347,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		    session, ref, exclusive, inmem_splitp, istreep));
 		WT_RET(ret);
 	}
-
-	mod = page->modify;
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -456,7 +457,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 		if (exclusive)
 			LF_SET(WT_SKIP_UPDATE_ERR);
 		else if (top && !WT_PAGE_IS_INTERNAL(page) &&
-		    page->memory_footprint > 10 * btree->maxleafpage)
+		    page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_SKIP_UPDATE_RESTORE);
 		WT_RET(__wt_reconcile(session, ref, NULL, flags));
 		WT_ASSERT(session,
