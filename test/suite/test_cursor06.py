@@ -60,30 +60,41 @@ class test_cursor06(wttest.WiredTigerTestCase):
             
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
-        self.pop(uri)
-        cursor = self.session.open_cursor(uri, None)
-        for i in range(0, 10):
-            self.set_kv(cursor)
-            cursor.insert()
-            cursor.reconfigure("overwrite=0")
-            self.set_kv(cursor)
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                              cursor.insert())
-            cursor.reconfigure("overwrite=1")
-        
+        for open_config in ( None, "overwrite=0", "overwrite=1" ):
+            self.session.drop(uri, "force")
+            self.pop(uri)
+            cursor = self.session.open_cursor(uri, None, open_config)
+            if open_config != "overwrite=0":
+                self.set_kv(cursor)
+                cursor.insert()
+            for i in range(0, 10):
+                cursor.reconfigure("overwrite=0")
+                self.set_kv(cursor)
+                self.assertRaises(wiredtiger.WiredTigerError,
+                                  lambda: cursor.insert())
+                cursor.reconfigure("overwrite=1")
+                self.set_kv(cursor)
+                cursor.insert()
+            cursor.close()
+            
     def test_reconfigure_readonly(self):
         uri = self.type + self.name
-        self.pop(uri)
-        cursor = self.session.open_cursor(uri, None)
-        for i in range(0, 10):
-            self.set_kv(cursor)
-            cursor.update()
-            cursor.reconfigure("readonly=1")
-            self.set_kv(cursor)
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                              cursor.update())
-            cursor.reconfigure("readonly=0")
-
+        for open_config in ( None, "readonly=0", "readonly=1" ):
+            self.session.drop(uri, "force")
+            self.pop(uri)
+            cursor = self.session.open_cursor(uri, None, open_config)
+            if open_config != "readonly=1":
+                self.set_kv(cursor)
+                cursor.update()
+            for i in range(0, 10):
+                cursor.reconfigure("readonly=1")
+                self.set_kv(cursor)
+                self.assertRaises(wiredtiger.WiredTigerError,
+                        lambda: cursor.update())
+                cursor.reconfigure("readonly=0")
+                self.set_kv(cursor)
+                cursor.update()
+            cursor.close()
 
 if __name__ == '__main__':
     wttest.run()
