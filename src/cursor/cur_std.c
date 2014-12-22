@@ -623,7 +623,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * of two configuration string checks.
 	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
-	if (cval.len == 1) {
+	if (cval.len != 0) {
 		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
 		cursor->update = cursor->update_orig = __wt_cursor_notsup;
 		cursor->remove = cursor->remove_orig = __wt_cursor_notsup;
