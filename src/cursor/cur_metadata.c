@@ -436,7 +436,10 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
-	/* Metadata cursors default to readonly. */
+	/*
+	 * Metadata cursors default to readonly; if not set to not-readonly,
+	 * they are permanently readonly and cannot be reconfigured.
+	 */
 	WT_ERR(__wt_config_gets_def(session, cfg, "readonly", 1, &cval));
 	if (cval.val != 0) {
 		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;

@@ -620,21 +620,23 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	/*
 	 * checkpoint, readonly
-	 * Checkpoint cursors are read-only, avoid any extra work.
+	 * Checkpoint cursors are permanently read-only, avoid the extra work
+	 * of two configuration string checks.
 	 */
 	readonly = 0;
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
-	if (cval.len == 0) {
-		WT_RET(
-		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
-		if (cval.val != 0)
-			readonly = 1;
-	} else
-		readonly = 1;
-	if (readonly) {
+	if (cval.len == 1) {
 		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
 		cursor->update = cursor->update_orig = __wt_cursor_notsup;
 		cursor->remove = cursor->remove_orig = __wt_cursor_notsup;
+	} else {
+		WT_RET(
+		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
+		if (cval.val != 0) {
+			cursor->insert = __wt_cursor_notsup;
+			cursor->update = __wt_cursor_notsup;
+			cursor->remove = __wt_cursor_notsup;
+		}
 	}
 
 	/*
