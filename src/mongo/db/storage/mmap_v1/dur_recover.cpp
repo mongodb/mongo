@@ -186,8 +186,7 @@ namespace mongo {
 
                     case JEntry::OpCode_DbContext: {
                         _lastDbName = (const char*) _entries->pos();
-                        const unsigned limit = std::min((unsigned)Namespace::MaxNsLenWithNUL,
-                                                        _entries->remaining());
+                        const unsigned limit = _entries->remaining();
                         const unsigned len = strnlen(_lastDbName, limit);
                         if (_lastDbName[len] != '\0') {
                             log() << "problem processing journal file during recovery";
@@ -290,7 +289,6 @@ namespace mongo {
             //TODO(mathias): look into making some of these dasserts
             verify(entry.e);
             verify(entry.dbName);
-            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             DurableMappedFile *mmf = last.newEntry(entry, *this);
 
@@ -340,7 +338,6 @@ namespace mongo {
 
         DurableMappedFile* RecoveryJob::getDurableMappedFile(const ParsedJournalEntry& entry) {
             verify(entry.dbName);
-            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
