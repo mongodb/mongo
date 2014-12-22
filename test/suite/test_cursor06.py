@@ -60,7 +60,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
             
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
-        for open_config in ( None, "overwrite=0", "overwrite=1" ):
+        for open_config in (None, "overwrite=0", "overwrite=1"):
             self.session.drop(uri, "force")
             self.pop(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
@@ -79,7 +79,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
             
     def test_reconfigure_readonly(self):
         uri = self.type + self.name
-        for open_config in ( None, "readonly=0", "readonly=1" ):
+        for open_config in (None, "readonly=0", "readonly=1"):
             self.session.drop(uri, "force")
             self.pop(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
@@ -90,7 +90,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
                 cursor.reconfigure("readonly=1")
                 self.set_kv(cursor)
                 self.assertRaises(wiredtiger.WiredTigerError,
-                        lambda: cursor.update())
+                                  lambda: cursor.update())
                 cursor.reconfigure("readonly=0")
                 self.set_kv(cursor)
                 cursor.update()
