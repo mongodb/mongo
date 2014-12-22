@@ -601,7 +601,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cdump;
 	WT_SESSION_IMPL *session;
-	int readonly;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
@@ -623,7 +622,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * Checkpoint cursors are permanently read-only, avoid the extra work
 	 * of two configuration string checks.
 	 */
-	readonly = 0;
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len == 1) {
 		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
