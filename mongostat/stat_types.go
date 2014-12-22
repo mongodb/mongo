@@ -70,6 +70,15 @@ type ServerStatus struct {
 	Repl               *ReplStatus            `bson:"repl"`
 	ShardCursorType    map[string]interface{} `bson:"shardCursorType"`
 	StorageEngine      map[string]string      `bson:"storageEngine"`
+	WiredTiger         *WiredTiger            `bson:"wiredTiger"`
+}
+
+type WiredTiger struct {
+	Transaction TransactionStats `bson:"transaction"`
+}
+
+type TransactionStats struct {
+	TransCheckpoints int64 `bson:"transaction checkpoints"`
 }
 
 type ReplStatus struct {
@@ -210,7 +219,7 @@ var StatHeaders = []StatHeader{
 	{"delete", Always},
 	{"getmore", Always},
 	{"command", Always},
-	{"flushes", MMAPOnly},
+	{"flushes", Always},
 	{"mapped", MMAPOnly},
 	{"vsize", Always},
 	{"res", Always},
@@ -563,13 +572,10 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
 		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
 
+		out.WriteCell(fmt.Sprintf("%v", line.Flushes))
+
 		// Columns for flushes + mapped only show up if mmap columns are active
 		if lineFlags&MMAPOnly > 0 {
-			if mmap {
-				out.WriteCell(fmt.Sprintf("%v", line.Flushes))
-			} else {
-				out.WriteCell("n/a")
-			}
 
 			if line.Mapped > 0 {
 				out.WriteCell(formatMegs(int64(line.Mapped)))
@@ -692,9 +698,12 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 		returnVal.CommandR = diff(newStat.OpcountersRepl.Command, oldStat.OpcountersRepl.Command, sampleSecs)
 	}
 
-	if newStat.BackgroundFlushing != nil && oldStat.BackgroundFlushing != nil {
+	if newStat.WiredTiger != nil && oldStat.WiredTiger != nil {
+		returnVal.Flushes = newStat.WiredTiger.Transaction.TransCheckpoints - oldStat.WiredTiger.Transaction.TransCheckpoints
+	} else if newStat.BackgroundFlushing != nil && oldStat.BackgroundFlushing != nil {
 		returnVal.Flushes = newStat.BackgroundFlushing.Flushes - oldStat.BackgroundFlushing.Flushes
 	}
+
 	returnVal.Time = newStat.SampleTime
 	returnVal.IsMongos =
 		(newStat.ShardCursorType != nil || newStat.Process == MongosProcess)
