@@ -505,16 +505,16 @@ namespace mongo {
         size_t idx;
         while ( ( idx = ident.find( '/', start ) ) != string::npos ) {
             StringData dir = ident.substr( 0, idx );
-            log() << "need to created: " << dir;
 
             boost::filesystem::path subdir = _path;
             subdir /= dir.toString();
             if ( !boost::filesystem::exists( subdir ) ) {
+                LOG(1) << "creating subdirectory: " << dir;
                 try {
                     boost::filesystem::create_directory( subdir );
                 }
-                catch( std::exception& e) {
-                    log() << "error creating path " << subdir.string() << ' ' << e.what();
+                catch (const std::exception& e) {
+                    error() << "error creating path " << subdir.string() << ' ' << e.what();
                     throw;
                 }
             }
