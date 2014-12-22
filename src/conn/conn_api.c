@@ -519,8 +519,8 @@ err:	if (nextractor != NULL) {
  *	Given a configuration, configure the extractor.
  */
 int
-__wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
-    WT_EXTRACTOR **extractorp, int *ownp)
+__wt_extractor_config(WT_SESSION_IMPL *session,
+    const char *config, WT_EXTRACTOR **extractorp, int *ownp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
@@ -531,21 +531,18 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 
 	conn = S2C(session);
 
-	WT_CLEAR(cval);
 	WT_RET_NOTFOUND_OK(
 	    __wt_config_getones_none(session, config, "extractor", &cval));
 	if (cval.len == 0)
 		return (0);
 
 	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
-		if (WT_STRING_MATCH(
-		    nextractor->name, cval.str, cval.len))
+		if (WT_STRING_MATCH(nextractor->name, cval.str, cval.len))
 			break;
 
 	if (nextractor == NULL)
 		WT_RET_MSG(session, EINVAL,
-		    "unknown extractor '%.*s'",
-		    (int)cval.len, cval.str);
+		    "unknown extractor '%.*s'", (int)cval.len, cval.str);
 
 	if (nextractor->extractor->customize != NULL) {
 		WT_RET(__wt_config_getones(session,
