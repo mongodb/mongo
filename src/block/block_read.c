@@ -168,6 +168,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, size, cksum));
 
+	WT_STAT_FAST_CONN_INCR(session, block_read);
+	WT_STAT_FAST_CONN_INCRV(session, block_byte_read, size);
+
 	/*
 	 * Grow the buffer as necessary and read the block.  Buffers should be
 	 * aligned for reading, but there are lots of buffers (for example, file
@@ -188,25 +191,24 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	buf->size = size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
-	blk->cksum = 0;
-	page_cksum = __wt_cksum(buf->mem,
-	    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP);
-	if (cksum != page_cksum) {
-		if (!F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
-			__wt_errx(session,
-			    "read checksum error [%"
-			    PRIu32 "B @ %" PRIuMAX ", %"
-			    PRIu32 " != %" PRIu32 "]",
-			    size, (uintmax_t)offset, cksum, page_cksum);
-
-		/* Panic if a checksum fails during an ordinary read. */
-		return (block->verify ||
-		    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
-		    WT_ERROR :
-		    __wt_illegal_value(session, block->name));
+	page_cksum = blk->cksum;
+	if (page_cksum == cksum) {
+		blk->cksum = 0;
+		page_cksum = __wt_cksum(buf->mem,
+		    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ?
+		    size : WT_BLOCK_COMPRESS_SKIP);
+		if (page_cksum == cksum)
+			return (0);
 	}
 
-	WT_STAT_FAST_CONN_INCR(session, block_read);
-	WT_STAT_FAST_CONN_INCRV(session, block_byte_read, size);
-	return (0);
+	if (!F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
+		__wt_errx(session,
+		    "read checksum error [%" PRIu32 "B @ %" PRIuMAX ", %"
+		    PRIu32 " != %" PRIu32 "]",
+		    size, (uintmax_t)offset, cksum, page_cksum);
+
+	/* Panic if a checksum fails during an ordinary read. */
+	return (block->verify ||
+	    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
+	    WT_ERROR : __wt_illegal_value(session, block->name));
 }

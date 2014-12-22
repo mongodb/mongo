@@ -235,10 +235,8 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Add unreferenced overflow page blocks to the free list so they are
 	 * reused immediately.
 	 */
-	if (ss->ovfl_next != 0) {
-		WT_ERR(__slvg_ovfl_reconcile(session, ss));
-		WT_ERR(__slvg_ovfl_discard(session, ss));
-	}
+	WT_ERR(__slvg_ovfl_reconcile(session, ss));
+	WT_ERR(__slvg_ovfl_discard(session, ss));
 
 	/*
 	 * Step 5:

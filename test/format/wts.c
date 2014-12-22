@@ -63,6 +63,9 @@ static WT_EVENT_HANDLER event_handler = {
 	NULL	/* Close handler. */
 };
 
+#undef	REMAIN
+#define	REMAIN(p, end)	(size_t)((p) >= (end) ? 0 : (end) - (p))
+
 /*
  * wts_open --
  *	Open a connection to a WiredTiger database.
@@ -72,58 +75,76 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	const char *buffer_align, *progname;
-	char config[2048], evict_config[64];
+	char config[4096], *end, *p;
 
 	*connp = NULL;
 
-	/* Build the eviction worker thread config string, if needed. */
-	evict_config[0] = '\0';
-	if (g.c_evict_max != 0 &&
-	    snprintf(evict_config, sizeof(evict_config),
-	    "eviction=(threads_max=%" PRIu32 "),",
-	    g.c_evict_max) >= (int)sizeof(evict_config))
-		die(ENOMEM, "eviction configuration buffer too small");
+	p = config;
+	end = config + sizeof(config);
+
+	p += snprintf(p, REMAIN(p, end),
+	    "create,checkpoint_sync=false,cache_size=%" PRIu32 "MB",
+	    g.c_cache);
+
+#ifdef _WIN32
+	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"t_format.exe\"");
+#else
+	p += snprintf(p, REMAIN(p, end), ",error_prefix=\"%s\"", g.progname);
+#endif
+
+	/* LSM configuration. */
+	if (DATASOURCE("lsm"))
+		p += snprintf(p, REMAIN(p, end),
+		    ",lsm_manager=(worker_thread_max=%" PRIu32 "),",
+		    g.c_lsm_worker_threads);
+
+	/* Eviction worker configuration. */
+	if (g.c_evict_max != 0)
+		p += snprintf(p, REMAIN(p, end),
+		    ",eviction=(threads_max=%" PRIu32 ")", g.c_evict_max);
+
+	/* Logging configuration. */
+	if (g.c_logging)
+		p += snprintf(p, REMAIN(p, end),
+		    ",log=(enabled=true,archive=%d,prealloc=%d)",
+		    g.c_logging_archive ? 1 : 0,
+		    g.c_logging_prealloc ? 1 : 0);
+
+	/* Miscellaneous. */
+#ifndef _WIN32
+	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
+#endif
+
+	p += snprintf(p, REMAIN(p, end), ",mmap=%d", g.c_mmap ? 1 : 0);
+
+	if (g.c_data_extend)
+		p += snprintf(p, REMAIN(p, end), ",file_extend=(data=8MB)");
+
+	p += snprintf(p, REMAIN(p, end),
+	    ",statistics=(%s)", g.c_statistics ? "fast" : "none");
+
+	/* Extensions. */
+	p += snprintf(p, REMAIN(p, end),
+	    ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    g.c_reverse ? REVERSE_PATH : "",
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
+	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
 
 	/*
 	 * Put configuration file configuration options second to last. Put
 	 * command line configuration options at the end. Do this so they
 	 * override the standard configuration.
 	 */
-#ifdef _WIN32
-	progname = "t_format.exe";
-	buffer_align = "";
-#else
-	progname = g.progname;
-	buffer_align = "buffer_alignment=512";
-#endif
-	if (snprintf(config, sizeof(config),
-	    "create,"
-	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
-	    "%s,lsm_manager=(worker_thread_max=%" PRIu32
-	    "),error_prefix=\"%s\","
-	    "%s,%s,%s,%s,%s"
-	    "extensions="
-	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
-	    "%s,%s",
-	    g.c_cache,
-	    buffer_align,
-	    g.c_lsm_worker_threads,
-	    progname,
-	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
-	    g.c_logging ? "log=(enabled=true)" : "",
-	    g.c_mmap ? "mmap=true" : "mmap=false",
-	    g.c_statistics ? "statistics=(fast)" : "statistics=(none)",
-	    evict_config,
-	    g.c_reverse ? REVERSE_PATH : "",
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
-	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
-	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
-	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
-	    g.c_config_open == NULL ? "" : g.c_config_open,
-	    g.config_open == NULL ? "" : g.config_open) >= (int)sizeof(config))
-		die(ENOMEM, "configuration buffer too small");
+	if (g.c_config_open != NULL)
+		p += snprintf(p, REMAIN(p, end), ",%s", g.c_config_open);
+	if (g.config_open != NULL)
+		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
+
+	if (REMAIN(p, end) == 0)
+		die(ENOMEM, "wiredtiger_open configuration buffer too small");
 
 	/*
 	 * Direct I/O may not work with backups, doing copies through the buffer
@@ -200,7 +221,7 @@ wts_create(void)
 		if (maxleafpage > 512)
 			maxleafpage >>= 1;
 	}
-	p += snprintf(p, (size_t)(end - p),
+	p += snprintf(p, REMAIN(p, end),
 	    "key_format=%s,"
 	    "allocation_size=512,%s"
 	    "internal_page_max=%d,leaf_page_max=%d",
@@ -214,43 +235,43 @@ wts_create(void)
 	 */
 	maxintlkey = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlkey > 20)
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",internal_key_max=%d", maxintlkey);
 	maxleafkey = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafkey > 20)
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",leaf_key_max=%d", maxleafkey);
 	maxleafvalue = MMRAND(maxleafpage * 10, maxleafpage / 40);
 	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",leaf_value_max=%d", maxleafvalue);
 
 	switch (g.type) {
 	case FIX:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",value_format=%" PRIu32 "t", g.c_bitcnt);
 		break;
 	case ROW:
 		if (g.c_huffman_key)
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",huffman_key=english");
 		if (g.c_prefix_compression)
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",prefix_compression_min=%" PRIu32,
 			    g.c_prefix_compression_min);
 		else
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",prefix_compression=false");
 		if (g.c_reverse)
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",collator=reverse");
 		/* FALLTHROUGH */
 	case VAR:
 		if (g.c_huffman_value)
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",huffman_value=english");
 		if (g.c_dictionary)
-			p += snprintf(p, (size_t)(end - p),
+			p += snprintf(p, REMAIN(p, end),
 			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
@@ -258,14 +279,13 @@ wts_create(void)
 	/* Configure checksums. */
 	switch (g.c_checksum_flag) {
 	case CHECKSUM_OFF:
-		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
+		p += snprintf(p, REMAIN(p, end), ",checksum=\"off\"");
 		break;
 	case CHECKSUM_ON:
-		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		p += snprintf(p, REMAIN(p, end), ",checksum=\"on\"");
 		break;
 	case CHECKSUM_UNCOMPRESSED:
-		p += snprintf(
-		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
+		p += snprintf(p, REMAIN(p, end), ",checksum=\"uncompressed\"");
 		break;
 	}
 
@@ -274,57 +294,55 @@ wts_create(void)
 	case COMPRESS_NONE:
 		break;
 	case COMPRESS_BZIP:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"bzip2\"");
 		break;
 	case COMPRESS_BZIP_RAW:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"bzip2-raw-test\"");
 		break;
 	case COMPRESS_LZO:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"LZO1B-6\"");
 		break;
 	case COMPRESS_SNAPPY:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"snappy\"");
 		break;
 	case COMPRESS_ZLIB:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"zlib\"");
 		break;
 	case COMPRESS_ZLIB_NO_RAW:
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"zlib-noraw\"");
 		break;
 	}
 
 	/* Configure Btree internal key truncation. */
-	p += snprintf(
-	    p, (size_t)(end - p), ",internal_key_truncate=%s",
+	p += snprintf(p, REMAIN(p, end), ",internal_key_truncate=%s",
 	    g.c_internal_key_truncation ? "true" : "false");
 
 	/* Configure Btree page key gap. */
-	p += snprintf(p, (size_t)(end - p), ",key_gap=%" PRIu32, g.c_key_gap);
+	p += snprintf(p, REMAIN(p, end), ",key_gap=%" PRIu32, g.c_key_gap);
 
 	/* Configure Btree split page percentage. */
-	p += snprintf(p, (size_t)(end - p),
-	    ",split_pct=%" PRIu32, g.c_split_pct);
+	p += snprintf(p, REMAIN(p, end), ",split_pct=%" PRIu32, g.c_split_pct);
 
 	/* Configure LSM and data-sources. */
 	if (DATASOURCE("helium"))
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    ",type=helium,helium_o_compress=%d,helium_o_truncate=1",
 		    g.c_compression_flag == COMPRESS_NONE ? 0 : 1);
 
 	if (DATASOURCE("kvsbdb"))
-		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
+		p += snprintf(p, REMAIN(p, end), ",type=kvsbdb");
 
 	if (DATASOURCE("lsm")) {
-		p += snprintf(p, (size_t)(end - p), ",type=lsm,lsm=(");
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end), ",type=lsm,lsm=(");
+		p += snprintf(p, REMAIN(p, end),
 		    "auto_throttle=%s,", g.c_auto_throttle ? "true" : "false");
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "chunk_size=%" PRIu32 "MB,", g.c_chunk_size);
 		/*
 		 * We can't set bloom_oldest without bloom, and we want to test
@@ -332,18 +350,21 @@ wts_create(void)
 		 */
 		if (g.c_bloom_oldest)
 			g.c_bloom = 1;
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "bloom=%s,", g.c_bloom ? "true" : "false");
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "bloom_bit_count=%" PRIu32 ",", g.c_bloom_bit_count);
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "bloom_hash_count=%" PRIu32 ",", g.c_bloom_hash_count);
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
-		p += snprintf(p, (size_t)(end - p),
+		p += snprintf(p, REMAIN(p, end),
 		    "merge_max=%" PRIu32 ",", g.c_merge_max);
-		p += snprintf(p, (size_t)(end - p), ",)");
+		p += snprintf(p, REMAIN(p, end), ",)");
 	}
+
+	if (REMAIN(p, end) == 0)
+		die(ENOMEM, "WT_SESSION.create configuration buffer too small");
 
 	/*
 	 * Create the underlying store.

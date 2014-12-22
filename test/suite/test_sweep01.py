@@ -96,6 +96,10 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close1 = stat_cursor[stat.conn.dh_conn_handles][2]
         sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        sclose1 = stat_cursor[stat.conn.dh_session_handles][2]
+        ssweep1 = stat_cursor[stat.conn.dh_session_sweeps][2]
+        tod1 = stat_cursor[stat.conn.dh_conn_tod][2]
+        ref1 = stat_cursor[stat.conn.dh_conn_ref][2]
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
         # Inactive time on a handle must be a minute or more.
@@ -112,7 +116,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep=0
-        while sleep < 100:
+        while sleep < 120:
             k = k+1
             c.set_key(k)
             c.set_value(1)
@@ -124,21 +128,60 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         close2 = stat_cursor[stat.conn.dh_conn_handles][2]
         sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        sclose2 = stat_cursor[stat.conn.dh_session_handles][2]
+        ssweep2 = stat_cursor[stat.conn.dh_session_sweeps][2]
         nfile2 = stat_cursor[stat.conn.file_open][2]
+        tod2 = stat_cursor[stat.conn.dh_conn_tod][2]
+        ref2 = stat_cursor[stat.conn.dh_conn_ref][2]
         stat_cursor.close()
         # print "checkpoint: " + str(self.ckpt)
         # print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         # print "close1: " + str(close1) + " close2: " + str(close2)
         # print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+        # print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+        # print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+        # print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+        # print "ref1: " + str(ref1) + " ref2: " + str(ref2)
 
         # 
         # The files are all closed.  Check that sweep did its work even
         # in the presence of recent checkpoints.
         #
+        if (close1 >= close2):
+            print "XX: close1: " + str(close1) + " close2: " + str(close2)
+            print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+            print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+            print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+            print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+            print "ref1: " + str(ref1) + " ref2: " + str(ref2)
+            print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(close1 < close2, True)
+        if (sweep1 >= sweep2):
+            print "close1: " + str(close1) + " close2: " + str(close2)
+            print "XX: sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+            print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+            print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+            print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+            print "ref1: " + str(ref1) + " ref2: " + str(ref2)
         self.assertEqual(sweep1 < sweep2, True)
+        if (nfile2 >= nfile1):
+            print "close1: " + str(close1) + " close2: " + str(close2)
+            print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+            print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+            print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+            print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+            print "ref1: " + str(ref1) + " ref2: " + str(ref2)
+            print "XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(nfile2 < nfile1, True)
         # The only files that should be left is the metadata and the active one.
+        if (nfile2 != 2):
+            print "close1: " + str(close1) + " close2: " + str(close2)
+            print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+            print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+            print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+            print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+            print "ref1: " + str(ref1) + " ref2: " + str(ref2)
+            print "XX2: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(nfile2 == 2, True)
 
 if __name__ == '__main__':

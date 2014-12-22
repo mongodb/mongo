@@ -424,17 +424,15 @@ struct __wt_page {
 #define	WT_INTL_FOREACH_BEGIN(session, page, ref) do {			\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
-	WT_SESSION_IMPL *__session = (session);				\
 	uint32_t __entries;						\
-	WT_ENTER_PAGE_INDEX(session);					\
+	WT_ASSERT(session, session->split_gen != 0);			\
 	for (__pindex = WT_INTL_INDEX_COPY(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
 #define	WT_INTL_FOREACH_END						\
-		}							\
-		WT_LEAVE_PAGE_INDEX(__session);				\
-	} while (0)
+	}								\
+} while (0)
 
 		/* Row-store leaf page. */
 		struct {

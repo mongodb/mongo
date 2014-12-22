@@ -322,6 +322,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	__wt_logrec_free(session, &txn->logrec);
 
 	/* Discard any memory from the session's split stash that we can. */
+	WT_ASSERT(session, session->split_gen == 0);
 	if (session->split_stash_cnt > 0)
 		__wt_split_stash_discard(session);
 

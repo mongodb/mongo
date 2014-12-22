@@ -106,7 +106,9 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 			    session, root_addr, root_addr_size));
 
 			/* Warm the cache, if possible. */
-			WT_ERR(__btree_preload(session));
+			WT_WITH_PAGE_INDEX(session,
+			    ret = __btree_preload(session));
+			WT_ERR(ret);
 
 			/* Get the last record number in a column-store file. */
 			if (btree->type != BTREE_ROW)
@@ -304,7 +306,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		break;
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "block_compressor", &cval));
+	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q)
 			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
