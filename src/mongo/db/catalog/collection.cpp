@@ -92,6 +92,7 @@ namespace mongo {
         _indexCatalog.init(txn);
         if ( isCapped() )
             _recordStore->setCappedDeleteCallback( this );
+        _infoCache.reset(txn);
     }
 
     Collection::~Collection() {

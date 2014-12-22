@@ -194,6 +194,13 @@ namespace mongo {
         }
 
         _profile = serverGlobalParams.defaultProfile;
+
+        list<string> collections;
+        _dbEntry->getCollectionNamespaces( &collections );
+        for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
+            const string ns = *it;
+            _collections[ns] = _getOrCreateCollectionInstance(txn, ns);
+        }
     }
 
 
@@ -426,17 +433,7 @@ namespace mongo {
             return it->second;
         }
 
-        auto_ptr<CollectionCatalogEntry> catalogEntry( _dbEntry->getCollectionCatalogEntry( txn, ns ) );
-        if ( !catalogEntry.get() )
-            return NULL;
-
-        auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( txn, ns ) );
-        invariant( rs.get() ); // if catalogEntry exists, so should this
-
-        // Not registering AddCollectionChange since this is for collections that already exist.
-        Collection* c = new Collection( txn, ns, catalogEntry.release(), rs.release(), this );
-        _collections[ns] = c;
-        return c;
+        return NULL;
     }
 
 
