@@ -44,6 +44,11 @@ namespace mongo {
             noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN), 
             unixSocketPermissions(DEFAULT_UNIX_PERMS), logAppend(false), logRenameOnRotate(true),
             logWithSyslog(false), isHttpInterfaceEnabled(false)
+
+#ifdef _WIN32
+            , isDataFileZeroingNeeded(true)
+#endif
+
         {
             started = time(0);
         }
@@ -94,6 +99,10 @@ namespace mongo {
         bool logRenameOnRotate;// True if logging should rename log files on rotate
         bool logWithSyslog;    // True if logging to syslog; must not be set if logpath is set.
         int syslogFacility;    // Facility used when appending messages to the syslog.
+
+#ifdef _WIN32
+        bool isDataFileZeroingNeeded;
+#endif
 
         bool isHttpInterfaceEnabled; // True if the dbwebserver should be enabled.
 

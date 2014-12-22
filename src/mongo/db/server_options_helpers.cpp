@@ -887,6 +887,10 @@ namespace {
             }
         }
 
+#ifdef _WIN32
+        serverGlobalParams.isDataFileZeroingNeeded = params.count("isDataFileZeroingNeeded");
+#endif
+
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {
             return Status(ErrorCodes::BadValue, "Cant use both a logpath and syslog ");
         }

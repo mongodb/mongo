@@ -461,6 +461,10 @@ namespace mongo {
                                   .hidden()
                                   .setSources(moe::SourceAllLegacy);
 
+#ifdef _WIN32
+        options->addOptionChaining("isDataFileZeroingNeeded", "isDataFileZeroingNeeded", moe::Bool, "zero out data file");
+#endif
+
         return Status::OK();
     }
 
