@@ -2207,8 +2207,8 @@ namespace mongo {
             // too much work to try to make this happen through inserts and deletes
             // we are intentionally manipulating the btree bucket directly here
             BtreeBucket::Loc* L = const_cast< BtreeBucket::Loc* >( &bt()->keyNode( 1 ).prevChildBucket );
-            getDur().writing(L)->Null();
-            getDur().writingInt( const_cast< BtreeBucket::Loc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
+            writing(L)->Null();
+            writingInt( const_cast< BtreeBucket::Loc& >( bt()->keyNode( 1 ).recordLoc ).GETOFS() ) |= 1; // make unused
             BSONObj k = BSON( "a" << toInsert );
             Base::insert( k );
         }

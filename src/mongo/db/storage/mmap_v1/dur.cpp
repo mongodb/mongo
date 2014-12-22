@@ -1,32 +1,30 @@
-// @file dur.cpp durability in the storage engine (crash-safeness / journaling)
-
 /**
-*    Copyright (C) 2009 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2009-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 /*
    phases:
@@ -73,57 +71,72 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/mmap_v1/dur.h"
+
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <iomanip>
 
 #include "mongo/db/client.h"
-#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/server.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
-using namespace mongoutils;
-
 namespace mongo {
+namespace dur {
 
-    namespace dur {
+namespace {
 
-        void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
-        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
-        void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
+    // Used to activate the flush thread
+    boost::mutex flushMutex;
+    boost::condition_variable flushRequested;
 
-        /** declared later in this file
-            only used in this file -- use DurableInterface::commitNow() outside
-        */
-        static void groupCommit();
+    // When set, the flush thread will exit
+    AtomicUInt32 shutdownRequested(0);
 
-        // Used to activate the flush thread
-        static boost::mutex flushMutex;
-        static boost::condition_variable flushRequested;
+    // One instance of each durability interface
+    DurableImpl durableImpl;
+    NonDurableImpl nonDurableImpl;
 
-        // When set, the flush thread will exit
-        static AtomicUInt32 shutdownRequested(0);
+    // Pre-allocated buffer for building the journal
+    AlignedBuilder journalBuilder(4 * 1024 * 1024);
+}
 
+        // Declared in dur_preplogbuffer.cpp
+        void PREPLOGBUFFER(JSectHeader& outHeader, AlignedBuilder& outBuffer);
+        void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed);
+        void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed);
 
+        // Declared in dur_journal.cpp
+        boost::filesystem::path getJournalDir();
+        void preallocateFiles();
+
+        // Declared and maintained in dur_commitjob.cpp
+        extern size_t privateMapBytes;
+
+        // Durability activity statistics
+        Stats stats;
+
+        // Reference to the write intents tracking object
         CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
-        Stats stats;
+        // The durability interface to use
+        DurableInterface* DurableInterface::_impl = &nonDurableImpl;
+
+
+        //
+        // Stats
+        //
 
         void Stats::S::reset() {
             memset(this, 0, sizeof(*this));
@@ -197,6 +210,28 @@ namespace mongo {
             }
         }
 
+
+        //
+        // DurableInterface
+        //
+
+        DurableInterface::DurableInterface() {
+
+        }
+
+        DurableInterface::~DurableInterface() {
+
+        }
+
+        void DurableInterface::enableDurability() {
+            _impl = &durableImpl;
+        }
+
+
+        //
+        // NonDurableImpl
+        //
+
         void* NonDurableImpl::writingPtr(void *x, unsigned len) {
             dassert(shutdownRequested.load() == 0);
             return x; 
@@ -214,16 +249,9 @@ namespace mongo {
         }
 
 
-
-        static DurableImpl* durableImpl = new DurableImpl();
-        static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
-        DurableInterface* DurableInterface::_impl = nonDurableImpl;
-
-        void DurableInterface::enableDurability() {
-            verify(_impl == nonDurableImpl);
-            _impl = durableImpl;
-        }
-
+        //
+        // DurableImpl
+        //
 
         bool DurableImpl::commitNow(OperationContext* txn) {
             NotifyAll::When when = commitJob._notify.now();
@@ -242,11 +270,6 @@ namespace mongo {
             return true;
         }
 
-        /** Declare that a file has been created
-            Normally writes are applied only after journaling, for safety.  But here the file
-            is created first, and the journal will just replay the creation if the create didn't
-            happen because of crashing.
-        */
         void DurableImpl::createdFile(const std::string& filename, unsigned long long len) {
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
             commitJob.noteOp(op);
@@ -259,26 +282,6 @@ namespace mongo {
             return p;
         }
 
-        /** declare intent to write
-            @param ofs offset within buf at which we will write
-            @param len the length at ofs we will write
-            @return new buffer pointer.
-        */
-        void* DurableImpl::writingAtOffset(void *buf, unsigned ofs, unsigned len) {
-            char *p = (char *) buf;
-            declareWriteIntent(p+ofs, len);
-            return p;
-        }
-
-        void* DurableImpl::writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges ) {
-            char *p = (char *) buf;
-            for( vector< pair< long long, unsigned > >::const_iterator i = ranges.begin();
-                    i != ranges.end(); ++i ) {
-                declareWriteIntent( p + i->first, i->second );
-            }
-            return p;
-        }
-
         bool DurableImpl::commitIfNeeded() {
             if (MONGO_likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
@@ -287,6 +290,23 @@ namespace mongo {
             // Just wake up the flush thread
             flushRequested.notify_one();
             return true;
+        }
+
+        void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
+            invariant(txn->lockState()->isW());
+
+            // a commit from the commit thread won't begin while we are in the write lock,
+            // but it may already be in progress and the end of that work is done outside 
+            // (dbMutex) locks. This line waits for that to complete if already underway.
+            {
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+            }
+
+            commitNow(txn);
+            MongoFile::flushAll(true);
+            journalCleanup();
+
+            invariant(!haveJournalFiles()); // Double check post-conditions
         }
 
         void DurableImpl::commitAndStopDurThread() {
@@ -302,9 +322,9 @@ namespace mongo {
 
         // Functor to be called over all MongoFiles
 
-        class validateSingleMapMatches {
+        class ValidateSingleMapMatches {
         public:
-            validateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
+            ValidateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
             void operator () (MongoFile *mf) {
                 if( mf->isDurableMappedFile() ) {
                     DurableMappedFile *mmf = (DurableMappedFile*) mf;
@@ -362,6 +382,7 @@ namespace mongo {
             unsigned long long& _bytes;
         };
 
+
         /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
         */
         void debugValidateAllMapsMatch() {
@@ -370,13 +391,12 @@ namespace mongo {
 
             unsigned long long bytes = 0;
             Timer t;
-            MongoFile::forEach(validateSingleMapMatches(bytes));
+            MongoFile::forEach(ValidateSingleMapMatches(bytes));
             OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (bytes / (1024*1024)) << "MB" << endl;
         }
 
-        extern size_t privateMapBytes;
 
-        static void _REMAPPRIVATEVIEW() {
+        static void _remapPrivateView() {
             // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
             //       to assure very good behavior here.
 
@@ -385,16 +405,16 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            invariant(!commitJob.hasWritten());
-
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
             // faults after remapping, so doing a little bit at a time will avoid big load spikes on
             // remapping.
             unsigned long long now = curTimeMicros64();
             double fraction = (now-lastRemap)/2000000.0;
-            if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap)
+            if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap) {
                 fraction = 1;
+            }
+
             lastRemap = now;
 
 #if defined(_WIN32) || defined(__sunos__)
@@ -456,57 +476,75 @@ namespace mongo {
                    << ' ' << t.millis() << "ms" << endl;
         }
 
-        /** We need to remap the private views periodically. otherwise they would become very large.
-            Call within write lock.  See top of file for more commentary.
-        */
-        static void REMAPPRIVATEVIEW() {
-            Timer t;
-            _REMAPPRIVATEVIEW();
-            stats.curr->_remapPrivateViewMicros += t.micros();
-        }
 
-        // this is a pseudo-local variable in the groupcommit functions 
-        // below.  however we don't truly do that so that we don't have to 
-        // reallocate, and more importantly regrow it, on every single commit.
-        static AlignedBuilder __theBuilder(4 * 1024 * 1024);
+        static void remapPrivateView() {
+            // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see
+            // any newly written data on reads.
+            invariant(!commitJob.hasWritten());
+
+            try {
+                Timer t;
+                _remapPrivateView();
+                stats.curr->_remapPrivateViewMicros += t.micros();
+
+                LOG(4) << "remapPrivateView end";
+                return;
+            }
+            catch (DBException& e) {
+                severe() << "dbexception in remapPrivateView causing immediate shutdown: "
+                         << e.toString();
+                mongoAbort("gc1");
+            }
+            catch (std::ios_base::failure& e) {
+                severe() << "ios_base exception in remapPrivateView causing immediate shutdown: "
+                         << e.what();
+                mongoAbort("gc2");
+            }
+            catch (std::bad_alloc& e) {
+                severe() << "bad_alloc exception in remapPrivateView causing immediate shutdown: "
+                         << e.what();
+                mongoAbort("gc3");
+            }
+            catch (std::exception& e) {
+                severe() << "exception in remapPrivateView causing immediate shutdown: "
+                         << e.what();
+                mongoAbort("gc4");
+            }
+        }
 
 
         static void _groupCommit() {
-            LOG(4) << "_groupCommit " << endl;
+            LOG(4) << "_groupCommit ";
 
-            {
-                AlignedBuilder &ab = __theBuilder;
+            // we need to make sure two group commits aren't running at the same time
+            // (and we are only read locked in the dbMutex, so it could happen -- while 
+            // there is only one dur thread, "early commits" can be done by other threads)
+            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
-                // we need to make sure two group commits aren't running at the same time
-                // (and we are only read locked in the dbMutex, so it could happen -- while 
-                // there is only one dur thread, "early commits" can be done by other threads)
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+            commitJob.commitingBegin();
 
-                commitJob.commitingBegin();
+            if (!commitJob.hasWritten()) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.committingNotifyCommitted();
+            }
+            else {
+                JSectHeader h;
+                PREPLOGBUFFER(h, journalBuilder);
 
-                if( !commitJob.hasWritten() ) {
-                    // getlasterror request could have came after the data was already committed
-                    commitJob.committingNotifyCommitted();
-                }
-                else {
-                    JSectHeader h;
-                    PREPLOGBUFFER(h,ab);
+                // todo : write to the journal outside locks, as this write can be slow.
+                //        however, be careful then about remapprivateview as that cannot be done 
+                //        if new writes are then pending in the private maps.
+                WRITETOJOURNAL(h, journalBuilder);
 
-                    // todo : write to the journal outside locks, as this write can be slow.
-                    //        however, be careful then about remapprivateview as that cannot be done 
-                    //        if new writes are then pending in the private maps.
-                    WRITETOJOURNAL(h, ab);
+                // data is now in the journal, which is sufficient for acknowledging getLastError.
+                // (ok to crash after that)
+                commitJob.committingNotifyCommitted();
 
-                    // data is now in the journal, which is sufficient for acknowledging getLastError.
-                    // (ok to crash after that)
-                    commitJob.committingNotifyCommitted();
+                WRITETODATAFILES(h, journalBuilder);
+                debugValidateAllMapsMatch();
 
-                    WRITETODATAFILES(h, ab);
-                    debugValidateAllMapsMatch();
-
-                    commitJob.committingReset();
-                    ab.reset();
-                }
+                commitJob.committingReset();
+                journalBuilder.reset();
             }
         }
 
@@ -520,60 +558,30 @@ namespace mongo {
         static void groupCommit() {
             try {
                 _groupCommit();
+
+                LOG(4) << "groupCommit end";
+                return;
             }
-            catch(DBException& e ) { 
-                log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
+            catch (DBException& e) {
+                severe() << "dbexception in groupCommit causing immediate shutdown: "
+                         << e.toString();
                 mongoAbort("gc1");
             }
-            catch(std::ios_base::failure& e) { 
-                log() << "ios_base exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+            catch(std::ios_base::failure& e) {
+                severe() << "ios_base exception in groupCommit causing immediate shutdown: "
+                         << e.what();
                 mongoAbort("gc2");
             }
-            catch(std::bad_alloc& e) { 
-                log() << "bad_alloc exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+            catch(std::bad_alloc& e) {
+                severe() << "bad_alloc exception in groupCommit causing immediate shutdown: "
+                         << e.what();
                 mongoAbort("gc3");
             }
             catch(std::exception& e) {
-                log() << "exception in groupCommit causing immediate shutdown: " << e.what() << endl;
+                severe() << "exception in groupCommit causing immediate shutdown: "
+                         << e.what();
                 mongoAbort("gc4");
             }
-            LOG(4) << "groupCommit end" << endl;
-        }
-
-        static void remapPrivateView() {
-            try {
-                // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't
-                // see newly written data on reads.
-                invariant(!commitJob.hasWritten());
-
-                REMAPPRIVATEVIEW();
-            }
-            catch (DBException& e) {
-                log() << "dbexception in remapPrivateView causing immediate shutdown: "
-                      << e.toString() 
-                      << endl;
-                mongoAbort("gc1");
-            }
-            catch (std::ios_base::failure& e) {
-                log() << "ios_base exception in remapPrivateView causing immediate shutdown: "
-                      << e.what()
-                      << endl;
-                mongoAbort("gc2");
-            }
-            catch (std::bad_alloc& e) {
-                log() << "bad_alloc exception in remapPrivateView causing immediate shutdown: "
-                      << e.what()
-                      << endl;
-                mongoAbort("gc3");
-            }
-            catch (std::exception& e) {
-                log() << "exception in remapPrivateView causing immediate shutdown: "
-                      << e.what()
-                      << endl;
-                mongoAbort("gc4");
-            }
-
-            LOG(4) << "remapPrivateView end" << endl;
         }
 
 
@@ -596,8 +604,6 @@ namespace mongo {
             }
         }
 
-        extern int groupCommitIntervalMs;
-        boost::filesystem::path getJournalDir();
 
         static void durThread() {
             Client::initThread("journal");
@@ -627,16 +633,20 @@ namespace mongo {
 
                     // commit sooner if one or more getLastError j:true is pending
                     for (unsigned i = 0; i <= 2; i++) {
-                        if (flushRequested.timed_wait(lock,
-                                                      Milliseconds(oneThird))) {
+                        if (flushRequested.timed_wait(lock, Milliseconds(oneThird))) {
                             // Someone forced a flush
                             break;
                         }
 
-                        if (commitJob._notify.nWaiting())
+                        if (commitJob._notify.nWaiting()) {
+                            // There are threads waiting for journaling
                             break;
-                        if (commitJob.bytes() > UncommittedBytesLimit / 10)
+                        }
+
+                        if (commitJob.bytes() > UncommittedBytesLimit / 2) {
+                            // The number of written bytes is growing
                             break;
+                        }
                     }
 
                     OperationContextImpl txn;
@@ -651,11 +661,11 @@ namespace mongo {
                     remapPrivateView();
                 }
                 catch(std::exception& e) {
-                    log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
+                    severe() << "exception in durThread causing immediate shutdown: " << e.what();
                     mongoAbort("exception in durThread");
                 }
                 catch (...) {
-                    log() << "unhandled exception in durThread causing immediate shutdown" << endl;
+                    severe() << "unhandled exception in durThread causing immediate shutdown";
                     mongoAbort("unhandled exception in durThread");
                 }
             }
@@ -663,7 +673,6 @@ namespace mongo {
             cc().shutdown();
         }
 
-        void preallocateFiles();
 
         /** at startup, recover, and then start the journal threads */
         void startup() {
@@ -676,15 +685,15 @@ namespace mongo {
                 replayJournalFilesAtStartup();
             }
             catch(DBException& e) {
-                log() << "dbexception during recovery: " << e.toString() << endl;
+                severe() << "dbexception during recovery: " << e.toString();
                 throw;
             }
             catch(std::exception& e) {
-                log() << "std::exception during recovery: " << e.what() << endl;
+                severe() << "std::exception during recovery: " << e.what();
                 throw;
             }
             catch(...) {
-                log() << "exception during recovery" << endl;
+                severe() << "exception during recovery";
                 throw;
             }
 
@@ -694,30 +703,11 @@ namespace mongo {
             boost::thread t(durThread);
         }
 
-        DurableInterface::~DurableInterface() {
-            log() << "ERROR warning ~DurableInterface not intended to be called" << std::endl;
-        }
-
-        void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
-            invariant(txn->lockState()->isW());
-
-            // a commit from the commit thread won't begin while we are in the write lock,
-            // but it may already be in progress and the end of that work is done outside 
-            // (dbMutex) locks. This line waits for that to complete if already underway.
-            {
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
-            }
-
-            commitNow(txn);
-            MongoFile::flushAll(true);
-            journalCleanup();
-
-            invariant(!haveJournalFiles()); // Double check post-conditions
-        }
         
         class DurSSS : public ServerStatusSection {
         public:
-            DurSSS() : ServerStatusSection( "dur" ){}
+            DurSSS() : ServerStatusSection( "dur" ) { }
+
             virtual bool includeByDefault() const { return true; }
             
             BSONObj generateSection(OperationContext* txn,
@@ -732,7 +722,5 @@ namespace mongo {
                 
         } durSSS;
 
-
-    } // namespace dur
-
+} // namespace dur
 } // namespace mongo

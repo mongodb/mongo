@@ -121,6 +121,25 @@ namespace mongo {
         void createNamespaceForIndex(OperationContext* txn, const StringData& name);
 
     private:
+
+        class EntryInsertion;
+        class EntryRemoval;
+
+        friend class NamespaceDetailsCollectionCatalogEntry;
+
+        //  The _collections map is a cache for efficiently looking up namespace information.
+        //  Access to the cache is protected by the _collectionsLock mutex.
+        //  Once initialized, the cache must remain consistent with the data in the memory-mapped
+        //  database files through _removeFromCache and _insertInCache_inlock. These methods
+        //  use the RecoveryUnit to ensure correct handling of rollback.
+        struct Entry {
+            scoped_ptr<CollectionCatalogEntry> catalogEntry;
+            scoped_ptr<RecordStoreV1Base> recordStore;
+        };
+
+        typedef std::map<std::string, Entry*> CollectionMap;
+
+
         RecordStoreV1Base* _getIndexRecordStore_inlock();
         RecordStoreV1Base* _getIndexRecordStore();
         RecordStoreV1Base* _getNamespaceRecordStore_inlock() const;
@@ -132,6 +151,7 @@ namespace mongo {
         void _addNamespaceToNamespaceCollection( OperationContext* txn,
                                                  const StringData& ns,
                                                  const BSONObj* options );
+
         void _addNamespaceToNamespaceCollection_inlock( OperationContext* txn,
                                                         const StringData& ns,
                                                         const BSONObj* options );
@@ -147,23 +167,8 @@ namespace mongo {
 
         void _ensureSystemCollection_inlock( OperationContext* txn,
                                              const StringData& ns );
+
         void _lazyInit( OperationContext* txn );
-
-        std::string _path;
-
-        MmapV1ExtentManager _extentManager;
-        NamespaceIndex _namespaceIndex;
-
-        //  The _collections map is a cache for efficiently looking up namespace information.
-        //  Access to the cache is protected by the _collectionsLock mutex.
-        //  Once initialized, the cache must remain consistent with the data in the memory-mapped
-        //  database files through _removeFromCache and _insertInCache_inlock. These methods
-        //  use the RecoveryUnit to ensure correct handling of rollback.
-
-        struct Entry {
-            scoped_ptr<CollectionCatalogEntry> catalogEntry;
-            scoped_ptr<RecordStoreV1Base> recordStore;
-        };
 
         /**
          * Populate the _collections cache.
@@ -176,13 +181,13 @@ namespace mongo {
          */
         void _removeFromCache(RecoveryUnit* ru, const StringData& ns);
 
+
+        std::string _path;
+
+        MmapV1ExtentManager _extentManager;
+        NamespaceIndex _namespaceIndex;
+
         mutable boost::mutex _collectionsLock;
-        typedef std::map<std::string, Entry*> CollectionMap;
         CollectionMap _collections;
-
-        class EntryInsertion;
-        class EntryRemoval;
-
-        friend class NamespaceDetailsCollectionCatalogEntry;
     };
 }

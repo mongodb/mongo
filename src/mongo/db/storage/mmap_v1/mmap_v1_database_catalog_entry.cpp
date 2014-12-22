@@ -105,7 +105,7 @@ namespace mongo {
 
         void commit() { }
     private:
-        std::string _ns;
+        const std::string _ns;
         MMAPV1DatabaseCatalogEntry* const _entry;
     };
 
@@ -133,7 +133,7 @@ namespace mongo {
         }
 
     private:
-        std::string _ns;
+        const std::string _ns;
         MMAPV1DatabaseCatalogEntry* const _catalogEntry;
         Entry* const _cachedEntry;
     };

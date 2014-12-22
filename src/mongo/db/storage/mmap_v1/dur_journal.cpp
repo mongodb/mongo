@@ -724,7 +724,7 @@ namespace mongo {
             @param uncompressed - a buffer that will be written to the journal after compression
             will not return until on disk
         */
-        void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed) {
+        void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             Timer t;
             j.journal(h, uncompressed);
             stats.curr->_writeToJournalMicros += t.micros();
