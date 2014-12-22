@@ -65,10 +65,8 @@ __conn_dhandle_open_lock(
 		 * If the handle is already open for a special operation,
 		 * give up.
 		 */
-		if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
-			printf("Collided with special flags\n");
+		if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
-		}
 
 		/*
 		 * If the handle is open, get a read lock and recheck.
@@ -111,11 +109,9 @@ __conn_dhandle_open_lock(
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			return (0);
-		} else if (ret != EBUSY || (is_open && want_exclusive)) {
-			if (ret == EBUSY)
-				printf("busy, open and exclusive\n");
+		} else if (ret != EBUSY || (is_open && want_exclusive))
 			return (ret);
-		} else
+		else
 			lock_busy = 1;
 
 		/* Give other threads a chance to make progress. */
