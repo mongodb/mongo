@@ -9,18 +9,17 @@
 
 /*
  * __wt_getenv --
- * 	Get a non-null environment variable
+ * 	Get a non-NULL, greater than zero-length environment variable.
  */
 int
-__wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **env)
+__wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
 {
 	const char *temp;
 
-	*env = NULL;
+	*envp = NULL;
 
-	if (((temp = getenv(variable)) != NULL) && strlen(temp) > 0) {
-		return (__wt_strdup(session, temp, env));
-	}
+	if (((temp = getenv(variable)) != NULL) && strlen(temp) > 0)
+		return (__wt_strdup(session, temp, envp));
 
 	return (WT_NOTFOUND);
 }
