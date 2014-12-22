@@ -36,7 +36,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -65,11 +64,8 @@ namespace mongo {
           _filter(filter),
           _shouldDedup(true),
           _params(params),
-          _commonStats(kStageType),
           _btreeCursor(NULL),
-          _keyEltsToUse(0),
-          _movePastKeyElts(false),
-          _endKeyInclusive(false) {
+          _commonStats(kStageType) {
         _iam = _params.descriptor->getIndexCatalog()->getIndex(_params.descriptor);
         _keyPattern = _params.descriptor->keyPattern().getOwned();
 
@@ -120,51 +116,24 @@ namespace mongo {
             }
         }
         else {
+            // "Fast" Btree-specific navigation.
             _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
+            _checker.reset(new IndexBoundsChecker(&_params.bounds,
+                                                  _keyPattern,
+                                                  _params.direction));
 
-            // For single intervals, we can use an optimized scan which checks against the position
-            // of an end cursor.  For all other index scans, we fall back on using
-            // IndexBoundsChecker to determine when we've finished the scan.
-            BSONObj startKey;
-            bool startKeyInclusive;
-            if (IndexBoundsBuilder::isSingleInterval(_params.bounds,
-                                                     &startKey,
-                                                     &startKeyInclusive,
-                                                     &_endKey,
-                                                     &_endKeyInclusive)) {
-                // We want to point at the start key if it's inclusive, and we want to point past
-                // the start key if it's exclusive.
-                _btreeCursor->seek(startKey, !startKeyInclusive);
-
-                IndexCursor* endCursor;
-                invariant(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
-                invariant(endCursor);
-
-                // TODO: Is it a valid assumption that we can always make this cast safely?
-                // See SERVER-12397.
-                _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
-
-                // If the end key is inclusive, we want to point *past* it since that's the end.
-                _endCursor->seek(_endKey, _endKeyInclusive);
+            int nFields = _keyPattern.nFields();
+            vector<const BSONElement*> key;
+            vector<bool> inc;
+            key.resize(nFields);
+            inc.resize(nFields);
+            if (_checker->getStartKey(&key, &inc)) {
+                _btreeCursor->seek(key, inc);
+                _keyElts.resize(nFields);
+                _keyEltsInc.resize(nFields);
             }
             else {
-                _checker.reset(new IndexBoundsChecker(&_params.bounds,
-                                                      _keyPattern,
-                                                      _params.direction));
-
-                int nFields = _keyPattern.nFields();
-                vector<const BSONElement*> key;
-                vector<bool> inc;
-                key.resize(nFields);
-                inc.resize(nFields);
-                if (_checker->getStartKey(&key, &inc)) {
-                    _btreeCursor->seek(key, inc);
-                    _keyElts.resize(nFields);
-                    _keyEltsInc.resize(nFields);
-                }
-                else {
-                    _scanState = HIT_END;
-                }
+                _scanState = HIT_END;
             }
         }
 
@@ -282,10 +251,6 @@ namespace mongo {
             _savedLoc = _indexCursor->getValue();
         }
         _indexCursor->savePosition();
-
-        if (_endCursor) {
-            _endCursor->savePosition();
-        }
     }
 
     void IndexScan::restoreState(OperationContext* opCtx) {
@@ -300,24 +265,6 @@ namespace mongo {
         if (!_indexCursor->restorePosition( opCtx ).isOK() || _indexCursor->isEOF()) {
             _scanState = HIT_END;
             return;
-        }
-
-        if (_endCursor) {
-            // Single interval case.
-            if (!_endCursor->restorePosition(opCtx).isOK()) {
-                _scanState = HIT_END;
-                return;
-            }
-
-            // If we were EOF when we yielded, we don't always want to have '_btreeCursor' run until
-            // EOF. New documents may have been inserted after our end key, and our end marker may
-            // be before them.
-            //
-            // As an example, say we're counting from 5 to 10 and the index only has keys for 6, 7,
-            // 8, and 9. '_btreeCursor' will point at key 6 at the start and '_endCursor' will be
-            // EOF. If we insert documents with keys 11 during a yield, we need to relocate
-            // '_endCursor' to point at them as the end key of our scan.
-            _endCursor->seek(_endKey, _endKeyInclusive);
         }
 
         if (!_savedKey.binaryEqual(_indexCursor->getKey())
@@ -369,20 +316,6 @@ namespace mongo {
 
             if ((cmp != 0 && cmp != _params.direction)
                 || (cmp == 0 && !_params.bounds.endKeyInclusive)) {
-                _scanState = HIT_END;
-            }
-            else {
-                ++_specificStats.keysExamined;
-            }
-        }
-        else if (_endCursor) {
-            // We're in the single interval case, and we have a cursor pointing to the end position.
-            // We can check whether the scan is over by seeing if our cursor points at the same
-            // thing as the end cursor.
-            _scanState = GETTING_NEXT;
-            invariant(!_checker);
-
-            if (_endCursor->pointsAt(*_btreeCursor)) {
                 _scanState = HIT_END;
             }
             else {

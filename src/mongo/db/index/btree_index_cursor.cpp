@@ -74,8 +74,10 @@ namespace mongo {
     }
 
     void BtreeIndexCursor::seek(const BSONObj& position, bool afterKey) {
-        const bool forward = (1 == _cursor->getDirection());
-        _cursor->locate(position, (afterKey == forward) ? RecordId::max() : RecordId::min());
+        // XXX This used a hard-coded direction of 1 and is only correct in the forward direction.
+        invariant(_cursor->getDirection() == 1);
+        _cursor->locate(position, 
+                        afterKey ? RecordId::max() : RecordId::min());
     }
 
     bool BtreeIndexCursor::pointsAt(const BtreeIndexCursor& other) {
