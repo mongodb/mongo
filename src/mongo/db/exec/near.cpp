@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/near.h"
 
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/assert_util.h"
 
@@ -92,6 +93,9 @@ namespace mongo {
     PlanStage::StageState NearStage::work(WorkingSetID* out) {
 
         ++_stats->common.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_stats->common.executionTimeMillis);
 
         WorkingSetID toReturn = WorkingSet::INVALID_ID;
         Status error = Status::OK();
