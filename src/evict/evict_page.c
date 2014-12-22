@@ -24,9 +24,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_STATE *txn_state;
-	int inmem_split, istree;
+	int forced_eviction, inmem_split, istree;
 
 	page = ref->page;
+	forced_eviction = (page->read_gen == WT_READGEN_OLDEST);
 	inmem_split = istree = 0;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
@@ -115,6 +116,12 @@ done:	session->excl_next = 0;
 
 	if (txn_state != NULL)
 		txn_state->snap_min = WT_TXN_NONE;
+
+	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
+	    !F_ISSET(S2C(session)->cache, WT_EVICT_EARLY_CANDIDATES)) {
+		F_SET(S2C(session)->cache, WT_EVICT_EARLY_CANDIDATES);
+		WT_TRET(__wt_evict_server_wake(session));
+	}
 
 	return (ret);
 }
