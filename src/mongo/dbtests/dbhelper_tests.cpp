@@ -160,7 +160,7 @@ namespace mongo {
             ASSERT_LESS_THAN( estSizeBytes, maxSizeBytes );
 
             Database* db = dbHolder().get( &txn, nsToDatabase(range.ns) );
-            const Collection* collection = db->getCollection(&txn, ns);
+            const Collection* collection = db->getCollection(ns);
 
             // Make sure all the disklocs actually correspond to the right info
             for ( set<RecordId>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {

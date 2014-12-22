@@ -55,7 +55,7 @@ namespace {
                                       DatabaseCatalogEntry* dbce,
                                       const std::string& collectionName) {
 
-        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(txn, collectionName);
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collectionName);
 
         std::vector<string> indexNames;
         std::vector<BSONObj> indexSpecs;
@@ -103,7 +103,7 @@ namespace {
             // open a bad index and fail.
             // TODO see if MultiIndexBlock can be made to work without a Collection.
             db.reset(new Database(txn, dbce->name(), dbce));
-            collection = db->getCollection(txn, collectionName);
+            collection = db->getCollection(collectionName);
             invariant(collection);
 
             indexer.reset(new MultiIndexBlock(txn, collection));

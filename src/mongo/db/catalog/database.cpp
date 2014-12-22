@@ -165,15 +165,15 @@ namespace mongo {
 
     Collection* Database::_getOrCreateCollectionInstance(OperationContext* txn,
                                                          const StringData& fullns) {
-        Collection* collection = getCollection( txn, fullns );
+        Collection* collection = getCollection( fullns );
         if (collection) {
             return collection;
         }
 
-        auto_ptr<CollectionCatalogEntry> cce( _dbEntry->getCollectionCatalogEntry( txn, fullns ) );
+        auto_ptr<CollectionCatalogEntry> cce( _dbEntry->getCollectionCatalogEntry( fullns ) );
         invariant( cce.get() );
 
-        auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( txn, fullns ) );
+        auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( fullns ) );
         invariant( rs.get() ); // if cce exists, so should this
 
         // Not registering AddCollectionChange since this is for collections that already exist.
@@ -249,7 +249,7 @@ namespace mongo {
             string ns = *i;
             invariant( NamespaceString::normal( ns ) );
 
-            CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry( txn, ns );
+            CollectionCatalogEntry* coll = _dbEntry->getCollectionCatalogEntry( ns );
 
             CollectionOptions options = coll->getCollectionOptions( txn );
             if ( !options.temp )
@@ -307,7 +307,7 @@ namespace mongo {
         for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
             const string ns = *it;
 
-            Collection* collection = getCollection( opCtx, ns );
+            Collection* collection = getCollection( ns );
             if ( !collection )
                 continue;
 
@@ -341,7 +341,7 @@ namespace mongo {
         LOG(1) << "dropCollection: " << fullns << endl;
         massertNamespaceNotIndex( fullns, "dropCollection" );
 
-        Collection* collection = getCollection( txn, fullns );
+        Collection* collection = getCollection( fullns );
         if ( !collection ) {
             // collection doesn't exist
             return Status::OK();
@@ -426,7 +426,7 @@ namespace mongo {
         _collections.erase( it );
     }
 
-    Collection* Database::getCollection( OperationContext* txn, const StringData& ns ) {
+    Collection* Database::getCollection( const StringData& ns ) const {
         invariant( _name == nsToDatabaseSubstring( ns ) );
         CollectionMap::const_iterator it = _collections.find( ns );
         if ( it != _collections.end() && it->second ) {
@@ -447,7 +447,7 @@ namespace mongo {
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
         { // remove anything cached
-            Collection* coll = getCollection( txn, fromNS );
+            Collection* coll = getCollection( fromNS );
             if ( !coll )
                 return Status( ErrorCodes::NamespaceNotFound, "collection not found to rename" );
             IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator( txn, true );
@@ -469,7 +469,7 @@ namespace mongo {
     }
 
     Collection* Database::getOrCreateCollection(OperationContext* txn, const StringData& ns) {
-        Collection* c = getCollection( txn, ns );
+        Collection* c = getCollection( ns );
         if ( !c ) {
             c = createCollection( txn, ns );
         }
@@ -481,7 +481,7 @@ namespace mongo {
                                             const CollectionOptions& options,
                                             bool allocateDefaultSpace,
                                             bool createIdIndex ) {
-        massert( 17399, "collection already exists", getCollection( txn, ns ) == NULL );
+        massert( 17399, "collection already exists", getCollection( ns ) == NULL );
         massertNamespaceNotIndex( ns, "createCollection" );
         invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 
@@ -596,7 +596,7 @@ namespace mongo {
             return Status( ErrorCodes::InvalidNamespace,
                            str::stream() << "invalid ns: " << ns );
 
-        Collection* collection = db->getCollection( txn, ns );
+        Collection* collection = db->getCollection( ns );
 
         if ( collection )
             return Status( ErrorCodes::NamespaceExists,

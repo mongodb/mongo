@@ -662,7 +662,7 @@ namespace mongo {
         }
 
         if ( allocateDefaultSpace ) {
-            RecordStoreV1Base* rs = _getRecordStore( txn, ns );
+            RecordStoreV1Base* rs = _getRecordStore( ns );
             if ( options.initialNumExtents > 0 ) {
                 int size = _massageExtentSize( &_extentManager, options.cappedSize );
                 for ( int i = 0; i < options.initialNumExtents; i++ ) {
@@ -711,8 +711,8 @@ namespace mongo {
         _insertInCache_inlock(txn, name, entry);
     }
 
-    CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
-                                                                                  const StringData& ns ) const {
+    CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(
+                                                                    const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
         if ( i == _collections.end() )
@@ -756,13 +756,11 @@ namespace mongo {
         }
     }
 
-    RecordStore* MMAPV1DatabaseCatalogEntry::getRecordStore( OperationContext* txn,
-                                                            const StringData& ns ) {
-        return _getRecordStore( txn, ns );
+    RecordStore* MMAPV1DatabaseCatalogEntry::getRecordStore( const StringData& ns ) const {
+        return _getRecordStore( ns );
     }
 
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( OperationContext* txn,
-                                                                   const StringData& ns ) {
+    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
         if ( i == _collections.end() )
@@ -787,7 +785,7 @@ namespace mongo {
             md.setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
         }
 
-        RecordStore* rs = _getRecordStore(txn, entry->descriptor()->indexNamespace());
+        RecordStore* rs = _getRecordStore(entry->descriptor()->indexNamespace());
         invariant(rs);
 
         std::auto_ptr<SortedDataInterface> btree(

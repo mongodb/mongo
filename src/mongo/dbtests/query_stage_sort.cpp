@@ -190,7 +190,7 @@ namespace QueryStageSortTests {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
@@ -210,7 +210,7 @@ namespace QueryStageSortTests {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
@@ -239,7 +239,7 @@ namespace QueryStageSortTests {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
@@ -259,7 +259,7 @@ namespace QueryStageSortTests {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
@@ -351,7 +351,7 @@ namespace QueryStageSortTests {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());

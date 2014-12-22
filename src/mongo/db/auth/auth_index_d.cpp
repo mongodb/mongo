@@ -84,8 +84,7 @@ namespace {
             return Status::OK();
         }
 
-        Collection* collection = autoDb.getDb()->getCollection(txn,
-                                                               NamespaceString(systemUsers));
+        Collection* collection = autoDb.getDb()->getCollection(NamespaceString(systemUsers));
         if (!collection) {
             return Status::OK();
         }

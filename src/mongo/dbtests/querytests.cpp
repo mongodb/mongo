@@ -62,7 +62,7 @@ namespace QueryTests {
             {
                 WriteUnitOfWork wunit(&_txn);
                 _database = _context.db();
-                _collection = _database->getCollection( &_txn, ns() );
+                _collection = _database->getCollection( ns() );
                 if ( _collection ) {
                     _database->dropCollection( &_txn, ns() );
                 }
@@ -177,7 +177,7 @@ namespace QueryTests {
             {
                 WriteUnitOfWork wunit(&_txn);
                 Database* db = ctx.db();
-                if ( db->getCollection( &_txn, ns() ) ) {
+                if ( db->getCollection( ns() ) ) {
                     _collection = NULL;
                     db->dropCollection( &_txn, ns() );
                 }
@@ -665,7 +665,7 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns )->cursorManager(),
+            ClientCursorPin clientCursor( ctx.db()->getCollection( ns )->cursorManager(),
                                           cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
@@ -1553,8 +1553,7 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn,
-                                                                          ns())->cursorManager(),
+                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( ns())->cursorManager(),
                                                                           cursorId );
                 string expectedAssertion =
                         str::stream() << "Cannot kill active cursor " << cursorId; 

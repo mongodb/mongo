@@ -54,7 +54,7 @@ namespace CountTests {
 
             {
                 WriteUnitOfWork wunit(&_txn);
-                _collection = _database->getCollection( &_txn, ns() );
+                _collection = _database->getCollection( ns() );
                 if ( _collection ) {
                     _database->dropCollection( &_txn, ns() );
                 }

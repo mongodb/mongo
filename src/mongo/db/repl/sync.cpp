@@ -56,7 +56,7 @@ namespace repl {
         const char *ns = o.getStringField("ns");
 
         // capped collections
-        Collection* collection = db->getCollection(txn, ns);
+        Collection* collection = db->getCollection(ns);
         if ( collection && collection->isCapped() ) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();

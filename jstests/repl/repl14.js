@@ -24,12 +24,13 @@ function testWithCollectionIndexIds( capped, sparse, useIds ) {
     else { // Otherwise avoid the auto generated _id.
         mc._mongo.insert( mc._fullName, toInsert, 0 );
     }
+    assert.eq(mc.count(), 1)
     
     s = rt.start( false ); // slave
     sc = s.getDB( 'd' )[ 'c' ]; // slave collection
 
     // Wait for the document to be cloned.
-    assert.soon( function() { return sc.count() > 0; } );
+    assert.soon( function() { return sc.count() > 0; },"doc not replicated soon enough", 60*1000 );
     
     modifiers = {$push:{a:1}};
     if ( capped ) {

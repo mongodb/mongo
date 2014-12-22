@@ -328,7 +328,7 @@ namespace mongo {
             {
                 string ns = dbName + ".system.namespaces";
                 Client::Context ctx(txn,  ns );
-                Collection* coll = originalDatabase->getCollection( txn, ns );
+                Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
                     while ( !it->isEOF() ) {
@@ -373,7 +373,7 @@ namespace mongo {
                 }
 
                 Client::Context readContext(txn, ns, originalDatabase);
-                Collection* originalCollection = originalDatabase->getCollection( txn, ns );
+                Collection* originalCollection = originalDatabase->getCollection( ns );
                 invariant( originalCollection );
 
                 // data

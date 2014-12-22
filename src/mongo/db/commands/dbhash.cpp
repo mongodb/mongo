@@ -78,7 +78,7 @@ namespace mongo {
         }
 
         *fromCache = false;
-        Collection* collection = db->getCollection( opCtx, fullCollectionName );
+        Collection* collection = db->getCollection( fullCollectionName );
         if ( !collection )
             return "";
 

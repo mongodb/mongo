@@ -995,7 +995,7 @@ namespace mongo {
 
         Database* database = _context->db();
         dassert(database);
-        _collection = database->getCollection(txn, request->getTargetingNS());
+        _collection = database->getCollection(request->getTargetingNS());
         if (!_collection) {
             if (intentLock) {
                 // try again with full X lock.
@@ -1208,7 +1208,7 @@ namespace mongo {
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
                 Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
                 Database* db = ctx.db();
-                if ( db->getCollection( txn, nsString.ns() ) ) {
+                if ( db->getCollection( nsString.ns() ) ) {
                     // someone else beat us to it
                 }
                 else {
@@ -1256,7 +1256,7 @@ namespace mongo {
             }
 
             Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
-            Collection* collection = db->getCollection(txn, nsString.ns());
+            Collection* collection = db->getCollection(nsString.ns());
 
             if ( collection == NULL ) {
                 if ( createCollection ) {
@@ -1375,7 +1375,7 @@ namespace mongo {
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
-                                                  ctx.db()->getCollection(txn, nss),
+                                                  ctx.db()->getCollection(nss),
                                                   &parsedDelete,
                                                   &rawExec));
                 boost::scoped_ptr<PlanExecutor> exec(rawExec);

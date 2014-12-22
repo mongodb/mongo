@@ -111,7 +111,7 @@ namespace mongo {
                 b.append( "name", collection );
 
                 CollectionOptions options =
-                    dbEntry->getCollectionCatalogEntry( txn, ns )->getCollectionOptions(txn);
+                    dbEntry->getCollectionCatalogEntry( ns )->getCollectionOptions(txn);
                 b.append( "options", options.toBSON() );
 
                 BSONObj maybe = b.obj();

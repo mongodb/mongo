@@ -66,6 +66,7 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
@@ -161,7 +162,7 @@ namespace repl {
 
                 localDB = ctx.db();
                 verify( localDB );
-                localOplogRSCollection = localDB->getCollection(txn, rsoplog);
+                localOplogRSCollection = localDB->getCollection(rsoplog);
                 massert(13389,
                         "local.oplog.rs missing. did you drop it? if so restart server",
                         localOplogRSCollection);
@@ -276,7 +277,7 @@ namespace repl {
             Client::Context ctx(txn, rsoplog);
             localDB = ctx.db();
             invariant( localDB );
-            localOplogRSCollection = localDB->getCollection( txn, rsoplog );
+            localOplogRSCollection = localDB->getCollection( rsoplog );
             massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", localOplogRSCollection);
         }
 
@@ -350,7 +351,7 @@ namespace repl {
             Client::Context ctx(txn, logNS);
             localDB = ctx.db();
             invariant(localDB);
-            localOplogMainCollection = localDB->getCollection(txn, logNS);
+            localOplogMainCollection = localDB->getCollection(logNS);
             invariant(localOplogMainCollection);
         }
 
@@ -473,7 +474,7 @@ namespace repl {
             ns = rsoplog;
 
         Client::Context ctx(txn, ns);
-        Collection* collection = ctx.db()->getCollection(txn, ns );
+        Collection* collection = ctx.db()->getCollection( ns );
 
         if ( collection ) {
 
@@ -590,7 +591,7 @@ namespace repl {
                 invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
             }
         }
-        Collection* collection = db->getCollection( txn, ns );
+        Collection* collection = db->getCollection( ns );
         IndexCatalog* indexCatalog = collection == NULL ? NULL : collection->getIndexCatalog();
 
         // operation type -- see logOp() comments for types

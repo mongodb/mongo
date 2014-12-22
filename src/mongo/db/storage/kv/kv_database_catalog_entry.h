@@ -65,11 +65,9 @@ namespace mongo {
 
         virtual void getCollectionNamespaces( std::list<std::string>* out ) const;
 
-        virtual CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
-                                                                   const StringData& ns ) const;
+        virtual CollectionCatalogEntry* getCollectionCatalogEntry( const StringData& ns ) const;
 
-        virtual RecordStore* getRecordStore( OperationContext* txn,
-                                             const StringData& ns );
+        virtual RecordStore* getRecordStore( const StringData& ns ) const;
 
         virtual IndexAccessMethod* getIndex( OperationContext* txn,
                                              const CollectionCatalogEntry* collection,

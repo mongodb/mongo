@@ -127,7 +127,7 @@ namespace mongo {
 
             // Make sure the collection is valid.
             Database* db = ctx.db();
-            Collection* collection = db->getCollection(txn, db->name() + '.' + collName);
+            Collection* collection = db->getCollection(db->name() + '.' + collName);
             uassert(17446, "Couldn't find the collection " + collName, NULL != collection);
 
             // Pull out the plan

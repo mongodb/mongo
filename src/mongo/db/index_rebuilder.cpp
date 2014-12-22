@@ -68,7 +68,7 @@ namespace {
             Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
             Client::Context ctx(txn, ns);
 
-            Collection* collection = ctx.db()->getCollection(txn, ns);
+            Collection* collection = ctx.db()->getCollection(ns);
             if ( collection == NULL )
                 continue;
 

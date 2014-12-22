@@ -88,7 +88,7 @@ namespace QueryStageCountScan {
         }
 
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-            Collection* collection = db->getCollection(&_txn, ns());
+            Collection* collection = db->getCollection(ns());
             return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
         }
 

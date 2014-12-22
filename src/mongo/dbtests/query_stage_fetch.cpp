@@ -89,7 +89,7 @@ namespace QueryStageFetch {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
             Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
@@ -151,7 +151,7 @@ namespace QueryStageFetch {
             Lock::DBLock lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
             Client::Context ctx(&_txn, ns());
             Database* db = ctx.db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Collection* coll = db->getCollection(ns());
             if (!coll) {
                 WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());

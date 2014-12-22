@@ -587,10 +587,10 @@ namespace {
                 Client::Context ctx(txn, ns);
 
                 //  The common case: no implicit collection creation
-                if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
+                if (!upsert || ctx.db()->getCollection(ns) != NULL) {
                     PlanExecutor* rawExec;
                     uassertStatusOK(getExecutorUpdate(txn,
-                                                      ctx.db()->getCollection(txn, ns),
+                                                      ctx.db()->getCollection(ns),
                                                       &parsedUpdate,
                                                       &op.debug(),
                                                       &rawExec));
@@ -625,7 +625,7 @@ namespace {
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
             Database* db = ctx.db();
-            if ( db->getCollection( txn, ns ) ) {
+            if ( db->getCollection( ns ) ) {
                 // someone else beat us to it, that's ok
                 // we might race while we unlock if someone drops
                 // but that's ok, we'll just do nothing and error out
@@ -640,7 +640,7 @@ namespace {
 
             PlanExecutor* rawExec;
             uassertStatusOK(getExecutorUpdate(txn,
-                                              ctx.db()->getCollection(txn, ns),
+                                              ctx.db()->getCollection(ns),
                                               &parsedUpdate,
                                               &op.debug(),
                                               &rawExec));
@@ -696,7 +696,7 @@ namespace {
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
-                                                  ctx.db()->getCollection(txn, ns),
+                                                  ctx.db()->getCollection(ns),
                                                   &parsedDelete,
                                                   &rawExec));
                 boost::scoped_ptr<PlanExecutor> exec(rawExec);
@@ -863,7 +863,7 @@ namespace {
             js = fixed.getValue();
 
         WriteUnitOfWork wunit(txn);
-        Collection* collection = ctx.db()->getCollection( txn, ns );
+        Collection* collection = ctx.db()->getCollection( ns );
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
@@ -1025,7 +1025,7 @@ namespace {
             // Client::Context may implicitly create a database, so check existence
             if (dbHolder().get(txn, nsString.db()) != NULL) {
                 Client::Context ctx(txn, ns);
-                if (mode == MODE_X || ctx.db()->getCollection(txn, nsString)) {
+                if (mode == MODE_X || ctx.db()->getCollection(nsString)) {
                     if (multi.size() > 1) {
                         const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
                         insertMulti(txn, ctx, keepGoing, ns, multi, op);

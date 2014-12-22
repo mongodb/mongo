@@ -61,7 +61,7 @@ namespace mongo {
         invariant(!request.isExplain());
 
         const NamespaceString& nsString = request.getNamespaceString();
-        Collection* collection = db->getCollection(txn, nsString.ns());
+        Collection* collection = db->getCollection(nsString.ns());
 
         // The update stage does not create its own collection.  As such, if the update is
         // an upsert, create the collection that the update stage inserts into beforehand.

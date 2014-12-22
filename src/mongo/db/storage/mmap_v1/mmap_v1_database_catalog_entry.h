@@ -100,11 +100,9 @@ namespace mongo {
         /*
          * will return NULL if ns does not exist
          */
-        CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
-                                                           const StringData& ns ) const;
+        CollectionCatalogEntry* getCollectionCatalogEntry( const StringData& ns ) const;
 
-        RecordStore* getRecordStore( OperationContext* txn,
-                                     const StringData& ns );
+        RecordStore* getRecordStore( const StringData& ns ) const;
 
         IndexAccessMethod* getIndex( OperationContext* txn,
                                      const CollectionCatalogEntry* collection,
@@ -151,9 +149,7 @@ namespace mongo {
         RecordStoreV1Base* _getIndexRecordStore();
         RecordStoreV1Base* _getNamespaceRecordStore_inlock() const;
         RecordStoreV1Base* _getNamespaceRecordStore() const;
-
-        RecordStoreV1Base* _getRecordStore( OperationContext* txn,
-                                            const StringData& ns );
+        RecordStoreV1Base* _getRecordStore( const StringData& ns ) const;
 
         void _addNamespaceToNamespaceCollection( OperationContext* txn,
                                                  const StringData& ns,

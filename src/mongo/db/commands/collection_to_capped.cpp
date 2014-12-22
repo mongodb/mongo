@@ -53,12 +53,12 @@ namespace {
         string fromNs = db->name() + "." + shortFrom;
         string toNs = db->name() + "." + shortTo;
 
-        Collection* fromCollection = db->getCollection( txn, fromNs );
+        Collection* fromCollection = db->getCollection( fromNs );
         if ( !fromCollection )
             return Status( ErrorCodes::NamespaceNotFound,
                            str::stream() << "source collection " << fromNs <<  " does not exist" );
 
-        if ( db->getCollection( txn, toNs ) )
+        if ( db->getCollection( toNs ) )
             return Status( ErrorCodes::NamespaceExists, "to collection already exists" );
 
         // create new collection
@@ -77,7 +77,7 @@ namespace {
             wunit.commit();
         }
 
-        Collection* toCollection = db->getCollection( txn, toNs );
+        Collection* toCollection = db->getCollection( toNs );
         invariant( toCollection ); // we created above
 
         // how much data to ignore because it won't fit anyway
@@ -203,7 +203,7 @@ namespace {
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            Collection* coll = db->getCollection(opCtx, ns);
+            Collection* coll = db->getCollection(ns);
             if (coll) {
                 return IndexBuilder::killMatchingIndexBuilds(coll, criteria);
             }
@@ -245,7 +245,7 @@ namespace {
             string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
-            if ( db->getCollection( txn, longTmpName ) ) {
+            if ( db->getCollection( longTmpName ) ) {
                 Status status = db->dropCollection( txn, longTmpName );
                 if ( !status.isOK() )
                     return appendCommandStatus( result, status );
@@ -256,7 +256,7 @@ namespace {
             if ( !status.isOK() )
                 return appendCommandStatus( result, status );
 
-            verify( db->getCollection( txn, longTmpName ) );
+            verify( db->getCollection( longTmpName ) );
 
             WriteUnitOfWork wunit(txn);
             status = db->dropCollection( txn, longSource );

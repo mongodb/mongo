@@ -139,7 +139,7 @@ namespace mongo {
                 Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
                 Client::Context ctx(txn, ns, false /* don't check version */);
                 Database* db = ctx.db();
-                if ( db->getCollection( txn, ns ) ) {
+                if ( db->getCollection( ns ) ) {
                     // someone else beat us to it, that's ok
                     // we might race while we unlock if someone drops
                     // but that's ok, we'll just do nothing and error out

@@ -179,7 +179,7 @@ namespace {
         // lock on the database, instead of optimizing with IS.
         Lock::CollectionLock collLock(txn->lockState(), ns, MODE_S);
 
-        Collection* collection = db->getCollection( txn, ns );
+        Collection* collection = db->getCollection( ns );
         if (!collection) {
             return;
         }

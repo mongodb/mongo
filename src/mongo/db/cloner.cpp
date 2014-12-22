@@ -118,8 +118,16 @@ namespace mongo {
             // Make sure database still exists after we resume from the temp release
             Database* db = dbHolder().openDb(txn, _dbName);
 
-            Collection* collection = db->getCollection( txn, to_collection );
-            if (!collection) {
+            bool createdCollection = false;
+            Collection* collection = NULL;
+
+            collection = db->getCollection( to_collection );
+            if ( !collection ) {
+                massert( 17321,
+                         str::stream()
+                         << "collection dropped during clone ["
+                         << to_collection.ns() << "]",
+                         !createdCollection );
                 WriteUnitOfWork wunit(txn);
                 collection = db->createCollection(txn, to_collection.ns());
                 verify(collection);
@@ -172,7 +180,7 @@ namespace mongo {
                                               << " dropped while cloning",
                                 db != NULL);
 
-                        collection = db->getCollection(txn, to_collection);
+                        collection = db->getCollection(to_collection);
                         uassert(28594,
                                 str::stream() << "Collection " << to_collection.ns()
                                               << " dropped while cloning",
@@ -294,7 +302,7 @@ namespace mongo {
         // during the temp release
         Database* db = dbHolder().openDb(txn, toDBName);
 
-        Collection* collection = db->getCollection( txn, to_collection );
+        Collection* collection = db->getCollection( to_collection );
         if ( !collection ) {
             WriteUnitOfWork wunit(txn);
             collection = db->createCollection( txn, to_collection.ns() );
@@ -564,7 +572,7 @@ namespace mongo {
                         str::stream() << "database " << toDBName << " dropped during clone",
                         db);
 
-                Collection* c = db->getCollection( txn, to_name );
+                Collection* c = db->getCollection( to_name );
                 if ( c && !c->getIndexCatalog()->haveIdIndex( txn ) ) {
                     // We need to drop objects with duplicate _ids because we didn't do a true
                     // snapshot and this is before applying oplog operations that occur during the

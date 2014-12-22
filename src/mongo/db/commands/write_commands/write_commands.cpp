@@ -229,7 +229,7 @@ namespace mongo {
             // Get a pointer to the (possibly NULL) collection.
             Collection* collection = NULL;
             if ( autoDb.getDb() ) {
-                collection = autoDb.getDb()->getCollection( txn, nsString.ns() );
+                collection = autoDb.getDb()->getCollection( nsString.ns() );
             }
 
             PlanExecutor* rawExec;
@@ -274,7 +274,7 @@ namespace mongo {
             // Get a pointer to the (possibly NULL) collection.
             Collection* collection = NULL;
             if (autoDb.getDb()) {
-                collection = autoDb.getDb()->getCollection(txn, nsString.ns());
+                collection = autoDb.getDb()->getCollection(nsString.ns());
             }
 
             PlanExecutor* rawExec;

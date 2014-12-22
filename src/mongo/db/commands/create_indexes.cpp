@@ -143,7 +143,7 @@ namespace mongo {
                 db = dbHolder().openDb(txn, ns.db());
             }
 
-            Collection* collection = db->getCollection( txn, ns.ns() );
+            Collection* collection = db->getCollection( ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
                 WriteUnitOfWork wunit(txn);
@@ -220,7 +220,7 @@ namespace mongo {
                 Database* db = dbHolder().get(txn, ns.db());
                 uassert(28551, "database dropped during index build", db);
                 uassert(28552, "collection dropped during index build",
-                        db->getCollection(txn, ns.ns()));
+                        db->getCollection(ns.ns()));
             }
 
             {

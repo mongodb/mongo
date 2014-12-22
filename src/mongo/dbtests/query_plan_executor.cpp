@@ -129,7 +129,7 @@ namespace QueryPlanExecutor {
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            const Collection* coll = context.db()->getCollection(&_txn, ns());
+            const Collection* coll = context.db()->getCollection(ns());
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
@@ -180,7 +180,7 @@ namespace QueryPlanExecutor {
 
     private:
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-            Collection* collection = db->getCollection( &_txn, ns() );
+            Collection* collection = db->getCollection( ns() );
             return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
         }
 

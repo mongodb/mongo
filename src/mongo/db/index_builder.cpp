@@ -96,7 +96,7 @@ namespace mongo {
                                 Lock::DBLock* dbLock) const {
         const NamespaceString ns(_index["ns"].String());
 
-        Collection* c = db->getCollection( txn, ns.ns() );
+        Collection* c = db->getCollection( ns.ns() );
         if ( !c ) {
             WriteUnitOfWork wunit(txn);
             c = db->getOrCreateCollection( txn, ns.ns() );
@@ -147,7 +147,7 @@ namespace mongo {
             dbLock->relockWithMode(MODE_X);
             Database* db = dbHolder().get(txn, ns.db());
             fassert(28553, db);
-            fassert(28554, db->getCollection(txn, ns.ns()));
+            fassert(28554, db->getCollection(ns.ns()));
             indexer.unregisterIndexBuild(descriptor);
         }
 

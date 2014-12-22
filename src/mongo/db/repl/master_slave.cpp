@@ -254,7 +254,7 @@ namespace repl {
             auto_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 localSources,
-                                                ctx.db()->getCollection(txn, localSources)));
+                                                ctx.db()->getCollection(localSources)));
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -299,7 +299,7 @@ namespace repl {
         auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             localSources,
-                                            ctx.db()->getCollection(txn, localSources)));
+                                            ctx.db()->getCollection(localSources)));
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {

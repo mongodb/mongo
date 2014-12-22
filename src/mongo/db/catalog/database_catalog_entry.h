@@ -82,12 +82,10 @@ namespace mongo {
         virtual void getCollectionNamespaces( std::list<std::string>* out ) const = 0;
 
         // The DatabaseCatalogEntry owns this, do not delete
-        virtual CollectionCatalogEntry* getCollectionCatalogEntry( OperationContext* txn,
-                                                                   const StringData& ns ) const = 0;
+        virtual CollectionCatalogEntry* getCollectionCatalogEntry( const StringData& ns ) const = 0;
 
         // The DatabaseCatalogEntry owns this, do not delete
-        virtual RecordStore* getRecordStore( OperationContext* txn,
-                                             const StringData& ns ) = 0;
+        virtual RecordStore* getRecordStore( const StringData& ns ) const = 0;
 
         // Ownership passes to caller
         virtual IndexAccessMethod* getIndex( OperationContext* txn,

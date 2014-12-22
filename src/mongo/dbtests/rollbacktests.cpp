@@ -80,13 +80,13 @@ namespace {
         return db->renameCollection( txn, source.ns(), target.ns(), false );
     }
     Status truncateCollection( OperationContext* txn, const NamespaceString& nss ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         return coll->truncate( txn );
     }
     RecordId insertRecord( OperationContext* txn,
                           const NamespaceString& nss,
                           const BSONObj& data ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         StatusWith<RecordId> status = coll->insertDocument( txn, data, false );
         ASSERT_OK( status.getStatus() );
         return status.getValue();
@@ -94,7 +94,7 @@ namespace {
     void assertOnlyRecord( OperationContext* txn,
                            const NamespaceString& nss,
                            const BSONObj& data ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         scoped_ptr<RecordIterator> iter( coll->getIterator( txn ) );
         ASSERT( !iter->isEOF() );
         RecordId loc = iter->getNext();
@@ -102,16 +102,16 @@ namespace {
         ASSERT_EQ( data, coll->docFor( txn, loc ) );
     }
     void assertEmpty( OperationContext* txn, const NamespaceString& nss ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         scoped_ptr<RecordIterator> iter( coll->getIterator( txn ) );
         ASSERT( iter->isEOF() );
     }
     bool indexExists( OperationContext* txn, const NamespaceString& nss, const string& idxName ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         return coll->getIndexCatalog()->findIndexByName( txn, idxName, true ) != NULL;
     }
     bool indexReady( OperationContext* txn, const NamespaceString& nss, const string& idxName ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         return coll->getIndexCatalog()->findIndexByName( txn, idxName, false ) != NULL;
     }
     size_t getNumIndexEntries( OperationContext* txn,
@@ -119,7 +119,7 @@ namespace {
                                const string& idxName ) {
         size_t numEntries = 0;
 
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         IndexCatalog* catalog = coll->getIndexCatalog();
         IndexDescriptor* desc = catalog->findIndexByName( txn, idxName, false );
 
@@ -141,7 +141,7 @@ namespace {
         return numEntries;
     }
     void dropIndex( OperationContext* txn, const NamespaceString& nss, const string& idxName ) {
-        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection( txn, nss.ns() );
+        Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );
         IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName( txn, idxName );
         ASSERT( desc );
         ASSERT_OK( coll->getIndexCatalog()->dropIndex( txn, desc ) );
@@ -479,7 +479,7 @@ namespace {
             ScopedTransaction transaction(&txn, MODE_IX);
             AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Collection* coll = autoDb.getDb()->getCollection( &txn, ns );
+            Collection* coll = autoDb.getDb()->getCollection( ns );
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -520,7 +520,7 @@ namespace {
             ScopedTransaction transaction(&txn, MODE_IX);
             AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
+            Collection* coll = autoDb.getDb()->getCollection(ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -573,7 +573,7 @@ namespace {
             ScopedTransaction transaction(&txn, MODE_IX);
             AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
+            Collection* coll = autoDb.getDb()->getCollection(ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -616,7 +616,7 @@ namespace {
             ScopedTransaction transaction(&txn, MODE_IX);
             AutoGetDb autoDb(&txn, nss.db(), MODE_X);
 
-            Collection* coll = autoDb.getDb()->getCollection(&txn, ns);
+            Collection* coll = autoDb.getDb()->getCollection(ns);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             string idxName = "a";
@@ -693,7 +693,7 @@ namespace {
                 ASSERT( !collectionExists( &ctx, nss.ns() ) );
                 ASSERT_OK( userCreateNS( &txn, ctx.db(), nss.ns(), BSONObj(), false, false ) );
                 ASSERT( collectionExists( &ctx, nss.ns() ) );
-                Collection* coll = ctx.db()->getCollection( &txn, ns );
+                Collection* coll = ctx.db()->getCollection( ns );
                 IndexCatalog* catalog = coll->getIndexCatalog();
 
                 ASSERT_OK( catalog->createIndexOnEmptyCollection( &txn, specA ) );

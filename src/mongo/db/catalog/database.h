@@ -90,10 +90,10 @@ namespace mongo {
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
-        Collection* getCollection( OperationContext* txn, const StringData& ns );
+        Collection* getCollection( const StringData& ns ) const ;
 
-        Collection* getCollection( OperationContext* txn, const NamespaceString& ns ) {
-            return getCollection( txn, ns.ns() );
+        Collection* getCollection( const NamespaceString& ns ) const {
+            return getCollection( ns.ns() );
         }
 
         Collection* getOrCreateCollection( OperationContext* txn, const StringData& ns );

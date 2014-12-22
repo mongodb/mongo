@@ -255,7 +255,7 @@ namespace QueryStageUpdate {
                 OpDebug* opDebug = &curOp.debug();
                 UpdateDriver driver( (UpdateDriver::Options()) );
                 Database* db = ctx.ctx().db();
-                Collection* coll = db->getCollection(&_txn, ns());
+                Collection* coll = db->getCollection(ns());
 
                 // Get the RecordIds that would be returned by an in-order scan.
                 vector<RecordId> locs;

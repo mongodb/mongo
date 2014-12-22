@@ -275,7 +275,7 @@ namespace repl {
                 if ( createCollection == 0 &&
                      !isIndexBuild &&
                      isCrudOpType(opType) &&
-                     ctx.db()->getCollection(txn,ns) == NULL ) {
+                     ctx.db()->getCollection(ns) == NULL ) {
                     // uh, oh, we need to create collection
                     // try again
                     continue;

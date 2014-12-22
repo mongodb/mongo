@@ -154,7 +154,7 @@ namespace mongo {
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
                 std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
                 allKilledIndexes.insert(allKilledIndexes.end(),
                                         killedIndexes.begin(),
                                         killedIndexes.end());
@@ -255,10 +255,10 @@ namespace mongo {
 
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(),
-                                        killedIndexes.begin(),
+                std::vector<BSONObj> killedIndexes = 
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                allKilledIndexes.insert(allKilledIndexes.end(), 
+                                        killedIndexes.begin(), 
                                         killedIndexes.end());
             }
             return allKilledIndexes;
@@ -447,7 +447,7 @@ namespace mongo {
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = nsToDrop;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, nsToDrop), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -478,7 +478,7 @@ namespace mongo {
 
             AutoGetDb autoDb(txn, dbname, MODE_X);
             Database* const db = autoDb.getDb();
-            Collection* coll = db ? db->getCollection( txn, nsToDrop ) : NULL;
+            Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
 
             // If db/collection does not exist, short circuit and return.
             if ( !db || !coll ) {
@@ -1018,7 +1018,7 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
 
-            Collection* coll = ctx.db()->getCollection( txn, ns );
+            Collection* coll = ctx.db()->getCollection( ns );
             if ( !coll ) {
                 errmsg = "ns does not exist";
                 return false;

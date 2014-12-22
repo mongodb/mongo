@@ -80,7 +80,7 @@ namespace {
         replCoord->clearSyncSourceBlacklist();
 
         // Truncate the oplog in case there was a prior initial sync that failed.
-        Collection* collection = autoDb.getDb()->getCollection(txn, rsoplog);
+        Collection* collection = autoDb.getDb()->getCollection(rsoplog);
         fassert(28565, collection);
         WriteUnitOfWork wunit(txn);
         Status status = collection->truncate(txn);
