@@ -192,6 +192,9 @@ namespace {
             *numKeysOut = _data->size();
         }
 
+        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const { }
+
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
             return _currentKeySize + ( sizeof(IndexKeyEntry) * _data->size() );
         }

@@ -98,6 +98,9 @@ namespace mongo {
             *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
         }
 
+        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const { }
+
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const {
             return _btree->getRecordStore()->dataSize( txn );
         }
@@ -162,7 +165,7 @@ namespace mongo {
                                      &_ofs,
                                      keyBegin,
                                      keyBeginLen,
-                                     afterKey, 
+                                     afterKey,
                                      keyEnd,
                                      keyEndInclusive,
                                      _direction);

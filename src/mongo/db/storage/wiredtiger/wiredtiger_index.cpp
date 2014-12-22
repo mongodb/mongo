@@ -400,6 +400,12 @@ namespace {
         }
 
         invariant(output);
+        appendCustomStats(txn, output, 1);
+    }
+
+    void WiredTigerIndex::appendCustomStats(OperationContext* txn,
+                                            BSONObjBuilder* output,
+                                            double scale) const {
 
         {
             BSONObjBuilder metadata(output->subobjStart("metadata"));
@@ -435,6 +441,7 @@ namespace {
             output->append("code", static_cast<int>(status.code()));
             output->append("reason", status.reason());
         }
+
     }
 
     Status WiredTigerIndex::dupKeyCheck( OperationContext* txn,

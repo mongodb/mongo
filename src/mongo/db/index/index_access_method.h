@@ -63,8 +63,8 @@ namespace mongo {
          * 'loc') into the index.  'obj' is the object at the location 'loc'.  If not NULL,
          * 'numInserted' will be set to the number of keys added to the index for the document.  If
          * there is more than one key for 'obj', either all keys will be inserted or none will.
-         * 
-         * The behavior of the insertion can be specified through 'options'.  
+         *
+         * The behavior of the insertion can be specified through 'options'.
          */
         virtual Status insert(OperationContext* txn,
                               const BSONObj& obj,
@@ -72,7 +72,7 @@ namespace mongo {
                               const InsertDeleteOptions& options,
                               int64_t* numInserted) = 0;
 
-        /** 
+        /**
          * Analogous to above, but remove the records instead of inserting them.  If not NULL,
          * numDeleted will be set to the number of keys removed from the index for the document.
          */
@@ -154,6 +154,14 @@ namespace mongo {
          */
         virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys,
                                 BSONObjBuilder* output) = 0;
+
+        /**
+         * Add custom statistics about this index to BSON object builder, for display.
+         *
+         * 'scale' is a scaling factor to apply to all byte statistics.
+         */
+        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale)
+            const = 0;
 
         /**
          * @return The number of bytes consumed by this index.

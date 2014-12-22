@@ -696,7 +696,7 @@ namespace {
         result->appendBool( "capped", _isCapped );
         if ( _isCapped ) {
             result->appendIntOrLL( "max", _cappedMaxDocs );
-            result->appendIntOrLL( "maxSize", _cappedMaxSize );
+            result->appendIntOrLL( "maxSize", static_cast<long long>(_cappedMaxSize / scale) );
         }
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
@@ -734,6 +734,7 @@ namespace {
             bob.append("code", static_cast<int>(status.code()));
             bob.append("reason", status.reason());
         }
+
     }
 
     Status WiredTigerRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {

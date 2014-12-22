@@ -99,7 +99,7 @@ namespace mongo {
             if ( extraInfo && level > 0 ) {
                 extentInfo.append( BSON( "len" << e->length << "loc: " << e->myLoc.toBSONObj() ) );
             }
-            cur = e->xnext;            
+            cur = e->xnext;
         }
 
         if ( extraInfo ) {
@@ -567,7 +567,7 @@ namespace mongo {
                         results->valid = false;
                     }
                     DiskLoc nextDiskLoc = thisExtent->xnext;
-                    
+
                     if (extentCount > 0 && !nextDiskLoc.isNull()
                         &&  _getExtent( txn, nextDiskLoc )->xprev != extentDiskLoc) {
                         StringBuilder sb;
@@ -810,7 +810,8 @@ namespace mongo {
         if ( isCapped() ) {
             result->appendBool( "capped", true );
             result->appendNumber( "max", _details->maxCappedDocs() );
-            result->appendNumber( "maxSize", static_cast<long long>( storageSize( txn, NULL, 0 ) ) );
+            result->appendNumber( "maxSize", static_cast<long long>(storageSize(txn, NULL, 0) /
+                                      scale) );
         }
     }
 

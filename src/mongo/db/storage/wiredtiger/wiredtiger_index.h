@@ -94,7 +94,8 @@ namespace mongo {
 
         virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
                                   BSONObjBuilder* output) const;
-
+        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const;
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
 
         virtual bool isEmpty(OperationContext* txn);
