@@ -524,7 +524,6 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 	WT_NAMED_EXTRACTOR *nextractor;
 
 	*extractorp = NULL;
@@ -532,34 +531,34 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 
 	conn = S2C(session);
 
-	if ((ret =
-	    __wt_config_getones_none(session, config, "extractor", &cval)) != 0)
-		return (ret == WT_NOTFOUND || cval.len == 0 ? 0 : ret);
+	WT_CLEAR(cval);
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_getones_none(session, config, "extractor", &cval));
+	if (cval.len == 0)
+		return (0);
 
-	if (cval.len > 0) {
-		TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
-			if (WT_STRING_MATCH(
-			    nextractor->name, cval.str, cval.len))
-				break;
+	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
+		if (WT_STRING_MATCH(
+		    nextractor->name, cval.str, cval.len))
+			break;
 
-		if (nextractor == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown extractor '%.*s'",
-			    (int)cval.len, cval.str);
+	if (nextractor == NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "unknown extractor '%.*s'",
+		    (int)cval.len, cval.str);
 
-		if (nextractor->extractor->customize != NULL) {
-			WT_RET(__wt_config_getones(session,
-			    config, "app_metadata", &cval));
-			WT_RET(nextractor->extractor->customize(
-			    nextractor->extractor, &session->iface,
-			    session->dhandle->name, &cval, extractorp));
-		}
-
-		if (*extractorp == NULL)
-			*extractorp = nextractor->extractor;
-		else
-			*ownp = 1;
+	if (nextractor->extractor->customize != NULL) {
+		WT_RET(__wt_config_getones(session,
+		    config, "app_metadata", &cval));
+		WT_RET(nextractor->extractor->customize(
+		    nextractor->extractor, &session->iface,
+		    session->dhandle->name, &cval, extractorp));
 	}
+
+	if (*extractorp == NULL)
+		*extractorp = nextractor->extractor;
+	else
+		*ownp = 1;
 
 	return (0);
 }
