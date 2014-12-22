@@ -66,6 +66,10 @@ typedef struct {
 #define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
+	{ "abort",
+	  "if timed run should drop core",			/* 0% */
+	  C_BOOL, 0, 0, 0, &g.c_abort, NULL },
+
 	{ "auto_throttle",
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
@@ -191,6 +195,18 @@ static CONFIG c[] = {
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
 	  0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
+
+	{ "logging",
+	  "if logging configured",				/* 30% */
+	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+
+	{ "logging_archive",
+	  "if log file archival configured",			/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging_archive, NULL },
+
+	{ "logging_prealloc",
+	  "if log file pre-allocation configured",		/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL },
 
 	{ "logging",
 	  "if logging configured",				/* 30% */
