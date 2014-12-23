@@ -188,6 +188,8 @@ def get_default(c):
     t = gettype(c)
     if c.default == 'false':
         return '0'
+    elif t == 'string' and c.default == 'none':
+        return ''
     elif t == 'category':
         return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))
             for subc in sorted(c.subconfig)))
