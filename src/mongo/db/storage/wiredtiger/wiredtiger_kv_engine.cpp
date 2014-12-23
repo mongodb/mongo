@@ -158,7 +158,11 @@ namespace mongo {
         if (ret == EINVAL) {
             fassertFailedNoTrace(28561);
         }
-        invariantWTOK(ret);
+        else if (ret != 0) {
+            Status s(wtRCToStatus(ret));
+            msgassertedNoTrace(28595, s.reason());
+        }
+
         _sessionCache.reset( new WiredTigerSessionCache( this ) );
 
         _sizeStorerUri = "table:sizeStorer";
