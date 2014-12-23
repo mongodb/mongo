@@ -101,7 +101,9 @@ namespace mongo {
         invariant(opCtx);
         WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, opCtx);
         WT_CURSOR* cursor = curwrap.get();
-        cursor->set_key(cursor, uri);
+        invariant(cursor);
+        std::string strUri = uri.toString();
+        cursor->set_key(cursor, strUri.c_str());
         int ret = cursor->search(cursor);
         if (ret == WT_NOTFOUND) {
             return StatusWith<std::string>(ErrorCodes::NoSuchKey, str::stream()
