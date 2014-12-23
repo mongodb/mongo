@@ -139,10 +139,18 @@ wts_ops(void)
 				break;
 			}
 
-			/* Tell the thread if it's done. */
 			if (thread_ops == 0) {
-				if (fourths == 0)
+				/*
+				 * Optionally drop core (for testing recovery),
+				 * otherwise tell the thread it's done.
+				 */
+				if (fourths == 0) {
+					if (g.c_abort) {
+						static char *core = NULL;
+						*core = 0;
+					}
 					tinfo[i].quit = 1;
+				}
 			} else
 				if (tinfo[i].ops >= thread_ops)
 					tinfo[i].quit = 1;

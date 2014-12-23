@@ -716,11 +716,10 @@ __split_multi_inmem(
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Take the oldest active
-	 * transaction ID to make sure these updates are not skipped by a
-	 * checkpoint.
+	 * updates we installed may be older than that.  Inherit the first
+	 * dirty transaction from the original page.
 	 */
-	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
+	page->modify->first_dirty_txn = orig->modify->first_dirty_txn;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
@@ -1137,8 +1136,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we are moving may be older than that: inherit the original
-	 * page's transaction ID.
+	 * updates we installed may be older than that.  Inherit the first
+	 * dirty transaction from the original page.
 	 */
 	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
 

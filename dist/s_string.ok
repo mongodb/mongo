@@ -138,6 +138,7 @@ GETTIMEOFDAY
 GIDs
 Gcc
 Geoff
+GetEnvironmentVariableA
 GetFileAttributesEx
 GetFileSizeEx
 GetLastError
@@ -639,6 +640,7 @@ func
 funcs
 gcc
 gdb
+getenv
 getfiles
 getid
 getline

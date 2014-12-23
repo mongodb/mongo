@@ -407,6 +407,15 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	    (cache->eviction_dirty_target * bytes_max) / 100)
 		/* Ignore clean pages unless the cache is too large */
 		LF_SET(WT_EVICT_PASS_DIRTY);
+	else if (F_ISSET(cache, WT_EVICT_WOULD_BLOCK)) {
+		/*
+		 * Evict pages with oldest generation (which would otherwise
+		 * block application threads) set regardless of whether we have
+		 * reached the eviction trigger.
+		 */
+		LF_SET(WT_EVICT_PASS_WOULD_BLOCK);
+		F_CLR(cache, WT_EVICT_WOULD_BLOCK);
+	}
 
 	if (F_ISSET(cache, WT_EVICT_STUCK))
 		LF_SET(WT_EVICT_PASS_AGGRESSIVE);
@@ -1074,6 +1083,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+			continue;
+
+		/*
+		 * If we are only trickling out pages marked for definite
+		 * eviction, skip anything that isn't marked.
+		 */
+		if (LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
+		    page->read_gen != WT_READGEN_OLDEST)
 			continue;
 
 		/* Limit internal pages to 50% unless we get aggressive. */

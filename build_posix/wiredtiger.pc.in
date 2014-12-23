@@ -7,5 +7,5 @@ Name: WiredTiger
 Description: The WiredTiger Data Engine
 Requires:
 Version: @PACKAGE_VERSION@
-Libs: -L${libdir} -lwiredtiger-@VERSION_NOPATCH@
-Cflags: -I${includedir}/wiredtiger-@VERSION_NOPATCH@
+Libs: -L${libdir} -lwiredtiger
+Cflags: -I${includedir}

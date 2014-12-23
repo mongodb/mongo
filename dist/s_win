@@ -44,6 +44,7 @@ win_filelist()
 	    -e 's;os_posix/os_flock.c;os_win/os_flock.c;' \
 	    -e 's;os_posix/os_fsync.c;os_win/os_fsync.c;' \
 	    -e 's;os_posix/os_ftruncate.c;os_win/os_ftruncate.c;' \
+	    -e 's;os_posix/os_getenv.c;os_win/os_getenv.c;' \
 	    -e 's;os_posix/os_map.c;os_win/os_map.c;' \
 	    -e 's;os_posix/os_mtx_cond.c;os_win/os_mtx_cond.c;' \
 	    -e 's;os_posix/os_once.c;os_win/os_once.c;' \

@@ -519,12 +519,11 @@ err:	if (nextractor != NULL) {
  *	Given a configuration, configure the extractor.
  */
 int
-__wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
-    WT_EXTRACTOR **extractorp, int *ownp)
+__wt_extractor_config(WT_SESSION_IMPL *session,
+    const char *config, WT_EXTRACTOR **extractorp, int *ownp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 	WT_NAMED_EXTRACTOR *nextractor;
 
 	*extractorp = NULL;
@@ -532,34 +531,31 @@ __wt_extractor_config(WT_SESSION_IMPL *session, const char *config,
 
 	conn = S2C(session);
 
-	if ((ret =
-	    __wt_config_getones_none(session, config, "extractor", &cval)) != 0)
-		return (ret == WT_NOTFOUND || cval.len == 0 ? 0 : ret);
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_getones_none(session, config, "extractor", &cval));
+	if (cval.len == 0)
+		return (0);
 
-	if (cval.len > 0) {
-		TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
-			if (WT_STRING_MATCH(
-			    nextractor->name, cval.str, cval.len))
-				break;
+	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
+		if (WT_STRING_MATCH(nextractor->name, cval.str, cval.len))
+			break;
 
-		if (nextractor == NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "unknown extractor '%.*s'",
-			    (int)cval.len, cval.str);
+	if (nextractor == NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "unknown extractor '%.*s'", (int)cval.len, cval.str);
 
-		if (nextractor->extractor->customize != NULL) {
-			WT_RET(__wt_config_getones(session,
-			    config, "app_metadata", &cval));
-			WT_RET(nextractor->extractor->customize(
-			    nextractor->extractor, &session->iface,
-			    session->dhandle->name, &cval, extractorp));
-		}
-
-		if (*extractorp == NULL)
-			*extractorp = nextractor->extractor;
-		else
-			*ownp = 1;
+	if (nextractor->extractor->customize != NULL) {
+		WT_RET(__wt_config_getones(session,
+		    config, "app_metadata", &cval));
+		WT_RET(nextractor->extractor->customize(
+		    nextractor->extractor, &session->iface,
+		    session->dhandle->name, &cval, extractorp));
 	}
+
+	if (*extractorp == NULL)
+		*extractorp = nextractor->extractor;
+	else
+		*ownp = 1;
 
 	return (0);
 }
@@ -1007,15 +1003,19 @@ static int
 __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	const char *env_config;
 	size_t len;
 
-	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL)
+	ret = __wt_getenv(session, "WIREDTIGER_CONFIG", &env_config);
+	if (ret == WT_NOTFOUND)
 		return (0);
+	WT_ERR(ret);
+
 	len = strlen(env_config);
 	if (len == 0)
-		return (0);
-	WT_RET(__wt_buf_set(session, cbuf, env_config, len + 1));
+		goto err;			/* Free the memory. */
+	WT_ERR(__wt_buf_set(session, cbuf, env_config, len + 1));
 
 	/*
 	 * Security stuff:
@@ -1023,26 +1023,28 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	 * If the "use_environment_priv" configuration string is set, use the
 	 * environment variable if the process has appropriate privileges.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
 	if (cval.val == 0 && __wt_has_priv())
-		WT_RET_MSG(session, WT_ERROR, "%s",
+		WT_ERR_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_CONFIG environment variable set but process "
 		    "lacks privileges to use that environment variable");
 
 	/* Check any version. */
-	WT_RET(__conn_config_check_version(session, env_config));
+	WT_ERR(__conn_config_check_version(session, env_config));
 
 	/* Upgrade the configuration string. */
-	WT_RET(__wt_config_upgrade(session, cbuf));
+	WT_ERR(__wt_config_upgrade(session, cbuf));
 
 	/* Check the configuration information. */
-	WT_RET(__wt_config_check(session,
+	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), env_config, 0));
 
 	/* Append it to the stack. */
-	__conn_config_append(cfg, env_config);
+	__conn_config_append(cfg, cbuf->data);
 
-	return (0);
+err:	__wt_free(session, env_config);
+
+      return (ret);
 }
 
 /*
@@ -1052,17 +1054,19 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 static int
 __conn_home(WT_SESSION_IMPL *session, const char *home, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_CONFIG_ITEM cval;
 
 	/* If the application specifies a home directory, use it. */
 	if (home != NULL)
 		goto copy;
 
+	ret = __wt_getenv(session, "WIREDTIGER_HOME", &S2C(session)->home);
+	if (ret == 0)
+		return (0);
+
 	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
-	if ((home = getenv("WIREDTIGER_HOME")) == NULL || strlen(home) == 0) {
-		home = ".";
-		goto copy;
-	}
+	home = ".";
 
 	/*
 	 * Security stuff:
