@@ -3,6 +3,7 @@ package json
 import (
 	"fmt"
 	"reflect"
+	"github.com/mongodb/mongo-tools/common/util"
 )
 
 // Transition functions for recognizing Date.
@@ -32,7 +33,6 @@ func (d *decodeState) storeDate(v reflect.Value) {
 	if op != scanBeginCtor {
 		d.error(fmt.Errorf("expected beginning of constructor"))
 	}
-
 	args, err := d.ctor("Date", []reflect.Type{dateType})
 	if err != nil {
 		d.error(err)
@@ -60,7 +60,16 @@ func (d *decodeState) getDate() interface{} {
 	if err := ctorNumArgsMismatch("Date", 1, len(args)); err != nil {
 		d.error(err)
 	}
-	arg0, err := args[0].(Number).Int64()
+	arg0num, isNumber := args[0].(Number)
+	if !isNumber {
+		// validate the date format of the string
+		_, err := util.FormatDate(args[0].(string))
+		if err != nil {
+			d.error(fmt.Errorf("unexpected ISODate format"))
+		}
+		return ISODate(args[0].(string))
+	}
+	arg0, err := arg0num.Int64()
 	if err != nil {
 		d.error(fmt.Errorf("expected int64 for first argument of Date constructor"))
 	}

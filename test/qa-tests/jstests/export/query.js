@@ -5,8 +5,8 @@
     }
 
     // Tests running mongoexport with --query specified.
-    
-    jsTest.log('Testing exporting with --query'); 
+
+    jsTest.log('Testing exporting with --query');
 
     var toolTest = getToolTest('query');
     var commonToolArgs = getCommonToolArguments();
@@ -61,7 +61,7 @@
     );
     assert.eq(0, ret);
 
-    // import the data into the destination collection 
+    // import the data into the destination collection
     ret = toolTest.runTool.apply(
         toolTest,
         ['import', '--file', exportTarget, '--db', 'test',
@@ -72,7 +72,7 @@
 
     // make sure the query was applied correctly
     assert.eq(1, destColl.count());
-    assert.eq(1, destColl.count({ a: 1, c: '1' })); 
+    assert.eq(1, destColl.count({ a: 1, c: '1' }));
 
     // remove the export, clear the destination collection
     removeFile(exportTarget);
@@ -87,7 +87,7 @@
     );
     assert.eq(0, ret);
 
-    // import the data into the destination collection 
+    // import the data into the destination collection
     ret = toolTest.runTool.apply(
         toolTest,
         ['import', '--file', exportTarget, '--db', 'test',
@@ -113,7 +113,7 @@
     );
     assert.eq(0, ret);
 
-    // import the data into the destination collection 
+    // import the data into the destination collection
     ret = toolTest.runTool.apply(
         toolTest,
         ['import', '--file', exportTarget, '--db', 'test',
@@ -145,7 +145,28 @@
     assert.eq(0, ret);
     assert.eq(1, destColl.count());
 
+    // TOOLS-530 add support for ISODate and string formatting for query flag
+    sourceColl.drop()
+    destColl.drop()
+    sourceColl.insert({ a: 1, x: ISODate("2014-12-11T13:52:39.498Z"), y: ISODate("2014-12-13T13:52:39.498Z")});
+    ret = toolTest.runTool.apply(
+    toolTest,
+    ['export', '--out', exportTarget, '--db', 'test',
+        '--collection', 'source', '--query', '{x:{$gt:ISODate("2014-12-11T13:52:39.3Z"), $lt:ISODate("2014-12-11T13:52:39.5Z")}}'].
+        concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+    ret = toolTest.runTool.apply(
+    toolTest,
+    ['import', '--file', exportTarget, '--db', 'test',
+        '--collection', 'dest'].
+        concat(commonToolArgs)
+    );
+    assert.eq(0, ret);
+    assert.eq(1, destColl.count());
+
+
     // success
     toolTest.stop();
-    
+
 }());

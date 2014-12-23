@@ -1,9 +1,10 @@
-package util
+package db
 
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"strconv"
 )
@@ -49,16 +50,16 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 		return sessionSafety, nil
 	}
 
-	if jVal, ok := jsonWriteConcern[j]; ok && IsTruthy(jVal) {
+	if jVal, ok := jsonWriteConcern[j]; ok && util.IsTruthy(jVal) {
 		sessionSafety.J = true
 	}
 
-	if fsyncVal, ok := jsonWriteConcern[fSync]; ok && IsTruthy(fsyncVal) {
+	if fsyncVal, ok := jsonWriteConcern[fSync]; ok && util.IsTruthy(fsyncVal) {
 		sessionSafety.FSync = true
 	}
 
 	if wtimeout, ok := jsonWriteConcern[wTimeout]; ok {
-		wtimeoutValue, err := ToInt(wtimeout)
+		wtimeoutValue, err := util.ToInt(wtimeout)
 		if err != nil {
 			return sessionSafety, fmt.Errorf("invalid '%v' argument: %v", wTimeout, wtimeout)
 		}
@@ -66,7 +67,7 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 	}
 
 	if wInterface, ok := jsonWriteConcern[w]; ok {
-		wValue, err := ToInt(wInterface)
+		wValue, err := util.ToInt(wInterface)
 		if err != nil {
 			// if the argument is neither a string nor int, error out
 			wStrVal, ok := wInterface.(string)

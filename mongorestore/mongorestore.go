@@ -102,7 +102,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	if err != nil {
 		return fmt.Errorf("error determining if connected to replica set: %v", err)
 	}
-	restore.safety, err = util.BuildWriteConcern(restore.OutputOptions.WriteConcern, isRepl)
+	restore.safety, err = db.BuildWriteConcern(restore.OutputOptions.WriteConcern, isRepl)
 	if err != nil {
 		return fmt.Errorf("error parsing write concern: %v", err)
 	}
