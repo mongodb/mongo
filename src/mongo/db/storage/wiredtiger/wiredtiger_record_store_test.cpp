@@ -350,6 +350,148 @@ namespace mongo {
         rs.reset( NULL ); // this has to be deleted before ss
     }
 
+namespace {
+
+    class GoodValidateAdaptor : public ValidateAdaptor {
+    public:
+        virtual Status validate(const RecordData& record, size_t* dataSize) {
+            *dataSize = static_cast<size_t>(record.size());
+            return Status::OK();
+        }
+    };
+
+    class BadValidateAdaptor : public ValidateAdaptor {
+    public:
+        virtual Status validate(const RecordData& record, size_t* dataSize) {
+            *dataSize = static_cast<size_t>(record.size());
+            return Status(ErrorCodes::UnknownError, "");
+        }
+    };
+
+    class SizeStorerValidateTest : public mongo::unittest::Test {
+    private:
+        virtual void setUp() {
+            harnessHelper.reset(new WiredTigerHarnessHelper());
+            sizeStorer.reset(new WiredTigerSizeStorer());
+            rs.reset(harnessHelper->newNonCappedRecordStore());
+            WiredTigerRecordStore* wtrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());
+            wtrs->setSizeStorer(sizeStorer.get());
+            uri = wtrs->getURI();
+
+            expectedNumRecords = WiredTigerRecordStore::kCollectionScanOnCreationThreshold;
+            expectedDataSize = expectedNumRecords * 2;
+            {
+                scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+                WriteUnitOfWork uow( opCtx.get() );
+                for (int i=0; i < expectedNumRecords; i++) {
+                    ASSERT_OK(rs->insertRecord( opCtx.get(), "a", 2, false ).getStatus());
+                }
+                uow.commit();
+            }
+            ASSERT_EQUALS(expectedNumRecords, rs->numRecords(NULL));
+            ASSERT_EQUALS(expectedDataSize, rs->dataSize(NULL));
+            sizeStorer->store(uri, 0, 0);
+        }
+        virtual void tearDown() {
+            expectedNumRecords = 0;
+            expectedDataSize = 0;
+
+            rs.reset(NULL);
+            sizeStorer.reset(NULL);
+            harnessHelper.reset(NULL);
+            rs.reset(NULL);
+        }
+
+    protected:
+        long long getNumRecords() const {
+            long long numRecords;
+            long long unused;
+            sizeStorer->load(uri, &numRecords, &unused);
+            return numRecords;
+        }
+
+        long long getDataSize() const {
+            long long unused;
+            long long dataSize;
+            sizeStorer->load(uri, &unused, &dataSize);
+            return dataSize;
+        }
+
+        boost::scoped_ptr<WiredTigerHarnessHelper> harnessHelper;
+        boost::scoped_ptr<WiredTigerSizeStorer> sizeStorer;
+        boost::scoped_ptr<RecordStore> rs;
+        std::string uri;
+
+        long long expectedNumRecords;
+        long long expectedDataSize;
+    };
+
+    // Basic validation - size storer data is not updated.
+    TEST_F(SizeStorerValidateTest, Basic) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        ValidateResults results;
+        BSONObjBuilder output;
+        ASSERT_OK(rs->validate(opCtx.get(), false, false, NULL, &results, &output));
+        BSONObj obj = output.obj();
+        ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
+        ASSERT_EQUALS(0, getNumRecords());
+        ASSERT_EQUALS(0, getDataSize());
+    }
+
+    // Full validation - size storer data is updated.
+    TEST_F(SizeStorerValidateTest, FullWithGoodAdaptor) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        GoodValidateAdaptor adaptor;
+        ValidateResults results;
+        BSONObjBuilder output;
+        ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+        BSONObj obj = output.obj();
+        ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
+        ASSERT_EQUALS(expectedNumRecords, getNumRecords());
+        ASSERT_EQUALS(expectedDataSize, getDataSize());
+    }
+
+    // Full validation with a validation adaptor that fails - size storer data is not updated.
+    TEST_F(SizeStorerValidateTest, FullWithBadAdapter) {
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        BadValidateAdaptor adaptor;
+        ValidateResults results;
+        BSONObjBuilder output;
+        ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+        BSONObj obj = output.obj();
+        ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
+        ASSERT_EQUALS(0, getNumRecords());
+        ASSERT_EQUALS(0, getDataSize());
+    }
+
+    // Load bad _numRecords and _dataSize values at record store creation.
+    TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
+        rs.reset(NULL);
+
+        scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        sizeStorer->store(uri, expectedNumRecords*2, expectedDataSize*2);
+        rs.reset(new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, -1, -1, NULL,
+                                           sizeStorer.get()));
+        ASSERT_EQUALS(expectedNumRecords*2, rs->numRecords(NULL));
+        ASSERT_EQUALS(expectedDataSize*2, rs->dataSize(NULL));
+
+        // Full validation should fix record and size counters.
+        GoodValidateAdaptor adaptor;
+        ValidateResults results;
+        BSONObjBuilder output;
+        ASSERT_OK(rs->validate(opCtx.get(), true, true, &adaptor, &results, &output));
+        BSONObj obj = output.obj();
+        ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
+        ASSERT_EQUALS(expectedNumRecords, getNumRecords());
+        ASSERT_EQUALS(expectedDataSize, getDataSize());
+
+        ASSERT_EQUALS(expectedNumRecords, rs->numRecords(NULL));
+        ASSERT_EQUALS(expectedDataSize, rs->dataSize(NULL));
+}
+
+}  // namespace
+
+
     StatusWith<RecordId> insertBSON(scoped_ptr<OperationContext>& opCtx,
                                    scoped_ptr<RecordStore>& rs,
                                    const OpTime& opTime) {

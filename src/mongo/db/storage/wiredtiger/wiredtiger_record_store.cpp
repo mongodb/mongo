@@ -74,6 +74,8 @@ namespace {
 
     const std::string kWiredTigerEngineName = "wiredTiger";
 
+    const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
+
     // static
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
         const StringData& ns,
@@ -212,7 +214,7 @@ namespace {
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             }
 
-            if ( _sizeStorer == NULL || _numRecords.load() < 10000 ) {
+            if (_sizeStorer == NULL || _numRecords.load() < kCollectionScanOnCreationThreshold) {
                 LOG(1) << "doing scan of collection " << ns << " to get info";
 
                 _numRecords.store(0);
@@ -658,6 +660,7 @@ namespace {
                                             BSONObjBuilder* output ) {
 
         long long nrecords = 0;
+        long long dataSizeTotal = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         results->valid = true;
         while( !iter->isEOF() ) {
@@ -671,8 +674,35 @@ namespace {
                     results->valid = false;
                     results->errors.push_back( str::stream() << loc << " is corrupted" );
                 }
+                dataSizeTotal += static_cast<long long>(dataSize);
             }
             iter->getNext();
+        }
+
+        if (_sizeStorer && full && scanData && results->valid) {
+            if (nrecords != _numRecords.load() || dataSizeTotal != _dataSize.load()) {
+                warning() << _uri << ": Existing record and data size counters ("
+                          << _numRecords.load() << " records " << _dataSize.load() << " bytes) "
+                          << "are inconsistent with full validation results ("
+                          << nrecords << " records " << dataSizeTotal << " bytes). "
+                          << "Updating counters with new values.";
+            }
+
+            _numRecords.store(nrecords);
+            _dataSize.store(dataSizeTotal);
+
+            long long oldNumRecords;
+            long long oldDataSize;
+            _sizeStorer->load(_uri, &oldNumRecords, &oldDataSize);
+            if (nrecords != oldNumRecords || dataSizeTotal != oldDataSize) {
+                warning() << _uri << ": Existing data in size storer ("
+                          << oldNumRecords << " records " << oldDataSize << " bytes) "
+                          << "is inconsistent with full validation results ("
+                          << _numRecords.load() << " records " << _dataSize.load() << " bytes). "
+                          << "Updating size storer with new values.";
+            }
+
+            _sizeStorer->store(_uri, _numRecords.load(), _dataSize.load());
         }
 
         output->appendNumber( "nrecords", nrecords );
