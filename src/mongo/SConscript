@@ -1105,7 +1105,6 @@ test = env.Install(
                        "s/cluster_ops",
                        "s/cluster_ops_impl",
                        "mocklib",
-                       "db/exec/mock_stage",
                        "$BUILD_DIR/mongo/db/auth/authmocks",
                        "$BUILD_DIR/mongo/db/query/query",
                        "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
