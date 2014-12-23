@@ -33,7 +33,6 @@ from glob import glob
 from time import mktime
 from subprocess import call
 import json
-import pprint
 from datetime import datetime
 
 try:
