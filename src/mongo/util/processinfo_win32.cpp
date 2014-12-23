@@ -34,7 +34,6 @@
 #include <iostream>
 #include <psapi.h>
 #include <wbemidl.h>
-#include <boost/algorithm/string.hpp>
 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"
@@ -160,16 +159,15 @@ namespace mongo {
             return false;
         }
 
-        // Connect to the root\default namespace with the current user.
         hr = pLoc->ConnectServer(
             BSTR(L"ROOT\\CIMV2"),   //namespace
-            NULL,                    // User name 
-            NULL,                    // User password
-            0,                        // Locale 
-            NULL,                    // Security flags
-            0,                        // Authority 
-            0,                        // Context object 
-            &pSvc);                    // IWbemServices proxy
+            NULL,                   // User name 
+            NULL,                   // User password
+            0,                      // Locale 
+            NULL,                   // Security flags
+            0,                      // Authority 
+            0,                      // Context object 
+            &pSvc);                 // IWbemServices proxy
         pLoc->Release();
         if (FAILED(hr)) {
             return false;
@@ -183,8 +181,7 @@ namespace mongo {
             query,
             WBEM_FLAG_FORWARD_ONLY,         // Flags
             0,                              // Context
-            &pEnum
-            );
+            &pEnum);
         SysFreeString(language);
         SysFreeString(query);
         pSvc->Release();
@@ -200,8 +197,7 @@ namespace mongo {
                 0,                  // Time out
                 1,                  // One object
                 &pObj,
-                &uReturned
-                );
+                &uReturned);
             if (FAILED(hr)) {
                 pEnum->Release();
                 return false;
@@ -303,7 +299,7 @@ namespace mongo {
                             if (getInstalledHotfixIDs(hotfixIDs)) {
                               for(list< string >::const_iterator i = hotfixIDs.begin(); i != hotfixIDs.end(); ++i) {
                                 string hotfixID = *i;
-                                if (boost::iequals(hotfixID, "KB2731284")) {
+                                if (hotfixID == "KB2731284") {
                                   log() << "Hotfix for KB2731284 is installed, no need to zero-out data files";
                                   fileZeroNeeded = false;
                                   break;
