@@ -1097,8 +1097,9 @@ namespace {
 
         // Global storage engine may not be started in all cases before we exit
         if (getGlobalEnvironment()->getGlobalStorageEngine() == NULL) {
-            dbexit(code); // never returns
-            invariant(false);
+            dbexit(code); // returns only under a windows service
+            invariant(code == EXIT_WINDOWS_SERVICE_STOP);
+            return;
         }
 
         getGlobalEnvironment()->setKillAllOperations();
@@ -1111,10 +1112,14 @@ namespace {
         // operation context, which also instantiates a recovery unit. Also, using the
         // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
         // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
-        DefaultLockerImpl globalLocker;
-        LockResult result = globalLocker.lockGlobalBegin(MODE_X);
+        //
+        // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
+        // of this function to prevent any operations from running that need a lock.
+        //
+        DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
+        LockResult result = globalLocker->lockGlobalBegin(MODE_X);
         if (result == LOCK_WAITING) {
-            result = globalLocker.lockGlobalComplete(UINT_MAX);
+            result = globalLocker->lockGlobalComplete(UINT_MAX);
         }
 
         invariant(LOCK_OK == result);
