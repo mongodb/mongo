@@ -112,7 +112,7 @@ module.exports = function(opts) {
       .attr("x2", width);
 
     crosshairY
-      .attr("y2", height);
+      .attr("y2", height+20);
 
     windshield
       .attr("width", width)
@@ -159,6 +159,13 @@ module.exports = function(opts) {
 
     // focus.select("rect.marker")
     //   .style("fill", serie.color);
+
+    xlabel
+      .attr('transform', 'translate(' + x(accx(d)) + ',' + (height+34) + ')')
+      .text(options.xSetting === 'relative' ? 
+        d3.format(',')(accx(d)) : 
+        d3.time.format('%b %d %H:%M:%S')(accx(d)))
+      .moveToFront();
 
     crosshairX
       .attr("y1", y(d.y))
@@ -242,13 +249,13 @@ module.exports = function(opts) {
   var crosshairX = svg.append("line")
     .style("stroke", "#ddd")
     .style("display", "none")
-    .attr("class", 'x')
+    .attr("class", 'x cross')
     .attr("x1", 0);
 
   var crosshairY = svg.append("line")
     .style("stroke", "#ddd")
     .style("display", "none")
-    .attr("class", 'x')
+    .attr("class", 'x cross')
     .attr("y1", 0);
 
   // focus
@@ -260,6 +267,12 @@ module.exports = function(opts) {
     .attr("r", 6)
     .attr("fill", "none")
     .attr("stroke-width", 2);
+
+  var xlabel = svg.append("text")
+    .attr('text-anchor', 'middle')
+    .attr('class', 'xlabel')
+    .attr('font-size', '0.8em')
+    .attr('fill', '#bbb');
 
   // focus.append('rect')
   //   .attr("class", "marker")
@@ -289,11 +302,13 @@ module.exports = function(opts) {
       crosshairX.style("display", null);
       crosshairY.style("display", null);
       focus.style("display", null);
+      xlabel.style("display", null);
     })
     .on("mouseout", function() { 
       focus.style("display", "none"); 
       crosshairX.style("display", "none"); 
       crosshairY.style("display", "none"); 
+      xlabel.style("display", "none");
     })
     .on("mousemove", mousemove);
 
