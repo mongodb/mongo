@@ -13,7 +13,8 @@
  */
 static int
 __curlog_logrec(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
+    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie,
+    int firstrecord)
 {
 	WT_CURSOR_LOG *cl;
 
