@@ -80,7 +80,7 @@ env.Substfile(
 #
 # WiredTiger library
 #
-filelistfile = "dist/filelist.win" if windows else 'dist/filelist'
+filelistfile = "build_win/filelist.win" if windows else 'dist/filelist'
 
 wtsources = []
 
