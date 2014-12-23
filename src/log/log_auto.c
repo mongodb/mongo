@@ -135,7 +135,7 @@ __wt_logop_col_put_print(
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"recno\": \"%" PRIu64 "\",\n", recno);
 	WT_RET(__logrec_jsonify_str(session, &escaped, &value));
-	fprintf(out, "    \"value\": \"%s\",\n", escaped);
+	fprintf(out, "    \"value\": \"%s\"", escaped);
 	__wt_free(session, escaped);
 	return (0);
 }
@@ -192,7 +192,7 @@ __wt_logop_col_remove_print(
 
 	fprintf(out, "    \"optype\": \"col_remove\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	fprintf(out, "    \"recno\": \"%" PRIu64 "\",\n", recno);
+	fprintf(out, "    \"recno\": \"%" PRIu64 "\"", recno);
 	return (0);
 }
 
@@ -250,7 +250,7 @@ __wt_logop_col_truncate_print(
 	fprintf(out, "    \"optype\": \"col_truncate\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	fprintf(out, "    \"start\": \"%" PRIu64 "\",\n", start);
-	fprintf(out, "    \"stop\": \"%" PRIu64 "\",\n", stop);
+	fprintf(out, "    \"stop\": \"%" PRIu64 "\"", stop);
 	return (0);
 }
 
@@ -312,7 +312,7 @@ __wt_logop_row_put_print(
 	WT_RET(__logrec_jsonify_str(session, &escaped, &key));
 	fprintf(out, "    \"key\": \"%s\",\n", escaped);
 	WT_RET(__logrec_jsonify_str(session, &escaped, &value));
-	fprintf(out, "    \"value\": \"%s\",\n", escaped);
+	fprintf(out, "    \"value\": \"%s\"", escaped);
 	__wt_free(session, escaped);
 	return (0);
 }
@@ -372,7 +372,7 @@ __wt_logop_row_remove_print(
 	fprintf(out, "    \"optype\": \"row_remove\",\n");
 	fprintf(out, "    \"fileid\": \"%" PRIu32 "\",\n", fileid);
 	WT_RET(__logrec_jsonify_str(session, &escaped, &key));
-	fprintf(out, "    \"key\": \"%s\",\n", escaped);
+	fprintf(out, "    \"key\": \"%s\"", escaped);
 	__wt_free(session, escaped);
 	return (0);
 }
@@ -437,7 +437,7 @@ __wt_logop_row_truncate_print(
 	fprintf(out, "    \"start\": \"%s\",\n", escaped);
 	WT_RET(__logrec_jsonify_str(session, &escaped, &stop));
 	fprintf(out, "    \"stop\": \"%s\",\n", escaped);
-	fprintf(out, "    \"mode\": \"%" PRIu32 "\",\n", mode);
+	fprintf(out, "    \"mode\": \"%" PRIu32 "\"", mode);
 	__wt_free(session, escaped);
 	return (0);
 }

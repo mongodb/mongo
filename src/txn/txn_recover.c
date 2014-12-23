@@ -265,8 +265,8 @@ __txn_commit_apply(
  *	Roll the log forward to recover committed changes.
  */
 static int
-__txn_log_recover(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
+__txn_log_recover(WT_SESSION_IMPL *session,
+    WT_ITEM *logrec, WT_LSN *lsnp, void *cookie, int firstrecord)
 {
 	WT_RECOVERY *r;
 	const uint8_t *end, *p;
@@ -276,6 +276,7 @@ __txn_log_recover(
 	r = cookie;
 	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
+	WT_UNUSED(firstrecord);
 
 	/* First, peek at the log record type. */
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
