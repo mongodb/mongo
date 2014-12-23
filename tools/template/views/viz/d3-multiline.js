@@ -25,7 +25,6 @@ module.exports = function(opts) {
     data = opts.data;
     series = data.series;
     options = data.options;
-    console.log(data);
 
     if (series.length === 0) {
       svg.style('visibility', 'hidden');
@@ -38,19 +37,19 @@ module.exports = function(opts) {
 
     // switch x-axis and update domain
     if (options.xSetting === 'relative') {
-      // calculate min date
-      var minDate = d3.min(data.series, function (s) { return d3.min(s.data, function (v) { return v.x; }); });
+      accx = function (d) { return d.xrel };
       x = x_relative;
-      xAxis.tickFormat(function (d) { return (d-minDate) / 1000 });
+      xAxis.tickFormat(d3.format(','));
     } else {
+      accx = function (d) { return d.x };
       x = x_absolute;
       xAxis.tickFormat(customTimeFormat);
     }
 
     x.range([0, width]);
     x.domain([
-      d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.x; }); }),
-      d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.x; }); })
+      d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
+      d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
     ]);
 
     // switch y-axis and update domain
@@ -79,7 +78,7 @@ module.exports = function(opts) {
 
     // transition data
     paths = svg.selectAll(".serie")
-      .data(series, function (d) { return d.cid});
+      .data(series, function (d) { return d.cid });
 
     paths.enter()
       .append("g")
@@ -88,15 +87,14 @@ module.exports = function(opts) {
           .attr("class", "line")
           .style("stroke", function(d) { return d.color; });
 
-
     paths.exit().remove();
 
-    paths.selectAll('path')
+    paths.selectAll('.line')
       .transition().duration(transTime)
-      .attr("d", function(d) { return line(d.data); });
+      .attr("d", function (d) { return line(accx)(d.data) } );
 
     circles = paths.selectAll(".point")
-      .data(function (serie) { return serie.data.map( function(d) { return {x: d.x, y:d.y, c:serie.color }}); });
+      .data(function (serie) { return serie.data.map( function(d) { return {x: accx(d), y:d.y, c:serie.color }}); });
 
     circles.enter().append("circle")
       .attr("class", "point")
@@ -125,10 +123,12 @@ module.exports = function(opts) {
 
   function findClosest(mx, series) {
     var mxi = x.invert(mx);
-    var i = bisect(series.data, mxi);
+    var i = bisect(accx)(series.data, mxi);
     var d0 = series.data[i - 1];
     var d1 = series.data[i];
-    return (d0 === undefined || (mxi - d0.x > d1.x - mxi)) ? d1 : d0;
+    if (d0 === undefined) return d1;
+    if (d1 === undefined) return d0;
+    return (mxi - accx(d0) > accx(d1) - mxi) ? d1 : d0;
   }
 
   function mousemove() {
@@ -138,14 +138,14 @@ module.exports = function(opts) {
 
     var dArr = series.map(function (serie) { return findClosest(mx, serie); });
     var dists = dArr.map(function (d) {
-      return Math.sqrt(Math.pow(mx-x(d.x), 2) + Math.pow(my-y(d.y), 2));
+      return Math.sqrt(Math.pow(mx-x(accx(d)), 2) + Math.pow(my-y(d.y), 2));
     })
     var i = dists.indexOf(Math.min.apply(Math, dists));
     var serie = series[i];
     var d = dArr[i];
 
     focus
-      .attr("transform", "translate(" + x(d.x) + "," + y(d.y) + ")")
+      .attr("transform", "translate(" + x(accx(d)) + "," + y(d.y) + ")")
       .moveToFront();
 
     focus.select("circle")
@@ -165,8 +165,8 @@ module.exports = function(opts) {
       .attr("y2", y(d.y));
 
     crosshairY
-      .attr("x1", x(d.x))
-      .attr("x2", x(d.x));
+      .attr("x1", x(accx(d)))
+      .attr("x2", x(accx(d)));
   }
 
   // --- initial setup (only called once) ---
@@ -182,9 +182,13 @@ module.exports = function(opts) {
     el = opts.el;
 
   var options = data.options;
-  var series; // initialized in redraw
+  var series;
 
-  var bisect = d3.bisector(function(d) { return d.x; }).left;
+  var accx = function (d) { return d.x };
+
+  var bisect = function (accx) { 
+    return d3.bisector(function(d) { return accx(d); }).left;
+  }
 
   // x scale and axis
   var x_absolute = d3.time.scale();
@@ -214,11 +218,13 @@ module.exports = function(opts) {
     .scale(y)
     .orient("left");
 
-  var line = d3.svg.line()
-    .interpolate("monotone")
-    .tension(0.8)
-    .x(function(d) { return x(d.x); })
-    .y(function(d) { return y(d.y); });
+  var line = function (accx) {
+    return d3.svg.line()
+      // .interpolate("monotone")
+      // .tension(0.8)
+      .x(function(d) { return x(accx(d)); })
+      .y(function(d) { return y(d.y); })
+  }
 
   var svg = d3.select(el)
     .append('g')

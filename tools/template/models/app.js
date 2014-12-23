@@ -24,6 +24,11 @@ var App = module.exports = AmpersandState.extend({
         _.map(serie.values, function (v, k) {
           return {x: new Date(k), y: v};
         }), 'x');
+      // calculate relative x values per series
+      var minx = Math.min.apply(null, data.map(function (d) { return d.x }));
+      data.forEach(function (d) {
+        d.xrel = (d.x - minx) / 1000;
+      })
       groups[group] = true;
       return { group: group, name: name, data: data };
     });
