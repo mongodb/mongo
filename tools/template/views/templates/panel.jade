@@ -1,9 +1,11 @@
 .panel.panel-default
   .panel-heading
+    if suptitle
+      span.suptitle= suptitle
     h4.panel-title
       i(data-hook="indicator").fa.fa-circle-o
       a(data-toggle='collapse', data-parent='#panel-accordion')
-        = title
+        = subtitle
       .pull-right
         i(data-hook='caret', class='fa')
 

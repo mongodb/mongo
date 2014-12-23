@@ -70,8 +70,11 @@ var PanelView = module.exports = AmpersandView.extend({
     this.parent.parent.statChanged(stat);
   },
   collapsibleToggle: function (event) {
-    $(this.query('.collapse')).collapse('toggle');
-    this.model.toggle('open');
+    if (this.model.open) {
+      this.collapsibleClose(event);
+    } else {
+      this.collapsibleOpen(event);
+    }
   },
   collapsibleClose: function (event) {
     $(this.query('.collapse')).collapse('hide');

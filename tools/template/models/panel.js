@@ -29,6 +29,27 @@ var Panel = module.exports = AmpersandState.extend({
         if (selected.length === 0) return 'none';
         return 'some';
       }
+    },
+    suptitle: {
+      deps: ['title'],
+      cache: false,
+      fn: function () {
+        var tokens = this.title.split(' ');
+        if (tokens.length > 1) {
+          return tokens[0];
+        }
+        return '';
+      }
+    },
+    subtitle: {
+      deps: ['title'],
+      fn: function () {
+        var tokens = this.title.split(' ');
+        if (tokens.length > 1) {
+          return tokens[1];
+        }
+        return this.title;
+      }
     }
   }
 });

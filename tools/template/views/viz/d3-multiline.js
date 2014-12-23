@@ -196,18 +196,18 @@ module.exports = function(opts) {
   var customTimeFormat = d3.time.format.multi([
     [".%L", function(d) { return d.getMilliseconds(); }],
     [":%S", function(d) { return d.getSeconds(); }],
-    ["%b %e %H:%M:%S", function(d) { return d.getMinutes(); }],
-    ["%b %e %H:%M:%S", function(d) { return d.getHours(); }],
-    ["%b %e %Y", function(d) { return d.getDay() && d.getDate() != 1; }],
-    ["%b %e %Y", function(d) { return d.getDate() != 1; }],
-    ["%b %e %Y", function(d) { return d.getMonth(); }],
+    ["%b %e %H:%M", function(d) { return d.getMinutes(); }],
+    ["%b %e %H:%M", function(d) { return d.getHours(); }],
+    ["%b %e", function(d) { return d.getDay() && d.getDate() != 1; }],
+    ["%b %e", function(d) { return d.getDate() != 1; }],
+    ["%Y", function(d) { return d.getMonth(); }],
     ["%Y", function() { return true; }]
   ]);
   var x = (options.xSetting === 'relative') ? x_relative : x_absolute;
   
   var xAxis = d3.svg.axis()
     .scale(x)
-    .ticks(15)
+    .ticks(10)
     .orient("bottom");
 
   // y scale and axis
