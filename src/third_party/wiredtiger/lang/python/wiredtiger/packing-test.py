@@ -28,11 +28,50 @@
 
 from packing import pack, unpack
 
-def check(fmt, *v):
-    print fmt, repr(v), ''.join('%02x' % ord(c) for c in pack(fmt, *v))
+def check_common(fmt, verbose, *v):
+    v = list(v)
+    packed = pack(fmt, *v)
+    unpacked = unpack(fmt, packed)
+    if unpacked == v:
+        result = 'ok'
+    else:
+        result = '** FAIL!'
+    print '* %s as %s: %s' % (repr(v), fmt, result)
+    if verbose or unpacked != v:
+        print '** packed: ', ''.join('%02x' % ord(c) for c in packed)
+        print '** unpacked: ', unpacked
 
-check('iii', 0, 101, -99)
-check('3i', 0, 101, -99)
-check('iS', 42, "forty two")
-check('u', r"\x42" * 20)
-check('uu', r"\x42" * 10, r"\x42" * 10)
+def check(fmt, *v):
+    check_common(fmt, False, *v)
+
+def check_verbose(fmt, *v):
+    check_common(fmt, True, *v)
+
+
+if __name__ == '__main__':
+    import sys
+    if 'verbose' in sys.argv:
+        check = check_verbose
+    check('iii', 0, 101, -99)
+    check('3i', 0, 101, -99)
+    check('iS', 42, "forty two")
+
+    #
+    check('S', 'abc')
+    check('9S', 'a' * 9)
+    check('9SS', "forty two", "spam egg")
+    check('42S', 'a' * 42)
+    check('42SS', 'a' * 42, 'something')
+    check('S42S', 'something', 'a' * 42)
+    # nul terminated string with padding
+    check('10SS', 'aaaaa\x00\x00\x00\x00\x00', 'something')
+    check('S10S', 'something', 'aaaaa\x00\x00\x00\x00\x00')
+
+    check('u', r"\x42" * 20)
+    check('uu', r"\x42" * 10, r"\x42" * 10)
+    check('3u', r"\x4")
+    check('3uu', r"\x4", r"\x42" * 10)
+    check('u3u', r"\x42" * 10, r"\x4")
+
+    check('s', "4")
+    check("2s", "42")

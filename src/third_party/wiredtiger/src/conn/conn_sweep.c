@@ -41,30 +41,17 @@ __sweep(WT_SESSION_IMPL *session)
 			continue;
 
 		/*
-		 * We have a candidate for closing; if it's open, flush dirty
-		 * leaf pages, then acquire an exclusive lock on the handle
-		 * and close it. We might be blocking opens for a long time
-		 * (over disk I/O), but the handle was quiescent for awhile.
+		 * We have a candidate for closing; if it's open, acquire an
+		 * exclusive lock on the handle and close it. We might be
+		 * blocking opens for a long time (over disk I/O), but the
+		 * handle was quiescent for awhile.
 		 *
-		 * The close can fail if an update cannot be written (updates in
-		 * a no-longer-referenced file might not yet be globally visible
-		 * if sessions have disjoint sets of files open).  If the handle
-		 * is busy, skip it, we'll retry the close the next time, after
-		 * the transaction state has progressed.
-		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_cache_op(
-			    session, NULL, WT_SYNC_WRITE_LEAVES));
-			WT_RET(ret);
-
-			/* Re-check that this looks like a good candidate. */
-			if (dhandle->timeofdeath == 0 ||
-			    now <= dhandle->timeofdeath + WT_DHANDLE_SWEEP_WAIT)
-				continue;
-		}
-
-		/*
+		 * The close can fail if an update cannot be written (updates
+		 * in a no-longer-referenced file might not yet be globally
+		 * visible if sessions have disjoint sets of files open).  If
+		 * the handle is busy, skip it, we'll retry the close the next
+		 * time, after the transaction state has progressed.
+		 *
 		 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
 		 * opens to block on us rather than returning an EBUSY error to
 		 * the application.
@@ -79,9 +66,11 @@ __sweep(WT_SESSION_IMPL *session)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_btree_sync_and_close(session, 0));
-			if (ret == 0)
-				WT_STAT_FAST_CONN_INCR(
-				    session, dh_conn_handles);
+			if (ret != 0)
+				goto unlock;
+
+			/* We closed the btree handle, bump the statistic. */
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 		}
 
 		/*
@@ -90,17 +79,18 @@ __sweep(WT_SESSION_IMPL *session)
 		 * re-checks that the handle is not in use, which is why we
 		 * don't do any special handling of EBUSY returns above.
 		 */
-		if (ret == 0 && dhandle->session_ref == 0) {
+		if (dhandle->session_inuse == 0 && dhandle->session_ref == 0) {
 			WT_WITH_DHANDLE(session, dhandle,
 			    ret = __wt_conn_dhandle_discard_single(session, 0));
+			if (ret != 0)
+				goto unlock;
 
 			/* If the handle was discarded, it isn't locked. */
-			if (ret == 0)
-				locked = 0;
+			locked = 0;
 		} else
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 
-		if (locked)
+unlock:		if (locked)
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 
 		WT_RET_BUSY_OK(ret);

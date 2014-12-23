@@ -165,8 +165,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 
 	WT_RET(__wt_meta_track_on(session));
 
-	/* Be careful to ignore any btree handle in our caller. */
-	WT_CLEAR_BTREE_IN_SESSION(session);
+	/* Paranoia: clear any handle from our caller. */
+	session->dhandle = NULL;
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __drop_colgroup(session, uri, force, cfg);

@@ -946,7 +946,7 @@ struct __wt_session {
 	 * created with WT_CONNECTION::add_compressor.  If WiredTiger has
 	 * builtin support for \c "snappy" or \c "zlib" compression\, these
 	 * names are also available.  See @ref compression for more
-	 * information., a string; default empty.}
+	 * information., a string; default \c none.}
 	 * @config{cache_resident, do not ever evict the object's pages; see
 	 * @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
@@ -966,7 +966,7 @@ struct __wt_session {
 	 * strings; default empty.}
 	 * @config{collator, configure custom collation for keys.  Permitted
 	 * values are \c "none" or a custom collator name created with
-	 * WT_CONNECTION::add_collator., a string; default empty.}
+	 * WT_CONNECTION::add_collator., a string; default \c none.}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>. For tables\, the number of
 	 * entries must match the total number of values in \c key_format and \c
@@ -982,17 +982,17 @@ struct __wt_session {
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Permitted
 	 * values are \c "none" or an extractor name created with
-	 * WT_CONNECTION::add_extractor., a string; default empty.}
+	 * WT_CONNECTION::add_extractor., a string; default \c none.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default empty.}
+	 * default \c none.}
 	 * @config{huffman_value, configure Huffman encoding for values.
 	 * Permitted values are \c "none"\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>". See @ref huffman for more information., a string;
-	 * default empty.}
+	 * default \c none.}
 	 * @config{immutable, configure the index to be immutable - that is an
 	 * index is not changed by any update to a record in the table., a
 	 * boolean flag; default \c false.}
@@ -1600,8 +1600,8 @@ struct __wt_connection {
 	 * prepended to each log record\, may contain strftime conversion
 	 * specifications., a string; default \c "%b %d %H:%M:%S".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
-	 * write of the log records., an integer between 0 and 100000; default
-	 * \c 0.}
+	 * write of the log records; setting this value above 0 configures
+	 * statistics logging., an integer between 0 and 100000; default \c 0.}
 	 * @config{ ),,}
 	 * @config{verbose, enable messages for various events.  Only available
 	 * if WiredTiger is configured with --enable-verbose.  Options are given
@@ -1905,7 +1905,7 @@ struct __wt_connection {
  * records.  Permitted values are \c "none" or \c "bzip2"\, \c "snappy" or
  * custom compression engine \c "name" created with
  * WT_CONNECTION::add_compressor.  See @ref compression for more information., a
- * string; default empty.}
+ * string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable
  * logging subsystem., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log files., an
@@ -1979,9 +1979,10 @@ struct __wt_connection {
  * record\, may contain strftime conversion specifications., a string; default
  * \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
- * between each write of the log records., an integer between 0 and 100000;
- * default \c 0.}
- * @config{ ),,}
+ * between each write of the log records; setting this value above 0 configures
+ * statistics logging., an integer between 0 and 100000; default \c 0.}
+ * @config{
+ * ),,}
  * @config{transaction_sync = (, how to sync log records when the transaction
  * commits., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to sync the log on every
@@ -2612,7 +2613,8 @@ struct __wt_collator {
 	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_COLLATOR **customp);
 
 	/*!
-	 * If non-NULL, a callback performed when the database is closed.
+	 * If non-NULL a callback performed when the data source is closed
+	 * for customized extractors otherwise when the database is closed.
 	 *
 	 * The WT_COLLATOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.
@@ -3036,7 +3038,9 @@ struct __wt_extractor {
 	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
 
 	/*!
-	 * If non-NULL, a callback performed when the database is closed.
+	 * If non-NULL a callback performed when the index or column group
+	 * is closed for customized extractors otherwise when the database
+	 * is closed.
 	 *
 	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
 	 * the handle will not be subsequently accessed by WiredTiger.

@@ -407,6 +407,15 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	    (cache->eviction_dirty_target * bytes_max) / 100)
 		/* Ignore clean pages unless the cache is too large */
 		LF_SET(WT_EVICT_PASS_DIRTY);
+	else if (F_ISSET(cache, WT_EVICT_WOULD_BLOCK)) {
+		/*
+		 * Evict pages with oldest generation (which would otherwise
+		 * block application threads) set regardless of whether we have
+		 * reached the eviction trigger.
+		 */
+		LF_SET(WT_EVICT_PASS_WOULD_BLOCK);
+		F_CLR(cache, WT_EVICT_WOULD_BLOCK);
+	}
 
 	if (F_ISSET(cache, WT_EVICT_STUCK))
 		LF_SET(WT_EVICT_PASS_AGGRESSIVE);
@@ -941,9 +950,11 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * Re-check the "no eviction" flag -- it is used to enforce
 		 * exclusive access when a handle is being closed.
 		 */
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
 			WT_WITH_BTREE(session, btree,
 			    ret = __evict_walk_file(session, &slot, flags));
+			WT_ASSERT(session, session->split_gen == 0);
+		}
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
@@ -1072,6 +1083,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		 * multiple times.
 		 */
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+			continue;
+
+		/*
+		 * If we are only trickling out pages marked for definite
+		 * eviction, skip anything that isn't marked.
+		 */
+		if (LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) &&
+		    page->read_gen != WT_READGEN_OLDEST)
 			continue;
 
 		/* Limit internal pages to 50% unless we get aggressive. */
@@ -1281,6 +1300,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
+	WT_ASSERT(session, is_app || session->split_gen == 0);
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
