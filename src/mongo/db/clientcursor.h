@@ -43,6 +43,7 @@ namespace mongo {
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     class ClientCursor;
     class Collection;
+    class CollectionCursorCache;
     class CurOp;
     class Database;
     class NamespaceDetails;
@@ -61,7 +62,7 @@ namespace mongo {
         /**
          * This ClientCursor constructor creates a cursorid that can be getMore'd
          */
-        ClientCursor(const Collection* collection,
+        ClientCursor(CollectionCursorCache* cursorCache,
                      PlanExecutor* exec,
                      int qopts = 0,
                      const BSONObj query = BSONObj(),
@@ -70,7 +71,7 @@ namespace mongo {
         /**
          * This ClientCursor is used to track sharding state.
          */
-        ClientCursor(const Collection* collection);
+        ClientCursor(CollectionCursorCache* cursorCache);
 
         //
         // Basic accessors
@@ -78,7 +79,7 @@ namespace mongo {
 
         CursorId cursorid() const { return _cursorid; }
         std::string ns() const { return _ns; }
-        const Collection* collection() const { return _collection; }
+        CollectionCursorCache* cursorCache() const { return _cursorCache; }
         bool isAggCursor() const { return _isAggCursor; }
 
         //
@@ -220,7 +221,7 @@ namespace mongo {
         // The namespace we're operating on.
         std::string _ns;
 
-        const Collection* _collection;
+        CollectionCursorCache* _cursorCache;
 
         // if we've added it to the total open counter yet
         bool _countedYet;
@@ -288,7 +289,7 @@ namespace mongo {
     */
     class ClientCursorPin : boost::noncopyable {
     public:
-        ClientCursorPin( const Collection* collection, long long cursorid );
+        ClientCursorPin( CollectionCursorCache* cursorCache, long long cursorid );
         ~ClientCursorPin();
         // This just releases the pin, does not delete the underlying
         // unless ownership has passed to us after kill

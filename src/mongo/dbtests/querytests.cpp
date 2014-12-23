@@ -265,7 +265,7 @@ namespace QueryTests {
             {
                 // Check internal server handoff to getmore.
                 Client::WriteContext ctx(&_txn,  ns);
-                ClientCursorPin clientCursor( ctx.getCollection(), cursorId );
+                ClientCursorPin clientCursor( ctx.getCollection()->cursorCache(), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
@@ -665,7 +665,8 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns ), cursorId );
+            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns )->cursorCache(),
+                                          cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
     };
@@ -1515,7 +1516,7 @@ namespace QueryTests {
             ClientCursor *clientCursor = 0;
             {
                 AutoGetCollectionForRead ctx(&_txn, ns());
-                ClientCursorPin clientCursorPointer(ctx.getCollection(), cursorId);
+                ClientCursorPin clientCursorPointer(ctx.getCollection()->cursorCache(), cursorId);
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }
@@ -1552,7 +1553,9 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx(&_txn,  ns() );
-                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn, ns() ), cursorId );
+                ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn,
+                                                                          ns())->cursorCache(),
+                                                                          cursorId );
                 string expectedAssertion =
                         str::stream() << "Cannot kill active cursor " << cursorId; 
                 ASSERT_THROWS_WHAT(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),

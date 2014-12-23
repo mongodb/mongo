@@ -415,7 +415,7 @@ namespace QueryPlanExecutor {
                 PlanExecutor* exec = makeCollScanExec(coll,filterObj);
 
                 // Make a client cursor from the runner.
-                new ClientCursor(coll, exec, 0, BSONObj());
+                new ClientCursor(coll->cursorCache(), exec, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
@@ -441,8 +441,8 @@ namespace QueryPlanExecutor {
                 PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                 // Make a client cursor from the runner.
-                ClientCursor* cc = new ClientCursor(collection, exec, 0, BSONObj());
-                ClientCursorPin ccPin(collection, cc->cursorid());
+                ClientCursor* cc = new ClientCursor(collection->cursorCache(), exec, 0, BSONObj());
+                ClientCursorPin ccPin(collection->cursorCache(), cc->cursorid());
 
                 // If the cursor is pinned, it sticks around,
                 // even after invalidation.
@@ -481,7 +481,7 @@ namespace QueryPlanExecutor {
                     PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                     // Make a client cursor from the runner.
-                    new ClientCursor(collection, exec, 0, BSONObj());
+                    new ClientCursor(collection->cursorCache(), exec, 0, BSONObj());
                 }
 
                 // There should be one cursor before timeout,

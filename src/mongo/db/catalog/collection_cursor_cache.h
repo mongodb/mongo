@@ -54,6 +54,8 @@ namespace mongo {
 
         // -----------------
 
+        std::string ns() { return _nss.ns(); }
+
         /**
          * @param collectionGoingAway Pass as true if the Collection instance is going away.
          *                            This could be because the db is being closed, or the

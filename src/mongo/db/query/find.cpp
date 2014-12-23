@@ -211,7 +211,7 @@ namespace mongo {
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
         // CC, so don't delete it.
-        ClientCursorPin ccPin(collection, cursorid);
+        ClientCursorPin ccPin(collection->cursorCache(), cursorid);
         ClientCursor* cc = ccPin.c();
 
         // If we're not being called from DBDirectClient we want to associate the RecoveryUnit
@@ -824,7 +824,7 @@ namespace mongo {
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(collection, exec.get(),
+            ClientCursor* cc = new ClientCursor(collection->cursorCache(), exec.get(),
                                                 pq.getOptions().toInt(),
                                                 pq.getFilter());
             ccId = cc->cursorid();
