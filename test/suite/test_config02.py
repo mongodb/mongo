@@ -149,6 +149,8 @@ class test_config02(wttest.WiredTigerTestCase):
             '/No such file or directory/')
 
     def test_home_not_writeable(self):
+        if os.name == "nt":
+            self.skipTest('Unix specific test skipped on Windows')
         dir = 'subdir'
         os.mkdir(dir)
         os.chmod(dir, 0555)
