@@ -522,7 +522,7 @@ namespace {
 
         const char* cursorArray = dbmessage.getArray(n);
 
-        int found = CollectionCursorCache::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
+        int found = CursorManager::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
         if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
@@ -781,7 +781,7 @@ namespace {
                     // because it may now be out of sync with the client's iteration state.
                     // SERVER-7952
                     // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                    CollectionCursorCache::eraseCursorGlobal(txn, cursorid );
+                    CursorManager::eraseCursorGlobal(txn, cursorid );
                 }
                 ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;

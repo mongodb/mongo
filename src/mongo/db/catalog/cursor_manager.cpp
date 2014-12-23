@@ -1,4 +1,4 @@
-// collection_cursor_cache.h
+// cursor_manager.cpp
 
 /**
 *    Copyright (C) 2013 MongoDB Inc.
@@ -28,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/catalog/collection_cursor_cache.h"
+#include "mongo/db/catalog/cursor_manager.h"
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/db/audit.h"
@@ -87,14 +87,14 @@ namespace mongo {
         ~GlobalCursorIdCache();
 
         /**
-         * this gets called when a CollectionCursorCache gets created
-         * @return the id the CollectionCursorCache should use when generating
+         * this gets called when a CursorManager gets created
+         * @return the id the CursorManager should use when generating
          * cursor ids
          */
         unsigned created( const std::string& ns );
 
         /**
-         * called by CollectionCursorCache when its going away
+         * called by CursorManager when its going away
          */
         void destroyed( unsigned id, const std::string& ns );
 
@@ -204,7 +204,7 @@ namespace mongo {
             return false;
         }
 
-        return collection->cursorCache()->eraseCursor(txn, id, checkAuth);
+        return collection->cursorManager()->eraseCursor(txn, id, checkAuth);
     }
 
     std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
@@ -228,7 +228,7 @@ namespace mongo {
                 continue;
             }
 
-            totalTimedOut += collection->cursorCache()->timeoutCursors( millisSinceLastCall );
+            totalTimedOut += collection->cursorManager()->timeoutCursors( millisSinceLastCall );
 
         }
 
@@ -237,12 +237,12 @@ namespace mongo {
 
     // ---
 
-    std::size_t CollectionCursorCache::timeoutCursorsGlobal(OperationContext* txn, 
+    std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* txn,
         int millisSinceLastCall) {;
     return _globalCursorIdCache.timeoutCursors(txn, millisSinceLastCall);
     }
 
-    int CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
+    int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n,
         const char* _ids) {
         ConstDataCursor ids(_ids);
         int numDeleted = 0;
@@ -254,10 +254,10 @@ namespace mongo {
         }
         return numDeleted;
     }
-    bool CollectionCursorCache::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
+    bool CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
         return _globalCursorIdCache.eraseCursor(txn, id, true);
     }
-    bool CollectionCursorCache::eraseCursorGlobal(OperationContext* txn, CursorId id) {
+    bool CursorManager::eraseCursorGlobal(OperationContext* txn, CursorId id) {
         return _globalCursorIdCache.eraseCursor(txn, id, false );
     }
 
@@ -265,19 +265,19 @@ namespace mongo {
     // --------------------------
 
 
-    CollectionCursorCache::CollectionCursorCache( const StringData& ns )
+    CursorManager::CursorManager( const StringData& ns )
         : _nss( ns ),
-          _mutex( "CollectionCursorCache" ) {
+          _mutex( "CursorManager" ) {
         _collectionCacheRuntimeId = _globalCursorIdCache.created( _nss.ns() );
         _random.reset( new PseudoRandom( _globalCursorIdCache.nextSeed() ) );
     }
 
-    CollectionCursorCache::~CollectionCursorCache() {
+    CursorManager::~CursorManager() {
         invalidateAll( true );
         _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _nss.ns() );
     }
 
-    void CollectionCursorCache::invalidateAll( bool collectionGoingAway ) {
+    void CursorManager::invalidateAll( bool collectionGoingAway ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         for ( ExecSet::iterator it = _nonCachedExecutors.begin();
@@ -346,9 +346,9 @@ namespace mongo {
         }
     }
 
-    void CollectionCursorCache::invalidateDocument( OperationContext* txn,
-                                                    const RecordId& dl,
-                                                    InvalidationType type ) {
+    void CursorManager::invalidateDocument( OperationContext* txn,
+                                            const RecordId& dl,
+                                            InvalidationType type ) {
         if ( supportsDocLocking() ) {
             // If a storage engine supports doc locking, then we do not need to invalidate.
             // The transactional boundaries of the operation protect us.
@@ -373,7 +373,7 @@ namespace mongo {
         }
     }
 
-    std::size_t CollectionCursorCache::timeoutCursors( int millisSinceLastCall ) {
+    std::size_t CursorManager::timeoutCursors( int millisSinceLastCall ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         vector<ClientCursor*> toDelete;
@@ -395,18 +395,18 @@ namespace mongo {
         return toDelete.size();
     }
 
-    void CollectionCursorCache::registerExecutor( PlanExecutor* exec ) {
+    void CursorManager::registerExecutor( PlanExecutor* exec ) {
         SimpleMutex::scoped_lock lk(_mutex);
         const std::pair<ExecSet::iterator, bool> result = _nonCachedExecutors.insert(exec);
         invariant(result.second); // make sure this was inserted
     }
 
-    void CollectionCursorCache::deregisterExecutor( PlanExecutor* exec ) {
+    void CursorManager::deregisterExecutor( PlanExecutor* exec ) {
         SimpleMutex::scoped_lock lk(_mutex);
         _nonCachedExecutors.erase(exec);
     }
 
-    ClientCursor* CollectionCursorCache::find( CursorId id, bool pin ) {
+    ClientCursor* CursorManager::find( CursorId id, bool pin ) {
         SimpleMutex::scoped_lock lk( _mutex );
         CursorMap::const_iterator it = _cursors.find( id );
         if ( it == _cursors.end() )
@@ -423,14 +423,14 @@ namespace mongo {
         return cursor;
     }
 
-    void CollectionCursorCache::unpin( ClientCursor* cursor ) {
+    void CursorManager::unpin( ClientCursor* cursor ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         invariant( cursor->isPinned() );
         cursor->unsetPinned();
     }
 
-    void CollectionCursorCache::getCursorIds( std::set<CursorId>* openCursors ) {
+    void CursorManager::getCursorIds( std::set<CursorId>* openCursors ) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
@@ -439,12 +439,12 @@ namespace mongo {
         }
     }
 
-    size_t CollectionCursorCache::numCursors(){
+    size_t CursorManager::numCursors(){
         SimpleMutex::scoped_lock lk( _mutex );
         return _cursors.size();
     }
 
-    CursorId CollectionCursorCache::_allocateCursorId_inlock() {
+    CursorId CursorManager::_allocateCursorId_inlock() {
         for ( int i = 0; i < 10000; i++ ) {
             unsigned mypart = static_cast<unsigned>( _random->nextInt32() );
             CursorId id = cursorIdFromParts( _collectionCacheRuntimeId, mypart );
@@ -454,7 +454,7 @@ namespace mongo {
         fassertFailed( 17360 );
     }
 
-    CursorId CollectionCursorCache::registerCursor( ClientCursor* cc ) {
+    CursorId CursorManager::registerCursor( ClientCursor* cc ) {
         invariant( cc );
         SimpleMutex::scoped_lock lk( _mutex );
         CursorId id = _allocateCursorId_inlock();
@@ -462,12 +462,12 @@ namespace mongo {
         return id;
     }
 
-    void CollectionCursorCache::deregisterCursor( ClientCursor* cc ) {
+    void CursorManager::deregisterCursor( ClientCursor* cc ) {
         SimpleMutex::scoped_lock lk( _mutex );
         _deregisterCursor_inlock( cc );
     }
 
-    bool CollectionCursorCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
+    bool CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         CursorMap::iterator it = _cursors.find( id );
@@ -498,7 +498,7 @@ namespace mongo {
         return true;
     }
 
-    void CollectionCursorCache::_deregisterCursor_inlock( ClientCursor* cc ) {
+    void CursorManager::_deregisterCursor_inlock( ClientCursor* cc ) {
         invariant( cc );
         CursorId id = cc->cursorid();
         _cursors.erase( id );

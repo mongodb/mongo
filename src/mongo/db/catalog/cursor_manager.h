@@ -1,4 +1,4 @@
-// collection_cursor_cache.h
+// cursor_manager.h
 
 /**
 *    Copyright (C) 2013 MongoDB Inc.
@@ -43,14 +43,14 @@ namespace mongo {
     class PseudoRandom;
     class PlanExecutor;
 
-    class CollectionCursorCache {
+    class CursorManager {
     public:
-        CollectionCursorCache( const StringData& ns );
+        CursorManager( const StringData& ns );
 
         /**
          * will kill() all PlanExecutor instances it has
          */
-        ~CollectionCursorCache();
+        ~CursorManager();
 
         // -----------------
 

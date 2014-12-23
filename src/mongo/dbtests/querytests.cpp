@@ -265,7 +265,7 @@ namespace QueryTests {
             {
                 // Check internal server handoff to getmore.
                 Client::WriteContext ctx(&_txn,  ns);
-                ClientCursorPin clientCursor( ctx.getCollection()->cursorCache(), cursorId );
+                ClientCursorPin clientCursor( ctx.getCollection()->cursorManager(), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
@@ -319,10 +319,10 @@ namespace QueryTests {
             // Check that the cursor has been removed.
             {
                 AutoGetCollectionForRead ctx(&_txn, ns);
-                ASSERT(0 == ctx.getCollection()->cursorCache()->numCursors());
+                ASSERT(0 == ctx.getCollection()->cursorManager()->numCursors());
             }
 
-            ASSERT_FALSE(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId));
+            ASSERT_FALSE(CursorManager::eraseCursorGlobal(&_txn, cursorId));
 
             // Check that a subsequent get more fails with the cursor removed.
             ASSERT_THROWS( _client.getMore( ns, cursorId ), UserException );
@@ -369,8 +369,8 @@ namespace QueryTests {
             // Check that the cursor still exists
             {
                 AutoGetCollectionForRead ctx(&_txn, ns);
-                ASSERT(1 == ctx.getCollection()->cursorCache()->numCursors());
-                ASSERT(ctx.getCollection()->cursorCache()->find(cursorId, false));
+                ASSERT(1 == ctx.getCollection()->cursorManager()->numCursors());
+                ASSERT(ctx.getCollection()->cursorManager()->find(cursorId, false));
             }
 
             // Check that the cursor can be iterated until all documents are returned.
@@ -665,7 +665,7 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns )->cursorCache(),
+            ClientCursorPin clientCursor( ctx.db()->getCollection( &_txn, ns )->cursorManager(),
                                           cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
@@ -1172,7 +1172,7 @@ namespace QueryTests {
             Collection* collection = ctx.getCollection();
             if ( !collection )
                 return 0;
-            return collection->cursorCache()->numCursors();
+            return collection->cursorManager()->numCursors();
         }
 
         const char * ns() {
@@ -1516,7 +1516,7 @@ namespace QueryTests {
             ClientCursor *clientCursor = 0;
             {
                 AutoGetCollectionForRead ctx(&_txn, ns());
-                ClientCursorPin clientCursorPointer(ctx.getCollection()->cursorCache(), cursorId);
+                ClientCursorPin clientCursorPointer(ctx.getCollection()->cursorManager(), cursorId);
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }
@@ -1554,11 +1554,11 @@ namespace QueryTests {
             {
                 Client::WriteContext ctx(&_txn,  ns() );
                 ClientCursorPin pinCursor( ctx.ctx().db()->getCollection( &_txn,
-                                                                          ns())->cursorCache(),
+                                                                          ns())->cursorManager(),
                                                                           cursorId );
                 string expectedAssertion =
                         str::stream() << "Cannot kill active cursor " << cursorId; 
-                ASSERT_THROWS_WHAT(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
+                ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_txn, cursorId),
                                    MsgAssertionException, expectedAssertion);
             }
             

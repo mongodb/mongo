@@ -69,12 +69,12 @@ namespace mongo {
         return cursorStatsOpen.get();
     }
 
-    ClientCursor::ClientCursor(CollectionCursorCache* cursorCache,
+    ClientCursor::ClientCursor(CursorManager* cursorManager,
                                PlanExecutor* exec,
                                int qopts,
                                const BSONObj query,
                                bool isAggCursor)
-        : _cursorCache(cursorCache),
+        : _cursorManager(cursorManager),
           _countedYet(false),
           _isAggCursor(isAggCursor),
           _unownedRU(NULL) {
@@ -84,14 +84,14 @@ namespace mongo {
         _query = query;
         _queryOptions = qopts;
         if (exec->collection()) {
-            invariant(cursorCache == exec->collection()->cursorCache());
+            invariant(cursorManager == exec->collection()->cursorManager());
         }
         init();
     }
 
-    ClientCursor::ClientCursor(CollectionCursorCache* cursorCache)
-        : _ns(cursorCache->ns()),
-          _cursorCache(cursorCache),
+    ClientCursor::ClientCursor(CursorManager* cursorManager)
+        : _ns(cursorManager->ns()),
+          _cursorManager(cursorManager),
           _countedYet(false),
           _queryOptions(QueryOption_NoCursorTimeout),
           _isAggCursor(false),
@@ -100,7 +100,7 @@ namespace mongo {
     }
 
     void ClientCursor::init() {
-        invariant( _cursorCache );
+        invariant( _cursorManager );
 
         _isPinned = false;
         _isNoTimeout = false;
@@ -116,7 +116,7 @@ namespace mongo {
             cursorStatsOpenNoTimeout.increment();
         }
 
-        _cursorid = _cursorCache->registerCursor( this );
+        _cursorid = _cursorManager->registerCursor( this );
 
         cursorStatsOpen.increment();
         _countedYet = true;
@@ -138,13 +138,13 @@ namespace mongo {
                 cursorStatsOpenNoTimeout.decrement();
         }
 
-        if ( _cursorCache ) {
+        if ( _cursorManager ) {
             // this could be null if kill() was killed
-            _cursorCache->deregisterCursor( this );
+            _cursorManager->deregisterCursor( this );
         }
 
         // defensive:
-        _cursorCache = NULL;
+        _cursorManager = NULL;
         _cursorid = INVALID_CURSOR_ID;
         _pos = -2;
         _isNoTimeout = false;
@@ -154,7 +154,7 @@ namespace mongo {
         if ( _exec.get() )
             _exec->kill();
 
-        _cursorCache = NULL;
+        _cursorManager = NULL;
     }
 
     //
@@ -218,10 +218,10 @@ namespace mongo {
     // deleted from underneath us, so we can save the pointer and ignore the ID.
     //
 
-    ClientCursorPin::ClientCursorPin( CollectionCursorCache* cursorCache, long long cursorid )
+    ClientCursorPin::ClientCursorPin( CursorManager* cursorManager, long long cursorid )
         : _cursor( NULL ) {
         cursorStatsOpenPinned.increment();
-        _cursor = cursorCache->find( cursorid, true );
+        _cursor = cursorManager->find( cursorid, true );
     }
 
     ClientCursorPin::~ClientCursorPin() {
@@ -235,14 +235,14 @@ namespace mongo {
 
         invariant( _cursor->isPinned() );
 
-        if ( _cursor->cursorCache() == NULL ) {
+        if ( _cursor->cursorManager() == NULL ) {
             // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
             // kill it.
             deleteUnderlying();
         }
         else {
-            // Unpin the cursor under the collection cursor cache lock.
-            _cursor->cursorCache()->unpin( _cursor );
+            // Unpin the cursor under the collection cursor manager lock.
+            _cursor->cursorManager()->unpin( _cursor );
         }
     }
 
@@ -252,11 +252,11 @@ namespace mongo {
         // - We must unpin the cursor before destruction, since it is an error to destroy a pinned
         //   cursor.
         // - In addition, we must deregister the cursor before unpinning, since it is an
-        //   error to unpin a registered cursor without holding the cursor cache lock (note that we
-        //   can't simply unpin with the cursor cache lock here, since we need to guarantee
+        //   error to unpin a registered cursor without holding the cursor manager lock (note that
+        //   we can't simply unpin with the cursor manager lock here, since we need to guarantee
         //   exclusive ownership of the cursor when we are deleting it).
-        if ( _cursor->cursorCache() ) {
-            _cursor->cursorCache()->deregisterCursor( _cursor );
+        if ( _cursor->cursorManager() ) {
+            _cursor->cursorManager()->deregisterCursor( _cursor );
             _cursor->kill();
         }
         _cursor->unsetPinned();
@@ -287,7 +287,7 @@ namespace mongo {
             while (!inShutdown()) {
                 OperationContextImpl txn;
                 cursorStatsTimedOut.increment(
-                    CollectionCursorCache::timeoutCursorsGlobal(&txn, t.millisReset()));
+                    CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
                 sleepsecs(Secs);
             }
             client.shutdown();

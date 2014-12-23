@@ -270,7 +270,7 @@ namespace mongo {
         //
 
         /**
-         * Register this plan executor with the collection cursor cache so that it
+         * Register this plan executor with the collection cursor manager so that it
          * receives notifications for events that happen while yielding any locks.
          *
          * Deregistration happens automatically when this plan executor is destroyed.

@@ -90,7 +90,7 @@ namespace ExecutorRegistry {
         void registerExecutor( PlanExecutor* exec ) {
             WriteUnitOfWork wuow(&_opCtx);
             _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
-                            ->cursorCache()
+                            ->cursorManager()
                             ->registerExecutor(exec);
             wuow.commit();
         }
@@ -98,7 +98,7 @@ namespace ExecutorRegistry {
         void deregisterExecutor( PlanExecutor* exec ) {
             WriteUnitOfWork wuow(&_opCtx);
             _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
-                            ->cursorCache()
+                            ->cursorManager()
                             ->deregisterExecutor(exec);
             wuow.commit();
         }

@@ -137,7 +137,7 @@ namespace mongo {
                 for (size_t i = 0; i < execs.size(); i++) {
                     // transfer ownership of an executor to the ClientCursor (which manages its own
                     // lifetime).
-                    ClientCursor* cc = new ClientCursor( collection->cursorCache(),
+                    ClientCursor* cc = new ClientCursor( collection->cursorManager(),
                                                          execs.releaseAt(i) );
 
                     // we are mimicking the aggregation cursor output here

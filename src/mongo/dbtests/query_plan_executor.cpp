@@ -154,7 +154,7 @@ namespace QueryPlanExecutor {
             Collection* collection = ctx.getCollection();
             if ( !collection )
                 return 0;
-            return collection->cursorCache()->numCursors();
+            return collection->cursorManager()->numCursors();
         }
 
         void registerExec( PlanExecutor* exec ) {
@@ -162,7 +162,7 @@ namespace QueryPlanExecutor {
             AutoGetCollectionForRead ctx(&_txn, ns());
             WriteUnitOfWork wunit(&_txn);
             Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
-            collection->cursorCache()->registerExecutor( exec );
+            collection->cursorManager()->registerExecutor( exec );
             wunit.commit();
         }
 
@@ -171,7 +171,7 @@ namespace QueryPlanExecutor {
             AutoGetCollectionForRead ctx(&_txn, ns());
             WriteUnitOfWork wunit(&_txn);
             Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
-            collection->cursorCache()->deregisterExecutor( exec );
+            collection->cursorManager()->deregisterExecutor( exec );
             wunit.commit();
         }
 
@@ -415,12 +415,12 @@ namespace QueryPlanExecutor {
                 PlanExecutor* exec = makeCollScanExec(coll,filterObj);
 
                 // Make a client cursor from the runner.
-                new ClientCursor(coll->cursorCache(), exec, 0, BSONObj());
+                new ClientCursor(coll->cursorManager(), exec, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                coll->cursorCache()->invalidateAll(false);
+                coll->cursorManager()->invalidateAll(false);
                 ASSERT_EQUALS(0U, numCursors());
             }
         };
@@ -441,13 +441,14 @@ namespace QueryPlanExecutor {
                 PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                 // Make a client cursor from the runner.
-                ClientCursor* cc = new ClientCursor(collection->cursorCache(), exec, 0, BSONObj());
-                ClientCursorPin ccPin(collection->cursorCache(), cc->cursorid());
+                ClientCursor* cc = new ClientCursor(collection->cursorManager(), exec, 0,
+                                                    BSONObj());
+                ClientCursorPin ccPin(collection->cursorManager(), cc->cursorid());
 
                 // If the cursor is pinned, it sticks around,
                 // even after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                collection->cursorCache()->invalidateAll(false);
+                collection->cursorManager()->invalidateAll(false);
                 ASSERT_EQUALS(1U, numCursors());
 
                 // The invalidation should have killed the runner.
@@ -481,13 +482,13 @@ namespace QueryPlanExecutor {
                     PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                     // Make a client cursor from the runner.
-                    new ClientCursor(collection->cursorCache(), exec, 0, BSONObj());
+                    new ClientCursor(collection->cursorManager(), exec, 0, BSONObj());
                 }
 
                 // There should be one cursor before timeout,
                 // and zero cursors after timeout.
                 ASSERT_EQUALS(1U, numCursors());
-                CollectionCursorCache::timeoutCursorsGlobal(&_txn, 600001);
+                CursorManager::timeoutCursorsGlobal(&_txn, 600001);
                 ASSERT_EQUALS(0U, numCursors());
             }
         };
