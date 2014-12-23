@@ -72,9 +72,8 @@ __txn_commit_printlog(
 
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp) {
-		if (firstrecord == 0) {
+		if (!firstrecord)
 			fprintf(out, ",\n");
-		}
 
 		firstrecord = 0;
 
@@ -426,9 +425,8 @@ __wt_txn_truncate_end(WT_SESSION_IMPL *session)
  *	Print a log record in a human-readable format.
  */
 static int
-__txn_printlog(
-    WT_SESSION_IMPL *session, WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie,
-    int firstrecord)
+__txn_printlog(WT_SESSION_IMPL *session,
+    WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie, int firstrecord)
 {
 	FILE *out;
 	WT_LOG_RECORD *logrec;
@@ -450,7 +448,7 @@ __txn_printlog(
 	/* First, peek at the log record type. */
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
-	if (firstrecord == 0)
+	if (!firstrecord)
 		fprintf(out, ",\n");
 
 	if (fprintf(out, "  { \"lsn\" : [%" PRIu32 ",%" PRId64 "],\n",

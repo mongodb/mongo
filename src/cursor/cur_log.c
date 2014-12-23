@@ -12,13 +12,13 @@
  *	Callback function from log_scan to get a log record.
  */
 static int
-__curlog_logrec(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie,
-    int firstrecord)
+__curlog_logrec(WT_SESSION_IMPL *session,
+    WT_ITEM *logrec, WT_LSN *lsnp, void *cookie, int firstrecord)
 {
 	WT_CURSOR_LOG *cl;
 
 	cl = cookie;
+	WT_UNUSED(firstrecord);
 
 	/* Set up the LSNs and take a copy of the log record for the cursor. */
 	*cl->cur_lsn = *lsnp;
