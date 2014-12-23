@@ -746,8 +746,14 @@ namespace {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = txn->getClient()->getAuthorizationSession()->checkAuthForGetMore(
-                        nsString, cursorid);
+                Status status = Status::OK();
+                if (CursorManager::getGlobalCursorManager()->ownsCursorId(cursorid)) {
+                    // TODO Implement auth check for global cursors.  SERVER-16657.
+                }
+                else {
+                    status = txn->getClient()->getAuthorizationSession()->checkAuthForGetMore(
+                            nsString, cursorid);
+                }
                 audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
                 uassertStatusOK(status);
 

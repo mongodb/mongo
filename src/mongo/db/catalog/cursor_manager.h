@@ -99,6 +99,7 @@ namespace mongo {
 
         bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth );
 
+        bool ownsCursorId( CursorId cursorId );
         void getCursorIds( std::set<CursorId>* openCursors );
         std::size_t numCursors();
 
@@ -112,6 +113,8 @@ namespace mongo {
         void unpin( ClientCursor* cursor );
 
         // ----------------------
+
+        static CursorManager* getGlobalCursorManager();
 
         static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
             const char* ids);

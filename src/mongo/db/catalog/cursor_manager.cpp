@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/cursor_manager.h"
 
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/init.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -108,7 +109,6 @@ namespace mongo {
         std::size_t timeoutCursors(OperationContext* txn, int millisSinceLastCall);
 
         int64_t nextSeed();
-
     private:
         SimpleMutex _mutex;
 
@@ -117,7 +117,23 @@ namespace mongo {
         unsigned _nextId;
 
         SecureRandom* _secureRandom;
-    } _globalCursorIdCache;
+    };
+
+    // Note that "globalCursorIdCache" must be declared before "globalCursorManager", as the latter
+    // calls into the former during destruction.
+    boost::scoped_ptr<GlobalCursorIdCache> globalCursorIdCache;
+    boost::scoped_ptr<CursorManager> globalCursorManager;
+
+    MONGO_INITIALIZER(GlobalCursorIdCache)(InitializerContext* context) {
+        globalCursorIdCache.reset(new GlobalCursorIdCache());
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(GlobalCursorManager, ("GlobalCursorIdCache"))
+        (InitializerContext* context) {
+        globalCursorManager.reset(new CursorManager(""));
+        return Status::OK();
+    }
 
     GlobalCursorIdCache::GlobalCursorIdCache()
         : _mutex( "GlobalCursorIdCache" ),
@@ -189,6 +205,10 @@ namespace mongo {
             }
         }
 
+        if (ns == globalCursorManager->ns()) {
+            return globalCursorManager->eraseCursor(txn, id, checkAuth);
+        }
+
         AutoGetCollectionForRead ctx(txn, nss);
         if (!ctx.getDb()) {
             return false;
@@ -203,7 +223,6 @@ namespace mongo {
                                                  ErrorCodes::CursorNotFound );
             return false;
         }
-
         return collection->cursorManager()->eraseCursor(txn, id, checkAuth);
     }
 
@@ -218,7 +237,13 @@ namespace mongo {
         size_t totalTimedOut = 0;
 
         for ( unsigned i = 0; i < todo.size(); i++ ) {
-            AutoGetCollectionForRead ctx(txn, todo[i]);
+            const std::string& ns = todo[i];
+            if ( ns == globalCursorManager->ns() ) {
+                totalTimedOut += globalCursorManager->timeoutCursors( millisSinceLastCall );
+                continue;
+            }
+
+            AutoGetCollectionForRead ctx(txn, ns);
             if (!ctx.getDb()) {
                 continue;
             }
@@ -229,7 +254,6 @@ namespace mongo {
             }
 
             totalTimedOut += collection->cursorManager()->timeoutCursors( millisSinceLastCall );
-
         }
 
         return totalTimedOut;
@@ -237,9 +261,13 @@ namespace mongo {
 
     // ---
 
+    CursorManager* CursorManager::getGlobalCursorManager() {
+        return globalCursorManager.get();
+    }
+
     std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* txn,
         int millisSinceLastCall) {;
-    return _globalCursorIdCache.timeoutCursors(txn, millisSinceLastCall);
+    return globalCursorIdCache->timeoutCursors(txn, millisSinceLastCall);
     }
 
     int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n,
@@ -255,10 +283,10 @@ namespace mongo {
         return numDeleted;
     }
     bool CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id) {
-        return _globalCursorIdCache.eraseCursor(txn, id, true);
+        return globalCursorIdCache->eraseCursor(txn, id, true);
     }
     bool CursorManager::eraseCursorGlobal(OperationContext* txn, CursorId id) {
-        return _globalCursorIdCache.eraseCursor(txn, id, false );
+        return globalCursorIdCache->eraseCursor(txn, id, false );
     }
 
 
@@ -268,13 +296,13 @@ namespace mongo {
     CursorManager::CursorManager( const StringData& ns )
         : _nss( ns ),
           _mutex( "CursorManager" ) {
-        _collectionCacheRuntimeId = _globalCursorIdCache.created( _nss.ns() );
-        _random.reset( new PseudoRandom( _globalCursorIdCache.nextSeed() ) );
+        _collectionCacheRuntimeId = globalCursorIdCache->created( _nss.ns() );
+        _random.reset( new PseudoRandom( globalCursorIdCache->nextSeed() ) );
     }
 
     CursorManager::~CursorManager() {
         invalidateAll( true );
-        _globalCursorIdCache.destroyed( _collectionCacheRuntimeId, _nss.ns() );
+        globalCursorIdCache->destroyed( _collectionCacheRuntimeId, _nss.ns() );
     }
 
     void CursorManager::invalidateAll( bool collectionGoingAway ) {
@@ -428,6 +456,10 @@ namespace mongo {
 
         invariant( cursor->isPinned() );
         cursor->unsetPinned();
+    }
+
+    bool CursorManager::ownsCursorId( CursorId cursorId ) {
+        return _collectionCacheRuntimeId == idFromCursorId( cursorId );
     }
 
     void CursorManager::getCursorIds( std::set<CursorId>* openCursors ) {
