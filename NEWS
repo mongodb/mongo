@@ -27,7 +27,7 @@ New features and API changes:
   to do these operations while the checkpoint server is running.
   [#1397] [#1404] SERVER-16236 SERVER-16457
 
-* Add support for immutable indeces. [#1344]
+* Add support for immutable indexes. [#1344]
 
 * Added several new statistics field, improved accuracy for some statistics
   tracking and simplified mechanism for querying a particular statistic.
