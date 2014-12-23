@@ -159,10 +159,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 		/*
 		 * We failed to get the page -- yield before retrying, and if
-		 * we've yielded a few times start sleeping so we don't burn
+		 * we've yielded enough times, start sleeping so we don't burn
 		 * CPU to no purpose.
 		 */
-		if (++wait_cnt < 5)
+		if (++wait_cnt < 1000)
 			__wt_yield();
 		 else {
 			wait_cnt *= 2;
