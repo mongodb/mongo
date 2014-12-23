@@ -2745,7 +2745,21 @@ namespace mongo {
                     return false;
                 }
 
-                return passthrough( conf, cmdObj, result );
+                bool retval = passthrough( conf, cmdObj, result );
+
+                BSONObj peekResultObj = result.asTempObj();
+
+                if (peekResultObj["ok"].trueValue() && peekResultObj.hasField("cursor")) {
+                    long long cursorId = peekResultObj["cursor"]["id"].Long();
+                    if (cursorId) {
+                        const string cursorNs = peekResultObj["cursor"]["ns"].String();
+                        cursorCache.storeRef(conf->getPrimary().getConnString(),
+                                             cursorId,
+                                             cursorNs);
+                    }
+                }
+
+                return retval;
             }
         } cmdListIndexes;
 
