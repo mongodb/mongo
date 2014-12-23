@@ -54,7 +54,6 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
@@ -511,10 +510,7 @@ namespace {
                 s << " code:" << exceptionInfo.code;
         }
 
-        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
-            s << " numYields:" << curop.numYields();
-        
-        s << " ";
+        s << " numYields:" << curop.numYields() << " ";
         
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
@@ -600,8 +596,7 @@ namespace {
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
-        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
-            b.appendNumber( "numYield" , curop.numYields() );
+        b.appendNumber("numYield", curop.numYields());
 
         if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );

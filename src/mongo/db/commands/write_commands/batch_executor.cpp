@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -855,15 +854,16 @@ namespace mongo {
              ++state.currIndex) {
 
             if (elapsedTracker.intervalHasElapsed()) {
-                // Consider yielding between inserts. We never yield for storage engines that
-                // support document-level locking. TODO: as an optimization, this should only
-                // yield if another thread is waiting for our lock.
-                if (!supportsDocLocking() && state.hasLock()) {
+                // Yield between inserts.
+                if (state.hasLock()) {
                     // Release our locks. They get reacquired when insertOne() calls
                     // ExecInsertsState::lockAndCheck(). Since the lock manager guarantees FIFO
                     // queues waiting on locks, there is no need to explicitly sleep or give up
                     // control of the processor here.
                     state.unlock();
+
+                    // This releases any storage engine held locks/snapshots.
+                    _txn->recoveryUnit()->commitAndRestart();
                 }
 
                 _txn->checkForInterrupt();

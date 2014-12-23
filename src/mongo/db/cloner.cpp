@@ -112,8 +112,8 @@ namespace mongo {
             invariant(from_collection.coll() != "system.indexes");
 
             // XXX: can probably take dblock instead
-            ScopedTransaction transaction(txn, MODE_X);
-            scoped_ptr<Lock::GlobalWrite> lk(new Lock::GlobalWrite(txn->lockState()));
+            scoped_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
+            scoped_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
 
             // Make sure database still exists after we resume from the temp release
             Database* db = dbHolder().openDb(txn, _dbName);
@@ -148,9 +148,13 @@ namespace mongo {
                     }
 
                     if (_mayYield) {
-                        lk.reset();
+                        scopedXact.reset();
+                        globalWriteLock.reset();
+
                         txn->getCurOp()->yielded();
-                        lk.reset(new Lock::GlobalWrite(txn->lockState()));
+
+                        scopedXact.reset(new ScopedTransaction(txn, MODE_X));
+                        globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
 
                         // Check if everything is still all right.
                         if (logForRepl) {
