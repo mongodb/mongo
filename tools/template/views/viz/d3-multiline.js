@@ -15,57 +15,59 @@ module.exports = function(opts) {
   
   function redraw(opts) {
     var transTime = 300;
-    // var initial = (initial === undefined) || false;
 
-    // recalculate width/height
-    width = opts.width - margin.left - margin.right;
-    height = opts.height - margin.top - margin.bottom;
-    
-    // new data and settings
-    data = opts.data;
-    series = data.series;
-    options = data.options;
+    // data may have changed
+    if (opts) {     
+      // recalculate width/height
+      width = opts.width - margin.left - margin.right;
+      height = opts.height - margin.top - margin.bottom;
+      
+      // new data and settings
+      data = opts.data;
+      series = data.series;
+      options = data.options;   
 
-    if (series.length === 0) {
-      svg.style('visibility', 'hidden');
-      // return false;
-    } else {
-      svg.style('visibility', 'visible');
-    }
+      if (series.length === 0) {
+        svg.style('visibility', 'hidden');
+        // return false;
+      } else {
+        svg.style('visibility', 'visible');
+      }
 
-    svg.attr({width: width, height: height});
+      svg.attr({width: width, height: height});
 
-    // switch x-axis and update domain
-    if (options.xSetting === 'relative') {
-      accx = function (d) { return d.xrel };
-      x = x_relative;
-      xAxis.tickFormat(d3.format(','));
-    } else {
-      accx = function (d) { return d.x };
-      x = x_absolute;
-      xAxis.tickFormat(customTimeFormat);
-    }
+      // switch x-axis and update domain
+      if (options.xSetting === 'relative') {
+        accx = function (d) { return d.xrel };
+        x = x_relative;
+        xAxis.tickFormat(d3.format(','));
+      } else {
+        accx = function (d) { return d.x };
+        x = x_absolute;
+        xAxis.tickFormat(customTimeFormat);
+      }
 
-    x.range([0, width]);
-    x.domain([
-      d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
-      d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
-    ]);
-
-    // switch y-axis and update domain
-    if (options.ySetting === 'linear') {
-      y = y_linear;
-      y.domain([
-        d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.y; }); }),
-        d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
+      x.range([0, width]);
+      x.domain([
+        d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
+        d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
       ]);
-    } else {
-      y = y_logscale;
-      y.domain([
-        0.1, d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
-      ]);
+
+      // switch y-axis and update domain
+      if (options.ySetting === 'linear') {
+        y = y_linear;
+        y.domain([
+          d3.min(series, function (s) { return d3.min(s.data, function (v) {return v.y; }); }),
+          d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
+        ]);
+      } else {
+        y = y_logscale;
+        y.domain([
+          0.1, d3.max(series, function (s) { return d3.max(s.data, function (v) {return v.y; }); })
+        ]);
+      }
+      y.range([height, 0]);
     }
-    y.range([height, 0]);
 
     // redraw x and y axes
     svg.selectAll('.x')
@@ -236,8 +238,6 @@ module.exports = function(opts) {
   var svg = d3.select(el)
     .append('g')
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-  
-  // svg.attr({width: width, height: height});
 
   svg.append("g")
     .attr("class", "x axis")
