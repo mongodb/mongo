@@ -266,7 +266,8 @@ __txn_commit_apply(
  */
 static int
 __txn_log_recover(
-    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
+    WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie,
+    int firstrecord)
 {
 	WT_RECOVERY *r;
 	const uint8_t *end, *p;

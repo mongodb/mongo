@@ -1160,7 +1160,7 @@ err:
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     int (*func)(WT_SESSION_IMPL *session,
-    WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
+    WT_ITEM *record, WT_LSN *lsnp, void *cookie, int firstrecord), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(uncitem);
@@ -1174,6 +1174,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
 	int eol;
+	int firstrecord;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1181,6 +1182,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log_fh = NULL;
 	logcount = 0;
 	logfiles = NULL;
+	firstrecord = 1;
 	eol = 0;
 	WT_CLEAR(buf);
 
@@ -1364,10 +1366,13 @@ advance:
 				WT_ERR(__log_decompress(session, &buf,
 				    &uncitem));
 				WT_ERR((*func)(session, uncitem, &rd_lsn,
-				    cookie));
+				    cookie, firstrecord));
 				__wt_scr_free(&uncitem);
 			} else
-				WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
+				WT_ERR((*func)(session, &buf, &rd_lsn, cookie,
+				    firstrecord));
+
+			firstrecord = 0;
 
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
