@@ -63,8 +63,6 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
-#include "mongo/db/server_options.h"
-
 using namespace mongoutils;
 
 #ifndef O_NOATIME
@@ -241,13 +239,6 @@ namespace mongo {
             if (!ProcessInfo::isDataFileZeroingNeeded()) {
                 return;
             }
-
-#ifdef _WIN32
-            if (!serverGlobalParams.isDataFileZeroingNeeded) {
-                log() << "Not zeroing out new datafile because isDataFileZeroingNeeded option is set to true" << endl;
-                return;
-            }
-#endif
 
             lseek(fd, 0, SEEK_SET);
 

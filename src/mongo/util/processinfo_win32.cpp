@@ -33,6 +33,8 @@
 
 #include <iostream>
 #include <psapi.h>
+#include <wuapi.h>
+#include <boost/algorithm/string.hpp>
 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"
@@ -116,6 +118,99 @@ namespace mongo {
 #endif
     }
 
+    string BSTRToString(const BSTR bstr, int cp = CP_UTF8)
+    {
+        string result;
+
+	      if (!bstr) {
+		       return result;
+	      }
+
+	      int len = SysStringLen(bstr);
+	      int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
+	      if (res > 0) {
+		        result.resize(res);
+		        WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
+	      }
+	      return result;
+    }
+
+    bool getInstalledUpdateTitlesInternal(list<string> &updateTitles)
+    {
+	    HRESULT hr;
+	    IUpdateSession *updateSession;
+	    IUpdateSearcher *updateSearcher;
+	    IUpdateHistoryEntryCollection *historyEntryCollection;
+	    LONG historyCount;
+    
+	    if (CoCreateInstance(CLSID_UpdateSession, NULL, CLSCTX_INPROC_SERVER, IID_IUpdateSession, (LPVOID*)&updateSession) != S_OK) {
+		    return false;
+	    }
+	
+	    hr = updateSession->CreateUpdateSearcher(&updateSearcher);
+	    updateSession->Release();
+	    if (hr != S_OK) {
+		    return false;
+	    }
+	
+	    if (updateSearcher->GetTotalHistoryCount(&historyCount) != S_OK) {
+		    updateSearcher->Release();
+		    return false;
+	    }
+	
+	    hr = updateSearcher->QueryHistory(1, historyCount, &historyEntryCollection);
+	    updateSearcher->Release();
+	    if (hr != S_OK) {
+		    return false;
+	    }
+
+	    if (historyEntryCollection->get_Count(&historyCount) != S_OK) {
+		    historyEntryCollection->Release();
+		    return false;
+	    }
+
+	    for (LONG idx = 0; idx < historyCount; idx++) {
+		    IUpdateHistoryEntry *historyEntry;
+		    if (historyEntryCollection->get_Item(idx, &historyEntry) != S_OK) {
+			    historyEntryCollection->Release();
+			    return false;
+		    }
+		
+		    UpdateOperation operationType;
+		    OperationResultCode operationResultCode;
+		    if (historyEntry->get_Operation(&operationType) != S_OK || historyEntry->get_ResultCode(&operationResultCode) != S_OK) {
+			    historyEntry->Release();
+			    historyEntryCollection->Release();
+			    return false;
+		    }
+		    if (operationType == UpdateOperation::uoInstallation && operationResultCode == OperationResultCode::orcSucceeded) {
+			    BSTR title;
+			    if (historyEntry->get_Title(&title) != S_OK) {
+				    historyEntry->Release();
+				    historyEntryCollection->Release();
+				    return false;
+			    }
+			    updateTitles.push_back(BSTRToString(title));
+			    SysFreeString(title);
+		    }
+
+		    historyEntry->Release();
+	    }
+	    historyEntryCollection->Release();
+	    return true;
+    }
+
+    bool getInstalledUpdateTitles(list<string> &updateTitles)
+    {
+	    if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) != S_OK) {
+		    return false;
+	    }
+
+	    bool result = getInstalledUpdateTitlesInternal(updateTitles);
+	    ::CoUninitialize();
+	    return result;
+    }
+
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
@@ -175,6 +270,20 @@ namespace mongo {
                         //
                         if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
                             fileZeroNeeded = true;
+
+                            // If the hotfix for http://support.microsoft.com/kb/2731284 is installed,
+                            // there is no need to zero-out data files.
+                            list<string> updateTitles;
+                            if (getInstalledUpdateTitles(updateTitles)) {
+                              for(list< string >::const_iterator i = updateTitles.begin(); i != updateTitles.end(); ++i) {
+                                string updateTitle = *i;
+                                if (boost::iequals(updateTitle, "Hotfix for Windows (KB2731284)")) {
+                                  log() << "Hotfix for KB2731284 is installed, no need to zero-out data files";
+                                  fileZeroNeeded = false;
+                                  break;
+                                }
+                              }
+                            }
                         }
                         break;
                     case 0:
