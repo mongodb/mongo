@@ -267,7 +267,7 @@ namespace mongo {
         virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,
-                                 ValidateResults* results, BSONObjBuilder* output ) const = 0;
+                                 ValidateResults* results, BSONObjBuilder* output ) = 0;
 
         /**
          * @param scaleSize - amount by which to scale size metrics

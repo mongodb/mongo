@@ -509,7 +509,7 @@ namespace mongo {
                                        bool scanData,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
-                                       BSONObjBuilder* output ) const {
+                                       BSONObjBuilder* output ) {
         // TODO validate that _numRecords and _dataSize are correct in scanData mode
         if ( scanData ) {
             bool invalidObject = false;

@@ -655,7 +655,7 @@ namespace {
                                             bool scanData,
                                             ValidateAdaptor* adaptor,
                                             ValidateResults* results,
-                                            BSONObjBuilder* output ) const {
+                                            BSONObjBuilder* output ) {
 
         long long nrecords = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );

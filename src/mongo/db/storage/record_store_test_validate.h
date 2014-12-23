@@ -77,7 +77,7 @@ namespace {
             return _harnessHelper->newOperationContext();
         }
 
-        const RecordStore& getRecordStore() { return *_rs; }
+        RecordStore& getRecordStore() { return *_rs; }
 
         const set<string>& getInsertedRecords() { return _remain; }
 

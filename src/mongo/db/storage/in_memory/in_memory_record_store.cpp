@@ -403,7 +403,7 @@ namespace mongo {
                                          bool scanData,
                                          ValidateAdaptor* adaptor,
                                          ValidateResults* results,
-                                         BSONObjBuilder* output) const {
+                                         BSONObjBuilder* output) {
         results->valid = true;
         if (scanData && full) {
             for (Records::const_iterator it = _data->records.begin();

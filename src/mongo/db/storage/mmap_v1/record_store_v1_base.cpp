@@ -512,7 +512,7 @@ namespace mongo {
     Status RecordStoreV1Base::validate( OperationContext* txn,
                                         bool full, bool scanData,
                                         ValidateAdaptor* adaptor,
-                                        ValidateResults* results, BSONObjBuilder* output ) const {
+                                        ValidateResults* results, BSONObjBuilder* output ) {
 
         // 1) basic status that require no iteration
         // 2) extent level info

@@ -143,7 +143,7 @@ namespace mongo {
                                  bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results,
-                                 BSONObjBuilder* output ) const;
+                                 BSONObjBuilder* output );
 
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
