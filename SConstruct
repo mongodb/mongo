@@ -883,7 +883,8 @@ elif windows:
                      'shell32.lib',
                      'Iphlpapi.lib',
                      'ole32.lib',
-                     'oleaut32.lib'])
+                     'oleaut32.lib',
+                     'wbemuuid.lib'])
 
     # v8 calls timeGetTime()
     if usev8:

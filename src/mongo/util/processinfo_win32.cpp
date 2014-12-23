@@ -33,7 +33,7 @@
 
 #include <iostream>
 #include <psapi.h>
-#include <wuapi.h>
+#include <wbemidl.h>
 #include <boost/algorithm/string.hpp>
 
 #include "mongo/util/processinfo.h"
@@ -118,95 +118,121 @@ namespace mongo {
 #endif
     }
 
-    string BSTRToString(const BSTR bstr, int cp = CP_UTF8)
-    {
+    string BSTRToString(const BSTR bstr, int cp = CP_UTF8) {
         string result;
 
-          if (!bstr) {
-               return result;
-          }
+        if (!bstr) {
+            return result;
+        }
 
-          int len = SysStringLen(bstr);
-          int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
-          if (res > 0) {
-                result.resize(res);
-                WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
-          }
-          return result;
+        int len = SysStringLen(bstr);
+        int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
+        if (res > 0) {
+            result.resize(res);
+            WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
+        }
+        return result;
     }
 
-    bool getInstalledUpdateTitlesInternal(list<string> &updateTitles)
-    {
+    bool getInstalledHotfixIDsInternal(list<string> &hotfixIDs) {
         HRESULT hr;
-        IUpdateSession *updateSession;
-        IUpdateSearcher *updateSearcher;
-        IUpdateHistoryEntryCollection *historyEntryCollection;
-        LONG historyCount;
-    
-        if (CoCreateInstance(CLSID_UpdateSession, NULL, CLSCTX_INPROC_SERVER, IID_IUpdateSession, (LPVOID*)&updateSession) != S_OK) {
-            return false;
-        }
-    
-        hr = updateSession->CreateUpdateSearcher(&updateSearcher);
-        updateSession->Release();
-        if (hr != S_OK) {
-            return false;
-        }
-    
-        if (updateSearcher->GetTotalHistoryCount(&historyCount) != S_OK) {
-            updateSearcher->Release();
-            return false;
-        }
-    
-        hr = updateSearcher->QueryHistory(1, historyCount, &historyEntryCollection);
-        updateSearcher->Release();
-        if (hr != S_OK) {
+        IWbemLocator *pLoc;
+        IWbemServices *pSvc;
+        IEnumWbemClassObject *pEnum;
+
+        hr = CoInitializeSecurity(
+            NULL,                        // Security descriptor    
+            -1,                          // COM negotiates authentication service
+            NULL,                        // Authentication services
+            NULL,                        // Reserved
+            RPC_C_AUTHN_LEVEL_DEFAULT,   // Default authentication level for proxies
+            RPC_C_IMP_LEVEL_IMPERSONATE, // Default Impersonation level for proxies
+            NULL,                        // Authentication info
+            EOAC_NONE,                   // Additional capabilities of the client or server
+            NULL);                       // Reserved
+        if (FAILED(hr)) {
             return false;
         }
 
-        if (historyEntryCollection->get_Count(&historyCount) != S_OK) {
-            historyEntryCollection->Release();
+        hr = CoCreateInstance(CLSID_WbemLocator, 0,
+            CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID *)&pLoc);
+        if (FAILED(hr)) {
             return false;
         }
 
-        for (LONG idx = 0; idx < historyCount; idx++) {
-            IUpdateHistoryEntry *historyEntry;
-            if (historyEntryCollection->get_Item(idx, &historyEntry) != S_OK) {
-                historyEntryCollection->Release();
+        // Connect to the root\default namespace with the current user.
+        hr = pLoc->ConnectServer(
+            BSTR(L"ROOT\\CIMV2"),   //namespace
+            NULL,                    // User name 
+            NULL,                    // User password
+            0,                        // Locale 
+            NULL,                    // Security flags
+            0,                        // Authority 
+            0,                        // Context object 
+            &pSvc);                    // IWbemServices proxy
+        pLoc->Release();
+        if (FAILED(hr)) {
+            return false;
+        }
+
+        BSTR language = SysAllocString(L"WQL");
+        BSTR query = SysAllocString(L"SELECT HotFixID FROM Win32_QuickFixEngineering");
+
+        hr = pSvc->ExecQuery(
+            language,
+            query,
+            WBEM_FLAG_FORWARD_ONLY,         // Flags
+            0,                              // Context
+            &pEnum
+            );
+        SysFreeString(language);
+        SysFreeString(query);
+        pSvc->Release();
+        if (FAILED(hr)) {
+            return false;
+        }
+
+        for (;;) {
+            IWbemClassObject *pObj;
+            ULONG uReturned;
+
+            hr = pEnum->Next(
+                0,                  // Time out
+                1,                  // One object
+                &pObj,
+                &uReturned
+                );
+            if (FAILED(hr)) {
+                pEnum->Release();
                 return false;
             }
-        
-            UpdateOperation operationType;
-            OperationResultCode operationResultCode;
-            if (historyEntry->get_Operation(&operationType) != S_OK || historyEntry->get_ResultCode(&operationResultCode) != S_OK) {
-                historyEntry->Release();
-                historyEntryCollection->Release();
-                return false;
-            }
-            if (operationType == UpdateOperation::uoInstallation && operationResultCode == OperationResultCode::orcSucceeded) {
-                BSTR title;
-                if (historyEntry->get_Title(&title) != S_OK) {
-                    historyEntry->Release();
-                    historyEntryCollection->Release();
-                    return false;
-                }
-                updateTitles.push_back(BSTRToString(title));
-                SysFreeString(title);
+
+            if (uReturned == 0) {
+                break;
             }
 
-            historyEntry->Release();
+            VARIANT value;
+            hr = pObj->Get(L"HotFixID", 0, &value, NULL, NULL);
+            pObj->Release();
+            if (FAILED(hr)) {
+                pEnum->Release();
+                return false;
+            }
+
+            string hotfixID = BSTRToString(value.bstrVal);
+            VariantClear(&value);
+            hotfixIDs.push_back(hotfixID);
         }
-        historyEntryCollection->Release();
+        pEnum->Release();
         return true;
     }
 
-    bool getInstalledUpdateTitles(list<string> &updateTitles)
-    {
+    bool getInstalledHotfixIDs(list<string> &hotfixIDs) {
         if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) != S_OK) {
             return false;
         }
 
-        bool result = getInstalledUpdateTitlesInternal(updateTitles);
+        bool result = getInstalledHotfixIDsInternal(hotfixIDs);
         ::CoUninitialize();
         return result;
     }
@@ -273,11 +299,11 @@ namespace mongo {
 
                             // If the hotfix for http://support.microsoft.com/kb/2731284 is installed,
                             // there is no need to zero-out data files.
-                            list<string> updateTitles;
-                            if (getInstalledUpdateTitles(updateTitles)) {
-                              for(list< string >::const_iterator i = updateTitles.begin(); i != updateTitles.end(); ++i) {
-                                string updateTitle = *i;
-                                if (boost::iequals(updateTitle, "Hotfix for Windows (KB2731284)")) {
+                            list<string> hotfixIDs;
+                            if (getInstalledHotfixIDs(hotfixIDs)) {
+                              for(list< string >::const_iterator i = hotfixIDs.begin(); i != hotfixIDs.end(); ++i) {
+                                string hotfixID = *i;
+                                if (boost::iequals(hotfixID, "KB2731284")) {
                                   log() << "Hotfix for KB2731284 is installed, no need to zero-out data files";
                                   fileZeroNeeded = false;
                                   break;
