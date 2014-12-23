@@ -403,7 +403,7 @@ namespace {
         appendCustomStats(txn, output, 1);
     }
 
-    void WiredTigerIndex::appendCustomStats(OperationContext* txn,
+    bool WiredTigerIndex::appendCustomStats(OperationContext* txn,
                                             BSONObjBuilder* output,
                                             double scale) const {
 
@@ -441,7 +441,7 @@ namespace {
             output->append("code", static_cast<int>(status.code()));
             output->append("reason", status.reason());
         }
-
+        return true;
     }
 
     Status WiredTigerIndex::dupKeyCheck( OperationContext* txn,

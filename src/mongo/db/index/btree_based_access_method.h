@@ -105,7 +105,7 @@ namespace mongo {
         virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys,
                                 BSONObjBuilder* output);
 
-        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
             const;
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 

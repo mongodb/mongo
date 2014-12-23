@@ -159,8 +159,10 @@ namespace mongo {
          * Add custom statistics about this index to BSON object builder, for display.
          *
          * 'scale' is a scaling factor to apply to all byte statistics.
+         *
+         * Returns true if stats were appended.
          */
-        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale)
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* result, double scale)
             const = 0;
 
         /**

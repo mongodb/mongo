@@ -958,9 +958,10 @@ namespace mongo {
                 IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
                 invariant(iam);
 
-                BSONObjBuilder bob(indexDetails.subobjStart(descriptor->indexNamespace()));
-
-                iam->appendCustomStats(txn, &bob, scale);
+                BSONObjBuilder bob;
+                if (iam->appendCustomStats(txn, &bob, scale)) {
+                    indexDetails.append(descriptor->indexName(), bob.obj());
+                }
             }
 
             result.append("indexDetails", indexDetails.done());

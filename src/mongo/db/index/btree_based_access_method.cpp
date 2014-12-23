@@ -231,10 +231,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    void BtreeBasedAccessMethod::appendCustomStats(OperationContext* txn,
+    bool BtreeBasedAccessMethod::appendCustomStats(OperationContext* txn,
                                                    BSONObjBuilder* output,
                                                    double scale) const {
-        _newInterface->appendCustomStats(txn, output, scale);
+        return _newInterface->appendCustomStats(txn, output, scale);
     }
 
     long long BtreeBasedAccessMethod::getSpaceUsedBytes( OperationContext* txn ) const {

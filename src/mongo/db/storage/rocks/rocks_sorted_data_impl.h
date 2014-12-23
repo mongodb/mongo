@@ -83,8 +83,10 @@ namespace mongo {
         virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
                                   BSONObjBuilder* output) const;
 
-        virtual void appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const { }
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const {
+            return false;
+        }
 
         virtual bool isEmpty(OperationContext* txn);
 

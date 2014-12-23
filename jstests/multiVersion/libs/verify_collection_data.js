@@ -130,6 +130,9 @@ function CollectionDataValidator() {
         delete newCollectionStats["maxSize"];
         delete collectionStats["maxSize"];
 
+        // Delete key added in 2.8-rc3
+        delete collectionStats["indexDetails"];
+
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 
         // Get the indexes for this collection

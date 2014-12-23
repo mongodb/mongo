@@ -547,7 +547,7 @@ namespace mongo {
         result->appendBool("capped", _isCapped);
         if (_isCapped) {
             result->appendIntOrLL("max", _cappedMaxDocs);
-            result->appendIntOrLL("maxSize", _cappedMaxSize);
+            result->appendIntOrLL("maxSize", _cappedMaxSize / scale);
         }
         bool valid = _db->GetProperty(_columnFamily.get(), "rocksdb.stats", &statsString);
         invariant( valid );
