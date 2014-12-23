@@ -122,93 +122,93 @@ namespace mongo {
     {
         string result;
 
-	      if (!bstr) {
-		       return result;
-	      }
+          if (!bstr) {
+               return result;
+          }
 
-	      int len = SysStringLen(bstr);
-	      int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
-	      if (res > 0) {
-		        result.resize(res);
-		        WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
-	      }
-	      return result;
+          int len = SysStringLen(bstr);
+          int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
+          if (res > 0) {
+                result.resize(res);
+                WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
+          }
+          return result;
     }
 
     bool getInstalledUpdateTitlesInternal(list<string> &updateTitles)
     {
-	    HRESULT hr;
-	    IUpdateSession *updateSession;
-	    IUpdateSearcher *updateSearcher;
-	    IUpdateHistoryEntryCollection *historyEntryCollection;
-	    LONG historyCount;
+        HRESULT hr;
+        IUpdateSession *updateSession;
+        IUpdateSearcher *updateSearcher;
+        IUpdateHistoryEntryCollection *historyEntryCollection;
+        LONG historyCount;
     
-	    if (CoCreateInstance(CLSID_UpdateSession, NULL, CLSCTX_INPROC_SERVER, IID_IUpdateSession, (LPVOID*)&updateSession) != S_OK) {
-		    return false;
-	    }
-	
-	    hr = updateSession->CreateUpdateSearcher(&updateSearcher);
-	    updateSession->Release();
-	    if (hr != S_OK) {
-		    return false;
-	    }
-	
-	    if (updateSearcher->GetTotalHistoryCount(&historyCount) != S_OK) {
-		    updateSearcher->Release();
-		    return false;
-	    }
-	
-	    hr = updateSearcher->QueryHistory(1, historyCount, &historyEntryCollection);
-	    updateSearcher->Release();
-	    if (hr != S_OK) {
-		    return false;
-	    }
+        if (CoCreateInstance(CLSID_UpdateSession, NULL, CLSCTX_INPROC_SERVER, IID_IUpdateSession, (LPVOID*)&updateSession) != S_OK) {
+            return false;
+        }
+    
+        hr = updateSession->CreateUpdateSearcher(&updateSearcher);
+        updateSession->Release();
+        if (hr != S_OK) {
+            return false;
+        }
+    
+        if (updateSearcher->GetTotalHistoryCount(&historyCount) != S_OK) {
+            updateSearcher->Release();
+            return false;
+        }
+    
+        hr = updateSearcher->QueryHistory(1, historyCount, &historyEntryCollection);
+        updateSearcher->Release();
+        if (hr != S_OK) {
+            return false;
+        }
 
-	    if (historyEntryCollection->get_Count(&historyCount) != S_OK) {
-		    historyEntryCollection->Release();
-		    return false;
-	    }
+        if (historyEntryCollection->get_Count(&historyCount) != S_OK) {
+            historyEntryCollection->Release();
+            return false;
+        }
 
-	    for (LONG idx = 0; idx < historyCount; idx++) {
-		    IUpdateHistoryEntry *historyEntry;
-		    if (historyEntryCollection->get_Item(idx, &historyEntry) != S_OK) {
-			    historyEntryCollection->Release();
-			    return false;
-		    }
-		
-		    UpdateOperation operationType;
-		    OperationResultCode operationResultCode;
-		    if (historyEntry->get_Operation(&operationType) != S_OK || historyEntry->get_ResultCode(&operationResultCode) != S_OK) {
-			    historyEntry->Release();
-			    historyEntryCollection->Release();
-			    return false;
-		    }
-		    if (operationType == UpdateOperation::uoInstallation && operationResultCode == OperationResultCode::orcSucceeded) {
-			    BSTR title;
-			    if (historyEntry->get_Title(&title) != S_OK) {
-				    historyEntry->Release();
-				    historyEntryCollection->Release();
-				    return false;
-			    }
-			    updateTitles.push_back(BSTRToString(title));
-			    SysFreeString(title);
-		    }
+        for (LONG idx = 0; idx < historyCount; idx++) {
+            IUpdateHistoryEntry *historyEntry;
+            if (historyEntryCollection->get_Item(idx, &historyEntry) != S_OK) {
+                historyEntryCollection->Release();
+                return false;
+            }
+        
+            UpdateOperation operationType;
+            OperationResultCode operationResultCode;
+            if (historyEntry->get_Operation(&operationType) != S_OK || historyEntry->get_ResultCode(&operationResultCode) != S_OK) {
+                historyEntry->Release();
+                historyEntryCollection->Release();
+                return false;
+            }
+            if (operationType == UpdateOperation::uoInstallation && operationResultCode == OperationResultCode::orcSucceeded) {
+                BSTR title;
+                if (historyEntry->get_Title(&title) != S_OK) {
+                    historyEntry->Release();
+                    historyEntryCollection->Release();
+                    return false;
+                }
+                updateTitles.push_back(BSTRToString(title));
+                SysFreeString(title);
+            }
 
-		    historyEntry->Release();
-	    }
-	    historyEntryCollection->Release();
-	    return true;
+            historyEntry->Release();
+        }
+        historyEntryCollection->Release();
+        return true;
     }
 
     bool getInstalledUpdateTitles(list<string> &updateTitles)
     {
-	    if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) != S_OK) {
-		    return false;
-	    }
+        if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) != S_OK) {
+            return false;
+        }
 
-	    bool result = getInstalledUpdateTitlesInternal(updateTitles);
-	    ::CoUninitialize();
-	    return result;
+        bool result = getInstalledUpdateTitlesInternal(updateTitles);
+        ::CoUninitialize();
+        return result;
     }
 
     void ProcessInfo::SystemInfo::collectSystemInfo() {
