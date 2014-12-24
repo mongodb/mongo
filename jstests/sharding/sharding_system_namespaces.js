@@ -17,9 +17,9 @@ var db = st.s.getDB("test");
 var coll = db.sharding_system_namespaces;
 
 function checkCollectionOptions(database) {
-  var collectionsInfos = database.runCommand("listCollections");
+  var collectionsInfos = database.getCollectionInfos();
   printjson(collectionsInfos);
-  var info = collectionsInfos.collections.filter(function(c) {
+  var info = collectionsInfos.filter(function(c) {
     return c.name == "sharding_system_namespaces";
   })[0];
   assert.eq(info.options.storageEngine.wiredTiger.configString, "block_compressor=zlib");

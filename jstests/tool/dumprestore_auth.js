@@ -71,10 +71,9 @@ assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 2");
 assert.eq(22 , c.findOne().a , "after restore 2");
 
-listCollOut = c.getDB().runCommand("listCollections");
-assert.eq(1, listCollOut.ok, "listCollections failed");
+collections = c.getDB().getCollectionInfos();
 fooColl = null;
-listCollOut.collections.forEach(function(coll) {
+collections.forEach(function(coll) {
     if (coll.name === "foo") {
         fooColl = coll;
     }
@@ -103,10 +102,9 @@ assert.soon("c.findOne()" , "no data after sleep");
 assert.eq(1 , c.count() , "after restore 3");
 assert.eq(22 , c.findOne().a , "after restore 3");
 
-listCollOut = c.getDB().runCommand("listCollections");
-assert.eq(1, listCollOut.ok);
+collections = c.getDB().getCollectionInfos();
 fooColl = null;
-listCollOut.collections.forEach(function(coll) {
+collections.forEach(function(coll) {
     if (coll.name === "foo") {
         fooColl = coll;
     }
