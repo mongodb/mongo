@@ -242,10 +242,6 @@ namespace {
                 return _it == other._it;
             }
 
-            virtual void aboutToDeleteBucket(const RecordId& bucket) {
-                invariant(!"aboutToDeleteBucket should not be called");
-            }
-
             virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {
                 const BSONObj key = stripFieldNames(keyRaw);
                 _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
@@ -350,10 +346,6 @@ namespace {
                 const ReverseCursor& other = static_cast<const ReverseCursor&>(otherBase);
                 invariant(&_data == &other._data); // iterators over same index
                 return _it == other._it;
-            }
-
-            virtual void aboutToDeleteBucket(const RecordId& bucket) {
-                invariant(!"aboutToDeleteBucket should not be called");
             }
 
             virtual bool locate(const BSONObj& keyRaw, const RecordId& loc) {

@@ -31,10 +31,9 @@
 #include <string>
 
 #include "mongo/db/json.h"
-#include "mongo/db/storage/mmap_v1//btree/btree_logic.h"
+#include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
 #include "mongo/db/storage/mmap_v1/heap_record_store_btree.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
-
 
 namespace mongo {
 
@@ -78,6 +77,7 @@ namespace mongo {
         // Everything needed for a fully-functional Btree logic
         TestHeadManager headManager;
         HeapRecordStoreBtree recordStore;
+        SavedCursorRegistry cursorRegistry;
         BtreeLogic<OnDiskFormat> btree;
         DiskLoc dummyDiskLoc;
     };

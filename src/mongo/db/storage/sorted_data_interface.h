@@ -214,13 +214,6 @@ namespace mongo {
              virtual bool pointsToSamePlaceAs(const Cursor& other) const = 0;
 
             /**
-             * If the SortedDataInterface impl calls the BucketNotificationCallback, the argument must
-             * be forwarded to all Cursors over that SortedData.
-             * TODO something better.
-             */
-            virtual void aboutToDeleteBucket(const RecordId& bucket) = 0;
-
-            /**
              * Position 'this' forward (reverse) cursor either at the entry or
              * immediately after (or immediately before) the specified key and RecordId.
              * The cursor should be positioned at EOF if no such entry exists.

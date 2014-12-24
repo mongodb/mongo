@@ -26,13 +26,15 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
-
+#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
 namespace mongo {
 
@@ -60,16 +62,15 @@ namespace mongo {
     class BtreeInterfaceImpl : public SortedDataInterface {
     public:
         BtreeInterfaceImpl(HeadManager* headManager,
-                                RecordStore* recordStore,
-                                const Ordering& ordering,
-                                const string& indexName,
-                                BucketDeletionNotification* bucketDeletionNotification) {
-
+                           RecordStore* recordStore,
+                           SavedCursorRegistry* cursorRegistry,
+                           const Ordering& ordering,
+                           const string& indexName) {
             _btree.reset(new BtreeLogic<OnDiskFormat>(headManager,
                                                       recordStore,
+                                                      cursorRegistry,
                                                       ordering,
-                                                      indexName,
-                                                      bucketDeletionNotification));
+                                                      indexName));
         }
 
         virtual ~BtreeInterfaceImpl() { }
@@ -214,16 +215,26 @@ namespace mongo {
 
             virtual void savePosition() {
                 if (!_bucket.isNull()) {
-                    _savedKey = getKey().getOwned();
-                    _savedLoc = getDiskLoc();
+                    _saved.bucket = _bucket;
+                    _saved.key = getKey().getOwned();
+                    _saved.loc = getDiskLoc();
+                    _btree->savedCursors()->registerCursor(&_saved);
                 }
             }
 
             virtual void restorePosition(OperationContext* txn) {
                 if (!_bucket.isNull()) {
+                    invariant(!_saved.bucket.isNull());
+                    _saved.bucket = DiskLoc(); // guard against accidental double restore
+
+                    if (!_btree->savedCursors()->unregisterCursor(&_saved)) {
+                        locate(_saved.key, _saved.loc.toRecordId());
+                        return;
+                    }
+
                     _btree->restorePosition(_txn,
-                                            _savedKey,
-                                            _savedLoc,
+                                            _saved.key,
+                                            _saved.loc,
                                             _direction,
                                             &_bucket,
                                             &_ofs);
@@ -239,8 +250,7 @@ namespace mongo {
             int _ofs;
 
             // Only used by save/restorePosition() if _bucket is non-Null.
-            BSONObj _savedKey;
-            DiskLoc _savedLoc;
+            SavedCursorRegistry::SavedCursor _saved;
         };
 
         virtual Cursor* newCursor(OperationContext* txn, int direction) const {
@@ -257,25 +267,24 @@ namespace mongo {
 
     SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                                             RecordStore* recordStore,
+                                            SavedCursorRegistry* cursorRegistry,
                                             const Ordering& ordering,
                                             const string& indexName,
-                                            int version,
-                                            BucketDeletionNotification* bucketDeletion) {
-
+                                            int version) {
         if (0 == version) {
             return new BtreeInterfaceImpl<BtreeLayoutV0>(headManager,
                                                          recordStore,
+                                                         cursorRegistry,
                                                          ordering,
-                                                         indexName,
-                                                         bucketDeletion);
+                                                         indexName);
         }
         else {
             invariant(1 == version);
             return new BtreeInterfaceImpl<BtreeLayoutV1>(headManager,
                                                          recordStore,
+                                                         cursorRegistry,
                                                          ordering,
-                                                         indexName,
-                                                         bucketDeletion);
+                                                         indexName);
         }
     }
 

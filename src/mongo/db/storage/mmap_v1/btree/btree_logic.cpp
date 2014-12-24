@@ -36,6 +36,7 @@
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -1276,7 +1277,7 @@ namespace mongo {
                                             const DiskLoc bucketLoc) {
         invariant(bucketLoc != getRootLoc(txn));
 
-        _bucketDeletion->aboutToDeleteBucket(bucketLoc.toRecordId());
+        _cursorRegistry->invalidateCursorsForBucket(bucketLoc);
 
         BucketType* p = getBucket(txn, bucket->parent);
         int parentIdx = indexInParent(txn, bucket, bucketLoc);
@@ -1301,17 +1302,7 @@ namespace mongo {
                                                   DiskLoc* bucketLocInOut,
                                                   int* keyOffsetInOut) const {
 
-        // _keyOffset is -1 if the bucket was deleted.  When buckets are deleted the Btree calls
-        // a clientcursor function that calls down to all BTree buckets.  Really, this deletion
-        // thing should be kept BTree-internal.  This'll go away with finer grained locking: we
-        // can hold on to a bucket for as long as we need it.
-        if (-1 == *keyOffsetInOut) {
-            locate(txn, savedKey, savedLoc, direction, keyOffsetInOut, bucketLocInOut);
-            return;
-        }
-
-        invariant(*keyOffsetInOut >= 0);
-
+        // The caller has to ensure validity of the saved cursor using the SavedCursorRegistry
         BucketType* bucket = getBucket(txn, *bucketLocInOut);
         invariant(bucket);
         invariant(BtreeLayout::INVALID_N_SENTINEL != bucket->n);
@@ -1461,7 +1452,7 @@ namespace mongo {
         }
 
         *txn->recoveryUnit()->writing(&getBucket(txn, bucket->nextChild)->parent) = bucket->parent;
-        _bucketDeletion->aboutToDeleteBucket(bucketLoc.toRecordId());
+        _cursorRegistry->invalidateCursorsForBucket(bucketLoc);
         deallocBucket(txn, bucket, bucketLoc);
     }
 

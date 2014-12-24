@@ -791,16 +791,16 @@ namespace {
             md.setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
         }
 
-        RecordStore* rs = _getRecordStore(entry->descriptor()->indexNamespace());
+        RecordStoreV1Base* rs = _getRecordStore(entry->descriptor()->indexNamespace());
         invariant(rs);
 
         std::auto_ptr<SortedDataInterface> btree(
             getMMAPV1Interface(entry->headManager(),
                                rs,
+                               &rs->savedCursors,
                                entry->ordering(),
                                entry->descriptor()->indexNamespace(),
-                               entry->descriptor()->version(),
-                               &BtreeBasedAccessMethod::invalidateCursors));
+                               entry->descriptor()->version()));
 
         if (IndexNames::HASHED == type)
             return new HashAccessMethod( entry, btree.release() );

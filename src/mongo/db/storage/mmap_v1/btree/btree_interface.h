@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/jsobj.h"
@@ -37,14 +39,12 @@
 #pragma once
 
 namespace mongo {
-
-    class BucketDeletionNotification;
+    class SavedCursorRegistry;
 
     SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                                             RecordStore* recordStore,
+                                            SavedCursorRegistry* cursorRegistry,
                                             const Ordering& ordering,
                                             const string& indexName,
-                                            int version,
-                                            BucketDeletionNotification* bucketDeletion);
-
+                                            int version);
 }  // namespace mongo

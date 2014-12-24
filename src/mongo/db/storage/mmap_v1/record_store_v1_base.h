@@ -31,6 +31,8 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/platform/unordered_set.h"
 
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
@@ -99,6 +101,57 @@ namespace mongo {
 
     };
 
+    /**
+     * Class that stores active cursors that have been saved (as part of yielding) to
+     * allow them to be invalidated if the thing they pointed at goes away. The registry is
+     * thread-safe, as readers may concurrently register and remove their cursors. Contention is
+     * expected to be very low, as yielding is infrequent. This logically belongs to the
+     * RecordStore, but is not contained in it to facilitate unit testing.
+     */
+    class SavedCursorRegistry {
+    public:
+        /**
+         * The destructor ensures the cursor is unregistered when an exception is thrown.
+         * Note that the SavedCursor may outlive the registry it was saved in.
+         */
+        struct SavedCursor {
+            SavedCursor() : _registry(NULL) { }
+            virtual ~SavedCursor() { if (_registry) _registry->unregisterCursor(this); }
+            DiskLoc bucket;
+            BSONObj key;
+            DiskLoc loc;
+
+        private:
+            friend class SavedCursorRegistry;
+            // Non-null iff registered. Accessed by owner or writer with MODE_X collection lock
+            SavedCursorRegistry* _registry;
+        };
+
+        ~SavedCursorRegistry();
+
+        /**
+         * Adds given saved cursor to SavedCursorRegistry. Doesn't take ownership.
+         */
+        void registerCursor(SavedCursor* cursor);
+
+        /**
+         * Removes given saved cursor. Returns true if the cursor was still present, and false
+         * if it had already been removed due to invalidation. Doesn't take ownership.
+         */
+        bool unregisterCursor(SavedCursor* cursor);
+
+        /**
+         * When a btree-bucket disappears due to merge/split or similar, this invalidates all
+         * cursors that point at the same bucket by removing them from the registry.
+         */
+        void invalidateCursorsForBucket(DiskLoc bucket);
+
+    private:
+        SpinLock _mutex;
+        typedef unordered_set<SavedCursor *> SavedCursorSet; // SavedCursor pointers not owned here
+        SavedCursorSet _cursors;
+    };
+
     class RecordStoreV1Base : public RecordStore {
     public:
 
@@ -120,10 +173,10 @@ namespace mongo {
          * @param details - takes ownership
          * @param em - does NOT take ownership
          */
-        RecordStoreV1Base( const StringData& ns,
-                           RecordStoreV1MetaData* details,
-                           ExtentManager* em,
-                           bool isSystemIndexes );
+        RecordStoreV1Base(const StringData& ns,
+                          RecordStoreV1MetaData* details,
+                          ExtentManager* em,
+                          bool isSystemIndexes);
 
         virtual ~RecordStoreV1Base();
 
@@ -182,6 +235,9 @@ namespace mongo {
         virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
 
         const RecordStoreV1MetaData* details() const { return _details.get(); }
+
+        // This keeps track of cursors saved during yielding, for invalidation purposes.
+        SavedCursorRegistry savedCursors;
 
         DiskLoc getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const;
 

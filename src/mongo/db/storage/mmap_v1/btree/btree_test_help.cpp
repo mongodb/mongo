@@ -58,17 +58,14 @@ namespace mongo {
     // BtreeLogicTestHelper
     //
 
-    static BucketDeletionNotification dummyBucketDeletionNotification;
-
     template <class OnDiskFormat>
     BtreeLogicTestHelper<OnDiskFormat>::BtreeLogicTestHelper(const BSONObj& order)
             : recordStore("TestRecordStore"),
               btree(&headManager,
                     &recordStore,
+                    &cursorRegistry,
                     Ordering::make(order),
-                    "TestIndex",
-                    &dummyBucketDeletionNotification) {
-
+                    "TestIndex") {
         static const string randomData("RandomStuff");
 
         // Generate a valid record location for a "fake" record, which we will repeatedly use

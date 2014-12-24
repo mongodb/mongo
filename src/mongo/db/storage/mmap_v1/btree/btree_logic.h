@@ -28,20 +28,20 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/catalog/head_manager.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_ondisk.h"
-#include "mongo/db/storage/mmap_v1/btree/bucket_deletion_notification.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 
-
 namespace mongo {
 
-    class BucketDeletionNotification;
     class RecordStore;
+    class SavedCursorRegistry;
 
     // Used for unit-testing only
     template <class BtreeLayout> class BtreeLogicTestBase;
@@ -77,15 +77,14 @@ namespace mongo {
          */
         BtreeLogic(HeadManager* head,
                    RecordStore* store,
+                   SavedCursorRegistry* cursors,
                    const Ordering& ordering,
-                   const string& indexName,
-                   BucketDeletionNotification* bucketDeletion)
+                   const string& indexName)
             : _headManager(head),
               _recordStore(store),
+              _cursorRegistry(cursors),
               _ordering(ordering),
-              _indexName(indexName),
-              _bucketDeletion(bucketDeletion) { 
-        
+              _indexName(indexName) {
         }
 
         //
@@ -235,6 +234,8 @@ namespace mongo {
         //
 
         const RecordStore* getRecordStore() const { return _recordStore; }
+
+        SavedCursorRegistry* savedCursors() const { return _cursorRegistry; }
 
         static int lowWaterMark();
 
@@ -591,12 +592,12 @@ namespace mongo {
         // Not owned here.
         RecordStore* _recordStore;
 
+        // Not owned Here.
+        SavedCursorRegistry* _cursorRegistry;
+
         Ordering _ordering;
 
         string _indexName;
-
-        // Not owned here
-        BucketDeletionNotification* _bucketDeletion;
     };
 
 }  // namespace mongo

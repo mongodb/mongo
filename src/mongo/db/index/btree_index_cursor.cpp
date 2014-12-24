@@ -39,33 +39,9 @@
 
 namespace mongo {
 
-    // We keep a list of active cursors so that when a btree's bucket is deleted we notify the
-    // cursors that are pointing into that bucket.  This will go away with finer grained locking.
-    unordered_set<BtreeIndexCursor*> BtreeIndexCursor::_activeCursors;
-    SimpleMutex BtreeIndexCursor::_activeCursorsMutex("active_btree_index_cursors");
-
-    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor)
-        : _cursor(cursor) {
-
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        _activeCursors.insert(this);
-    }
-
-    BtreeIndexCursor::~BtreeIndexCursor() {
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        _activeCursors.erase(this);
-    }
+    BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
 
     bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }
-
-    void BtreeIndexCursor::aboutToDeleteBucket(const RecordId& bucket) {
-        SimpleMutex::scoped_lock lock(_activeCursorsMutex);
-        for (unordered_set<BtreeIndexCursor*>::iterator i = _activeCursors.begin();
-             i != _activeCursors.end(); ++i) {
-
-            (*i)->_cursor->aboutToDeleteBucket(bucket);
-        }
-    }
 
     Status BtreeIndexCursor::seek(const BSONObj& position) {
         _cursor->locate(position, 

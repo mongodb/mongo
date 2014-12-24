@@ -49,13 +49,6 @@ namespace mongo {
 
     MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
-    void BtreeBasedAccessMethod::InvalidateCursorsNotification::aboutToDeleteBucket(
-            const RecordId& bucket) {
-        BtreeIndexCursor::aboutToDeleteBucket(bucket);
-    }
-
-    BtreeBasedAccessMethod::InvalidateCursorsNotification BtreeBasedAccessMethod::invalidateCursors;
-
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState,
                                                    SortedDataInterface* btree)
         : _btreeState(btreeState),

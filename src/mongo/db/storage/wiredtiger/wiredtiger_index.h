@@ -147,8 +147,6 @@ namespace mongo {
 
             virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
 
-            virtual void aboutToDeleteBucket(const RecordId& bucket);
-
             virtual bool locate(const BSONObj &key, const RecordId& loc);
 
             virtual void customLocate(const BSONObj& keyBegin,

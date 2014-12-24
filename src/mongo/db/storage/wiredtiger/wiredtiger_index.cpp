@@ -600,10 +600,6 @@ namespace {
         return getKey() == other.getKey();
     }
 
-    void WiredTigerIndex::IndexCursor::aboutToDeleteBucket(const RecordId& bucket) {
-        invariant(!"aboutToDeleteBucket should not be called");
-    }
-
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const RecordId& loc) {
         _uniqueLen = -1;
         WT_CURSOR *c = _cursor.get();

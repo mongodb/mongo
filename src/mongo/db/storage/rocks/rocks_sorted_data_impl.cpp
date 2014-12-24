@@ -144,10 +144,6 @@ namespace mongo {
                        ( valid && otherValid && _iterator->key() == realOther->_iterator->key() );
             }
 
-            void aboutToDeleteBucket(const RecordId& bucket) {
-                invariant( !"aboutToDeleteBucket should never be called from RocksSortedDataImpl" );
-            }
-
             bool locate(const BSONObj& key, const RecordId& loc) {
                 if (_forward) {
                     return _locate(stripFieldNames(key), loc);

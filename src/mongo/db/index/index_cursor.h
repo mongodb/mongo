@@ -41,7 +41,7 @@ namespace mongo {
      * An IndexCursor is the interface through which one traverses the entries of a given
      * index. The internal structure of an index is kept isolated.
      *
-     * The cursor must be initiailized by seek()ing to a given entry in the index.  The index is
+     * The cursor must be initialized by seek()ing to a given entry in the index.  The index is
      * traversed by calling next() or skip()-ping ahead.
      *
      * The set of predicates a given index can understand is known a priori.  These predicates may

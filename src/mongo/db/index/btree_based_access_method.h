@@ -37,7 +37,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/mmap_v1/btree/bucket_deletion_notification.h"  // XXX HK this can go away
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
@@ -112,16 +111,6 @@ namespace mongo {
 
         // XXX: consider migrating callers to use IndexCursor instead
         virtual RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
-
-        /**
-         * Invalidates all active cursors, which point at the bucket being deleted.
-         * TODO see if there is a better place to put this.
-         */
-        class InvalidateCursorsNotification : public BucketDeletionNotification {
-        public:
-            virtual void aboutToDeleteBucket(const RecordId& bucket);
-        };
-        static InvalidateCursorsNotification invalidateCursors;
 
     protected:
         // Friends who need getKeys.

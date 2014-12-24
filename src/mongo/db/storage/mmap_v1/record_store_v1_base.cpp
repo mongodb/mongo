@@ -70,6 +70,45 @@ namespace mongo {
                         / sizeof(RecordStoreV1Base::bucketSizes[0])
                         == RecordStoreV1Base::Buckets);
 
+    SavedCursorRegistry::~SavedCursorRegistry() {
+        for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end(); it++) {
+            (*it)->_registry = NULL; // prevent SavedCursor destructor from accessing this
+        }
+    }
+
+    void SavedCursorRegistry::registerCursor(SavedCursor* cursor) {
+        invariant(!cursor->_registry);
+        cursor->_registry = this;
+        scoped_spinlock lock(_mutex);
+        _cursors.insert(cursor);
+    }
+
+    bool SavedCursorRegistry::unregisterCursor(SavedCursor* cursor) {
+        if (!cursor->_registry) {
+            return false;
+        }
+        invariant(cursor->_registry == this);
+        cursor->_registry = NULL;
+        scoped_spinlock lock(_mutex);
+        invariant(_cursors.erase(cursor));
+        return true;
+    }
+
+    void SavedCursorRegistry::invalidateCursorsForBucket(DiskLoc bucket) {
+        // While this is not strictly necessary as an exclusive collection lock will be held,
+        // it's cleaner to just make the SavedCursorRegistry thread-safe. Spinlock is OK here.
+        scoped_spinlock lock(mutex);
+        for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end();) {
+            if ((*it)->bucket == bucket) {
+                (*it)->_registry = NULL; // prevent ~SavedCursor from trying to unregister
+                _cursors.erase(it++);
+            }
+            else {
+                it++;
+            }
+        }
+    }
+
     RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
                                           RecordStoreV1MetaData* details,
                                           ExtentManager* em,
