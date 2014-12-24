@@ -1978,6 +1978,10 @@ def doConfigure(myenv):
 
 env = doConfigure( env )
 
+# Load the compilation_db tool. We want to do this after configure so we don't end up with
+# compilation database entries for the configure tests, which is weird.
+env.Tool("compilation_db")
+
 env['PDB'] = '${TARGET.base}.pdb'
 
 def checkErrorCodes():
@@ -2173,6 +2177,8 @@ Export("wiredtiger")
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
+
+env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 env.SConscript('SConscript.smoke')

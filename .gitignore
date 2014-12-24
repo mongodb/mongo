@@ -154,3 +154,5 @@ buildinfo.cpp
 *.wixobj
 *.wixpdb
 DriverInclude.wxs
+
+compile_commands.json
