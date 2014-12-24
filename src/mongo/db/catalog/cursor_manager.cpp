@@ -116,7 +116,7 @@ namespace mongo {
         Map _idToNS;
         unsigned _nextId;
 
-        SecureRandom* _secureRandom;
+        boost::scoped_ptr<SecureRandom> _secureRandom;
     };
 
     // Note that "globalCursorIdCache" must be declared before "globalCursorManager", as the latter
@@ -138,17 +138,16 @@ namespace mongo {
     GlobalCursorIdCache::GlobalCursorIdCache()
         : _mutex( "GlobalCursorIdCache" ),
           _nextId( 0 ),
-          _secureRandom( NULL ) {
+          _secureRandom() {
     }
 
     GlobalCursorIdCache::~GlobalCursorIdCache() {
-        // we're just going to leak everything, as it doesn't matter
     }
 
     int64_t GlobalCursorIdCache::nextSeed() {
         SimpleMutex::scoped_lock lk( _mutex );
         if ( !_secureRandom )
-            _secureRandom = SecureRandom::create();
+            _secureRandom.reset(SecureRandom::create());
         return _secureRandom->nextInt64();
     }
 
