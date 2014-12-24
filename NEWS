@@ -88,14 +88,14 @@ Other significant changes:
   records.  SERVER-16351
 
 * Several bug fixes and performance improvements in LSM including:
- - Fix a bug in LSM search_near, where it return a deleted item.
+ - Add support for custom collators in LSM trees. [#1361]
+ - Fix a bug in LSM search_near, where it returned a deleted item.
    BF-694, BF-700
- - Improve background maintenance operation so that it doesn't fill the
-   cache.
+ - Improve background maintenance operations so that the cache does
+   not get full unnecessarily.
  - Fix a bug that could lead to updates being written into old chunks.
    [#1432] [#1418]
  - Fix a bug in background merge that could skip updates.  SERVER-16123
- - Add support for custom collators in LSM trees. [#1361]
 
 * Fix a bug when maintaining the cache, that could cause checkpoints to
   skip writing an update that should have been included. [#1419] SERVER-16336
