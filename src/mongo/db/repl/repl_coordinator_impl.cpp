@@ -1273,6 +1273,10 @@ namespace {
         return Status(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
     }
 
+    bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState() const {
+        return _canServeNonLocalReads.loadRelaxed();
+    }
+
     bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
         if (!idx->unique()) {
             return false;
