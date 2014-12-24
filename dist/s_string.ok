@@ -436,6 +436,7 @@ btmem
 btree
 btrees
 buf
+buflen
 bufs
 bufsz
 builtin

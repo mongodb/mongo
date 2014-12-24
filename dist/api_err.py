@@ -78,7 +78,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
-# Output the wiredtiger_strerror code.
+# Output the wiredtiger_strerror and wiredtiger_sterror_r code.
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
@@ -87,37 +87,52 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 
 /*
  * wiredtiger_strerror --
- *\tReturn a string for any error value.
+ *\tReturn a string for any error value in a static buffer.
  */
 const char *
 wiredtiger_strerror(int error)
 {
-\tstatic char errbuf[64];
-\tchar *p;
+\tstatic char buf[128];
 
-\tif (error == 0)
-\t\treturn ("Successful return: 0");
+\tif (wiredtiger_strerror_r(error, buf, sizeof(buf)) != 0)
+\t\t(void)snprintf(buf, sizeof(buf), "error return: %d", error);
+\treturn (buf);
+}
+
+/*
+ * wiredtiger_strerror_r --
+ *\tReturn a string for any error value, thread-safe version.
+ */
+int
+wiredtiger_strerror_r(int error, char *buf, size_t buflen)
+{
+\tconst char *p;
+
+\t/* Require at least 2 bytes, printable character and trailing nul. */
+\tif (buflen < 2)
+\t\treturn (ENOMEM);
 
 \tswitch (error) {
+\tcase 0:
+\t\tp = "Successful return: 0";
+\t\tbreak;
 ''')
 
 for err in errors:
     tfile.write('\tcase ' + err.name + ':\n')
-    tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
+    tfile.write('\t\tp = "' + err.name + ': ' + err.desc + '";\n')
+    tfile.write('\t\tbreak;\n')
 
 tfile.write('''\
 \tdefault:
-\t\tif (error > 0 && (p = strerror(error)) != NULL)
-\t\t\treturn (p);
-\t\tbreak;
+\t\treturn (__wt_strerror_r(error, buf, buflen));
 \t}
 
 \t/*
-\t * !!!
-\t * Not thread-safe, but this is never supposed to happen.
+\t * Return success if anything printed (we checked if the buffer had
+\t * space for at least one character).
 \t */
-\t(void)snprintf(errbuf, sizeof(errbuf), "Unknown error: %d", error);
-\treturn (errbuf);
+\treturn (snprintf(buf, buflen, "%s", p) > 0 ? 0 : ENOMEM);
 }
 ''')
 tfile.close()
