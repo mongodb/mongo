@@ -3,7 +3,7 @@ dnl build by dist/s_version
 VERSION_MAJOR=2
 VERSION_MINOR=5
 VERSION_PATCH=0
-VERSION_STRING='"WiredTiger 2.5.0: (December 23, 2014)"'
+VERSION_STRING='"WiredTiger 2.5.0: (December 24, 2014)"'
 
 AC_SUBST(VERSION_MAJOR)
 AC_SUBST(VERSION_MINOR)
