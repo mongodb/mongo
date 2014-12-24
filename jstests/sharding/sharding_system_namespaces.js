@@ -1,3 +1,6 @@
+// TODO: This test incorrectly assumes that wiredTiger is compiled into the server.  SERVER-16660.
+
+/*
 // SERVER-16498 d_migrate.cpp should not rely on system.namespaces
 //
 // This test create a sharded collection with wiredtiger options.
@@ -55,3 +58,4 @@ assert.commandWorked(db.adminCommand({
 printShardingStatus();
 
 checkCollectionOptions(anotherShard.getDB("test"));
+*/
