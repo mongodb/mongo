@@ -315,6 +315,8 @@ __wt_debug_disk(
 
 	__dmsg(ds, "%s page", __wt_page_type_string(dsk->type));
 	switch (dsk->type) {
+	case WT_PAGE_BLOCK_MANAGER:
+		break;
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
@@ -331,6 +333,8 @@ __wt_debug_disk(
 	}
 
 	switch (dsk->type) {
+	case WT_PAGE_BLOCK_MANAGER:
+		break;
 	case WT_PAGE_COL_FIX:
 		__debug_dsk_col_fix(ds, dsk);
 		break;
