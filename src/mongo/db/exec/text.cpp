@@ -279,9 +279,12 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
+        // Fetch the document
+        BSONObj doc(_params.index->getCollection()->docFor(_txn, loc));
+
         // Filter for phrases and negated terms
         if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(_txn, loc))) {
+            if (!_ftsMatcher.matchesNonTerm(doc)) {
                 return PlanStage::NEED_TIME;
             }
         }
@@ -289,7 +292,7 @@ namespace mongo {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = loc;
-        member->obj = _params.index->getCollection()->docFor(_txn, member->loc);
+        member->obj = doc;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         member->addComputed(new TextScoreComputedData(score));
         return PlanStage::ADVANCED;

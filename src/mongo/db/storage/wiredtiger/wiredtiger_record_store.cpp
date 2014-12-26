@@ -56,47 +56,25 @@
 
 namespace mongo {
 namespace {
+    static const int kMinimumRecordStoreVersion = 1;
+    static const int kCurrentRecordStoreVersion = 1; // New record stores use this by default.
+    static const int kMaximumRecordStoreVersion = 1;
+    BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion >= kMinimumRecordStoreVersion);
+    BOOST_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
+
     bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
-        WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, opCtx);
-        WT_CURSOR* c = curwrap.get();
-        c->set_key(c, uri.c_str());
-        int ret = c->search(c);
-        if (ret == WT_NOTFOUND)
+        StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
+        if (!appMetadata.isOK()) {
             return false;
-        invariantWTOK(ret);
-
-        const char* config = NULL;
-        c->get_value(c, &config);
-        invariant(config);
-
-        WiredTigerConfigParser topParser(config);
-        WT_CONFIG_ITEM metadata;
-        if (topParser.get("app_metadata", &metadata) != 0)
-            return false;
-
-        if (metadata.len == 0)
-            return false;
-
-        WiredTigerConfigParser parser(metadata);
-        WT_CONFIG_ITEM keyItem;
-        WT_CONFIG_ITEM value;
-        while (parser.next(&keyItem, &value) == 0) {
-            const StringData key(keyItem.str, keyItem.len);
-            if (key == "oplogKeyExtractionVersion") {
-                if (value.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM &&  value.val == 1)
-                    return true;
-            }
-
-            // This prevents downgrades with unsupported metadata settings.
-            severe() << "Unrecognized WiredTiger metadata setting: " << key << '=' << value.str;
-            fassertFailedNoTrace(28548);
         }
 
-        return false;
+        return (appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
     }
 } // namespace
 
     const std::string kWiredTigerEngineName = "wiredTiger";
+
+    const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
 
     // static
     StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
@@ -155,16 +133,22 @@ namespace {
         if ( NamespaceString::oplog(ns) ) {
             // force file for oplog
             ss << "type=file,";
-            ss << "app_metadata=(oplogKeyExtractionVersion=1),";
             // Tune down to 10m.  See SERVER-16247
             ss << "memory_page_max=10m,";
         }
-        else {
-            // Force this to be empty since users shouldn't be allowed to change it.
-            ss << "app_metadata=(),";
-        }
+
+        // WARNING: No user-specified config can appear below this line. These options are required
+        // for correct behavior of the server.
 
         ss << "key_format=q,value_format=u";
+
+        // Record store metadata
+        ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
+        if (NamespaceString::oplog(ns)) {
+            ss << ",oplogKeyExtractionVersion=1";
+        }
+        ss << ")";
+
         return StatusWith<std::string>(ss);
     }
 
@@ -189,6 +173,11 @@ namespace {
               _sizeStorer( sizeStorer ),
               _sizeStorerCounter(0)
     {
+        Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+            ctx, uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion);
+        if (!versionStatus.isOK()) {
+            fassertFailedWithStatusNoTrace(28548, versionStatus);
+        }
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -225,7 +214,7 @@ namespace {
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             }
 
-            if ( _sizeStorer == NULL || _numRecords.load() < 10000 ) {
+            if (_sizeStorer == NULL || _numRecords.load() < kCollectionScanOnCreationThreshold) {
                 LOG(1) << "doing scan of collection " << ns << " to get info";
 
                 _numRecords.store(0);
@@ -287,7 +276,7 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
             session->getSession(),
-            "statistics:" + GetURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+            "statistics:" + getURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
         uassertStatusOK(result.getStatus());
 
         int64_t size = result.getValue();
@@ -657,7 +646,7 @@ namespace {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
         WiredTigerSession* session = cache->getSession();
         WT_SESSION *s = session->getSession();
-        int ret = s->compact(s, GetURI().c_str(), NULL);
+        int ret = s->compact(s, getURI().c_str(), NULL);
         invariantWTOK(ret);
         cache->releaseSession(session);
         return Status::OK();
@@ -668,9 +657,10 @@ namespace {
                                             bool scanData,
                                             ValidateAdaptor* adaptor,
                                             ValidateResults* results,
-                                            BSONObjBuilder* output ) const {
+                                            BSONObjBuilder* output ) {
 
         long long nrecords = 0;
+        long long dataSizeTotal = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         results->valid = true;
         while( !iter->isEOF() ) {
@@ -684,8 +674,35 @@ namespace {
                     results->valid = false;
                     results->errors.push_back( str::stream() << loc << " is corrupted" );
                 }
+                dataSizeTotal += static_cast<long long>(dataSize);
             }
             iter->getNext();
+        }
+
+        if (_sizeStorer && full && scanData && results->valid) {
+            if (nrecords != _numRecords.load() || dataSizeTotal != _dataSize.load()) {
+                warning() << _uri << ": Existing record and data size counters ("
+                          << _numRecords.load() << " records " << _dataSize.load() << " bytes) "
+                          << "are inconsistent with full validation results ("
+                          << nrecords << " records " << dataSizeTotal << " bytes). "
+                          << "Updating counters with new values.";
+            }
+
+            _numRecords.store(nrecords);
+            _dataSize.store(dataSizeTotal);
+
+            long long oldNumRecords;
+            long long oldDataSize;
+            _sizeStorer->load(_uri, &oldNumRecords, &oldDataSize);
+            if (nrecords != oldNumRecords || dataSizeTotal != oldDataSize) {
+                warning() << _uri << ": Existing data in size storer ("
+                          << oldNumRecords << " records " << oldDataSize << " bytes) "
+                          << "is inconsistent with full validation results ("
+                          << _numRecords.load() << " records " << _dataSize.load() << " bytes). "
+                          << "Updating size storer with new values.";
+            }
+
+            _sizeStorer->store(_uri, _numRecords.load(), _dataSize.load());
         }
 
         output->appendNumber( "nrecords", nrecords );
@@ -693,7 +710,7 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(output->subobjStart(kWiredTigerEngineName));
-        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
@@ -709,18 +726,45 @@ namespace {
         result->appendBool( "capped", _isCapped );
         if ( _isCapped ) {
             result->appendIntOrLL( "max", _cappedMaxDocs );
-            result->appendIntOrLL( "maxSize", _cappedMaxSize );
+            result->appendIntOrLL( "maxSize", static_cast<long long>(_cappedMaxSize / scale) );
         }
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
-        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+        {
+            BSONObjBuilder metadata(bob.subobjStart("metadata"));
+            Status status = WiredTigerUtil::getApplicationMetadata(txn, getURI(), &metadata);
+            if (!status.isOK()) {
+                metadata.append("error", "unable to retrieve metadata");
+                metadata.append("code", static_cast<int>(status.code()));
+                metadata.append("reason", status.reason());
+            }
+        }
+
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(txn, _uri, &type, &sourceURI);
+        StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadata(txn, sourceURI);
+        StringData creationStringName("creationString");
+        if (!metadataResult.isOK()) {
+            BSONObjBuilder creationString(bob.subobjStart(creationStringName));
+            creationString.append("error", "unable to retrieve creation config");
+            creationString.append("code", static_cast<int>(metadataResult.getStatus().code()));
+            creationString.append("reason", metadataResult.getStatus().reason());
+        }
+        else {
+            bob.append("creationString", metadataResult.getValue());
+            // Type can be "lsm" or "file"
+            bob.append("type", type);
+        }
+
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(),
                                                           "statistics=(fast)", &bob);
         if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
             bob.append("code", static_cast<int>(status.code()));
             bob.append("reason", status.reason());
         }
+
     }
 
     Status WiredTigerRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {
@@ -902,7 +946,7 @@ namespace {
           _txn( txn ),
           _forward( dir == CollectionScanParams::FORWARD ),
           _forParallelCollectionScan( forParallelCollectionScan ),
-          _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ),
+          _cursor( new WiredTigerCursor( rs.getURI(), rs.instanceId(), txn ) ),
           _eof(false),
           _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
         RS_ITERATOR_TRACE("start");
@@ -1071,7 +1115,7 @@ namespace {
             // parallel collection scan or something
             needRestore = true;
             _savedRecoveryUnit = txn->recoveryUnit();
-            _cursor.reset( new WiredTigerCursor( _rs.GetURI(), _rs.instanceId(), txn ) );
+            _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), txn ) );
             _forParallelCollectionScan = false; // we only do this the first time
         }
 

@@ -124,7 +124,7 @@ file_config = format_meta + [
         items, and the default value of 4KB is a good choice absent
         requirements from the operating system or storage device''',
         min='512B', max='128MB'),
-    Config('block_compressor', '', r'''
+    Config('block_compressor', 'none', r'''
         configure a compressor for file blocks.  Permitted values are
         \c "none" or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
@@ -142,7 +142,7 @@ file_config = format_meta + [
         applications which can rely on decompression to fail if a block
         has been corrupted''',
         choices=['on', 'off', 'uncompressed']),
-    Config('collator', '', r'''
+    Config('collator', 'none', r'''
         configure custom collation for keys.  Permitted values are
         \c "none" or a custom collator name created with
         WT_CONNECTION::add_collator'''),
@@ -154,11 +154,11 @@ file_config = format_meta + [
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
-    Config('huffman_key', '', r'''
+    Config('huffman_key', 'none', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
-    Config('huffman_value', '', r'''
+    Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
@@ -273,7 +273,7 @@ table_only_config = [
 ]
 
 index_only_config = [
-    Config('extractor', '', r'''
+    Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
         WT_CONNECTION::add_extractor'''),
@@ -426,7 +426,8 @@ connection_runtime_config = [
             a timestamp prepended to each log record, may contain strftime
             conversion specifications'''),
         Config('wait', '0', r'''
-            seconds to wait between each write of the log records''',
+            seconds to wait between each write of the log records; setting
+            this value above 0 configures statistics logging''',
             min='0', max='100000'),
         ]),
     Config('verbose', '', r'''
@@ -509,7 +510,7 @@ common_wiredtiger_open = [
         Config('archive', 'true', r'''
             automatically archive unneeded log files''',
             type='boolean'),
-        Config('compressor', '', r'''
+        Config('compressor', 'none', r'''
             configure a compressor for log records.  Permitted values are
             \c "none" or \c "bzip2", \c "snappy" or custom compression
             engine \c "name" created with WT_CONNECTION::add_compressor.

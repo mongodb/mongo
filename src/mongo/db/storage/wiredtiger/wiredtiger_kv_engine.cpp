@@ -142,7 +142,7 @@ namespace mongo {
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
-        ss << "statistics=(all),";
+        ss << "statistics=(fast),";
         if ( _durable ) {
             ss << "log=(enabled=true,archive=true,path=journal,compressor=";
 
@@ -505,16 +505,16 @@ namespace mongo {
         size_t idx;
         while ( ( idx = ident.find( '/', start ) ) != string::npos ) {
             StringData dir = ident.substr( 0, idx );
-            log() << "need to created: " << dir;
 
             boost::filesystem::path subdir = _path;
             subdir /= dir.toString();
             if ( !boost::filesystem::exists( subdir ) ) {
+                LOG(1) << "creating subdirectory: " << dir;
                 try {
                     boost::filesystem::create_directory( subdir );
                 }
-                catch( std::exception& e) {
-                    log() << "error creating path " << subdir.string() << ' ' << e.what();
+                catch (const std::exception& e) {
+                    error() << "error creating path " << subdir.string() << ' ' << e.what();
                     throw;
                 }
             }

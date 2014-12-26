@@ -53,6 +53,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
@@ -112,25 +113,17 @@ namespace mongo {
 
             // XXX: can probably take dblock instead
             ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lk(txn->lockState());
+            scoped_ptr<Lock::GlobalWrite> lk(new Lock::GlobalWrite(txn->lockState()));
 
             // Make sure database still exists after we resume from the temp release
             Database* db = dbHolder().openDb(txn, _dbName);
 
-            bool createdCollection = false;
-            Collection* collection = NULL;
-
-            collection = db->getCollection( txn, to_collection );
-            if ( !collection ) {
-                massert( 17321,
-                         str::stream()
-                         << "collection dropped during clone ["
-                         << to_collection.ns() << "]",
-                         !createdCollection );
+            Collection* collection = db->getCollection( txn, to_collection );
+            if (!collection) {
                 WriteUnitOfWork wunit(txn);
-                createdCollection = true;
-                collection = db->createCollection( txn, to_collection.ns() );
-                verify( collection );
+                collection = db->createCollection(txn, to_collection.ns());
+                verify(collection);
+
                 if (logForRepl) {
                     repl::logOp(txn,
                                 "c",
@@ -148,6 +141,38 @@ namespace mongo {
                         if( lastLog )
                             log() << "clone " << to_collection << ' ' << numSeen << endl;
                         lastLog = now;
+                    }
+
+                    if (_mayBeInterrupted) {
+                        txn->checkForInterrupt();
+                    }
+
+                    if (_mayYield) {
+                        lk.reset();
+                        txn->getCurOp()->yielded();
+                        lk.reset(new Lock::GlobalWrite(txn->lockState()));
+
+                        // Check if everything is still all right.
+                        if (logForRepl) {
+                            uassert(28592,
+                                    str::stream() << "Cannot write to db: " << _dbName
+                                                  << " after yielding",
+                                    repl::getGlobalReplicationCoordinator()->
+                                        canAcceptWritesForDatabase(_dbName));
+                        }
+
+                        // TODO: SERVER-16598 abort if original db or collection is gone.
+                        db = dbHolder().get(txn, _dbName);
+                        uassert(28593,
+                                str::stream() << "Database " << _dbName
+                                              << " dropped while cloning",
+                                db != NULL);
+
+                        collection = db->getCollection(txn, to_collection);
+                        uassert(28594,
+                                str::stream() << "Collection " << to_collection.ns()
+                                              << " dropped while cloning",
+                                collection != NULL);
                     }
                 }
 

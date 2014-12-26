@@ -162,55 +162,17 @@ namespace mongo {
 
         IndexScanParams _params;
 
-        // Stats
-        CommonStats _commonStats;
-        IndexScanStats _specificStats;
-
-        //
-        // Btree-specific navigation state.
-        //
-
-        // When _params.bounds.isSimpleRange is false, we assume that we are traversing a btree
-        // index and make use of the BtreeIndexCursor methods for navigation.  We do this because
-        // using the btree-specific navigation methods will yield better index scan performance.
-        //
-        // This assumption will need to change when we introduce new index types not based on the
-        // btree index.  This is being tracked in SERVER-12397.
-        BtreeIndexCursor* _btreeCursor;
-
-        //
-        // If we have decided to use the BtreeIndexCursor methods for navigation, we make a decision
-        // to employ one of two different algorithms for determining when the index scan has reached
-        // the end:
-        //
-
-        //
-        // 1) If the index scan is not a single interval, then we use an IndexBoundsChecker to
-        //    determine when the index scan has reached the end.  In this case, _checker will be
-        //    non-NULL (and _endCursor will be NULL).
-        //
-
+        // For our "fast" Btree-only navigation AKA the index bounds optimization.
         scoped_ptr<IndexBoundsChecker> _checker;
+        BtreeIndexCursor* _btreeCursor;
         int _keyEltsToUse;
         bool _movePastKeyElts;
         std::vector<const BSONElement*> _keyElts;
         std::vector<bool> _keyEltsInc;
 
-        //
-        // 2) If the index scan is a single interval, then the scan can execute faster by
-        //    checking for the end via comparison against an end cursor, rather than repeatedly
-        //    doing BSON compares against scanned keys.  In this case, _endCursor will be non-NULL
-        //    (and _checker will be NULL).
-        //
-
-        // The end cursor.
-        boost::scoped_ptr<BtreeIndexCursor> _endCursor;
-
-        // The key that the end cursor should point to.
-        BSONObj _endKey;
-
-        // Is the end key included in the range?
-        bool _endKeyInclusive;
+        // Stats
+        CommonStats _commonStats;
+        IndexScanStats _specificStats;
     };
 
 }  // namespace mongo

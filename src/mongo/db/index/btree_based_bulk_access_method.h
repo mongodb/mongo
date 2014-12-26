@@ -88,6 +88,11 @@ namespace mongo {
             return _notAllowed();
         }
 
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
+            const {
+            return false;
+        }
+
         virtual Status remove(OperationContext* txn,
                               const BSONObj& obj,
                               const RecordId& loc,

@@ -547,9 +547,12 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
+	/* Block out checkpoints to avoid spurious EBUSY errors. */
+	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri, __wt_salvage,
 	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
+	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -682,9 +685,12 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
+	/* Block out checkpoints to avoid spurious EBUSY errors. */
+	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
 	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
+	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -702,9 +708,12 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, verify, config, cfg);
+	/* Block out checkpoints to avoid spurious EBUSY errors. */
+	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, uri, __wt_verify,
 	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
+	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }

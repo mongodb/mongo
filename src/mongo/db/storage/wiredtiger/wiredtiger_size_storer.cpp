@@ -66,7 +66,7 @@ namespace mongo {
                                          long long numRecords, long long dataSize ) {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );
-        Entry& entry = _entries[rs->GetURI()];
+        Entry& entry = _entries[rs->getURI()];
         entry.rs = rs;
         entry.numRecords = numRecords;
         entry.dataSize = dataSize;
@@ -76,7 +76,7 @@ namespace mongo {
     void WiredTigerSizeStorer::onDestroy( WiredTigerRecordStore* rs ) {
         _checkMagic();
         boost::mutex::scoped_lock lk( _entriesMutex );
-        Entry& entry = _entries[rs->GetURI()];
+        Entry& entry = _entries[rs->getURI()];
         entry.numRecords = rs->numRecords( NULL );
         entry.dataSize = rs->dataSize( NULL );
         entry.dirty = true;

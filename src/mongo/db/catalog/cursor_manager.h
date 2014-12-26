@@ -1,4 +1,4 @@
-// collection_cursor_cache.h
+// cursor_manager.h
 
 /**
 *    Copyright (C) 2013 MongoDB Inc.
@@ -43,16 +43,18 @@ namespace mongo {
     class PseudoRandom;
     class PlanExecutor;
 
-    class CollectionCursorCache {
+    class CursorManager {
     public:
-        CollectionCursorCache( const StringData& ns );
+        CursorManager( const StringData& ns );
 
         /**
          * will kill() all PlanExecutor instances it has
          */
-        ~CollectionCursorCache();
+        ~CursorManager();
 
         // -----------------
+
+        std::string ns() { return _nss.ns(); }
 
         /**
          * @param collectionGoingAway Pass as true if the Collection instance is going away.
@@ -97,6 +99,7 @@ namespace mongo {
 
         bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth );
 
+        bool ownsCursorId( CursorId cursorId );
         void getCursorIds( std::set<CursorId>* openCursors );
         std::size_t numCursors();
 
@@ -110,6 +113,8 @@ namespace mongo {
         void unpin( ClientCursor* cursor );
 
         // ----------------------
+
+        static CursorManager* getGlobalCursorManager();
 
         static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, 
             const char* ids);

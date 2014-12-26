@@ -444,13 +444,13 @@ namespace mongo {
         // Collection can be null for an EOFStage plan, or other places where registration
         // is not needed.
         if (_exec->collection()) {
-            _exec->collection()->cursorCache()->registerExecutor(exec);
+            _exec->collection()->cursorManager()->registerExecutor(exec);
         }
     }
 
     PlanExecutor::ScopedExecutorRegistration::~ScopedExecutorRegistration() {
         if (_exec->collection()) {
-            _exec->collection()->cursorCache()->deregisterExecutor(_exec);
+            _exec->collection()->cursorManager()->deregisterExecutor(_exec);
         }
     }
 

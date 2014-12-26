@@ -18,13 +18,19 @@ var rsObj = st._rs[0].test;
 var primary = rsObj.getPrimary();
 var secondaries = rsObj.getSecondaries();
 
-var rsConfig = primary.getDB("local").system.replset.findOne();
-
 jsTestLog( "Reconfiguring replica set..." );
 
+var rsConfig = primary.getDB("local").system.replset.findOne();
+// First, make sure the last node in the config is not the primary
+rsConfig.members[0].priority = 10;
+rsConfig.version++;
+reconfig(rsObj, rsConfig);
+rsObj.waitForState(rsObj.nodes[0], rsObj.PRIMARY, 60* 1000);
+primary = rsObj.getPrimary();
+
+// Now remove the last node in the config.
 var removedNode = rsConfig.members.pop();
 rsConfig.version++;
-
 reconfig(rsObj, rsConfig);
 
 var numRSHosts = function(){

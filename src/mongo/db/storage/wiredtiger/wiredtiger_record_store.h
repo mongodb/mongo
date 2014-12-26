@@ -54,6 +54,13 @@ namespace mongo {
     public:
 
         /**
+         * During record store creation, if size storer reports a record count under
+         * 'kCollectionScanOnCreationThreshold', perform a collection scan to update size storer
+         * as well as internal record and data size counters.
+         */
+        static const long long kCollectionScanOnCreationThreshold;
+
+        /**
          * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
          * Configuration string is constructed from:
          *     built-in defaults
@@ -143,7 +150,7 @@ namespace mongo {
                                  bool scanData,
                                  ValidateAdaptor* adaptor,
                                  ValidateResults* results,
-                                 BSONObjBuilder* output ) const;
+                                 BSONObjBuilder* output );
 
         virtual void appendCustomStats( OperationContext* txn,
                                         BSONObjBuilder* result,
@@ -174,7 +181,7 @@ namespace mongo {
         int64_t cappedMaxDocs() const;
         int64_t cappedMaxSize() const;
 
-        const std::string& GetURI() const { return _uri; }
+        const std::string& getURI() const { return _uri; }
         uint64_t instanceId() const { return _instanceId; }
 
         void setSizeStorer( WiredTigerSizeStorer* ss ) { _sizeStorer = ss; }

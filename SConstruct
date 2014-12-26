@@ -2222,7 +2222,6 @@ env.AlwaysBuild( "s3shell" )
 def s3dist( env , target , source ):
     s3push( str(source[0]) , "mongodb" )
 
-env.Alias( "dist" , '$SERVER_ARCHIVE' )
 env.AlwaysBuild(env.Alias( "s3dist" , [ '$SERVER_ARCHIVE' ] , [ s3dist ] ))
 
 # --- an uninstall target ---
