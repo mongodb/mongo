@@ -487,17 +487,6 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         _topCoord->setFollowerMode(newState.s);
 
-        // If the topCoord reports that we are a candidate now, the only possible scenario is that
-        // we transitioned to followerMode SECONDARY and are a one-node replica set.
-        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-             // If our config describes a one-node replica set, we're the one member, and
-             // we're electable, we must short-circuit the election.  Elections are normally
-             // triggered by incoming heartbeats, but with a one-node set there are no
-             // heartbeats.
-             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
-             _isWaitingForDrainToComplete = true;
-         }
-
         const PostMemberStateUpdateAction action =
             _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *success = true;
@@ -529,10 +518,10 @@ namespace {
         //
         // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
         // mode until we have the global exclusive lock, which forbids all other threads from making
-        // writes, we know that from the time that _isWaitingForDrainToComplete is set after calls
-        // to _topCoord->processWinElection() until this method returns, no external writes will be
-        // processed.  This is important so that a new temp collection isn't introduced on the new
-        // primary before we drop all the temp collections.
+        // writes, we know that from the time that _isWaitingForDrainToComplete is set in
+        // _performPostMemberStateUpdateAction(kActionWinElection) until this method returns, no
+        // external writes will be processed.  This is important so that a new temp collection isn't
+        // introduced on the new primary before we drop all the temp collections.
 
         boost::unique_lock<boost::mutex> lk(_mutex);
         if (!_isWaitingForDrainToComplete) {
@@ -1195,14 +1184,7 @@ namespace {
         }
 
         if (_topCoord->becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(_replExecutor.now())) {
-            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
-            _isWaitingForDrainToComplete = true;
-
-            boost::unique_lock<boost::mutex> lk(_mutex);
-            const PostMemberStateUpdateAction action =
-                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-            lk.unlock();
-            _performPostMemberStateUpdateAction(action);
+            _performPostMemberStateUpdateAction(kActionWinElection);
         }
     }
 
@@ -1597,14 +1579,7 @@ namespace {
             // If we just unfroze and ended our stepdown period and we are a one node replica set,
             // the topology coordinator will have gone into the candidate role to signal that we
             // need to elect ourself.
-            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
-            _isWaitingForDrainToComplete = true;
-
-            boost::unique_lock<boost::mutex> lk(_mutex);
-            const PostMemberStateUpdateAction action =
-                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-            lk.unlock();
-            _performPostMemberStateUpdateAction(action);
+            _performPostMemberStateUpdateAction(kActionWinElection);
         }
         *result = Status::OK();
     }
@@ -1917,6 +1892,9 @@ namespace {
     ReplicationCoordinatorImpl::_updateCurrentMemberStateFromTopologyCoordinator_inlock() {
         const MemberState newState = _topCoord->getMemberState();
         if (newState == _currentState) {
+            if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+                return kActionWinElection;
+            }
             return kActionNone;
         }
         PostMemberStateUpdateAction result;
@@ -1943,6 +1921,13 @@ namespace {
             }
             result = kActionChooseNewSyncSource;
         }
+        if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+            // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
+            // role is if the configuration represents a single-node replica set.  In that case, the
+            // overriding requirement is to elect this singleton node primary.
+            result = kActionWinElection;
+        }
+
         _currentState = newState;
         log() << "transition to " << newState.toString() << rsLog;
         return result;
@@ -1961,6 +1946,18 @@ namespace {
             _externalState->closeConnections();
             _externalState->clearShardingState();
             break;
+        case kActionWinElection: {
+            boost::unique_lock<boost::mutex> lk(_mutex);
+            _electionId = OID::gen();
+            _topCoord->processWinElection(_electionId, getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+            const PostMemberStateUpdateAction nextAction =
+                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            invariant(nextAction != kActionWinElection);
+            lk.unlock();
+            _performPostMemberStateUpdateAction(nextAction);
+            break;
+        }
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
@@ -2059,15 +2056,6 @@ namespace {
          _rsConfig = newConfig;
          log() << "new replica set config in use: " << _rsConfig.toBSON() << rsLog;
          _thisMembersConfigIndex = myIndex;
-
-         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-             // If the new config describes a one-node replica set, we're the one member, and
-             // we're electable, we must short-circuit the election.  Elections are normally
-             // triggered by incoming heartbeats, but with a one-node set there are no
-             // heartbeats.
-             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
-             _isWaitingForDrainToComplete = true;
-         }
 
          const PostMemberStateUpdateAction action =
              _updateCurrentMemberStateFromTopologyCoordinator_inlock();
