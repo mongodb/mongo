@@ -13,19 +13,17 @@ d3.selection.prototype.moveToFront = function() {
 
 module.exports = function(opts) {
   
-  function redraw(opts) {
+  function redraw(update) {
     var transTime = 200;
 
     // data may have changed
-    if (opts) {     
-      // recalculate width/height
+    if (update) {
+      opts = update;
       width = opts.width - margin.left - margin.right;
       height = opts.height - margin.top - margin.bottom;
-      
-      // new data and settings
+      data = opts.data;
       model = data.model;
       options = model.serialize();
-      data = opts.data;
       series = data.series;
 
       if (series.length === 0) {
@@ -47,12 +45,18 @@ module.exports = function(opts) {
         x = x_absolute;
         xAxis.tickFormat(customTimeFormat);
       }
-
       x.range([0, width]);
-      x.domain([
+
+      var domain = [
         d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
         d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
-      ]);
+      ];
+
+      if (_.isEqual(x.domain(), [0, 1]) || options.recalcXDomain) {
+        x.domain(domain);
+        // re-set x axis for zoom behavior
+        zoom.x(x);
+      }
 
       // calculate pixels per data point for possible sub-sampling
       if (series.length > 0) {
@@ -142,6 +146,7 @@ module.exports = function(opts) {
 
   } // redraw
 
+
   function downSampled(data, density) {
     if (options.allowSampling) {
       return data.filter(function (x, i) { 
@@ -217,15 +222,19 @@ module.exports = function(opts) {
     width = opts.width - margin.left - margin.right,
     height = opts.height - margin.top - margin.bottom,
     data = opts.data,
-    el = opts.el;
-
-  var model = data.model,
-      options = model.serialize();
+    el = opts.el,
+    model = data.model,
+    options = model.serialize();
 
   var accx = function (d) { return d.x };
 
   var bisect = function (accx) { 
     return d3.bisector(function(d) { return accx(d); }).left;
+  }
+
+  function zoomed() {
+    model.recalcXDomain = false;
+    redraw(opts);
   }
 
   // x scale and axis
@@ -264,9 +273,15 @@ module.exports = function(opts) {
       .y(function(d) { return y(d.y); })
   }
 
+  var zoom = d3.behavior.zoom()
+    .scaleExtent([1, 30])
+    .x(x)
+    .on("zoom", zoomed);
+
   var svg = d3.select(el)
     .append('g')
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+    .call(zoom);
 
   svg.append("g")
     .attr("class", "x axis")

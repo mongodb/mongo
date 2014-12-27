@@ -21,6 +21,10 @@ var Chart = module.exports = AmpersandState.extend({
     subSampled: {
       type: 'boolean',
       default: false
+    },
+    recalcXDomain: {
+      type: 'boolean',
+      default: true
     }
   },
   derived: {
