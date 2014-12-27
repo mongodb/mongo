@@ -36,6 +36,8 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/s/chunk.h"
@@ -551,8 +553,20 @@ namespace mongo {
         bool allowShardVersionFailure =
             rawConn->type() == ConnectionString::SET &&
             DBClientReplicaSet::isSecondaryQuery( _qSpec.ns(), _qSpec.query(), _qSpec.options() );
+        bool connIsDown = rawConn->isFailed();
+        if (allowShardVersionFailure && !connIsDown) {
+            // If the replica set connection believes that it has a valid primary that is up,
+            // confirm that the replica set monitor agrees that the suspected primary is indeed up.
+            const DBClientReplicaSet* replConn = dynamic_cast<const DBClientReplicaSet*>(rawConn);
+            ReplicaSetMonitorPtr rsMonitor = ReplicaSetMonitor::get(replConn->getSetName());
+            if (!rsMonitor->isHostUp(replConn->getSuspectedPrimaryHostAndPort())) {
+                connIsDown = true;
+            }
+        }
 
-        if ( allowShardVersionFailure && rawConn->isFailed() ) {
+        if (allowShardVersionFailure && connIsDown) {
+            // If we're doing a secondary-allowed query and the primary is down, don't attempt to
+            // set the shard version.
 
             state->conn->donotCheckVersion();
 

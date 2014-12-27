@@ -446,6 +446,14 @@ namespace mongo {
                         break;
                     }
                 }
+
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns)) {
+                    warning() << "stepped down from primary while deleting chunk; "
+                              << "orphaning data in " << ns
+                              << " in range [" << min << ", " << max << ")";
+                    return numDeleted;
+                }
+
                 if ( callback )
                     callback->goingToDelete( obj );
 

@@ -34,8 +34,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
-#include "mongo/db/catalog/collection_cursor_cache.h"
 #include "mongo/db/catalog/collection_info_cache.h"
+#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
@@ -125,7 +125,7 @@ namespace mongo {
         const RecordStore* getRecordStore() const { return _recordStore; }
         RecordStore* getRecordStore() { return _recordStore; }
 
-        CollectionCursorCache* cursorCache() const { return &_cursorCache; }
+        CursorManager* cursorManager() const { return &_cursorManager; }
 
         bool requiresIdIndex() const;
 
@@ -313,7 +313,7 @@ namespace mongo {
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
-        mutable CollectionCursorCache _cursorCache;
+        mutable CursorManager _cursorManager;
 
         friend class Database;
         friend class IndexCatalog;

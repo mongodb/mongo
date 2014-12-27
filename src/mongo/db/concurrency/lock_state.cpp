@@ -608,25 +608,14 @@ namespace {
 
             if (result == LOCK_OK) break;
 
-            DeadlockDetector wfg(globalLockManager, this);
-            if (wfg.check().hasCycle()) {
-                // Make sure that the caller actually expects the deadlock return value
-                if (!checkDeadlock) {
-                    severe() << "LockerId " << getId() << " encountered an unexpected deadlock."
-                             << " The server will shut down in order to prevent becoming"
-                             << " unresponsive. The cycle of deadlocked threads is: "
-                             << wfg.toString();
+            if (checkDeadlock) {
+                DeadlockDetector wfg(globalLockManager, this);
+                if (wfg.check().hasCycle()) {
+                    warning() << "Deadlock found: " << wfg.toString();
 
-                    // Dump the lock manager state and the stack trace so we can investigate
-                    globalLockManager.dump();
-
-                    fassertFailed(28591);
+                    result = LOCK_DEADLOCK;
+                    break;
                 }
-
-                warning() << "Deadlock found: " << wfg.toString();
-
-                result = LOCK_DEADLOCK;
-                break;
             }
 
             const unsigned elapsedTimeMs = timer.millis();

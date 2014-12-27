@@ -1905,11 +1905,17 @@ namespace mongo {
                 Collection* collection = db->getCollection( txn, ns );
 
                 if ( !collection ) {
-                    string system_namespaces = nsToDatabase(ns) + ".system.namespaces";
-                    BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
+                    list<BSONObj> infos =
+                            conn->getCollectionInfos(nsToDatabase(ns),
+                                                     BSON("name" << nsToCollectionSubstring(ns)));
+
                     BSONObj options;
-                    if ( entry["options"].isABSONObj() )
-                        options = entry["options"].Obj();
+                    if (infos.size() > 0) {
+                        BSONObj entry = infos.front();
+                        if (entry["options"].isABSONObj()) {
+                            options = entry["options"].Obj();
+                        }
+                    }
 
                     WriteUnitOfWork wuow(txn);
                     Status status = userCreateNS( txn, db, ns, options, true, false );

@@ -404,7 +404,7 @@ namespace mongo {
         // Takes ownership of the collection
         txn->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
 
-        it->second->_cursorCache.invalidateAll(false);
+        it->second->_cursorManager.invalidateAll(false);
         _collections.erase( it );
     }
 

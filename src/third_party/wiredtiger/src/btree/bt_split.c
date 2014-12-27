@@ -716,11 +716,10 @@ __split_multi_inmem(
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Take the oldest active
-	 * transaction ID to make sure these updates are not skipped by a
-	 * checkpoint.
+	 * updates we installed may be older than that.  Inherit the first
+	 * dirty transaction from the original page.
 	 */
-	page->modify->first_dirty_txn = S2C(session)->txn_global.oldest_id;
+	page->modify->first_dirty_txn = orig->modify->first_dirty_txn;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
@@ -900,7 +899,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
-	__split_verify_intl_key_order(session, parent);
+	WT_WITH_PAGE_INDEX(session,
+	    __split_verify_intl_key_order(session, parent));
 #endif
 
 	/*
@@ -977,7 +977,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * are holding it locked.
 	 */
 	if (ret == 0 && !exclusive && __split_should_deepen(session, parent))
-		ret = __split_deepen(session, parent);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __split_deepen(session, parent));
 
 err:	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
@@ -1135,8 +1136,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we are moving may be older than that: inherit the original
-	 * page's transaction ID.
+	 * updates we installed may be older than that.  Inherit the first
+	 * dirty transaction from the original page.
 	 */
 	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
 

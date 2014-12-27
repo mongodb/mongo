@@ -124,7 +124,7 @@ namespace mongo {
                                 bool full,
                                 bool scanData,
                                 ValidateAdaptor* adaptor,
-                                ValidateResults* results, BSONObjBuilder* output) const {
+                                ValidateResults* results, BSONObjBuilder* output) {
             invariant(false);
         }
 

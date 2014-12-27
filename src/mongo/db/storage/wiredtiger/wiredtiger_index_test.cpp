@@ -30,6 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
@@ -141,4 +144,26 @@ namespace mongo {
         ASSERT_NOT_EQUALS(std::string::npos, config.find("abc=def"));
     }
 
-}
+    TEST(WiredTigerIndexTest, FullValidateMetadata) {
+        MyHarnessHelper harnessHelper;
+        boost::scoped_ptr<SortedDataInterface> sorted(harnessHelper.newSortedDataInterface(false));
+        boost::scoped_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+
+        long long numKeys = 0;
+        BSONObjBuilder bob;
+        sorted->fullValidate(opCtx.get(), true, &numKeys, &bob);
+        BSONObj obj = bob.obj();
+
+        BSONElement metadataElement = obj.getField("metadata");
+        ASSERT_TRUE(metadataElement.isABSONObj());
+        BSONObj metadata = metadataElement.Obj();
+
+        BSONElement versionElement = metadata.getField("formatVersion");
+        ASSERT_TRUE(versionElement.isNumber());
+
+        BSONElement infoObjElement = metadata.getField("infoObj");
+        ASSERT_EQUALS(mongo::String, infoObjElement.type());
+        ASSERT_STRING_CONTAINS(infoObjElement.String(), "test.wt");
+    }
+
+}  // namespace mongo

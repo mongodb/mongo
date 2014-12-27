@@ -400,6 +400,38 @@ namespace {
         }
 
         invariant(output);
+        appendCustomStats(txn, output, 1);
+    }
+
+    bool WiredTigerIndex::appendCustomStats(OperationContext* txn,
+                                            BSONObjBuilder* output,
+                                            double scale) const {
+
+        {
+            BSONObjBuilder metadata(output->subobjStart("metadata"));
+            Status status = WiredTigerUtil::getApplicationMetadata(txn, uri(), &metadata);
+            if (!status.isOK()) {
+                metadata.append("error", "unable to retrieve metadata");
+                metadata.append("code", static_cast<int>(status.code()));
+                metadata.append("reason", status.reason());
+            }
+        }
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(txn, _uri, &type, &sourceURI);
+        StatusWith<std::string> metadataResult = WiredTigerUtil::getMetadata(txn, sourceURI);
+        StringData creationStringName("creationString");
+        if (!metadataResult.isOK()) {
+            BSONObjBuilder creationString(output->subobjStart(creationStringName));
+            creationString.append("error", "unable to retrieve creation config");
+            creationString.append("code", static_cast<int>(metadataResult.getStatus().code()));
+            creationString.append("reason", metadataResult.getStatus().reason());
+        }
+        else {
+            output->append(creationStringName, metadataResult.getValue());
+            // Type can be "lsm" or "file"
+            output->append("type", type);
+        }
+
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),
@@ -409,6 +441,7 @@ namespace {
             output->append("code", static_cast<int>(status.code()));
             output->append("reason", status.reason());
         }
+        return true;
     }
 
     Status WiredTigerIndex::dupKeyCheck( OperationContext* txn,

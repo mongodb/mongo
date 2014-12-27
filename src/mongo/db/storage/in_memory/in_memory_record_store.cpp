@@ -403,7 +403,7 @@ namespace mongo {
                                          bool scanData,
                                          ValidateAdaptor* adaptor,
                                          ValidateResults* results,
-                                         BSONObjBuilder* output) const {
+                                         BSONObjBuilder* output) {
         results->valid = true;
         if (scanData && full) {
             for (Records::const_iterator it = _data->records.begin();
@@ -431,7 +431,7 @@ namespace mongo {
         result->appendBool( "capped", _isCapped );
         if ( _isCapped ) {
             result->appendIntOrLL( "max", _cappedMaxDocs );
-            result->appendIntOrLL( "maxSize", _cappedMaxSize );
+            result->appendIntOrLL( "maxSize", _cappedMaxSize / scale );
         }
     }
 

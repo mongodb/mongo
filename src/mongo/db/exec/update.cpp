@@ -51,14 +51,14 @@ namespace mongo {
         const char idFieldName[] = "_id";
         const FieldRef idFieldRef(idFieldName);
 
-        Status storageValid(const mb::Document&, const bool);
-        Status storageValid(const mb::ConstElement&, const bool);
-        Status storageValidChildren(const mb::ConstElement&, const bool);
+        Status storageValid(const mb::Document&, const bool = true);
+        Status storageValid(const mb::ConstElement&, const bool = true);
+        Status storageValidChildren(const mb::ConstElement&, const bool = true);
 
         /**
          * mutable::document storageValid check -- like BSONObj::_okForStorage
          */
-        Status storageValid(const mb::Document& doc, const bool deep = true) {
+        Status storageValid(const mb::Document& doc, const bool deep) {
             mb::ConstElement currElem = doc.root().leftChild();
             while (currElem.ok()) {
                 if (currElem.getFieldName() == idFieldName) {
@@ -154,19 +154,21 @@ namespace mongo {
          */
         Status storageValidParents(const mb::ConstElement& elem) {
             const mb::ConstElement& root = elem.getDocument().root();
-            const mb::ConstElement& parent = elem.parent();
-            if (elem != root && parent.ok() && parent != root) {
-                Status s = storageValid(parent, false);
-                if (s.isOK()) {
-                    s = storageValidParents(parent);
-                }
+            if (elem != root) {
+                const mb::ConstElement& parent = elem.parent();
+                if (parent.ok() && parent != root) {
+                    Status s = storageValid(parent, false);
+                    if (s.isOK()) {
+                        s = storageValidParents(parent);
+                    }
 
-                return s;
+                    return s;
+                }
             }
             return Status::OK();
         }
 
-        Status storageValid(const mb::ConstElement& elem, const bool deep = true) {
+        Status storageValid(const mb::ConstElement& elem, const bool deep) {
             if (!elem.ok())
                 return Status(ErrorCodes::BadValue, "Invalid elements cannot be stored.");
 
@@ -176,8 +178,8 @@ namespace mongo {
             // TODO: Revisit how mutable handles array field names. We going to need to make
             // this better if we ever want to support ordered updates that can alter the same
             // element repeatedly; see SERVER-12848.
-            const bool childOfArray = elem.parent().ok() ?
-                (elem.parent().getType() == mongo::Array) : false;
+            const mb::ConstElement& parent = elem.parent();
+            const bool childOfArray = parent.ok() ? (parent.getType() == mongo::Array) : false;
 
             if (!childOfArray) {
                 StringData fieldName = elem.getFieldName();
@@ -197,10 +199,12 @@ namespace mongo {
                 }
             }
 
-            // Check children if there are any.
-            Status s = storageValidChildren(elem, deep);
-            if (!s.isOK())
-                return s;
+            if (deep) {
+                // Check children if there are any.
+                Status s = storageValidChildren(elem, deep);
+                if (!s.isOK())
+                    return s;
+            }
 
             return Status::OK();
         }

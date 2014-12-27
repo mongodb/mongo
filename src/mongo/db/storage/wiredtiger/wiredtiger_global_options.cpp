@@ -47,7 +47,7 @@ namespace mongo {
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.cacheSizeGB",
                                             "wiredTigerCacheSizeGB",
                                             moe::Int,
-                                            "maximum amount of memory to allocate for cache;"
+                                            "maximum amount of memory to allocate for cache; "
                                             "defaults to 1/2 of physical RAM")
             .validRange(1,10000);
         wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.checkpointDelaySecs",
