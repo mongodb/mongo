@@ -23,9 +23,10 @@ module.exports = function(opts) {
       height = opts.height - margin.top - margin.bottom;
       
       // new data and settings
+      model = data.model;
+      options = model.serialize();
       data = opts.data;
       series = data.series;
-      options = data.options;   
 
       if (series.length === 0) {
         svg.style('visibility', 'hidden');
@@ -52,6 +53,17 @@ module.exports = function(opts) {
         d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
         d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
       ]);
+
+      // downsample data
+      if (series.length > 0) {
+        var s0 = series[0].data;
+        xRangeBand = x(accx(s0[1])) - x(accx(s0[0]));
+      } else {
+        xRangeBand = 1;
+      }
+
+      // tell model if it's been downsampled or not
+      model.downSampled = options.allowSampling && (xRangeBand < 1);
 
       // switch y-axis and update domain
       if (options.ySetting === 'linear') {
@@ -91,24 +103,31 @@ module.exports = function(opts) {
 
     paths.exit().remove();
 
+    // subsample data if there are more data points than pixel
     paths.selectAll('.line')
       .transition().duration(transTime)
-      .attr("d", function (d) { return line(accx)(d.data) } );
+      .attr("d", function (d) { return line(accx)(downSampled(d.data, 1./xRangeBand))});
 
-    circles = paths.selectAll(".point")
-      .data(function (serie) { return serie.data.map( function(d) { return {x: accx(d), y:d.y, c:serie.color }}); });
+    // only plot circles if they have enough space on x axis
+    if (xRangeBand > 6) {
+      circles = paths.selectAll(".point")
+        .data(function (serie) { return serie.data.map( function(d) { return {x: accx(d), y:d.y, c:serie.color }}); });
 
-    circles.enter().append("circle")
-      .attr("class", "point")
-      .attr("r", "3px")
-      .style("fill", function (d) { return d.c; });
+      circles.enter().append("circle")
+        .attr("class", "point")
+        .attr("r", "3px")
+        .style("fill", function (d) { return d.c; });
 
-    circles.exit().remove();
+      circles.exit().remove();
 
-    circles
-      .transition().duration(transTime)
-      .attr("cx", function (d) { return x(d.x); })
-      .attr("cy", function (d) { return y(d.y); })
+      circles
+        .transition().duration(transTime)
+        .attr("cx", function (d) { return x(d.x); })
+        .attr("cy", function (d) { return y(d.y); })    
+
+    } else {
+      paths.selectAll(".point").remove();
+    }
 
     crosshairX
       .attr("x2", width);
@@ -123,11 +142,21 @@ module.exports = function(opts) {
 
   } // redraw
 
+  function downSampled(data, density) {
+    if (options.allowSampling) {
+      return data.filter(function (x, i) { 
+        return i % Math.ceil(density) === 0 
+      });      
+    }
+    return data;
+  }
+
   function findClosest(mx, series) {
+    var sampledSeries = downSampled(series.data, 1./xRangeBand);
     var mxi = x.invert(mx);
-    var i = bisect(accx)(series.data, mxi);
-    var d0 = series.data[i - 1];
-    var d1 = series.data[i];
+    var i = bisect(accx)(sampledSeries, mxi);
+    var d0 = sampledSeries[i - 1];
+    var d1 = sampledSeries[i];
     if (d0 === undefined) return d1;
     if (d1 === undefined) return d0;
     return (mxi - accx(d0) > accx(d1) - mxi) ? d1 : d0;
@@ -190,8 +219,8 @@ module.exports = function(opts) {
     data = opts.data,
     el = opts.el;
 
-  var options = data.options;
-  var series;
+  var model = data.model,
+      options = model.serialize();
 
   var accx = function (d) { return d.x };
 
@@ -312,7 +341,7 @@ module.exports = function(opts) {
     })
     .on("mousemove", mousemove);
 
-  var paths, circles;  // initialized in redraw
+  var paths, circles, xRangeBand, series;  // initialized in redraw
 
   return redraw;
 }

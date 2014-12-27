@@ -13,6 +13,14 @@ var Chart = module.exports = AmpersandState.extend({
       type: 'string',
       default: 'linear',
       values: ['linear', 'log-scale']
+    },
+    allowSampling: {
+      type: 'boolean',
+      default: true
+    },
+    downSampled: {
+      type: 'boolean',
+      default: false
     }
   },
   derived: {
