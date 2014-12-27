@@ -2,7 +2,11 @@
   nav#navbar(role='navigation').navbar.navbar-default
     .container-fluid
       .navbar-header
-        .navbar-brand WTstats
+        .navbar-brand 
+          .menu-toggle
+            a(data-hook='menu-toggle')
+              i.fa.fa-bars
+          | WTstats
       ul.nav.navbar-right
         li(data-hook='sample-warning').navbar-text
           .alert.alert-warning(title="warning: more series data points than pixels. data is being sub-sampled to improve performance. To avoid sub-sampling, increase the browser window width or zoom in.")
