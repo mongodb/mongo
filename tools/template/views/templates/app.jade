@@ -4,6 +4,11 @@
       .navbar-header
         .navbar-brand WTstats
       ul.nav.navbar-right
+        li(data-hook='sample-warning').navbar-text
+          .alert.alert-warning(title="warning: more series data points than pixels. data is being sub-sampled to improve performance.")
+            i#menubtn.fa.fa-warning
+            span sub-sampling
+
         li.navbar-text
           i#menubtn.fa.fa-clock-o
           span x-axis

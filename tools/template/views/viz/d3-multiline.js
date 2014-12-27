@@ -14,7 +14,7 @@ d3.selection.prototype.moveToFront = function() {
 module.exports = function(opts) {
   
   function redraw(opts) {
-    var transTime = 300;
+    var transTime = 200;
 
     // data may have changed
     if (opts) {     
@@ -54,7 +54,7 @@ module.exports = function(opts) {
         d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
       ]);
 
-      // downsample data
+      // calculate pixels per data point for possible sub-sampling
       if (series.length > 0) {
         var s0 = series[0].data;
         xRangeBand = x(accx(s0[1])) - x(accx(s0[0]));
@@ -62,8 +62,8 @@ module.exports = function(opts) {
         xRangeBand = 1;
       }
 
-      // tell model if it's been downsampled or not
-      model.downSampled = options.allowSampling && (xRangeBand < 1);
+      // tell model if it's been sub-sampled or not
+      model.subSampled = options.allowSampling && (xRangeBand < 1);
 
       // switch y-axis and update domain
       if (options.ySetting === 'linear') {

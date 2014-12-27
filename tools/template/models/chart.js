@@ -18,7 +18,7 @@ var Chart = module.exports = AmpersandState.extend({
       type: 'boolean',
       default: true
     },
-    downSampled: {
+    subSampled: {
       type: 'boolean',
       default: false
     }

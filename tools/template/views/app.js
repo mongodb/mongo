@@ -12,6 +12,12 @@ var AppView = module.exports = AmpersandView.extend({
   events: {
     'click .navbar-right label': 'navButtonClicked'
   },
+  bindings: {
+    'model.chart.subSampled': {
+      type: 'toggle',
+      hook: 'sample-warning'
+    }
+  },
   subviews: {
     sidebar: {
       hook: 'sidebar',
