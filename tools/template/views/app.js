@@ -53,7 +53,7 @@ var AppView = module.exports = AmpersandView.extend({
     var name = $input.attr('name');
     var value = $input.val();
     this.model.chart[name] = value;
-    this.model.chart.recalcXDomain = false;
+    this.model.chart.recalcXDomain = (name === 'xSetting');
     this.chartView.render();
   }
 

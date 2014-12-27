@@ -47,21 +47,21 @@ module.exports = function(opts) {
       }
       x.range([0, width]);
 
-      var domain = [
-        d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
-        d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
-      ];
-
-      if (_.isEqual(x.domain(), [0, 1]) || options.recalcXDomain) {
-        x.domain(domain);
+      if (_.isEqual(x.domain(), [0, 1]) || _.isEqual(x.domain(), [new Date(0), new Date(1)]) || options.recalcXDomain) {
+        debug('recalc domain');
+        xExtent = [
+          d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
+          d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
+        ];
+        x.domain(xExtent);
         // re-set x axis for zoom behavior
         zoom.x(x);
       }
 
       // calculate pixels per data point for possible sub-sampling
       if (series.length > 0) {
-        var s0 = series[0].data;
-        xRangeBand = x(accx(s0[1])) - x(accx(s0[0]));
+        var s = _.find(series, function (serie) { return serie.data.length > 1 }).data;
+        xRangeBand = s ? x(accx(s[1])) - x(accx(s[0])) : 1;
       } else {
         xRangeBand = 1;
       }
@@ -87,11 +87,9 @@ module.exports = function(opts) {
 
     // redraw x and y axes
     svg.selectAll('.x')
-      .transition().duration(transTime)
       .call(xAxis.scale(x));
 
     svg.selectAll('.y')
-      .transition().duration(transTime)
       .call(yAxis.scale(y));      
 
     // transition data
@@ -109,13 +107,12 @@ module.exports = function(opts) {
 
     // subsample data if there are more data points than pixel
     paths.selectAll('.line')
-      .transition().duration(transTime)
-      .attr("d", function (d) { return line(accx)(downSampled(d.data, 1./xRangeBand))});
+      .attr("d", function (d) { return line(accx)(downSampled(d.data)) });
 
     // only plot circles if they have enough space on x axis
     if (xRangeBand > 6) {
       circles = paths.selectAll(".point")
-        .data(function (serie) { return serie.data.map( function(d) { return {x: accx(d), y:d.y, c:serie.color }}); });
+        .data(function (serie) { return downSampled(serie.data).map( function(d) { return {x: accx(d), y:d.y, c:serie.color }}); });
 
       circles.enter().append("circle")
         .attr("class", "point")
@@ -125,7 +122,6 @@ module.exports = function(opts) {
       circles.exit().remove();
 
       circles
-        .transition().duration(transTime)
         .attr("cx", function (d) { return x(d.x); })
         .attr("cy", function (d) { return y(d.y); })    
 
@@ -146,18 +142,26 @@ module.exports = function(opts) {
 
   } // redraw
 
+  function clipped(data) {
+    var domain = x.domain();
+    var left = bisect(accx)(data, domain[0]);
+    var right = bisect(accx)(data, domain[1]);
+    return data.slice(left, right);
+  }
 
-  function downSampled(data, density) {
-    if (options.allowSampling) {
-      return data.filter(function (x, i) { 
-        return i % Math.ceil(density) === 0 
+  function downSampled(data) {
+    data = clipped(data);
+    var density = 1./xRangeBand;
+    if (options.allowSampling && density > 1.) {
+      return data.filter(function (d, i) { 
+        return (i % Math.ceil(density) === 0);
       });      
     }
     return data;
   }
 
   function findClosest(mx, series) {
-    var sampledSeries = downSampled(series.data, 1./xRangeBand);
+    var sampledSeries = downSampled(series.data);
     var mxi = x.invert(mx);
     var i = bisect(accx)(sampledSeries, mxi);
     var d0 = sampledSeries[i - 1];
@@ -174,8 +178,8 @@ module.exports = function(opts) {
 
     var dArr = series.map(function (serie) { return findClosest(mx, serie); });
     var dists = dArr.map(function (d) {
-      return Math.sqrt(Math.pow(mx-x(accx(d)), 2) + Math.pow(my-y(d.y), 2));
-    })
+      return d ? Math.pow(mx-x(accx(d)), 2) + Math.pow(my-y(d.y), 2) : Infinity;
+    });
     var i = dists.indexOf(Math.min.apply(Math, dists));
     var serie = series[i];
     var d = dArr[i];
@@ -228,7 +232,7 @@ module.exports = function(opts) {
 
   var accx = function (d) { return d.x };
 
-  var bisect = function (accx) { 
+  function bisect(accx) { 
     return d3.bisector(function(d) { return accx(d); }).left;
   }
 
@@ -274,7 +278,7 @@ module.exports = function(opts) {
   }
 
   var zoom = d3.behavior.zoom()
-    .scaleExtent([1, 30])
+    .scaleExtent([1, 50])
     .x(x)
     .on("zoom", zoomed);
 
@@ -356,7 +360,11 @@ module.exports = function(opts) {
     })
     .on("mousemove", mousemove);
 
-  var paths, circles, xRangeBand, series;  // initialized in redraw
+  var paths, 
+      circles, 
+      xRangeBand, 
+      series,
+      xExtent;  // initialized in redraw
 
   return redraw;
 }
