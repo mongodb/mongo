@@ -15,6 +15,7 @@ var App = module.exports = AmpersandState.extend({
     stats: StatCollection
   },
   parse: function (attrs, options) {
+    var year = new Date().getFullYear();
     var groups = {};
     var stats = _.map(attrs.series, function (serie) {
       var tokens = serie.key.split(':');
@@ -22,7 +23,10 @@ var App = module.exports = AmpersandState.extend({
       var name = tokens[1].trim();
       var data = _.sortBy(
         _.map(serie.values, function (v, k) {
-          return {x: new Date(k), y: v};
+          var tokens = k.split(' ');
+          tokens.splice(2, 0, year.toString());
+          var d = tokens.join(' ');
+          return {x: Date.parse(d), y: v};
         }), 'x');
       // calculate relative x values per series
       var minx = Math.min.apply(null, data.map(function (d) { return d.x }));
