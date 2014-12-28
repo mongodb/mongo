@@ -46,7 +46,7 @@ function createErrorNotifier(titlePrefix) {
   };
 }
 
-gulp.task('default', ['templates', 'styles', 'fonts', 'js']);
+gulp.task('default', ['static', 'templates', 'styles', 'fonts', 'js']);
 
 gulp.task('js', function() {
   var b = browserify({
@@ -148,11 +148,11 @@ gulp.task('pack', ['default'], function() {
 /**
  * @task assets Copies all static asset files into `BUILD`.
  */
-// gulp.task('static', [
-//   'copy images'
-// ]);
+gulp.task('static', [
+  'copy images'
+]);
 
-// gulp.task('copy images', function() {
-//   return gulp.src('./assets/img/*')
-//     .pipe(gulp.dest(BUILD + '/img'));
-// });
+gulp.task('copy images', function() {
+  return gulp.src('./assets/img/*')
+    .pipe(gulp.dest(BUILD + '/img'));
+});
