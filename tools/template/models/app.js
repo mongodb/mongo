@@ -26,7 +26,7 @@ var App = module.exports = AmpersandState.extend({
           var tokens = k.split(' ');
           tokens.splice(2, 0, year.toString());
           var d = tokens.join(' ');
-          return {x: Date.parse(d), y: v};
+          return {x: new Date(d), y: v};
         }), 'x');
       // calculate relative x values per series
       var minx = Math.min.apply(null, data.map(function (d) { return d.x }));
