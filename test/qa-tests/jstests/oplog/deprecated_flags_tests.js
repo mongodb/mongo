@@ -10,7 +10,7 @@ if (typeof getToolTest === 'undefined') {
 (function() {
   var toolTest = getToolTest('oplogDeprecatedFlagTest');
   var commonToolArgs = getCommonToolArguments();
-  var expectedError = 'error parsing command line: --dbpath and related ' +
+  var expectedError = 'error parsing command line options: --dbpath and related ' +
     'flags are not supported in 2.8 tools.';
 
   var verifyFlagFails = function(flag) {
