@@ -2,7 +2,7 @@
  * This file tests the FSM test framework.
  */
 
-load('jstests/parallel/fsm_libs/fsm.js');
+load('jstests/concurrency/fsm_libs/fsm.js');
 
 (function() {
     var getWeightedRandomChoice = fsm._getWeightedRandomChoice;

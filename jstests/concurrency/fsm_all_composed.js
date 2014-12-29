@@ -1,6 +1,6 @@
-load('jstests/parallel/fsm_libs/runner.js');
+load('jstests/concurrency/fsm_libs/runner.js');
 
-var dir = 'jstests/parallel/fsm_workloads';
+var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
     'indexed_insert_multikey.js', // SERVER-16143
