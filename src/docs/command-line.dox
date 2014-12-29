@@ -295,14 +295,14 @@ The \c stat command outputs run-time statistics for the WiredTiger
 engine, or, if specified, for the URI on the command-line.
 
 @subsection util_stat_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] stat [-a] [uri]</code>
+<code>wt [-Vv] [-C config] [-h directory] stat [-f] [uri]</code>
 
 @subsection util_stat_options Options
 The following are command-specific options for the \c stat command:
 
-@par <code>-a</code>
-Include all statistics in the output (equivalent to passing
-<code>statistics=(all)</code>) to WT_SESSION::open_cursor.
+@par <code>-f</code>
+Include only "fast" statistics in the output (equivalent to passing
+<code>statistics=(fast)</code>) to WT_SESSION::open_cursor.
 
 <hr>
 @section util_upgrade wt upgrade
