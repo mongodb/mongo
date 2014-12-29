@@ -15,16 +15,26 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	size_t urilen;
-	int all, ch, objname_free;
-	const char *pval, *desc;
+	int ch, objname_free;
+	const char *config, *pval, *desc;
 	char *objname, *uri;
 
-	all = objname_free = 0;
+	objname_free = 0;
 	objname = uri = NULL;
-	while ((ch = __wt_getopt(progname, argc, argv, "a")) != EOF)
+	config = NULL;
+	while ((ch = __wt_getopt(progname, argc, argv, "af")) != EOF)
 		switch (ch) {
 		case 'a':
-			all = 1;
+			/*
+			 * Historically, the -a option meant include all of the
+			 * statistics; because we are opening the database with
+			 * statistics=(all), that is now the default, allow the
+			 * option for compatibility.
+			 */
+			config = NULL;
+			break;
+		case 'f':
+			config = "statistics=(fast)";
 			break;
 		case '?':
 		default:
@@ -58,8 +68,9 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	}
 	snprintf(uri, urilen, "statistics:%s", objname);
 
-	if ((ret = session->open_cursor(session, uri, NULL,
-	    all ? "statistics=(all)" : NULL, &cursor)) != 0) {
+	
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, uri, wiredtiger_strerror(ret));
 		goto err;
@@ -97,7 +108,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "stat -a [uri]\n",
+	    "stat [-f] [uri]\n",
 	    progname, usage_prefix);
 	return (1);
 }
