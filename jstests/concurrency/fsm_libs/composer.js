@@ -1,4 +1,4 @@
-load('jstests/parallel/fsm_libs/fsm.js');
+load('jstests/concurrency/fsm_libs/fsm.js');
 
 var composer = (function() {
 

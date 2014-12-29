@@ -1,7 +1,7 @@
 load('jstests/libs/parallelTester.js');
-load('jstests/parallel/fsm_libs/assert.js');
-load('jstests/parallel/fsm_libs/utils.js');
-load('jstests/parallel/fsm_libs/worker_thread.js');
+load('jstests/concurrency/fsm_libs/assert.js');
+load('jstests/concurrency/fsm_libs/utils.js');
+load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 
 /** extendWorkload usage:
@@ -290,7 +290,7 @@ function prepareCollections(workloads, context, cluster, clusterOptions) {
     var dbName, collName, myDB;
     var firstWorkload = true;
 
-    // Clean up the state left behind by other tests in the parallel suite
+    // Clean up the state left behind by other tests in the concurrency suite
     // to avoid having too many open files
     db.dropDatabase();
 
@@ -565,8 +565,8 @@ function throwError(workerErrs) {
 }
 
 workerThread.fsm = function(workloads, args) {
-    load('jstests/parallel/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/parallel/fsm_libs/fsm.js'); // for fsm.run
+    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
+    load('jstests/concurrency/fsm_libs/fsm.js'); // for fsm.run
 
     return workerThread.main(workloads, args, function(configs) {
         var workloads = Object.keys(configs);
@@ -576,8 +576,8 @@ workerThread.fsm = function(workloads, args) {
 };
 
 workerThread.composed = function(workloads, args) {
-    load('jstests/parallel/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/parallel/fsm_libs/composer.js'); // for composer.run
+    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
+    load('jstests/concurrency/fsm_libs/composer.js'); // for composer.run
 
     return workerThread.main(workloads, args, function(configs) {
         // TODO: make mixing probability configurable

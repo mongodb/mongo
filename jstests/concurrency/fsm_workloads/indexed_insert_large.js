@@ -6,8 +6,8 @@
  * value is a string large enough to make the whole index key be 1K, which is
  * the maximum.
  */
-load('jstests/parallel/fsm_libs/runner.js'); // for parseConfig
-load('jstests/parallel/fsm_workloads/indexed_insert_base.js'); // for $config
+load('jstests/concurrency/fsm_libs/runner.js'); // for parseConfig
+load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 

@@ -1,5 +1,5 @@
-load('jstests/parallel/fsm_libs/runner.js'); // for extendWorkload
-load('jstests/parallel/fsm_example.js'); // for $config
+load('jstests/concurrency/fsm_libs/runner.js'); // for extendWorkload
+load('jstests/concurrency/fsm_example.js'); // for $config
 
 // extendWorkload takes a $config object and a callback, and returns an extended $config object.
 var $config = extendWorkload($config, function($config, $super) {

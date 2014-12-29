@@ -14,7 +14,7 @@ var workerThread = (function() {
         var configs = {};
 
         try {
-            load('jstests/parallel/fsm_libs/assert.js');
+            load('jstests/concurrency/fsm_libs/assert.js');
             globalAssertLevel = args.globalAssertLevel;
 
             if (args.clusterOptions.addr) {
@@ -28,7 +28,7 @@ var workerThread = (function() {
                 myDB = db.getSiblingDB(args.dbName);
             }
 
-            load('jstests/parallel/fsm_libs/runner.js'); // for parseConfig
+            load('jstests/concurrency/fsm_libs/runner.js'); // for parseConfig
             workloads.forEach(function(workload) {
                 load(workload);
                 var config = parseConfig($config); // to normalize
