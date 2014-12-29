@@ -26,14 +26,14 @@
     var testDB = primary.getDB('test');
     for (var i = 0; i < 10; i++) {
         testDB.data.insert({ _id: i });
-        testDB.getLastError('majority');
     }
+    replTest.awaitReplication();
+
     // sanity check the insertion worked
     assert.eq(10, testDB.data.count());
 
     // make sure that exporting from any of the nodes works with --slaveOk
     nodes.forEach(function(node) {
-
         // remove the export, clean the destination collection
         removeFile(exportTarget);
         testDB.dest.remove({});
