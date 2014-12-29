@@ -117,122 +117,56 @@ namespace mongo {
 #endif
     }
 
-    string BSTRToString(const BSTR bstr, int cp = CP_UTF8) {
-        string result;
+    bool getFileVersion(const char *filePath, DWORD &fileVersionMS, DWORD &fileVersionLS) {
+        DWORD  verHandle = NULL;
+        UINT   size = 0;
+        LPBYTE lpBuffer = NULL;
+        DWORD  verSize = GetFileVersionInfoSizeA(filePath, NULL);
 
-        if (!bstr) {
-            return result;
-        }
-
-        int len = SysStringLen(bstr);
-        int res = WideCharToMultiByte(cp, 0, bstr, len, NULL, 0, NULL, NULL);
-        if (res > 0) {
-            result.resize(res);
-            WideCharToMultiByte(cp, 0, bstr, len, &result[0], res, NULL, NULL);
-        }
-        return result;
-    }
-
-    bool getInstalledHotfixIDsInternal(list<string> &hotfixIDs) {
-        HRESULT hr;
-        IWbemLocator *pLoc;
-        IWbemServices *pSvc;
-        IEnumWbemClassObject *pEnum;
-
-        hr = CoInitializeSecurity(
-            NULL,                        // Security descriptor    
-            -1,                          // COM negotiates authentication service
-            NULL,                        // Authentication services
-            NULL,                        // Reserved
-            RPC_C_AUTHN_LEVEL_DEFAULT,   // Default authentication level for proxies
-            RPC_C_IMP_LEVEL_IMPERSONATE, // Default Impersonation level for proxies
-            NULL,                        // Authentication info
-            EOAC_NONE,                   // Additional capabilities of the client or server
-            NULL);                       // Reserved
-        if (FAILED(hr)) {
+        if (verSize == 0) {
             return false;
         }
 
-        hr = CoCreateInstance(CLSID_WbemLocator, 0,
-            CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID *)&pLoc);
-        if (FAILED(hr)) {
+        char *verData = new char[verSize];
+
+        if (GetFileVersionInfoA(filePath, NULL, verSize, verData) == 0) {
+            delete[] verData;
             return false;
         }
 
-        hr = pLoc->ConnectServer(
-            BSTR(L"ROOT\\CIMV2"),   //namespace
-            NULL,                   // User name 
-            NULL,                   // User password
-            0,                      // Locale 
-            NULL,                   // Security flags
-            0,                      // Authority 
-            0,                      // Context object 
-            &pSvc);                 // IWbemServices proxy
-        pLoc->Release();
-        if (FAILED(hr)) {
+        if (VerQueryValueA(verData, "\\", (VOID FAR* FAR*)&lpBuffer, &size) == 0) {
+            delete[] verData;
+            return false;
+        }
+    
+        if (size != sizeof(VS_FIXEDFILEINFO)) {
+            delete[] verData;
             return false;
         }
 
-        BSTR language = SysAllocString(L"WQL");
-        BSTR query = SysAllocString(L"SELECT HotFixID FROM Win32_QuickFixEngineering");
-
-        hr = pSvc->ExecQuery(
-            language,
-            query,
-            WBEM_FLAG_FORWARD_ONLY,         // Flags
-            0,                              // Context
-            &pEnum);
-        SysFreeString(language);
-        SysFreeString(query);
-        pSvc->Release();
-        if (FAILED(hr)) {
-            return false;
-        }
-
-        for (;;) {
-            IWbemClassObject *pObj;
-            ULONG uReturned;
-
-            hr = pEnum->Next(
-                0,                  // Time out
-                1,                  // One object
-                &pObj,
-                &uReturned);
-            if (FAILED(hr)) {
-                pEnum->Release();
-                return false;
-            }
-
-            if (uReturned == 0) {
-                break;
-            }
-
-            VARIANT value;
-            hr = pObj->Get(L"HotFixID", 0, &value, NULL, NULL);
-            pObj->Release();
-            if (FAILED(hr)) {
-                pEnum->Release();
-                return false;
-            }
-
-            string hotfixID = BSTRToString(value.bstrVal);
-            VariantClear(&value);
-            hotfixIDs.push_back(hotfixID);
-        }
-        pEnum->Release();
+        VS_FIXEDFILEINFO *verInfo = (VS_FIXEDFILEINFO *)lpBuffer;
+        fileVersionMS = verInfo->dwFileVersionMS;
+        fileVersionLS = verInfo->dwFileVersionLS;
+        delete[] verData;
         return true;
     }
 
-    bool getInstalledHotfixIDs(list<string> &hotfixIDs) {
-        if (CoInitializeEx(NULL, COINIT_APARTMENTTHREADED) != S_OK) {
-            return false;
+    bool getEnvironmentVariable(const char *varName, string &value) {
+        DWORD varValueSize = GetEnvironmentVariableA(varName, NULL, 0);
+        if (varValueSize == 0) {
+              return false;
         }
-
-        bool result = getInstalledHotfixIDsInternal(hotfixIDs);
-        ::CoUninitialize();
-        return result;
+        char *varValue = new char[varValueSize];
+        varValueSize = GetEnvironmentVariableA(varName, varValue, varValueSize);
+        if (varValueSize == 0) {
+              delete[] varValue;
+              return false;
+        }
+        value.assign(varValue, varValueSize);
+        delete[] varValue;
+        return true;
     }
-
+    
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
@@ -293,18 +227,31 @@ namespace mongo {
                         if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
                             fileZeroNeeded = true;
 
-                            // If the hotfix for http://support.microsoft.com/kb/2731284 is installed,
-                            // there is no need to zero-out data files.
-                            list<string> hotfixIDs;
-                            if (getInstalledHotfixIDs(hotfixIDs)) {
-                              for(list< string >::const_iterator i = hotfixIDs.begin(); i != hotfixIDs.end(); ++i) {
-                                string hotfixID = *i;
-                                if (hotfixID == "KB2731284") {
-                                  log() << "Hotfix for KB2731284 is installed, no need to zero-out data files";
-                                  fileZeroNeeded = false;
-                                  break;
+                            // Check the version of the ntfs.sys driver. If the version shows that the KB2731284 hotfix
+                            // or a later update is installed, zeroing out data files is unnecessary.
+                            string systemRoot;
+                            if (getEnvironmentVariable("SystemRoot", systemRoot)) {
+                                string ntfsDotSysPath = systemRoot + "\\system32\\drivers\\ntfs.sys";
+                                DWORD fileVersionMS;
+                                DWORD fileVersionLS;
+                                if (getFileVersion("c:\\windows\\system32\\drivers\\ntfs.sys", fileVersionMS, fileVersionLS)) {
+                                    WORD fileVersionFirstNumber = (fileVersionMS >> 16) & 0xffff;
+                                    WORD fileVersionSecondNumber = (fileVersionMS >> 0) & 0xffff;
+                                    WORD fileVersionThirdNumber = (fileVersionLS >> 16) & 0xffff;
+                                    WORD fileVersionFourthNumber = (fileVersionLS >> 0) & 0xffff;
+
+                                    if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7600) {
+                                        if (fileVersionFourthNumber >= 21296) {
+                                            log() << "Hotfix KB2731284 or later update is installed, no need to zero-out data files";
+                                            fileZeroNeeded = false;
+                                        }
+                                    } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7601) {
+                                        if (fileVersionFourthNumber >= 22083) {
+                                            log() << "Hotfix KB2731284 or later update is installed, no need to zero-out data files";
+                                            fileZeroNeeded = false;
+                                        }
+                                    }
                                 }
-                              }
                             }
                         }
                         break;
