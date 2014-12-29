@@ -68,23 +68,26 @@ func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
 	return validateReaderFields(tsvInputReader.fields)
 }
 
-// StreamDocument takes in two channels: it sends processed documents on the
-// readDocChan channel and if any error is encountered, the error is sent on the
-// errChan channel. It keeps reading from the underlying input source until it
-// hits EOF or an error. If ordered is true, it streams the documents in which
-// the documents are read
-func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D, errChan chan error) {
+// StreamDocument takes a boolean indicating if the documents should be streamed
+// in read order and a channel on which to stream the documents processed from
+// the underlying reader. Returns a non-nil error if encountered
+func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
 	tsvRecordChan := make(chan ConvertibleDoc, tsvInputReader.numDecoders)
+	tsvErrChan := make(chan error)
+
+	// begin reading from source
 	go func() {
 		var err error
 		for {
 			tsvInputReader.tsvRecord, err = tsvInputReader.tsvReader.ReadString(entryDelimiter)
 			if err != nil {
-				if err != io.EOF {
-					tsvInputReader.numProcessed++
-					errChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
-				}
 				close(tsvRecordChan)
+				if err == io.EOF {
+					tsvErrChan <- nil
+				} else {
+					tsvInputReader.numProcessed++
+					tsvErrChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
+				}
 				return
 			}
 			tsvRecordChan <- TSVConvertibleDoc{
@@ -95,7 +98,13 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 			tsvInputReader.numProcessed++
 		}
 	}()
-	errChan <- streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readDocChan)
+
+	// begin processing read bytes
+	go func() {
+		tsvErrChan <- streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readDocChan)
+	}()
+
+	return channelQuorumError(tsvErrChan, 2)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for TSV input. It

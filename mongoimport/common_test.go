@@ -500,6 +500,31 @@ func TestStreamDocuments(t *testing.T) {
 	})
 }
 
+func TestChannelQuorumError(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	Convey("Given a channel and a quorum...", t, func() {
+		Convey("an error should be returned if one is received", func() {
+			ch := make(chan error, 2)
+			ch <- nil
+			ch <- io.EOF
+			So(channelQuorumError(ch, 2), ShouldNotBeNil)
+		})
+		Convey("no error should be returned if none is received", func() {
+			ch := make(chan error, 2)
+			ch <- nil
+			ch <- nil
+			So(channelQuorumError(ch, 2), ShouldBeNil)
+		})
+		Convey("no error should be returned if up to quorum nil errors are received", func() {
+			ch := make(chan error, 3)
+			ch <- nil
+			ch <- nil
+			ch <- io.EOF
+			So(channelQuorumError(ch, 2), ShouldBeNil)
+		})
+	})
+}
+
 func TestFilterIngestError(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 

@@ -687,10 +687,8 @@ func TestImportDocuments(t *testing.T) {
 			fileHandle, err := os.Open("testdata/test_plain.json")
 			So(err, ShouldBeNil)
 			jsonInputReader := NewJSONInputReader(true, fileHandle, 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go jsonInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldNotBeNil)
+			So(jsonInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
 		Convey("an error should be thrown for invalid CSV import on test data", func() {
 			mongoImport, err := NewMongoImport()
@@ -704,10 +702,6 @@ func TestImportDocuments(t *testing.T) {
 			mongoImport.IngestOptions.MaintainInsertionOrder = true
 			_, err = mongoImport.ImportDocuments()
 			So(err, ShouldNotBeNil)
-			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": 2, "c": 3},
-			}
-			So(checkOnlyHasDocuments(*mongoImport.SessionProvider, expectedDocuments), ShouldBeNil)
 		})
 	})
 }

@@ -26,19 +26,15 @@ func TestCSVStreamDocument(t *testing.T) {
 			contents := `1, 2, foo"bar`
 			fields := []string{"a", "b", "c"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldNotBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
 		Convey("escaped quotes are parsed correctly", func() {
 			contents := `1, 2, "foo""bar"`
 			fields := []string{"a", "b", "c"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 		})
 		Convey("multiple escaped quotes separated by whitespace parsed correctly", func() {
 			contents := `1, 2, "foo"" ""bar"`
@@ -49,10 +45,8 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", `foo" "bar`},
 			}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 		Convey("integer valued strings should be converted", func() {
@@ -64,10 +58,8 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", " 3e"},
 			}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 		Convey("extra fields should be prefixed with 'field'", func() {
@@ -80,11 +72,9 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"field3", " may"},
 			}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
-			So(<-errChan, ShouldBeNil)
 		})
 		Convey("nested CSV fields should be imported properly", func() {
 			contents := `1, 2f , " 3e" , " may"`
@@ -98,34 +88,29 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"field3", " may"},
 			}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
-			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
+			docChan := make(chan bson.D, 4)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+
 			readDocument := <-docChan
 			So(readDocument[0], ShouldResemble, expectedRead[0])
 			So(readDocument[1].Name, ShouldResemble, expectedRead[1].Name)
 			So(*readDocument[1].Value.(*bson.D), ShouldResemble, expectedRead[1].Value)
 			So(readDocument[2], ShouldResemble, expectedRead[2])
 			So(readDocument[3], ShouldResemble, expectedRead[3])
-			So(<-errChan, ShouldBeNil)
 		})
 		Convey("whitespace separated quoted strings are still an error", func() {
 			contents := `1, 2, "foo"  "bar"`
 			fields := []string{"a", "b", "c"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldNotBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
 		Convey("nested CSV fields causing header collisions should error", func() {
 			contents := `1, 2f , " 3e" , " may", june`
 			fields := []string{"a", "b.c", "field3"}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
 			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
-			So(<-errChan, ShouldNotBeNil)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldNotBeNil)
 		})
 		Convey("calling StreamDocument() for CSVs should return next set of "+
 			"values", func() {
@@ -142,12 +127,10 @@ func TestCSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", 6},
 			}
 			csvInputReader := NewCSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			errChan := make(chan error)
-			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
+			docChan := make(chan bson.D, 2)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedReadOne)
 			So(<-docChan, ShouldResemble, expectedReadTwo)
-			So(<-errChan, ShouldBeNil)
 		})
 	})
 }
@@ -263,13 +246,10 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 			fileHandle, err := os.Open("testdata/test.csv")
 			So(err, ShouldBeNil)
 			csvInputReader := NewCSVInputReader(fields, fileHandle, 1)
-
-			errChan := make(chan error)
-			docChan := make(chan bson.D, 1)
-			go csvInputReader.StreamDocument(true, docChan, errChan)
+			docChan := make(chan bson.D, 50)
+			So(csvInputReader.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedReadOne)
 			So(<-docChan, ShouldResemble, expectedReadTwo)
-			So(<-errChan, ShouldBeNil)
 		})
 	})
 }

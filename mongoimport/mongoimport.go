@@ -65,10 +65,10 @@ type MongoImport struct {
 }
 
 type InputReader interface {
-	// StreamDocument sends InputReader processed BSON documents on the read channel
-	// If an error is encountered during processing, it is sent on the err channel.
-	// Otherwise, once documents are streamed, nil is sent on the err channel.
-	StreamDocument(ordered bool, read chan bson.D, err chan error)
+	// StreamDocument takes a boolean indicating if the documents should be streamed
+	// in read order and a channel on which to stream the documents processed from
+	// the underlying reader.  Returns a non-nil error if encountered
+	StreamDocument(ordered bool, read chan bson.D) error
 
 	// ReadAndValidateHeader reads the header line from the InputReader and returns
 	// a non-nil error if the fields from the header line are invalid; returns
@@ -332,23 +332,20 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	}
 
 	readDocChan := make(chan bson.D, workerBufferSize)
-
-	// any read errors should cause mongoimport to stop ingestion immediately
-	readErrChan := make(chan error, 1)
-
-	// whether or not documents should be streamed in read order
+	processingErrChan := make(chan error)
 	ordered := mongoImport.IngestOptions.MaintainInsertionOrder
 
-	// handle all input reads in a separate goroutine
-	go inputReader.StreamDocument(ordered, readDocChan, readErrChan)
+	// read and process from the input reader
+	go func() {
+		processingErrChan <- inputReader.StreamDocument(ordered, readDocChan)
+	}()
 
-	// return immediately on ingest errors - these will be triggered
-	// either by an issue ingesting data or if the read channel is
-	// closed so we can block here while reads happen in a goroutine
-	if err = mongoImport.IngestDocuments(readDocChan); err != nil {
-		return mongoImport.insertionCount, err
-	}
-	return mongoImport.insertionCount, <-readErrChan
+	// insert documents into the target database
+	go func() {
+		processingErrChan <- mongoImport.IngestDocuments(readDocChan)
+	}()
+
+	return mongoImport.insertionCount, channelQuorumError(processingErrChan, 2)
 }
 
 // IngestDocuments takes a slice of documents and either inserts/upserts them -
@@ -368,12 +365,16 @@ func (mongoImport *MongoImport) IngestDocuments(readDocChan chan bson.D) (retErr
 	//    error - and stopOnError is set to true
 
 	wg := &sync.WaitGroup{}
+	mt := &sync.Mutex{}
 	for i := 0; i < numInsertionWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			// only set the first insertion error and cause sibling goroutines to terminate immediately
-			if err := mongoImport.runInsertionWorker(readDocChan); err != nil && retErr == nil {
+			err := mongoImport.runInsertionWorker(readDocChan)
+			mt.Lock()
+			defer mt.Unlock()
+			if err != nil && retErr == nil {
 				retErr = err
 				mongoImport.Kill(err)
 			}
@@ -436,13 +437,10 @@ readLoop:
 				if err = mongoImport.insert(documents, collection); err != nil {
 					return err
 				}
-				// TODO: TOOLS-313; better to use a progress bar here
-				if mongoImport.insertionCount%10000 == 0 {
-					log.Logf(log.Info, "Progress: %v documents inserted...", mongoImport.insertionCount)
-				}
 				documents = documents[:0]
 				numMessageBytes = 0
 			}
+
 			// ignore blank fields if specified
 			if ignoreBlanks {
 				document = removeBlankFields(document)

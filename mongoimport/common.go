@@ -59,6 +59,19 @@ func (str *sizeTrackingReader) Read(p []byte) (n int, err error) {
 	return
 }
 
+// channelQuorumError takes a channel and a quorum - which specifies how many
+// messages to receive on that channel before returning. It either returns the
+// first non-nil error received on the channel or nil if up to `quorum` nil
+// errors are received
+func channelQuorumError(ch <-chan error, quorum int) (err error) {
+	for i := 0; i < quorum; i++ {
+		if err = <-ch; err != nil {
+			return
+		}
+	}
+	return
+}
+
 // constructUpsertDocument constructs a BSON document to use for upserts
 func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 	upsertDocument := bson.M{}
@@ -225,6 +238,7 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 	}
 	var importWorkers []*ImportWorker
 	wg := &sync.WaitGroup{}
+	mt := &sync.Mutex{}
 	importTomb := &tomb.Tomb{}
 	inChan := readDocChan
 	outChan := outputChan
@@ -243,7 +257,10 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 		go func() {
 			defer wg.Done()
 			// only set the first worker error and cause sibling goroutines to terminate immediately
-			if err := importWorker.processDocuments(ordered); err != nil && retErr == nil {
+			err := importWorker.processDocuments(ordered)
+			mt.Lock()
+			defer mt.Unlock()
+			if err != nil && retErr == nil {
 				retErr = err
 				importWorker.tomb.Kill(err)
 			}

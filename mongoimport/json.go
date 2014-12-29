@@ -92,33 +92,38 @@ func (jsonInputReader *JSONInputReader) ReadAndValidateHeader() error {
 	return nil
 }
 
-// StreamDocument takes in two channels: it sends processed documents on the
-// readChan channel and if any error is encountered, the error is sent on the
-// errChan channel. It keeps reading from the underlying input source until it
-// hits EOF or an error. If ordered is true, it streams the documents in which
-// the documents are read
-func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+// StreamDocument takes a boolean indicating if the documents should be streamed
+// in read order and a channel on which to stream the documents processed from
+// the underlying reader. Returns a non-nil error if encountered
+func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (retErr error) {
 	rawChan := make(chan ConvertibleDoc, jsonInputReader.numDecoders)
+	jsonErrChan := make(chan error)
+
+	// begin reading from source
 	go func() {
 		var err error
 		for {
 			if jsonInputReader.isArray {
 				if err = jsonInputReader.readJSONArraySeparator(); err != nil {
-					if err != io.EOF {
-						jsonInputReader.numProcessed++
-						errChan <- fmt.Errorf("error reading separator after document #%v: %v", jsonInputReader.numProcessed, err)
-					}
 					close(rawChan)
+					if err == io.EOF {
+						jsonErrChan <- nil
+					} else {
+						jsonInputReader.numProcessed++
+						jsonErrChan <- fmt.Errorf("error reading separator after document #%v: %v", jsonInputReader.numProcessed, err)
+					}
 					return
 				}
 			}
 			rawBytes, err := jsonInputReader.decoder.ScanObject()
 			if err != nil {
-				if err != io.EOF {
-					jsonInputReader.numProcessed++
-					errChan <- fmt.Errorf("error processing document #%v: %v", jsonInputReader.numProcessed, err)
-				}
 				close(rawChan)
+				if err == io.EOF {
+					jsonErrChan <- nil
+				} else {
+					jsonInputReader.numProcessed++
+					jsonErrChan <- fmt.Errorf("error processing document #%v: %v", jsonInputReader.numProcessed, err)
+				}
 				return
 			}
 			rawChan <- JSONConvertibleDoc{
@@ -128,7 +133,13 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 			jsonInputReader.numProcessed++
 		}
 	}()
-	errChan <- streamDocuments(ordered, jsonInputReader.numDecoders, rawChan, readChan)
+
+	// begin processing read bytes
+	go func() {
+		jsonErrChan <- streamDocuments(ordered, jsonInputReader.numDecoders, rawChan, readChan)
+	}()
+
+	return channelQuorumError(jsonErrChan, 2)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for JSON input. It

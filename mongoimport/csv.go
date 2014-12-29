@@ -63,23 +63,26 @@ func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
 	return validateReaderFields(csvInputReader.fields)
 }
 
-// StreamDocument takes in two channels: it sends processed documents on the
-// readDocChan channel and if any error is encountered, the error is sent on the
-// errChan channel. It keeps reading from the underlying input source until it
-// hits EOF or an error. If ordered is true, it streams the documents in which
-// the documents are read
-func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D, errChan chan error) {
+// StreamDocument takes a boolean indicating if the documents should be streamed
+// in read order and a channel on which to stream the documents processed from
+// the underlying reader. Returns a non-nil error if encountered
+func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
 	csvRecordChan := make(chan ConvertibleDoc, csvInputReader.numDecoders)
+	csvErrChan := make(chan error)
+
+	// begin reading from source
 	go func() {
 		var err error
 		for {
 			csvInputReader.csvRecord, err = csvInputReader.csvReader.Read()
 			if err != nil {
-				if err != io.EOF {
-					csvInputReader.numProcessed++
-					errChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
-				}
 				close(csvRecordChan)
+				if err == io.EOF {
+					csvErrChan <- nil
+				} else {
+					csvInputReader.numProcessed++
+					csvErrChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
+				}
 				return
 			}
 			csvRecordChan <- CSVConvertibleDoc{
@@ -90,7 +93,12 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 			csvInputReader.numProcessed++
 		}
 	}()
-	errChan <- streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readDocChan)
+
+	go func() {
+		csvErrChan <- streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readDocChan)
+	}()
+
+	return channelQuorumError(csvErrChan, 2)
 }
 
 // This is required to satisfy the ConvertibleDoc interface for CSV input. It
