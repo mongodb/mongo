@@ -27,11 +27,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import fileinput, os, re, shutil, sys, textwrap
+import os, re, sys
 from collections import defaultdict
 from glob import glob
-from time import mktime
-from subprocess import call
 import json
 from datetime import datetime
 
@@ -42,7 +40,6 @@ except ImportError:
     print >>sys.stderr, "Could not import stat_data.py, it should be\
         in the same directory as %s" % sys.argv[0]
     sys.exit(-1)
-
 
 thisyear = datetime.today().year
 def parsetime(s):
@@ -76,13 +73,6 @@ def munge(args, title, values):
     ydata = {}
     last_value = 0.0
     for t, v in sorted(values):
-        # if args.abstime:
-        # Build the time series, milliseconds since the epoch
-        # x = int(mktime(parsetime(t).timetuple())) * 1000
-        # else:
-        #     # Build the time series as seconds since the start of the data
-        #     x = (parsetime(t) - start_time).seconds
-
         float_v = float(v)
         if not stats_cleared:
             float_v = float_v - last_value
@@ -100,8 +90,6 @@ import argparse
 
 def main():   
     parser = argparse.ArgumentParser(description='Create graphs from WiredTiger statistics.')
-    parser.add_argument('--abstime', action='store_true',
-        help='use absolute time on the x axis')
     parser.add_argument('--all', '-A', action='store_true',
         help='generate all series as separate HTML output files by category')
     parser.add_argument('--clear', action='store_true',
@@ -196,11 +184,6 @@ def main():
             print 'Output: ' + outputname + ' has no data.  Do not create.'
             return
 
-        #---------------------------------------
-        chart_extra = {}
-        # Add in the x axis if the user wants time.
-        if args.abstime:
-            chart_extra['x_axis_format'] = '%H:%M:%S'
 
         json_output = { "series": [] }
 
@@ -221,16 +204,15 @@ def main():
         if args.json:
             jsonfile = filename + '.json'
             with open(jsonfile, 'w') as f:
-                print "creating %s" % jsonfile
                 json.dump(json_output, f)
+                print "created %s" % jsonfile
 
         # write output file
         dstfile = open(outputname, 'wt')
         replaced_contents = contents.replace('"### INSERT DATA HERE ###"', json.dumps(json_output))
         dstfile.write(replaced_contents)
         dstfile.close()
-
-        print "creating %s" % dstfile.name
+        print "created %s" % dstfile.name
 
     # Split out the data, convert timestamps
     results = []
