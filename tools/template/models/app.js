@@ -18,9 +18,17 @@ var App = module.exports = AmpersandState.extend({
     var year = new Date().getFullYear();
     var groups = {};
     var stats = _.map(attrs.series, function (serie) {
-      var tokens = serie.key.split(':');
-      var group = tokens[0].trim();
-      var name = tokens[1].trim();
+      if (serie.key.indexOf(':') !== -1) {
+        var tokens = serie.key.split(':');
+        var group = tokens[0].trim();
+        var name = tokens[1].trim();
+      } else {
+        var group = 'stats';
+        var name = serie.key;
+      }
+      debug('group:', group);
+      debug('name:', name);
+
       var data = _.sortBy(
         _.map(serie.values, function (v, k) {
           // add current year to date string
