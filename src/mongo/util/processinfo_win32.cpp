@@ -120,14 +120,14 @@ namespace mongo {
         DWORD verSize = GetFileVersionInfoSizeA(filePath, NULL);
         if (verSize == 0) {
             DWORD gle = GetLastError();
-            warning() << "GetFileVersionInfoSizeA failed with " << errnoWithDescription(gle);
+            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
             return false;
         }
 
         char *verData = new char[verSize];
         if (GetFileVersionInfoA(filePath, NULL, verSize, verData) == 0) {
             DWORD gle = GetLastError();
-            warning() << "GetFileVersionInfoSizeA failed with " << errnoWithDescription(gle);
+            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
             delete[] verData;
             return false;
         }
@@ -136,13 +136,13 @@ namespace mongo {
         LPBYTE lpBuffer;
         if (VerQueryValueA(verData, "\\", (LPVOID *)&lpBuffer, &size) == 0) {
             DWORD gle = GetLastError();
-            warning() << "VerQueryValueA failed with " << errnoWithDescription(gle);
+            warning() << "VerQueryValueA on " << filePath << " failed with " << errnoWithDescription(gle);
             delete[] verData;
             return false;
         }
     
         if (size != sizeof(VS_FIXEDFILEINFO)) {
-            warning() << "VerQueryValueA returned data structure with unexpected size";
+            warning() << "VerQueryValueA on " << filePath << " returned structure with unexpected size";
             delete[] verData;
             return false;
         }
@@ -158,7 +158,7 @@ namespace mongo {
         DWORD varValueSize = GetEnvironmentVariableA(varName, NULL, 0);
         if (varValueSize == 0) {
             DWORD gle = GetLastError();
-            warning() << "GetEnvironmentVariableA failed with " << errnoWithDescription(gle);
+            warning() << "GetEnvironmentVariableA on " << varName << " failed with " << errnoWithDescription(gle);
             return false;
         }
 
@@ -166,7 +166,7 @@ namespace mongo {
         varValueSize = GetEnvironmentVariableA(varName, varValue, varValueSize);
         if (varValueSize == 0) {
             DWORD gle = GetLastError();
-            warning() << "GetEnvironmentVariableA failed with " << errnoWithDescription(gle);
+            warning() << "GetEnvironmentVariableA on " << varName << " failed with " << errnoWithDescription(gle);
             delete[] varValue;
             return false;
         }
@@ -265,6 +265,7 @@ namespace mongo {
                                 log() << "Hotfix KB2731284 or later update is installed, no need to zero-out data files";
                                 fileZeroNeeded = false;
                             } else {
+                                log() << "Hotfix KB2731284 or later update is not installed, will zero-out data files";
                                 fileZeroNeeded = true;
                             }
                         }
