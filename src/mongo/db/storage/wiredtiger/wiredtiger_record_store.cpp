@@ -92,16 +92,7 @@ namespace {
             ss << "prefix_compression,";
         }
 
-        // TODO: remove this; SERVER-16568
-        std::string localCollectionBlockCompressor;
-        if (wiredTigerGlobalOptions.collectionBlockCompressor == "none") {
-            localCollectionBlockCompressor = "";
-        }
-        else {
-            localCollectionBlockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
-        }
-
-        ss << "block_compressor=" << localCollectionBlockCompressor << ",";
+        ss << "block_compressor=" << wiredTigerGlobalOptions.collectionBlockCompressor << ",";
 
         ss << extraStrings << ",";
 

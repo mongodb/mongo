@@ -289,16 +289,7 @@ namespace {
             ss << "prefix_compression,";
         }
 
-        // TODO: remove this; SERVER-16568
-        std::string localIndexBlockCompressor;
-        if (wiredTigerGlobalOptions.indexBlockCompressor == "none") {
-            localIndexBlockCompressor = "";
-        }
-        else {
-            localIndexBlockCompressor = wiredTigerGlobalOptions.indexBlockCompressor;
-        }
-
-        ss << "block_compressor=" << localIndexBlockCompressor << ",";
+        ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
         ss << extraConfig;
 
         // Validate configuration object.

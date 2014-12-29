@@ -145,16 +145,7 @@ namespace mongo {
         ss << "statistics=(fast),";
         if ( _durable ) {
             ss << "log=(enabled=true,archive=true,path=journal,compressor=";
-
-            // TODO: remove this; SERVER-16568
-            std::string localJournalCompressor;
-            if (wiredTigerGlobalOptions.journalCompressor == "none") {
-                localJournalCompressor = "";
-            }
-            else {
-                localJournalCompressor = wiredTigerGlobalOptions.journalCompressor;
-            }
-            ss << localJournalCompressor << "),";
+            ss << wiredTigerGlobalOptions.journalCompressor << "),";
         }
         ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
         ss << ",log_size=2GB),";
