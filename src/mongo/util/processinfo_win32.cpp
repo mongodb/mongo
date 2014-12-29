@@ -121,6 +121,89 @@ namespace mongo {
 #endif
     }
 
+    bool getFileVersion(const char *filePath, DWORD &fileVersionMS, DWORD &fileVersionLS) {
+        DWORD verSize = GetFileVersionInfoSizeA(filePath, NULL);
+        if (verSize == 0) {
+            DWORD gle = GetLastError();
+            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        boost::scoped_array<char> verData(new char[verSize]);
+        if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
+            DWORD gle = GetLastError();
+            warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        UINT size;
+        VS_FIXEDFILEINFO *verInfo;
+        if (VerQueryValueA(verData.get(), "\\", (LPVOID *)&verInfo, &size) == 0) {
+            DWORD gle = GetLastError();
+            warning() << "VerQueryValueA on " << filePath << " failed with " << errnoWithDescription(gle);
+            return false;
+        }
+    
+        if (size != sizeof(VS_FIXEDFILEINFO)) {
+            warning() << "VerQueryValueA on " << filePath << " returned structure with unexpected size";
+            return false;
+        }
+
+        fileVersionMS = verInfo->dwFileVersionMS;
+        fileVersionLS = verInfo->dwFileVersionLS;
+        return true;
+    }
+
+    // If the version of the ntfs.sys driver shows that the KB2731284 hotfix or a later update
+    // is installed, zeroing out data files is unnecessary. The file version numbers used below
+    // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
+    bool isKB2731284OrLaterUpdateInstalled() {
+        UINT pathBufferSize = GetSystemDirectoryA(NULL, 0);
+        if (pathBufferSize == 0) {
+            DWORD gle = GetLastError();
+            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        boost::scoped_array<char> systemDirectory(new char[pathBufferSize]);
+        UINT systemDirectoryPathLen;
+        systemDirectoryPathLen = GetSystemDirectoryA(systemDirectory.get(), pathBufferSize);
+        if (systemDirectoryPathLen == 0) {
+            DWORD gle = GetLastError();
+            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        if (systemDirectoryPathLen != pathBufferSize - 1) {
+            warning() << "GetSystemDirectoryA returned unexpected path length";
+            return false;
+        }
+
+        string ntfsDotSysPath = systemDirectory.get();
+        if (ntfsDotSysPath.back() != '\\') {
+            ntfsDotSysPath.append("\\");
+        }
+        ntfsDotSysPath.append("drivers\\ntfs.sys");
+        DWORD fileVersionMS;
+        DWORD fileVersionLS;
+        if (getFileVersion(ntfsDotSysPath.c_str(), fileVersionMS, fileVersionLS)) {
+            WORD fileVersionFirstNumber = HIWORD(fileVersionMS);
+            WORD fileVersionSecondNumber = LOWORD(fileVersionMS);
+            WORD fileVersionThirdNumber = HIWORD(fileVersionLS);
+            WORD fileVersionFourthNumber = LOWORD(fileVersionLS);
+
+            if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7600 &&
+                    fileVersionFourthNumber >= 21296 && fileVersionFourthNumber <= 21999) {
+                return true; 
+            } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7601 &&
+                    fileVersionFourthNumber >= 22083 && fileVersionFourthNumber <= 22999) {
+                return true; 
+            }
+        }
+
+        return false;
+    }
+
     void ProcessInfo::SystemInfo::collectSystemInfo() {
         BSONObjBuilder bExtra;
         stringstream verstr;
@@ -179,7 +262,13 @@ namespace mongo {
                         // http://support.microsoft.com/kb/2731284.
                         //
                         if ((osvi.wServicePackMajor >= 0) && (osvi.wServicePackMajor < 2)) {
-                            fileZeroNeeded = true;
+                            if (isKB2731284OrLaterUpdateInstalled()) {
+                                log() << "Hotfix KB2731284 or later update is installed, no need to zero-out data files";
+                                fileZeroNeeded = false;
+                            } else {
+                                log() << "Hotfix KB2731284 or later update is not installed, will zero-out data files";
+                                fileZeroNeeded = true;
+                            }
                         }
                         break;
                     case 0:

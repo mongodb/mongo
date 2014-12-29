@@ -886,7 +886,8 @@ elif windows:
                      'Psapi.lib',
                      'DbgHelp.lib',
                      'shell32.lib',
-                     'Iphlpapi.lib'])
+                     'Iphlpapi.lib',
+                     'version.lib'])
 
     # v8 calls timeGetTime()
     if usev8:
