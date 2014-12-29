@@ -33,7 +33,6 @@
 
 #include <iostream>
 #include <psapi.h>
-#include <wbemidl.h>
 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"
