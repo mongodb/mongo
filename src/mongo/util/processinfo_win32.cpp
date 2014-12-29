@@ -177,7 +177,7 @@ namespace mongo {
 
     // If the version of the ntfs.sys driver shows that the KB2731284 hotfix or a later update
     // is installed, zeroing out data files is unnecessary. The file version numbers used below
-    // are taken from the Hotfix File Informationo at http://support.microsoft.com/kb/2731284.
+    // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
     bool isKB2731284OrLaterUpdateInstalled() {
         string systemRoot;
         if (getEnvironmentVariable("SystemRoot", systemRoot)) {
@@ -191,10 +191,10 @@ namespace mongo {
                 WORD fileVersionFourthNumber = fileVersionLS & 0xffff;
 
                 if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7600 &&
-                        fileVersionFourthNumber >= 21296) {
+                        fileVersionFourthNumber >= 21296 && fileVersionFourthNumber <= 21999) {
                     return true; 
                 } else if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7601 &&
-                        fileVersionFourthNumber >= 22083) {
+                        fileVersionFourthNumber >= 22083 && fileVersionFourthNumber <= 22999) {
                     return true; 
                 }
             }
