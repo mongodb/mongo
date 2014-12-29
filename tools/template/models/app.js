@@ -23,6 +23,7 @@ var App = module.exports = AmpersandState.extend({
       var name = tokens[1].trim();
       var data = _.sortBy(
         _.map(serie.values, function (v, k) {
+          // add current year to date string
           var tokens = k.split(' ');
           tokens.splice(2, 0, year.toString());
           var d = tokens.join(' ');

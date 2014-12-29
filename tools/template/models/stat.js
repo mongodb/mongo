@@ -8,10 +8,6 @@ var Stat = module.exports = AmpersandState.extend({
       type: 'string',
       default: ''
     },
-    short_name: {
-      type: 'string',
-      default: ''
-    },
     group: {
       type: 'string',
       default: ''

@@ -133,6 +133,10 @@ gulp.task('styles', function() {
     .pipe(gulp.dest(BUILD + '/css'));
 });
 
+/**
+ * 'gulp pack' will build all targets, then run packify to bundle everything into
+ * a single .html file, and save this template in the tools directory.
+ */
 gulp.task('pack', ['default'], function() {
   process.chdir('./' + BUILD)
   var opts = {
@@ -146,7 +150,7 @@ gulp.task('pack', ['default'], function() {
 
 
 /**
- * @task assets Copies all static asset files into `BUILD`.
+ * Copies all static asset files into `BUILD`.
  */
 gulp.task('static', [
   'copy images'

@@ -48,7 +48,6 @@ module.exports = function(opts) {
       x.range([0, width]);
 
       if (_.isEqual(x.domain(), [0, 1]) || _.isEqual(x.domain(), [new Date(0), new Date(1)]) || options.recalcXDomain) {
-        debug('recalc domain');
         xExtent = [
           d3.min(series, function (s) { return d3.min(s.data, function (d) {return accx(d); }); }),
           d3.max(series, function (s) { return d3.max(s.data, function (d) {return accx(d); }); })
