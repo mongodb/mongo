@@ -12,7 +12,7 @@ if (typeof getToolTest === 'undefined') {
   var toolTest = getToolTest('oplogUnreachableHostsTest');
   var commonToolArgs = getCommonToolArguments();
 
-  var fromUnreachableError = 'error connecting to source host';
+  var fromUnreachableError = 'error connecting to source db';
   var args = ['oplog'].concat(commonToolArgs).concat('--from',
     'doesnte.xist:27999');
   assert(toolTest.runTool.apply(toolTest, args) !== 0,
@@ -37,7 +37,7 @@ if (typeof getToolTest === 'undefined') {
     'mongooplog should fail when --host is not reachable');
 
   var output = rawMongoProgramOutput();
-  var hostUnreachableError = 'error connecting to destination host';
+  var hostUnreachableError = 'error connecting to destination db';
 
   assert(output.indexOf(hostUnreachableError) !== -1,
     'mongooplog should output correct error when "host" is not reachable');
