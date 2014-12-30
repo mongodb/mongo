@@ -395,9 +395,7 @@ __recovery_file_scan(WT_RECOVERY *r)
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	if (r->nfiles > r->max_fileid)
-		r->max_fileid = r->nfiles;
-	return (ret);
+err:	return (ret);
 }
 
 /*
@@ -405,16 +403,17 @@ err:	if (r->nfiles > r->max_fileid)
  *	Run recovery.
  */
 int
-__wt_txn_recover(WT_CONNECTION_IMPL *conn)
+__wt_txn_recover(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *metac;
 	WT_DECL_RET;
 	WT_RECOVERY r;
-	WT_SESSION_IMPL *session;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
 	int was_backup;
 
+	conn = S2C(session);
 	WT_CLEAR(r);
 	INIT_LSN(&r.ckpt_lsn);
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;

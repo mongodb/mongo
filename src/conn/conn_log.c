@@ -328,7 +328,7 @@ err:		__wt_err(session, ret, "log archive server error");
 
 /*
  * __wt_logmgr_create --
- *	Start the log subsystem and archive server thread.
+ *	Initialize the log subsystem (before running recovery).
  */
 int
 __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
@@ -378,8 +378,23 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
+	return (0);
+}
+
+/*
+ * __wt_logmgr_open --
+ *	Start the log subsystem and archive server thread.
+ */
+int
+__wt_logmgr_open(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
 	/* If no log thread services are configured, we're done. */ 
-	if (!FLD_ISSET(conn->log_flags,
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
+	    !FLD_ISSET(conn->log_flags,
 	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
 		return (0);
 

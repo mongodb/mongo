@@ -227,6 +227,7 @@ extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_logmgr_open(WT_SESSION_IMPL *session);
 extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
@@ -658,4 +659,4 @@ extern int __wt_txn_checkpoint_log( WT_SESSION_IMPL *session, int full, uint32_t
 extern int __wt_txn_truncate_log( WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern int __wt_txn_truncate_end(WT_SESSION_IMPL *session);
 extern int __wt_txn_printlog(WT_SESSION *wt_session, FILE *out);
-extern int __wt_txn_recover(WT_CONNECTION_IMPL *conn);
+extern int __wt_txn_recover(WT_SESSION_IMPL *session);

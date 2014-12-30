@@ -712,15 +712,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * where the previous log file ends.
 	 */
 	WT_ERR(__wt_log_newfile(session, 1, NULL));
-
-	/*
-	 * If there were log files, run recovery.
-	 * XXX belongs at a higher level than this.
-	 */
-	if (logcount > 0) {
-		log->trunc_lsn = log->alloc_lsn;
-		WT_ERR(__wt_txn_recover(conn));
-	}
+	log->trunc_lsn = log->alloc_lsn;
 
 err:	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
@@ -1220,8 +1212,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 
 			/*
 			 * Log cursors may not know the starting LSN.  If an
-			 * LSN pointer is passed in, but it is the INIT_LSN,
-			 * start from the first_lsn.
+			 * LSN is passed in that it is equal to the smallest
+			 * LSN, start from the beginning of the log.
 			 */
 			start_lsn = *lsnp;
 			if (IS_INIT_LSN(&start_lsn))
