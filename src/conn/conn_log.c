@@ -223,7 +223,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	 */
 	for (i = reccount; i < (u_int)conn->log_prealloc; i++) {
 		WT_ERR(__wt_log_allocfile(
-		    session, ++log->prep_fileid, WT_LOG_PREPNAME));
+		    session, ++log->prep_fileid, WT_LOG_PREPNAME, 1));
 		WT_STAT_FAST_CONN_INCR(session, log_prealloc_files);
 	}
 

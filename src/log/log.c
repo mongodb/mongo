@@ -569,7 +569,8 @@ err:	if (log_fh != NULL)
  *	pre-allocating the file and moving it to the destination name.
  */
 int
-__wt_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
+__wt_log_allocfile(
+    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, int prealloc)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
@@ -598,7 +599,8 @@ __wt_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
 	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
-	WT_ERR(__log_prealloc(session, log_fh));
+	if (prealloc)
+		WT_ERR(__log_prealloc(session, log_fh));
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_close(session, tmp_fh));
@@ -1022,7 +1024,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * If we need to create the log file, do so now.
 	 */
 	if (create_log && (ret = __wt_log_allocfile(
-	    session, log->fileid, WT_LOG_FILENAME)) != 0)
+	    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
 		return (ret);
 	WT_RET(__log_openfile(session,
 	    0, &log->log_fh, WT_LOG_FILENAME, log->fileid));
