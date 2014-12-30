@@ -42,6 +42,7 @@ namespace mongo {
     class OperationContext;
     class RecoveryUnit;
     struct StorageGlobalParams;
+    class StorageEngineLockFile;
 
     /**
      * The StorageEngine class is the top level interface for creating a new storage
@@ -65,7 +66,8 @@ namespace mongo {
             /**
              * Return a new instance of the StorageEngine.  Caller owns the returned pointer.
              */
-            virtual StorageEngine* create(const StorageGlobalParams& params) const = 0;
+            virtual StorageEngine* create(const StorageGlobalParams& params,
+                                          const StorageEngineLockFile& lockFile) const = 0;
 
             /**
              * Returns the name of the storage engine.

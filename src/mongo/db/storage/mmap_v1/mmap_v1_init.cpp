@@ -39,8 +39,9 @@ namespace mongo {
         class MMAPV1Factory : public StorageEngine::Factory {
         public:
             virtual ~MMAPV1Factory() { }
-            virtual StorageEngine* create(const StorageGlobalParams& params) const {
-                return new MMAPV1Engine();
+            virtual StorageEngine* create(const StorageGlobalParams& params,
+                                          const StorageEngineLockFile& lockFile) const {
+                return new MMAPV1Engine(lockFile);
             }
 
             virtual StringData getCanonicalName() const {

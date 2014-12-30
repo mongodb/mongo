@@ -41,6 +41,9 @@ namespace mongo {
     void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {
     }
 
+    void GlobalEnvironmentNoop::shutdownGlobalStorageEngineCleanly() {
+    }
+
     void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
                                                       const StorageEngine::Factory* factory) {
         // Takes ownership of 'factory' and deletes it because we don't need it.

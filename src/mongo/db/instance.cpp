@@ -1082,8 +1082,7 @@ namespace {
         log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
         boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->cleanShutdown();
+        getGlobalEnvironment()->shutdownGlobalStorageEngineCleanly();
     }
 
     void exitCleanly(ExitCode code) {

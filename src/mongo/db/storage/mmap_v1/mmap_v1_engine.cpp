@@ -287,7 +287,7 @@ namespace {
     }
 } // namespace
 
-    MMAPV1Engine::MMAPV1Engine() {
+    MMAPV1Engine::MMAPV1Engine(const StorageEngineLockFile& lockFile) {
         // TODO check non-journal subdirs if using directory-per-db
         checkReadAhead(storageGlobalParams.dbpath);
 

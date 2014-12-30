@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/global_environment_experiment.h"
@@ -37,6 +38,7 @@
 namespace mongo {
 
     class Client;
+    class StorageEngineLockFile;
 
     class GlobalEnvironmentMongoD : public GlobalEnvironmentExperiment {
     public:
@@ -49,6 +51,8 @@ namespace mongo {
         StorageEngine* getGlobalStorageEngine();
 
         void setGlobalStorageEngine(const std::string& name);
+
+        void shutdownGlobalStorageEngineCleanly();
 
         void registerStorageEngine(const std::string& name,
                                    const StorageEngine::Factory* factory);
@@ -80,6 +84,8 @@ namespace mongo {
 
         // protected by Client::clientsMutex
         std::vector<KillOpListenerInterface*> _killOpListeners;
+
+        boost::scoped_ptr<StorageEngineLockFile> _lockFile;
 
         // logically owned here, but never deleted by anyone.
         StorageEngine* _storageEngine;

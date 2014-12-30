@@ -42,7 +42,8 @@ namespace mongo {
         class RocksFactory : public StorageEngine::Factory {
         public:
             virtual ~RocksFactory(){}
-            virtual StorageEngine* create( const StorageGlobalParams& params ) const {
+            virtual StorageEngine* create(const StorageGlobalParams& params,
+                                          const StorageEngineLockFile& lockFile) const {
                 KVStorageEngineOptions options;
                 options.directoryPerDB = params.directoryperdb;
                 options.forRepair = params.repair;

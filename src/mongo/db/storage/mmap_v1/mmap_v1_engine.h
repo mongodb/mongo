@@ -43,7 +43,7 @@ namespace mongo {
 
     class MMAPV1Engine : public StorageEngine {
     public:
-        MMAPV1Engine();
+        MMAPV1Engine(const StorageEngineLockFile& lockFile);
         virtual ~MMAPV1Engine();
 
         void finishInit();

@@ -36,6 +36,8 @@ namespace mongo {
 
         void setGlobalStorageEngine(const std::string& name);
 
+        void shutdownGlobalStorageEngineCleanly();
+
         void registerStorageEngine(const std::string& name,
                                    const StorageEngine::Factory* factory);
 

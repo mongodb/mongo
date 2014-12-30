@@ -36,10 +36,12 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -78,11 +80,36 @@ namespace mongo {
         // Do not proceed if data directory has been used by a different storage engine previously.
         StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
 
-        _storageEngine = factory->create(storageGlobalParams);
+        try {
+            _lockFile.reset(new StorageEngineLockFile(storageGlobalParams.dbpath));
+        }
+        catch (const std::exception& ex) {
+            uassert(28596, str::stream()
+                << "Unable to determine status of lock file in the data directory "
+                << storageGlobalParams.dbpath << ": " << ex.what(),
+                false);
+        }
+        if (_lockFile->createdByUncleanShutdown()) {
+            warning() << "Detected unclean shutdown - "
+                      << _lockFile->getFilespec() << " is not empty. "
+                      << "This may prevent the current storage engine "
+                      << name << " from starting up.";
+        }
+
+        ScopeGuard guard = MakeGuard(&StorageEngineLockFile::close, _lockFile.get());
+        _storageEngine = factory->create(storageGlobalParams, *_lockFile);
         _storageEngine->finishInit();
 
         // Write a new metadata file if it is not present.
         StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, canonicalName);
+
+        guard.Dismiss();
+    }
+
+    void GlobalEnvironmentMongoD::shutdownGlobalStorageEngineCleanly() {
+        invariant(_storageEngine);
+        invariant(_lockFile.get());
+        _storageEngine->cleanShutdown();
     }
 
     void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,

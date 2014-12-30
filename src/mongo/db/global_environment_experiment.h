@@ -101,6 +101,11 @@ namespace mongo {
         virtual void setGlobalStorageEngine(const std::string& name) = 0;
 
         /**
+         * Shuts down storage engine cleanly and releases any locks on mongod.lock.
+         */
+        virtual void shutdownGlobalStorageEngineCleanly() = 0;
+
+        /**
          * Return the storage engine instance we're using.
          */
         virtual StorageEngine* getGlobalStorageEngine() = 0;

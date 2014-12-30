@@ -54,7 +54,8 @@ namespace mongo {
         class WiredTigerFactory : public StorageEngine::Factory {
         public:
             virtual ~WiredTigerFactory(){}
-            virtual StorageEngine* create( const StorageGlobalParams& params ) const {
+            virtual StorageEngine* create(const StorageGlobalParams& params,
+                                          const StorageEngineLockFile& lockFile) const {
                 WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
                                                                  wiredTigerGlobalOptions.engineConfig,
                                                                  params.dur,
