@@ -55,7 +55,6 @@ namespace {
                                       DatabaseCatalogEntry* dbce,
                                       const std::string& collectionName) {
 
-        Database db(txn, dbce->name(), dbce);
         CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(txn, collectionName);
 
         std::vector<string> indexNames;
@@ -81,6 +80,7 @@ namespace {
         // Skip the rest if there are no indexes to rebuild.
         if (indexSpecs.empty()) return Status::OK();
 
+        boost::scoped_ptr<Database> db;
         Collection* collection;
         boost::scoped_ptr<MultiIndexBlock> indexer;
         {
@@ -102,7 +102,8 @@ namespace {
             // Indexes must be dropped before we open the Collection otherwise we could attempt to
             // open a bad index and fail.
             // TODO see if MultiIndexBlock can be made to work without a Collection.
-            collection = db.getCollection(txn, collectionName);
+            db.reset(new Database(txn, dbce->name(), dbce));
+            collection = db->getCollection(txn, collectionName);
             invariant(collection);
 
             indexer.reset(new MultiIndexBlock(txn, collection));
@@ -166,6 +167,8 @@ namespace {
                           bool preserveClonedFilesOnFailure,
                           bool backupOriginalFiles) {
 
+
+
         // We must hold some form of lock here
         invariant(txn->lockState()->isLocked());
         invariant( dbName.find( '.' ) == string::npos );
@@ -192,12 +195,22 @@ namespace {
             return Status( ErrorCodes::BadValue, "backupOriginalFiles not supported" );
         }
 
-        // Close and reopen the db to invalidate all current users and caches.
-        // WARNING: it is important that the opened Database object isn't used for anything as its
-        // cache must remain empty until we return.
+        // Close the db to invalidate all current users and caches.
         dbHolder().close(txn, dbName);
-        dbHolder().openDb(txn, dbName);
-
+        // Open the db after everything finishes
+        class OpenDbInDestructor {
+        public:
+            OpenDbInDestructor(OperationContext* txn, const std::string& db) :
+                  _dbName(db)
+                , _txn(txn)
+            {}
+            ~OpenDbInDestructor() {
+                dbHolder().openDb(_txn, _dbName);
+            }
+        private:
+            const std::string& _dbName;
+            OperationContext* _txn;
+        } dbOpener(txn, dbName);
         DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(txn, dbName);
 
         std::list<std::string> colls;

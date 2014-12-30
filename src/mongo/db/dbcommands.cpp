@@ -290,6 +290,8 @@ namespace mongo {
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
+            // Open database before returning
+            dbHolder().openDb(txn, dbname);
             return appendCommandStatus( result, status );
         }
     } cmdRepairDatabase;

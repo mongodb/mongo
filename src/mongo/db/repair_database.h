@@ -36,6 +36,11 @@ namespace mongo {
     class StorageEngine;
     class StringData;
 
+    /**
+     * Repairs a database using a storage engine-specific, best-effort process.
+     * Some data may be lost or modified in the process but the output will
+     * be structurally valid on successful return.
+     */
     Status repairDatabase(OperationContext* txn,
                           StorageEngine* engine,
                           const std::string& dbName,
