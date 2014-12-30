@@ -145,3 +145,30 @@ assert(!planCacheContains(shape), 'plan cache for query shape not flushed after 
 
 print('Plan details before setting filter = ' + tojson(planBeforeSetFilter.details, '', true));
 print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details, '', true));
+
+//
+// Tests for the 'indexFilterSet' explain field.
+//
+
+// No filter.
+t.getPlanCache().clear();
+assert.eq(false, t.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+assert.eq(false, t.find(queryA1, projectionA1).sort(sortA1)
+                                              .explain('queryPlanner').queryPlanner.indexFilterSet);
+
+// With one filter set.
+assert.commandWorked(t.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
+assert.eq(true, t.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+assert.eq(false, t.find(queryA1, projectionA1).sort(sortA1)
+                                              .explain('queryPlanner').queryPlanner.indexFilterSet);
+
+// With two filters set.
+assert.commandWorked(t.runCommand('planCacheSetFilter', {
+    query: queryA1,
+    projection: projectionA1,
+    sort: sortA1,
+    indexes: [indexA1B1, indexA1C1]
+}));
+assert.eq(true, t.find({z: 1}).explain('queryPlanner').queryPlanner.indexFilterSet);
+assert.eq(true, t.find(queryA1, projectionA1).sort(sortA1)
+                                             .explain('queryPlanner').queryPlanner.indexFilterSet);
