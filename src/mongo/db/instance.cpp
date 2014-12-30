@@ -1067,6 +1067,10 @@ namespace {
         return shutdownInProgress.loadRelaxed() != 0;
     }
 
+    bool inShutdownStrict() {
+        return shutdownInProgress.load() != 0;
+    }
+
     static void shutdownServer() {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();

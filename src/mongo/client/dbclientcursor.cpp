@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

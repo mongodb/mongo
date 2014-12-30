@@ -45,6 +45,7 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -206,10 +207,10 @@ namespace {
             }
 
             // Wait until we've applied the ops we have before we choose a sync target
-            while (!_appliedBuffer && !inShutdown()) {
+            while (!_appliedBuffer && !inShutdownStrict()) {
                 _condvar.wait(lock);
             }
-            if (inShutdown()) {
+            if (inShutdownStrict()) {
                 return;
             }
         }

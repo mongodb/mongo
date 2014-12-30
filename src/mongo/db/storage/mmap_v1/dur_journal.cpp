@@ -50,6 +50,7 @@
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
