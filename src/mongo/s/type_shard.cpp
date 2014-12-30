@@ -38,8 +38,8 @@ namespace mongo {
 
     const BSONField<std::string> ShardType::name("_id");
     const BSONField<std::string> ShardType::host("host");
-    const BSONField<bool> ShardType::draining("draining");
-    const BSONField<long long> ShardType::maxSize("maxSize");
+    const BSONField<bool> ShardType::draining("draining", false);
+    const BSONField<long long> ShardType::maxSize("maxSize", 0);
     const BSONField<BSONArray> ShardType::tags("tags");
 
     ShardType::ShardType() {

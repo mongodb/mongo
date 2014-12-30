@@ -110,8 +110,7 @@ namespace ShardingTests {
             _shard = Shard("shard0000",
                            "$hostFooBar:27017",
                            0 /* maxSize */,
-                           false /* draining */,
-                           BSONArray() /* tags */);
+                           false /* draining */);
             // Need to run this to ensure the shard is in the global lookup table
             Shard::installShard(_shard.getName(), _shard);
 

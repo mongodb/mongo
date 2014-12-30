@@ -100,21 +100,24 @@ namespace mongo {
      */
     static bool tryMoveToOtherShard(const ChunkManager& manager, const ChunkType& chunk) {
         // reload sharding metadata before starting migration
-        Shard::reloadShardInfo();
         ChunkManagerPtr chunkMgr = manager.reload(false /* just reloaded in mulitsplit */);
 
-        vector<Shard> allShards;
-        Shard::getAllShards(allShards);
-        if (allShards.size() < 2) {
+        ShardInfoMap shardInfo;
+        Status loadStatus = DistributionStatus::populateShardInfoMap(&shardInfo);
+
+        if (!loadStatus.isOK()) {
+            warning() << "failed to load shard metadata while trying to moveChunk after "
+                      << "auto-splitting" << causedBy(loadStatus);
+            return false;
+        }
+
+        if (shardInfo.size() < 2) {
             LOG(0) << "no need to move top chunk since there's only 1 shard" << endl;
             return false;
         }
 
-        ShardInfoMap shardInfo;
-        DistributionStatus::populateShardInfoMap(allShards, &shardInfo);
-
         OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunkMap;
-        DistributionStatus::populateShardToChunksMap(allShards,
+        DistributionStatus::populateShardToChunksMap(shardInfo,
                                                      *chunkMgr,
                                                      &shardToChunkMap.mutableMap());
 

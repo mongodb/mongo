@@ -34,23 +34,23 @@
 namespace mongo {
 
     TEST( Shard, EqualityRs ) {
-        Shard a("foo", "bar/a,b", 0, false, BSONArray());
-        Shard b("foo", "bar/a,b", 0, false, BSONArray());
+        Shard a("foo", "bar/a,b", 0, false);
+        Shard b("foo", "bar/a,b", 0, false);
         ASSERT_EQUALS( a, b );
 
-        b = Shard("foo", "bar/b,a", 0, false, BSONArray());
+        b = Shard("foo", "bar/b,a", 0, false);
         ASSERT_EQUALS( a, b );
     }
 
     TEST( Shard, EqualitySingle ) {
-        ASSERT_EQUALS(Shard("foo", "b.foo.com:123", 0, false, BSONArray()),
-                      Shard("foo", "b.foo.com:123", 0, false, BSONArray()));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false, BSONArray()),
-                          Shard("foo", "a.foo.com:123", 0, false, BSONArray()));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false, BSONArray()),
-                          Shard("foo", "b.foo.com:124", 0, false, BSONArray()));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false, BSONArray()),
-                          Shard("foa", "b.foo.com:123", 0, false, BSONArray()));
+        ASSERT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
+                      Shard("foo", "b.foo.com:123", 0, false));
+        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
+                          Shard("foo", "a.foo.com:123", 0, false));
+        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
+                          Shard("foo", "b.foo.com:124", 0, false));
+        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
+                          Shard("foa", "b.foo.com:123", 0, false));
     }
 
     TEST( Shard, EqualitySync ) {

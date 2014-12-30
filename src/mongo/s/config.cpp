@@ -839,8 +839,7 @@ namespace mongo {
         _primary = Shard(_primary.getName(),
                          ConnectionString(fullString, ConnectionString::SYNC),
                          _primary.getMaxSizeMB(),
-                         _primary.isDraining(),
-                         _primary.tags());
+                         _primary.isDraining());
         Shard::installShard(_primary.getName(), _primary);
 
         LOG(1) << " config string : " << fullString << endl;

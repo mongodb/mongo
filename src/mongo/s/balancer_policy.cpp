@@ -36,11 +36,11 @@
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/s/type_tags.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
-
 
 namespace mongo {
 
@@ -232,30 +232,66 @@ namespace mongo {
         }
     }
 
-    void DistributionStatus::populateShardInfoMap(const vector<Shard> allShards,
-                                                  ShardInfoMap* shardInfo) {
-        for (vector<Shard>::const_iterator it = allShards.begin();
-                it != allShards.end(); ++it ) {
-            const Shard& shard = *it;
-            ShardStatus status = shard.getStatus();
-            shardInfo->insert(make_pair(shard.getName(),
-                                        ShardInfo(shard.getMaxSizeMB(),
-                                                  status.dataSizeBytes() * 1024 * 1024,
-                                                  shard.isDraining(),
-                                                  shard.tags(),
-                                                  status.mongoVersion())));
+    Status DistributionStatus::populateShardInfoMap(ShardInfoMap* shardInfo) {
+        try {
+            ScopedDbConnection conn(configServer.getPrimary().getConnString(), 30);
+
+            auto_ptr<DBClientCursor> cursor(conn->query(ShardType::ConfigNS , Query()));
+            uassert(28597, "Failed to load shard config", cursor.get() != NULL);
+
+            while (cursor->more()) {
+                ShardType shard;
+                std::string errMsg;
+                bool parseOk = shard.parseBSON(cursor->next(), &errMsg);
+
+                if (!parseOk) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  errMsg);
+                }
+
+                std::set<std::string> dummy;
+                ShardInfo newShardEntry(shard.getMaxSize(),
+                                        Shard::getShardDataSizeBytes(shard.getHost()) /
+                                            1024 / 1024,
+                                        shard.getDraining(),
+                                        dummy,
+                                        Shard::getShardMongoVersion(shard.getHost()));
+
+                if (shard.isTagsSet()) {
+                    BSONArrayIteratorSorted tagIter(shard.getTags());
+                    while (tagIter.more()) {
+                        BSONElement tagElement = tagIter.next();
+                        if (tagElement.type() != String) {
+                            return Status(ErrorCodes::UnsupportedFormat,
+                                          str::stream() << "shard tags only supports strings, "
+                                              << "found " << typeName(tagElement.type()));
+                        }
+
+                        newShardEntry.addTag(tagElement.String());
+                    }
+                }
+
+                shardInfo->insert(make_pair(shard.getName(), newShardEntry));
+            }
+
+            conn.done();
         }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        return Status::OK();
     }
 
-    void DistributionStatus::populateShardToChunksMap(const vector<Shard>& allShards,
+    void DistributionStatus::populateShardToChunksMap(const ShardInfoMap& allShards,
                                                       const ChunkManager& chunkMgr,
                                                       ShardToChunksMap* shardToChunksMap) {
         // Makes sure there is an entry in shardToChunksMap for every shard.
-        for (vector<Shard>::const_iterator it = allShards.begin();
+        for (ShardInfoMap::const_iterator it = allShards.begin();
                 it != allShards.end(); ++it) {
 
             OwnedPointerVector<ChunkType>*& chunkList =
-                    (*shardToChunksMap)[it->getName()];
+                    (*shardToChunksMap)[it->first];
 
             if (chunkList == NULL) {
                 chunkList = new OwnedPointerVector<ChunkType>();

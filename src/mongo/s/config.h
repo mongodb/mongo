@@ -108,8 +108,7 @@ namespace mongo {
               _primary("config",
                        "",
                        0 /* maxSize */,
-                       false /* draining */,
-                       BSONArray() /* tags */),
+                       false /* draining */),
               _shardingEnabled(false),
               _lock("DBConfig") ,
               _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {

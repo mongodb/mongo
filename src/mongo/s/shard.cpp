@@ -133,8 +133,7 @@ namespace mongo {
                 ShardPtr shard = boost::make_shared<Shard>(shardData.getName(),
                                                            shardData.getHost(),
                                                            maxSize,
-                                                           isDraining,
-                                                           tags);
+                                                           isDraining);
 
                 _lookup[shardData.getName()] = shard;
                 _installHost(shardData.getHost(), shard);
@@ -352,32 +351,23 @@ namespace mongo {
     Shard::Shard(const std::string& name,
             const std::string& addr,
             long long maxSizeMB,
-            bool isDraining,
-            const BSONArray& tags):
+            bool isDraining):
                 _name(name),
                 _addr(addr),
                 _maxSizeMB(maxSizeMB),
                 _isDraining(isDraining) {
         _setAddr(addr);
-
-        BSONArrayIteratorSorted iter(tags);
-        while (iter.more()) {
-            BSONElement tag = iter.next();
-            _tags.insert(tag.String());
-        }
     }
 
     Shard::Shard(const std::string& name,
             const ConnectionString& connStr,
             long long maxSizeMB,
-            bool isDraining,
-            const set<string>& tags):
+            bool isDraining):
                 _name(name),
                 _addr(connStr.toString()),
                 _cs(connStr),
                 _maxSizeMB(maxSizeMB),
-                _isDraining(isDraining),
-                _tags(tags) {
+                _isDraining(isDraining) {
     }
 
     Shard Shard::findIfExists( const string& shardName ) {
@@ -450,22 +440,46 @@ namespace mongo {
         return res;
     }
 
-    ShardStatus Shard::getStatus() const {
-        BSONObj serverStatus = runCommand("admin", BSON("serverStatus" << 1));
+    string Shard::getShardMongoVersion(const string& shardHost) {
+        ScopedDbConnection conn(shardHost);
+        BSONObj serverStatus;
+        bool ok = conn->runCommand("admin", BSON("serverStatus" << 1), serverStatus);
+        conn.done();
+
+        uassert(28598,
+                str::stream() << "call to serverStatus on " << shardHost
+                              << " failed: " << serverStatus,
+                ok);
+
         BSONElement versionElement = serverStatus["version"];
 
         uassert(28589, "version field not found in serverStatus",
                 versionElement.type() == String);
-        string version = serverStatus["version"].String();
+        return serverStatus["version"].String();
+    }
 
-        BSONObj listDatabases = runCommand("admin", BSON("listDatabases" << 1));
+    long long Shard::getShardDataSizeBytes(const string& shardHost) {
+        ScopedDbConnection conn(shardHost);
+        BSONObj listDatabases;
+        bool ok = conn->runCommand("admin", BSON("listDatabases" << 1), listDatabases);
+        conn.done();
+
+        uassert(28599,
+                str::stream() << "call to listDatabases on " << shardHost
+                              << " failed: " << listDatabases,
+                ok);
+
         BSONElement totalSizeElem = listDatabases["totalSize"];
 
         uassert(28590, "totalSize field not found in listDatabases",
                 totalSizeElem.isNumber());
-        long long dataSizeBytes = listDatabases["totalSize"].numberLong();
+        return listDatabases["totalSize"].numberLong();
+    }
 
-        return ShardStatus(*this, dataSizeBytes, version);
+    ShardStatus Shard::getStatus() const {
+        return ShardStatus(*this,
+                           getShardDataSizeBytes(getConnString()),
+                           getShardMongoVersion(getConnString()));
     }
 
     void Shard::reloadShardInfo() {

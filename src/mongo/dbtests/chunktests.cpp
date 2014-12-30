@@ -60,8 +60,7 @@ namespace mongo {
                 Shard shard(name,
                             name,
                             0 /* maxSize */,
-                            false /* draining */,
-                            BSONArray() /* tags */);
+                            false /* draining */);
                 shards.insert( shard );
                 
                 ChunkPtr chunk( new Chunk( this, mySplitPoints[ i-1 ], mySplitPoints[ i ],
