@@ -124,33 +124,29 @@ namespace mongo {
             return false;
         }
 
-        char *verData = new char[verSize];
-        if (GetFileVersionInfoA(filePath, NULL, verSize, verData) == 0) {
+        boost::scoped_array<char> verData(new char[verSize]);
+        if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
             DWORD gle = GetLastError();
             warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
-            delete[] verData;
             return false;
         }
 
         UINT size;
         LPBYTE lpBuffer;
-        if (VerQueryValueA(verData, "\\", (LPVOID *)&lpBuffer, &size) == 0) {
+        if (VerQueryValueA(verData.get(), "\\", (LPVOID *)&lpBuffer, &size) == 0) {
             DWORD gle = GetLastError();
             warning() << "VerQueryValueA on " << filePath << " failed with " << errnoWithDescription(gle);
-            delete[] verData;
             return false;
         }
     
         if (size != sizeof(VS_FIXEDFILEINFO)) {
             warning() << "VerQueryValueA on " << filePath << " returned structure with unexpected size";
-            delete[] verData;
             return false;
         }
 
         VS_FIXEDFILEINFO *verInfo = (VS_FIXEDFILEINFO *)lpBuffer;
         fileVersionMS = verInfo->dwFileVersionMS;
         fileVersionLS = verInfo->dwFileVersionLS;
-        delete[] verData;
         return true;
     }
 
@@ -162,16 +158,14 @@ namespace mongo {
             return false;
         }
 
-        char *varValue = new char[varValueSize];
-        varValueSize = GetEnvironmentVariableA(varName, varValue, varValueSize);
+        boost::scoped_array<char> varValue(new char[varValueSize]);
+        varValueSize = GetEnvironmentVariableA(varName, varValue.get(), varValueSize);
         if (varValueSize == 0) {
             DWORD gle = GetLastError();
             warning() << "GetEnvironmentVariableA on " << varName << " failed with " << errnoWithDescription(gle);
-            delete[] varValue;
             return false;
         }
-        value.assign(varValue, varValueSize);
-        delete[] varValue;
+        value.assign(varValue.get(), varValueSize);
         return true;
     }
 
