@@ -95,10 +95,12 @@ namespace mongo {
                       << "This may prevent the current storage engine "
                       << name << " from starting up.";
         }
+        uassertStatusOK(_lockFile->open());
 
         ScopeGuard guard = MakeGuard(&StorageEngineLockFile::close, _lockFile.get());
         _storageEngine = factory->create(storageGlobalParams, *_lockFile);
         _storageEngine->finishInit();
+        uassertStatusOK(_lockFile->writePid());
 
         // Write a new metadata file if it is not present.
         StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, canonicalName);
@@ -110,6 +112,7 @@ namespace mongo {
         invariant(_storageEngine);
         invariant(_lockFile.get());
         _storageEngine->cleanShutdown();
+        _lockFile->clearPidAndUnlock();
     }
 
     void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,
