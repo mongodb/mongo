@@ -712,7 +712,12 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * where the previous log file ends.
 	 */
 	WT_ERR(__wt_log_newfile(session, 1, NULL));
-	log->trunc_lsn = log->alloc_lsn;
+
+	/* If we found log files, save the new state. */
+	if (logcount > 0) {
+		log->trunc_lsn = log->alloc_lsn;
+		FLD_SET(conn->log_flags, WT_CONN_LOG_EXISTED);
+	}
 
 err:	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
@@ -1216,7 +1221,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			 * LSN, start from the beginning of the log.
 			 */
 			start_lsn = *lsnp;
-			if (IS_INIT_LSN(&start_lsn))
+			if (WT_IS_INIT_LSN(&start_lsn))
 				start_lsn = log->first_lsn;
 		}
 		end_lsn = log->alloc_lsn;
@@ -1555,7 +1560,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
-	INIT_LSN(&lsn);
+	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
 	 * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a

@@ -362,17 +362,17 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
 	else
 		log->allocsize = LOG_ALIGN;
-	INIT_LSN(&log->alloc_lsn);
-	INIT_LSN(&log->ckpt_lsn);
-	INIT_LSN(&log->first_lsn);
-	INIT_LSN(&log->sync_lsn);
+	WT_INIT_LSN(&log->alloc_lsn);
+	WT_INIT_LSN(&log->ckpt_lsn);
+	WT_INIT_LSN(&log->first_lsn);
+	WT_INIT_LSN(&log->sync_lsn);
 	/*
 	 * We only use file numbers for directory sync, so this needs to
 	 * initialized to zero.
 	 */
-	ZERO_LSN(&log->sync_dir_lsn);
-	INIT_LSN(&log->trunc_lsn);
-	INIT_LSN(&log->write_lsn);
+	WT_ZERO_LSN(&log->sync_dir_lsn);
+	WT_INIT_LSN(&log->trunc_lsn);
+	WT_INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_log_open(session));
