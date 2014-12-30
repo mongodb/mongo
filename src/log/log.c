@@ -713,13 +713,10 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(__wt_log_newfile(session, 1, NULL));
 
-	/*
-	 * If there were log files, run recovery.
-	 * XXX belongs at a higher level than this.
-	 */
+	/* If we found log files, save the new state. */
 	if (logcount > 0) {
 		log->trunc_lsn = log->alloc_lsn;
-		WT_ERR(__wt_txn_recover(conn));
+		FLD_SET(conn->log_flags, WT_CONN_LOG_EXISTED);
 	}
 
 err:	if (logfiles != NULL)
@@ -1220,11 +1217,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 
 			/*
 			 * Log cursors may not know the starting LSN.  If an
-			 * LSN pointer is passed in, but it is the INIT_LSN,
-			 * start from the first_lsn.
+			 * LSN is passed in that it is equal to the smallest
+			 * LSN, start from the beginning of the log.
 			 */
 			start_lsn = *lsnp;
-			if (IS_INIT_LSN(&start_lsn))
+			if (WT_IS_INIT_LSN(&start_lsn))
 				start_lsn = log->first_lsn;
 		}
 		end_lsn = log->alloc_lsn;
@@ -1563,7 +1560,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
-	INIT_LSN(&lsn);
+	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
 	 * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a

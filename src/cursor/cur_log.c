@@ -264,8 +264,8 @@ __curlog_reset(WT_CURSOR *cursor)
 	cl = (WT_CURSOR_LOG *)cursor;
 	cl->stepp = cl->stepp_end = NULL;
 	cl->step_count = 0;
-	INIT_LSN(cl->cur_lsn);
-	INIT_LSN(cl->next_lsn);
+	WT_INIT_LSN(cl->cur_lsn);
+	WT_INIT_LSN(cl->next_lsn);
 	return (0);
 }
 
@@ -348,8 +348,8 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	cursor->key_format = LOGC_KEY_FORMAT;
 	cursor->value_format = LOGC_VALUE_FORMAT;
 
-	INIT_LSN(cl->cur_lsn);
-	INIT_LSN(cl->next_lsn);
+	WT_INIT_LSN(cl->cur_lsn);
+	WT_INIT_LSN(cl->next_lsn);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
