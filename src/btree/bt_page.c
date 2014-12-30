@@ -166,7 +166,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			__wt_yield();
 		 else {
 			wait_cnt *= 2;
-			sleep_cnt = WT_MAX(wait_cnt, 10000);
+			sleep_cnt = WT_MIN(wait_cnt, 10000);
 			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
 			__wt_sleep(0, sleep_cnt);
 		}
