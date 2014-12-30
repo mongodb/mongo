@@ -60,6 +60,14 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 		// remove "key" and "v" from the map versions
 		delete(metaAsMap.Indexes[i], "key")
 		meta.Indexes[i].Options = metaAsMap.Indexes[i]
+
+		// parse the values of the index keys, so we can support extended json
+		for pos, field := range meta.Indexes[i].Key {
+			meta.Indexes[i].Key[pos].Value, err = bsonutil.ParseJSONValue(field.Value)
+			if err != nil {
+				return nil, nil, fmt.Errorf("extended json in '%v' field: %v", field.Name, err)
+			}
+		}
 	}
 
 	return meta.Options, meta.Indexes, nil

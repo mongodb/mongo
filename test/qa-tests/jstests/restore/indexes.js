@@ -24,6 +24,7 @@
     testColl.ensureIndex({ a: 1 });
     testColl.ensureIndex({ b: 1 }, { sparse: true, unique: true });
     testColl.ensureIndex({ a: 1, b: -1 });
+    testColl.ensureIndex({ b: NumberLong("1"), a: NumberLong("1") });
     testColl.ensureIndex({ listField: 1 });
     testColl.ensureIndex({ textField: 'text' }, { language: 'spanish' });
     testColl.ensureIndex({ geoField: '2dsphere' });

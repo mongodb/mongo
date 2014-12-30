@@ -22,7 +22,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		return v, nil
 	case map[string]interface{}: // document
 		for key, jsonValue := range v {
-			bsonValue, err := parseJSONValue(jsonValue)
+			bsonValue, err := ParseJSONValue(jsonValue)
 			if err != nil {
 				return nil, err
 			}
@@ -32,7 +32,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case []interface{}: // array
 		for i, jsonValue := range v {
-			bsonValue, err := parseJSONValue(jsonValue)
+			bsonValue, err := ParseJSONValue(jsonValue)
 			if err != nil {
 				return nil, err
 			}
@@ -97,7 +97,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		return bson.Undefined, nil
 
 	default:
-		return nil, fmt.Errorf("Conversion of JSON type '%v' unsupported", v)
+		return nil, fmt.Errorf("conversion of JSON type '%v' unsupported", v)
 	}
 }
 
