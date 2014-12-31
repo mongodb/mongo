@@ -348,7 +348,7 @@ namespace {
         if (!_isCapped)
             return false;
 
-        if (_dataSize.load() > _cappedMaxSize)
+        if (_dataSize.load() >= _cappedMaxSize)
             return true;
 
         if ((_cappedMaxDocs != -1) && (_numRecords.load() > _cappedMaxDocs))
