@@ -404,6 +404,9 @@ namespace mongo {
         return newLocation;
     }
 
+    bool RecordStoreV1Base::updateWithDamagesSupported() const {
+        return true;
+    }
 
     Status RecordStoreV1Base::updateWithDamages( OperationContext* txn,
                                                  const RecordId& loc,

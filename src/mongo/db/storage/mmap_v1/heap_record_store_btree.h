@@ -81,6 +81,10 @@ namespace mongo {
             invariant(false);
         }
 
+        virtual bool updateWithDamagesSupported() const {
+            return true;
+        }
+
         virtual Status updateWithDamages(OperationContext* txn,
                                          const RecordId& loc,
                                          const RecordData& oldRec,

@@ -571,38 +571,16 @@ namespace {
         return StatusWith<RecordId>( loc );
     }
 
+    bool WiredTigerRecordStore::updateWithDamagesSupported() const {
+        return false;
+    }
+
     Status WiredTigerRecordStore::updateWithDamages( OperationContext* txn,
                                                      const RecordId& loc,
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages ) {
-
-        // apply changes to our copy
-
-        std::string data(reinterpret_cast<const char *>(oldRec.data()), oldRec.size());
-
-        char* root = const_cast<char*>( data.c_str() );
-        for( size_t i = 0; i < damages.size(); i++ ) {
-            mutablebson::DamageEvent event = damages[i];
-            const char* sourcePtr = damageSource + event.sourceOffset;
-            char* targetPtr = root + event.targetOffset;
-            std::memcpy(targetPtr, sourcePtr, event.size);
-        }
-
-        // write back
-
-        WiredTigerItem value(data);
-
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
-        curwrap.assertInActiveTxn();
-        WT_CURSOR *c = curwrap.get();
-        c->set_key(c, _makeKey(loc));
-        c->set_value(c, value.Get());
-
-        int ret = c->update(c);
-        invariantWTOK(ret);
-
-        return Status::OK();
+        invariant(false);
     }
 
     void WiredTigerRecordStore::_oplogSetStartHack( WiredTigerRecoveryUnit* wru ) const {

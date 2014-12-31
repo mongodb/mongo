@@ -182,6 +182,15 @@ namespace mongo {
                                                   bool enforceQuota,
                                                   UpdateMoveNotifier* notifier ) = 0;
 
+        /**
+         * @return Returns 'false' if this record store does not implement
+         * 'updatewithDamages'. If this method returns false, 'updateWithDamages' must not be
+         * called, and all updates must be routed through 'updateRecord' above. This allows the
+         * update framework to avoid doing the work of damage tracking if the underlying record
+         * store cannot utilize that information.
+         */
+        virtual bool updateWithDamagesSupported() const = 0;
+
         virtual Status updateWithDamages( OperationContext* txn,
                                           const RecordId& loc,
                                           const RecordData& oldRec,

@@ -98,7 +98,8 @@ namespace mongo {
         Status update(const StringData& matchedField,
                       mutablebson::Document* doc,
                       BSONObj* logOpRec = NULL,
-                      FieldRefSet* updatedFields = NULL);
+                      FieldRefSet* updatedFields = NULL,
+                      bool* docWasModified = NULL);
 
         //
         // Accessors

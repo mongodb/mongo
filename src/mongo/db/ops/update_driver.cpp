@@ -221,7 +221,8 @@ namespace mongo {
     Status UpdateDriver::update(const StringData& matchedField,
                                 mutablebson::Document* doc,
                                 BSONObj* logOpRec,
-                                FieldRefSet* updatedFields) {
+                                FieldRefSet* updatedFields,
+                                bool* docWasModified) {
         // TODO: assert that update() is called at most once in a !_multi case.
 
         // Use the passed in FieldRefSet
@@ -297,6 +298,10 @@ namespace mongo {
 
             if (!execInfo.noOp) {
                 status = (*it)->apply();
+
+                if (docWasModified)
+                    *docWasModified = true;
+
                 if (!status.isOK()) {
                     return status;
                 }

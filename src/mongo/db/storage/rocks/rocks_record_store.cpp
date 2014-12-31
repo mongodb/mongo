@@ -422,6 +422,10 @@ namespace mongo {
         return StatusWith<RecordId>( loc );
     }
 
+    bool RocksRecordStore::updateWithDamagesSupported() const {
+        return true;
+    }
+
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
                                                 const RecordId& loc,
                                                 const RecordData& oldRec,

@@ -317,6 +317,10 @@ namespace mongo {
         return StatusWith<RecordId>(loc);
     }
 
+    bool InMemoryRecordStore::updateWithDamagesSupported() const {
+        return true;
+    }
+
     Status InMemoryRecordStore::updateWithDamages( OperationContext* txn,
                                                    const RecordId& loc,
                                                    const RecordData& oldRec,

@@ -47,6 +47,9 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
+        if (!rs->updateWithDamagesSupported())
+            return;
+
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
@@ -110,6 +113,9 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
+        if (!rs->updateWithDamagesSupported())
+            return;
+
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
@@ -171,6 +177,9 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
+        if (!rs->updateWithDamagesSupported())
+            return;
+
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
@@ -229,6 +238,9 @@ namespace mongo {
     TEST( RecordStoreTestHarness, UpdateWithNoDamages ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+
+        if (!rs->updateWithDamagesSupported())
+            return;
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );

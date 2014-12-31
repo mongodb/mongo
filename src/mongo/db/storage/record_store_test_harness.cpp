@@ -278,6 +278,9 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
+        if (!rs->updateWithDamagesSupported())
+            return;
+
         string s1 = "aaa111bbb";
         string s2 = "aaa222bbb";
 
