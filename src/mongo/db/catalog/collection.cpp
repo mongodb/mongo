@@ -184,6 +184,9 @@ namespace mongo {
     StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota ) {
+
+        uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
+
         if ( _indexCatalog.findIdIndex( txn ) ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<RecordId>( ErrorCodes::InternalError,
@@ -192,7 +195,9 @@ namespace mongo {
             }
         }
 
-        return _insertDocument( txn, docToInsert, enforceQuota );
+        StatusWith<RecordId> res = _insertDocument( txn, docToInsert, enforceQuota );
+        invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
+        return res;
     }
 
     StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
@@ -298,6 +303,8 @@ namespace mongo {
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
 
+        uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
+
         BSONObj objOld = _recordStore->dataFor( txn, oldLocation ).releaseToBson();
 
         if ( objOld.hasElement( "_id" ) ) {
@@ -366,7 +373,7 @@ namespace mongo {
             Status s = _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
             if (!s.isOK())
                 return StatusWith<RecordId>(s);
-
+            invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
             return newLocation;
         }
 
@@ -390,7 +397,7 @@ namespace mongo {
 
         // Broadcast the mutation so that query results stay correct.
         _cursorManager.invalidateDocument(txn, oldLocation, INVALIDATION_MUTATION);
-
+        invariant( txnId == txn->recoveryUnit()->getMyTransactionCount() );
         return newLocation;
     }
 

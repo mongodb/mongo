@@ -78,6 +78,7 @@ namespace mongo {
         _session( NULL ),
         _depth(0),
         _active( false ),
+        _myTransactionCount( 0 ),
         _everStartedWrite( false ),
         _currentlySquirreled( false ),
         _syncing( false ) {
@@ -210,6 +211,11 @@ namespace mongo {
             LOG(2) << "WT rollback_transaction";
         }
         _active = false;
+        _myTransactionCount++;
+    }
+
+    uint64_t WiredTigerRecoveryUnit::getMyTransactionCount() const {
+        return _myTransactionCount;
     }
 
     void WiredTigerRecoveryUnit::_txnOpen() {
@@ -225,7 +231,7 @@ namespace mongo {
     void WiredTigerRecoveryUnit::beingReleasedFromOperationContext() {
         LOG(2) << "WiredTigerRecoveryUnit::beingReleased";
         _currentlySquirreled = true;
-        if ( !wt_keeptxnopen() ) {
+        if ( _active == false && !wt_keeptxnopen() ) {
             _commit();
         }
     }

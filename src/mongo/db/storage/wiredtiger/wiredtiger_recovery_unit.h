@@ -76,6 +76,8 @@ namespace mongo {
         virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
         virtual void syncDataAndTruncateJournal() {}
 
+        virtual uint64_t getMyTransactionCount() const;
+
         // ---- WT STUFF
 
         WiredTigerSession* getSession();
@@ -104,6 +106,7 @@ namespace mongo {
         bool _defaultCommit;
         int _depth;
         bool _active;
+        uint64_t _myTransactionCount;
         bool _everStartedWrite;
         Timer _timer;
         bool _currentlySquirreled;
