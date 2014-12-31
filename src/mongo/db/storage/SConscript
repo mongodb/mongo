@@ -9,6 +9,15 @@ env.Library(
     )
 
 env.Library(
+    target='key_string',
+    source=[
+        'key_string.cpp',
+        ],
+    LIBDEPS=[]
+    )
+
+
+env.Library(
     target='bson_collection_catalog_entry',
     source=[
         'bson_collection_catalog_entry.cpp',
@@ -87,4 +96,13 @@ env.CppUnitTest(
     LIBDEPS=[
         'storage_engine_metadata',
     ],
+)
+
+env.CppUnitTest(
+    target='storage_key_string_test',
+    source='key_string_test.cpp',
+    LIBDEPS=[
+        'key_string',
+        '$BUILD_DIR/mongo/bson',
+        ]
 )
