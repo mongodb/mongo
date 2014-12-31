@@ -25,6 +25,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
             '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/mongo/db/storage/key_string',
             '$BUILD_DIR/mongo/db/storage/oplog_hack',
             '$BUILD_DIR/mongo/elapsed_tracker',
             '$BUILD_DIR/mongo/foundation',

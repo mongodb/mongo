@@ -51,7 +51,7 @@ namespace mongo {
     public:
         MyHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
 
-            const char* config = "create,cache_size=1G,extensions=[local=(entry=index_collator_extension)],";
+            const char* config = "create,cache_size=1G,";
             int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config, &_conn);
             invariantWTOK( ret );
 
@@ -80,8 +80,8 @@ namespace mongo {
             invariantWTOK( WiredTigerIndex::Create(&txn, uri, result.getValue()));
 
             if ( unique )
-                return new WiredTigerIndexUnique( uri, &desc );
-            return new WiredTigerIndexStandard( uri, &desc );
+                return new WiredTigerIndexUnique( &txn, uri, &desc );
+            return new WiredTigerIndexStandard( &txn, uri, &desc );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {

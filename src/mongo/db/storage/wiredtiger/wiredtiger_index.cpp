@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -48,15 +49,23 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
+#if 0
+#define TRACE_CURSOR log() << "WT index (" << (const void*)&_idx << ") "
+#define TRACE_INDEX log() << "WT index (" << (const void*)this << ") "
+#else
+#define TRACE_CURSOR if ( 0 ) log()
+#define TRACE_INDEX if ( 0 ) log()
+#endif
+
 namespace mongo {
 namespace {
     static const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
 
     static const WiredTigerItem emptyItem(NULL, 0);
 
-    static const int kMinimumIndexVersion = 1;
-    static const int kCurrentIndexVersion = 1; // New indexes use this by default.
-    static const int kMaximumIndexVersion = 1;
+    static const int kMinimumIndexVersion = 2;
+    static const int kCurrentIndexVersion = 2; // New indexes use this by default.
+    static const int kMaximumIndexVersion = 2;
     BOOST_STATIC_ASSERT(kCurrentIndexVersion >= kMinimumIndexVersion);
     BOOST_STATIC_ASSERT(kCurrentIndexVersion <= kMaximumIndexVersion);
 
@@ -95,139 +104,6 @@ namespace {
 
     void putRecordIdAtOffset(void* dest, size_t byteOffset, RecordId loc) {
         putRecordId(static_cast<char*>(dest) + byteOffset, loc);
-    }
-
-    /**
-     * Constructs an IndexKeyEntry from a slice containing the bytes of a BSONObject followed
-     * by the bytes of a RecordId
-     */
-    static IndexKeyEntry makeIndexKeyEntry(const WT_ITEM *keyCols) {
-        const char* data = static_cast<const char*>( keyCols->data );
-        BSONObj key( data );
-        if ( keyCols->size == static_cast<size_t>( key.objsize() ) ) {
-            // in unique mode
-            return IndexKeyEntry( key, RecordId() );
-        }
-        invariant( keyCols->size == key.objsize() + sizeof(RecordIdRepr) );
-
-        return IndexKeyEntry( key, getRecordIdAt(data + key.objsize()));
-    }
-
-    WiredTigerItem _toItem( const BSONObj& key, const RecordId& loc,
-                            boost::scoped_array<char>*out ) {
-        size_t keyLen = key.objsize() + sizeof(RecordIdRepr);
-        out->reset( new char[keyLen] );
-        memcpy( out->get(), key.objdata(), key.objsize() );
-        putRecordIdAtOffset(out->get(), key.objsize(), loc);
-
-        return WiredTigerItem( out->get(), keyLen );
-    }
-
-    /**
-     * Custom comparator used to compare Index Entries by BSONObj and RecordId
-     */
-    struct WiredTigerIndexCollator : public WT_COLLATOR {
-        public:
-            WiredTigerIndexCollator(const Ordering& order)
-                    :WT_COLLATOR(), _indexComparator(order) {
-                compare = _compare;
-                terminate = _terminate;
-            }
-
-            int Compare(WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b) const {
-                const IndexKeyEntry lhs = makeIndexKeyEntry(a);
-                const IndexKeyEntry rhs = makeIndexKeyEntry(b);
-                int cmp = _indexComparator.compare( lhs, rhs );
-                if (cmp < 0)
-                    cmp = -1;
-                else if (cmp > 0)
-                    cmp = 1;
-                return cmp;
-            }
-
-            static int _compare(WT_COLLATOR *coll,
-                                WT_SESSION *s,
-                                const WT_ITEM *a,
-                                const WT_ITEM *b,
-                                int *cmp) {
-
-                try {
-                    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
-                    *cmp = c->Compare(s, a, b);
-                    return 0;
-                }
-                catch (...) {
-                    std::terminate();
-                }
-            }
-
-            static int _terminate(WT_COLLATOR *coll, WT_SESSION *s) {
-                try {
-                    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
-                    delete c;
-                    return 0;
-                }
-                catch (...) {
-                    std::terminate();
-                }
-            }
-
-        private:
-            const IndexEntryComparison _indexComparator;
-    };
-
-    int index_collator_customize(WT_COLLATOR *coll,
-                                 WT_SESSION *s,
-                                 const char *uri,
-                                 WT_CONFIG_ITEM *metadata,
-                                 WT_COLLATOR **collp) {
-        try {
-            invariant(metadata->type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
-            WiredTigerConfigParser config(*metadata);
-
-            WT_CONFIG_ITEM version;
-            if (config.get("formatVersion", &version) != 0) {
-                fassertFailedWithStatusNoTrace(28580,
-                    Status(ErrorCodes::UnsupportedFormat, str::stream()
-                           << "Found an index from an unsupported RC version."
-                           << " Please restart with --repair to fix."));
-
-            }
-
-            WT_CONFIG_ITEM infoObj;
-            const int infoObjRet = config.get("infoObj", &infoObj);
-            if (infoObjRet != 0) {
-                // This must be from a future version from when we removed infoObj. Print something
-                // reasonable.
-                infoObj.str = "(unknown)";
-                infoObj.len = strlen(infoObj.str);
-            }
-
-            if (version.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM
-                    || version.val < kMinimumIndexVersion || version.val > kMaximumIndexVersion) {
-                fassertFailedWithStatusNoTrace(28579,
-                    Status(ErrorCodes::UnsupportedFormat, str::stream()
-                           << "Index " << infoObj.str
-                           << " has unsupported formatVersion " << version.str
-                           << ". Please restart with --repair to fix."));
-            }
-
-            invariant(infoObjRet == 0);
-
-            IndexDescriptor desc(0, "unknown", fromjson(std::string(infoObj.str, infoObj.len)));
-            *collp = new WiredTigerIndexCollator(Ordering::make(desc.keyPattern()));
-            return 0;
-        }
-        catch (...) {
-            std::terminate();
-        }
-    }
-
-    extern "C" MONGO_COMPILER_API_EXPORT int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
-            static WT_COLLATOR idx_static;
-
-            idx_static.customize = index_collator_customize;
-            return conn->add_collator(conn, "mongo_index", &idx_static, NULL);
     }
 
     // taken from btree_logic.cpp
@@ -313,7 +189,7 @@ namespace {
         // for correct behavior of the server.
 
         // Indexes need to store the metadata for collation to work as expected.
-        ss << ",key_format=u,value_format=u,collator=mongo_index";
+        ss << ",key_format=u,value_format=u";
 
         // Index metadata
         ss << ",app_metadata=("
@@ -333,10 +209,21 @@ namespace {
         return s->create(s, uri.c_str(), config.c_str());
     }
 
-    WiredTigerIndex::WiredTigerIndex(const std::string& uri, const IndexDescriptor* desc)
+    WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
+                                     const std::string& uri,
+                                     const IndexDescriptor* desc)
         : _ordering(Ordering::make(desc->keyPattern())),
           _uri( uri ),
           _instanceId( WiredTigerSession::genCursorId() ) {
+        Status versionStatus =
+            WiredTigerUtil::checkApplicationMetadataFormatVersion(ctx,
+                                                                  uri,
+                                                                  kMinimumIndexVersion,
+                                                                  kMaximumIndexVersion);
+        if (!versionStatus.isOK()) {
+            fassertFailedWithStatusNoTrace(28579, versionStatus);
+        }
+
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,
@@ -377,7 +264,9 @@ namespace {
         IndexCursor cursor(*this, txn, true );
         cursor.locate( minKey, RecordId::min() );
         long long count = 0;
+        TRACE_INDEX << " fullValidate";
         while ( !cursor.isEOF() ) {
+            TRACE_INDEX << "\t" << cursor.getKey();
             cursor.advance();
             count++;
         }
@@ -470,7 +359,8 @@ namespace {
     bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const RecordId& loc ) {
         invariant( unique() );
         // First check whether the key exists.
-        WiredTigerItem item( key.objdata(), key.objsize() );
+        KeyString data = KeyString::make( key, _ordering );
+        WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key( c, item.Get() );
         int ret = c->search(c);
         if ( ret == WT_NOTFOUND )
@@ -550,7 +440,7 @@ namespace {
     class WiredTigerIndex::StandardBulkBuilder : public BulkBuilder {
     public:
         StandardBulkBuilder(WiredTigerIndex* idx, OperationContext* txn)
-            : BulkBuilder(idx, txn) {
+            : BulkBuilder(idx, txn), _idx(idx) {
         }
 
         Status addKey(const BSONObj& key, const RecordId& loc) {
@@ -560,14 +450,10 @@ namespace {
                     return s;
             }
 
-            // Build a buffer with the key and loc concatenated.
-            const size_t keyLen = key.objsize() + sizeof(RecordIdRepr);
-            invariant(keyLen <= kBufferSize);
-            memcpy(_buffer, key.objdata(), key.objsize());
-            putRecordIdAtOffset(_buffer, key.objsize(), loc);
+            KeyString data = KeyString::make( key, _idx->_ordering, loc );
 
             // Can't use WiredTigerCursor since we aren't using the cache.
-            WiredTigerItem item(_buffer, keyLen);
+            WiredTigerItem item(data.getBuffer(), data.getSize());
             _cursor->set_key(_cursor, item.Get() );
             _cursor->set_value(_cursor, &emptyItem);
             invariantWTOK(_cursor->insert(_cursor));
@@ -584,9 +470,7 @@ namespace {
         }
 
     private:
-        // Will need to support dynamic sizing if we remove TempKeyMaxSize.
-        static const size_t kBufferSize = TempKeyMaxSize + sizeof(RecordIdRepr);
-        char _buffer[kBufferSize];
+        WiredTigerIndex* _idx;
     };
 
     /**
@@ -600,7 +484,7 @@ namespace {
     class WiredTigerIndex::UniqueBulkBuilder : public BulkBuilder {
     public:
         UniqueBulkBuilder(WiredTigerIndex* idx, OperationContext* txn, bool dupsAllowed)
-            : BulkBuilder(idx, txn), _dupsAllowed(dupsAllowed) {
+            : BulkBuilder(idx, txn), _idx(idx), _dupsAllowed(dupsAllowed) {
         }
 
         Status addKey(const BSONObj& newKey, const RecordId& loc) {
@@ -649,8 +533,9 @@ namespace {
         void doInsert() {
 
             invariant(!_locs.empty());
-
-            WiredTigerItem keyItem(_key.objdata(), _key.objsize());
+            
+            KeyString data = KeyString::make( _key, _idx->_ordering );
+            WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
             _cursor->set_key(_cursor, keyItem.Get());
 
             invariant(_locs.size() > 0);
@@ -663,6 +548,7 @@ namespace {
             _locs.clear();
         }
 
+        WiredTigerIndex* _idx;
         const bool _dupsAllowed;
         BSONObj _key;
         std::vector<RecordIdRepr> _locs;
@@ -710,6 +596,7 @@ namespace {
         if ( getRecordId() != other.getRecordId() )
             return false;
 
+        // TODO: make fast
         return getKey() == other.getKey();
     }
 
@@ -728,31 +615,64 @@ namespace {
         if (loc.isNull())
             searchLoc = _forward ? RecordId::min() : RecordId::max();
 
-        boost::scoped_array<char> data;
-        WiredTigerItem myKey = _toItem( key, searchLoc, &data );
+        TRACE_CURSOR << " _locate " << key << " " << loc << (_forward ? " forward" : " backward");
+
+        KeyString data = _idx.unique() ?
+            KeyString::make( key, _idx._ordering ) :
+            KeyString::make( key, _idx._ordering, searchLoc );
+        WiredTigerItem myKey( data.getBuffer(), data.getSize() );
 
         int cmp = -1;
         c->set_key(c, myKey.Get() );
 
-
         int ret = c->search_near(c, &cmp);
         if ( ret == WT_NOTFOUND ) {
             _eof = true;
+            TRACE_CURSOR << "\t not found";
             return false;
         }
         invariantWTOK( ret );
+
+        TRACE_CURSOR << "\t cmp: " << cmp;
+
         // Make sure we land on a matching key
-        if ( _forward ? cmp < 0 : cmp > 0 )
-            ret = _forward ? c->next(c) : c->prev(c);
-
-        _eof = ret != 0;
-
-        if ( _eof ) {
-            return false;
+        if ( cmp < 0 ) {
+            if ( _forward ) {
+                ret = c->next(c);
+            }
+            else {
+                // do nothing
+            }
+        }
+        else if ( cmp > 0 ) {
+            if ( _forward ) {
+                // do nothing
+            }
+            else {
+                ret = c->prev(c);
+            }
         }
 
-        if ( key != getKey() ) {
+        _eof = ret == WT_NOTFOUND;
+
+        if ( _eof ) {
+            TRACE_CURSOR << "\t eof " << ret << " _forward: " << _forward;
             return false;
+        }
+        else {
+            invariantWTOK( ret );
+        }
+
+        {
+            WT_ITEM keyItem;
+            int ret = c->get_key(c, &keyItem);
+            invariantWTOK(ret);
+
+            if ( data.getSize() != keyItem.size ||
+                 memcmp( data.getBuffer(), keyItem.data, keyItem.size ) ) {
+                TRACE_CURSOR << "\t key != " << getKey();
+                return false;
+            }
         }
 
         if ( !_idx.unique() ) {
@@ -766,6 +686,8 @@ namespace {
             // so nothing to do
             return true;
         }
+
+        TRACE_CURSOR << "\t in weird";
 
         // we're looking for a specific RecordId, lets see if we can find
 
@@ -821,7 +743,7 @@ namespace {
            bool afterKey,
            const vector<const BSONElement*>& keyEnd,
            const vector<bool>& keyEndInclusive) {
-
+        // TODO: don't go to a bson obj then to a KeyString, go straight
         BSONObj key = IndexEntryComparison::makeQueryObject(
                          keyBegin, keyBeginLen,
                          afterKey, keyEnd, keyEndInclusive, getDirection() );
@@ -842,7 +764,13 @@ namespace {
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
         invariantWTOK(ret);
-        return makeIndexKeyEntry(&keyItem).key;
+
+        BSONObj key = KeyString::toBson( static_cast<const char*>(keyItem.data),
+                                         keyItem.size,
+                                         _idx._ordering );
+
+        TRACE_INDEX << " returning key: " << key;
+        return key;
     }
 
     RecordId WiredTigerIndex::IndexCursor::getRecordId() const {
@@ -871,7 +799,11 @@ namespace {
             return loc;
         }
         invariantWTOK( c->get_key(c, &item) );
-        return makeIndexKeyEntry( &item ).loc;
+        RecordIdRepr repr;
+        memcpy( &repr,
+                static_cast<const char*>(item.data) + item.size - sizeof(RecordIdRepr),
+                sizeof(RecordIdRepr) );
+        return RecordId( endian::bigToNative(repr) );
     }
 
     void WiredTigerIndex::IndexCursor::advance() {
@@ -910,6 +842,7 @@ namespace {
         _savedForCheck = _txn->recoveryUnit();
 
         if ( !wt_keeptxnopen() && !_eof ) {
+            // TODO: use KeyString
             _savedKey = getKey().getOwned();
             _savedLoc = getRecordId();
             _cursor.reset();
@@ -930,9 +863,10 @@ namespace {
 
     // ------------------------------
 
-    WiredTigerIndexUnique::WiredTigerIndexUnique( const std::string& uri,
+    WiredTigerIndexUnique::WiredTigerIndexUnique( OperationContext* ctx,
+                                                  const std::string& uri,
                                                   const IndexDescriptor* desc )
-        : WiredTigerIndex( uri, desc ) {
+        : WiredTigerIndex( ctx, uri, desc ) {
     }
 
     Status WiredTigerIndexUnique::_insert( WT_CURSOR* c,
@@ -940,7 +874,8 @@ namespace {
                                            const RecordId& loc,
                                            bool dupsAllowed ) {
 
-        WiredTigerItem keyItem( key.objdata(), key.objsize() );
+        KeyString data = KeyString::make( key, _ordering );
+        WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
         RecordIdRepr locRepr = loc.repr();
         WiredTigerItem valueItem( &locRepr, sizeof(locRepr) );
         c->set_key( c, keyItem.Get() );
@@ -1012,7 +947,8 @@ namespace {
                                           const BSONObj& key,
                                           const RecordId& loc,
                                           bool dupsAllowed ) {
-        WiredTigerItem keyItem( key.objdata(), key.objsize() );
+        KeyString data = KeyString::make( key, _ordering );
+        WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
         c->set_key( c, keyItem.Get() );
 
         if ( !dupsAllowed ) {
@@ -1065,9 +1001,10 @@ namespace {
 
     // ------------------------------
 
-    WiredTigerIndexStandard::WiredTigerIndexStandard( const std::string& uri,
+    WiredTigerIndexStandard::WiredTigerIndexStandard( OperationContext* ctx,
+                                                      const std::string& uri,
                                                       const IndexDescriptor* desc )
-        : WiredTigerIndex( uri, desc ) {
+        : WiredTigerIndex( ctx, uri, desc ) {
     }
 
     Status WiredTigerIndexStandard::_insert( WT_CURSOR* c,
@@ -1076,8 +1013,10 @@ namespace {
                                              bool dupsAllowed ) {
         invariant( dupsAllowed );
 
-        boost::scoped_array<char> data;
-        WiredTigerItem item = _toItem( key, loc, &data );
+        TRACE_INDEX << " key: " << key << " loc: " << loc;
+
+        KeyString data = KeyString::make( key, _ordering, loc );
+        WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key(c, item.Get() );
         c->set_value(c, &emptyItem);
         int ret = c->insert( c );
@@ -1095,8 +1034,8 @@ namespace {
                                             const RecordId& loc,
                                             bool dupsAllowed ) {
         invariant( dupsAllowed );
-        boost::scoped_array<char> data;
-        WiredTigerItem item = _toItem( key, loc, &data);
+        KeyString data = KeyString::make( key, _ordering, loc );
+        WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key(c, item.Get() );
         int ret = c->remove(c);
         if (ret != WT_NOTFOUND) {
@@ -1104,5 +1043,26 @@ namespace {
         }
     }
 
+    // ---------------- for compatability with rc4 and previous ------
+
+    int index_collator_customize(WT_COLLATOR *coll,
+                                 WT_SESSION *s,
+                                 const char *uri,
+                                 WT_CONFIG_ITEM *metadata,
+                                 WT_COLLATOR **collp) {
+        fassertFailedWithStatusNoTrace(28580,
+                                       Status(ErrorCodes::UnsupportedFormat, str::stream()
+                                              << "Found an index from an unsupported RC version."
+                                              << " Please restart with --repair to fix."));
+    }
+
+    extern "C" MONGO_COMPILER_API_EXPORT int index_collator_extension(WT_CONNECTION *conn,
+                                                                      WT_CONFIG_ARG *cfg) {
+        static WT_COLLATOR idx_static;
+
+        idx_static.customize = index_collator_customize;
+        return conn->add_collator(conn, "mongo_index", &idx_static, NULL);
+
+    }
 
 }  // namespace mongo

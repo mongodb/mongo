@@ -43,6 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
@@ -227,6 +228,11 @@ namespace mongo {
                 << "Application metadata for " << uri
                 << " has unsupported format version " << version);
         }
+
+        LOG(2) << "WiredTigerUtil::checkApplicationMetadataFormatVersion "
+               << " uri: " << uri
+               << " ok range " << minimumVersion << " -> " << maximumVersion
+               << " current: " << version;
 
         return Status::OK();
     }

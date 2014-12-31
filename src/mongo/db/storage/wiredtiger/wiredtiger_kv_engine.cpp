@@ -141,7 +141,6 @@ namespace mongo {
         ss << "create,";
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
-        ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(fast),";
         if ( _durable ) {
             ss << "log=(enabled=true,archive=true,path=journal,compressor=";
@@ -355,8 +354,8 @@ namespace mongo {
                                                                      const StringData& ident,
                                                                      const IndexDescriptor* desc ) {
         if ( desc->unique() )
-            return new WiredTigerIndexUnique( _uri( ident ), desc );
-        return new WiredTigerIndexStandard( _uri( ident ), desc );
+            return new WiredTigerIndexUnique( opCtx, _uri( ident ), desc );
+        return new WiredTigerIndexStandard( opCtx, _uri( ident ), desc );
     }
 
     Status WiredTigerKVEngine::dropIdent( OperationContext* opCtx,

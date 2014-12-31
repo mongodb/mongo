@@ -83,7 +83,7 @@ namespace QueryStageDistinct {
             ASSERT_FALSE(member->hasObj());
             BSONElement keyElt;
             ASSERT_TRUE(member->getFieldDotted(field, &keyElt));
-            ASSERT_EQUALS(mongo::NumberInt, keyElt.type());
+            ASSERT_TRUE(keyElt.isNumber());
 
             return keyElt.numberInt();
         }
