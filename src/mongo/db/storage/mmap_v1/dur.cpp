@@ -108,6 +108,10 @@ namespace {
     DurableImpl durableImpl;
     NonDurableImpl nonDurableImpl;
 
+    // Remap loop state
+    unsigned remapFileToStartAt;
+    unsigned long long remapLastTimestamp;
+
 
     /**
      * MMAP V1 durability server status section.
@@ -335,8 +339,10 @@ namespace {
         }
 
 
-        // Functor to be called over all MongoFiles
-
+        /**
+         * Functor to be called over all MongoFiles and check that the contents of the private view
+         * match with that of the shared view after journal apply.
+         */
         class ValidateSingleMapMatches {
         public:
             ValidateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
@@ -346,7 +352,10 @@ namespace {
                     const unsigned char *p = (const unsigned char *) mmf->getView();
                     const unsigned char *w = (const unsigned char *) mmf->view_write();
 
-                    if (!p || !w) return; // File not fully opened yet
+                    // Ignore pre-allocated files that are not fully created yet
+                    if (!p || !w) {
+                        return;
+                    }
 
                     _bytes += mmf->length();
 
@@ -418,51 +427,53 @@ namespace {
 
 
         static void _remapPrivateView() {
-            // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
-            //       to assure very good behavior here.
-
-            static unsigned startAt;
-            static unsigned long long lastRemap;
-
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
-            // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
-            // faults after remapping, so doing a little bit at a time will avoid big load spikes on
-            // remapping.
+            // We want to remap all private views about every 2 seconds. There could be ~1000 views
+            // so we do a little each pass. There will be copy on write faults after remapping, so
+            // doing a little bit at a time will avoid big load spikes when the pages are touched.
+            //
+            // TODO: Instead of the time-based logic above, consider using ProcessInfo and watching
+            //       for getResidentSize to drop, which is more precise
             unsigned long long now = curTimeMicros64();
-            double fraction = (now-lastRemap)/2000000.0;
+            double fraction = (now - remapLastTimestamp) / 2000000.0;
             if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap) {
                 fraction = 1;
             }
 
-            lastRemap = now;
+            // We don't want to get close to the UncommittedBytesLimit
+            const double f = privateMapBytes / ((double)UncommittedBytesLimit);
+            if (f > fraction) {
+                fraction = f;
+            }
 
-#if defined(_WIN32) || defined(__sunos__)
-            // Note that this negatively affects performance.
-            // We must grab the exclusive lock here because remapPrivateView() on Windows and
-            // Solaris need to grab it as well, due to the lack of an atomic way to remap a
-            // memory mapped file.
+            // We are definitely doing some remap, so reset the private map estimate
+            privateMapBytes = 0;
+            remapLastTimestamp = now;
+
+            // There is no way that the set of files can change while we are in this method,
+            // because we hold the flush lock in X mode. For files to go away, a database needs to
+            // be dropped, which means acquiring the flush lock in at least IX mode.
+            //
+            // However, the record fetcher logic unfortunately operates without any locks and on
+            // Windows and Solaris remap is not atomic and there is a window where the record
+            // fetcher might get an access violation. That's why we acquire the mongo files mutex
+            // here in X mode and the record fetcher takes in in S-mode (see MmapV1RecordFetcher
+            // for more detail).
+            //
             // See SERVER-5723 for performance improvement.
             // See SERVER-5680 to see why this code is necessary on Windows.
             // See SERVER-8795 to see why this code is necessary on Solaris.
+#if defined(_WIN32) || defined(__sunos__)
             LockMongoFilesExclusive lk;
 #else
             LockMongoFilesShared lk;
 #endif
-            set<MongoFile*>& files = MongoFile::getAllFiles();
-            unsigned sz = files.size();
-            if( sz == 0 )
-                return;
 
-            {
-                // be careful not to use too much memory if the write rate is 
-                // extremely high
-                double f = privateMapBytes / ((double)UncommittedBytesLimit);
-                if( f > fraction ) { 
-                    fraction = f;
-                }
-                privateMapBytes = 0;
+            std::set<MongoFile*>& files = MongoFile::getAllFiles();
+            const unsigned sz = files.size();
+            if (sz == 0) {
+                return;
             }
 
             unsigned ntodo = (unsigned) (sz * fraction);
@@ -472,13 +483,16 @@ namespace {
             const set<MongoFile*>::iterator b = files.begin();
             const set<MongoFile*>::iterator e = files.end();
             set<MongoFile*>::iterator i = b;
-            // skip to our starting position
-            for( unsigned x = 0; x < startAt; x++ ) {
+
+            // Skip to our starting position as remembered from the last remap cycle
+            for( unsigned x = 0; x < remapFileToStartAt; x++ ) {
                 i++;
                 if( i == e ) i = b;
             }
-            unsigned startedAt = startAt;
-            startAt = (startAt + ntodo) % sz; // mark where to start next time
+
+            // Mark where to start on the next cycle
+            const unsigned startedAt = remapFileToStartAt;
+            remapFileToStartAt = (remapFileToStartAt + ntodo) % sz;
 
             Timer t;
             for( unsigned x = 0; x < ntodo; x++ ) {
@@ -493,11 +507,17 @@ namespace {
                     if( i == e ) i = b;
                 }
             }
+
             LOG(3) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo
-                   << ' ' << t.millis() << "ms" << endl;
+                   << ' ' << t.millis() << "ms";
         }
 
 
+        /**
+         * Remaps the private view from the shared view so that it does not consume too much
+         * copy-on-write/swap space. Must only be called after the in-memory journal has been
+         * flushed to disk and applied on top of the shared view.
+         */
         static void remapPrivateView() {
             // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see
             // any newly written data on reads.
