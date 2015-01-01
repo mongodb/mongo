@@ -120,7 +120,8 @@ namespace QueryStageCount {
 
         void update(const RecordId& oldLoc, const BSONObj& newDoc) {
             WriteUnitOfWork wunit(&_txn);
-            _coll->updateDocument(&_txn, oldLoc, newDoc, false, NULL);
+            BSONObj oldDoc = _coll->getRecordStore()->dataFor( &_txn, oldLoc ).releaseToBson();
+            _coll->updateDocument(&_txn, oldLoc, oldDoc, newDoc, false, NULL);
             wunit.commit();
         }
 

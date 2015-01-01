@@ -556,11 +556,11 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
-                    StatusWith<RecordId> res = _collection->updateDocument(_txn,
-                                                                          loc,
-                                                                          newObj,
-                                                                          true,
-                                                                          _params.opDebug);
+                    StatusWith<RecordId> res = _collection->updateDocument(
+                        _txn,
+                        loc, oldObj, newObj,
+                        true,
+                        _params.opDebug);
                     uassertStatusOK(res.getStatus());
                     RecordId newLoc = res.getValue();
 

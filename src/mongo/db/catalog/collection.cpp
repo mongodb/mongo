@@ -302,14 +302,13 @@ namespace mongo {
     ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
 
     StatusWith<RecordId> Collection::updateDocument( OperationContext* txn,
-                                                    const RecordId& oldLocation,
-                                                    const BSONObj& objNew,
-                                                    bool enforceQuota,
-                                                    OpDebug* debug ) {
+                                                     const RecordId& oldLocation,
+                                                     const BSONObj& objOld,
+                                                     const BSONObj& objNew,
+                                                     bool enforceQuota,
+                                                     OpDebug* debug ) {
 
         uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
-
-        BSONObj objOld = _recordStore->dataFor( txn, oldLocation ).releaseToBson();
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];
