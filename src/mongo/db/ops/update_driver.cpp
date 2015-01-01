@@ -235,7 +235,7 @@ namespace mongo {
             targetFields = targetFieldScopedPtr.get();
         }
 
-        _affectIndices = false;
+        _affectIndices = (isDocReplacement() && (_indexedFields != NULL));
 
         _logDoc.reset();
         LogBuilder logBuilder(_logDoc.root());

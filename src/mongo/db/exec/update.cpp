@@ -559,7 +559,7 @@ namespace mongo {
                     StatusWith<RecordId> res = _collection->updateDocument(
                         _txn,
                         loc, oldObj, newObj,
-                        true,
+                        true, driver->modsAffectIndices(),
                         _params.opDebug);
                     uassertStatusOK(res.getStatus());
                     RecordId newLoc = res.getValue();

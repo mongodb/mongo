@@ -208,6 +208,7 @@ namespace mongo {
                                              const BSONObj& oldDoc,
                                              const BSONObj& newDoc,
                                              bool enforceQuota,
+                                             bool indexesAffected,
                                              OpDebug* debug );
 
         /**
