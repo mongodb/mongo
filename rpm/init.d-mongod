@@ -21,7 +21,6 @@ SYSCONFIG="/etc/sysconfig/mongod"
 
 DBPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*dbpath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
 PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
-PIDDIR=`dirname $PIDFILEPATH`
 
 mongod=${MONGOD-/usr/bin/mongod}
 
@@ -31,6 +30,8 @@ MONGO_GROUP=mongod
 if [ -f "$SYSCONFIG" ]; then
     . "$SYSCONFIG"
 fi
+
+PIDDIR=`dirname $PIDFILEPATH`
 
 # Handle NUMA access to CPUs (SERVER-3574)
 # This verifies the existence of numactl as well as testing that the command works
