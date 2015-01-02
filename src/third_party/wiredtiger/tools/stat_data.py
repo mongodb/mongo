@@ -85,6 +85,7 @@ prefix_list = [
     'connection',
     'session',
     'block-manager',
+    'thread-yield',
     'async',
     'btree',
     'compression',

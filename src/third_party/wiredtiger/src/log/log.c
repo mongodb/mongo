@@ -569,7 +569,8 @@ err:	if (log_fh != NULL)
  *	pre-allocating the file and moving it to the destination name.
  */
 int
-__wt_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
+__wt_log_allocfile(
+    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, int prealloc)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
@@ -598,7 +599,8 @@ __wt_log_allocfile(WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
 	WT_ERR(__log_openfile(session, 1, &log_fh, WT_LOG_TMPNAME, lognum));
 	WT_ERR(__log_file_header(session, log_fh, NULL, 1));
 	WT_ERR(__wt_ftruncate(session, log_fh, LOG_FIRST_RECORD));
-	WT_ERR(__log_prealloc(session, log_fh));
+	if (prealloc)
+		WT_ERR(__log_prealloc(session, log_fh));
 	tmp_fh = log_fh;
 	log_fh = NULL;
 	WT_ERR(__wt_close(session, tmp_fh));
@@ -713,13 +715,10 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(__wt_log_newfile(session, 1, NULL));
 
-	/*
-	 * If there were log files, run recovery.
-	 * XXX belongs at a higher level than this.
-	 */
+	/* If we found log files, save the new state. */
 	if (logcount > 0) {
 		log->trunc_lsn = log->alloc_lsn;
-		WT_ERR(__wt_txn_recover(conn));
+		FLD_SET(conn->log_flags, WT_CONN_LOG_EXISTED);
 	}
 
 err:	if (logfiles != NULL)
@@ -1025,7 +1024,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * If we need to create the log file, do so now.
 	 */
 	if (create_log && (ret = __wt_log_allocfile(
-	    session, log->fileid, WT_LOG_FILENAME)) != 0)
+	    session, log->fileid, WT_LOG_FILENAME, 0)) != 0)
 		return (ret);
 	WT_RET(__log_openfile(session,
 	    0, &log->log_fh, WT_LOG_FILENAME, log->fileid));
@@ -1160,7 +1159,7 @@ err:
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     int (*func)(WT_SESSION_IMPL *session,
-    WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
+    WT_ITEM *record, WT_LSN *lsnp, void *cookie, int firstrecord), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(uncitem);
@@ -1174,6 +1173,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
 	int eol;
+	int firstrecord;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1181,6 +1181,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log_fh = NULL;
 	logcount = 0;
 	logfiles = NULL;
+	firstrecord = 1;
 	eol = 0;
 	WT_CLEAR(buf);
 
@@ -1218,11 +1219,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 
 			/*
 			 * Log cursors may not know the starting LSN.  If an
-			 * LSN pointer is passed in, but it is the INIT_LSN,
-			 * start from the first_lsn.
+			 * LSN is passed in that it is equal to the smallest
+			 * LSN, start from the beginning of the log.
 			 */
 			start_lsn = *lsnp;
-			if (IS_INIT_LSN(&start_lsn))
+			if (WT_IS_INIT_LSN(&start_lsn))
 				start_lsn = log->first_lsn;
 		}
 		end_lsn = log->alloc_lsn;
@@ -1364,10 +1365,13 @@ advance:
 				WT_ERR(__log_decompress(session, &buf,
 				    &uncitem));
 				WT_ERR((*func)(session, uncitem, &rd_lsn,
-				    cookie));
+				    cookie, firstrecord));
 				__wt_scr_free(&uncitem);
 			} else
-				WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
+				WT_ERR((*func)(session, &buf, &rd_lsn, cookie,
+				    firstrecord));
+
+			firstrecord = 0;
 
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
@@ -1558,7 +1562,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
-	INIT_LSN(&lsn);
+	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
 	 * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a

@@ -600,13 +600,20 @@ __checkpoint_worker(
 	bm = btree->bm;
 	conn = S2C(session);
 	ckpt = ckptbase = NULL;
-	INIT_LSN(&ckptlsn);
 	dhandle = session->dhandle;
 	name_alloc = NULL;
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
 	was_modified = btree->modified;
+
+	/*
+	 * Set the checkpoint LSN to the maximum LSN so that recovery will
+	 * never roll old changes forward over the non-logged changed in this
+	 * checkpoint.  If logging is enabled, a real checkpoint LSN will
+	 * be assigned later for this checkpoint and overwrite this.
+	 */
+	WT_MAX_LSN(&ckptlsn);
 
 	/* Get the list of checkpoints for this file. */
 	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, &ckptbase));

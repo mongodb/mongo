@@ -3300,48 +3300,58 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_MEMORY_FREE			1103
 /*! connection: memory re-allocations */
 #define	WT_STAT_CONN_MEMORY_GROW			1104
+/*! thread-yield: page acquire busy blocked */
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1105
+/*! thread-yield: page acquire eviction blocked */
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1106
+/*! thread-yield: page acquire locked blocked */
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1107
+/*! thread-yield: page acquire read blocked */
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1108
+/*! thread-yield: page acquire time sleeping (usecs) */
+#define	WT_STAT_CONN_PAGE_SLEEP				1109
 /*! connection: total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1105
+#define	WT_STAT_CONN_READ_IO				1110
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1106
+#define	WT_STAT_CONN_REC_PAGES				1111
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1107
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1112
 /*! reconciliation: split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1108
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1113
 /*! reconciliation: split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1109
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1114
 /*! connection: pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1110
+#define	WT_STAT_CONN_RWLOCK_READ			1115
 /*! connection: pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1111
+#define	WT_STAT_CONN_RWLOCK_WRITE			1116
 /*! session: open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1112
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1117
 /*! session: open session count */
-#define	WT_STAT_CONN_SESSION_OPEN			1113
+#define	WT_STAT_CONN_SESSION_OPEN			1118
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1114
+#define	WT_STAT_CONN_TXN_BEGIN				1119
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1115
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1120
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1116
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1121
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1117
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1122
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1118
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1123
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1119
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1124
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1120
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1125
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1121
+#define	WT_STAT_CONN_TXN_COMMIT				1126
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1122
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1127
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1123
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1128
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1124
+#define	WT_STAT_CONN_TXN_ROLLBACK			1129
 /*! connection: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1125
+#define	WT_STAT_CONN_WRITE_IO				1130
 
 /*!
  * @}

@@ -241,12 +241,17 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Start the optional async threads. */
 	WT_RET(__wt_async_create(session, cfg));
 
+	WT_RET(__wt_logmgr_create(session, cfg));
+
+	/* Run recovery. */
+	WT_RET(__wt_txn_recover(session));
+
 	/*
 	 * Start the optional logging/archive thread.
 	 * NOTE: The log manager must be started before checkpoints so that the
 	 * checkpoint server knows if logging is enabled.
 	 */
-	WT_RET(__wt_logmgr_create(session, cfg));
+	WT_RET(__wt_logmgr_open(session));
 
 	/* Start the optional checkpoint thread. */
 	WT_RET(__wt_checkpoint_server_create(session, cfg));
