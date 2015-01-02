@@ -418,12 +418,14 @@ namespace {
 
             if (ret != WT_NOTFOUND) invariantWTOK(ret);
  
-            WriteUnitOfWork wuow( txn );
-            ret = c->session->truncate(c->session, NULL, NULL, c, NULL);
-            invariantWTOK(ret);
-            _changeNumRecords(txn, -docsRemoved);
-            _increaseDataSize(txn, -sizeSaved);
-            wuow.commit();
+            if (docsRemoved > 0) {
+                WriteUnitOfWork wuow( txn );
+                ret = c->session->truncate(c->session, NULL, NULL, c, NULL);
+                invariantWTOK(ret);
+                _changeNumRecords(txn, -docsRemoved);
+                _increaseDataSize(txn, -sizeSaved);
+                wuow.commit();
+            }
         }
         catch ( const WriteConflictException& wce ) {
             delete txn->releaseRecoveryUnit();
