@@ -340,74 +340,6 @@ namespace {
 
 
         /**
-         * Functor to be called over all MongoFiles and check that the contents of the private view
-         * match with that of the shared view after journal apply.
-         */
-        class ValidateSingleMapMatches {
-        public:
-            ValidateSingleMapMatches(unsigned long long& bytes) :_bytes(bytes)  {}
-            void operator () (MongoFile *mf) {
-                if( mf->isDurableMappedFile() ) {
-                    DurableMappedFile *mmf = (DurableMappedFile*) mf;
-                    const unsigned char *p = (const unsigned char *) mmf->getView();
-                    const unsigned char *w = (const unsigned char *) mmf->view_write();
-
-                    // Ignore pre-allocated files that are not fully created yet
-                    if (!p || !w) {
-                        return;
-                    }
-
-                    _bytes += mmf->length();
-
-                    verify( mmf->length() == (unsigned) mmf->length() );
-
-                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                        return; // next file
-
-                    unsigned low = 0xffffffff;
-                    unsigned high = 0;
-                    log() << "DurParanoid mismatch in " << mmf->filename() << endl;
-                    int logged = 0;
-                    unsigned lastMismatch = 0xffffffff;
-                    for( unsigned i = 0; i < mmf->length(); i++ ) {
-                        if( p[i] != w[i] ) {
-                            if( lastMismatch != 0xffffffff && lastMismatch+1 != i )
-                                log() << endl; // separate blocks of mismatches
-                            lastMismatch= i;
-                            if( ++logged < 60 ) {
-                                if( logged == 1 )
-                                    log() << "ofs % 628 = 0x" << hex << (i%628) << endl; // for .ns files to find offset in record
-                                stringstream ss;
-                                ss << "mismatch ofs:" << hex << i <<  "\tfilemap:" << setw(2) << (unsigned) w[i] << "\tprivmap:" << setw(2) << (unsigned) p[i];
-                                if( p[i] > 32 && p[i] <= 126 )
-                                    ss << '\t' << p[i];
-                                log() << ss.str() << endl;
-                            }
-                            if( logged == 60 )
-                                log() << "..." << endl;
-                            if( i < low ) low = i;
-                            if( i > high ) high = i;
-                        }
-                    }
-                    if( low != 0xffffffff ) {
-                        std::stringstream ss;
-                        ss << "journal error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
-                        log() << ss.str() << endl;
-                        log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
-                        //vector<WriteIntent>& _intents = commitJob.wi()._intents;
-                        //(void) _intents; // mark as unused. Useful for inspection in debugger
-
-                        // should we abort() here so this isn't unnoticed in some circumstances?
-                        massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
-                    }
-                }
-            }
-        private:
-            unsigned long long& _bytes;
-        };
-
-
-        /**
          * Diagnostic to check that the private view and the non-private view are in sync after
          * applying the journal changes. This function is very slow and only runs when paranoid
          * checks are enabled.
@@ -415,14 +347,76 @@ namespace {
          * Must be called under at least S flush lock to ensure that there are no concurrent
          * writes happening.
          */
-        static void debugValidateAllMapsMatch() {
-            if (!(mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid))
-                return;
+        static void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
+            const unsigned char *p = (const unsigned char *)mmf->getView();
+            const unsigned char *w = (const unsigned char *)mmf->view_write();
 
-            unsigned long long bytes = 0;
-            Timer t;
-            MongoFile::forEach(ValidateSingleMapMatches(bytes));
-            OCCASIONALLY log() << "DurParanoid map check " << t.millis() << "ms for " <<  (bytes / (1024*1024)) << "MB" << endl;
+            // Ignore pre-allocated files that are not fully created yet
+            if (!p || !w) {
+                return;
+            }
+
+            if (memcmp(p, w, (unsigned)mmf->length()) == 0) {
+                return;
+            }
+
+            unsigned low = 0xffffffff;
+            unsigned high = 0;
+
+            log() << "DurParanoid mismatch in " << mmf->filename();
+
+            int logged = 0;
+            unsigned lastMismatch = 0xffffffff;
+
+            for (unsigned i = 0; i < mmf->length(); i++) {
+                if (p[i] != w[i]) {
+
+                    if (lastMismatch != 0xffffffff && lastMismatch + 1 != i) {
+                        // Separate blocks of mismatches
+                        log() << std::endl;
+                    }
+
+                    lastMismatch = i;
+
+                    if (++logged < 60) {
+                        if (logged == 1) {
+                            // For .ns files to find offset in record
+                            log() << "ofs % 628 = 0x" << hex << (i % 628) << endl;
+                        }
+
+                        stringstream ss;
+                        ss << "mismatch ofs:" << hex << i
+                           << "\tfilemap:" << setw(2) << (unsigned)w[i]
+                           << "\tprivmap:" << setw(2) << (unsigned)p[i];
+
+                        if (p[i] > 32 && p[i] <= 126) {
+                            ss << '\t' << p[i];
+                        }
+
+                        log() << ss.str() << endl;
+                    }
+
+                    if (logged == 60) {
+                        log() << "..." << endl;
+                    }
+
+                    if (i < low) low = i;
+                    if (i > high) high = i;
+                }
+            }
+
+            if (low != 0xffffffff) {
+                std::stringstream ss;
+                ss << "journal error warning views mismatch " << mmf->filename() << ' '
+                   << hex << low << ".." << high
+                   << " len:" << high - low + 1;
+
+                log() << ss.str() << endl;
+                log() << "priv loc: " << (void*)(p + low) << ' ' << endl;
+
+                severe() << "Written data does not match in-memory view. Missing WriteIntent?";
+                invariant(false);
+            }
         }
 
 
@@ -471,6 +465,7 @@ namespace {
 #endif
 
             std::set<MongoFile*>& files = MongoFile::getAllFiles();
+
             const unsigned sz = files.size();
             if (sz == 0) {
                 return;
@@ -495,15 +490,24 @@ namespace {
             remapFileToStartAt = (remapFileToStartAt + ntodo) % sz;
 
             Timer t;
+
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
-                if( (*i)->isDurableMappedFile() ) {
+                if ((*i)->isDurableMappedFile()) {
                     DurableMappedFile *mmf = (DurableMappedFile*) *i;
-                    verify(mmf);
-                    if( mmf->willNeedRemap() ) {
+
+                    // Sanity check that the contents of the shared and the private view match so
+                    // we don't end up overwriting data.
+                    if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid) {
+                        debugValidateFileMapsMatch(mmf);
+                    }
+
+                    if (mmf->willNeedRemap()) {
                         mmf->remapThePrivateView();
                     }
+
                     i++;
+
                     if( i == e ) i = b;
                 }
             }
@@ -522,10 +526,6 @@ namespace {
             // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see
             // any newly written data on reads.
             invariant(!commitJob.hasWritten());
-
-            // Sanity check that the contents of the shared and the private view match so we don't
-            // end up overwriting data.
-            debugValidateAllMapsMatch();
 
             try {
                 Timer t;
