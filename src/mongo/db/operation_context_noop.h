@@ -29,6 +29,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 
@@ -36,12 +37,16 @@ namespace mongo {
 
     class OperationContextNoop : public OperationContext {
     public:
-        OperationContextNoop(RecoveryUnit* ru) {
-            _recoveryUnit.reset(ru);
+        OperationContextNoop(RecoveryUnit* ru)
+            : _recoveryUnit(ru),
+              _locker(new LockerNoop()) {
+
         }
 
-        OperationContextNoop() {
-            _recoveryUnit.reset(new RecoveryUnitNoop());
+        OperationContextNoop()
+            : _recoveryUnit(new RecoveryUnitNoop()),
+              _locker(new LockerNoop()) {
+
         }
 
         virtual ~OperationContextNoop() { }
@@ -69,8 +74,7 @@ namespace mongo {
         }
 
         virtual Locker* lockState() const {
-            // TODO: This should return an actual object if necessary for testing.
-            return NULL;
+            return _locker.get();
         }
 
         virtual ProgressMeter* setMessage(const char * msg,
@@ -103,6 +107,7 @@ namespace mongo {
 
     private:
         std::auto_ptr<RecoveryUnit> _recoveryUnit;
+        scoped_ptr<Locker> _locker;
         ProgressMeter _pm;
     };
 

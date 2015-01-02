@@ -35,7 +35,6 @@
 #include <utility>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/client.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_based_access_method.h"
@@ -49,7 +48,6 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
@@ -57,38 +55,54 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
-    namespace {
-        bool newCollectionsUsePowerOf2SizesFlag = true; // Unused, needed for server parameter.
+    /**
+     * Declaration for the "newCollectionsUsePowerOf2Sizes" server parameter, which is now
+     * deprecated in 2.8.
+     * Note that:
+     * - setting to true performs a no-op.
+     * - setting to false will fail.
+     */
+    class NewCollectionsUsePowerOf2SizesParameter : public ExportedServerParameter<bool> {
+    public:
+        NewCollectionsUsePowerOf2SizesParameter() :
+            ExportedServerParameter<bool>(ServerParameterSet::getGlobal(),
+                                          "newCollectionsUsePowerOf2Sizes",
+                                          &newCollectionsUsePowerOf2SizesFlag,
+                                          true,
+                                          true) {
 
-        /**
-         * Declaration for the "newCollectionsUsePowerOf2Sizes" server parameter,
-         * which is now deprecated in 2.8.
-         * Note that:
-         * - setting to true performs a no-op.
-         * - setting to false will fail.
-         */
-        class NewCollectionsUsePowerOf2SizesParameter : public ExportedServerParameter<bool> {
-        public:
-            NewCollectionsUsePowerOf2SizesParameter() :
-                ExportedServerParameter<bool>(ServerParameterSet::getGlobal(),
-                "newCollectionsUsePowerOf2Sizes",
-                &newCollectionsUsePowerOf2SizesFlag,
-                true,
-                true) {}
+        }
 
-            virtual Status validate(const bool& potentialNewValue) {
-                if (!potentialNewValue) {
-                    return Status(ErrorCodes::BadValue,
-                        "newCollectionsUsePowerOf2Sizes cannot be set to false. "
-                        "Use noPadding instead during createCollection.");
-                }
-
-                return Status::OK();
+        virtual Status validate(const bool& potentialNewValue) {
+            if (!potentialNewValue) {
+                return Status(ErrorCodes::BadValue,
+                              "newCollectionsUsePowerOf2Sizes cannot be set to false. "
+                              "Use noPadding instead during createCollection.");
             }
 
-        } exportedNewCollectionsUsePowerOf2SizesParameter;
+            return Status::OK();
+        }
+
+    private:
+        // Unused, needed for server parameter.
+        bool newCollectionsUsePowerOf2SizesFlag;
+
+    } exportedNewCollectionsUsePowerOf2SizesParameter;
+
+
+    int _massageExtentSize(const ExtentManager* em, long long size) {
+        if (size < em->minSize())
+            return em->minSize();
+        if (size > em->maxSize())
+            return em->maxSize();
+
+        return static_cast<int>(size);
     }
+
+} // namespace
+
 
     /**
      * Registers the insertion of a new entry in the _collections cache with the RecoveryUnit,
@@ -124,7 +138,6 @@ namespace mongo {
             : _ns(ns.toString()), _catalogEntry(catalogEntry), _cachedEntry(cachedEntry) { }
 
         void rollback() {
-            boost::mutex::scoped_lock lk(_catalogEntry->_collectionsLock);
             _catalogEntry->_collections[_ns] = _cachedEntry;
         }
 
@@ -166,7 +179,7 @@ namespace mongo {
                 // _init. That is ok, since they can't have indexes on them anyway.
                 if (!entry) {
                     entry = new Entry();
-                    _insertInCache_inlock(txn, ns, entry);
+                    _insertInCache(txn, ns, entry);
 
                     // Add the indexes on this namespace to the list of namespaces to load.
                     std::vector<std::string> indexNames;
@@ -190,7 +203,7 @@ namespace mongo {
         catch(std::exception& e) {
             log() << "warning database " << path << " " << name << " could not be opened";
             DBException* dbe = dynamic_cast<DBException*>(&e);
-            if ( dbe != 0 ) {
+            if (dbe) {
                 log() << "DBException " << dbe->getCode() << ": " << e.what() << endl;
             }
             else {
@@ -217,10 +230,10 @@ namespace mongo {
 
     void MMAPV1DatabaseCatalogEntry::_removeFromCache(RecoveryUnit* ru,
                                                       const StringData& ns) {
-        boost::mutex::scoped_lock lk(_collectionsLock);
         CollectionMap::iterator i = _collections.find(ns.toString());
-        if ( i == _collections.end() )
+        if (i == _collections.end()) {
             return;
+        }
 
         //  If there is an operation context, register a rollback to restore the cache entry
         if (ru) {
@@ -416,12 +429,11 @@ namespace mongo {
 
         _getNamespaceRecordStore()->deleteRecord( txn, oldSpecLocation );
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         Entry*& entry = _collections[toNS.toString()];
         invariant( entry == NULL );
         txn->recoveryUnit()->registerChange(new EntryInsertion(toNS, this));
         entry = new Entry();
-        _insertInCache_inlock(txn, toNS, entry);
+        _insertInCache(txn, toNS, entry);
 
         return Status::OK();
     }
@@ -497,20 +509,11 @@ namespace mongo {
         _namespaceIndex.getCollectionNamespaces( tofill );
     }
 
-    namespace {
-        int _massageExtentSize( const ExtentManager* em, long long size ) {
-            if ( size < em->minSize() )
-                return em->minSize();
-            if ( size > em->maxSize() )
-                return em->maxSize();
-            return static_cast<int>( size );
-        }
-    }
+    void MMAPV1DatabaseCatalogEntry::_ensureSystemCollection(OperationContext* txn,
+                                                             const StringData& ns) {
 
-    void MMAPV1DatabaseCatalogEntry::_ensureSystemCollection_inlock( OperationContext* txn,
-                                                                     const StringData& ns ) {
-        NamespaceDetails* details = _namespaceIndex.details( ns );
-        if ( details ) {
+        NamespaceDetails* details = _namespaceIndex.details(ns);
+        if (details) {
             return;
         }
         _namespaceIndex.add_ns( txn, ns, DiskLoc(), false );
@@ -543,8 +546,8 @@ namespace mongo {
         bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details( nsn.toString() ) == NULL;
         bool isSystemIndexesGoingToBeNew = _namespaceIndex.details( nsi.toString() ) == NULL;
 
-        _ensureSystemCollection_inlock( txn, nsn.toString() );
-        _ensureSystemCollection_inlock( txn, nsi.toString() );
+        _ensureSystemCollection(txn, nsn.toString());
+        _ensureSystemCollection(txn, nsi.toString());
 
         if ( isSystemNamespacesGoingToBeNew ) {
             txn->recoveryUnit()->registerChange(new EntryInsertion(nsn.toString(), this));
@@ -597,7 +600,7 @@ namespace mongo {
         }
 
         if ( isSystemIndexesGoingToBeNew ) {
-            _addNamespaceToNamespaceCollection_inlock( txn, nsi.toString(), NULL );
+            _addNamespaceToNamespaceCollection(txn, nsi.toString(), NULL);
         }
 
         if ( !nsEntry->catalogEntry )
@@ -647,14 +650,11 @@ namespace mongo {
                 options.cappedMaxDocs;
         }
 
-        {
-            boost::mutex::scoped_lock lk( _collectionsLock );
-            Entry*& entry = _collections[ns.toString()];
-            invariant( !entry );
-            txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
-            entry = new Entry();
-            _insertInCache_inlock(txn, ns, entry);
-        }
+        Entry*& entry = _collections[ns.toString()];
+        invariant( !entry );
+        txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
+        entry = new Entry();
+        _insertInCache(txn, ns, entry);
 
         if ( allocateDefaultSpace ) {
             RecordStoreV1Base* rs = _getRecordStore( ns );
@@ -698,56 +698,59 @@ namespace mongo {
         _addNamespaceToNamespaceCollection(txn, name, NULL);
         _namespaceIndex.add_ns(txn, name, DiskLoc(), false);
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         Entry*& entry = _collections[name.toString()];
         invariant( !entry );
         txn->recoveryUnit()->registerChange(new EntryInsertion(name, this));
         entry = new Entry();
-        _insertInCache_inlock(txn, name, entry);
+        _insertInCache(txn, name, entry);
     }
 
     CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(
                                                                     const StringData& ns ) const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
+
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
-        if ( i == _collections.end() )
+        if (i == _collections.end()) {
             return NULL;
+        }
 
         invariant( i->second->catalogEntry.get() );
         return i->second->catalogEntry.get();
     }
 
-    void MMAPV1DatabaseCatalogEntry::_insertInCache_inlock(OperationContext* txn,
-                                                         const StringData& ns,
-                                                         Entry* entry) {
+    void MMAPV1DatabaseCatalogEntry::_insertInCache(OperationContext* txn,
+                                                    const StringData& ns,
+                                                    Entry* entry) {
+
         NamespaceDetails* details = _namespaceIndex.details(ns);
         invariant(details);
 
-        entry->catalogEntry.reset( new NamespaceDetailsCollectionCatalogEntry( ns,
-                                                                               details,
-                                                                               _getIndexRecordStore_inlock(),
-                                                                               this ) );
+        entry->catalogEntry.reset(
+            new NamespaceDetailsCollectionCatalogEntry(ns,
+                                                       details,
+                                                       _getIndexRecordStore(),
+                                                       this));
 
-        NamespaceString nss( ns );
+        auto_ptr<NamespaceDetailsRSV1MetaData> md(
+            new NamespaceDetailsRSV1MetaData(ns,
+                                             details,
+                                             _getNamespaceRecordStore()));
 
-        auto_ptr<NamespaceDetailsRSV1MetaData> md( new NamespaceDetailsRSV1MetaData( ns,
-                                                                                     details,
-                                                                                     _getNamespaceRecordStore_inlock() ) );
+        const NamespaceString nss(ns);
 
-        if ( details->isCapped ) {
-            entry->recordStore.reset( new CappedRecordStoreV1( txn,
-                                                               NULL, //TOD(ERH) this will blow up :)
-                                                               ns,
-                                                               md.release(),
-                                                               &_extentManager,
-                                                               nss.coll() == "system.indexes" ) );
+        if (details->isCapped) {
+            entry->recordStore.reset(new CappedRecordStoreV1(txn,
+                                                             NULL,
+                                                             ns,
+                                                             md.release(),
+                                                             &_extentManager,
+                                                             nss.coll() == "system.indexes"));
         }
         else {
-            entry->recordStore.reset( new SimpleRecordStoreV1( txn,
-                                                               ns,
-                                                               md.release(),
-                                                               &_extentManager,
-                                                               nss.coll() == "system.indexes" ) );
+            entry->recordStore.reset(new SimpleRecordStoreV1(txn,
+                                                             ns,
+                                                             md.release(),
+                                                             &_extentManager,
+                                                             nss.coll() == "system.indexes"));
         }
     }
 
@@ -756,10 +759,10 @@ namespace mongo {
     }
 
     RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getRecordStore( const StringData& ns ) const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator i = _collections.find( ns.toString() );
-        if ( i == _collections.end() )
+        if (i == _collections.end()) {
             return NULL;
+        }
 
         invariant( i->second->recordStore.get() );
         return i->second->recordStore.get();
@@ -814,58 +817,49 @@ namespace mongo {
     }
 
     RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getIndexRecordStore() {
-        boost::mutex::scoped_lock lk( _collectionsLock );
-        return _getIndexRecordStore_inlock();
-    }
-
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getIndexRecordStore_inlock() {
-        NamespaceString nss( name(), "system.indexes" );
+        const NamespaceString nss(name(), "system.indexes");
         Entry* entry = _collections[nss.toString()];
         invariant( entry );
+
         return entry->recordStore.get();
     }
 
     RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore() const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
-        return _getNamespaceRecordStore_inlock();
-    }
-
-    RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore_inlock() const {
-        NamespaceString nss( name(), "system.namespaces" );
+        const NamespaceString nss( name(), "system.namespaces" );
         CollectionMap::const_iterator i = _collections.find( nss.toString() );
         invariant( i != _collections.end() );
+
         return i->second->recordStore.get();
     }
 
-    void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection( OperationContext* txn,
-                                                                         const StringData& ns,
-                                                                         const BSONObj* options ) {
-        boost::mutex::scoped_lock lk( _collectionsLock );
-        _addNamespaceToNamespaceCollection_inlock( txn, ns, options );
-    }
+    void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection(OperationContext* txn,
+                                                                        const StringData& ns,
+                                                                        const BSONObj* options) {
 
-    void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection_inlock( OperationContext* txn,
-                                                                                const StringData& ns,
-                                                                                const BSONObj* options ) {
-        if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
+        if (nsToCollectionSubstring(ns) == "system.namespaces") {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
             return;
         }
 
         BSONObjBuilder b;
         b.append("name", ns);
-        if ( options && !options->isEmpty() )
+        if (options && !options->isEmpty()) {
             b.append("options", *options);
-        BSONObj obj = b.done();
+        }
 
-        RecordStoreV1Base* rs = _getNamespaceRecordStore_inlock();
+        const BSONObj obj = b.done();
+
+        RecordStoreV1Base* rs = _getNamespaceRecordStore();
         invariant( rs );
+
         StatusWith<RecordId> loc = rs->insertRecord( txn, obj.objdata(), obj.objsize(), false );
         massertStatusOK( loc.getStatus() );
     }
 
-    void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection( OperationContext* txn,
-                                                                             const StringData& ns ) {
+    void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection(
+                                                                    OperationContext* txn,
+                                                                    const StringData& ns ) {
+
         if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
             return;

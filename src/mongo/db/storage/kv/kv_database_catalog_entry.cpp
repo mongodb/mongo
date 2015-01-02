@@ -56,7 +56,6 @@ namespace mongo {
                 _dce->_engine->getEngine()->dropIdent(_opCtx, _ident);
             }
 
-            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
             const CollectionMap::iterator it = _dce->_collections.find(_collection);
             if (it != _dce->_collections.end()) {
                 delete it->second;
@@ -94,7 +93,6 @@ namespace mongo {
         }
 
         virtual void rollback() {
-            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
             _dce->_collections[_collection] = _entry;
         }
 
@@ -123,7 +121,6 @@ namespace mongo {
     }
 
     bool KVDatabaseCatalogEntry::isEmpty() const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
         return _collections.empty();
     }
 
@@ -134,7 +131,6 @@ namespace mongo {
     int64_t KVDatabaseCatalogEntry::sizeOnDisk( OperationContext* opCtx ) const {
         int64_t size = 0;
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         for ( CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it ) {
             const KVCollectionCatalogEntry* coll = it->second;
             if ( !coll )
@@ -166,26 +162,31 @@ namespace mongo {
     }
 
     void KVDatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
-        for ( CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it ) {
+        for (CollectionMap::const_iterator it = _collections.begin();
+             it != _collections.end();
+             ++it) {
+
             out->push_back( it->first );
         }
     }
 
     CollectionCatalogEntry* KVDatabaseCatalogEntry::getCollectionCatalogEntry(
                                                                     const StringData& ns ) const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
+
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
-        if ( it == _collections.end() )
+        if (it == _collections.end()) {
             return NULL;
+        }
+
         return it->second;
     }
 
     RecordStore* KVDatabaseCatalogEntry::getRecordStore( const StringData& ns ) const {
-        boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
-        if ( it == _collections.end() )
+        if (it == _collections.end()) {
             return NULL;
+        }
+
         return it->second->getRecordStore();
     }
 
@@ -193,19 +194,16 @@ namespace mongo {
                                                      const StringData& ns,
                                                      const CollectionOptions& options,
                                                      bool allocateDefaultSpace ) {
+
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+
         if (ns.empty()) {
             return Status(ErrorCodes::BadValue, "Collection namespace cannot be empty");
         }
 
-        // we assume there is a logical lock on the collection name above
-
-        {
-            boost::mutex::scoped_lock lk( _collectionsLock );
-            if (_collections.count(ns.toString())) {
-                invariant(_collections[ns.toString()]);
-                return Status( ErrorCodes::NamespaceExists,
-                               "collection already exists" );
-            }
+        if (_collections.count(ns.toString())) {
+            invariant(_collections[ns.toString()]);
+            return Status(ErrorCodes::NamespaceExists, "collection already exists");
         }
 
         // need to create it
@@ -221,7 +219,7 @@ namespace mongo {
 
         RecordStore* rs = _engine->getEngine()->getRecordStore( txn, ns, ident, options );
         invariant( rs );
-        boost::mutex::scoped_lock lk( _collectionsLock );
+
         txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns, ident, true));
         _collections[ns.toString()] =
             new KVCollectionCatalogEntry( _engine->getEngine(), _engine->getCatalog(),
@@ -238,8 +236,8 @@ namespace mongo {
         RecordStore* rs = _engine->getEngine()->getRecordStore( opCtx, ns, ident, md.options );
         invariant( rs );
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         invariant(!_collections.count(ns));
+
         // No change registration since this is only for committed collections
         _collections[ns] = new KVCollectionCatalogEntry( _engine->getEngine(),
                                                          _engine->getCatalog(),
@@ -252,19 +250,21 @@ namespace mongo {
                                                      const StringData& fromNS,
                                                      const StringData& toNS,
                                                      bool stayTemp ) {
+
+        invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+
         RecordStore* originalRS = NULL;
-        // Note: assuming that both fromNS and toNS (or whole db) are X-locked from above.
-        {
-            boost::mutex::scoped_lock lk( _collectionsLock );
-            CollectionMap::const_iterator it = _collections.find( fromNS.toString() );
-            if ( it == _collections.end() )
-                return Status( ErrorCodes::NamespaceNotFound, "rename cannot find collection" );
-            originalRS = it->second->getRecordStore();
 
-            it = _collections.find( toNS.toString() );
-            if ( it != _collections.end() )
-                return Status( ErrorCodes::NamespaceExists, "for rename to already exists" );
+        CollectionMap::const_iterator it = _collections.find( fromNS.toString() );
+        if (it == _collections.end()) {
+            return Status(ErrorCodes::NamespaceNotFound, "rename cannot find collection");
+        }
 
+        originalRS = it->second->getRecordStore();
+
+        it = _collections.find( toNS.toString() );
+        if (it != _collections.end()) {
+            return Status(ErrorCodes::NamespaceExists, "for rename to already exists");
         }
 
         const std::string identFrom = _engine->getCatalog()->getCollectionIdent( fromNS );
@@ -284,7 +284,6 @@ namespace mongo {
         BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData( txn, toNS );
         RecordStore* rs = _engine->getEngine()->getRecordStore( txn, toNS, identTo, md.options );
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
         invariant(itFrom != _collections.end());
         txn->recoveryUnit()->registerChange(new RemoveCollectionChange(txn, this, fromNS, identFrom,
@@ -300,18 +299,18 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status KVDatabaseCatalogEntry::dropCollection( OperationContext* opCtx,
-                                                   const StringData& ns ) {
-        KVCollectionCatalogEntry* entry;
-        {
-            boost::mutex::scoped_lock lk( _collectionsLock );
-            CollectionMap::const_iterator it = _collections.find( ns.toString() );
-            if ( it == _collections.end() )
-                return Status( ErrorCodes::NamespaceNotFound, "cannnot find collection to drop" );
-            entry = it->second;
+    Status KVDatabaseCatalogEntry::dropCollection(OperationContext* opCtx, const StringData& ns) {
+        invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
+
+        CollectionMap::const_iterator it = _collections.find( ns.toString() );
+        if (it == _collections.end()) {
+            return Status(ErrorCodes::NamespaceNotFound, "cannnot find collection to drop");
         }
 
-        invariant( entry->getTotalIndexCount( opCtx ) == entry->getCompletedIndexCount( opCtx ) );
+        KVCollectionCatalogEntry* const entry = it->second;
+
+        invariant(entry->getTotalIndexCount(opCtx) == entry->getCompletedIndexCount(opCtx));
+
         {
             std::vector<std::string> indexNames;
             entry->getAllIndexes( opCtx, &indexNames );
@@ -319,24 +318,24 @@ namespace mongo {
                 entry->removeIndex( opCtx, indexNames[i] );
             }
         }
+
         invariant( entry->getTotalIndexCount( opCtx ) == 0 );
 
-        string ident = _engine->getCatalog()->getCollectionIdent( ns );
+        const std::string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
-
-        Status status = _engine->getCatalog()->dropCollection( opCtx, ns );
-        if ( !status.isOK() )
+        Status status = _engine->getCatalog()->dropCollection(opCtx, ns);
+        if (!status.isOK()) {
             return status;
+        }
 
-
-        const CollectionMap::iterator it = _collections.find(ns.toString());
-        invariant(it != _collections.end());
-
-        // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to drop
-        // the collection only on WUOW::commit().
-        opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(opCtx, this, ns, ident,
-                                                                         it->second, true));
+        // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to
+        // drop the collection only on WUOW::commit().
+        opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(opCtx,
+                                                                         this,
+                                                                         ns,
+                                                                         ident,
+                                                                         it->second,
+                                                                         true));
 
         _collections.erase( ns.toString() );
 

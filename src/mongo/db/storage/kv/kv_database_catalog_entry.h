@@ -33,9 +33,6 @@
 #include <map>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/db/catalog/database_catalog_entry.h"
 
 namespace mongo {
@@ -95,10 +92,10 @@ namespace mongo {
         class AddCollectionChange;
         class RemoveCollectionChange;
 
-        KVStorageEngine* _engine; // not owned here
+        typedef std::map<std::string, KVCollectionCatalogEntry*> CollectionMap;
 
-        typedef std::map<std::string,KVCollectionCatalogEntry*> CollectionMap;
+
+        KVStorageEngine* const _engine; // not owned here
         CollectionMap _collections;
-        mutable boost::mutex _collectionsLock;
     };
 }

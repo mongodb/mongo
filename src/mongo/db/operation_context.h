@@ -148,17 +148,14 @@ namespace mongo {
                  : _txn(txn),
                    _ended(false) {
 
-            if ( _txn->lockState() ) {
-                _txn->lockState()->beginWriteUnitOfWork();
-            }
-
+            _txn->lockState()->beginWriteUnitOfWork();
             _txn->recoveryUnit()->beginUnitOfWork();
         }
 
         ~WriteUnitOfWork() {
             _txn->recoveryUnit()->endUnitOfWork();
 
-            if (_txn->lockState() && !_ended) {
+            if (!_ended) {
                 _txn->lockState()->endWriteUnitOfWork();
             }
         }
@@ -167,11 +164,9 @@ namespace mongo {
             invariant(!_ended);
 
             _txn->recoveryUnit()->commitUnitOfWork();
+            _txn->lockState()->endWriteUnitOfWork();
 
-            if (_txn->lockState()) {
-                _txn->lockState()->endWriteUnitOfWork();
-                _ended = true;
-            }
+            _ended = true;
         }
 
     private:
