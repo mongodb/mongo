@@ -706,7 +706,8 @@ namespace {
 
 
     AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
-        : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
+        : _locker(locker),
+          _released(false) {
 
         invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_S));
     }
@@ -720,11 +721,14 @@ namespace {
     }
 
     void AutoAcquireFlushLockForMMAPV1Commit::release() {
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        if (!_released) {
+            invariant(_locker->unlock(resourceIdMMAPV1Flush));
+            _released = true;
+        }
     }
 
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        release();
     }
 
 

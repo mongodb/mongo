@@ -52,34 +52,6 @@ namespace mongo {
             LOG(3) << "journal WRITETODATAFILES 2" << endl;
         }
 
-#if 0
-        // the old implementation.  doesn't work with groupCommitWithLimitedLocks()
-        void WRITETODATAFILES_Impl2() {
-            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
-                const WriteIntent& intent = *it;
-                stats.curr->_writeToDataFilesBytes += intent.length();
-                dassert(intent.w_ptr);
-                memcpy(intent.w_ptr, intent.start(), intent.length());
-            }
-        }
-#endif
-
-#if defined(_EXPERIMENTAL)
-        // doesn't work with groupCommitWithLimitedLocks()
-        void WRITETODATAFILES_Impl3() {
-            /* we go backwards as what is at the end is most likely in the cpu cache.  it won't be much, but we'll take it. */
-            for( set<WriteIntent>::const_iterator it(commitJob.writes().begin()), end(commitJob.writes().end()); it != end; ++it ) {
-                const WriteIntent& intent = *it;
-                stats.curr->_writeToDataFilesBytes += intent.length();
-                dassert(intent.w_ptr);
-                memcpy(intent.w_ptr,
-                       commitJob._ab.atOfs(intent.ofsInJournalBuffer),
-                       intent.length());
-            }
-        }
-#endif
-
         /** apply the writes back to the non-private MMF after they are for certain in redo log
 
             (1) todo we don't need to write back everything every group commit.  we MUST write back

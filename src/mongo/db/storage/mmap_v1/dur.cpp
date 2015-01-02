@@ -111,9 +111,11 @@ namespace {
     DurableImpl durableImpl;
     NonDurableImpl nonDurableImpl;
 
+    // How many commit cycles to do before considering doing a remap
+    enum { NumCommitsBeforeRemap = 10 };
+
     // Remap loop state
     unsigned remapFileToStartAt;
-    unsigned long long remapLastTimestamp;
 
 
     /**
@@ -149,9 +151,6 @@ namespace {
         // Declared in dur_journal.cpp
         boost::filesystem::path getJournalDir();
         void preallocateFiles();
-
-        // Declared and maintained in dur_commitjob.cpp
-        extern size_t privateMapBytes;
 
         // Durability activity statistics
         Stats stats;
@@ -262,11 +261,11 @@ namespace {
         //
 
         void* NonDurableImpl::writingPtr(void *x, unsigned len) {
-            dassert(shutdownRequested.load() == 0);
             return x; 
         }
 
-        void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
+        void NonDurableImpl::declareWriteIntent(void *, unsigned) {
+
         }
 
         bool NonDurableImpl::commitNow(OperationContext* txn) {
@@ -300,15 +299,13 @@ namespace {
         }
 
         void DurableImpl::createdFile(const std::string& filename, unsigned long long len) {
-            shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
+            shared_ptr<DurOp> op(new FileCreatedOp(filename, len));
             commitJob.noteOp(op);
         }
 
-        void* DurableImpl::writingPtr(void *x, unsigned len) {
-            dassert(shutdownRequested.load() == 0);
-            void *p = x;
-            declareWriteIntent(p, len);
-            return p;
+        void* DurableImpl::writingPtr(void* x, unsigned len) {
+            declareWriteIntent(x, len);
+            return x;
         }
 
         bool DurableImpl::commitIfNeeded() {
@@ -328,7 +325,8 @@ namespace {
             MongoFile::flushAll(true);
             journalCleanup();
 
-            invariant(!haveJournalFiles()); // Double check post-conditions
+            // Double check post-conditions
+            invariant(!haveJournalFiles());
         }
 
         void DurableImpl::commitAndStopDurThread() {
@@ -423,30 +421,8 @@ namespace {
         }
 
 
-        static void _remapPrivateView() {
+        static void _remapPrivateView(double fraction) {
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
-
-            // We want to remap all private views about every 2 seconds. There could be ~1000 views
-            // so we do a little each pass. There will be copy on write faults after remapping, so
-            // doing a little bit at a time will avoid big load spikes when the pages are touched.
-            //
-            // TODO: Instead of the time-based logic above, consider using ProcessInfo and watching
-            //       for getResidentSize to drop, which is more precise
-            unsigned long long now = curTimeMicros64();
-            double fraction = (now - remapLastTimestamp) / 2000000.0;
-            if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap) {
-                fraction = 1;
-            }
-
-            // We don't want to get close to the UncommittedBytesLimit
-            const double f = privateMapBytes / ((double)UncommittedBytesLimit);
-            if (f > fraction) {
-                fraction = f;
-            }
-
-            // We are definitely doing some remap, so reset the private map estimate
-            privateMapBytes = 0;
-            remapLastTimestamp = now;
 
             // There is no way that the set of files can change while we are in this method,
             // because we hold the flush lock in X mode. For files to go away, a database needs to
@@ -524,15 +500,18 @@ namespace {
          * Remaps the private view from the shared view so that it does not consume too much
          * copy-on-write/swap space. Must only be called after the in-memory journal has been
          * flushed to disk and applied on top of the shared view.
+         *
+         * @param fraction Value between (0, 1] indicating what fraction of the memory to remap.
+         *          Remapping too much or too frequently incurs copy-on-write page fault cost.
          */
-        static void remapPrivateView() {
+        static void remapPrivateView(double fraction) {
             // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see
             // any newly written data on reads.
             invariant(!commitJob.hasWritten());
 
             try {
                 Timer t;
-                _remapPrivateView();
+                _remapPrivateView(fraction);
                 stats.curr->_remapPrivateViewMicros += t.micros();
 
                 LOG(4) << "remapPrivateView end";
@@ -594,6 +573,11 @@ namespace {
             // Pre-allocated buffer for building the journal
             AlignedBuilder journalBuilder(4 * 1024 * 1024);
 
+            // Used as an estimate of how much / how fast to remap
+            uint64_t commitCounter(0);
+            uint64_t estimatedPrivateMapSize(0);
+            uint64_t remapLastTimestamp(0);
+
             while (shutdownRequested.loadRelaxed() == 0) {
                 unsigned ms = mmapv1GlobalOptions.journalCommitInterval;
                 if( ms == 0 ) { 
@@ -602,9 +586,9 @@ namespace {
 
                 unsigned oneThird = (ms / 3) + 1; // +1 so never zero
 
-                try {
-                    stats.rotate();
+                stats.rotate();
 
+                try {
                     boost::mutex::scoped_lock lock(flushMutex);
 
                     for (unsigned i = 0; i <= 2; i++) {
@@ -625,39 +609,109 @@ namespace {
                     }
 
                     // The commit logic itself
-                    LOG(4) << "groupCommit";
+                    LOG(4) << "groupCommit begin";
 
                     OperationContextImpl txn;
-
                     AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
                     commitJob.commitingBegin();
 
-                    if (commitJob.hasWritten()) {
+                    if (!commitJob.hasWritten()) {
+                        // getlasterror request could have came after the data was already
+                        // committed. No need to call committingReset though, because we have not
+                        // done any writes (hasWritten == false).
+                        commitJob.committingNotifyCommitted();
+                    }
+                    else {
                         JSectHeader h;
                         PREPLOGBUFFER(h, journalBuilder);
 
-                        // todo : write to the journal outside locks, as this write can be slow.
-                        //        however, be careful then about remapprivateview as that cannot be done 
-                        //        if new writes are then pending in the private maps.
-                        WRITETOJOURNAL(h, journalBuilder);
+                        estimatedPrivateMapSize += commitJob.bytes();
+                        commitCounter++;
 
-                        // Data is now in the journal, which is sufficient for acknowledging getLastError.
-                        commitJob.committingNotifyCommitted();
+                        // Need to reset the commit job's contents while under the S flush lock,
+                        // because otherwise someone might have done a write and this would wipe
+                        // out their changes without ever being committed.
                         commitJob.committingReset();
 
+                        const bool shouldRemap =
+                            (estimatedPrivateMapSize >= UncommittedBytesLimit) ||
+                            (commitCounter % NumCommitsBeforeRemap == 0) ||
+                            (mmapv1GlobalOptions.journalOptions &
+                                MMAPV1Options::JournalAlwaysRemap);
+
+                        double remapFraction = 0.0;
+
+                        // Now that the in-memory modifications have been collected, we can
+                        // potentially release the flush lock if remap is not necessary.
+                        if (shouldRemap) {
+                            // We want to remap all private views about every 2 seconds. There
+                            // could be ~1000 views so we do a little each pass. There will be copy
+                            // on write faults after remapping, so doing a little bit at a time
+                            // will avoid big load spikes when the pages are touched.
+                            //
+                            // TODO: Instead of the time-based logic above, consider using
+                            //       ProcessInfo and watching for getResidentSize to drop, which is
+                            //       more precise.
+                            remapFraction = (curTimeMicros64() - remapLastTimestamp) / 2000000.0;
+
+                            if (mmapv1GlobalOptions.journalOptions &
+                                        MMAPV1Options::JournalAlwaysRemap) {
+                                remapFraction = 1;
+                            }
+                            else {
+                                // We don't want to get close to the UncommittedBytesLimit
+                                const double f =
+                                    estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
+                                if (f > remapFraction) {
+                                    remapFraction = f;
+                                }
+                            }
+                        }
+                        else {
+                            LOG(4) << "groupCommit early release flush lock";
+
+                            // We will not be doing a remap so drop the flush lock. That way we
+                            // will be doing the journal I/O outside of lock, so other threads can
+                            // proceed.
+                            invariant(!shouldRemap);
+                            autoFlushLock.release();
+                        }
+
+                        // This performs an I/O to the journal file
+                        WRITETOJOURNAL(h, journalBuilder);
+
+                        // Data is now in the journal, which is sufficient for acknowledging
+                        // getLastError. Note that we are doing this outside of the flush lock,
+                        // which is alright because we will acknowledge the previous commit. If
+                        // any writes happened after we released the flush lock, those will not be
+                        // in the journalBuilder and hence will not be persisted, but in this case
+                        // commitJob.commitingBegin() bumps the commit number, so those writers
+                        // will wait for the next run of this loop.
+                        commitJob.committingNotifyCommitted();
+
+                        // Apply the journal entries on top of the shared view so that when flush
+                        // is requested it would write the latest.
                         WRITETODATAFILES(h, journalBuilder);
 
+                        // Data has now been written to the shared view. If remap was requested,
+                        // we would still be holding the S flush lock, so just upgrade it and
+                        // perform the remap.
+                        if (shouldRemap) {
+                            autoFlushLock.upgradeFlushLockToExclusive();
+                            remapPrivateView(remapFraction);
+
+                            autoFlushLock.release();
+
+                            // Reset the private map estimate outside of the lock
+                            estimatedPrivateMapSize = 0;
+                            remapLastTimestamp = curTimeMicros64();
+                        }
+
+                        // Do this reset after all locks have been released in order to not do
+                        // unnecessary work under lock.
                         journalBuilder.reset();
                     }
-                    else {
-                        // getlasterror request could have came after the data was already
-                        // committed
-                        commitJob.committingNotifyCommitted();
-                    }
-
-                    autoFlushLock.upgradeFlushLockToExclusive();
-                    remapPrivateView();
 
                     LOG(4) << "groupCommit end";
                 }

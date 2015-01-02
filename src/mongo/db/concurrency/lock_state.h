@@ -293,7 +293,8 @@ namespace mongo {
         void release();
 
     private:
-        MMAPV1LockerImpl* const _locker;
+        Locker* const _locker;
+        bool _released;
     };
 
 

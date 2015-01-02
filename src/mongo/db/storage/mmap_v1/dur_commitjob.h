@@ -135,7 +135,6 @@ namespace mongo {
                          other uses are in a read lock from a single thread (durThread)
         */
         class CommitJob : boost::noncopyable {
-            void _committingReset();
             ~CommitJob(){ verify(!"shouldn't destroy CommitJob!"); }
 
         public:
@@ -163,14 +162,11 @@ namespace mongo {
             void commitingBegin();
             /** the commit code calls this when data reaches the journal (on disk) */
             void committingNotifyCommitted() { 
-                groupCommitMutex.dassertLocked();
                 _notify.notifyAll(_commitNumber); 
             }
+
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */
-            void committingReset() {
-                groupCommitMutex.dassertLocked();
-                _committingReset();
-            }
+            void committingReset();
 
         public:
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
@@ -180,7 +176,6 @@ namespace mongo {
              * can be merged.  we sort here so the caller receives something they must 
              * keep const from their pov. */
             const std::vector<WriteIntent>& getIntentsSorted() {
-                groupCommitMutex.dassertLocked();
                 sort(_intentsAndDurOps._intents.begin(), _intentsAndDurOps._intents.end());
                 return _intentsAndDurOps._intents;
             }

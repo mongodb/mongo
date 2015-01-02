@@ -109,6 +109,7 @@ namespace mongo {
             verify( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
+
             if( mmf->relativePath() == local ) {
                 e.setLocalDbContextBit();
             }
@@ -118,10 +119,8 @@ namespace mongo {
                 bb.appendStruct(c);
                 bb.appendStr(lastDbPath.toString());
             }
+
             bb.appendStruct(e);
-#if defined(_EXPERIMENTAL)
-            i->ofsInJournalBuffer = bb.len();
-#endif
             bb.appendBuf(i->start(), e.len);
 
             if (MONGO_unlikely(e.len != (unsigned)i->length())) {
