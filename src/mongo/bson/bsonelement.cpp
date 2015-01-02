@@ -813,9 +813,57 @@ namespace mongo {
         return ret.str();
     }
 
-    /* must be same type when called, unless both sides are #s 
-       this large function is in header to facilitate inline-only use of bson
-    */
+namespace {
+    int compareInts(int lhs, int rhs) { return lhs == rhs ? 0 : lhs < rhs ? -1 : 1; }
+    int compareLongs(long long lhs, long long rhs) { return lhs == rhs ? 0 : lhs < rhs ? -1 : 1; }
+    int compareDoubles(double lhs, double rhs) {
+        if (lhs == rhs) return 0;
+        if (lhs < rhs) return -1;
+        if (lhs > rhs) return 1;
+
+        // If none of the above cases returned, lhs or rhs must be NaN.
+        if (isNaN(lhs)) return isNaN(rhs) ? 0 : -1;
+        dassert(isNaN(rhs));
+        return 1;
+    }
+
+    // This is the tricky one. Needs to support the following cases:
+    // * Doubles with a fractional component.
+    // * Longs that can't be precisely represented as a double.
+    // * Doubles outside of the range of Longs (including +/- Inf).
+    // * NaN (defined by us as less than all Longs)
+    // * Return value is always -1, 0, or 1 to ensure it is safe to negate.
+    int compareLongToDouble(long long lhs, double rhs) {
+        // All Longs are > NaN
+        if (isNaN(rhs)) return 1;
+
+        // Ints with magnitude <= 2**53 can be precisely represented as doubles.
+        // Additionally, doubles outside of this range can't have a fractional component.
+        static const long long kEndOfPreciseDoubles = 1ll << 53;
+        if (lhs <= kEndOfPreciseDoubles && lhs >= -kEndOfPreciseDoubles) {
+            return compareDoubles(lhs, rhs);
+        }
+
+        // Large magnitude doubles (including +/- Inf) are strictly > or < all Longs.
+        static const double kBoundOfLongRange = -static_cast<double>(LLONG_MIN); // positive 2**63
+        if (rhs >= kBoundOfLongRange) return -1; // Can't be represented in a Long.
+        if (rhs < -kBoundOfLongRange) return 1; // Can be represented in a Long.
+
+        // Remaining Doubles can have their integer component precisely represented as long longs.
+        // If they have a fractional component, they must be strictly > or < lhs even after
+        // truncation of the fractional component since low-magnitude lhs were handled above.
+        return compareLongs(lhs, rhs);
+    }
+
+    int compareDoubleToLong(double lhs, long long rhs) {
+        // Only implement the real logic once.
+        return -compareLongToDouble(rhs, lhs);
+    }
+} // namespace
+
+    /**
+     * l and r must be same canonicalType when called.
+     */
     int compareElementValues(const BSONElement& l, const BSONElement& r) {
         int f;
 
@@ -836,6 +884,7 @@ namespace mongo {
                 return -1;
             return l.date() == r.date() ? 0 : 1;
         case Date:
+            // Signed comparisons for Dates.
             {
                 long long a = (long long) l.Date().millis;
                 long long b = (long long) r.Date().millis;
@@ -843,36 +892,36 @@ namespace mongo {
                     return -1;
                 return a == b ? 0 : 1;
             }
-        case NumberLong:
-            if( r.type() == NumberLong ) {
-                long long L = l._numberLong();
-                long long R = r._numberLong();
-                if( L < R ) return -1;
-                if( L == R ) return 0;
-                return 1;
+
+        case NumberInt: {
+            // All types can precisely represent all NumberInts, so it is safe to simply convert to
+            // whatever rhs's type is.
+            switch (r.type()) {
+            case NumberInt: return compareInts(l._numberInt(), r._numberInt());
+            case NumberLong: return compareLongs(l._numberInt(), r._numberLong());
+            case NumberDouble: return compareDoubles(l._numberInt(), r._numberDouble());
+            default: invariant(false);
             }
-            goto dodouble;
-        case NumberInt:
-            if( r.type() == NumberInt ) {
-                int L = l._numberInt();
-                int R = r._numberInt();
-                if( L < R ) return -1;
-                return L == R ? 0 : 1;
+        }
+
+        case NumberLong: {
+            switch (r.type()) {
+            case NumberLong: return compareLongs(l._numberLong(), r._numberLong());
+            case NumberInt: return compareLongs(l._numberLong(), r._numberInt());
+            case NumberDouble: return compareLongToDouble(l._numberLong(), r._numberDouble());
+            default: invariant(false);
             }
-            // else fall through
-        case NumberDouble: 
-dodouble:
-            {
-                double left = l.number();
-                double right = r.number();
-                if( left < right ) 
-                    return -1;
-                if( left == right )
-                    return 0;
-                if( isNaN(left) )
-                    return isNaN(right) ? 0 : -1;
-                return 1;
+        }
+
+        case NumberDouble: {
+            switch (r.type()) {
+            case NumberDouble: return compareDoubles(l._numberDouble(), r._numberDouble());
+            case NumberInt: return compareDoubles(l._numberDouble(), r._numberInt());
+            case NumberLong: return compareDoubleToLong(l._numberDouble(), r._numberLong());
+            default: invariant(false);
             }
+        }
+
         case jstOID:
             return memcmp(l.value(), r.value(), OID::kOIDSize);
         case Code:
@@ -912,16 +961,11 @@ dodouble:
             return strcmp(l.regexFlags(), r.regexFlags());
         }
         case CodeWScope : {
-            f = l.canonicalType() - r.canonicalType();
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
-            if ( f )
-                return f;
-            f = strcmp( l.codeWScopeScopeDataUnsafe() , r.codeWScopeScopeDataUnsafe() );
-            if ( f )
-                return f;
-            return 0;
+            int cmp = StringData(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1).compare(
+                      StringData(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
+            if (cmp) return cmp;
+
+            return l.codeWScopeObject().woCompare(r.codeWScopeObject());
         }
         default:
             verify( false);

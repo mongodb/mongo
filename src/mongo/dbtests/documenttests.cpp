@@ -1296,9 +1296,9 @@ namespace DocumentTests {
                 assertComparison(-1, Value(vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
                 assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
                 assertComparison(-1, Value(mongo::OID()), Value(false));
-                assertComparison(-1, Value(false), Value(OpTime()));
-                assertComparison(0,  Value(OpTime()), Value(Date_t(0)));
-                assertComparison(-1, Value(Date_t(0)), Value(BSONRegEx("")));
+                assertComparison(-1, Value(false), Value(Date_t(0)));
+                assertComparison(-1, Value(Date_t(0)), Value(OpTime()));
+                assertComparison(-1, Value(OpTime()), Value(BSONRegEx("")));
                 assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", mongo::OID())));
                 assertComparison(-1, Value(BSONDBRef("", mongo::OID())), Value(BSONCode("")));
                 assertComparison(-1, Value(BSONCode("")), Value(BSONCodeWScope("", BSONObj())));

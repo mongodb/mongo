@@ -346,12 +346,12 @@ namespace {
         BSONObj o = BSON( "check" << Date_t( 0x5566778811223344LL ) );
         ASSERT_EQUALS( hashIt( o ), 4476222765095560467LL );
         o = builder1.appendTimestamp( "check", 0x55667788LL * 1000LL, 0x11223344LL ).obj();
-        ASSERT_EQUALS( hashIt( o ), 4476222765095560467LL );
+        ASSERT_EQUALS( hashIt( o ), 4873046866288452390LL );
 
         o = BSON( "check" << Date_t( 0 ) );
         ASSERT_EQUALS( hashIt( o ), -1178696894582842035LL );
         o = builder2.appendTimestamp( "check", 0 ).obj();
-        ASSERT_EQUALS( hashIt( o ), -1178696894582842035LL );
+        ASSERT_EQUALS( hashIt( o ), -7867208682377458672LL );
     }
 
     TEST( BSONElementHasher, HashRegEx ) {

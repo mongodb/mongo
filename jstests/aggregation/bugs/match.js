@@ -151,10 +151,6 @@ function checkMatchResults( indexed ) {
     t.save( { a:new Date() } );
     t.save( { a:new ObjectId() } );
     for( type = 1; type <= 18; ++type ) {
-        if ( indexed && type == 17 ) {
-            // SERVER-3304
-            continue;
-        }
         assertResults( null, { a:{ $type:type } } );
     }
 
