@@ -242,7 +242,7 @@ namespace mongo {
         void _setId(RecordId loc);
         bool cappedAndNeedDelete() const;
         void cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted );
-        void _changeNumRecords(OperationContext* txn, bool insert);
+        void _changeNumRecords(OperationContext* txn, int64_t diff);
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
         StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len);

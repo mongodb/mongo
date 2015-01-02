@@ -335,7 +335,7 @@ namespace {
         ret = c->remove(c);
         invariantWTOK(ret);
 
-        _changeNumRecords(txn, false);
+        _changeNumRecords(txn, -1);
         _increaseDataSize(txn, -old_length);
     }
 
@@ -377,37 +377,53 @@ namespace {
         WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
         txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
 
+        int64_t dataSize = _dataSize.load();
+        int64_t numRecords = _numRecords.load();
+
+        int64_t sizeOverCap = (dataSize > _cappedMaxSize) ? dataSize - _cappedMaxSize : 0;
+        int64_t sizeSaved = 0;
+        int64_t docsOverCap = 0, docsRemoved = 0;
+        if (_cappedMaxDocs != -1 && numRecords > _cappedMaxDocs)
+            docsOverCap = numRecords - _cappedMaxDocs;
+
         try {
             WiredTigerCursor curwrap( _uri, _instanceId, txn);
             WT_CURSOR *c = curwrap.get();
-            int ret = c->next(c);
-            RecordId oldest;
-            while ( ret == 0 && cappedAndNeedDelete() ) {
-                WriteUnitOfWork wuow( txn );
-
-                invariant(_numRecords.load() > 0);
-
+            int ret = 0;
+            while (( sizeSaved < sizeOverCap || docsRemoved < docsOverCap ) &&
+                   (ret = c->next(c)) == 0 ) {
                 int64_t key;
                 ret = c->get_key(c, &key);
                 invariantWTOK(ret);
-                oldest = _fromKey(key);
+                RecordId oldest = _fromKey(key);
 
-                if ( oldest >= justInserted )
+                // don't go past the record we just inserted
+                if ( oldest >= justInserted ) {
+                    ret = c->prev(c);
+                    invariantWTOK(ret);
                     break;
+                }
 
                 if ( _cappedDeleteCallback ) {
                     uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
                 }
 
-                deleteRecord( txn, oldest );
+                WT_ITEM old_value;
+                ret = c->get_value(c, &old_value);
+                invariantWTOK(ret);
 
-                ret = c->next(c);
-
-                wuow.commit();
+                ++docsRemoved;
+                sizeSaved += old_value.size;
             }
 
             if (ret != WT_NOTFOUND) invariantWTOK(ret);
-
+ 
+            WriteUnitOfWork wuow( txn );
+            ret = c->session->truncate(c->session, NULL, NULL, c, NULL);
+            invariantWTOK(ret);
+            _changeNumRecords(txn, -docsRemoved);
+            _increaseDataSize(txn, -sizeSaved);
+            wuow.commit();
         }
         catch ( const WriteConflictException& wce ) {
             delete txn->releaseRecoveryUnit();
@@ -475,7 +491,7 @@ namespace {
                                                        "WiredTigerRecordStore::insertRecord" ) );
         }
 
-        _changeNumRecords( txn, true );
+        _changeNumRecords( txn, 1 );
         _increaseDataSize( txn, len );
 
         cappedDeleteAsNeeded(txn, loc);
@@ -866,24 +882,24 @@ namespace {
 
     class WiredTigerRecordStore::NumRecordsChange : public RecoveryUnit::Change {
     public:
-        NumRecordsChange(WiredTigerRecordStore* rs, bool insert) :_rs(rs), _insert(insert) {}
+        NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) :_rs(rs), _diff(diff) {}
         virtual void commit() {}
         virtual void rollback() {
-            _rs->_numRecords.fetchAndAdd(_insert ? -1 : 1);
+            _rs->_numRecords.fetchAndAdd( -_diff );
         }
 
     private:
         WiredTigerRecordStore* _rs;
-        bool _insert;
+        int64_t _diff;
     };
 
-    void WiredTigerRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
-        txn->recoveryUnit()->registerChange(new NumRecordsChange(this, insert));
-        if ( _numRecords.fetchAndAdd(insert ? 1 : -1) < 0 ) {
-            if ( insert )
-                _numRecords.store( 1 );
-            else
-                _numRecords.store( 0 );
+    void WiredTigerRecordStore::_changeNumRecords( OperationContext* txn, int64_t diff ) {
+        txn->recoveryUnit()->registerChange(new NumRecordsChange(this, diff));
+        if ( diff > 0 ) {
+            if ( _numRecords.fetchAndAdd( diff ) < diff )
+                    _numRecords.store( diff );
+        } else if ( _numRecords.fetchAndAdd( diff ) < 0 ) {
+            _numRecords.store( 0 );
         }
     }
 
