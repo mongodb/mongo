@@ -108,8 +108,30 @@ namespace {
     DurableImpl durableImpl;
     NonDurableImpl nonDurableImpl;
 
-    // Pre-allocated buffer for building the journal
-    AlignedBuilder journalBuilder(4 * 1024 * 1024);
+
+    /**
+     * MMAP V1 durability server status section.
+     */
+    class DurSSS : public ServerStatusSection {
+    public:
+        DurSSS() : ServerStatusSection("dur") {
+
+        }
+
+        virtual bool includeByDefault() const { return true; }
+
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const {
+
+            if (!storageGlobalParams.dur) {
+                return BSONObj();
+            }
+
+            return dur::stats.asObj();
+        }
+
+    } durSSS;
+
 }
 
         // Declared in dur_preplogbuffer.cpp
@@ -295,13 +317,6 @@ namespace {
         void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
             invariant(txn->lockState()->isW());
 
-            // a commit from the commit thread won't begin while we are in the write lock,
-            // but it may already be in progress and the end of that work is done outside 
-            // (dbMutex) locks. This line waits for that to complete if already underway.
-            {
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
-            }
-
             commitNow(txn);
             MongoFile::flushAll(true);
             journalCleanup();
@@ -383,9 +398,15 @@ namespace {
         };
 
 
-        /** (SLOW) diagnostic to check that the private view and the non-private view are in sync.
-        */
-        void debugValidateAllMapsMatch() {
+        /**
+         * Diagnostic to check that the private view and the non-private view are in sync after
+         * applying the journal changes. This function is very slow and only runs when paranoid
+         * checks are enabled.
+         *
+         * Must be called under at least S flush lock to ensure that there are no concurrent
+         * writes happening.
+         */
+        static void debugValidateAllMapsMatch() {
             if (!(mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid))
                 return;
 
@@ -482,6 +503,10 @@ namespace {
             // any newly written data on reads.
             invariant(!commitJob.hasWritten());
 
+            // Sanity check that the contents of the shared and the private view match so we don't
+            // end up overwriting data.
+            debugValidateAllMapsMatch();
+
             try {
                 Timer t;
                 _remapPrivateView();
@@ -493,114 +518,39 @@ namespace {
             catch (DBException& e) {
                 severe() << "dbexception in remapPrivateView causing immediate shutdown: "
                          << e.toString();
-                mongoAbort("gc1");
             }
             catch (std::ios_base::failure& e) {
                 severe() << "ios_base exception in remapPrivateView causing immediate shutdown: "
                          << e.what();
-                mongoAbort("gc2");
             }
             catch (std::bad_alloc& e) {
                 severe() << "bad_alloc exception in remapPrivateView causing immediate shutdown: "
                          << e.what();
-                mongoAbort("gc3");
             }
             catch (std::exception& e) {
                 severe() << "exception in remapPrivateView causing immediate shutdown: "
                          << e.what();
-                mongoAbort("gc4");
             }
+            catch (...) {
+                severe() << "unknown exception in remapPrivateView causing immediate shutdown: ";
+            }
+
+            invariant(false);
         }
 
 
-        static void _groupCommit() {
-            LOG(4) << "_groupCommit ";
-
-            // we need to make sure two group commits aren't running at the same time
-            // (and we are only read locked in the dbMutex, so it could happen -- while 
-            // there is only one dur thread, "early commits" can be done by other threads)
-            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
-
-            commitJob.commitingBegin();
-
-            if (!commitJob.hasWritten()) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.committingNotifyCommitted();
-            }
-            else {
-                JSectHeader h;
-                PREPLOGBUFFER(h, journalBuilder);
-
-                // todo : write to the journal outside locks, as this write can be slow.
-                //        however, be careful then about remapprivateview as that cannot be done 
-                //        if new writes are then pending in the private maps.
-                WRITETOJOURNAL(h, journalBuilder);
-
-                // data is now in the journal, which is sufficient for acknowledging getLastError.
-                // (ok to crash after that)
-                commitJob.committingNotifyCommitted();
-
-                WRITETODATAFILES(h, journalBuilder);
-                debugValidateAllMapsMatch();
-
-                commitJob.committingReset();
-                journalBuilder.reset();
-            }
-        }
-
-        /** locking: in at least 'R' when called
-                     or, for early commits (commitIfNeeded), in W or X
-            @param lwg set if the durcommitthread *only* -- then we will upgrade the lock 
-                   to W so we can remapprivateview. only durcommitthread calls with 
-                   lgw != 0 as more than one thread upgrading would deadlock
-            @see DurableMappedFile::close()
-        */
-        static void groupCommit() {
-            try {
-                _groupCommit();
-
-                LOG(4) << "groupCommit end";
-                return;
-            }
-            catch (DBException& e) {
-                severe() << "dbexception in groupCommit causing immediate shutdown: "
-                         << e.toString();
-                mongoAbort("gc1");
-            }
-            catch(std::ios_base::failure& e) {
-                severe() << "ios_base exception in groupCommit causing immediate shutdown: "
-                         << e.what();
-                mongoAbort("gc2");
-            }
-            catch(std::bad_alloc& e) {
-                severe() << "bad_alloc exception in groupCommit causing immediate shutdown: "
-                         << e.what();
-                mongoAbort("gc3");
-            }
-            catch(std::exception& e) {
-                severe() << "exception in groupCommit causing immediate shutdown: "
-                         << e.what();
-                mongoAbort("gc4");
-            }
-        }
-
-
-        /** called when a DurableMappedFile is closing -- we need to go ahead and group commit in that case before its
-            views disappear
-        */
+        /**
+         * Called when a DurableMappedFile is closing and must only happen under a global lock (at
+         * least R, so that no writes can happen). Asserts that there are no unwritten changes,
+         * because that would mean journal replay on recovery would try to write to non-existent
+         * files and fail.
+         */
         void closingFileNotification() {
-            if (!storageGlobalParams.dur)
-                return;
-
             if (commitJob.hasWritten()) {
-                if (inShutdown()) {
-                    log() << "journal warning files are closing outside locks with writes pending"
-                          << endl;
-                }
-                else {
-                    // File is closing while there are unwritten changes
-                    fassertFailed(18507);
-                }
+                severe() << "journal warning files are closing outside locks with writes pending";
+
+                // File is closing while there are unwritten changes
+                invariant(false);
             }
         }
 
@@ -618,6 +568,9 @@ namespace {
 
             }
 
+            // Pre-allocated buffer for building the journal
+            AlignedBuilder journalBuilder(4 * 1024 * 1024);
+
             while (shutdownRequested.loadRelaxed() == 0) {
                 unsigned ms = mmapv1GlobalOptions.journalCommitInterval;
                 if( ms == 0 ) { 
@@ -631,7 +584,6 @@ namespace {
 
                     boost::mutex::scoped_lock lock(flushMutex);
 
-                    // commit sooner if one or more getLastError j:true is pending
                     for (unsigned i = 0; i <= 2; i++) {
                         if (flushRequested.timed_wait(lock, Milliseconds(oneThird))) {
                             // Someone forced a flush
@@ -639,7 +591,7 @@ namespace {
                         }
 
                         if (commitJob._notify.nWaiting()) {
-                            // There are threads waiting for journaling
+                            // One or more getLastError j:true is pending
                             break;
                         }
 
@@ -649,24 +601,66 @@ namespace {
                         }
                     }
 
+                    // The commit logic itself
+                    LOG(4) << "groupCommit";
+
                     OperationContextImpl txn;
 
-                    // Waits for all active writers to drain and won't let new ones start, but
-                    // lets the readers go on.
-                    AutoAcquireFlushLockForMMAPV1Commit flushLock(txn.lockState());
-                    groupCommit();
+                    AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
-                    // Causes everybody to stall so that the in-memory view can be remapped.
-                    flushLock.upgradeFlushLockToExclusive();
+                    commitJob.commitingBegin();
+
+                    if (commitJob.hasWritten()) {
+                        JSectHeader h;
+                        PREPLOGBUFFER(h, journalBuilder);
+
+                        // todo : write to the journal outside locks, as this write can be slow.
+                        //        however, be careful then about remapprivateview as that cannot be done 
+                        //        if new writes are then pending in the private maps.
+                        WRITETOJOURNAL(h, journalBuilder);
+
+                        // Data is now in the journal, which is sufficient for acknowledging getLastError.
+                        commitJob.committingNotifyCommitted();
+                        commitJob.committingReset();
+
+                        WRITETODATAFILES(h, journalBuilder);
+
+                        journalBuilder.reset();
+                    }
+                    else {
+                        // getlasterror request could have came after the data was already
+                        // committed
+                        commitJob.committingNotifyCommitted();
+                    }
+
+                    autoFlushLock.upgradeFlushLockToExclusive();
                     remapPrivateView();
+
+                    LOG(4) << "groupCommit end";
                 }
-                catch(std::exception& e) {
-                    severe() << "exception in durThread causing immediate shutdown: " << e.what();
-                    mongoAbort("exception in durThread");
+                catch (DBException& e) {
+                    severe() << "dbexception in durThread causing immediate shutdown: "
+                             << e.toString();
+                    invariant(false);
+                }
+                catch (std::ios_base::failure& e) {
+                    severe() << "ios_base exception in durThread causing immediate shutdown: "
+                             << e.what();
+                    invariant(false);
+                }
+                catch (std::bad_alloc& e) {
+                    severe() << "bad_alloc exception in durThread causing immediate shutdown: "
+                             << e.what();
+                    invariant(false);
+                }
+                catch (std::exception& e) {
+                    severe() << "exception in durThread causing immediate shutdown: "
+                             << e.what();
+                    invariant(false);
                 }
                 catch (...) {
                     severe() << "unhandled exception in durThread causing immediate shutdown";
-                    mongoAbort("unhandled exception in durThread");
+                    invariant(false);
                 }
             }
 
@@ -674,10 +668,14 @@ namespace {
         }
 
 
-        /** at startup, recover, and then start the journal threads */
+        /**
+         * Invoked at server startup. Recovers the database by replaying journal files and then
+         * starts the durability thread.
+         */
         void startup() {
-            if (!storageGlobalParams.dur)
+            if (!storageGlobalParams.dur) {
                 return;
+            }
 
             journalMakeDir();
 
@@ -702,25 +700,6 @@ namespace {
             DurableInterface::enableDurability();
             boost::thread t(durThread);
         }
-
-        
-        class DurSSS : public ServerStatusSection {
-        public:
-            DurSSS() : ServerStatusSection( "dur" ) { }
-
-            virtual bool includeByDefault() const { return true; }
-            
-            BSONObj generateSection(OperationContext* txn,
-                                    const BSONElement& configElement) const {
-
-                if (!storageGlobalParams.dur) {
-                    return BSONObj();
-                }
-
-                return dur::stats.asObj();
-            }
-                
-        } durSSS;
 
 } // namespace dur
 } // namespace mongo
