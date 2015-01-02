@@ -282,7 +282,7 @@ namespace {
         invariant(_rsConfigState == kConfigStartingUp);
         const PostMemberStateUpdateAction action =
             _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-        _setMyLastOptime_inlock(&lk, lastOpTime);
+        _setMyLastOptime_inlock(&lk, lastOpTime, false);
         if (lk.owns_lock()) {
             lk.unlock();
         }
@@ -684,13 +684,15 @@ namespace {
 
     void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _setMyLastOptime_inlock(&lock, ts);
+        _setMyLastOptime_inlock(&lock, ts, false);
     }
 
     void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
-            boost::unique_lock<boost::mutex>* lock, const OpTime& ts) {
+            boost::unique_lock<boost::mutex>* lock, const OpTime& ts, bool isRollbackAllowed) {
         invariant(lock->owns_lock());
-        _updateSlaveInfoOptime_inlock(&_slaveInfo[_getMyIndexInSlaveInfo_inlock()], ts);
+        SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
+        invariant(isRollbackAllowed || mySlaveInfo->opTime <= ts);
+        _updateSlaveInfoOptime_inlock(mySlaveInfo, ts);
 
         if (_getReplicationMode_inlock() != modeReplSet) {
             return;
@@ -2298,7 +2300,7 @@ namespace {
         }
         fassert(18741, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
-    }        
+    }
 
     void ReplicationCoordinatorImpl::resetLastOpTimeFromOplog(OperationContext* txn) {
         StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
@@ -2310,7 +2312,8 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        setMyLastOptime(lastOpTime);
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _setMyLastOptime_inlock(&lk, lastOpTime, true);
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(

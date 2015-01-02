@@ -249,6 +249,11 @@ namespace repl {
 
         /**
          * Updates our internal tracking of the last OpTime applied to this node.
+         *
+         * The new value of "ts" must be no less than any prior value passed to this method, and it
+         * is the caller's job to properly synchronize this behavior.  The exception to this rule is
+         * that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for "ts" is
+         * reset based on the contents of the oplog, and may go backwards due to rollback.
          */
         virtual void setMyLastOptime(const OpTime& ts) = 0;
 
