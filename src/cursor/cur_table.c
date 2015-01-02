@@ -725,9 +725,11 @@ __curtable_close(WT_CURSOR *cursor)
 
 	if (ctable->plan != ctable->table->plan)
 		__wt_free(session, ctable->plan);
-	for (i = 0; ctable->cfg[i] != NULL; ++i)
-		__wt_free(session, ctable->cfg[i]);
-	__wt_free(session, ctable->cfg);
+	if (ctable->cfg != NULL) {
+		for (i = 0; ctable->cfg[i] != NULL; ++i)
+			__wt_free(session, ctable->cfg[i]);
+		__wt_free(session, ctable->cfg);
+	}
 	if (cursor->value_format != ctable->table->value_format)
 		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
