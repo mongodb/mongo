@@ -48,6 +48,7 @@ namespace mongo {
     class IndexDescriptor;
     class RecordStore;
     class RecordStoreV1Base;
+    class RecoveryUnit;
     class OperationContext;
 
     class MMAPV1DatabaseCatalogEntry : public DatabaseCatalogEntry {

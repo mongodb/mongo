@@ -43,6 +43,7 @@
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
-#include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 #include "mongo/util/file_allocator.h"
@@ -152,25 +152,6 @@ namespace mongo {
 
         try {
             WriteUnitOfWork wunit(txn);
-
-            Status s = _extentManager.init(txn);
-            if ( !s.isOK() ) {
-                msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
-            }
-
-            _namespaceIndex.init( txn );
-
-            // upgrade freelist
-            NamespaceString oldFreeList( name, "$freelist" );
-            NamespaceDetails* details = _namespaceIndex.details( oldFreeList.ns() );
-            if ( details ) {
-                if ( !details->firstExtent.isNull() ) {
-                    _extentManager.freeExtents(txn,
-                                               details->firstExtent,
-                                               details->lastExtent);
-                }
-                _namespaceIndex.kill_ns( txn, oldFreeList.ns() );
-            }
 
             _init( txn );
 
@@ -536,15 +517,28 @@ namespace mongo {
     }
 
     void MMAPV1DatabaseCatalogEntry::_init( OperationContext* txn ) {
-        // this is sort of insane
-        // it's because the whole storage/mmap_v1 is highly recursive
+        Status s = _extentManager.init(txn);
+        if (!s.isOK()) {
+            msgasserted(16966, str::stream() << "_extentManager.init failed: " << s.toString());
+        }
 
-        _namespaceIndex.init( txn );
+        _namespaceIndex.init(txn);
 
-        NamespaceString nsi( name(), "system.indexes" );
-        NamespaceString nsn( name(), "system.namespaces" );
+        // Upgrade freelist
+        const NamespaceString oldFreeList(name(), "$freelist");
+        NamespaceDetails* freeListDetails = _namespaceIndex.details(oldFreeList.ns());
+        if (freeListDetails) {
+            if (!freeListDetails->firstExtent.isNull()) {
+                _extentManager.freeExtents(txn,
+                                           freeListDetails->firstExtent,
+                                           freeListDetails->lastExtent);
+            }
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
+            _namespaceIndex.kill_ns(txn, oldFreeList.ns());
+        }
+
+        const NamespaceString nsi( name(), "system.indexes" );
+        const NamespaceString nsn( name(), "system.namespaces" );
 
         bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details( nsn.toString() ) == NULL;
         bool isSystemIndexesGoingToBeNew = _namespaceIndex.details( nsi.toString() ) == NULL;
@@ -558,6 +552,7 @@ namespace mongo {
         if ( isSystemIndexesGoingToBeNew ) {
             txn->recoveryUnit()->registerChange(new EntryInsertion(nsi.toString(), this));
         }
+
         Entry*& indexEntry = _collections[nsi.toString()];
         Entry*& nsEntry = _collections[nsn.toString()];
 

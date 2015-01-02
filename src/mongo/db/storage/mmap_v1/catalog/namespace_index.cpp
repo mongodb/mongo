@@ -37,7 +37,9 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/mmap_v1/catalog/hashtab.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
@@ -45,14 +47,23 @@
 
 namespace mongo {
 
-    NamespaceDetails* NamespaceIndex::details(const StringData& ns) {
-        Namespace n(ns);
+    NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
+        : _dir(dir),
+          _database(database),
+          _ht(NULL) {
+
+    }
+
+    NamespaceIndex::~NamespaceIndex() {
+
+    }
+
+    NamespaceDetails* NamespaceIndex::details(const StringData& ns) const {
+        const Namespace n(ns);
         return details(n);
     }
 
-    NamespaceDetails* NamespaceIndex::details(const Namespace& ns) {
-        if ( !_ht.get() )
-            return 0;
+    NamespaceDetails* NamespaceIndex::details(const Namespace& ns) const {
         return _ht->get(ns);
     }
 
@@ -77,17 +88,12 @@ namespace mongo {
 
         massert(17315, "no . in ns", nsIsFull(nss.toString()));
 
-        init( txn );
-        uassert( 10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
+        uassert(10081, "too many namespaces/collections", _ht->put(txn, ns, *details));
     }
 
     void NamespaceIndex::kill_ns( OperationContext* txn, const StringData& ns) {
         const NamespaceString nss(ns.toString());
         invariant(txn->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-
-        if (!_ht.get()) {
-            return;
-        }
 
         const Namespace n(ns);
         _ht->kill(txn, n);
@@ -129,9 +135,10 @@ namespace mongo {
     }
 
     void NamespaceIndex::getCollectionNamespaces( list<string>* tofill ) const {
-        if ( _ht.get() )
-            _ht->iterAll( stdx::bind( namespaceGetNamespacesCallback,
-                                      stdx::placeholders::_1, stdx::placeholders::_2, tofill) );
+        _ht->iterAll(stdx::bind(namespaceGetNamespacesCallback,
+                                stdx::placeholders::_1,
+                                stdx::placeholders::_2,
+                                tofill));
     }
 
     void NamespaceIndex::maybeMkdir() const {
@@ -143,7 +150,7 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
-    NOINLINE_DECL void NamespaceIndex::_init( OperationContext* txn ) {
+    NOINLINE_DECL void NamespaceIndex::init( OperationContext* txn ) {
         invariant(!_ht.get());
 
         unsigned long long len = 0;
@@ -215,17 +222,14 @@ namespace mongo {
             }
         }
 
-        if ( p == 0 ) {
-            /** TODO: this shouldn't terminate? */
+        if (p == 0) {
             log() << "error couldn't open file " << pathString << " terminating" << endl;
-            dbexit( EXIT_FS );
+            invariant(false);
         }
 
-
-        verify( len <= 0x7fffffff );
+        invariant( len <= 0x7fffffff );
         _ht.reset(new NamespaceHashTable(p, (int) len, "namespace index"));
     }
-
 
 }
 
