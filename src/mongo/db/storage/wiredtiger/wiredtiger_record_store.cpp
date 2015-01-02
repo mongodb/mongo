@@ -389,20 +389,18 @@ namespace {
         try {
             WiredTigerCursor curwrap( _uri, _instanceId, txn);
             WT_CURSOR *c = curwrap.get();
+            RecordId oldest;
             int ret = 0;
             while (( sizeSaved < sizeOverCap || docsRemoved < docsOverCap ) &&
                    (ret = c->next(c)) == 0 ) {
                 int64_t key;
                 ret = c->get_key(c, &key);
                 invariantWTOK(ret);
-                RecordId oldest = _fromKey(key);
 
                 // don't go past the record we just inserted
-                if ( oldest >= justInserted ) {
-                    ret = c->prev(c);
-                    invariantWTOK(ret);
+                oldest = _fromKey(key);
+                if ( oldest >= justInserted )
                     break;
-                }
 
                 if ( _cappedDeleteCallback ) {
                     uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -417,8 +415,14 @@ namespace {
             }
 
             if (ret != WT_NOTFOUND) invariantWTOK(ret);
- 
+
             if (docsRemoved > 0) {
+                // if we scanned to the end of the collection or past our insert, go back one
+                if ( ret == WT_NOTFOUND || oldest >= justInserted ) {
+                    ret = c->prev(c);
+                }
+                invariantWTOK(ret);
+
                 WriteUnitOfWork wuow( txn );
                 ret = c->session->truncate(c->session, NULL, NULL, c, NULL);
                 invariantWTOK(ret);
