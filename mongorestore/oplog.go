@@ -63,6 +63,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		WaitTime:  3 * time.Second,
 		Writer:    log.Writer(0),
 		BarLength: ProgressBarLength,
+		IsBytes:   true,
 	}
 	bar.Start()
 	defer bar.Stop()

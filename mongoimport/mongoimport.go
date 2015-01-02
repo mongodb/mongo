@@ -276,6 +276,7 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 			Name:     fmt.Sprintf("%v.%v", mongoImport.ToolOptions.DB, mongoImport.ToolOptions.Collection),
 			Watching: &fileSizeProgressor{fileSize, inputReader},
 			Writer:   log.Writer(0),
+			IsBytes:  true,
 		}
 		bar.Start()
 	}

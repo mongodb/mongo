@@ -229,6 +229,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			Watching:  watchProgressor,
 			Writer:    log.Writer(0),
 			BarLength: ProgressBarLength,
+			IsBytes: true,
 		}
 		restore.progressManager.Attach(bar)
 		defer restore.progressManager.Detach(bar)

@@ -8,7 +8,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"sort"
 	"strings"
-	//"text/tabwriter"
 	"time"
 )
 
@@ -266,16 +265,6 @@ func (slice LockUsages) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func formatMegs(size int64) string {
-	result := float64(size)
-	unit := "m"
-	if result > 1024 {
-		unit = "g"
-		result = result / 1024
-	}
-	return fmt.Sprintf("%.1f%v", result, unit)
-}
-
 func formatNet(diff int64) string {
 	div := int64(1000)
 	unit := "b"
@@ -429,8 +418,8 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		lineJson["conn"] = fmt.Sprintf("%v", line.NumConnections)
 		lineJson["time"] = fmt.Sprintf("%v", line.Time.Format("15:04:05"))
 		lineJson["host"] = line.Host
-		lineJson["vsize"] = formatMegs(int64(line.Virtual))
-		lineJson["res"] = formatMegs(int64(line.Resident))
+		lineJson["vsize"] = text.FormatByteAmount(int64(line.Virtual))
+		lineJson["res"] = text.FormatByteAmount(int64(line.Resident))
 
 		// add mmapv1-specific fields
 		if lineFlags&MMAPOnly > 0 {
@@ -443,13 +432,13 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 
 			mappedVal := ""      // empty for mongos
 			if line.Mapped > 0 { // not mongos, update accordingly
-				mappedVal = formatMegs(int64(line.Mapped))
+				mappedVal = text.FormatByteAmount(int64(line.Mapped))
 			}
 			lineJson["mapped"] = mappedVal
 
 			nonMappedVal := ""       // empty for mongos
 			if line.NonMapped >= 0 { // not mongos, update accordingly
-				nonMappedVal = formatMegs(int64(line.NonMapped))
+				nonMappedVal = text.FormatByteAmount(int64(line.NonMapped))
 			}
 			lineJson["non-mapped"] = nonMappedVal
 
@@ -578,7 +567,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		if lineFlags&MMAPOnly > 0 {
 
 			if line.Mapped > 0 {
-				out.WriteCell(formatMegs(int64(line.Mapped)))
+				out.WriteCell(text.FormatByteAmount(int64(line.Mapped)))
 			} else {
 				//for mongos nodes, Mapped is empty, so write a blank cell.
 				out.WriteCell("")
@@ -586,14 +575,14 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		}
 
 		// Columns for Virtual and Resident are always active
-		out.WriteCell(formatMegs(int64(line.Virtual)))
-		out.WriteCell(formatMegs(int64(line.Resident)))
+		out.WriteCell(text.FormatByteAmount(int64(line.Virtual)))
+		out.WriteCell(text.FormatByteAmount(int64(line.Resident)))
 
 		if lineFlags&MMAPOnly > 0 {
 			if lineFlags&AllOnly > 0 {
 				nonMappedVal := ""
 				if line.NonMapped >= 0 { // not mongos, update accordingly
-					nonMappedVal = formatMegs(int64(line.NonMapped))
+					nonMappedVal = text.FormatByteAmount(int64(line.NonMapped))
 				}
 				out.WriteCell(nonMappedVal)
 			}

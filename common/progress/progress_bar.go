@@ -3,6 +3,7 @@ package progress
 import (
 	"bytes"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/text"
 	"io"
 	"time"
 )
@@ -62,6 +63,10 @@ type Bar struct {
 	// BarLength is the number of characters used to print the bar
 	BarLength int
 
+	// IsBytes denotes whether byte-specific formatting (kB, MB, GB) should
+	// be applied to the numeric output
+	IsBytes bool
+
 	// Watching is the object that implements the Progressor to expose the
 	// values necessary for calculation
 	Watching Progressor
@@ -108,15 +113,24 @@ func (pb *Bar) Stop() {
 	close(pb.stopChan)
 }
 
+func (pb *Bar) formatCounts() (string, string) {
+	maxCount, currentCount := pb.Watching.Progress()
+	if pb.IsBytes {
+		return text.FormatByteAmount(maxCount), text.FormatByteAmount(currentCount)
+	}
+	return fmt.Sprintf("%v", maxCount), fmt.Sprintf("%v", currentCount)
+}
+
 // computes all necessary values renders to the bar's Writer
 func (pb *Bar) renderToWriter() {
-	max, currentCount := pb.Watching.Progress()
-	percent := float64(currentCount) / float64(max)
-	fmt.Fprintf(pb.Writer, "%v %v\t%d/%d (%2.1f%%)",
+	maxCount, currentCount := pb.Watching.Progress()
+	percent := float64(currentCount) / float64(maxCount)
+	maxStr, currentStr := pb.formatCounts()
+	fmt.Fprintf(pb.Writer, "%v %v\t%s/%s (%2.1f%%)",
 		drawBar(pb.BarLength, percent),
 		pb.Name,
-		currentCount,
-		max,
+		currentStr,
+		maxStr,
 		percent*100,
 	)
 }

@@ -58,7 +58,6 @@ func TestBasicProgressBar(t *testing.T) {
 }
 
 func TestBarConcurrency(t *testing.T) {
-	//var localCounter int64
 	writeBuffer := &bytes.Buffer{}
 
 	Convey("With a simple ProgressBar", t, func() {
@@ -136,6 +135,28 @@ func TestBarDrawing(t *testing.T) {
 			b := drawBar(10, 1.6)
 			So(strings.Count(b, BarFilling), ShouldEqual, 10)
 			So(strings.Count(b, BarEmpty), ShouldEqual, 0)
+		})
+	})
+}
+
+func TestBarUnits(t *testing.T) {
+	writeBuffer := &bytes.Buffer{}
+
+	Convey("With a simple ProgressBar with IsBytes==true", t, func() {
+		watching := NewCounter(1024 * 1024)
+		watching.Inc(777)
+		pbar := &Bar{
+			Name:     "\nTEST",
+			Watching: watching,
+			WaitTime: 10 * time.Millisecond,
+			Writer:   writeBuffer,
+			IsBytes:  true,
+		}
+
+		Convey("the written output should contain units", func() {
+			pbar.renderToWriter()
+			So(writeBuffer.String(), ShouldContainSubstring, "kB")
+			So(writeBuffer.String(), ShouldContainSubstring, "MB")
 		})
 	})
 }
