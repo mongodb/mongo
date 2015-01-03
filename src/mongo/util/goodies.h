@@ -155,43 +155,5 @@ namespace mongo {
 
     std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o);
 
-    /** A generic pointer type for function arguments.
-     *  It will convert from any pointer type except auto_ptr.
-     *  Semantics are the same as passing the pointer returned from get()
-     *  const ptr<T>  =>  T * const
-     *  ptr<const T>  =>  T const *  or  const T*
-     */
-    template <typename T>
-    struct ptr {
-
-        ptr() : _p(NULL) {}
-
-        // convert to ptr<T>
-        ptr(T* p) : _p(p) {} // needed for NULL
-        template<typename U> ptr(U* p) : _p(p) {}
-        template<typename U> ptr(const ptr<U>& p) : _p(p) {}
-        template<typename U> ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
-        template<typename U> ptr(const boost::scoped_ptr<U>& p) : _p(p.get()) {}
-        //template<typename U> ptr(const std::auto_ptr<U>& p) : _p(p.get()) {}
-
-        // assign to ptr<T>
-        ptr& operator= (T* p) { _p = p; return *this; } // needed for NULL
-        template<typename U> ptr& operator= (U* p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const ptr<U>& p) { _p = p; return *this; }
-        template<typename U> ptr& operator= (const boost::shared_ptr<U>& p) { _p = p.get(); return *this; }
-        template<typename U> ptr& operator= (const boost::scoped_ptr<U>& p) { _p = p.get(); return *this; }
-        //template<typename U> ptr& operator= (const std::auto_ptr<U>& p) { _p = p.get(); return *this; }
-
-        // use
-        T* operator->() const { return _p; }
-        T& operator*() const { return *_p; }
-
-        // convert from ptr<T>
-        operator T* () const { return _p; }
-
-    private:
-        T* _p;
-    };
-
 } // namespace mongo
 

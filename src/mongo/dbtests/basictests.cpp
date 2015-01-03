@@ -36,6 +36,7 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/paths.h"
+#include "mongo/util/ptr.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"

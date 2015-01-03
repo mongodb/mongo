@@ -38,6 +38,7 @@
 #include "mongo/s/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/ptr.h"
 
 namespace mongo {
 
