@@ -193,10 +193,10 @@ namespace mongo {
 
             return;
         }
-        void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
+        void PREPLOGBUFFER(/*out*/ JSectHeader& outHeader, AlignedBuilder& outBuffer) {
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
-            _PREPLOGBUFFER(h, ab);
+            _PREPLOGBUFFER(outHeader, outBuffer);
             stats.curr->_prepLogBufferMicros += t.micros();
         }
 

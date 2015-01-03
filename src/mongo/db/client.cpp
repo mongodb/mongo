@@ -54,7 +54,6 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbwebserver.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/jsobj.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
@@ -267,7 +267,7 @@ namespace {
             // TODO: Client::Context legacy, needs to be removed
             _txn->getCurOp()->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
 
-            _coll = _db.getDb()->getCollection(_txn, ns);
+            _coll = _db.getDb()->getCollection(ns);
         }
     }
 
@@ -282,7 +282,7 @@ namespace {
           _autodb(opCtx, _nss.db(), MODE_IX),
           _collk(opCtx->lockState(), ns, MODE_IX),
           _c(opCtx, ns, _autodb.getDb(), _autodb.justCreated()) {
-        _collection = _c.db()->getCollection( _txn, ns );
+        _collection = _c.db()->getCollection( ns );
         if ( !_collection && !_autodb.justCreated() ) {
             // relock in MODE_X
             _collk.relockWithMode( MODE_X, _autodb.lock() );
@@ -511,10 +511,7 @@ namespace {
                 s << " code:" << exceptionInfo.code;
         }
 
-        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
-            s << " numYields:" << curop.numYields();
-        
-        s << " ";
+        s << " numYields:" << curop.numYields() << " ";
         
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
@@ -600,8 +597,7 @@ namespace {
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
-        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
-            b.appendNumber( "numYield" , curop.numYields() );
+        b.appendNumber("numYield", curop.numYields());
 
         if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );

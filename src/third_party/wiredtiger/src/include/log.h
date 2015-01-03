@@ -13,17 +13,25 @@
 #define	LOG_ALIGN		128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
-#define	INIT_LSN(l)	do {						\
+#define	WT_INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
 	(l)->offset = 0;						\
 } while (0)
 
-#define	ZERO_LSN(l)	do {						\
+#define	WT_MAX_LSN(l)	do {						\
+	(l)->file = UINT32_MAX;						\
+	(l)->offset = INT64_MAX;					\
+} while (0)
+
+#define	WT_ZERO_LSN(l)	do {						\
 	(l)->file = 0;							\
 	(l)->offset = 0;						\
 } while (0)
 
-#define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
+#define	WT_IS_INIT_LSN(l)						\
+	((l)->file == 1 && (l)->offset == 0)
+#define	WT_IS_MAX_LSN(l)						\
+	((l)->file == UINT32_MAX && (l)->offset == INT64_MAX)
 
 /*
  * Both of the macros below need to change if the content of __wt_lsn
@@ -37,11 +45,6 @@
     ((const uint8_t *)(data) + offsetof(WT_LOG_RECORD, record))
 #define	LOG_REC_SIZE(size)						\
     ((size) - offsetof(WT_LOG_RECORD, record))
-
-#define	MAX_LSN(l)	do {						\
-	(l)->file = UINT32_MAX;						\
-	(l)->offset = INT64_MAX;					\
-} while (0)
 
 /*
  * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1

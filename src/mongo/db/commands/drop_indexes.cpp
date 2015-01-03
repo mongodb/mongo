@@ -75,7 +75,7 @@ namespace mongo {
                                                      Database* db, 
                                                      const BSONObj& cmdObj) {
             std::string toDeleteNs = db->name() + "." + cmdObj.firstElement().valuestrsafe();
-            Collection* collection = db->getCollection(opCtx, toDeleteNs);
+            Collection* collection = db->getCollection(toDeleteNs);
             IndexCatalog::IndexKillCriteria criteria;
 
             // Get index name to drop
@@ -136,7 +136,7 @@ namespace mongo {
             Client::Context ctx(txn, toDeleteNs);
             Database* db = ctx.db();
 
-            Collection* collection = db->getCollection( txn, toDeleteNs );
+            Collection* collection = db->getCollection( toDeleteNs );
             if ( ! collection ) {
                 errmsg = "ns not found";
                 return false;
@@ -235,7 +235,7 @@ namespace mongo {
             std::string ns = db->name() + '.' + cmdObj["reIndex"].valuestrsafe();
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -250,7 +250,7 @@ namespace mongo {
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, toDeleteNs);
 
-            Collection* collection = ctx.db()->getCollection( txn, toDeleteNs );
+            Collection* collection = ctx.db()->getCollection( toDeleteNs );
 
             if ( !collection ) {
                 errmsg = "ns not found";

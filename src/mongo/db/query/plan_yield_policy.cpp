@@ -30,10 +30,9 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
-#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
-#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -52,16 +51,10 @@ namespace mongo {
         OperationContext* opCtx = _planYielding->getOpCtx();
         invariant(opCtx);
 
-        // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that it's
-        // time to yield. Whether or not we will actually yield (doc-level locking systems won't),
-        // we need to check if this operation has been interrupted. Throws if the interrupt flag is
-        // set.
+        // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that
+        // it's time to yield. Whether or not we will actually yield, we need to check if this
+        // operation has been interrupted. Throws if the interrupt flag is set.
         opCtx->checkForInterrupt();
-
-        if (supportsDocLocking()) {
-            // Doc-level locking is supported, so no need to release locks.
-            return true;
-        }
 
         // No need to yield if the collection is NULL.
         if (NULL == _planYielding->collection()) {

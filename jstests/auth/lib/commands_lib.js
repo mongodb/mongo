@@ -2390,28 +2390,6 @@ var authCommandsLib = {
             ]
         }, */
         {
-            testname: "text",
-            command: {text: "x"},
-            testcases: [
-                {
-                    runOnDb: firstDbName,
-                    roles: roles_read,
-                    privileges: [
-                        { resource: {db: firstDbName, collection: "x"}, actions: ["find"] }
-                    ],
-                    expectFail: true
-                },
-                {
-                    runOnDb: secondDbName,
-                    roles: roles_readAny,
-                    privileges: [
-                        { resource: {db: secondDbName, collection: "x"}, actions: ["find"] }
-                    ],
-                    expectFail: true
-                }
-            ]
-        },
-        {
             testname: "top",
             command: {top: 1},
             skipSharded: true,

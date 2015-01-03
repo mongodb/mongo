@@ -14,12 +14,12 @@ t.save( { _id: 4, language: "en", title: "My fourth blog", text: "This stemmed b
 t.ensureIndex( { "title": "text", text: "text" }, { weights: { title: 10 },
                                                     default_language: "es" } );
 
-res = t.runCommand( "text", { search: "blog" } );
-assert.eq( 4, res.results.length );
+res = t.find( { "$text" : { "$search" : "blog" } } );
+assert.eq( 4, res.length() );
 
 assert.eq( [4], queryIDS( t, "stem" ) );
 assert.eq( [3], queryIDS( t, "stemmed" ) );
-assert.eq( [4], queryIDS( t, "stemmed", null, { language : "en" } ) );
+assert.eq( [4], queryIDS( t, "stemmed", null, { "$language" : "en" } ) );
 
 assert.eq( [1,2], queryIDS( t, "prueba" ) );
 

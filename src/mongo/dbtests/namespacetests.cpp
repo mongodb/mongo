@@ -536,28 +536,28 @@ namespace NamespaceTests {
                 Collection* committedColl;
                 {
                     WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(&txn, committedName));
+                    ASSERT_FALSE(db->getCollection(committedName));
                     committedColl = db->createCollection(&txn, committedName);
-                    ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+                    ASSERT_EQUALS(db->getCollection(committedName), committedColl);
                     wunit.commit();
                 }
 
-                ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+                ASSERT_EQUALS(db->getCollection(committedName), committedColl);
 
                 {
                     WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+                    ASSERT_FALSE(db->getCollection(rolledBackName));
                     Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
-                    ASSERT_EQUALS(db->getCollection(&txn, rolledBackName), rolledBackColl);
+                    ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
                     // not committing so creation should be rolled back
                 }
 
                 // The rolledBackCollection creation should have been rolled back
-                ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+                ASSERT_FALSE(db->getCollection(rolledBackName));
 
                 // The committedCollection should not have been affected by the rollback. Holders
                 // of the original Collection pointer should still be valid.
-                ASSERT_EQUALS(db->getCollection(&txn, committedName), committedColl);
+                ASSERT_EQUALS(db->getCollection(committedName), committedColl);
             }
         };
 
@@ -579,33 +579,33 @@ namespace NamespaceTests {
 
                 {
                     WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(&txn, droppedName));
+                    ASSERT_FALSE(db->getCollection(droppedName));
                     Collection* droppedColl;
                     droppedColl = db->createCollection(&txn, droppedName);
-                    ASSERT_EQUALS(db->getCollection(&txn, droppedName), droppedColl);
+                    ASSERT_EQUALS(db->getCollection(droppedName), droppedColl);
                     db->dropCollection(&txn, droppedName);
                     wunit.commit();
                 }
 
                 //  Should have been really dropped
-                ASSERT_FALSE(db->getCollection(&txn, droppedName));
+                ASSERT_FALSE(db->getCollection(droppedName));
 
                 {
                     WriteUnitOfWork wunit(&txn);
-                    ASSERT_FALSE(db->getCollection(&txn, rolledBackName));
+                    ASSERT_FALSE(db->getCollection(rolledBackName));
                     Collection* rolledBackColl = db->createCollection(&txn, rolledBackName);
                     wunit.commit();
-                    ASSERT_EQUALS(db->getCollection(&txn, rolledBackName), rolledBackColl);
+                    ASSERT_EQUALS(db->getCollection(rolledBackName), rolledBackColl);
                     db->dropCollection(&txn, rolledBackName);
                     // not committing so dropping should be rolled back
                 }
 
                 // The rolledBackCollection dropping should have been rolled back.
                 // Original Collection pointers are no longer valid.
-                ASSERT(db->getCollection(&txn, rolledBackName));
+                ASSERT(db->getCollection(rolledBackName));
 
                 // The droppedCollection should not have been restored by the rollback.
-                ASSERT_FALSE(db->getCollection(&txn, droppedName));
+                ASSERT_FALSE(db->getCollection(droppedName));
             }
         };
     }  // namespace DatabaseTests

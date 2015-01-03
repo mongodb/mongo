@@ -167,7 +167,7 @@ namespace {
                                              string* errmsg ) {
         fassert(16372, db);
         const char* profileName = db->getProfilingNS();
-        Collection* collection = db->getCollection( txn, profileName );
+        Collection* collection = db->getCollection( profileName );
 
         if ( collection ) {
             if ( !collection->isCapped() ) {

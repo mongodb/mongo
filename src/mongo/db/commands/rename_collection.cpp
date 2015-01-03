@@ -77,7 +77,7 @@ namespace mongo {
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = source;
             std::vector<BSONObj> prelim = 
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, source), criteria);
+                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
 
             std::vector<BSONObj> indexes;
 
@@ -168,7 +168,7 @@ namespace mongo {
             }
 
             Database* const sourceDB = dbHolder().get(txn, nsToDatabase(source));
-            Collection* const sourceColl = sourceDB ? sourceDB->getCollection(txn, source)
+            Collection* const sourceColl = sourceDB ? sourceDB->getCollection(source)
                                                     : NULL;
             if (!sourceColl) {
                 errmsg = "source namespace does not exist";
@@ -212,7 +212,7 @@ namespace mongo {
 
                 // Check if the target namespace exists and if dropTarget is true.
                 // If target exists and dropTarget is not true, return false.
-                if (targetDB->getCollection(txn, target)) {
+                if (targetDB->getCollection(target)) {
                     if (!cmdObj["dropTarget"].trueValue()) {
                         errmsg = "target namespace exists";
                         return false;

@@ -88,6 +88,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual bool isInPrimaryOrSecondaryState() const;
+
         virtual Seconds getSlaveDelaySecs() const;
 
         virtual void clearSyncSourceBlacklist();
@@ -278,7 +280,8 @@ namespace repl {
         enum PostMemberStateUpdateAction {
             kActionNone,
             kActionCloseAllConnections,  // Also indicates that we should clear sharding state.
-            kActionChooseNewSyncSource
+            kActionChooseNewSyncSource,
+            kActionWinElection
         };
 
         // Struct that holds information about clients waiting for replication.

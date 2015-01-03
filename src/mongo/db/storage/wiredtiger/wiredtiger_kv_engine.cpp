@@ -141,20 +141,10 @@ namespace mongo {
         ss << "create,";
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
-        ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(fast),";
         if ( _durable ) {
             ss << "log=(enabled=true,archive=true,path=journal,compressor=";
-
-            // TODO: remove this; SERVER-16568
-            std::string localJournalCompressor;
-            if (wiredTigerGlobalOptions.journalCompressor == "none") {
-                localJournalCompressor = "";
-            }
-            else {
-                localJournalCompressor = wiredTigerGlobalOptions.journalCompressor;
-            }
-            ss << localJournalCompressor << "),";
+            ss << wiredTigerGlobalOptions.journalCompressor << "),";
         }
         ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
         ss << ",log_size=2GB),";
@@ -168,7 +158,11 @@ namespace mongo {
         if (ret == EINVAL) {
             fassertFailedNoTrace(28561);
         }
-        invariantWTOK(ret);
+        else if (ret != 0) {
+            Status s(wtRCToStatus(ret));
+            msgassertedNoTrace(28595, s.reason());
+        }
+
         _sessionCache.reset( new WiredTigerSessionCache( this ) );
 
         _sizeStorerUri = "table:sizeStorer";
@@ -364,8 +358,8 @@ namespace mongo {
                                                                      const StringData& ident,
                                                                      const IndexDescriptor* desc ) {
         if ( desc->unique() )
-            return new WiredTigerIndexUnique( _uri( ident ), desc );
-        return new WiredTigerIndexStandard( _uri( ident ), desc );
+            return new WiredTigerIndexUnique( opCtx, _uri( ident ), desc );
+        return new WiredTigerIndexStandard( opCtx, _uri( ident ), desc );
     }
 
     Status WiredTigerKVEngine::dropIdent( OperationContext* opCtx,

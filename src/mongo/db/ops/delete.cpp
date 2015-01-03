@@ -60,7 +60,7 @@ namespace mongo {
 
         Collection* collection = NULL;
         if (db) {
-            collection = db->getCollection(txn, nsString.ns());
+            collection = db->getCollection(nsString.ns());
         }
 
         ParsedDelete parsedDelete(txn, &request);

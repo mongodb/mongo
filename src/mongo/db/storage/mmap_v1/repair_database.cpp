@@ -292,7 +292,9 @@ namespace mongo {
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "_tmp" );
-        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
+        bool created = false;
+        MONGO_ASSERT_ON_EXCEPTION( created = boost::filesystem::create_directory( reservedPath ) );
+        invariant( created );
         string reservedPathString = reservedPath.string();
 
         if ( !preserveClonedFilesOnFailure )
@@ -319,15 +321,14 @@ namespace mongo {
                                                              reservedPathString,
                                                              storageGlobalParams.directoryperdb,
                                                              true));
-                invariant(!dbEntry->exists());
-                tempDatabase.reset( new Database(dbName, dbEntry.get()));
+                tempDatabase.reset( new Database(txn, dbName, dbEntry.get()));
             }
 
             map<string,CollectionOptions> namespacesToCopy;
             {
                 string ns = dbName + ".system.namespaces";
                 Client::Context ctx(txn,  ns );
-                Collection* coll = originalDatabase->getCollection( txn, ns );
+                Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
                     while ( !it->isEOF() ) {
@@ -372,7 +373,7 @@ namespace mongo {
                 }
 
                 Client::Context readContext(txn, ns, originalDatabase);
-                Collection* originalCollection = originalDatabase->getCollection( txn, ns );
+                Collection* originalCollection = originalDatabase->getCollection( ns );
                 invariant( originalCollection );
 
                 // data

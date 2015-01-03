@@ -377,8 +377,11 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-for to_remove in ['-Werror', '-Wall', '-W']:
+# NOTE: Along with the warning flags, remove any flags for LTO when building v8,
+# as LTO builds currently appear to generate bad code with clang.
+for to_remove in ['-Werror', '-Wall', '-W', "-flto"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
+    removeIfPresent(env['LINKFLAGS'], to_remove)
 
 # specify rules for building libraries.cc and experimental-libraries.cc
 env['BUILDERS']['JS2C'] = Builder(action=js2c.JS2C)

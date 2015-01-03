@@ -46,6 +46,7 @@
 #include "mongo/s/version_manager.h"
 #include "mongo/server.h"
 #include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"
 

@@ -61,7 +61,16 @@ namespace mongo {
         // index filters should persist throughout life of collection
     }
 
+    const UpdateIndexData& CollectionInfoCache::indexKeys( OperationContext* txn ) const {
+        // This requires "some" lock, and MODE_IS is an expression for that, for now.
+        dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
+        invariant(_keysComputed);
+        return _indexedPaths;
+    }
+
     void CollectionInfoCache::computeIndexKeys( OperationContext* txn ) {
+        // This function modified objects attached to the Collection so we need a write lock
+        invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
         _indexedPaths.clear();
 
         IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);

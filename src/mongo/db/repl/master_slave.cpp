@@ -254,7 +254,7 @@ namespace repl {
             auto_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 localSources,
-                                                ctx.db()->getCollection(txn, localSources)));
+                                                ctx.db()->getCollection(localSources)));
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -299,7 +299,7 @@ namespace repl {
         auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             localSources,
-                                            ctx.db()->getCollection(txn, localSources)));
+                                            ctx.db()->getCollection(localSources)));
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -680,7 +680,7 @@ namespace repl {
         Client::Context ctx(txn, ns, false);
         ctx.getClient()->curop()->reset();
 
-        bool empty = ctx.db()->getDatabaseCatalogEntry()->isEmpty();
+        bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         LOG(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;

@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -855,15 +854,16 @@ namespace mongo {
              ++state.currIndex) {
 
             if (elapsedTracker.intervalHasElapsed()) {
-                // Consider yielding between inserts. We never yield for storage engines that
-                // support document-level locking. TODO: as an optimization, this should only
-                // yield if another thread is waiting for our lock.
-                if (!supportsDocLocking() && state.hasLock()) {
+                // Yield between inserts.
+                if (state.hasLock()) {
                     // Release our locks. They get reacquired when insertOne() calls
                     // ExecInsertsState::lockAndCheck(). Since the lock manager guarantees FIFO
                     // queues waiting on locks, there is no need to explicitly sleep or give up
                     // control of the processor here.
                     state.unlock();
+
+                    // This releases any storage engine held locks/snapshots.
+                    _txn->recoveryUnit()->commitAndRestart();
                 }
 
                 _txn->checkForInterrupt();
@@ -995,7 +995,7 @@ namespace mongo {
 
         Database* database = _context->db();
         dassert(database);
-        _collection = database->getCollection(txn, request->getTargetingNS());
+        _collection = database->getCollection(request->getTargetingNS());
         if (!_collection) {
             if (intentLock) {
                 // try again with full X lock.
@@ -1208,7 +1208,7 @@ namespace mongo {
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
                 Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
                 Database* db = ctx.db();
-                if ( db->getCollection( txn, nsString.ns() ) ) {
+                if ( db->getCollection( nsString.ns() ) ) {
                     // someone else beat us to it
                 }
                 else {
@@ -1256,7 +1256,7 @@ namespace mongo {
             }
 
             Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
-            Collection* collection = db->getCollection(txn, nsString.ns());
+            Collection* collection = db->getCollection(nsString.ns());
 
             if ( collection == NULL ) {
                 if ( createCollection ) {
@@ -1375,7 +1375,7 @@ namespace mongo {
 
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
-                                                  ctx.db()->getCollection(txn, nss),
+                                                  ctx.db()->getCollection(nss),
                                                   &parsedDelete,
                                                   &rawExec));
                 boost::scoped_ptr<PlanExecutor> exec(rawExec);

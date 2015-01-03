@@ -40,6 +40,7 @@
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/util/concurrency/mutex.h" // for StaticObserver
 #include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"

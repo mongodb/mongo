@@ -56,6 +56,10 @@ namespace mongo {
             return;
         }
 
+        // Top-level locks are freed, release any potential low-level (storage engine-specific
+        // locks). If we are yielding, we are at a safe place to do so.
+        txn->recoveryUnit()->commitAndRestart();
+
         // Track the number of yields in CurOp.
         txn->getCurOp()->yielded();
 

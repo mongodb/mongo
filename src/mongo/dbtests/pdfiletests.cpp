@@ -62,7 +62,7 @@ namespace PdfileTests {
                 return "unittests.pdfiletests.Insert";
             }
             Collection* collection() {
-                return _context.db()->getCollection( &_txn, ns() );
+                return _context.db()->getCollection( ns() );
             }
 
             OperationContextImpl _txn;

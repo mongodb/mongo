@@ -209,8 +209,7 @@ namespace mongo {
         if( killPending() )
             builder->append("killPending", true);
 
-        if (!getGlobalEnvironment()->getGlobalStorageEngine()->supportsDocLocking())
-            builder->append( "numYields" , _numYields );
+        builder->append( "numYields" , _numYields );
     }
 
     BSONObj CurOp::description() {

@@ -314,8 +314,6 @@ namespace mongo {
             friend class CurOp;
             void _finishInit();
             void checkNotStale() const;
-            void checkNsAccess( bool doauth );
-            void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
             bool _justCreated;
             bool _doVersion;
@@ -334,7 +332,7 @@ namespace mongo {
             Database* db() const { return _c.db(); }
 
             Collection* getCollection() const {
-                return _c.db()->getCollection(_txn, _nss.ns());
+                return _c.db()->getCollection(_nss.ns());
             }
 
             Context& ctx() { return _c; }

@@ -66,6 +66,10 @@ namespace repl {
         invariant(false);
     }
 
+    bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
+        invariant(false);
+    }
+
     Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {
         return Seconds(0);
     }

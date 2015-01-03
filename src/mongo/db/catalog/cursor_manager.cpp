@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {

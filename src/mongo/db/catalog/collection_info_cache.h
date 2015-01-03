@@ -73,11 +73,7 @@ namespace mongo {
         /* get set of index keys for this namespace.  handy to quickly check if a given
            field is indexed (Note it might be a secondary component of a compound index.)
         */
-        const UpdateIndexData& indexKeys( OperationContext* txn ) {
-            if ( !_keysComputed )
-                computeIndexKeys( txn );
-            return _indexedPaths;
-        }
+        const UpdateIndexData& indexKeys( OperationContext* txn ) const;
 
         // ---------------------
 

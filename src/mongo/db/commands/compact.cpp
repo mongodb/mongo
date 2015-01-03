@@ -81,7 +81,7 @@ namespace mongo {
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -149,7 +149,7 @@ namespace mongo {
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(txn, ns);
 
-            Collection* collection = ctx.db()->getCollection(txn, ns.ns());
+            Collection* collection = ctx.db()->getCollection(ns.ns());
             if( ! collection ) {
                 errmsg = "namespace does not exist";
                 return false;

@@ -36,6 +36,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 /**

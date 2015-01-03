@@ -154,7 +154,7 @@ namespace mongo {
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
                 std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
                 allKilledIndexes.insert(allKilledIndexes.end(),
                                         killedIndexes.begin(),
                                         killedIndexes.end());
@@ -185,18 +185,19 @@ namespace mongo {
             }
 
             {
-                // TODO: SERVER-4328 Don't lock globally
                 ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
-                if (dbHolder().get(txn, dbname) == NULL) {
-                    return true; // didn't exist, was no-op
+                AutoGetDb autoDB(txn, dbname, MODE_X);
+                Database* const db = autoDB.getDb();
+                if (!db) {
+                    // DB doesn't exist, so deem it a success.
+                    return true;
                 }
                 Client::Context context(txn, dbname);
-
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
-                stopIndexBuilds(txn, context.db(), cmdObj);
-                dropDatabase(txn, context.db());
+                stopIndexBuilds(txn, db, cmdObj);
+                dropDatabase(txn, db);
 
                 log() << "dropDatabase " << dbname << " finished";
 
@@ -254,10 +255,10 @@ namespace mongo {
 
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(),
-                                        killedIndexes.begin(),
+                std::vector<BSONObj> killedIndexes = 
+                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
+                allKilledIndexes.insert(allKilledIndexes.end(), 
+                                        killedIndexes.begin(), 
                                         killedIndexes.end());
             }
             return allKilledIndexes;
@@ -289,6 +290,8 @@ namespace mongo {
 
             IndexBuilder::restoreIndexes(indexesInProg);
 
+            // Open database before returning
+            dbHolder().openDb(txn, dbname);
             return appendCommandStatus( result, status );
         }
     } cmdRepairDatabase;
@@ -444,7 +447,7 @@ namespace mongo {
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = nsToDrop;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, nsToDrop), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -472,16 +475,17 @@ namespace mongo {
             }
 
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, nsToDrop);
-            Database* db = ctx.db();
 
-            Collection* coll = db->getCollection( txn, nsToDrop );
-            // If collection does not exist, short circuit and return.
-            if ( !coll ) {
+            AutoGetDb autoDb(txn, dbname, MODE_X);
+            Database* const db = autoDb.getDb();
+            Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
+
+            // If db/collection does not exist, short circuit and return.
+            if ( !db || !coll ) {
                 errmsg = "ns not found";
                 return false;
             }
+            Client::Context context(txn, nsToDrop);
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
 
@@ -1014,7 +1018,7 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
 
-            Collection* coll = ctx.db()->getCollection( txn, ns );
+            Collection* coll = ctx.db()->getCollection( ns );
             if ( !coll ) {
                 errmsg = "ns does not exist";
                 return false;

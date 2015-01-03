@@ -258,16 +258,8 @@ namespace {
         lossGuard.dismiss();
         _freshnessChecker.reset(NULL);
         _electCmdRunner.reset(NULL);
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        _electionId = OID::gen();
-        _topCoord->processWinElection(_electionId,
-                                      OpTime(Milliseconds(_replExecutor.now()).total_seconds(), 0));
-        const PostMemberStateUpdateAction action =
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-        _isWaitingForDrainToComplete = true;
+        _performPostMemberStateUpdateAction(kActionWinElection);
         _replExecutor.signalEvent(_electionFinishedEvent);
-        lk.unlock();
-        _performPostMemberStateUpdateAction(action);
     }
 
     void ReplicationCoordinatorImpl::_recoverFromElectionTie(

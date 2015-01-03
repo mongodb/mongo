@@ -250,6 +250,7 @@ __wt_logop_%(name)s_unpack(
     'fmt' : op_pack_fmt(optype)
 })
 
+    last_field = optype.fields[-1]
     tfile.write('''
 int
 __wt_logop_%(name)s_print(
@@ -276,7 +277,10 @@ __wt_logop_%(name)s_print(
     'print_args' : '\n\t'.join(
         '%sfprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' %
         (printf_setup(f), f[1], printf_fmt(f), printf_arg(f))
-        for f in optype.fields),
+        for f in optype.fields[:-1]) + str(
+        '\n\t%sfprintf(out, "    \\"%s\\": \\"%s\\"",%s);' %
+        (printf_setup(last_field), last_field[1],
+            printf_fmt(last_field), printf_arg(last_field))),
 })
 
 # Emit the printlog entry point

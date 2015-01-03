@@ -45,7 +45,8 @@ namespace mongo {
 
         void debugValidateAllMapsMatch();
 
-        static void WRITETODATAFILES_Impl1(const JSectHeader& h, AlignedBuilder& uncompressed) {
+        static void WRITETODATAFILES_Impl1(const JSectHeader& h,
+                                           const AlignedBuilder& uncompressed) {
             LOG(3) << "journal WRITETODATAFILES 1" << endl;
             RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), 0);
             LOG(3) << "journal WRITETODATAFILES 2" << endl;
@@ -99,7 +100,7 @@ namespace mongo {
             @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc&hl=en
         */
 
-        void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed) {
+        void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             Timer t;
             WRITETODATAFILES_Impl1(h, uncompressed);
             long long m = t.micros();

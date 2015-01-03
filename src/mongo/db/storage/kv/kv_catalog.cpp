@@ -252,8 +252,11 @@ namespace {
         BSONObj obj = _findEntry( opCtx, ns );
         LOG(3) << " fetched CCE metadata: " << obj;
         BSONCollectionCatalogEntry::MetaData md;
-        if ( obj["md"].isABSONObj() )
-            md.parse( obj["md"].Obj() );
+        const BSONElement mdElement = obj["md"];
+        if ( mdElement.isABSONObj() ) {
+            LOG(3) << "returning metadata: " << mdElement;
+            md.parse( mdElement.Obj() );
+        }
         return md;
     }
 
@@ -299,6 +302,7 @@ namespace {
             obj = b.obj();
         }
 
+        LOG(3) << "recording new metadata: " << obj;
         StatusWith<RecordId> status = _rs->updateRecord( opCtx,
                                                         loc,
                                                         obj.objdata(),

@@ -1902,7 +1902,7 @@ namespace mongo {
                 Client::WriteContext ctx(txn,  ns );
                 // Only copy if ns doesn't already exist
                 Database* db = ctx.ctx().db();
-                Collection* collection = db->getCollection( txn, ns );
+                Collection* collection = db->getCollection( ns );
 
                 if ( !collection ) {
                     list<BSONObj> infos =
@@ -1940,7 +1940,7 @@ namespace mongo {
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
                 Client::Context ctx(txn,  ns);
                 Database* db = ctx.db();
-                Collection* collection = db->getCollection( txn, ns );
+                Collection* collection = db->getCollection( ns );
                 if ( !collection ) {
                     errmsg = str::stream() << "collection dropped during migration: " << ns;
                     warning() << errmsg;

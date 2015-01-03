@@ -71,7 +71,7 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = db->getCollection( ns );
             if ( !collection ) {
                 collection = db->createCollection( txn, ns );
                 if ( !collection ) {
@@ -195,7 +195,7 @@ namespace mongo {
 
             IndexCatalog::IndexKillCriteria criteria;
             criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(opCtx, ns), criteria);
+            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
         }
 
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -209,7 +209,7 @@ namespace mongo {
             Database* db = autoDb.getDb();
             massert(13429, "no such database", db);
 
-            Collection* collection = db->getCollection(txn, nss.ns());
+            Collection* collection = db->getCollection(nss.ns());
             massert(28584, "no such collection", collection);
 
             std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);

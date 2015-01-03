@@ -223,7 +223,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 	 */
 	for (i = reccount; i < (u_int)conn->log_prealloc; i++) {
 		WT_ERR(__wt_log_allocfile(
-		    session, ++log->prep_fileid, WT_LOG_PREPNAME));
+		    session, ++log->prep_fileid, WT_LOG_PREPNAME, 1));
 		WT_STAT_FAST_CONN_INCR(session, log_prealloc_files);
 	}
 
@@ -328,7 +328,7 @@ err:		__wt_err(session, ret, "log archive server error");
 
 /*
  * __wt_logmgr_create --
- *	Start the log subsystem and archive server thread.
+ *	Initialize the log subsystem (before running recovery).
  */
 int
 __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
@@ -362,24 +362,39 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
 	else
 		log->allocsize = LOG_ALIGN;
-	INIT_LSN(&log->alloc_lsn);
-	INIT_LSN(&log->ckpt_lsn);
-	INIT_LSN(&log->first_lsn);
-	INIT_LSN(&log->sync_lsn);
+	WT_INIT_LSN(&log->alloc_lsn);
+	WT_INIT_LSN(&log->ckpt_lsn);
+	WT_INIT_LSN(&log->first_lsn);
+	WT_INIT_LSN(&log->sync_lsn);
 	/*
 	 * We only use file numbers for directory sync, so this needs to
 	 * initialized to zero.
 	 */
-	ZERO_LSN(&log->sync_dir_lsn);
-	INIT_LSN(&log->trunc_lsn);
-	INIT_LSN(&log->write_lsn);
+	WT_ZERO_LSN(&log->sync_dir_lsn);
+	WT_INIT_LSN(&log->trunc_lsn);
+	WT_INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
+	return (0);
+}
+
+/*
+ * __wt_logmgr_open --
+ *	Start the log subsystem and archive server thread.
+ */
+int
+__wt_logmgr_open(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
 	/* If no log thread services are configured, we're done. */ 
-	if (!FLD_ISSET(conn->log_flags,
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
+	    !FLD_ISSET(conn->log_flags,
 	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
 		return (0);
 

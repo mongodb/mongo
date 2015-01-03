@@ -275,7 +275,7 @@ namespace repl {
                 if ( createCollection == 0 &&
                      !isIndexBuild &&
                      isCrudOpType(opType) &&
-                     ctx.db()->getCollection(txn,ns) == NULL ) {
+                     ctx.db()->getCollection(ns) == NULL ) {
                     // uh, oh, we need to create collection
                     // try again
                     continue;
@@ -473,6 +473,10 @@ namespace repl {
 
 namespace {
     void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
+        if (replCoord->isInPrimaryOrSecondaryState()) {
+            return;
+        }
+
         ScopedTransaction transaction(txn, MODE_S);
         Lock::GlobalRead readLock(txn->lockState());
 

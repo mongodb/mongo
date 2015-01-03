@@ -156,7 +156,7 @@ namespace mongo {
 
         invariant(database);
 
-        Collection* collection = database->getCollection( txn, ns );
+        Collection* collection = database->getCollection( ns );
         if ( !collection ) {
             return false;
         }

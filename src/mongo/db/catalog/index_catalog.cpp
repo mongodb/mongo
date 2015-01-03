@@ -226,7 +226,7 @@ namespace mongo {
         auto_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             db->_indexesName,
-                                            db->getCollection(txn, db->_indexesName)));
+                                            db->getCollection(db->_indexesName)));
 
         BSONObj index;
         PlanExecutor::ExecState state;

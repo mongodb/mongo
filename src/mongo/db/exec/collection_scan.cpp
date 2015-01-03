@@ -218,7 +218,8 @@ namespace mongo {
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->restoreState(opCtx)) {
-                warning() << "Collection dropped or state deleted during yield of CollectionScan";
+                warning() << "Collection dropped or state deleted during yield of CollectionScan: "
+                          << opCtx->getNS();
                 _isDead = true;
             }
         }

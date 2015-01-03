@@ -37,6 +37,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/s/shard.h"
 

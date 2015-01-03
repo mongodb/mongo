@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -96,6 +97,8 @@ namespace mongo {
          * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
          */
         virtual void commitAndRestart() = 0;
+
+        virtual uint64_t getMyTransactionCount() const { return 0; }
 
         /**
          * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The

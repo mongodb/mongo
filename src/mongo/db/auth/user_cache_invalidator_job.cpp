@@ -42,6 +42,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/config.h"
 #include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 

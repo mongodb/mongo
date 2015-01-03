@@ -127,6 +127,10 @@ namespace mongo {
         return _collections.empty();
     }
 
+    bool KVDatabaseCatalogEntry::hasUserData() const {
+        return !isEmpty();
+    }
+
     int64_t KVDatabaseCatalogEntry::sizeOnDisk( OperationContext* opCtx ) const {
         int64_t size = 0;
 
@@ -168,8 +172,8 @@ namespace mongo {
         }
     }
 
-    CollectionCatalogEntry* KVDatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
-                                                                               const StringData& ns ) const {
+    CollectionCatalogEntry* KVDatabaseCatalogEntry::getCollectionCatalogEntry(
+                                                                    const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
         if ( it == _collections.end() )
@@ -177,8 +181,7 @@ namespace mongo {
         return it->second;
     }
 
-    RecordStore* KVDatabaseCatalogEntry::getRecordStore( OperationContext* txn,
-                                                         const StringData& ns ) {
+    RecordStore* KVDatabaseCatalogEntry::getRecordStore( const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
         CollectionMap::const_iterator it = _collections.find( ns.toString() );
         if ( it == _collections.end() )
