@@ -40,13 +40,3 @@
 
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-
-#if !defined(_WIN32)
-    typedef int HANDLE;
-#else
-    typedef void *HANDLE;
-#endif
-
-} // namespace mongo
-

@@ -41,6 +41,10 @@
 
 namespace mongo {
 
+#if !defined(_WIN32)
+    typedef int HANDLE;
+#endif
+
     extern const size_t g_minOSPageSizeBytes;
     void minOSPageSizeBytesTest(size_t minOSPageSizeBytes);  // lame-o
 
