@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/pch.h"
+
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/util/alignedbuilder.h"

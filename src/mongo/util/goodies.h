@@ -193,12 +193,5 @@ namespace mongo {
         T* _p;
     };
 
-
-
-    using boost::shared_ptr;
-    using boost::scoped_ptr;
-    using boost::scoped_array;
-    using boost::intrusive_ptr;
-    using boost::dynamic_pointer_cast;
 } // namespace mongo
 
