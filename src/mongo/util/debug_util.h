@@ -60,10 +60,6 @@ namespace mongo {
 #define MONGO_ONCE for( static bool undone = true; undone; undone = false )
 #define ONCE MONGO_ONCE
 
-#if defined(_WIN32)
-    inline int strcasecmp(const char* s1, const char* s2) {return _stricmp(s1, s2);}
-#endif
-
     // Sets SIGTRAP handler to launch GDB
     // Noop unless on *NIX and compiled with _DEBUG
     void setupSIGTRAPforGDB();

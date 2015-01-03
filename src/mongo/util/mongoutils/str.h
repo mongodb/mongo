@@ -239,4 +239,9 @@ namespace mongoutils {
 
 namespace mongo {
     using namespace mongoutils;
+
+#if defined(_WIN32)
+    inline int strcasecmp(const char* s1, const char* s2) {return _stricmp(s1, s2);}
+#endif
+
 }  // namespace mongo
