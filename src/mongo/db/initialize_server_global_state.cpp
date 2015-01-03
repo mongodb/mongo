@@ -34,6 +34,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <memory>
+#include <signal.h>
 
 #ifndef _WIN32
 #include <syslog.h>

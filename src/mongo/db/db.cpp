@@ -36,6 +36,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <limits>
+#include <signal.h>
 #include <string>
 
 #include "mongo/base/init.h"

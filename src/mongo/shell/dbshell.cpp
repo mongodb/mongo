@@ -34,6 +34,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <pcrecpp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 

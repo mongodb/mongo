@@ -31,6 +31,7 @@
 #include "mongo/pch.h"
 
 #include <boost/thread.hpp>
+#include <signal.h>
 
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"

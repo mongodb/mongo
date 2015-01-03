@@ -36,6 +36,7 @@
 #include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
+#include <signal.h>
 #include <vector>
 
 #ifdef _WIN32

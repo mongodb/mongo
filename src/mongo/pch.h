@@ -48,14 +48,6 @@
 #include <map>
 #include <vector>
 #include <set>
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-
-#include <time.h>
-#include <string.h>
-#include <limits.h>
-
 
 #define BOOST_FILESYSTEM_VERSION 3
 #include <boost/shared_ptr.hpp>
