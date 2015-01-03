@@ -42,39 +42,6 @@
 
 namespace mongo {
 
-    template<class T>
-    inline std::string ToString(const T& t) {
-        std::stringstream s;
-        s << t;
-        return s.str();
-    }
-
-    inline void dumpmemory(const char *data, int len) {
-        if ( len > 1024 )
-            len = 1024;
-        try {
-            const char *q = data;
-            const char *p = q;
-            while ( len > 0 ) {
-                for ( int i = 0; i < 16; i++ ) {
-                    if ( *p >= 32 && *p <= 126 )
-                        std::cout << *p;
-                    else
-                        std::cout << '.';
-                    p++;
-                }
-                std::cout << "  ";
-                p -= 16;
-                for ( int i = 0; i < 16; i++ )
-                    std::cout << (unsigned) ((unsigned char)*p++) << ' ';
-                std::cout << std::endl;
-                len -= 16;
-            }
-        }
-        catch (...) {
-        }
-    }
-
 // PRINT(2+2);  prints "2+2: 4"
 #define MONGO_PRINT(x) std::cout << #x ": " << (x) << std::endl
 #define PRINT MONGO_PRINT
