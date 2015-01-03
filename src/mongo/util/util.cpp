@@ -54,41 +54,6 @@ namespace mongo {
         return s;
     }
 
-    bool isPrime(int n) {
-        int z = 2;
-        while ( 1 ) {
-            if ( z*z > n )
-                break;
-            if ( n % z == 0 )
-                return false;
-            z++;
-        }
-        return true;
-    }
-
-    int nextPrime(int n) {
-        n |= 1; // 2 goes to 3...don't care...
-        while ( !isPrime(n) )
-            n += 2;
-        return n;
-    }
-
-    struct UtilTest : public StartupTest {
-        void run() {
-            verify( isPrime(3) );
-            verify( isPrime(2) );
-            verify( isPrime(13) );
-            verify( isPrime(17) );
-            verify( !isPrime(9) );
-            verify( !isPrime(6) );
-            verify( nextPrime(4) == 5 );
-            verify( nextPrime(8) == 11 );
-
-            verify( endsWith("abcde", "de") );
-            verify( !endsWith("abcde", "dasdfasdfashkfde") );
-        }
-    } utilTest;
-
     bool StaticObserver::_destroyingStatics = false;
 
 } // namespace mongo
