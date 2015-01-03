@@ -60,7 +60,6 @@
 #define BOOST_FILESYSTEM_VERSION 3
 #include <boost/shared_ptr.hpp>
 #include <boost/smart_ptr.hpp>
-#include <boost/version.hpp>
 
 #include "mongo/client/redef_macros.h"
 

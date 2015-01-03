@@ -40,6 +40,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/version.hpp>
 #include <iomanip>
 #include <fstream>
 

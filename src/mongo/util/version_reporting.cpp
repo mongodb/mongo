@@ -33,6 +33,7 @@
 
 #include "mongo/util/version_reporting.h"
 
+#include <boost/version.hpp>
 #include <sstream>
 #include <string>
 
