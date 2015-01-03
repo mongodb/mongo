@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/util/goodies.h"
 #include "mongo/util/thread_safe_string.h"
 #include <boost/noncopyable.hpp>
 

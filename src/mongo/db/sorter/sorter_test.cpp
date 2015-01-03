@@ -35,7 +35,6 @@
 
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 
 // Need access to internal classes

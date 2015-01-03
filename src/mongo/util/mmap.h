@@ -37,7 +37,6 @@
 
 #include "mongo/client/export_macros.h"
 #include "mongo/util/concurrency/rwlock.h"
-#include "mongo/util/goodies.h"
 
 namespace mongo {
 

@@ -42,7 +42,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

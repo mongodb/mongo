@@ -37,7 +37,6 @@
 
 #include "mongo/db/repl/server.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/time_support.h"
