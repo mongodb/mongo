@@ -42,18 +42,6 @@
 
 namespace mongo {
 
-    string hexdump(const char *data, unsigned len) {
-        verify( len < 1000000 );
-        const unsigned char *p = (const unsigned char *) data;
-        stringstream ss;
-        ss << std::hex << setw(2) << setfill('0');
-        for( unsigned i = 0; i < len; i++ ) {
-            ss << static_cast<unsigned>(p[i]) << ' ';
-        }
-        string s = ss.str();
-        return s;
-    }
-
     bool StaticObserver::_destroyingStatics = false;
 
 } // namespace mongo

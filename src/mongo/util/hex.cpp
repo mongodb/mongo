@@ -27,8 +27,11 @@
  *    then also delete it in the license file.
  */
 
-#include <string>
 #include "mongo/util/hex.h"
+
+#include <iomanip>
+#include <sstream>
+#include <string>
 
 namespace mongo {
 
@@ -65,4 +68,18 @@ namespace mongo {
     template<> std::string integerToHex<unsigned long>(unsigned long val) { return integerToHexDef(val); }
     template<> std::string integerToHex<long long>(long long val) { return integerToHexDef(val); }
     template<> std::string integerToHex<unsigned long long>(unsigned long long val) { return integerToHexDef(val); }
+
+
+    string hexdump(const char *data, unsigned len) {
+        verify( len < 1000000 );
+        const unsigned char *p = (const unsigned char *) data;
+        std::stringstream ss;
+        ss << std::hex << std::setw(2) << std::setfill('0');
+        for( unsigned i = 0; i < len; i++ ) {
+            ss << static_cast<unsigned>(p[i]) << ' ';
+        }
+        std::string s = ss.str();
+        return s;
+    }
+
 }

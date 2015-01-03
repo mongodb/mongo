@@ -58,6 +58,7 @@
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"

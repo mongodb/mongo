@@ -51,6 +51,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
