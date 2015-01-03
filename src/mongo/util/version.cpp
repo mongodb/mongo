@@ -33,6 +33,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -66,7 +67,7 @@ namespace mongo {
                 verify(*c == '\0');
                 break;
             }
-            else if (startsWith(curPart, "rc")){
+            else if (str::startsWith(curPart, "rc")){
                 num = 0;
                 verify( parseNumberFromString( curPart.substr(2), &num ).isOK() );
                 finalPart = -10 + num;

@@ -416,7 +416,7 @@ string finishCode( string code ) {
             return "";
 
         char * linePtr = line;
-        while ( startsWith( linePtr, "... " ) )
+        while ( str::startsWith( linePtr, "... " ) )
             linePtr += 4;
 
         code += linePtr;
@@ -831,7 +831,7 @@ int _main( int argc, char* argv[], char **envp ) {
                 continue;
             }
 
-            if ( startsWith( linePtr, "edit " ) ) {
+            if ( str::startsWith( linePtr, "edit " ) ) {
                 shellHistoryAdd( linePtr );
 
                 const char* s = linePtr + 5; // skip "edit "

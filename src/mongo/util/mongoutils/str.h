@@ -91,6 +91,12 @@ namespace mongoutils {
             size_t len = strlen(s);
             return len && s[len-1] == p;
         }
+        inline bool endsWith(const char *p, const char *suffix) {
+            size_t a = strlen(p);
+            size_t b = strlen(suffix);
+            if ( b > a ) return false;
+            return strcmp(p + a - b, suffix) == 0;
+        }
 
         inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
 

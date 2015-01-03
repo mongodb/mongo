@@ -160,7 +160,7 @@ namespace mongo {
                         ss << *q++;
                     ss << "\">";
                     q = p;
-                    if( startsWith(q, "http://www.mongodb.org/display/") )
+                    if( str::startsWith(q, "http://www.mongodb.org/display/") )
                         q += 31;
                     while( *q && *q != ' ' && *q != '\n' ) {
                         ss << (*q == '+' ? ' ' : *q);

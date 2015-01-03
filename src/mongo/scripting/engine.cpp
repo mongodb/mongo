@@ -134,7 +134,7 @@ namespace {
             for (boost::filesystem::directory_iterator it (p); it != end; it++) {
                 empty = false;
                 boost::filesystem::path sub(*it);
-                if (!endsWith(sub.string().c_str(), ".js"))
+                if (!str::endsWith(sub.string().c_str(), ".js"))
                     continue;
                 if (!execFile(sub.string(), printResult, reportError, timeoutMs))
                     return false;
