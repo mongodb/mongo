@@ -184,13 +184,7 @@ namespace mongo {
         }
 
         // Bool does not have a well defined encoding.
-#if __cplusplus >= 201103L
         void appendNum(bool j) = delete;
-#else
-        void appendNum(bool j) {
-            invariant(false);
-        }
-#endif
 
         void appendNum(double j) {
             BOOST_STATIC_ASSERT(sizeof(double) == 8);

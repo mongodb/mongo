@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <boost/config.hpp>
 #include <iosfwd>
 #include <string>
 
@@ -75,10 +76,8 @@ namespace mongo {
         inline Status(const Status& other);
         inline Status& operator=(const Status& other);
 
-#if __cplusplus >= 201103L
-        inline Status(Status&& other) noexcept;
-        inline Status& operator=(Status&& other) noexcept;
-#endif // __cplusplus >= 201103L
+        inline Status(Status&& other) BOOST_NOEXCEPT;
+        inline Status& operator=(Status&& other) BOOST_NOEXCEPT;
 
         inline ~Status();
 

@@ -36,19 +36,24 @@ namespace mongo {
 
     class SharedBuffer {
     public:
-        SharedBuffer() {}
+        SharedBuffer() = default;
 
         void swap(SharedBuffer& other) {
             _holder.swap(other._holder);
         }
 
-        /**
-         * C++03 compatible way of writing std::move(someSharedBuffer)
-         */
-        SharedBuffer moveFrom() {
-            SharedBuffer out;
-            this->swap(out);
-            return out;
+        SharedBuffer(const SharedBuffer&) = default;
+        SharedBuffer& operator=(const SharedBuffer&) = default;
+
+        SharedBuffer(SharedBuffer&& other)
+            : _holder() {
+            swap(other);
+        }
+
+        SharedBuffer& operator=(SharedBuffer&& other) {
+            swap(other);
+            other._holder.reset();
+            return *this;
         }
 
         static SharedBuffer allocate(size_t bytes) {

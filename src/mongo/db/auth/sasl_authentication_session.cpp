@@ -48,7 +48,7 @@
 
 namespace mongo {
     SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn
-        SaslAuthenticationSession::create = NULL;
+        SaslAuthenticationSession::create;
 
     // Mechanism name constants.
     const char SaslAuthenticationSession::mechanismCRAMMD5[] = "CRAM-MD5";

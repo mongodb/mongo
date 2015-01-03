@@ -35,7 +35,7 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 
 namespace mongo {
-    SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create = NULL;
+    SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;
 
     SaslClientSession::SaslClientSession() {}
 

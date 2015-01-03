@@ -28,12 +28,9 @@
 #pragma once
 
 #include <cstring>
+#include <type_traits>
 
 #include "mongo/platform/endian.h"
-
-#if __cplusplus >= 201103L
-#include <type_traits>
-#endif
 
 namespace mongo {
 

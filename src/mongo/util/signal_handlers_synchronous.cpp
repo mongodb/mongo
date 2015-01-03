@@ -131,7 +131,6 @@ namespace {
     void myTerminate() {
         boost::mutex::scoped_lock lk(streamMutex);
 
-#if __cplusplus >= 201103L || defined(_MSC_VER) // Available in MSVC++2010 and newer.
         // In c++11 we can recover the current exception to print it.
         if (std::exception_ptr eptr = std::current_exception()) {
             mallocFreeOStream << "terminate() called. An exception is active;"
@@ -172,9 +171,6 @@ namespace {
         else {
             mallocFreeOStream << "terminate() called. No exception is active";
         }
-#else
-        mallocFreeOStream << "terminate() called.\n";
-#endif
 
         printStackTrace(mallocFreeOStream);
         writeMallocFreeStreamToLog();

@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    // TODO: Does this need to have move support?
     /**
      * A replacement for the Record class. This class represents data in a record store.
      * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
@@ -47,7 +48,7 @@ namespace mongo {
         RecordData(const char* data, int size): _data(data), _size(size) { }
 
         RecordData(SharedBuffer ownedData, int size)
-                : _data(ownedData.get()), _size(size), _ownedData(ownedData.moveFrom()) {
+            : _data(ownedData.get()), _size(size), _ownedData(std::move(ownedData)) {
         }
 
         const char* data() const { return _data; }
@@ -60,7 +61,7 @@ namespace mongo {
         bool isOwned() const { return _ownedData.get(); }
 
         SharedBuffer releaseBuffer() {
-            return _ownedData.moveFrom();
+            return std::move(_ownedData);
         }
 
         BSONObj toBson() const { return isOwned() ? BSONObj(_ownedData) : BSONObj(_data); }

@@ -659,7 +659,7 @@ namespace mongo {
 
         SharedBuffer data = SharedBuffer::allocate(valueStorage.size());
         memcpy(data.get(), valueStorage.data(), valueStorage.size());
-        return RecordData(data.moveFrom(), valueStorage.size());
+        return RecordData(data, valueStorage.size());
     }
 
     void RocksRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {

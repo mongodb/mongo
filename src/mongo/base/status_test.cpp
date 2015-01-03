@@ -67,7 +67,6 @@ namespace {
         ASSERT_EQUALS(orig.refCount(), 2U);
     }
 
-#if __cplusplus >= 201103L
     TEST(Cloning, MoveCopyOK) {
         Status orig = Status::OK();
         ASSERT_TRUE(orig.isOK());
@@ -183,8 +182,6 @@ namespace {
         ASSERT_TRUE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 0U);
     }
-
-#endif // __cplusplus >= 201103L
 
     TEST(Cloning, OKIsNotRefCounted) {
         ASSERT_EQUALS(Status::OK().refCount(), 0U);

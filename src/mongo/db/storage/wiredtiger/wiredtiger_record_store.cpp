@@ -317,7 +317,7 @@ namespace {
 
         SharedBuffer data = SharedBuffer::allocate(value.size);
         memcpy( data.get(), value.data, value.size );
-        return RecordData(data.moveFrom(), value.size);
+        return RecordData(data, value.size);
     }
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {

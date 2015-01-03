@@ -107,11 +107,10 @@ namespace mongo {
         }
 
         explicit BSONObj(SharedBuffer ownedBuffer)
-                : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata())
-                , _ownedBuffer(ownedBuffer.moveFrom()) {
+            : _objdata(ownedBuffer.get() ? ownedBuffer.get() : BSONObj().objdata())
+            , _ownedBuffer(std::move(ownedBuffer)) {
         }
 
-#if __cplusplus >= 201103L
         /** Move construct a BSONObj */
         BSONObj(BSONObj&& other)
             : _objdata(std::move(other._objdata))
@@ -125,7 +124,6 @@ namespace mongo {
 
         /** Copy construct a BSONObj. */
         BSONObj(const BSONObj&) = default;
-#endif
 
         /** Provide assignment semantics. We use the value taking form so that we can use copy
          *  and swap, and consume both lvalue and rvalue references.

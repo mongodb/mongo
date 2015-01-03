@@ -45,19 +45,17 @@ namespace mongo {
         return *this;
     }
 
-#if __cplusplus >= 201103L
-    inline Status::Status(Status&& other) noexcept
+    inline Status::Status(Status&& other) BOOST_NOEXCEPT
         : _error(other._error) {
         other._error = nullptr;
     }
 
-    inline Status& Status::operator=(Status&& other) noexcept {
+    inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
         unref(_error);
         _error = other._error;
         other._error = nullptr;
         return *this;
     }
-#endif // __cplusplus >= 201103L
 
     inline Status::~Status() {
         unref(_error);

@@ -45,6 +45,7 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <mutex>
 
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
@@ -67,10 +68,6 @@
 #include "mongo/util/version.h"
 #include "mongo/util/version_reporting.h"
 #include "mongo/db/concurrency/lock_state.h"
-
-#if (__cplusplus >= 201103L)
-#include <mutex>
-#endif
 
 namespace PerfTests {
 
@@ -543,10 +540,8 @@ namespace PerfTests {
     mongo::mutex mtest("mtest");
     boost::mutex mboost;
     boost::timed_mutex mboost_timed;
-#if (__cplusplus >= 201103L)
     std::mutex mstd;
     std::timed_mutex mstd_timed;
-#endif
     SpinLock s;
     boost::condition c;
 
@@ -595,7 +590,7 @@ namespace PerfTests {
             SimpleMutex::scoped_lock lk(m);
         }
     };
-#if (__cplusplus >= 201103L)
+
     class stdmutexspeed : public B {
     public:
         string name() { return "std::mutex"; }
@@ -614,7 +609,7 @@ namespace PerfTests {
             std::lock_guard<std::timed_mutex> lk(mstd_timed);
         }
     };
-#endif
+
     class spinlockspeed : public B {
     public:
         string name() { return "spinlock"; }
@@ -1383,7 +1378,6 @@ namespace PerfTests {
         const Status _status;
     };
 
-#if __cplusplus >= 201103L
     class StatusMoveTestBase : public StatusTestBase {
     public:
         StatusMoveTestBase(bool ok)
@@ -1416,7 +1410,6 @@ namespace PerfTests {
             : StatusMoveTestBase(false) {}
         string name() { return "move-not-ok-status"; }
     };
-#endif
 
     class All : public Suite {
     public:
@@ -1485,10 +1478,8 @@ namespace PerfTests {
                 add< simplemutexspeed >();
                 add< boostmutexspeed >();
                 add< boosttimed_mutexspeed >();
-#if (__cplusplus >= 201103L)
                 add< stdmutexspeed >();
                 add< stdtimed_mutexspeed >();
-#endif
                 add< spinlockspeed >();
 #ifdef RUNCOMPARESWAP
                 add< casspeed >();
@@ -1517,10 +1508,8 @@ namespace PerfTests {
                 add< ReturnNotOKStatus >();
                 add< CopyOKStatus >();
                 add< CopyNotOKStatus >();
-#if __cplusplus >= 201103L
                 add< MoveOKStatus >();
                 add< MoveNotOKStatus >();
-#endif
             }
         }
     } myall;
