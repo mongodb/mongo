@@ -71,8 +71,6 @@ namespace mongo {
     using boost::shared_ptr;
 }
 
-
-#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 
 #endif // MONGO_PCH_H

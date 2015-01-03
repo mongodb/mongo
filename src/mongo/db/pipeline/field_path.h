@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/pch.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

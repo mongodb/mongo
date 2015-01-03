@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
     namespace base64 {
 
