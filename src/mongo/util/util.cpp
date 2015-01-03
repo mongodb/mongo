@@ -89,11 +89,6 @@ namespace mongo {
         }
     } utilTest;
 
-    ostream& operator<<( ostream &s, const ThreadSafeString &o ) {
-        s << o.toString();
-        return s;
-    }
-
     bool StaticObserver::_destroyingStatics = false;
 
 } // namespace mongo

@@ -38,7 +38,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -114,46 +113,6 @@ namespace mongo {
 #else
     typedef void *HANDLE;
 #endif
-
-
-    /**
-     * this is a thread safe string
-     * you will never get a bad pointer, though data may be mungedd
-     */
-    class ThreadSafeString : boost::noncopyable {
-    public:
-        ThreadSafeString( size_t size=256 )
-            : _size( size ) , _buf( new char[size] ) {
-            memset( _buf , '\0' , _size );
-        }
-
-        ~ThreadSafeString() {
-            delete[] _buf;
-        }
-
-        std::string toString() const {
-            return _buf;
-        }
-
-        ThreadSafeString& operator=( const StringData& str ) {
-            size_t s = str.size();
-            if ( s >= _size - 2 )
-                s = _size - 2;
-            strncpy( _buf , str.rawData() , s );
-            _buf[s] = '\0';
-            return *this;
-        }
-
-        bool empty() const {
-            return _buf[0] == '\0';
-        }
-
-    private:
-        const size_t _size;
-        char *const _buf;
-    };
-
-    std::ostream& operator<<(std::ostream &s, const ThreadSafeString &o);
 
 } // namespace mongo
 
