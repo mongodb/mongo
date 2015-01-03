@@ -27,6 +27,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/client/export_macros.h"
 #include "mongo/client/sasl_client_session.h"
 
 namespace mongo {

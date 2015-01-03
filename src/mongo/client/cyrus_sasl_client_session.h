@@ -25,6 +25,7 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/client/export_macros.h"
 #include "mongo/client/sasl_client_session.h"
 
 #include <sasl/sasl.h>

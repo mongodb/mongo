@@ -59,8 +59,6 @@
 
 #include "mongo/client/redef_macros.h"
 
-#include "mongo/client/export_macros.h"
-
 namespace mongo {
 
     using namespace std;
