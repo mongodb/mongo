@@ -35,7 +35,10 @@
 */
 
 
+#define MONGO_PCH_WHITELISTED
+#include "mongo/platform/basic.h"
 #include "mongo/pch.h"
+#undef MONGO_PCH_WHITELISTED
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>

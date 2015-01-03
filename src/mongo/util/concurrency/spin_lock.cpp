@@ -27,7 +27,10 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h" // todo eliminate this include
+#define MONGO_PCH_WHITELISTED
+#include "mongo/platform/basic.h"
+#include "mongo/pch.h"
+#undef MONGO_PCH_WHITELISTED // todo eliminate this include
 
 #include "mongo/util/concurrency/spin_lock.h"
 

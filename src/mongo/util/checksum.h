@@ -28,7 +28,10 @@
 
 #pragma once
 
+#define MONGO_PCH_WHITELISTED
+#include "mongo/platform/basic.h"
 #include "mongo/pch.h"
+#undef MONGO_PCH_WHITELISTED
 
 namespace mongo {
     /** a simple, rather dumb, but very fast checksum.  see perftests.cpp for unit tests. */

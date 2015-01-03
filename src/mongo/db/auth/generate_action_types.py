@@ -144,7 +144,7 @@ sourceFileTemplate = """// AUTO-GENERATED FILE DO NOT EDIT
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/action_type.h"
 

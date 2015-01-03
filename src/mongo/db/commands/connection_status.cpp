@@ -26,7 +26,10 @@
  *    it in the license file.
  */
 
-#include <mongo/pch.h>
+#define MONGO_PCH_WHITELISTED
+#include "mongo/platform/basic.h"
+#include "mongo/pch.h"
+#undef MONGO_PCH_WHITELISTED
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"

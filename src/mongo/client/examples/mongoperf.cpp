@@ -37,7 +37,10 @@
 // so we define the following macro
 #define MONGO_EXPOSE_MACROS 1
 
+#define MONGO_PCH_WHITELISTED
+#include "mongo/platform/basic.h"
 #include "mongo/pch.h"
+#undef MONGO_PCH_WHITELISTED
 
 #include <iostream>
 

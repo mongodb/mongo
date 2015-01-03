@@ -33,11 +33,13 @@
 #ifndef MONGO_PCH_H
 #define MONGO_PCH_H
 
+#ifndef MONGO_PCH_WHITELISTED
+#error New uses of mongo/pch.h are prohibited
+#endif
+
 // our #define macros must not be active when we include
 // system headers and boost headers
 #include "mongo/client/undef_macros.h"
-
-#include "mongo/platform/basic.h"
 
 #include <ctime>
 #include <cstring>
