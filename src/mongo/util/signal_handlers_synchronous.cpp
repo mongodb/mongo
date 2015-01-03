@@ -46,6 +46,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/debugger.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/log.h"

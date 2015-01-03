@@ -27,7 +27,9 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/util/debugger.h"
 
 #include "mongo/db/server_options.h"
 
@@ -40,7 +42,7 @@
 #endif  // defined(USE_GDBSERVER)
 
 namespace mongo {
-    void mongo_breakpoint() {
+    void breakpoint() {
 #ifdef _WIN32
         DEV DebugBreak();
 #endif

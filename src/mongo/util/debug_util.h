@@ -60,12 +60,4 @@ namespace mongo {
 #define MONGO_ONCE for( static bool undone = true; undone; undone = false )
 #define ONCE MONGO_ONCE
 
-    // Sets SIGTRAP handler to launch GDB
-    // Noop unless on *NIX and compiled with _DEBUG
-    void setupSIGTRAPforGDB();
-
-    void mongo_breakpoint();
-    inline void breakpoint() {
-        mongo_breakpoint();
-    }
 } // namespace mongo
