@@ -51,7 +51,7 @@
 #undef DESTRUCTOR_GUARD
 #pragma pop_macro("DESTRUCTOR_GUARD")
 
-// util/goodies.h
+// util/print.h
 #undef PRINT
 #pragma pop_macro("PRINT")
 #undef PRINTFL

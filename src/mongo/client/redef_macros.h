@@ -60,7 +60,7 @@
 #undef DESTRUCTOR_GUARD
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
 
-// util/goodies.h
+// util/print.h
 #pragma push_macro("PRINT")
 #undef PRINT
 #define PRINT MONGO_PRINT

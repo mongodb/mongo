@@ -58,6 +58,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/print.h"
 #include "mongo/util/ptr.h"
 
 namespace mongo {

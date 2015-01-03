@@ -42,13 +42,6 @@
 
 namespace mongo {
 
-// PRINT(2+2);  prints "2+2: 4"
-#define MONGO_PRINT(x) std::cout << #x ": " << (x) << std::endl
-#define PRINT MONGO_PRINT
-// PRINTFL; prints file:line
-#define MONGO_PRINTFL std::cout << __FILE__ ":" << __LINE__ << std::endl
-#define PRINTFL MONGO_PRINTFL
-
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
         if ( strlen(str) < l ) return false;

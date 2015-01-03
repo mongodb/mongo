@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/util/print.h"
 
 namespace DocumentTests {
 
