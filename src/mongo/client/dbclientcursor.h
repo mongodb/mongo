@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"

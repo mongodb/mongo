@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <vector>
 
 #include "mongo/util/net/message.h"

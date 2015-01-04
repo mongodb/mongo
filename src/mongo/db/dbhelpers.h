@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/db.h"
 #include "mongo/db/record_id.h"

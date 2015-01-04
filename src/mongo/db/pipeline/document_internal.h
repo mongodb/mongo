@@ -31,6 +31,7 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/db/pipeline/value.h"

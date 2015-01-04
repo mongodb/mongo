@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlockimpl.h"
 #include "mongo/util/concurrency/simplerwlock.h"

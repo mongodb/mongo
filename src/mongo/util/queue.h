@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 #include <limits>
 #include <queue>

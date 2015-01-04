@@ -35,6 +35,7 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/noncopyable.hpp>
 #include <set>
 
 #include "mongo/db/auth/authorization_manager.h"

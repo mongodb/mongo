@@ -37,6 +37,7 @@
 
 #include "mongo/util/concurrency/thread_pool.h"
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/util/concurrency/mvar.h"

@@ -31,6 +31,7 @@
 
 #include <list>
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 
 #include "mongo/stdx/functional.h"

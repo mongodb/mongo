@@ -34,6 +34,8 @@
 #include "mongo/platform/windows_basic.h"
 #endif
 
+#include <boost/noncopyable.hpp>
+
 #include "mutex.h"
 
 namespace mongo {

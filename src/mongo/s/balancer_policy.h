@@ -31,6 +31,8 @@
 #ifndef S_BALANCER_POLICY_HEADER
 #define S_BALANCER_POLICY_HEADER
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/base/status_with.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/jsobj.h"

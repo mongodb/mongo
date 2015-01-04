@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/repl/health.h"
 #include "mongo/util/concurrency/mutex.h"
 

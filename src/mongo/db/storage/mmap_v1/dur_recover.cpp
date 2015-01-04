@@ -35,6 +35,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/noncopyable.hpp>
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>

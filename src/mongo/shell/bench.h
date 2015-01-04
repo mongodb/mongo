@@ -33,6 +33,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/client/dbclientinterface.h"

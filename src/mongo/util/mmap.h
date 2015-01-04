@@ -33,6 +33,7 @@
 #include <sstream>
 #include <vector>
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/xtime.hpp>
 
 #include "mongo/client/export_macros.h"

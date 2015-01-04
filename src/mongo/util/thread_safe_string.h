@@ -32,7 +32,7 @@
 #include <iosfwd>
 #include <string>
 
-#include <boost/utility.hpp>
+#include <boost/noncopyable.hpp>
 
 #include "mongo/base/string_data.h"
 

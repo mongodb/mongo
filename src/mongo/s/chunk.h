@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/query_solution.h"

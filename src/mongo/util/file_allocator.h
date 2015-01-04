@@ -34,6 +34,7 @@
 
 #include <list>
 #include <boost/filesystem/path.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 
 #include "mongo/util/concurrency/mutex.h"

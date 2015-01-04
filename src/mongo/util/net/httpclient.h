@@ -35,6 +35,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/noncopyable.hpp>
+
 namespace mongo {
 
     class MONGO_CLIENT_API HttpClient : boost::noncopyable {

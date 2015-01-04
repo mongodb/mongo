@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>

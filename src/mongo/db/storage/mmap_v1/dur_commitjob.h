@@ -35,6 +35,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/util/alignedbuilder.h"

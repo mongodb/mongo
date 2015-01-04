@@ -38,6 +38,9 @@
 #include "mongo/platform/basic.h"
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
+
+#include <boost/noncopyable.hpp>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/md5.hpp"
 

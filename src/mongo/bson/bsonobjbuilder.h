@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/static_assert.hpp>
 #include <map>
 #include <cmath>

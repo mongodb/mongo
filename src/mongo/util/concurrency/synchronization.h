@@ -30,6 +30,8 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
+#include <boost/noncopyable.hpp>
+
 #include "mutex.h"
 
 namespace mongo {

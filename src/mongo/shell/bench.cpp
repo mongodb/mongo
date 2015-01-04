@@ -36,6 +36,7 @@
 
 #include <pcrecpp.h>
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 

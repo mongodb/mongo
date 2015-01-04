@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"

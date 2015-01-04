@@ -32,6 +32,7 @@
 
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 
 #include "mongo/bson/util/builder.h"
 
