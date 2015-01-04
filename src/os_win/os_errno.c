@@ -59,10 +59,10 @@ __wt_errno(void)
  * __wt_strerror --
  *	Windows implementation of wiredtiger_strerror.
  */
-char *
+const char *
 __wt_strerror(int error)
 {
-	char *p;
+	const char *p;
 
 	/*
 	 * POSIX errors are non-negative integers; check for 0 explicitly
@@ -83,7 +83,7 @@ int
 __wt_strerror_r(int error, char *buf, size_t buflen)
 {
 	DWORD lasterror;
-	char *p;
+	const char *p;
 
 	/* Require at least 2 bytes, printable character and trailing nul. */
 	if (buflen < 2)
