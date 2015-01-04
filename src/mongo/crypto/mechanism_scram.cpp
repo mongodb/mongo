@@ -30,6 +30,7 @@
 
 #include "mongo/crypto/mechanism_scram.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/crypto/crypto.h"
@@ -38,6 +39,8 @@
 
 namespace mongo {
 namespace scram {
+
+    using boost::scoped_ptr;
 
     // Compute the SCRAM step Hi() as defined in RFC5802
     static void HMACIteration(const unsigned char input[],

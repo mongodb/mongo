@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"

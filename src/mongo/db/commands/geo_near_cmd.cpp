@@ -28,6 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -51,6 +52,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     class Geo2dFindNearCmd : public Command {
     public:

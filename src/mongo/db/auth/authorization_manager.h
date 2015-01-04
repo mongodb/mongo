@@ -477,7 +477,7 @@ namespace mongo {
          */
         bool _authEnabled;
 
-        scoped_ptr<AuthzManagerExternalState> _externalState;
+        boost::scoped_ptr<AuthzManagerExternalState> _externalState;
 
         /**
          * Cached value of the authorization schema version.

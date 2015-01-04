@@ -41,6 +41,9 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
+
+using boost::scoped_ptr;
+
 namespace mongo {
 namespace repl {
 namespace {

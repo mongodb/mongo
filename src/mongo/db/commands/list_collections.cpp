@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/database.h"
@@ -45,6 +47,8 @@
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     class CmdListCollections : public Command {
     public:

@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/native_sasl_authentication_session.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/range/size.hpp>
 
 #include "mongo/base/init.h"
@@ -51,6 +52,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
 namespace {
     SaslAuthenticationSession* createNativeSaslAuthenticationSession(
         AuthorizationSession* authzSession,

@@ -27,7 +27,6 @@
  */
 
 #include <boost/scoped_ptr.hpp>
-
 #include <vector>
 
 #include "mongo/base/status.h"

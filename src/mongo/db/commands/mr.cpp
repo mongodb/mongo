@@ -34,6 +34,8 @@
 
 #include "mongo/db/commands/mr.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -65,6 +67,8 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace mr {
 

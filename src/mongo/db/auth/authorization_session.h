@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -222,7 +223,7 @@ namespace mongo {
         // lock on the admin database (to update out-of-date user privilege information).
         bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
-        scoped_ptr<AuthzSessionExternalState> _externalState;
+        boost::scoped_ptr<AuthzSessionExternalState> _externalState;
 
         // All Users who have been authenticated on this connection.
         UserSet _authenticatedUsers;

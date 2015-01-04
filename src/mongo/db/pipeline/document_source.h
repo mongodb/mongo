@@ -35,6 +35,7 @@
 
 #include <boost/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <deque>
 
@@ -558,7 +559,7 @@ namespace mongo {
         GroupsMap::iterator groupsIterator;
 
         // only used when _spilled
-        scoped_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+        boost::scoped_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
         std::pair<Value, Value> _firstPartOfNextGroup;
         Value _currentId;
         Accumulators _currentAccumulators;
@@ -608,7 +609,7 @@ namespace mongo {
         DocumentSourceMatch(const BSONObj &query,
             const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        scoped_ptr<Matcher> matcher;
+        boost::scoped_ptr<Matcher> matcher;
         bool _isTextQuery;
     };
 
@@ -903,7 +904,7 @@ namespace mongo {
 
         bool _done;
         bool _mergingPresorted;
-        scoped_ptr<MySorter::Iterator> _output;
+        boost::scoped_ptr<MySorter::Iterator> _output;
     };
 
     class DocumentSourceLimit : public DocumentSource
@@ -1050,11 +1051,11 @@ namespace mongo {
         void unwindPath(const FieldPath &fieldPath);
 
         // Configuration state.
-        scoped_ptr<FieldPath> _unwindPath;
+        boost::scoped_ptr<FieldPath> _unwindPath;
 
         // Iteration state.
         class Unwinder;
-        scoped_ptr<Unwinder> _unwinder;
+        boost::scoped_ptr<Unwinder> _unwinder;
     };
 
     class DocumentSourceGeoNear : public DocumentSource
@@ -1096,13 +1097,13 @@ namespace mongo {
         // coords and distanceField are required, rest are optional
         BSONObj coords; // "near" option, but near is a reserved keyword on windows
         bool coordsIsArray;
-        scoped_ptr<FieldPath> distanceField; // Using scoped_ptr because FieldPath can't be empty
+        boost::scoped_ptr<FieldPath> distanceField; // Using scoped_ptr because FieldPath can't be empty
         long long limit;
         double maxDistance;
         BSONObj query;
         bool spherical;
         double distanceMultiplier;
-        scoped_ptr<FieldPath> includeLocs;
+        boost::scoped_ptr<FieldPath> includeLocs;
         bool uniqueDocs;
 
         // these fields are used while processing the results

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -102,7 +104,7 @@ namespace mongo {
         double _boundsIncrement;
 
         class DensityEstimator;
-        scoped_ptr<DensityEstimator> _densityEstimator;
+        boost::scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
     /**
@@ -147,7 +149,7 @@ namespace mongo {
         double _boundsIncrement;
 
         class DensityEstimator;
-        scoped_ptr<DensityEstimator> _densityEstimator;
+        boost::scoped_ptr<DensityEstimator> _densityEstimator;
     };
 
 } // namespace mongo

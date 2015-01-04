@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/scripting/engine.h"
 
@@ -142,7 +144,7 @@ namespace mongo {
         CommonStats _commonStats;
         GroupStats _specificStats;
 
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // Current state for this stage.
         GroupState _groupState;

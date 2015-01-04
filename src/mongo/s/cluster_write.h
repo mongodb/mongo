@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -58,7 +60,7 @@ namespace mongo {
         bool _autoSplit;
         int _timeoutMillis;
 
-        scoped_ptr<ClusterWriterStats> _stats;
+        boost::scoped_ptr<ClusterWriterStats> _stats;
     };
 
     class ClusterWriterStats {
@@ -75,7 +77,7 @@ namespace mongo {
 
     private:
 
-        scoped_ptr<BatchWriteExecStats> _shardStats;
+        boost::scoped_ptr<BatchWriteExecStats> _shardStats;
     };
 
     /**

@@ -32,6 +32,8 @@
 
 #include "mongo/s/balance.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobj.h"
@@ -58,6 +60,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     MONGO_FP_DECLARE(skipBalanceRound);
 

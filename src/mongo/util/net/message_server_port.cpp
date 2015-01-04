@@ -34,6 +34,7 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #ifndef USE_ASIO
@@ -62,6 +63,8 @@
 #endif
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     class PortMessageServer : public MessageServer , public Listener {
     public:

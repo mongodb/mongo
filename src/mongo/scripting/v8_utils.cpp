@@ -32,6 +32,7 @@
 #include "mongo/scripting/v8_utils.h"
 
 #include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
@@ -48,6 +49,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 using namespace std;
+using boost::scoped_ptr;
 
 namespace mongo {
 

@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -39,6 +41,8 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace {
         class MyOperationContext : public OperationContextNoop {

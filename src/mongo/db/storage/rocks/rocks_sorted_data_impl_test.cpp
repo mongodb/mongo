@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
 
@@ -44,6 +45,8 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     class RocksSortedDataImplHarness : public HarnessHelper {
     public:

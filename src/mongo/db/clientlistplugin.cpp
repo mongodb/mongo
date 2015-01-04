@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -45,6 +46,9 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
 namespace {
 
     class ClientListPlugin : public WebStatusPlugin {

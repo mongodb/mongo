@@ -41,6 +41,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <map>
 #include <memory>
 #include <string>

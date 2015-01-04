@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
@@ -89,7 +91,7 @@ namespace mongo {
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
-        scoped_ptr<RecordIterator> _iter;
+        boost::scoped_ptr<RecordIterator> _iter;
 
         CollectionScanParams _params;
 

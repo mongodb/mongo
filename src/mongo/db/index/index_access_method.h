@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -226,7 +228,7 @@ namespace mongo {
         bool _isValid;
 
         // This is meant to be filled out only by the friends above.
-        scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;
+        boost::scoped_ptr<PrivateUpdateData> _indexSpecificUpdateData;
     };
 
     class UpdateTicket::PrivateUpdateData {

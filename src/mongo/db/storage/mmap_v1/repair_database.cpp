@@ -35,6 +35,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
@@ -53,6 +54,8 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     typedef boost::filesystem::path Path;
 

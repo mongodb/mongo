@@ -35,6 +35,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/dbmessage.h"
 #include "mongo/s/config.h"
 #include "mongo/util/net/message.h"

@@ -34,6 +34,8 @@
 
 #include "mongo/db/catalog/collection.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/clientcursor.h"
@@ -53,6 +55,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using logger::LogComponent;
 
     std::string CompactOptions::toString() const {

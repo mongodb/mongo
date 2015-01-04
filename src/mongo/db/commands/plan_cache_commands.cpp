@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <sstream>
 
@@ -47,6 +48,7 @@
 
 namespace {
 
+    using boost::scoped_ptr;
     using std::string;
     using namespace mongo;
 

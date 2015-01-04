@@ -30,6 +30,7 @@
 
 #include <set>
 #include <boost/optional/optional.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/exec/plan_stats.h"
@@ -139,7 +140,7 @@ namespace mongo {
         // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
         // is true, then 'tree' is used to store the relevant IndexEntry.
         // If 'collscanSoln' is true, then 'tree' should be NULL.
-        scoped_ptr<PlanCacheIndexTree> tree;
+        boost::scoped_ptr<PlanCacheIndexTree> tree;
 
         enum SolutionType {
             // Indicates that the plan should use

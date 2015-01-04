@@ -28,6 +28,8 @@
  *    then also delete it in the license file.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -39,6 +41,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
+using boost::scoped_ptr;
 using std::list;
 using std::string;
 

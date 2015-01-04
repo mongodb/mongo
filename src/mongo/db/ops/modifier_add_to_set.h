@@ -80,7 +80,7 @@ namespace mongo {
         mutablebson::Element _val;
 
         struct PreparedState;
-        scoped_ptr<PreparedState> _preparedState;
+        boost::scoped_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

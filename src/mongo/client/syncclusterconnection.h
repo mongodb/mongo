@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -157,7 +158,7 @@ namespace mongo {
         std::vector<BSONObj> _lastErrors;
 
         // Optionally attached by user
-        scoped_ptr<QueryHandler> _customQueryHandler;
+        boost::scoped_ptr<QueryHandler> _customQueryHandler;
 
         mongo::mutex _mutex;
         map<string,int> _lockTypes;

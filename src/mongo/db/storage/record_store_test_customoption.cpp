@@ -30,12 +30,16 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Verify that calling setCustomOption() with { "usePowerOf2Sizes": true }
     // returns an OK status.

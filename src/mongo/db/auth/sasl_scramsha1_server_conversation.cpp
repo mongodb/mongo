@@ -34,6 +34,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/crypto/crypto.h"
 #include "mongo/crypto/mechanism_scram.h"
@@ -47,6 +48,9 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
     SaslSCRAMSHA1ServerConversation::SaslSCRAMSHA1ServerConversation(
                                                     SaslAuthenticationSession* saslAuthSession) :
         SaslServerConversation(saslAuthSession),

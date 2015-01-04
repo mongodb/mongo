@@ -28,11 +28,15 @@
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
 
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     template <class OnDiskFormat>
     class BtreeBuilderInterfaceImpl : public SortedDataBuilderInterface {

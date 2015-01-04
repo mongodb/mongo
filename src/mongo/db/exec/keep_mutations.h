@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
@@ -71,7 +73,7 @@ namespace mongo {
         // Not owned here.
         WorkingSet* _workingSet;
 
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // Not owned here.  Should be the full query expression tree.
         const MatchExpression* _filter;

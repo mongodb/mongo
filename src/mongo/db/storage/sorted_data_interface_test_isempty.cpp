@@ -30,10 +30,14 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Verify that isEmpty() returns true when the index is empty,
     // returns false when a key is inserted, and returns true again

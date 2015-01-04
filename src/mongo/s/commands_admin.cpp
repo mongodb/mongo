@@ -32,6 +32,8 @@
 
 #include "mongo/db/commands.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -78,6 +80,8 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace dbgrid_cmds {
 

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -89,7 +91,7 @@ namespace mongo {
 
         // _ws is not owned by us.
         WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // The filter is not owned by us.
         const MatchExpression* _filter;

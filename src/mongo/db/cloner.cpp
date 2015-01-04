@@ -34,6 +34,8 @@
 
 #include "mongo/db/cloner.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
@@ -59,6 +61,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
 

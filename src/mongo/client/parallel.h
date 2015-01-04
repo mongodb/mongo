@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/export_macros.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher/matcher.h"
@@ -376,10 +378,10 @@ namespace mongo {
             int _options;
             BSONObj _cmd;
             DBClientBase * _conn;
-            scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
+            boost::scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
             bool _useShardConn;
 
-            scoped_ptr<DBClientCursor> _cursor;
+            boost::scoped_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
             bool _ok;

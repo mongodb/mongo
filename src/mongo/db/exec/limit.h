@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/record_id.h"
@@ -67,7 +69,7 @@ namespace mongo {
 
     private:
         WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // We only return this many results.
         int _numToReturn;

@@ -32,6 +32,7 @@
 #pragma once
 
 #include <atomic>
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <memory>
 #include <vector>

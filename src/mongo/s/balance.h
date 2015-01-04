@@ -35,6 +35,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/util/background.h"
@@ -77,7 +79,7 @@ namespace mongo {
         int _balancedLastTime;
 
         // decide which chunks to move; owned here.
-        scoped_ptr<BalancerPolicy> _policy;
+        boost::scoped_ptr<BalancerPolicy> _policy;
         
         /**
          * Checks that the balancer can connect to all servers it needs to do its job.

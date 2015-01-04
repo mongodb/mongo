@@ -110,7 +110,7 @@ namespace mongo {
 
     private:
         boost::mutex _distLockGuard; // Guards access to _authzDataUpdateLock
-        scoped_ptr<ScopedDistributedLock> _authzDataUpdateLock;
+        boost::scoped_ptr<ScopedDistributedLock> _authzDataUpdateLock;
     };
 
 } // namespace mongo

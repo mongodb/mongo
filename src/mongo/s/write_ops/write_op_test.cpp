@@ -28,6 +28,8 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/s/mock_ns_targeter.h"
@@ -38,6 +40,7 @@
 
 namespace {
 
+    using boost::scoped_ptr;
     using namespace mongo;
 
     WriteErrorDetail* buildError( int code, const BSONObj& info, const string& message ) {

@@ -32,6 +32,8 @@
 
 #include "mongo/db/commands/find_and_modify.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
@@ -44,6 +46,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     /* Find and Modify an object returning either the old (default) or new value*/
     class CmdFindAndModify : public Command {

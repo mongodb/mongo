@@ -242,7 +242,7 @@ namespace mongo {
 
         // Comparator for data buffer
         // Initialization follows sort key generator
-        scoped_ptr<WorkingSetComparator> _sortKeyComparator;
+        boost::scoped_ptr<WorkingSetComparator> _sortKeyComparator;
 
         // The data we buffer and sort.
         // _data will contain sorted data when all data is gathered
@@ -253,7 +253,7 @@ namespace mongo {
         // be used to provide the results of this stage through _resultIterator.
         std::vector<SortableDataItem> _data;
         typedef std::set<SortableDataItem, WorkingSetComparator> SortableDataItemSet;
-        scoped_ptr<SortableDataItemSet> _dataSet;
+        boost::scoped_ptr<SortableDataItemSet> _dataSet;
 
         // Iterates through _data post-sort returning it.
         std::vector<SortableDataItem>::iterator _resultIterator;

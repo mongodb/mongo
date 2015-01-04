@@ -93,7 +93,7 @@ namespace mongo {
 
         // The state carried over from prepare for apply/log
         struct PreparedState;
-        scoped_ptr<PreparedState> _preparedState;
+        boost::scoped_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

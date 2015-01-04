@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
@@ -230,12 +232,12 @@ namespace mongo {
                     const MatchExpressionParser::WhereCallback& whereCallback,
                     MatchExpression* root);
 
-        scoped_ptr<LiteParsedQuery> _pq;
+        boost::scoped_ptr<LiteParsedQuery> _pq;
 
         // _root points into _pq->getFilter()
-        scoped_ptr<MatchExpression> _root;
+        boost::scoped_ptr<MatchExpression> _root;
 
-        scoped_ptr<ParsedProjection> _proj;
+        boost::scoped_ptr<ParsedProjection> _proj;
 
         /**
          * Cache key is a string-ified combination of the query and sort obfuscated

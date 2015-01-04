@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/collection.h"
@@ -43,6 +45,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     /* select count(*) */
     class CmdCount : public Command {

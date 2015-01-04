@@ -30,6 +30,8 @@
  * This file tests db/exec/delete.cpp.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/dbdirectclient.h"
@@ -39,6 +41,8 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageDelete {
+
+    using boost::scoped_ptr;
 
     //
     // Stage-specific tests.

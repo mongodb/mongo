@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/catalog/collection_options.h"
@@ -219,7 +220,7 @@ namespace mongo {
             RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
             const bool _forward;
             bool _forParallelCollectionScan;
-            scoped_ptr<WiredTigerCursor> _cursor;
+            boost::scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
             const RecordId _readUntilForOplog;
 

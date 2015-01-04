@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -53,6 +54,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using boost::scoped_ptr;
 
     static bool isCursorCommand(BSONObj cmdObj) {
         BSONElement cursorElem = cmdObj["cursor"];

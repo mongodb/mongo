@@ -30,10 +30,15 @@
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
     BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets
                         == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
 

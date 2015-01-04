@@ -31,6 +31,7 @@
 
 #include "mongo/s/distlock.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/server_options.h"
@@ -43,6 +44,8 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     LabeledLevel DistributedLock::logLvl( 1 );
     DistributedLock::LastPings DistributedLock::lastPings;

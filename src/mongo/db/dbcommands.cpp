@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <time.h>
 
 #include "mongo/base/disallow_copying.h"
@@ -86,6 +87,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using std::string;
 
     CmdShutdown cmdShutdown;

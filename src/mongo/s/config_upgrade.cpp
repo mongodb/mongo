@@ -30,6 +30,8 @@
 
 #include "mongo/s/config_upgrade.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/cluster_client_internal.h"
@@ -46,6 +48,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using mongoutils::str::stream;
 
     //

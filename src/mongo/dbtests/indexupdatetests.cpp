@@ -28,6 +28,8 @@
  *    then also delete it in the license file.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
@@ -43,6 +45,8 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexUpdateTests {
+
+    using boost::scoped_ptr;
 
     static const char* const _ns = "unittests.indexupdate";
 

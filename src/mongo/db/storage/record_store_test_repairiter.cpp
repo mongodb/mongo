@@ -30,11 +30,14 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+using boost::scoped_ptr;
 using std::set;
 using std::string;
 using std::stringstream;

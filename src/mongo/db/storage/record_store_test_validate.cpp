@@ -30,10 +30,13 @@
 
 #include "mongo/db/storage/record_store_test_validate.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
+using boost::scoped_ptr;
 using std::string;
 
 namespace mongo {

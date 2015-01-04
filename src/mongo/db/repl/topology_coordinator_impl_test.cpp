@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -43,6 +44,8 @@
 
 #define ASSERT_NO_ACTION(EXPRESSION) \
     ASSERT_EQUALS(mongo::repl::HeartbeatResponseAction::NoAction, (EXPRESSION))
+
+using boost::scoped_ptr;
 
 namespace mongo {
 namespace repl {

@@ -30,10 +30,14 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Call getDirection() on a forward cursor and verify the result equals +1.
     TEST( SortedDataInterface, GetCursorDirection ) {

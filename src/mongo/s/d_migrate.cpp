@@ -39,6 +39,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <map>
 #include <string>
@@ -93,6 +94,7 @@
 using namespace std;
 
 namespace {
+    using boost::scoped_ptr;
     using mongo::WriteConcernOptions;
     using mongo::repl::ReplicationCoordinator;
 

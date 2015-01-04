@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <set>
 #include <string>
 #include <vector>

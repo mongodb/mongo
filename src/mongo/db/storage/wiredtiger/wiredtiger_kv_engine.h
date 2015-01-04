@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include <wiredtiger.h>
@@ -139,7 +140,7 @@ namespace mongo {
         std::set<std::string> _identToDrop;
         mutable boost::mutex _identToDropMutex;
 
-        scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
+        boost::scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
         string _sizeStorerUri;
         mutable ElapsedTracker _sizeStorerSyncTracker;
     };

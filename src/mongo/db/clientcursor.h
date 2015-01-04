@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "mongo/db/jsobj.h"
@@ -276,7 +277,7 @@ namespace mongo {
         //
         // The underlying execution machinery.
         //
-        scoped_ptr<PlanExecutor> _exec;
+        boost::scoped_ptr<PlanExecutor> _exec;
     };
 
     /**

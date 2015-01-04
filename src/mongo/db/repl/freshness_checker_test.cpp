@@ -43,6 +43,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
+using boost::scoped_ptr;
+
 namespace mongo {
 namespace repl {
 namespace {

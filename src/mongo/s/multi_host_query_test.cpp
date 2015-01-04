@@ -28,12 +28,15 @@
 
 #include "mongo/s/multi_host_query.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/synchronization.h"
 
 namespace {
 
     using namespace mongo;
+    using boost::scoped_ptr;
     using boost::shared_ptr;
     using std::map;
 

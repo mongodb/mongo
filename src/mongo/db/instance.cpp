@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <fstream>
 
@@ -94,6 +95,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using logger::LogComponent;
 
 namespace {

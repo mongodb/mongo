@@ -32,6 +32,8 @@
 
 #include "mongo/db/commands/index_filter_commands.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -42,6 +44,7 @@ using namespace mongo;
 
 namespace {
 
+    using boost::scoped_ptr;
     using std::string;
     using std::vector;
 

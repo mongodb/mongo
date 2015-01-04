@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"

@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/operation_context_impl.h"
@@ -46,6 +47,8 @@
 #include "mongo/util/time_support.h"
 
 namespace BasicTests {
+
+    using boost::scoped_ptr;
 
     class Rarely {
     public:

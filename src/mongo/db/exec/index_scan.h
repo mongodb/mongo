@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/index/index_access_method.h"
@@ -141,7 +143,7 @@ namespace mongo {
 
         // Index access.
         const IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
-        scoped_ptr<IndexCursor> _indexCursor;
+        boost::scoped_ptr<IndexCursor> _indexCursor;
         BSONObj _keyPattern;
 
         // Keeps track of what work we need to do next.
@@ -163,7 +165,7 @@ namespace mongo {
         IndexScanParams _params;
 
         // For our "fast" Btree-only navigation AKA the index bounds optimization.
-        scoped_ptr<IndexBoundsChecker> _checker;
+        boost::scoped_ptr<IndexBoundsChecker> _checker;
         BtreeIndexCursor* _btreeCursor;
         int _keyEltsToUse;
         bool _movePastKeyElts;

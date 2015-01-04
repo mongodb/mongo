@@ -32,6 +32,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
@@ -71,6 +73,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using boost::scoped_ptr;
 
     namespace dbgrid_pub_cmds {
 

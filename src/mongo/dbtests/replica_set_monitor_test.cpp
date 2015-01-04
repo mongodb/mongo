@@ -35,6 +35,7 @@
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <set>
 #include <vector>
 

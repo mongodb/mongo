@@ -33,6 +33,7 @@
 
 #include "mongo/s/cursors.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,8 @@
 #include "mongo/util/net/listen.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 

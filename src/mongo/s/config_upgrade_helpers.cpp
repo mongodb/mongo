@@ -30,6 +30,8 @@
 
 #include "mongo/s/config_upgrade_helpers.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
@@ -42,6 +44,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using mongoutils::str::stream;
 
     // Custom field used in upgrade state to determine if/where we failed on last upgrade

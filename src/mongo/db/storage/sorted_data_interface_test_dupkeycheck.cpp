@@ -30,10 +30,14 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Insert a key and verify that dupKeyCheck() returns a non-OK status for
     // the same key. When dupKeyCheck() is called with the exact (key, RecordId)

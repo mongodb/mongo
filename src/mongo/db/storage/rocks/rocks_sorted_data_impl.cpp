@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <cstdlib>
 #include <string>
 
@@ -49,6 +50,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace {
 

@@ -31,6 +31,7 @@
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
 
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/sasl_client_session.h"
@@ -41,6 +42,9 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
     SaslSCRAMSHA1ClientConversation::SaslSCRAMSHA1ClientConversation(
                                                     SaslClientSession* saslClientSession) :
         SaslClientConversation(saslClientSession),

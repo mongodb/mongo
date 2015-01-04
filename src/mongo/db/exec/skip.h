@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
@@ -66,7 +68,7 @@ namespace mongo {
 
     private:
         WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // We drop the first _toSkip results that we would have returned.
         int _toSkip;

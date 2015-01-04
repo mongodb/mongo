@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -41,6 +43,8 @@ using std::stringstream;
 using std::vector;
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Create multiple iterators over an empty record store.
     TEST( RecordStoreTestHarness, GetManyIteratorsEmpty ) {

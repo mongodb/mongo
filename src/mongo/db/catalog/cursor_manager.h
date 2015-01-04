@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/namespace_string.h"
@@ -133,7 +135,7 @@ namespace mongo {
 
         NamespaceString _nss;
         unsigned _collectionCacheRuntimeId;
-        scoped_ptr<PseudoRandom> _random;
+        boost::scoped_ptr<PseudoRandom> _random;
 
         SimpleMutex _mutex;
 

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -143,7 +144,7 @@ namespace mongo {
                           const RecordId& loc,
                           bool dupsAllowed);
 
-        scoped_ptr<SortedDataInterface> _newInterface;
+        boost::scoped_ptr<SortedDataInterface> _newInterface;
     };
 
     /**

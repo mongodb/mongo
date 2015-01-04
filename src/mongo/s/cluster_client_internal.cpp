@@ -32,6 +32,7 @@
 
 #include "mongo/s/cluster_client_internal.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,7 @@
 
 namespace mongo {
 
+    using boost::scoped_ptr;
     using std::string;
     using std::vector;
     using mongoutils::str::stream;

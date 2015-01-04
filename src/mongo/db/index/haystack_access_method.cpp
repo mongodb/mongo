@@ -32,6 +32,8 @@
 
 #include "mongo/db/index/haystack_access_method.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_keys_private.h"
@@ -42,6 +44,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
         : BtreeBasedAccessMethod(btreeState, btree) {

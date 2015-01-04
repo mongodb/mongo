@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
 #include "pcrecpp.h"
 
 #include "mongo/client/connpool.h"
@@ -59,6 +60,8 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;

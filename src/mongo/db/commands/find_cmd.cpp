@@ -30,6 +30,8 @@
 
 #include "mongo/db/commands/find_cmd.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -41,6 +43,8 @@
 #include "mongo/s/d_state.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     static FindCmd findCmd;
 

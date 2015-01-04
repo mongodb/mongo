@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <queue>
 
 #include "mongo/db/geo/hash.h"
@@ -107,8 +108,8 @@ namespace mongo {
         typedef pair<int, Candidate*> QueueEntry;
         typedef priority_queue<QueueEntry, vector<QueueEntry>,
                                CompareQueueEntries> CandidateQueue;
-        scoped_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
-        scoped_ptr<vector<GeoHash> > _results;
+        boost::scoped_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
+        boost::scoped_ptr<vector<GeoHash> > _results;
     };
 
 

@@ -32,6 +32,8 @@
 
 #include "mongo/db/index/btree_based_bulk_access_method.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
@@ -39,6 +41,8 @@
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     //
     // Comparison for external sorter interface

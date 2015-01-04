@@ -139,7 +139,7 @@ namespace mongo {
         bool _isOrderedSet;
 
         // (O)  metadata associated with this request for internal use.
-        scoped_ptr<BatchedRequestMetadata> _metadata;
+        boost::scoped_ptr<BatchedRequestMetadata> _metadata;
 
         // (O)  cached copied of target ns
         NamespaceString _targetNSS;

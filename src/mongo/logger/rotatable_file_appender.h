@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/logger/appender.h"

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <deque>
 #include <set>
@@ -199,10 +200,10 @@ namespace mongo {
         /** Returns true if stopWorkers() was called. This call is synchronized. */
         bool stopRequested() const;
 
-        scoped_ptr<RangeDeleterEnv> _env;
+        boost::scoped_ptr<RangeDeleterEnv> _env;
 
         // Initially not active. Must be started explicitly.
-        scoped_ptr<boost::thread> _worker;
+        boost::scoped_ptr<boost::thread> _worker;
 
         // Protects _stopRequested.
         mutable mutex _stopMutex;

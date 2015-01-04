@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <wiredtiger.h>
 
@@ -56,6 +57,9 @@
 #define RS_ITERATOR_TRACE(x)
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
 namespace {
     static const int kMinimumRecordStoreVersion = 1;
     static const int kCurrentRecordStoreVersion = 1; // New record stores use this by default.

@@ -32,10 +32,13 @@
 
 #include "mongo/db/query/lite_parsed_query.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
+using boost::scoped_ptr;
 
 namespace {
 

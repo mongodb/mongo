@@ -30,6 +30,8 @@
  * This file tests db/exec/collection_scan.cpp.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -45,6 +47,8 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
+
+    using boost::scoped_ptr;
 
     //
     // Stage-specific tests.

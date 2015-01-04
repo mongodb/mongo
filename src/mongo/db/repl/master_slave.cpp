@@ -44,6 +44,7 @@
 
 #include <iostream>
 #include <pcrecpp.h>
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/auth/authorization_manager.h"
@@ -66,8 +67,9 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
-namespace mongo {
+using boost::scoped_ptr;
 
+namespace mongo {
 namespace repl {
 
     void pretouchOperation(OperationContext* txn, const BSONObj& op);

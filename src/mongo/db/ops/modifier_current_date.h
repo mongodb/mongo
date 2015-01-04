@@ -84,7 +84,7 @@ namespace mongo {
 
         // State which changes with each call of the mod.
         struct PreparedState;
-        scoped_ptr<PreparedState> _preparedState;
+        boost::scoped_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

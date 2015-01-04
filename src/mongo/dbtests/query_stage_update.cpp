@@ -30,6 +30,8 @@
  * This file tests db/exec/update.cpp (UpdateStage).
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/dbdirectclient.h"
@@ -47,6 +49,8 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageUpdate {
+
+    using boost::scoped_ptr;
 
     class QueryStageUpdateBase {
     public:

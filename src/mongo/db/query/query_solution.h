@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/fts/fts_query.h"
@@ -148,7 +150,7 @@ namespace mongo {
 
         // If a stage has a non-NULL filter all values outputted from that stage must pass that
         // filter.
-        scoped_ptr<MatchExpression> filter;
+        boost::scoped_ptr<MatchExpression> filter;
 
     protected:
         /**
@@ -176,7 +178,7 @@ namespace mongo {
         QuerySolution() : hasBlockingStage(false), indexFilterApplied(false) { }
 
         // Owned here.
-        scoped_ptr<QuerySolutionNode> root;
+        boost::scoped_ptr<QuerySolutionNode> root;
 
         // Any filters in root or below point into this object.  Must be owned.
         BSONObj filterData;

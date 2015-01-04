@@ -30,10 +30,14 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Insert multiple single-field keys and advance to each of them
     // using a forward cursor by specifying their exact key. When

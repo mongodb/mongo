@@ -32,6 +32,8 @@
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
@@ -44,6 +46,8 @@
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
        contains records up to that size (meaning a record with a size exactly equal to

@@ -28,12 +28,14 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
+using boost::scoped_ptr;
 
 namespace {
 

@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/kv/kv_catalog.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <stdlib.h>
 
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -51,6 +52,8 @@ namespace {
     // NOTE: Must be locked *before* _identLock.
     const ResourceId resourceIdCatalogMetadata(RESOURCE_METADATA, 1ULL);
 }
+
+    using boost::scoped_ptr;
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
     public:

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
@@ -180,9 +182,9 @@ namespace mongo {
     private:
 
         BatchType _batchType;
-        scoped_ptr<BatchedInsertRequest> _insertReq;
-        scoped_ptr<BatchedUpdateRequest> _updateReq;
-        scoped_ptr<BatchedDeleteRequest> _deleteReq;
+        boost::scoped_ptr<BatchedInsertRequest> _insertReq;
+        boost::scoped_ptr<BatchedUpdateRequest> _updateReq;
+        boost::scoped_ptr<BatchedDeleteRequest> _deleteReq;
     };
 
     /**

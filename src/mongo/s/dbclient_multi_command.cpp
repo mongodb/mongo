@@ -28,6 +28,8 @@
 
 #include "mongo/s/dbclient_multi_command.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client_basic.h"
@@ -39,6 +41,8 @@
 #include "mongo/util/net/message.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
                                                           const StringData& dbName,

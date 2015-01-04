@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -253,7 +255,7 @@ namespace mongo {
                                             int len,
                                             bool enforceQuota );
 
-        scoped_ptr<RecordStoreV1MetaData> _details;
+        boost::scoped_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 

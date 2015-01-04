@@ -27,6 +27,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"
@@ -36,6 +38,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace {
         

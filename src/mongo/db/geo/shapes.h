@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -190,8 +191,8 @@ namespace mongo {
         std::vector<Point> _points;
 
         // Cached attributes of the polygon
-        mutable scoped_ptr<Box> _bounds;
-        mutable scoped_ptr<Point> _centroid;
+        mutable boost::scoped_ptr<Box> _bounds;
+        mutable boost::scoped_ptr<Point> _centroid;
     };
 
     class R2Region {
@@ -300,10 +301,10 @@ namespace mongo {
 
         PolygonWithCRS() : crs(UNSET) {}
 
-        scoped_ptr<S2Polygon> s2Polygon;
+        boost::scoped_ptr<S2Polygon> s2Polygon;
         // Simple polygons with strict winding order may be bigger or smaller than a hemisphere.
         // Only used for query. We don't support storing/indexing big polygons.
-        scoped_ptr<BigSimplePolygon> bigPolygon;
+        boost::scoped_ptr<BigSimplePolygon> bigPolygon;
 
         Polygon oldPolygon;
         CRS crs;

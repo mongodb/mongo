@@ -46,9 +46,12 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/util/log.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <algorithm>
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     //
     // Shared GeoNear search functionality

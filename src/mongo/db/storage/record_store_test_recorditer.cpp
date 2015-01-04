@@ -31,6 +31,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 #include <algorithm>
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+using boost::scoped_ptr;
 using std::string;
 using std::stringstream;
 

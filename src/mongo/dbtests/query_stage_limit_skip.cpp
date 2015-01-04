@@ -30,6 +30,8 @@
  * This file tests db/exec/limit.cpp and db/exec/skip.cpp.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/mock_stage.h"
@@ -42,6 +44,8 @@
 using namespace mongo;
 
 namespace {
+
+    using boost::scoped_ptr;
 
     static const int N = 50;
 

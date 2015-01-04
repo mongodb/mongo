@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -45,6 +47,8 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryPlanExecutor {
+
+    using boost::scoped_ptr;
 
     class PlanExecutorBase {
     public:

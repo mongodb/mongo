@@ -32,6 +32,8 @@
 
 #include "mongo/db/query/find.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -59,6 +61,8 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+
+using boost::scoped_ptr;
 
 namespace mongo {
     // The .h for this in find_constants.h.

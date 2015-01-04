@@ -192,9 +192,9 @@ namespace mongo {
 
             // functions
 
-            scoped_ptr<Mapper> mapper;
-            scoped_ptr<Reducer> reducer;
-            scoped_ptr<Finalizer> finalizer;
+            boost::scoped_ptr<Mapper> mapper;
+            boost::scoped_ptr<Reducer> reducer;
+            boost::scoped_ptr<Finalizer> finalizer;
 
             BSONObj mapParams;
             BSONObj scopeSetup;
@@ -351,10 +351,10 @@ namespace mongo {
             int _add(InMemory* im , const BSONObj& a);
 
             OperationContext* _txn;
-            scoped_ptr<Scope> _scope;
+            boost::scoped_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
 
-            scoped_ptr<InMemory> _temp;
+            boost::scoped_ptr<InMemory> _temp;
             long _size; // bytes in _temp
             long _dupCount; // number of duplicate key entries
 

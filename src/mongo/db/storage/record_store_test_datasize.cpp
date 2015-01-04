@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
@@ -37,6 +39,8 @@ using std::string;
 using std::stringstream;
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Verify that an empty collection takes up no space.
     TEST( RecordStoreTestHarness, DataSizeEmpty ) {

@@ -30,6 +30,7 @@
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
  */
 
+#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
@@ -59,6 +60,8 @@ namespace mongo {
 }  // namespace mongo
 
 namespace PlanRankingTests {
+
+    using boost::scoped_ptr;
 
     static const char* ns = "unittests.PlanRankingTests";
 

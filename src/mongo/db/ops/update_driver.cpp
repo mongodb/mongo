@@ -28,6 +28,8 @@
 
 #include "mongo/db/ops/update_driver.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
@@ -46,6 +48,7 @@ namespace mongo {
     namespace str = mongoutils::str;
     namespace mb = mongo::mutablebson;
 
+    using boost::scoped_ptr;
     using pathsupport::EqualityMatches;
 
     UpdateDriver::UpdateDriver(const Options& opts)

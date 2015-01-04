@@ -30,6 +30,8 @@
 
 #include "mongo/db/commands/group.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -41,6 +43,8 @@
 #include "mongo/db/query/get_executor.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     static GroupCommand cmdGroup;
 

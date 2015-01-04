@@ -33,8 +33,10 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
+#include <boost/scoped_ptr.hpp>
 #include <ostream>
 #include <memory>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/qlog.h"
@@ -50,6 +52,7 @@ using namespace mongo;
 
 namespace {
 
+    using boost::scoped_ptr;
     using std::auto_ptr;
 
     static const char* ns = "somebogusns";

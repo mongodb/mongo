@@ -28,6 +28,7 @@
 /**
  * Unit tests of the AuthorizationManager type.
  */
+#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
@@ -48,6 +49,8 @@
 
 namespace mongo {
 namespace {
+
+    using boost::scoped_ptr;
 
     TEST(RoleParsingTest, BuildRoleBSON) {
         RoleGraph graph;

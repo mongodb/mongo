@@ -30,10 +30,14 @@
 
 #include "mongo/db/client_basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     ClientBasic::ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {
     }

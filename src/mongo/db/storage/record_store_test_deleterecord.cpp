@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -39,6 +41,8 @@ using std::string;
 using std::stringstream;
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     // Insert a record and try to delete it.
     TEST( RecordStoreTestHarness, DeleteRecord ) {

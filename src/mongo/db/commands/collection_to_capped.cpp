@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -40,6 +42,9 @@
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
+
 namespace {
 
     Status cloneCollectionAsCapped( OperationContext* txn,

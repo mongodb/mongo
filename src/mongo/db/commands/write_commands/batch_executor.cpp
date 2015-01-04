@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands/write_commands/batch_executor.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <memory>
 
 #include "mongo/base/error_codes.h"
@@ -72,6 +73,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using boost::scoped_ptr;
 
     namespace {
 

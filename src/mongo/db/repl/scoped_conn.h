@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <map>
 
 #include "mongo/db/auth/authorization_manager.h"
@@ -96,7 +97,7 @@ namespace repl {
         static mongo::mutex mapMutex;
         struct ConnectionInfo {
             mongo::mutex lock;
-            scoped_ptr<DBClientConnection> cc;
+            boost::scoped_ptr<DBClientConnection> cc;
             bool connected;
             ConnectionInfo();
 
@@ -119,7 +120,7 @@ namespace repl {
         } *connInfo;
         typedef std::map<std::string,ScopedConn::ConnectionInfo*> M;
         static M& _map;
-        scoped_ptr<DBClientConnection>& conn() { return connInfo->cc; }
+        boost::scoped_ptr<DBClientConnection>& conn() { return connInfo->cc; }
         const std::string _hostport;
 
         // we should already be locked...

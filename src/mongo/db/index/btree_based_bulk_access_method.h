@@ -26,6 +26,7 @@
 *    it in the license file.
 */
 
+#include <boost/scoped_ptr.hpp>
 #include <set>
 #include <vector>
 

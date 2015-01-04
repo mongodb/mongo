@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"

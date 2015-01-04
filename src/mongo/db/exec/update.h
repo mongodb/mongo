@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
@@ -155,7 +157,7 @@ namespace mongo {
         Collection* _collection;
 
         // Owned by us.
-        scoped_ptr<PlanStage> _child;
+        boost::scoped_ptr<PlanStage> _child;
 
         // Stats
         CommonStats _commonStats;
