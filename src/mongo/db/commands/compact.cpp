@@ -145,15 +145,18 @@ namespace mongo {
 
 
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), db, MODE_X);
-            BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
-            Client::Context ctx(txn, ns);
+            AutoGetDb autoDb(txn, db, MODE_X);
+            Database* const collDB = autoDb.getDb();
+            Collection* collection = collDB ? collDB->getCollection(ns) : NULL;
 
-            Collection* collection = ctx.db()->getCollection(ns.ns());
-            if( ! collection ) {
+            // If db/collection does not exist, short circuit and return.
+            if ( !collDB || !collection ) {
                 errmsg = "namespace does not exist";
                 return false;
             }
+
+            Client::Context ctx(txn, ns);
+            BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
 
             if ( collection->isCapped() ) {
                 errmsg = "cannot compact a capped collection";
@@ -162,7 +165,7 @@ namespace mongo {
 
             log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), cmdObj);
+            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, collDB, cmdObj);
 
             StatusWith<CompactStats> status = collection->compact( txn, &compactOptions );
             if ( !status.isOK() )
