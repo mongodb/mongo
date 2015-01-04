@@ -122,26 +122,27 @@ namespace mongo {
                         BSONObj& jsobj,
                         string& errmsg,
                         BSONObjBuilder& anObjBuilder) {
-            const std::string coll = jsobj.firstElement().valuestrsafe();
-            if (coll.empty()) {
+            const std::string collName = jsobj.firstElement().valuestrsafe();
+            if (collName.empty()) {
                 errmsg = "no collection name specified";
                 return false;
             }
 
-            const std::string toDeleteNs = dbname + '.' + coll;
+            const std::string toDeleteNs = dbname + '.' + collName;
             if (!serverGlobalParams.quiet) {
                 LOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
+            AutoGetDb autoDb(txn, dbname, MODE_IS);
+            Database* const db = autoDb.getDb();
+            Collection* collection = db ? db->getCollection(toDeleteNs) : NULL;
 
-            Client::Context ctx(txn, toDeleteNs);
-            Database* db = ctx.db();
-
-            Collection* collection = db->getCollection( toDeleteNs );
-            if ( ! collection ) {
+            // If db/collection does not exist, short circuit and return.
+            if ( !db || !collection ) {
                 errmsg = "ns not found";
                 return false;
             }
 
+            Client::Context ctx(txn, toDeleteNs);
             stopIndexBuilds(txn, db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
