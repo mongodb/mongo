@@ -63,7 +63,6 @@
 namespace mongo {
 
     using namespace std;
-    using boost::dynamic_pointer_cast;
     using boost::intrusive_ptr;
     using boost::scoped_array;
     using boost::scoped_ptr;
