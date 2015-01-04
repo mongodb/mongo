@@ -1,5 +1,8 @@
 #! /bin/sh
 
+# Ulimit: don't drop core.
+ulimit -c 0
+
 # Timer: how many minutes format runs before aborting.
 timer=2
 
