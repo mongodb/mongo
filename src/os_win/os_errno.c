@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-const int windows_error_offset = -29000;
+static const int windows_error_offset = -29000;
 
 /*
  * __wt_map_error_to_windows_error --
@@ -15,7 +15,7 @@ const int windows_error_offset = -29000;
  * Standard C errors are positive integers from 0 - ~200
  * Windows errors are from 0 - 15999 according to the documentation
  */
-DWORD
+static DWORD
 __wt_map_error_to_windows_error(int error) {
 	/* Ensure we do not exceed the error range
 	   Also validate he do not get any COM errors
@@ -30,7 +30,7 @@ __wt_map_error_to_windows_error(int error) {
  * __wt_map_error_to_windows_error --
  *	Return a positive integer, a decoded Windows error
  */
-int
+static int
 __wt_map_windows_error_to_error(DWORD winerr) {
 	return (winerr + windows_error_offset);
 }
@@ -52,31 +52,50 @@ __wt_errno(void)
 	WT_ASSERT(NULL, err != ERROR_SUCCESS);
 
 	return (err == ERROR_SUCCESS ?
-	    WT_ERROR :
-	    __wt_map_windows_error_to_error(err));
+	    WT_ERROR : __wt_map_windows_error_to_error(err));
+}
+
+/*
+ * __wt_strerror --
+ *	Windows implementation of wiredtiger_strerror.
+ */
+char *
+__wt_strerror(int error)
+{
+	char *p;
+
+	/*
+	 * POSIX errors are non-negative integers; check for 0 explicitly
+	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 */
+	if (error == 0)
+		return ("Successful return: 0");
+	if (error > 0 && (p = strerror(error)) != NULL)
+		return (p);
+	return (NULL);
 }
 
 /*
  * __wt_strerror_r --
- *	Windows implementation of strerror_r.
+ *	Windows implementation of wiredtiger_strerror_r.
  */
 int
 __wt_strerror_r(int error, char *buf, size_t buflen)
 {
-	char *p;
 	DWORD lasterror;
+	char *p;
 
 	/* Require at least 2 bytes, printable character and trailing nul. */
 	if (buflen < 2)
 		return (ENOMEM);
 
 	/*
-	 * POSIX errors are non-negative integers, copy the string into the
-	 * user's buffer. Return success if anything printed (we checked if
-	 * the buffer had space for at least one character).
+	 * Check for POSIX errors, Windows errors, then fallback to something
+	 * generic.  Copy the string into the user's buffer, return success if
+	 * anything printed.
 	 */
-	if (error > 0 &&
-	    (p = strerror(error)) != NULL && snprintf(buf, buflen, "%s", p) > 0)
+	p = __wt_strerror(error);
+	if (p != NULL && snprintf(buf, buflen, "%s", p) > 0)
 		return (0);
 
 	if (error < 0) {
@@ -92,15 +111,13 @@ __wt_strerror_r(int error, char *buf, size_t buflen)
 			buflen,
 			NULL);
 
-		if (lasterror != 0) {
+		if (lasterror != 0)
 			return (0);
-		}
 
 		/* Fall through to the fallback error code */
 	}
 
 	/* Fallback to a generic message, then guess it's a memory problem. */
 	return (
-		snprintf(buf, buflen, "error return: %d", error) > 0 ?
-		0 : ENOMEM);
+	    snprintf(buf, buflen, "error return: %d", error) > 0 ? 0 : ENOMEM);
 }

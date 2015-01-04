@@ -22,8 +22,28 @@ __wt_errno(void)
 }
 
 /*
+ * __wt_strerror --
+ *	POSIX implementation of wiredtiger_strerror.
+ */
+char *
+__wt_strerror(int error)
+{
+	char *p;
+
+	/*
+	 * POSIX errors are non-negative integers; check for 0 explicitly
+	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 */
+	if (error == 0)
+		return ("Successful return: 0");
+	if (error > 0 && (p = strerror(error)) != NULL)
+		return (p);
+	return (NULL);
+}
+
+/*
  * __wt_strerror_r --
- *	POSIX implementation of strerror_r.
+ *	POSIX implementation of wiredtiger_strerror_r.
  */
 int
 __wt_strerror_r(int error, char *buf, size_t buflen)
@@ -35,12 +55,11 @@ __wt_strerror_r(int error, char *buf, size_t buflen)
 		return (ENOMEM);
 
 	/*
-	 * POSIX errors are non-negative integers, copy the string into the
-	 * user's buffer. Return success if anything printed (we checked if
-	 * the buffer had space for at least one character).
+	 * Check for POSIX errors then fallback to something generic.  Copy the
+	 * string into the user's buffer, return success if anything printed.
 	 */
-	if (error > 0 &&
-	    (p = strerror(error)) != NULL && snprintf(buf, buflen, "%s", p) > 0)
+	p = __wt_strerror(error);
+	if (p != NULL && snprintf(buf, buflen, "%s", p) > 0)
 		return (0);
 
 	/* Fallback to a generic message, then guess it's a memory problem. */
