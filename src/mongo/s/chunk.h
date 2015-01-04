@@ -31,6 +31,7 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/keypattern.h"
@@ -51,13 +52,13 @@ namespace mongo {
     class ChunkObjUnitTest;
     struct WriteConcernOptions;
 
-    typedef shared_ptr<const Chunk> ChunkPtr;
+    typedef boost::shared_ptr<const Chunk> ChunkPtr;
 
     // key is max for each Chunk or ChunkRange
     typedef std::map<BSONObj,ChunkPtr,BSONObjCmp> ChunkMap;
-    typedef std::map<BSONObj,shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
+    typedef std::map<BSONObj,boost::shared_ptr<ChunkRange>,BSONObjCmp> ChunkRangeMap;
 
-    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
 
     /**
        config.chunks
@@ -578,7 +579,7 @@ namespace mongo {
         bool operator()( const ChunkRange &l, const ChunkRange &r ) const {
             return _cmp(l.getMin(), r.getMin());
         }
-        bool operator()( const shared_ptr<ChunkRange> l, const shared_ptr<ChunkRange> r ) const {
+        bool operator()( const boost::shared_ptr<ChunkRange> l, const boost::shared_ptr<ChunkRange> r ) const {
             return operator()(*l, *r);
         }
     private:

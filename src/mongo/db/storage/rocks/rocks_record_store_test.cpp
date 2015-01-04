@@ -33,6 +33,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -50,6 +51,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     class RocksRecordStoreHarnessHelper : public HarnessHelper {
     public:

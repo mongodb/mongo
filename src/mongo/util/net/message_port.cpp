@@ -33,6 +33,7 @@
 
 #include "mongo/util/net/message_port.h"
 
+#include <boost/shared_ptr.hpp>
 #include <fcntl.h>
 #include <time.h>
 
@@ -55,6 +56,8 @@
 #endif
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
 // if you want trace output:
 #define mmm(x)

@@ -35,6 +35,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <boost/shared_ptr.hpp>
 #include <iostream>
 #include <map>
 
@@ -49,6 +50,8 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     namespace unittest {
 

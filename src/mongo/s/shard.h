@@ -35,6 +35,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 
 namespace mongo {
@@ -190,7 +192,7 @@ namespace mongo {
         bool      _isDraining; // shard is currently being removed
         std::set<std::string> _tags;
     };
-    typedef shared_ptr<Shard> ShardPtr;
+    typedef boost::shared_ptr<Shard> ShardPtr;
 
     class ShardStatus {
     public:
@@ -233,7 +235,7 @@ namespace mongo {
     };
 
     class ChunkManager;
-    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+    typedef boost::shared_ptr<const ChunkManager> ChunkManagerPtr;
 
     class ShardConnection : public AScopedConnection {
     public:

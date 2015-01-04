@@ -33,6 +33,7 @@
 #include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
 
 #include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -41,6 +42,9 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
+
 namespace {
 
     const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372

@@ -43,6 +43,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using boost::shared_ptr;
 
     const char DocumentSourceGroup::groupName[] = "$group";
 

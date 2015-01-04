@@ -32,6 +32,7 @@
 #include <iostream>
 #include <iomanip>
 #include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
@@ -49,6 +50,7 @@
 
 using namespace std;
 using boost::scoped_array;
+using boost::shared_ptr;
 
 namespace mongo {
 

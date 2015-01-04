@@ -33,12 +33,15 @@
 
 #include "mongo/util/net/miniwebserver.h"
 
+#include <boost/shared_ptr.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     MiniWebServer::MiniWebServer(const string& name, const string &ip, int port)
         : Listener(name, ip, port, false)

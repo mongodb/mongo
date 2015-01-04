@@ -28,11 +28,14 @@
 #include "mongo/util/options_parser/option_description.h"
 
 #include <algorithm>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace optionenvironment {
+
+    using boost::shared_ptr;
 
     namespace {
         /**

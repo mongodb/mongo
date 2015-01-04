@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/paths.h"

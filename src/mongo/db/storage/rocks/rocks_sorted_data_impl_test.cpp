@@ -47,6 +47,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     class RocksSortedDataImplHarness : public HarnessHelper {
     public:

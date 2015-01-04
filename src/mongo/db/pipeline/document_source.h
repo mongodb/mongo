@@ -36,6 +36,7 @@
 #include <boost/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <deque>
 
@@ -245,7 +246,7 @@ namespace mongo {
         virtual ~DocumentSourceNeedsMongod() {}
 
         // Gives subclasses access to a MongodInterface implementation
-        shared_ptr<MongodInterface> _mongod;
+        boost::shared_ptr<MongodInterface> _mongod;
     };
 
 
@@ -493,7 +494,7 @@ namespace mongo {
         DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /// Spill groups map to disk and returns an iterator to the file.
-        shared_ptr<Sorter<Value, Value>::Iterator> spill();
+        boost::shared_ptr<Sorter<Value, Value>::Iterator> spill();
 
         // Only used by spill. Would be function-local if that were legal in C++03.
         class SpillSTLComparator;

@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <list>
 
 #include "mongo/db/jsobj.h"
@@ -66,16 +67,16 @@ namespace repl {
     };
 
     inline void multiCommand(BSONObj cmd, std::list<Target>& L) {
-        std::list< shared_ptr<BackgroundJob> > jobs;
+        std::list< boost::shared_ptr<BackgroundJob> > jobs;
 
         for( std::list<Target>::iterator i = L.begin(); i != L.end(); i++ ) {
             Target& d = *i;
             _MultiCommandJob *j = new _MultiCommandJob(cmd, d);
-            jobs.push_back( shared_ptr<BackgroundJob>(j) );
+            jobs.push_back( boost::shared_ptr<BackgroundJob>(j) );
             j->go();
         }
 
-        for( std::list< shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
+        for( std::list< boost::shared_ptr<BackgroundJob> >::iterator i = jobs.begin(); i != jobs.end(); i++ ) {
             (*i)->wait();
         }
     }

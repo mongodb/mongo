@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/plan_executor.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
@@ -42,6 +44,8 @@
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     namespace {
 

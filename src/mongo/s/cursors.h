@@ -36,6 +36,7 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/client/parallel.h"

@@ -53,6 +53,7 @@ namespace mongo {
 namespace optionenvironment {
 
     using namespace std;
+    using boost::shared_ptr;
 
     namespace po = boost::program_options;
 

@@ -35,6 +35,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard.h"

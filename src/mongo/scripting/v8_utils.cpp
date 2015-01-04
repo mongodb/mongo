@@ -35,6 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include <iostream>
@@ -232,13 +233,13 @@ namespace mongo {
             }
 
         private:
-            shared_ptr<SharedData> _sharedData;
+            boost::shared_ptr<SharedData> _sharedData;
         };
 
         bool _started;
         bool _done;
         scoped_ptr<boost::thread> _thread;
-        shared_ptr<SharedData> _sharedData;
+        boost::shared_ptr<SharedData> _sharedData;
     };
 
     class CountDownLatchHolder {

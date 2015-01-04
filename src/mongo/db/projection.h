@@ -33,6 +33,9 @@
 #include "mongo/platform/basic.h"
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
+
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/util/string_map.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"

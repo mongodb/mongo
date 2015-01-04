@@ -50,14 +50,12 @@
 #include <vector>
 
 #define BOOST_FILESYSTEM_VERSION 3
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/redef_macros.h"
 
 namespace mongo {
 
     using namespace std;
-    using boost::shared_ptr;
 }
 
 #include "mongo/util/debug_util.h"

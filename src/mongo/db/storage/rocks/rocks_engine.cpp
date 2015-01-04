@@ -58,6 +58,8 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+
     const std::string RocksEngine::kOrderingPrefix("indexordering-");
     const std::string RocksEngine::kCollectionPrefix("collection-");
 

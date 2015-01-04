@@ -34,6 +34,7 @@
 
 #include "mongo/s/chunk.h"
 
+#include <boost/shared_ptr.hpp>
 #include <iostream>
 
 #include "mongo/base/owned_pointer_map.h"
@@ -70,6 +71,8 @@
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     inline bool allOfType(BSONType type, const BSONObj& o) {
         BSONObjIterator it(o);

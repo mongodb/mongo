@@ -40,6 +40,7 @@
 namespace {
 
     using namespace mongo;
+    using boost::shared_ptr;
     using std::vector;
 
     /**

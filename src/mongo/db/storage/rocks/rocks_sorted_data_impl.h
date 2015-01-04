@@ -31,6 +31,7 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 #include <atomic>
+#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include <rocksdb/db.h>

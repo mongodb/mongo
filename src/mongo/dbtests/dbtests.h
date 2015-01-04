@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/instance.h"
 #include "mongo/unittest/unittest.h"
 

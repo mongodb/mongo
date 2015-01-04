@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 
 #include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
@@ -45,6 +46,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using boost::shared_ptr;
 
 namespace {
     class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {

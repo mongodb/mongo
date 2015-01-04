@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/record_id.h"

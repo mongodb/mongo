@@ -37,6 +37,7 @@
 
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 
+#include <boost/shared_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/client.h"
@@ -47,6 +48,8 @@
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     namespace dur {
 

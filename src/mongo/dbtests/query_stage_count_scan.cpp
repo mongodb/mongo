@@ -46,6 +46,8 @@
 
 namespace QueryStageCountScan {
 
+    using boost::shared_ptr;
+
     class CountBase {
     public:
         CountBase() : _client(&_txn) {

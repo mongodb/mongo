@@ -27,6 +27,7 @@
  */
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection.h"
@@ -49,6 +50,7 @@
 namespace QueryPlanExecutor {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     class PlanExecutorBase {
     public:

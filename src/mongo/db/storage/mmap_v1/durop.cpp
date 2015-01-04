@@ -46,10 +46,12 @@
 using namespace mongoutils;
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace mongo {
 
     using boost::scoped_array;
+    using boost::shared_ptr;
 
     namespace dur {
 

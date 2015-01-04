@@ -33,6 +33,7 @@
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <cstdlib>
 #include <string>
 
@@ -52,6 +53,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     namespace {
 

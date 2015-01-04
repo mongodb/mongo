@@ -36,6 +36,7 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durop.h"
@@ -113,7 +114,7 @@ namespace mongo {
         public:
             std::vector<WriteIntent> _intents;
             Already<127> _alreadyNoted;
-            std::vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
+            std::vector< boost::shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
 
             /** reset the IntentsAndDurOps structure (empties all the above) */
             void clear();
@@ -142,12 +143,12 @@ namespace mongo {
             CommitJob();
 
             /** note an operation other than a "basic write". threadsafe (locks in the impl) */
-            void noteOp(shared_ptr<DurOp> p);
+            void noteOp(boost::shared_ptr<DurOp> p);
 
             /** record/note an intent to write */
             void note(void* p, int len);
 
-            std::vector< shared_ptr<DurOp> >& ops() {
+            std::vector< boost::shared_ptr<DurOp> >& ops() {
                 groupCommitMutex.dassertLocked(); // this is what really makes the below safe
                 return _intentsAndDurOps._durOps;                
             }

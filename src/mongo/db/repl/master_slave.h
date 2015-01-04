@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/repl/oplogreader.h"
 
 /* replication data overview
@@ -75,7 +77,7 @@ namespace repl {
        not done (always use main for now).
     */
     class ReplSource {
-        shared_ptr<threadpool::ThreadPool> tp;
+        boost::shared_ptr<threadpool::ThreadPool> tp;
 
         void resync(OperationContext* txn, const std::string& dbName);
 
@@ -137,7 +139,7 @@ namespace repl {
 
         int nClonedThisPass;
 
-        typedef std::vector< shared_ptr< ReplSource > > SourceVector;
+        typedef std::vector< boost::shared_ptr< ReplSource > > SourceVector;
         static void loadAll(OperationContext* txn, SourceVector&);
 
         explicit ReplSource(OperationContext* txn, BSONObj);

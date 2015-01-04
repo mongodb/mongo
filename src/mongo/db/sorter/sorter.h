@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <deque>
 #include <fstream>
 #include <string>

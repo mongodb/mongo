@@ -28,6 +28,7 @@
 *    it in the license file.
 */
 
+#include <boost/shared_ptr.hpp>
 #include <set>
 #include <string>
 
@@ -39,6 +40,8 @@
 
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     namespace fts {
 

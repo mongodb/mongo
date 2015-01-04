@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 namespace mongo {
 
     // utility class for assembling hierarchical objects
@@ -84,7 +86,7 @@ namespace mongo {
 
     private:
         void addBuilder( const std::string &name ) {
-            shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name ) ) );
+            boost::shared_ptr< BSONObjBuilder > newBuilder( new BSONObjBuilder( back()->subobjStart( name ) ) );
             _builders.push_back( std::make_pair( name, newBuilder.get() ) );
             _builderStorage.push_back( newBuilder );
         }
@@ -97,7 +99,7 @@ namespace mongo {
         BSONObjBuilder *back() { return _builders.back().second; }
 
         std::vector< std::pair< std::string, BSONObjBuilder * > > _builders;
-        std::vector< shared_ptr< BSONObjBuilder > > _builderStorage;
+        std::vector< boost::shared_ptr< BSONObjBuilder > > _builderStorage;
 
     };
 

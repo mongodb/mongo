@@ -36,6 +36,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>
@@ -68,6 +69,8 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     /**
      * Thrown when a journal section is corrupt. This is considered OK as long as it occurs while

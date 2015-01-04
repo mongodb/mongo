@@ -43,6 +43,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -59,6 +61,9 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    using boost::shared_ptr;
+
     namespace dur {
 
         extern Journal j;

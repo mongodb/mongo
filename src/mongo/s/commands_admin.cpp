@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
@@ -82,6 +83,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     namespace dbgrid_cmds {
 

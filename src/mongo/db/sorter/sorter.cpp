@@ -49,6 +49,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/shared_ptr.hpp>
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"
@@ -63,6 +64,8 @@
 
 namespace mongo {
     namespace sorter {
+
+        using boost::shared_ptr;
         using namespace mongoutils;
 
         // We need to use the "real" errno everywhere, not GetLastError() on Windows

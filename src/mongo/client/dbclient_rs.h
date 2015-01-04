@@ -42,7 +42,7 @@ namespace mongo {
     class ReplicaSetMonitor;
     class TagSet;
     struct ReadPreferenceSetting;
-    typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
+    typedef boost::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
     /** Use this class to connect to a replica set of servers.  The class will manage
        checking for which server in a replica set is master, and do failover automatically.
@@ -224,7 +224,7 @@ namespace mongo {
          * @throws DBException when an error occurred either when trying to connect to
          *     a node that was thought to be ok or when an assertion happened.
          */
-        DBClientConnection* selectNodeUsingTags(shared_ptr<ReadPreferenceSetting> readPref);
+        DBClientConnection* selectNodeUsingTags(boost::shared_ptr<ReadPreferenceSetting> readPref);
 
         /**
          * @return true if the last host used in the last slaveOk query is still in the

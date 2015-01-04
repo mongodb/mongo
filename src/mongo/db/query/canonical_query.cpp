@@ -39,6 +39,7 @@
 
 namespace {
 
+    using boost::shared_ptr;
     using std::auto_ptr;
     using std::string;
     using namespace mongo;

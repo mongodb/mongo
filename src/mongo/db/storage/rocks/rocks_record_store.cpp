@@ -37,6 +37,7 @@
 #include <algorithm>
 
 #include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -54,6 +55,8 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     namespace {
 

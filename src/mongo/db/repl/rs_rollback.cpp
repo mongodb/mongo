@@ -33,6 +33,8 @@
 
 #include "mongo/db/repl/rs_rollback.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
@@ -93,6 +95,9 @@
  */
 
 namespace mongo {
+
+    using boost::shared_ptr;
+
 namespace repl {
 namespace {
 

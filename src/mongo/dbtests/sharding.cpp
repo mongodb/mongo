@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/dbdirectclient.h"
@@ -44,6 +46,8 @@
 #include "mongo/util/log.h"
 
 namespace ShardingTests {
+
+    using boost::shared_ptr;
 
     namespace serverandquerytests {
         class test1 {

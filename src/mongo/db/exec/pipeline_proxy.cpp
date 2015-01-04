@@ -30,12 +30,15 @@
 
 #include "mongo/db/exec/pipeline_proxy.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using boost::shared_ptr;
 
     PipelineProxyStage::PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
                                            const boost::shared_ptr<PlanExecutor>& child,

@@ -46,6 +46,8 @@
 
 namespace QueryStageFetch {
 
+    using boost::shared_ptr;
+
     class QueryStageFetchBase {
     public:
         QueryStageFetchBase() : _client(&_txn) {

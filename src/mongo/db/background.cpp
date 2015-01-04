@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+
 namespace {
 
     class BgInfo {

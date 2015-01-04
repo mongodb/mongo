@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/concurrency/lock_manager_test_help.h"
@@ -41,7 +42,9 @@ namespace mongo {
 namespace {
     const int NUM_PERF_ITERS = 1000*1000; // numeber of iterations to use for lock perf
 }
-    
+
+    using boost::shared_ptr;
+
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 

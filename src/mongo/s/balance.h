@@ -36,6 +36,7 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/balancer_policy.h"
@@ -67,7 +68,7 @@ namespace mongo {
 
     private:
         typedef MigrateInfo CandidateChunk;
-        typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
+        typedef boost::shared_ptr<CandidateChunk> CandidateChunkPtr;
 
         // hostname:port of my mongos
         std::string _myid;

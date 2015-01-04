@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+
 namespace repl {
 
     //number of readers created;

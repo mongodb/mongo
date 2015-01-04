@@ -74,6 +74,7 @@
 #include "mongo/util/text.h"
 
 using namespace std;
+using boost::shared_ptr;
 using mongo::Message;
 using mongo::DbMessage;
 using mongo::BSONObj;

@@ -52,6 +52,7 @@
 namespace QueryStageAnd {
 
     using boost::scoped_ptr;
+    using boost::shared_ptr;
 
     class QueryStageAndBase {
     public:

@@ -34,6 +34,8 @@
 
 #include "mongo/client/parallel.h"
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclient_rs.h"
@@ -50,6 +52,8 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using boost::shared_ptr;
 
     LabeledLevel pc( "pcursor", 2 );
 

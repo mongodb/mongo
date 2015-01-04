@@ -38,6 +38,8 @@
 namespace mongo {
 namespace optionenvironment {
 
+    using boost::shared_ptr;
+
     // Environment implementation
 
     Status Environment::addKeyConstraint(KeyConstraint* keyConstraint) {

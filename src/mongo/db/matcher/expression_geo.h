@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -99,7 +101,7 @@ namespace mongo {
     private:
         BSONObj _rawObj;
         // Share ownership of our query with all of our clones
-        shared_ptr<const GeoExpression> _query;
+        boost::shared_ptr<const GeoExpression> _query;
     };
 
 
@@ -168,7 +170,7 @@ namespace mongo {
     private:
         BSONObj _rawObj;
         // Share ownership of our query with all of our clones
-        shared_ptr<const GeoNearExpression> _query;
+        boost::shared_ptr<const GeoNearExpression> _query;
     };
 
 }  // namespace mongo

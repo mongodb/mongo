@@ -34,6 +34,7 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/export_macros.h"
 #include "mongo/db/dbmessage.h"
@@ -101,10 +102,10 @@ namespace mongo {
         }
     };
 
-    typedef shared_ptr<ShardConnection> ShardConnectionPtr;
+    typedef boost::shared_ptr<ShardConnection> ShardConnectionPtr;
 
     class DBClientCursor;
-    typedef shared_ptr<DBClientCursor> DBClientCursorPtr;
+    typedef boost::shared_ptr<DBClientCursor> DBClientCursorPtr;
 
     class MONGO_CLIENT_API ParallelConnectionState {
     public:
@@ -133,7 +134,7 @@ namespace mongo {
     };
 
     typedef ParallelConnectionState PCState;
-    typedef shared_ptr<PCState> PCStatePtr;
+    typedef boost::shared_ptr<PCState> PCStatePtr;
 
     class MONGO_CLIENT_API ParallelConnectionMetadata {
     public:
@@ -165,7 +166,7 @@ namespace mongo {
     };
 
     typedef ParallelConnectionMetadata PCMData;
-    typedef shared_ptr<PCMData> PCMDataPtr;
+    typedef boost::shared_ptr<PCMData> PCMDataPtr;
 
     /**
      * Runs a query in parallel across N servers, enforcing compatible chunk versions for queries
@@ -398,7 +399,7 @@ namespace mongo {
          * @param conn optional connection to use.  will use standard pooled if non-specified
          * @param useShardConn use ShardConnection
          */
-        static shared_ptr<CommandResult> spawnCommand( const std::string& server,
+        static boost::shared_ptr<CommandResult> spawnCommand( const std::string& server,
                                                        const std::string& db,
                                                        const BSONObj& cmd,
                                                        int options,
