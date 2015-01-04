@@ -31,6 +31,7 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/unittest/temp_dir.h"

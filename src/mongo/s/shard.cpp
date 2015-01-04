@@ -34,6 +34,7 @@
 
 #include "mongo/s/shard.h"
 
+#include <boost/make_shared.hpp>
 #include <set>
 #include <string>
 #include <vector>

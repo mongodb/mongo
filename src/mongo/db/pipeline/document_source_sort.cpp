@@ -33,6 +33,8 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include <boost/make_shared.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"

@@ -31,7 +31,7 @@
 
 #include "mongo/scripting/v8-3.25_utils.h"
 
-#include <boost/smart_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>

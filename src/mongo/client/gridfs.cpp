@@ -35,7 +35,6 @@
 #include "mongo/client/gridfs.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/smart_ptr.hpp>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>

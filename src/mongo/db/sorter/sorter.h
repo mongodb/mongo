@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr.hpp>
 #include <deque>
 #include <fstream>
 #include <string>

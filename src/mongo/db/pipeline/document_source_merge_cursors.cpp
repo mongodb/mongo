@@ -33,6 +33,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
+#include <boost/make_shared.hpp>
 
 namespace mongo {
 

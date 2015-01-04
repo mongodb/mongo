@@ -33,6 +33,8 @@
 
 #include "mongo/db/projection.h"
 
+#include <boost/make_shared.hpp>
+
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

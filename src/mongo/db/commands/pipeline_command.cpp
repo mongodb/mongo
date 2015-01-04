@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/smart_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"

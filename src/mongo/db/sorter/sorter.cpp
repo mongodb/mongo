@@ -48,6 +48,7 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/make_shared.hpp>
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"

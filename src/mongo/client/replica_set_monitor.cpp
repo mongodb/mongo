@@ -32,6 +32,7 @@
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
+#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 #include <limits>
 

@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
 
+#include <boost/make_shared.hpp>
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"

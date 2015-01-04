@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/network_interface_impl.h"
 
+#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 #include <memory>
 #include <sstream>

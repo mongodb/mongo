@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
+#include <boost/shared_array.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/db/concurrency/write_conflict_exception.h"

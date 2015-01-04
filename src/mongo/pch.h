@@ -54,7 +54,6 @@
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/utility.hpp>
 
 #include "mongo/client/redef_macros.h"

@@ -30,6 +30,8 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
+#include <boost/make_shared.hpp>
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
