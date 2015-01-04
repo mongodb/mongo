@@ -35,6 +35,7 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/thread/condition.hpp>
+#include <iostream>
 
 #include "mongo/util/concurrency/task.h"
 

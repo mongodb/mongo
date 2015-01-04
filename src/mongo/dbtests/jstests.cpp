@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iostream>
 #include <limits>
 
 #include "mongo/base/parse_number.h"

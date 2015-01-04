@@ -37,6 +37,7 @@
 #include <syslog.h>
 #endif
 #include <ios>
+#include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 

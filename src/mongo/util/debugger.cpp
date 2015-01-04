@@ -31,6 +31,8 @@
 
 #include "mongo/util/debugger.h"
 
+#include <iostream>
+
 #include "mongo/db/server_options.h"
 
 #ifndef _WIN32

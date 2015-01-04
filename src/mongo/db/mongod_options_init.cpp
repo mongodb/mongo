@@ -28,6 +28,8 @@
 
 #include "mongo/db/mongod_options.h"
 
+#include <iostream>
+
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"

@@ -28,7 +28,6 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
-#include <iostream>
 #include <sstream>
 #include <string>
 

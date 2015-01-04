@@ -34,6 +34,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <iostream>
+
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"

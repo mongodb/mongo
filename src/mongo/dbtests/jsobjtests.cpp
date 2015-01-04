@@ -36,6 +36,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <iostream>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"

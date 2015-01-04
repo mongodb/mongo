@@ -30,6 +30,8 @@
 
 #include "mongo/db/commands/server_status_internal.h"
 
+#include <iostream>
+
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/mongoutils/str.h"
 

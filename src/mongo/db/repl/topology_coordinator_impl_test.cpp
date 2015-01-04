@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iostream>
+
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"

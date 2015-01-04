@@ -32,6 +32,7 @@
 
 #include "mongo/s/mongos_options.h"
 
+#include <iostream>
 #include <string>
 #include <vector>
 

@@ -33,6 +33,8 @@
 
 #include "mongo/scripting/engine_v8-3.25.h"
 
+#include <iostream>
+
 #include "mongo/base/init.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"

@@ -35,6 +35,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <fstream>
+#include <iostream>
 #include <numeric>
 #include <string>
 

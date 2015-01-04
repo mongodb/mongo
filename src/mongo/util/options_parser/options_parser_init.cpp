@@ -28,6 +28,8 @@
 
 #include "mongo/util/options_parser/startup_options.h"
 
+#include <iostream>
+
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"

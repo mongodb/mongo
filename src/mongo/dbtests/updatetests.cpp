@@ -34,6 +34,8 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <iostream>
+
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"

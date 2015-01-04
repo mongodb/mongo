@@ -34,7 +34,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/tss.hpp>
-#include <ostream>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>

@@ -30,7 +30,6 @@
 
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
-#include <iostream>
 #include <list>
 
 #include "mongo/base/status.h"

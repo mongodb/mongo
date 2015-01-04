@@ -31,6 +31,7 @@
 #include "mongo/dbtests/framework_options.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <iostream>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"

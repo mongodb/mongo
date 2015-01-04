@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iostream>
+
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/base64.h"

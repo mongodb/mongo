@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <iostream>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbdirectclient.h"

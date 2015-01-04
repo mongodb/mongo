@@ -37,6 +37,8 @@
 
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 
+#include <iostream>
+
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage_options.h"

@@ -35,6 +35,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
+#include <iostream>
 #include <limits>
 #include <signal.h>
 #include <string>

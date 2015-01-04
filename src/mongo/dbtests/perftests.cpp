@@ -42,6 +42,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/version.hpp>
 #include <iomanip>
+#include <iostream>
 #include <fstream>
 
 #include "mongo/db/db.h"

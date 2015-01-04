@@ -28,7 +28,6 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <iostream>
 #include <vector>
 
 #include "mongo/base/status.h"

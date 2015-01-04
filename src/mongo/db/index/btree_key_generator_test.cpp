@@ -28,6 +28,8 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
+#include <iostream>
+
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 

@@ -28,7 +28,6 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-#include <iostream>
 #include <sstream>
 
 #include "mongo/util/assert_util.h"

@@ -30,6 +30,8 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include <iostream>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/sasl_client_authenticate.h"

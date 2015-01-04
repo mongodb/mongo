@@ -34,6 +34,7 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/thread.hpp>
+#include <iostream>
 #include <signal.h>
 
 #include "mongo/base/initializer.h"

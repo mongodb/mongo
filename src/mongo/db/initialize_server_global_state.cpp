@@ -36,6 +36,7 @@
 #include "mongo/db/initialize_server_global_state.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <iostream>
 #include <memory>
 #include <signal.h>
 

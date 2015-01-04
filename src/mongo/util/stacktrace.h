@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"

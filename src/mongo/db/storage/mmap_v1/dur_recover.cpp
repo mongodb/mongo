@@ -37,6 +37,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fcntl.h>
 #include <iomanip>
+#include <iostream>
 #include <sys/stat.h>
 
 #include "mongo/db/curop.h"

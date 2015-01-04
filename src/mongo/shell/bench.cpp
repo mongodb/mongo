@@ -37,6 +37,7 @@
 #include <pcrecpp.h>
 
 #include <boost/thread/thread.hpp>
+#include <iostream>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"

@@ -33,7 +33,6 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 #include "mongo/db/jsobj.h"
-#include <iostream>
 
 namespace mongo {
 

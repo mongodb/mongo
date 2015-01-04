@@ -35,6 +35,7 @@
 #include "mongo/s/server.h"
 
 #include <boost/thread/thread.hpp>
+#include <iostream>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"

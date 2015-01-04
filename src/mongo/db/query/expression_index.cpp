@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/expression_index.h"
 
+#include <iostream>
+
 #include "third_party/s2/s2regioncoverer.h"
 
 #include "mongo/db/geo/geoconstants.h"

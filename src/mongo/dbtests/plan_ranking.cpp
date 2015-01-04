@@ -30,6 +30,8 @@
  * This file tests db/query/plan_ranker.cpp and db/query/multi_plan_runner.cpp.
  */
 
+#include <iostream>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"

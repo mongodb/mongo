@@ -31,6 +31,7 @@
 #include "mongo/db/mongod_options.h"
 
 #include <boost/filesystem.hpp>
+#include <iostream>
 #include <string>
 #include <vector>
 

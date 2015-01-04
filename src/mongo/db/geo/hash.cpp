@@ -33,6 +33,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 #include <algorithm> // for max()
+#include <iostream>
 
 // So we can get at the str namespace.
 using namespace mongoutils;

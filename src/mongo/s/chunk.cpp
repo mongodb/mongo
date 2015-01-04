@@ -34,6 +34,8 @@
 
 #include "mongo/s/chunk.h"
 
+#include <iostream>
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"

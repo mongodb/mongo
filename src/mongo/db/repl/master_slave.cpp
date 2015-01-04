@@ -42,6 +42,7 @@
 
 #include "mongo/db/repl/master_slave.h"
 
+#include <iostream>
 #include <pcrecpp.h>
 #include <boost/thread/thread.hpp>
 
