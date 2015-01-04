@@ -36,6 +36,9 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
         if (!merging) {
             if (!input.missing()) {

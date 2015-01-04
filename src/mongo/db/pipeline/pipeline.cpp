@@ -48,6 +48,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     const char Pipeline::commandName[] = "aggregate";
     const char Pipeline::pipelineName[] = "pipeline";
     const char Pipeline::explainName[] = "explain";

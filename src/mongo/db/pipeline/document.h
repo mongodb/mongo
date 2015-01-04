@@ -31,6 +31,8 @@
 #include "mongo/db/pipeline/document_internal.h"
 
 #include <boost/functional/hash.hpp>
+#include <boost/intrusive_ptr.hpp>
+
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
@@ -198,7 +200,7 @@ namespace mongo {
         const DocumentStorage& storage() const {
             return (_storage ? *_storage : DocumentStorage::emptyDoc());
         }
-        intrusive_ptr<const DocumentStorage> _storage;
+        boost::intrusive_ptr<const DocumentStorage> _storage;
     };
 
     inline bool operator== (const Document& l, const Document& r) {
@@ -381,7 +383,7 @@ namespace mongo {
         Document freeze() {
             // This essentially moves _storage into a new Document by way of temp.
             Document ret;
-            intrusive_ptr<const DocumentStorage> temp (storagePtr(), /*inc_ref_count=*/false);
+            boost::intrusive_ptr<const DocumentStorage> temp (storagePtr(), /*inc_ref_count=*/false);
             temp.swap(ret._storage);
             _storage = NULL;
             return ret;

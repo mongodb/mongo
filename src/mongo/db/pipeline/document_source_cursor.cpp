@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     DocumentSourceCursor::~DocumentSourceCursor() {
         dispose();
     }

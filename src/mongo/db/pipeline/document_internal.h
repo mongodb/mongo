@@ -30,6 +30,8 @@
 
 #include <third_party/murmurhash3/MurmurHash3.h>
 
+#include <boost/intrusive_ptr.hpp>
+
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/db/pipeline/value.h"
 
@@ -233,7 +235,7 @@ namespace mongo {
         }
 
         /// Shallow copy of this. Caller owns memory.
-        intrusive_ptr<DocumentStorage> clone() const;
+        boost::intrusive_ptr<DocumentStorage> clone() const;
 
         size_t allocatedBytes() const {
             return !_buffer ? 0 : (_bufferEnd - _buffer + hashTabBytes());

@@ -42,6 +42,9 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     const char DocumentSourceSort::sortName[] = "$sort";
 
     const char *DocumentSourceSort::getSourceName() const {

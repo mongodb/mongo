@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     /** Helper class to unwind array from a single document. */
     class DocumentSourceUnwind::Unwinder {
     public:

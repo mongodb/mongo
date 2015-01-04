@@ -39,6 +39,8 @@
 
 namespace ExpressionTests {
 
+    using boost::intrusive_ptr;
+
     /** Convert BSONObj to a BSONObj with our $const wrappings. */
     static BSONObj constify(const BSONObj& obj, bool parentIsArray=false) {
         BSONObjBuilder bob;

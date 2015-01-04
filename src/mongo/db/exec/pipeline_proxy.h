@@ -29,7 +29,8 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -44,7 +45,7 @@ namespace mongo {
      */
     class PipelineProxyStage : public PlanStage {
     public:
-        PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
+        PipelineProxyStage(boost::intrusive_ptr<Pipeline> pipeline,
                            const boost::shared_ptr<PlanExecutor>& child,
                            WorkingSet* ws);
 
@@ -90,7 +91,7 @@ namespace mongo {
         boost::optional<BSONObj> getNextBson();
 
         // Things in the _stash sould be returned before pulling items from _pipeline.
-        const intrusive_ptr<Pipeline> _pipeline;
+        const boost::intrusive_ptr<Pipeline> _pipeline;
         vector<BSONObj> _stash;
         const bool _includeMetaData;
         boost::weak_ptr<PlanExecutor> _childExec;

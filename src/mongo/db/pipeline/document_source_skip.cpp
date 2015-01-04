@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     const char DocumentSourceSkip::skipName[] = "$skip";
 
     DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx):

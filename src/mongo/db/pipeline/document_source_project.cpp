@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     const char DocumentSourceProject::projectName[] = "$project";
 
     DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,

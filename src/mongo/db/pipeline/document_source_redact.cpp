@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     const char DocumentSourceRedact::redactName[] = "$redact";
 
     DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,

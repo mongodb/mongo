@@ -44,6 +44,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
 namespace {
     class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
     public:

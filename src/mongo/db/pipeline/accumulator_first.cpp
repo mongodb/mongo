@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     void AccumulatorFirst::processInternal(const Value& input, bool merging) {
         /* only remember the first value seen */
         if (!_haveFirst) {

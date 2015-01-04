@@ -41,6 +41,7 @@
 
 namespace mongo {
     using namespace mongoutils;
+    using boost::intrusive_ptr;
 
     Position DocumentStorage::findField(StringData requested) const {
         int reqSize = requested.size(); // get size calculation out of the way if needed

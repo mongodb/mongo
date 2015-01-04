@@ -40,6 +40,8 @@
 
 namespace AccumulatorTests {
 
+    using boost::intrusive_ptr;
+
     class Base {
     protected:
         BSONObj fromDocument( const Document& document ) {

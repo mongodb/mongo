@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
 
     const char* DocumentSourceMergeCursors::getSourceName() const {

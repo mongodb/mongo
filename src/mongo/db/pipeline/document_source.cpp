@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext> &pCtx)
         : pSource(NULL)
         , pExpCtx(pCtx)

@@ -34,6 +34,9 @@
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     const char DocumentSourceOut::outName[] = "$out";
 
     DocumentSourceOut::~DocumentSourceOut() {

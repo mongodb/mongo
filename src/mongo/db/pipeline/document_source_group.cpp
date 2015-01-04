@@ -41,6 +41,9 @@
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     const char DocumentSourceGroup::groupName[] = "$group";
 
     const char *DocumentSourceGroup::getSourceName() const {

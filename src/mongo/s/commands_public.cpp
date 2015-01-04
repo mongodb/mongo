@@ -70,6 +70,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     namespace dbgrid_pub_cmds {
 
         namespace {

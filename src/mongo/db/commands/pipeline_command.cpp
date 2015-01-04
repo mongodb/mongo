@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     static bool isCursorCommand(BSONObj cmdObj) {
         BSONElement cursorElem = cmdObj["cursor"];
         if (cursorElem.eoo())

@@ -115,7 +115,7 @@ namespace mongo {
         int size() const { return _size; }
         StringData stringData() const { return StringData(c_str(), _size); }
 
-        static intrusive_ptr<const RCString> create(StringData s);
+        static boost::intrusive_ptr<const RCString> create(StringData s);
 
 // MSVC: C4291: 'declaration' : no matching operator delete found; memory will not be freed if 
 // initialization throws an exception

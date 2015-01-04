@@ -50,7 +50,6 @@
 #include <vector>
 
 #define BOOST_FILESYSTEM_VERSION 3
-#include <boost/intrusive_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
@@ -61,7 +60,6 @@
 namespace mongo {
 
     using namespace std;
-    using boost::intrusive_ptr;
     using boost::scoped_array;
     using boost::scoped_ptr;
     using boost::shared_ptr;

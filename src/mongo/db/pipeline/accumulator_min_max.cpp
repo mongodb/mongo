@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     void AccumulatorMinMax::processInternal(const Value& input, bool merging) {
         // nullish values should have no impact on result
         if (!input.nullish()) {

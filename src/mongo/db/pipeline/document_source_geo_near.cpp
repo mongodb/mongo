@@ -35,6 +35,9 @@
 #include "mongo/db/pipeline/document.h"
 
 namespace mongo {
+
+    using boost::intrusive_ptr;
+
     char DocumentSourceGeoNear::geoNearName[] = "$geoNear";
     const char *DocumentSourceGeoNear::getSourceName() const { return geoNearName; }
 

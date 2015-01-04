@@ -42,6 +42,8 @@
 
 namespace PipelineTests {
 
+    using boost::intrusive_ptr;
+
     namespace FieldPath {
 
         using mongo::FieldPath;

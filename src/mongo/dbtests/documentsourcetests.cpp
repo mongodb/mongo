@@ -48,6 +48,8 @@
 
 namespace DocumentSourceTests {
 
+    using boost::intrusive_ptr;
+
     static const char* const ns = "unittests.documentsourcetests";
     static const BSONObj metaTextScore = BSON("$meta" << "textScore");
 

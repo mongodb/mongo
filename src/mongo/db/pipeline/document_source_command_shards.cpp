@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         verify(false);

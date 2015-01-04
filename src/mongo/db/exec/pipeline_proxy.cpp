@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     PipelineProxyStage::PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
                                            const boost::shared_ptr<PlanExecutor>& child,
                                            WorkingSet* ws)

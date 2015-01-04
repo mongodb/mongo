@@ -29,6 +29,8 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsonmisc.h"
@@ -146,7 +148,7 @@ namespace mongo {
             putRefCountable(new RCCodeWScope(cws.code.toString(), cws.scope));
         }
 
-        void putRefCountable(intrusive_ptr<const RefCountable> ptr) {
+        void putRefCountable(boost::intrusive_ptr<const RefCountable> ptr) {
             genericRCPtr = ptr.get();
 
             if (genericRCPtr) {
@@ -173,12 +175,12 @@ namespace mongo {
             return arrayPtr->vec;
         }
 
-        intrusive_ptr<const RCCodeWScope> getCodeWScope() const {
+        boost::intrusive_ptr<const RCCodeWScope> getCodeWScope() const {
             dassert(typeid(*genericRCPtr) == typeid(const RCCodeWScope));
             return static_cast<const RCCodeWScope*>(genericRCPtr);
         }
 
-        intrusive_ptr<const RCDBRef> getDBRef() const {
+        boost::intrusive_ptr<const RCDBRef> getDBRef() const {
             dassert(typeid(*genericRCPtr) == typeid(const RCDBRef));
             return static_cast<const RCDBRef*>(genericRCPtr);
         }

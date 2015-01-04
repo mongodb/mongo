@@ -48,6 +48,7 @@
 
 namespace mongo {
     using namespace mongoutils;
+    using boost::intrusive_ptr;
 
     /// Helper function to easily wrap constants with $const.
     static Value serializeConstant(Value val) {

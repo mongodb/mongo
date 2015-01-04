@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     void AccumulatorSum::processInternal(const Value& input, bool merging) {
         // do nothing with non numeric types
         if (!input.numeric())

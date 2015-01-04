@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     void AccumulatorLast::processInternal(const Value& input, bool merging) {
         /* always remember the last value seen */
         _last = input;

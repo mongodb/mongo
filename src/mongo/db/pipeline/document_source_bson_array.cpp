@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
     boost::optional<Document> DocumentSourceBsonArray::getNext() {
         pExpCtx->checkForInterrupt();
 

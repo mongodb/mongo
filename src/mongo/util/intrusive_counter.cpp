@@ -36,6 +36,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+    using boost::intrusive_ptr;
     using namespace mongoutils;
 
     intrusive_ptr<const RCString> RCString::create(StringData s) {

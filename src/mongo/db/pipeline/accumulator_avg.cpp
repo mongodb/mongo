@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using boost::intrusive_ptr;
+
 namespace {
     const char subTotalName[] = "subTotal";
     const char countName[] = "count";

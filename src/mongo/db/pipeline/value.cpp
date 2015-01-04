@@ -42,6 +42,7 @@
 
 namespace mongo {
     using namespace mongoutils;
+    using boost::intrusive_ptr;
 
     void ValueStorage::verifyRefCountingIfShould() const {
         switch (type) {
