@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document.h"
 
 #include <boost/functional/hash.hpp>
+#include <boost/scoped_array.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/field_path.h"

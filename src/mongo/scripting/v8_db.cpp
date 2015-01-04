@@ -48,6 +48,7 @@
 #include "mongo/util/text.h"
 
 using namespace std;
+using boost::scoped_array;
 
 namespace mongo {
 

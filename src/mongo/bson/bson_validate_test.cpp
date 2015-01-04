@@ -27,6 +27,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include <boost/scoped_array.hpp>
+
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
@@ -37,6 +39,7 @@
 namespace {
 
     using namespace mongo;
+    using boost::scoped_array;
 
     void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
         // like a BSONObj string, but without a NUL terminator.

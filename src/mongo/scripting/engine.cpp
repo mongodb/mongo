@@ -35,6 +35,7 @@
 
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
+#include <boost/scoped_array.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"

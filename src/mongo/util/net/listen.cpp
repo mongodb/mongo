@@ -34,6 +34,8 @@
 
 #include "mongo/util/net/listen.h"
 
+#include <boost/scoped_array.hpp>
+
 #include "mongo/db/server_options.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/exit.h"

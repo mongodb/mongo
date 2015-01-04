@@ -34,6 +34,7 @@
 #include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED
 
+#include <boost/scoped_array.hpp>
 #include <iostream>
 #include <psapi.h>
 
@@ -41,6 +42,7 @@
 #include "mongo/util/log.h"
 
 using namespace std;
+using boost::scoped_array;
 
 namespace mongo {
 

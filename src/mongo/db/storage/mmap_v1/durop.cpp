@@ -49,6 +49,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    using boost::scoped_array;
+
     namespace dur {
 
         /** read a durop from journal file referenced by br.

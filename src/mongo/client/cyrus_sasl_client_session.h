@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include <boost/scoped_array.hpp>
+
 #include "mongo/client/export_macros.h"
 #include "mongo/client/sasl_client_session.h"
 
