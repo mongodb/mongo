@@ -102,12 +102,12 @@ class test_config03(test_base03.test_base03):
         if self.s_create == False:
             successargs = successargs.replace(',create=false,',',create,')
             expect_fail = True
-            fail_msg = '/No such file or directory/'
+            fail_msg = '/(No such file or directory|The system cannot find the file specified)/'
         elif self.s_create == None:
             successargs = successargs + 'create=true,'
             expect_fail = True
-            fail_msg = '/No such file or directory/'
-        
+            fail_msg = '/(No such file or directory|The system cannot find the file specified)/'
+
         if self.s_eviction_target >= self.s_eviction_trigger:
             # construct args that guarantee that target < trigger
             # we know that trigger >= 1

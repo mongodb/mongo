@@ -146,7 +146,7 @@ class test_config02(wttest.WiredTigerTestCase):
         dir = 'nondir'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open(dir, 'create'),
-            '/No such file or directory/')
+            '/(No such file or directory|The system cannot find the path specified)/')
 
     def test_home_not_writeable(self):
         dir = 'subdir'
