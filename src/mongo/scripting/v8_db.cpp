@@ -129,8 +129,8 @@ namespace mongo {
     v8::Handle<v8::Value> mongoConsExternal(V8Scope* scope, const v8::Arguments& args) {
         string host = "127.0.0.1";
         if (args.Length() > 0 && args[0]->IsString()) {
-            v8::String::AsciiValue a(args[0])
-            host = string(*a);
+            v8::String::Utf8Value utf(args[0]);
+            host = string(*utf);
         }
 
         // only allow function template to be used by a constructor
