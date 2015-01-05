@@ -37,7 +37,7 @@ var $config = (function() {
         insert: { insert: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var ixSpec = {};
         ixSpec[this.indexedField] = 'text';
         assertAlways.commandWorked(db[collName].ensureIndex(ixSpec));

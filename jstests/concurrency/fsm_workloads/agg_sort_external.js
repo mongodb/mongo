@@ -38,7 +38,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertWhenOwnColl.eq(db[collName].find().itcount() / 2, db[otherCollName].find().itcount());
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
 
         // drop all collections with this workload's assumed-to-be-unique prefix

@@ -66,7 +66,7 @@ var $config = (function() {
         assertConsistency: { insert: 0.5, update: 0.5 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         assertAlways.commandWorked(db[collName].ensureIndex({ tid: 1, i: 1 }));
     }
 

@@ -47,14 +47,14 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.commandWorked(res);
     };
 
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
         var outDB = db.getSiblingDB(uniqueDBName);
         assertAlways.commandWorked(outDB.createCollection(collName));
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         var outDB = db.getSiblingDB(uniqueDBName);
         var res = outDB.dropDatabase();
         assertAlways.commandWorked(res);
