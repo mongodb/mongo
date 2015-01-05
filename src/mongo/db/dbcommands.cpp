@@ -1014,15 +1014,18 @@ namespace mongo {
             const std::string ns = dbname + "." + collName;
 
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
-            Client::Context ctx(txn,  ns );
+            AutoGetDb autoDb(txn, dbname, MODE_X);
+            Database* const db = autoDb.getDb();
+            Collection* coll = db ? db->getCollection(ns) : NULL;
 
-            Collection* coll = ctx.db()->getCollection( ns );
-            if ( !coll ) {
+            // If db/collection does not exist, short circuit and return.
+            if ( !db || !coll ) {
                 errmsg = "ns does not exist";
                 return false;
             }
+
+            Client::Context ctx(txn,  ns);
+            WriteUnitOfWork wunit(txn);
 
             bool ok = true;
 
