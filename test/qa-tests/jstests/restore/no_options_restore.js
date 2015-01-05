@@ -20,17 +20,15 @@
     // the db we'll use
     var testDB = toolTest.db.getSiblingDB('test');
 
-    // turn off auto-use of power of 2 sizes, so we know exactly what
-    // options new collections will have
-    var cmdRet = testDB.adminCommand({ setParameter: 1, 
-        newCollectionsUsePowerOf2Sizes: false }); 
-    assert.eq(1, cmdRet.ok);
-
     // we'll use three different collections - the first will have
     // options set, the second won't, the third will be capped.
     var collWithOptions = testDB.withOptions;
     var collWithoutOptions = testDB.withoutOptions;
     var collCapped = testDB.capped;
+
+    // create the noPadding collection
+    var noPaddingOptions = {noPadding: true};
+    testDB.createCollection('withOptions', noPaddingOptions);
 
     // create the capped collection
     var cappedOptions = { capped: true, size: 4096, autoIndexId: true };
@@ -77,9 +75,9 @@
     var cappedOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.capped' });
     assert.eq(cappedOptions, cappedOptionsFromDB.options);
     var withOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withOptions' });
-    assert.eq({ flags: 1 }, withOptionsFromDB.options);
+    assert.eq({ flags: 3 }, withOptionsFromDB.options);
     var withoutOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withoutOptions' });
-    assert.eq(undefined, withoutOptionsFromDB.options);
+    assert.eq({ flags: 1 }, withoutOptionsFromDB.options);
 
     // drop the data
     testDB.dropDatabase();
@@ -99,11 +97,11 @@
 
     // make sure the options were not restored
     cappedOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.capped' });
-    assert.eq(undefined, cappedOptionsFromDB.options);
+    assert.eq({ flags : 1 }, cappedOptionsFromDB.options);
     withOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withOptions' });
-    assert.eq(undefined, withOptionsFromDB.options);
+    assert.eq({ flags : 1 }, withOptionsFromDB.options);
     withoutOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withoutOptions' });
-    assert.eq(undefined, withoutOptionsFromDB.options);
+    assert.eq({ flags : 1 }, withoutOptionsFromDB.options);
 
     // additional check that the capped collection is no longer capped
     var cappedStats = testDB.capped.stats();
