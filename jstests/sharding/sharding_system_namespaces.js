@@ -16,6 +16,9 @@ var st = new ShardingTest({ shards : 2 });
 var db = st.s.getDB("test");
 var coll = db.sharding_system_namespaces;
 
+// This test relies on the wiredTiger storage engine being compiled
+// into the server. This assumption does not hold on 32-bit platforms.
+// See SERVER-16660.
 if (db.serverBuildInfo().bits != 32) {
 
     function checkCollectionOptions(database) {
