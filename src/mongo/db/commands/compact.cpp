@@ -176,7 +176,7 @@ namespace mongo {
 
             log() << "compact " << ns << " end";
 
-            IndexBuilder::restoreIndexes(indexesInProg);
+            IndexBuilder::restoreIndexes(txn, indexesInProg);
 
             return true;
         }

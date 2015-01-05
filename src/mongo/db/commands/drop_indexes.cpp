@@ -314,7 +314,7 @@ namespace mongo {
             result.append( "nIndexes", (int)all.size() );
             result.append( "indexes", all );
 
-            IndexBuilder::restoreIndexes(indexesInProg);
+            IndexBuilder::restoreIndexes(txn, indexesInProg);
             return true;
         }
     } cmdReIndex;

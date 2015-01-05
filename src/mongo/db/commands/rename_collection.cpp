@@ -93,10 +93,6 @@ namespace mongo {
             return indexes;
         }
 
-        virtual void restoreIndexBuildsOnSource(std::vector<BSONObj> indexesInProg, std::string source) {
-            IndexBuilder::restoreIndexes( indexesInProg );
-        }
-
         static void dropCollection(OperationContext* txn, Database* db, StringData collName) {
             WriteUnitOfWork wunit(txn);
             if (db->dropCollection(txn, collName).isOK()) {
@@ -203,7 +199,9 @@ namespace mongo {
 
             const std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, sourceDB, cmdObj);
             // Dismissed on success
-            ScopeGuard indexBuildRestorer = MakeGuard(IndexBuilder::restoreIndexes, indexesInProg);
+            ScopeGuard indexBuildRestorer = MakeGuard(IndexBuilder::restoreIndexes,
+                                                      txn,
+                                                      indexesInProg);
 
             Database* const targetDB = dbHolder().openDb(txn, nsToDatabase(target));
 

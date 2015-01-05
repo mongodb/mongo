@@ -291,7 +291,7 @@ namespace mongo {
             Status status = repairDatabase(txn, engine, dbname, preserveClonedFilesOnFailure,
                                            backupOriginalFiles );
 
-            IndexBuilder::restoreIndexes(indexesInProg);
+            IndexBuilder::restoreIndexes(txn, indexesInProg);
 
             // Open database before returning
             dbHolder().openDb(txn, dbname);

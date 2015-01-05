@@ -43,7 +43,22 @@ namespace mongo {
     class OperationContext;
 
     /**
-     * Forks off a thread to build an index.
+     * A helper class for replication to use for building indexes.
+     * In standalone mode, we use the client connection thread for building indexes in the
+     * background. In replication mode, secondaries must spawn a new thread to build background 
+     * indexes, since there are no client connection threads to use for such purpose.  IndexBuilder
+     * is a subclass of BackgroundJob to enable this use.
+     * This class is also used for building indexes in the foreground on secondaries, for
+     * code convenience.  buildInForeground() is directly called by the replication applier to
+     * build an index in the foreground; the properties of BackgroundJob are not used for this use
+     * case.
+     * For background index builds, BackgroundJob::go() is called on the IndexBuilder instance,
+     * which begins a new thread at this class's run() method.  After go() is called in the
+     * parent thread, waitForBgIndexStarting() must be called by the same parent thread,
+     * before any other thread calls go() on any other IndexBuilder instance.  This is
+     * ensured by the replication system, since commands are effectively run single-threaded
+     * by the replication applier, and index builds are treated as commands even though they look
+     * like inserts on system.indexes.
      */
     class IndexBuilder : public BackgroundJob {
     public:
@@ -64,7 +79,7 @@ namespace mongo {
          * index ns, index name, and/or index key spec.
          * Returns a vector of the indexes that were killed.
          */
-        static std::vector<BSONObj> 
+        static std::vector<BSONObj>
             killMatchingIndexBuilds(Collection* collection,
                                     const IndexCatalog::IndexKillCriteria& criteria);
 
@@ -73,11 +88,18 @@ namespace mongo {
          * not match the ns field in the indexes list, the BSONObj's ns field is changed before the
          * index is built (to handle rename).
          */
-        static void restoreIndexes(const std::vector<BSONObj>& indexes);
+        static void restoreIndexes(OperationContext* txn, const std::vector<BSONObj>& indexes);
+
+        /**
+         * Waits for a background index build to register itself.  This function must be called
+         * after starting a background index build via a BackgroundJob and before starting a
+         * subsequent one.
+         */
+        static void waitForBgIndexStarting();
 
     private:
-        Status _build(OperationContext* txn, 
-                      Database* db, 
+        Status _build(OperationContext* txn,
+                      Database* db,
                       bool allowBackgroundBuilding,
                       Lock::DBLock* dbLock) const;
 

@@ -606,6 +606,9 @@ namespace repl {
                     IndexBuilder* builder = new IndexBuilder(o);
                     // This spawns a new thread and returns immediately.
                     builder->go();
+                    // Wait for thread to start and register itself
+                    Lock::TempRelease release(txn->lockState());
+                    IndexBuilder::waitForBgIndexStarting();
                 }
                 else {
                     IndexBuilder builder(o);

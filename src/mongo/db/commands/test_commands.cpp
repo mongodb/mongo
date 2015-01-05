@@ -221,7 +221,7 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            IndexBuilder::restoreIndexes(indexes);
+            IndexBuilder::restoreIndexes(txn, indexes);
 
             if (!fromRepl) {
                 repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
