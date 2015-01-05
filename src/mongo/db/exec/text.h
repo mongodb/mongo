@@ -141,7 +141,7 @@ namespace mongo {
          * score) pair for this document.  Also rejects documents that don't match this stage's
          * filter.
          */
-        void addTerm(const BSONObj& key, const RecordId& loc);
+        void addTerm(const BSONObj key, WorkingSetID wsid);
 
         /**
          * Possibly return a result.  FYI, this may perform a fetch directly if it is needed to
@@ -178,10 +178,17 @@ namespace mongo {
         // Which _scanners are we currently reading from?
         size_t _currentIndexScanner;
 
+        // Map each buffered record id to this data.
+        struct TextRecordData {
+            TextRecordData() : wsid(WorkingSet::INVALID_ID), score(0.0) { }
+            WorkingSetID wsid;
+            double score;
+        };
+
         // Temporary score data filled out by sub-scans.  Used in READING_TERMS and
         // RETURNING_RESULTS.
-        // Maps from diskloc -> aggregate score for doc.
-        typedef unordered_map<RecordId, double, RecordId::Hasher> ScoreMap;
+        // Maps from diskloc -> (aggregate score for doc, wsid).
+        typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
         ScoreMap _scores;
         ScoreMap::const_iterator _scoreIterator;
     };

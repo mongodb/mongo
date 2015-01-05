@@ -225,7 +225,8 @@ namespace mongo {
 
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        // text's return is LOC_AND_UNOWNED_OBJ so it's fetched and has all fields.
+        // Text's return is LOC_AND_UNOWNED_OBJ or LOC_AND_OWNED_OBJ so it's fetched and has all
+        // fields.
         bool fetched() const { return true; }
         bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
@@ -447,9 +448,9 @@ namespace mongo {
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         /**
-         * This node changes the type to OWNED_OBJ.  There's no fetching possible after this.
+         * Data from the projection node is considered fetch iff the child provides fetched data.
          */
-        bool fetched() const { return true; }
+        bool fetched() const { return children[0]->fetched(); }
 
         bool hasField(const std::string& field) const {
             // TODO: Returning false isn't always the right answer -- we may either be including
@@ -709,7 +710,7 @@ namespace mongo {
         virtual StageType getType() const { return STAGE_COUNT_SCAN; }
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        bool fetched() const { return true; }
+        bool fetched() const { return false; }
         bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
         const BSONObjSet& getSort() const { return sorts; }

@@ -147,4 +147,100 @@ namespace {
         ASSERT_FALSE(member->getFieldDotted("y", &elt));
     }
 
+    //
+    // WorkingSet::iterator tests
+    //
+
+    TEST(WorkingSetIteratorTest, BasicIteratorTest) {
+        WorkingSet ws;
+
+        WorkingSetID id1 = ws.allocate();
+        WorkingSetMember* member1 = ws.get(id1);
+        member1->state = WorkingSetMember::LOC_AND_IDX;
+        member1->keyData.push_back(IndexKeyDatum(BSON("a" << 1), BSON("" << 3)));
+
+        WorkingSetID id2 = ws.allocate();
+        WorkingSetMember* member2 = ws.get(id2);
+        member2->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member2->obj = BSON("a" << 3);
+
+        int counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            ASSERT(it->state == WorkingSetMember::LOC_AND_IDX ||
+                   it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
+            counter++;
+        }
+        ASSERT_EQ(counter, 2);
+    }
+
+    TEST(WorkingSetIteratorTest, EmptyWorkingSet) {
+        WorkingSet ws;
+
+        int counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            counter++;
+        }
+        ASSERT_EQ(counter, 0);
+    }
+
+    TEST(WorkingSetIteratorTest, EmptyWorkingSetDueToFree) {
+        WorkingSet ws;
+
+        WorkingSetID id = ws.allocate();
+        ws.free(id);
+
+        int counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            counter++;
+        }
+        ASSERT_EQ(counter, 0);
+    }
+
+    TEST(WorkingSetIteratorTest, MixedFreeAndInUse) {
+        WorkingSet ws;
+
+        WorkingSetID id1 = ws.allocate();
+        WorkingSetID id2 = ws.allocate();
+        WorkingSetID id3 = ws.allocate();
+
+        WorkingSetMember* member = ws.get(id2);
+        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->obj = BSON("a" << 3);
+
+        ws.free(id1);
+        ws.free(id3);
+
+        int counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            ASSERT(it->state == WorkingSetMember::LOC_AND_UNOWNED_OBJ);
+            counter++;
+        }
+        ASSERT_EQ(counter, 1);
+    }
+
+    TEST(WorkingSetIteratorTest, FreeWhileIterating) {
+        WorkingSet ws;
+
+        ws.allocate();
+        ws.allocate();
+        ws.allocate();
+
+        // Free the last two members during iteration.
+        int counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            if (counter > 0) {
+                it.free();
+            }
+            counter++;
+        }
+        ASSERT_EQ(counter, 3);
+
+        // Verify that only one item remains in the working set.
+        counter = 0;
+        for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
+            counter++;
+        }
+        ASSERT_EQ(counter, 1);
+    }
+
 }  // namespace

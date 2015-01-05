@@ -34,6 +34,9 @@ namespace mongo {
          * If src has any data dest doesn't, add that data to dest.
          */
         static void mergeFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
+            // Both 'src' and 'dest' must have a RecordId (and they must be the same RecordId), as
+            // we should have just matched them according to this RecordId while doing an
+            // intersection.
             verify(dest->hasLoc());
             verify(src.hasLoc());
             verify(dest->loc == src.loc);
@@ -54,20 +57,14 @@ namespace mongo {
 
             if (src.hasObj()) {
                 // 'src' has the full document but 'dest' doesn't so we need to copy it over.
-                //
-                // The source diskloc must be in the "diskloc and unowned object" state rather than
-                // the "owned object" state. This is because we've just intersected according to
-                // diskloc. Since we merge based on finding working set members with matching
-                // disklocs, we shouldn't have a WSM that is missing the diskloc.
-                invariant(WorkingSetMember::LOC_AND_UNOWNED_OBJ == src.state);
-
-                // Copy the object to 'dest'.
                 dest->obj = src.obj;
 
                 // We have an object so we don't need key data.
                 dest->keyData.clear();
 
-                // 'dest' should be LOC_AND_UNOWNED_OBJ
+                // 'dest' should have the same state as 'src'. If 'src' has an unowned obj, then
+                // 'dest' also should have an unowned obj; if 'src' has an owned obj, then dest
+                // should also have an owned obj.
                 dest->state = src.state;
 
                 // Now 'dest' has the full object. No more work to do.

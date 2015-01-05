@@ -762,8 +762,33 @@ namespace mongo {
             invariant(member->hasObj());
             oldObj = member->obj;
 
+            // If the working set member is in the owned obj with loc state, then 'oldObj' may not
+            // be the latest version in the database. In this case, we must refetch the doc from the
+            // collection. We also must be tolerant of the possibility that the doc at the wsm's
+            // RecordId was deleted or updated after being force-fetched.
+            if (WorkingSetMember::LOC_AND_OWNED_OBJ == member->state) {
+                if (!_collection->findDoc(_txn, loc, &oldObj)) {
+                    // The doc was deleted after the force-fetch, so we just move on.
+                    ++_commonStats.needTime;
+                    return PlanStage::NEED_TIME;
+                }
+
+                // We need to make sure that the doc still matches the predicate, as it may have
+                // been updated since being force-fetched.
+                //
+                // 'cq' may be NULL in the case of idhack updates. In this case, doc-level locking
+                // storage engines will look up the key in the _id index and fetch the keyed
+                // document in a single work() cyle. Since yielding cannot happen between these
+                // two events, the OperationContext protects from the doc changing under our feet.
+                CanonicalQuery* cq = _params.canonicalQuery;
+                if (cq && !cq->root()->matchesBSON(oldObj, NULL)) {
+                    ++_commonStats.needTime;
+                    return PlanStage::NEED_TIME;
+                }
+            }
+
             // If we're here, then we have retrieved both a RecordId and the corresponding
-            // unowned object from the child stage. Since we have the object and the diskloc,
+            // object from the child stage. Since we have the object and the diskloc,
             // we can free the WSM.
             _ws->free(id);
 

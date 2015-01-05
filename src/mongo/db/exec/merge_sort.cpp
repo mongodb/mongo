@@ -181,7 +181,6 @@ namespace mongo {
 
         // But don't return it if it's flagged.
         if (_ws->isFlagged(*out)) {
-            _ws->free(*out);
             return PlanStage::NEED_TIME;
         }
 

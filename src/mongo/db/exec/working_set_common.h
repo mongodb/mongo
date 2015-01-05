@@ -44,6 +44,19 @@ namespace mongo {
                                           const Collection* collection);
 
         /**
+         * Iterates over 'workingSet'. For all valid working set members, if the member has a
+         * RecordId but does not have an owned obj, then puts the member in "loc with owned
+         * obj" state.
+         *
+         * This "force-fetching" is called on saveState() for storage-engines that support document-
+         * level locking. This ensures that all WS members are still valid, even after the
+         * OperationContext becomes invalid due to a yield.
+         */
+        static void forceFetchAllLocs(OperationContext* txn,
+                                      WorkingSet* workingSet,
+                                      const Collection* collection);
+
+        /**
          * After a NEED_FETCH is requested, this is used to actually retrieve the document
          * corresponding to 'member' from 'collection', and to set the state of 'member'
          * appropriately.
