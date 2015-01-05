@@ -51,7 +51,6 @@ using namespace std;
 // TODO: Win32 unicode console writing (in logger/console_appender?).
 // TODO: Extra log context appending, and re-enable log_user_*.js
 // TODO: Eliminate cout/cerr.
-// TODO: LogIndent (for mongodump).
 
 namespace mongo {
 
@@ -134,12 +133,6 @@ namespace mongo {
             log() << errmsg << endl;
         }
         printStackTrace(log().stream());
-    }
-
-    LogIndentLevel::LogIndentLevel() {
-    }
-
-    LogIndentLevel::~LogIndentLevel() {
     }
 
     Tee* const warnings = RamLog::get("warnings"); // Things put here go in serverStatus
