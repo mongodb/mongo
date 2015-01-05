@@ -25,7 +25,7 @@ function addZeroVoteArbiter(rsVersion, arbiterVersion) {
     replTest.initiate();
 
     var arbiterConn = replTest.add({binVersion: arbiterVersion});
-    var admin = conns[0].getDB('admin');
+    var admin = replTest.getPrimary().getDB('admin');
     var conf = replTest.conf();
     jsTestLog('current config:');
     printjson(conf);
