@@ -19,8 +19,8 @@ CONFIGFILE="/etc/mongod.conf"
 OPTIONS=" -f $CONFIGFILE"
 SYSCONFIG="/etc/sysconfig/mongod"
 
-DBPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*dbpath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
-PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
+DBPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(storage\.)?dbpath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
+PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d '[:blank:]'`
 
 mongod=${MONGOD-/usr/bin/mongod}
 
