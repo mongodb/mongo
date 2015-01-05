@@ -51,7 +51,6 @@
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -71,7 +70,8 @@ namespace {
                                           "newCollectionsUsePowerOf2Sizes",
                                           &newCollectionsUsePowerOf2SizesFlag,
                                           true,
-                                          true) {
+                                          true),
+            newCollectionsUsePowerOf2SizesFlag(true) {
 
         }
 
