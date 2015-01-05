@@ -62,7 +62,7 @@ var $config = (function() {
         createRole: { createRole: 1 }
     };
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
         dropRoles(db, pattern);
     }

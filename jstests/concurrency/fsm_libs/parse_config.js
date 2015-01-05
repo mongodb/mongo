@@ -57,6 +57,8 @@ function parseConfig(config) {
                    ' contains a state not in config.states: ' + toState);
             assert.eq('number', typeof config.transitions[fromState][toState],
                       'transitions.' + fromState + '.' + toState + ' should be a number');
+            assert(!isNaN(config.transitions[fromState][toState]),
+                   'transitions.' + fromState + '.' + toState + ' cannot be NaN');
         });
     });
 

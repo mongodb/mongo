@@ -8,7 +8,7 @@
  */
 function indexedNoindex($config, $super) {
 
-    $config.setup = function(db, collName) {
+    $config.setup = function(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
         var res = db[collName].dropIndex(this.getIndexSpec());

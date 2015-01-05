@@ -17,9 +17,8 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.assertResult = function(res, db, collName, query) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
-        var status = db.serverStatus();
-        if (isMongod(status)) {
-            if (isMMAPv1(status)) {
+        if (isMongod(db)) {
+            if (isMMAPv1(db)) {
                 // If an update triggers a document to move forward, then
                 // that document can be matched multiple times. If an update
                 // triggers a document to move backwards, then that document

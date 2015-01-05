@@ -274,20 +274,20 @@ var runner = (function() {
         }
     }
 
-    function setupWorkload(workload, context) {
+    function setupWorkload(workload, context, cluster) {
         var myDB = context[workload].db;
         var collName = context[workload].collName;
 
         var config = context[workload].config;
-        config.setup.call(config.data, myDB, collName);
+        config.setup.call(config.data, myDB, collName, cluster);
     }
 
-    function teardownWorkload(workload, context) {
+    function teardownWorkload(workload, context, cluster) {
         var myDB = context[workload].db;
         var collName = context[workload].collName;
 
         var config = context[workload].config;
-        config.teardown.call(config.data, myDB, collName);
+        config.teardown.call(config.data, myDB, collName, cluster);
     }
 
     function runWorkloads(workloads, clusterOptions, executionMode, executionOptions) {
@@ -303,7 +303,6 @@ var runner = (function() {
             clusterOptions.sameDB = true;
             clusterOptions.sameCollection = true;
         }
-        Object.freeze(clusterOptions);
 
         // Determine how strong to make assertions while simultaneously executing
         // different workloads
@@ -355,7 +354,7 @@ var runner = (function() {
 
                 try {
                     workloads.forEach(function(workload) {
-                        setupWorkload(workload, context);
+                        setupWorkload(workload, context, cluster);
                         cleanup.push(workload);
                     });
 
@@ -369,7 +368,7 @@ var runner = (function() {
                     endTime = new Date();
                     cleanup.forEach(function(workload) {
                         try {
-                            teardownWorkload(workload, context);
+                            teardownWorkload(workload, context, cluster);
                         } catch (err) {
                             print('Workload teardown function threw an exception:\n' + err.stack);
                             teardownFailed = true;

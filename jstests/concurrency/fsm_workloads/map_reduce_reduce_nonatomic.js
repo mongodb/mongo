@@ -47,13 +47,13 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.commandWorked(res);
     };
 
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
         assertAlways.commandWorked(db.createCollection(uniqueCollectionName));
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         assertAlways(db[uniqueCollectionName].drop());
     };
 

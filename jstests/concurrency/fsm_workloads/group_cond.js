@@ -17,7 +17,7 @@ load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/group.js'); // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
         assertAlways.commandWorked(db[collName].ensureIndex({ rand: 1 }));
     };
@@ -37,4 +37,4 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     return $config;
-})
+});

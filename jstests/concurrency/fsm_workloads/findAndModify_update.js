@@ -84,7 +84,7 @@ var $config = (function() {
         findAndModifyDescending: { findAndModifyAscending: 0.5, findAndModifyDescending: 0.5 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var res = db[collName].ensureIndex({ tid: 1, value: 1 });
         assertAlways.commandWorked(res);
     }

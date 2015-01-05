@@ -10,7 +10,7 @@
 
 function dropAllIndexes($config, $super) {
 
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         var oldIndexes = db[collName].getIndexes().map(function(ixSpec) {
             return ixSpec.name;
         });

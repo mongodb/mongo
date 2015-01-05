@@ -31,6 +31,10 @@ var blacklist = [
 
     'agg_group_external.js', // uses >100MB of data, and is flaky
     'agg_sort_external.js', // uses >100MB of data, and is flaky
+    'compact.js', // compact can only be run against a standalone mongod
+    'compact_simultaneous_padding_bytes.js', // compact can only be run against a mongod
+    'convert_to_capped_collection.js', // convertToCapped can't be run on mongos processes
+    'convert_to_capped_collection_index.js', // convertToCapped can't be run on mongos processes
     'findAndModify_remove.js', // our findAndModify queries lack shard keys
     'findAndModify_update.js', // our findAndModify queries lack shard keys
     'findAndModify_update_collscan.js', // our findAndModify queries lack shard keys
@@ -43,6 +47,7 @@ var blacklist = [
     'indexed_insert_eval_nolock.js', // eval doesn't work with sharded collections
     'remove_single_document.js', // our .remove(query, {justOne: true}) calls lack shard keys
     'remove_single_document_eval.js', // eval doesn't work with sharded collections
+    'remove_single_document_eval_nolock.js', // eval doesn't work with sharded collections
     'update_simple_eval.js', // eval doesn't work with sharded collections
     'update_simple_eval_nolock.js', // eval doesn't work with sharded collections
     'update_upsert_multi.js', // our update queries lack shard keys

@@ -42,7 +42,7 @@ var $config = extendWorkload($config, function($config, $super) {
         }.bind(this));
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         $super.teardown.apply(this, arguments);
 
         // drop all collections with this workload's assumed-to-be-unique prefix

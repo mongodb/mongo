@@ -33,7 +33,7 @@ var $config = (function() {
         }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         // index on 'value', the field being updated
         assertAlways.commandWorked(db[collName].ensureIndex({ value: 1 }));
         for (var i = 0; i < this.numDocs; ++i) {
@@ -57,8 +57,7 @@ var $config = (function() {
             assertResult: function assertResult(db, res) {
                 assertAlways.eq(0, res.nUpserted, tojson(res));
 
-                var status = db.serverStatus();
-                if (isMongod(status) && !isMMAPv1(status)) {
+                if (isMongod(db) && !isMMAPv1(db)) {
                     // For non-mmap storage engines we can have a strong assertion that exactly one
                     // doc will be modified.
                     assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));

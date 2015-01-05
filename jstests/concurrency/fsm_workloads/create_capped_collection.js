@@ -132,7 +132,7 @@ var $config = (function() {
         create: { create: 1 }
     };
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
         dropCollections(db, pattern);
     }

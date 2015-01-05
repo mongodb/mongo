@@ -37,7 +37,7 @@ var $config = (function() {
         insert: { insert: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var ixSpec = {};
         ixSpec[this.indexedField] = 'text';
         // Only allowed to create one text index, other tests may create one.

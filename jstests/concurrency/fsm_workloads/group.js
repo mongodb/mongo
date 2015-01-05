@@ -71,7 +71,7 @@ var $config = (function() {
         group: { group: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var i = 0; i < this.numDocs; ++i) {
             bulk.insert({ rand: Random.rand() });
@@ -81,7 +81,7 @@ var $config = (function() {
         assertAlways.eq(this.numDocs, res.nInserted);
     }
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         assertWhenOwnColl(db[collName].drop());
     }
 

@@ -9,7 +9,7 @@ var $config = extendWorkload($config, function($config, $super) {
     // and $config is the extended workload definition we're creating.
 
     // You can replace any properties on $config, including methods you want to override.
-    $config.setup = function(db, collName) {
+    $config.setup = function(db, collName, cluster) {
         // Overridden methods should usually call the corresponding method on $super.
         $super.setup.apply(this, arguments);
 

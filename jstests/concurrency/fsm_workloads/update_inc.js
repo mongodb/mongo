@@ -31,8 +31,7 @@ var $config = (function() {
             var res = db[collName].update({ _id: this.id }, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
-            var status = db.serverStatus();
-            if (isMongod(status) && !isMMAPv1(status)) {
+            if (isMongod(db) && !isMMAPv1(db)) {
                 // For non-mmap storage engines we can have a strong assertion that exactly one doc
                 // will be modified.
                 assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
@@ -69,7 +68,7 @@ var $config = (function() {
         find: { update: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         db[collName].insert({ _id: this.id });
     }
 

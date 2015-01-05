@@ -38,7 +38,7 @@ var $config = (function() {
         update: { update: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         // Create an index on all but one fieldName key to make it possible to test renames
         // between indexed fields and non-indexed fields
         fieldNames.slice(1).forEach(function(fieldName) {

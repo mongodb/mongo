@@ -44,7 +44,7 @@ var composer = (function() {
                 continue;
             }
 
-            // Transition to a state of another workloads with probability 'mixProb'
+            // Transition to a state of another workload with probability 'mixProb'
             var otherStates = [];
             workloads.forEach(function(workload) {
                 if (workload === currentWorkload) {

@@ -41,7 +41,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways(db[outCollName].drop());
     };
 
-    $config.teardown = function teardown(db, collName) {
+    $config.teardown = function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + prefix + '\\d+$');
         dropCollections(db, pattern);
     };

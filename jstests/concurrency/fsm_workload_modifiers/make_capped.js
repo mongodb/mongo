@@ -15,7 +15,7 @@
 
 function makeCapped($config, $super) {
 
-    $config.setup = function setup(db, collName) {
+    $config.setup = function setup(db, collName, cluster) {
         assertWhenOwnColl(function() {
             db[collName].drop();
             assertAlways.commandWorked(db.createCollection(collName, {

@@ -29,14 +29,14 @@ var $config = (function() {
         insert: { insert: 1 }
     };
 
-    function setup(db, collName) {
+    function setup(db, collName, cluster) {
         var res = db[collName].ensureIndex(
             { indexed_insert_ttl: 1 },
             { expireAfterSeconds: this.ttlSeconds });
         assertAlways.commandWorked(res);
     }
 
-    function teardown(db, collName) {
+    function teardown(db, collName, cluster) {
         // The TTL thread runs every 60 seconds, so for reliability, wait more than ttlSeconds
         // plus a minute.
         sleep((2 * this.ttlSeconds + 70) * 1000);
