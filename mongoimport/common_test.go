@@ -20,29 +20,29 @@ func init() {
 }
 
 var (
-	index              = uint64(0)
-	csvConvertibleDocs = []CSVConvertibleDoc{
-		CSVConvertibleDoc{
+	index         = uint64(0)
+	csvConverters = []CSVConverter{
+		CSVConverter{
 			fields: []string{"field1", "field2", "field3"},
 			data:   []string{"a", "b", "c"},
 			index:  index,
 		},
-		CSVConvertibleDoc{
+		CSVConverter{
 			fields: []string{"field4", "field5", "field6"},
 			data:   []string{"d", "e", "f"},
 			index:  index,
 		},
-		CSVConvertibleDoc{
+		CSVConverter{
 			fields: []string{"field7", "field8", "field9"},
 			data:   []string{"d", "e", "f"},
 			index:  index,
 		},
-		CSVConvertibleDoc{
+		CSVConverter{
 			fields: []string{"field10", "field11", "field12"},
 			data:   []string{"d", "e", "f"},
 			index:  index,
 		},
-		CSVConvertibleDoc{
+		CSVConverter{
 			fields: []string{"field13", "field14", "field15"},
 			data:   []string{"d", "e", "f"},
 			index:  index,
@@ -269,15 +269,30 @@ func TestRemoveBlankFields(t *testing.T) {
 	Convey("Given an unordered BSON document", t, func() {
 		Convey("the same document should be returned if there are no blanks", func() {
 			bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", "hello"}}
-			newDocument := removeBlankFields(bsonDocument)
-			So(bsonDocument, ShouldResemble, newDocument)
+			So(removeBlankFields(bsonDocument), ShouldResemble, bsonDocument)
 		})
 		Convey("a new document without blanks should be returned if there are "+
 			" blanks", func() {
-			bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", ""}}
-			newDocument := removeBlankFields(bsonDocument)
-			expectedDocument := bson.D{bson.DocElem{"a", 3}}
-			So(newDocument, ShouldResemble, expectedDocument)
+			bsonDocument := bson.D{
+				bson.DocElem{"a", 0},
+				bson.DocElem{"b", ""},
+				bson.DocElem{"c", ""},
+				bson.DocElem{"d", &bson.D{
+					bson.DocElem{"a", ""},
+					bson.DocElem{"b", ""},
+				}},
+				bson.DocElem{"e", &bson.D{
+					bson.DocElem{"a", ""},
+					bson.DocElem{"b", 1},
+				}},
+			}
+			expectedDocument := bson.D{
+				bson.DocElem{"a", 0},
+				bson.DocElem{"e", bson.D{
+					bson.DocElem{"b", 1},
+				}},
+			}
+			So(removeBlankFields(bsonDocument), ShouldResemble, expectedDocument)
 		})
 	})
 }
@@ -346,13 +361,13 @@ func TestProcessDocuments(t *testing.T) {
 
 	Convey("Given an import worker", t, func() {
 		index := uint64(0)
-		csvConvertibleDocs := []CSVConvertibleDoc{
-			CSVConvertibleDoc{
+		csvConverters := []CSVConverter{
+			CSVConverter{
 				fields: []string{"field1", "field2", "field3"},
 				data:   []string{"a", "b", "c"},
 				index:  index,
 			},
-			CSVConvertibleDoc{
+			CSVConverter{
 				fields: []string{"field4", "field5", "field6"},
 				data:   []string{"d", "e", "f"},
 				index:  index,
@@ -372,15 +387,15 @@ func TestProcessDocuments(t *testing.T) {
 		}
 		Convey("processDocuments should execute the expected conversion for documents, "+
 			"pass then on the output channel, and close the input channel if ordered is true", func() {
-			inputChannel := make(chan ConvertibleDoc, 100)
+			inputChannel := make(chan Converter, 100)
 			outputChannel := make(chan bson.D, 100)
 			importWorker := &ImportWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
 				tomb: &tomb.Tomb{},
 			}
-			inputChannel <- csvConvertibleDocs[0]
-			inputChannel <- csvConvertibleDocs[1]
+			inputChannel <- csvConverters[0]
+			inputChannel <- csvConverters[1]
 			close(inputChannel)
 			So(importWorker.processDocuments(true), ShouldBeNil)
 			doc1, open := <-outputChannel
@@ -394,15 +409,15 @@ func TestProcessDocuments(t *testing.T) {
 		})
 		Convey("processDocuments should execute the expected conversion for documents, "+
 			"pass then on the output channel, and leave the input channel open if ordered is false", func() {
-			inputChannel := make(chan ConvertibleDoc, 100)
+			inputChannel := make(chan Converter, 100)
 			outputChannel := make(chan bson.D, 100)
 			importWorker := &ImportWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
 				tomb: &tomb.Tomb{},
 			}
-			inputChannel <- csvConvertibleDocs[0]
-			inputChannel <- csvConvertibleDocs[1]
+			inputChannel <- csvConverters[0]
+			inputChannel <- csvConverters[1]
 			close(inputChannel)
 			So(importWorker.processDocuments(false), ShouldBeNil)
 			doc1, open := <-outputChannel
@@ -420,12 +435,12 @@ func TestProcessDocuments(t *testing.T) {
 func TestDoSequentialStreaming(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
-	Convey("Given some import workers, a ConvertibleDocs input channel and an bson.D output channel", t, func() {
-		inputChannel := make(chan ConvertibleDoc, 5)
+	Convey("Given some import workers, a Converters input channel and an bson.D output channel", t, func() {
+		inputChannel := make(chan Converter, 5)
 		outputChannel := make(chan bson.D, 5)
-		workerInputChannel := []chan ConvertibleDoc{
-			make(chan ConvertibleDoc),
-			make(chan ConvertibleDoc),
+		workerInputChannel := []chan Converter{
+			make(chan Converter),
+			make(chan Converter),
 		}
 		workerOutputChannel := []chan bson.D{
 			make(chan bson.D),
@@ -449,7 +464,7 @@ func TestDoSequentialStreaming(t *testing.T) {
 				go importWorker.processDocuments(true)
 			}
 			// feed in a bunch of documents
-			for _, inputCSVDocument := range csvConvertibleDocs {
+			for _, inputCSVDocument := range csvConverters {
 				inputChannel <- inputCSVDocument
 			}
 			close(inputChannel)
@@ -468,13 +483,13 @@ func TestStreamDocuments(t *testing.T) {
 			2. an input channel where documents are streamed in
 			3. an output channel where processed documents are streamed out`, t, func() {
 
-		inputChannel := make(chan ConvertibleDoc, 5)
+		inputChannel := make(chan Converter, 5)
 		outputChannel := make(chan bson.D, 5)
 
 		Convey("the entire pipeline should complete without error under normal circumstances", func() {
 			// stream in some documents
-			for _, csvConvertibleDoc := range csvConvertibleDocs {
-				inputChannel <- csvConvertibleDoc
+			for _, csvConverter := range csvConverters {
+				inputChannel <- csvConverter
 			}
 			close(inputChannel)
 			So(streamDocuments(true, 3, inputChannel, outputChannel), ShouldBeNil)
@@ -486,12 +501,12 @@ func TestStreamDocuments(t *testing.T) {
 		})
 		Convey("the entire pipeline should complete with error if an error is encountered", func() {
 			// stream in some documents - create duplicate headers to simulate an error
-			csvConvertibleDoc := CSVConvertibleDoc{
+			csvConverter := CSVConverter{
 				fields: []string{"field1", "field2"},
 				data:   []string{"a", "b", "c"},
 				index:  uint64(0),
 			}
-			inputChannel <- csvConvertibleDoc
+			inputChannel <- csvConverter
 			close(inputChannel)
 
 			// ensure that an error is returned on the error channel

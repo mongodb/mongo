@@ -30,8 +30,8 @@ type CSVInputReader struct {
 	sizeTracker
 }
 
-// CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
-type CSVConvertibleDoc struct {
+// CSVConverter implements the Converter interface for CSV input
+type CSVConverter struct {
 	fields, data []string
 	index        uint64
 }
@@ -67,7 +67,7 @@ func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
 // in read order and a channel on which to stream the documents processed from
 // the underlying reader. Returns a non-nil error if encountered
 func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
-	csvRecordChan := make(chan ConvertibleDoc, csvInputReader.numDecoders)
+	csvRecordChan := make(chan Converter, csvInputReader.numDecoders)
 	csvErrChan := make(chan error)
 
 	// begin reading from source
@@ -85,7 +85,7 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 				}
 				return
 			}
-			csvRecordChan <- CSVConvertibleDoc{
+			csvRecordChan <- CSVConverter{
 				fields: csvInputReader.fields,
 				data:   csvInputReader.csvRecord,
 				index:  csvInputReader.numProcessed,
@@ -101,12 +101,12 @@ func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan c
 	return channelQuorumError(csvErrChan, 2)
 }
 
-// This is required to satisfy the ConvertibleDoc interface for CSV input. It
-// does CSV-specific processing to convert the CSVConvertibleDoc to a bson.D
-func (csvConvertibleDoc CSVConvertibleDoc) Convert() (bson.D, error) {
+// This is required to satisfy the Converter interface for CSV input. It
+// does CSV-specific processing to convert the CSVConverter struct to a bson.D
+func (c CSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
-		csvConvertibleDoc.fields,
-		csvConvertibleDoc.data,
-		csvConvertibleDoc.index,
+		c.fields,
+		c.data,
+		c.index,
 	)
 }

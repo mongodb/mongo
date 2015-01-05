@@ -15,19 +15,18 @@ import (
 	"sync"
 )
 
-// ConvertibleDoc is an interface that adds the basic Convert method.
-//
-// Convert returns a valid BSON document that has been converted by the
-// underlying implementation. If conversion fails, err will be set.
-type ConvertibleDoc interface {
+// Converter is an interface that adds the basic Convert method which returns a
+// valid BSON document that has been converted by the underlying implementation.
+// If conversion fails, err will be set.
+type Converter interface {
 	Convert() (bson.D, error)
 }
 
-// An ImportWorker reads ConvertibleDoc from the unprocessedDataChan channel and
+// An ImportWorker reads Converter from the unprocessedDataChan channel and
 // sends processed BSON documents on the processedDocumentChan channel
 type ImportWorker struct {
 	// unprocessedDataChan is used to stream the input data for a worker to process
-	unprocessedDataChan chan ConvertibleDoc
+	unprocessedDataChan chan Converter
 
 	// used to stream the processed document back to the caller
 	processedDocumentChan chan bson.D
@@ -92,7 +91,7 @@ func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 // an outputChan (output) channel. It sequentially writes unprocessed data read from
 // the input channel to each worker and then sequentially reads the processed data
 // from each worker before passing it on to the output channel
-func doSequentialStreaming(workers []*ImportWorker, readDocChan chan ConvertibleDoc, outputChan chan bson.D) {
+func doSequentialStreaming(workers []*ImportWorker, readDocChan chan Converter, outputChan chan bson.D) {
 	numWorkers := len(workers)
 
 	// feed in the data to be processed and do round-robin
@@ -192,14 +191,22 @@ func filterIngestError(stopOnError bool, err error) error {
 	return nil
 }
 
-// removeBlankFields removes empty/blank fields in csv and tsv
-func removeBlankFields(document bson.D) bson.D {
-	for index, pair := range document {
-		if _, ok := pair.Value.(string); ok && pair.Value.(string) == "" {
-			document = append(document[:index], document[index+1:]...)
+// removeBlankFields takes document and returns a new copy in which
+// fields with empty/blank values are removed
+func removeBlankFields(document bson.D) (newDocument bson.D) {
+	for _, keyVal := range document {
+		if val, ok := keyVal.Value.(*bson.D); ok {
+			keyVal.Value = removeBlankFields(*val)
 		}
+		if val, ok := keyVal.Value.(string); ok && val == "" {
+			continue
+		}
+		if val, ok := keyVal.Value.(bson.D); ok && val == nil {
+			continue
+		}
+		newDocument = append(newDocument, keyVal)
 	}
-	return document
+	return newDocument
 }
 
 // setNestedValue takes a nested field - in the form "a.b.c" -
@@ -232,7 +239,7 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // channel in parallel and then sends over the processed data to the outputChan
 // channel - either in sequence or concurrently (depending on the value of
 // ordered) - in which the data was received
-func streamDocuments(ordered bool, numDecoders int, readDocChan chan ConvertibleDoc, outputChan chan bson.D) (retErr error) {
+func streamDocuments(ordered bool, numDecoders int, readDocChan chan Converter, outputChan chan bson.D) (retErr error) {
 	if numDecoders == 0 {
 		numDecoders = 1
 	}
@@ -244,7 +251,7 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 	outChan := outputChan
 	for i := 0; i < numDecoders; i++ {
 		if ordered {
-			inChan = make(chan ConvertibleDoc, workerBufferSize)
+			inChan = make(chan Converter, workerBufferSize)
 			outChan = make(chan bson.D, workerBufferSize)
 		}
 		importWorker := &ImportWorker{
@@ -256,7 +263,8 @@ func streamDocuments(ordered bool, numDecoders int, readDocChan chan Convertible
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// only set the first worker error and cause sibling goroutines to terminate immediately
+			// only set the first worker error and cause sibling goroutines
+			// to terminate immediately
 			err := importWorker.processDocuments(ordered)
 			mt.Lock()
 			defer mt.Unlock()
@@ -355,7 +363,7 @@ func validateReaderFields(fields []string) error {
 	return nil
 }
 
-// processDocuments reads from the ConvertibleDoc channel and for each record, converts it
+// processDocuments reads from the Converter channel and for each record, converts it
 // to a bson.D document before sending it on the processedDocumentChan channel. Once the
 // input channel is closed the processed channel is also closed if the worker streams its
 // reads in order
@@ -365,11 +373,11 @@ func (importWorker *ImportWorker) processDocuments(ordered bool) error {
 	}
 	for {
 		select {
-		case convertibleDoc, alive := <-importWorker.unprocessedDataChan:
+		case converter, alive := <-importWorker.unprocessedDataChan:
 			if !alive {
 				return nil
 			}
-			document, err := convertibleDoc.Convert()
+			document, err := converter.Convert()
 			if err != nil {
 				return err
 			}

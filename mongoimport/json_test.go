@@ -221,8 +221,8 @@ func TestReadJSONArraySeparator(t *testing.T) {
 func TestJSONConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a JSON input reader", t, func() {
-		Convey("calling convert on a JSONConvertibleDoc should return the expected BSON document", func() {
-			jsonConvertibleDoc := JSONConvertibleDoc{
+		Convey("calling convert on a JSONConverter should return the expected BSON document", func() {
+			jsonConverter := JSONConverter{
 				data:  []byte(`{field1:"a",field2:"b",field3:"c"}`),
 				index: uint64(0),
 			}
@@ -231,7 +231,7 @@ func TestJSONConvert(t *testing.T) {
 				bson.DocElem{"field2", "b"},
 				bson.DocElem{"field3", "c"},
 			}
-			document, err := jsonConvertibleDoc.Convert()
+			document, err := jsonConverter.Convert()
 			So(err, ShouldBeNil)
 			So(document, ShouldResemble, expectedDocument)
 		})

@@ -49,8 +49,8 @@ type JSONInputReader struct {
 	numDecoders int
 }
 
-// JSONConvertibleDoc implements the ConvertibleDoc interface for JSON input
-type JSONConvertibleDoc struct {
+// JSONConverter implements the Converter interface for JSON input
+type JSONConverter struct {
 	data  []byte
 	index uint64
 }
@@ -96,7 +96,7 @@ func (jsonInputReader *JSONInputReader) ReadAndValidateHeader() error {
 // in read order and a channel on which to stream the documents processed from
 // the underlying reader. Returns a non-nil error if encountered
 func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (retErr error) {
-	rawChan := make(chan ConvertibleDoc, jsonInputReader.numDecoders)
+	rawChan := make(chan Converter, jsonInputReader.numDecoders)
 	jsonErrChan := make(chan error)
 
 	// begin reading from source
@@ -126,7 +126,7 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 				}
 				return
 			}
-			rawChan <- JSONConvertibleDoc{
+			rawChan <- JSONConverter{
 				data:  rawBytes,
 				index: jsonInputReader.numProcessed,
 			}
@@ -142,18 +142,18 @@ func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan ch
 	return channelQuorumError(jsonErrChan, 2)
 }
 
-// This is required to satisfy the ConvertibleDoc interface for JSON input. It
-// does JSON-specific processing to convert the JSONConvertibleDoc to a bson.D
-func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
-	document, err := json.UnmarshalBsonD(jsonConvertibleDoc.data)
+// This is required to satisfy the Converter interface for JSON input. It
+// does JSON-specific processing to convert the JSONConverter struct to a bson.D
+func (j JSONConverter) Convert() (bson.D, error) {
+	document, err := json.UnmarshalBsonD(j.data)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", jsonConvertibleDoc.index, err)
+		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", j.index, err)
 	}
 	log.Logf(log.DebugHigh, "got line: %v", document)
 
 	bsonD, err := bsonutil.GetExtendedBsonD(document)
 	if err != nil {
-		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", jsonConvertibleDoc.index, err)
+		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", j.index, err)
 	}
 	log.Logf(log.DebugHigh, "got extended line: %#v", bsonD)
 	return bsonD, nil

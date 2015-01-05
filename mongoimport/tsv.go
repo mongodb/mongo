@@ -36,8 +36,8 @@ type TSVInputReader struct {
 	sizeTracker
 }
 
-// TSVConvertibleDoc implements the ConvertibleDoc interface for TSV input
-type TSVConvertibleDoc struct {
+// TSVConverter implements the Converter interface for TSV input
+type TSVConverter struct {
 	fields []string
 	data   string
 	index  uint64
@@ -72,7 +72,7 @@ func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
 // in read order and a channel on which to stream the documents processed from
 // the underlying reader. Returns a non-nil error if encountered
 func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
-	tsvRecordChan := make(chan ConvertibleDoc, tsvInputReader.numDecoders)
+	tsvRecordChan := make(chan Converter, tsvInputReader.numDecoders)
 	tsvErrChan := make(chan error)
 
 	// begin reading from source
@@ -90,7 +90,7 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 				}
 				return
 			}
-			tsvRecordChan <- TSVConvertibleDoc{
+			tsvRecordChan <- TSVConverter{
 				fields: tsvInputReader.fields,
 				data:   tsvInputReader.tsvRecord,
 				index:  tsvInputReader.numProcessed,
@@ -107,16 +107,12 @@ func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan c
 	return channelQuorumError(tsvErrChan, 2)
 }
 
-// This is required to satisfy the ConvertibleDoc interface for TSV input. It
-// does TSV-specific processing to convert the TSVConvertibleDoc to a bson.D
-func (tsvConvertibleDoc TSVConvertibleDoc) Convert() (bson.D, error) {
-	tsvTokens := strings.Split(
-		strings.TrimRight(tsvConvertibleDoc.data, "\r\n"),
-		tokenSeparator,
-	)
+// This is required to satisfy the Converter interface for TSV input. It
+// does TSV-specific processing to convert the TSVConverter struct to a bson.D
+func (t TSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
-		tsvConvertibleDoc.fields,
-		tsvTokens,
-		tsvConvertibleDoc.index,
+		t.fields,
+		strings.Split(strings.TrimRight(t.data, "\r\n"), tokenSeparator),
+		t.index,
 	)
 }

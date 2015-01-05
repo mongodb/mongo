@@ -160,8 +160,8 @@ func TestTSVReadAndValidateHeader(t *testing.T) {
 func TestTSVConvert(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
-		Convey("calling convert on a TSVConvertibleDoc should return the expected BSON document", func() {
-			tsvConvertibleDoc := TSVConvertibleDoc{
+		Convey("calling convert on a TSVConverter should return the expected BSON document", func() {
+			tsvConverter := TSVConverter{
 				fields: []string{"field1", "field2", "field3"},
 				data:   "a\tb\tc",
 				index:  uint64(0),
@@ -171,7 +171,7 @@ func TestTSVConvert(t *testing.T) {
 				bson.DocElem{"field2", "b"},
 				bson.DocElem{"field3", "c"},
 			}
-			document, err := tsvConvertibleDoc.Convert()
+			document, err := tsvConverter.Convert()
 			So(err, ShouldBeNil)
 			So(document, ShouldResemble, expectedDocument)
 		})
