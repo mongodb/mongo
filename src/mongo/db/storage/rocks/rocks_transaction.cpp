@@ -39,65 +39,120 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-    RocksTransactionEngine::RocksTransactionEngine() : _latestSeqId(1), _nextTransactionId(1) {}
+    RocksTransactionEngine::RocksTransactionEngine() : _latestSnapshotId(1), _nextTransactionId(1) {}
 
-    void RocksTransaction::commit() {
-        if (_writeShards.empty()) {
-            return;
-        }
-        uint64_t newSeqId = 0;
-        {
-            boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-            for (const auto& writeShard : _writeShards) {
-                invariant(_transactionEngine->_seqId[writeShard] <= _snapshotSeqId);
-                invariant(_transactionEngine->_uncommittedTransactionId[writeShard] ==
-                          _transactionId);
-                _transactionEngine->_uncommittedTransactionId.erase(writeShard);
-            }
-            newSeqId =
-                _transactionEngine->_latestSeqId.load(std::memory_order::memory_order_relaxed) + 1;
-            for (const auto& writeShard : _writeShards) {
-                _transactionEngine->_seqId[writeShard] = newSeqId;
-            }
-            _transactionEngine->_latestSeqId.store(newSeqId);
-        }
-        // cleanup
-        _snapshotSeqId = newSeqId;
-        _writeShards.clear();
+    std::list<uint64_t>::iterator RocksTransactionEngine::_getLatestSnapshotId_inlock() {
+        return _activeSnapshots.insert(_activeSnapshots.end(), _latestSnapshotId);
     }
 
-    bool RocksTransaction::registerWrite(const std::string& id) {
-        boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-        auto seqIdIter = _transactionEngine->_seqId.find(id);
-        if (seqIdIter != _transactionEngine->_seqId.end() && seqIdIter->second > _snapshotSeqId) {
+    bool RocksTransactionEngine::_isKeyCommittedAfterSnapshot_inlock(const std::string& key,
+                                                                     uint64_t snapshotId) {
+        auto iter = _keyInfo.find(key);
+        return iter != _keyInfo.end() && iter->second.first > snapshotId;
+    }
+
+    void RocksTransactionEngine::_registerCommittedKey_inlock(const std::string& key,
+                                                              uint64_t newSnapshotId) {
+        auto iter = _keyInfo.find(key);
+        if (iter != _keyInfo.end()) {
+            _keysSortedBySnapshot.erase(iter->second.second);
+            _keyInfo.erase(iter);
+        }
+
+        auto listIter = _keysSortedBySnapshot.insert(_keysSortedBySnapshot.end(), {key, newSnapshotId});
+        _keyInfo.insert({key, {newSnapshotId, listIter}});
+    }
+
+    void RocksTransactionEngine::_cleanUpKeysCommittedBeforeSnapshot_inlock(uint64_t snapshotId) {
+        while (!_keysSortedBySnapshot.empty() && _keysSortedBySnapshot.begin()->second <= snapshotId) {
+            auto keyInfoIter = _keyInfo.find(_keysSortedBySnapshot.begin()->first);
+            invariant(keyInfoIter != _keyInfo.end());
+            _keyInfo.erase(keyInfoIter);
+            _keysSortedBySnapshot.pop_front();
+        }
+    }
+
+    void RocksTransactionEngine::_cleanupSnapshot_inlock(
+        const std::list<uint64_t>::iterator& snapshotIter) {
+        bool needCleanup = _activeSnapshots.begin() == snapshotIter;
+        _activeSnapshots.erase(snapshotIter);
+        if (needCleanup) {
+            _cleanUpKeysCommittedBeforeSnapshot_inlock(_activeSnapshots.empty()
+                                                           ? std::numeric_limits<uint64_t>::max()
+                                                           : *_activeSnapshots.begin());
+        }
+    }
+
+    void RocksTransaction::commit() {
+        if (_writtenKeys.empty()) {
+            return;
+        }
+        uint64_t newSnapshotId = 0;
+        {
+            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            for (const auto& key : _writtenKeys) {
+                invariant(
+                    !_transactionEngine->_isKeyCommittedAfterSnapshot_inlock(key, _snapshotId));
+                invariant(_transactionEngine->_uncommittedTransactionId[key] == _transactionId);
+                _transactionEngine->_uncommittedTransactionId.erase(key);
+            }
+            newSnapshotId = _transactionEngine->_latestSnapshotId + 1;
+            for (const auto& key : _writtenKeys) {
+                _transactionEngine->_registerCommittedKey_inlock(key, newSnapshotId);
+            }
+            _cleanup_inlock();
+            _transactionEngine->_latestSnapshotId = newSnapshotId;
+        }
+        // cleanup
+        _writtenKeys.clear();
+    }
+
+    bool RocksTransaction::registerWrite(const std::string& key) {
+        boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+        if (_transactionEngine->_isKeyCommittedAfterSnapshot_inlock(key, _snapshotId)) {
             // write-committed write conflict
             return false;
         }
-        auto uncommittedTransactionIter = _transactionEngine->_uncommittedTransactionId.find(id);
+        auto uncommittedTransactionIter = _transactionEngine->_uncommittedTransactionId.find(key);
         if (uncommittedTransactionIter != _transactionEngine->_uncommittedTransactionId.end() &&
             uncommittedTransactionIter->second != _transactionId) {
             // write-uncommitted write conflict
             return false;
         }
-        _writeShards.insert(id);
-        _transactionEngine->_uncommittedTransactionId[id] = _transactionId;
+        _writtenKeys.insert(key);
+        _transactionEngine->_uncommittedTransactionId[key] = _transactionId;
         return true;
     }
 
     void RocksTransaction::abort() {
-        if (_writeShards.empty()) {
+        if (_writtenKeys.empty() && !_snapshotInitialized) {
             return;
         }
         {
-            boost::mutex::scoped_lock lk(_transactionEngine->_commitLock);
-            for (const auto& writeShard : _writeShards) {
-                _transactionEngine->_uncommittedTransactionId.erase(writeShard);
+            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            for (const auto& key : _writtenKeys) {
+                _transactionEngine->_uncommittedTransactionId.erase(key);
             }
+            _cleanup_inlock();
         }
-        _writeShards.clear();
+        _writtenKeys.clear();
     }
 
     void RocksTransaction::recordSnapshotId() {
-        _snapshotSeqId = _transactionEngine->getLatestSeqId();
+        {
+            boost::mutex::scoped_lock lk(_transactionEngine->_lock);
+            _cleanup_inlock();
+            _activeSnapshotsIter = _transactionEngine->_getLatestSnapshotId_inlock();
+        }
+        _snapshotId = *_activeSnapshotsIter;
+        _snapshotInitialized = true;
+    }
+
+    void RocksTransaction::_cleanup_inlock() {
+        if (_snapshotInitialized) {
+            _transactionEngine->_cleanupSnapshot_inlock(_activeSnapshotsIter);
+            _snapshotInitialized = false;
+            _snapshotId = std::numeric_limits<uint64_t>::max();
+        }
     }
 }
