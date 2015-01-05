@@ -127,13 +127,20 @@ namespace mongo {
 
 
     v8::Handle<v8::Value> mongoConsExternal(V8Scope* scope, const v8::Arguments& args) {
-        char host[255];
+        string host = "127.0.0.1";
         if (args.Length() > 0 && args[0]->IsString()) {
-            uassert(16666, "string argument too long", args[0]->ToString()->Utf8Length() < 250);
-            args[0]->ToString()->WriteAscii(host);
-        }
-        else {
-            strcpy(host, "127.0.0.1");
+<<<<<<< HEAD
+<<<<<<< HEAD
+            v8::String::Utf8Value utf(args[0]);
+            host = string(*utf);
+=======
+            v8::String::AsciiValue a(args[0])
+            host = string(*a);
+>>>>>>> b9eea90... Removing host string arg length limitation for mongo shell.
+=======
+            v8::String::AsciiValue a(args[0])
+            host = string(*a);
+>>>>>>> b9eea903405a0e00a2b75d01fce0a61c1e9bd3f9
         }
 
         // only allow function template to be used by a constructor
