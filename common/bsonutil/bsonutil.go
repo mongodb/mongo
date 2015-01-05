@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-
 var ErrNoSuchField = errors.New("no such field")
 
 func ConvertJSONDocumentToBSON(doc map[string]interface{}) error {
@@ -107,6 +106,15 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			}
 		}
 
+		if jsonValue, ok := doc["$code"]; ok {
+			switch v := jsonValue.(type) {
+			case string:
+				return bson.JavaScript{Code: v}, nil
+			default:
+				return nil, errors.New("Expected $code field to have string value")
+			}
+		}
+
 		if jsonValue, ok := doc["$oid"]; ok {
 			switch v := jsonValue.(type) {
 			case string:
@@ -179,6 +187,32 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 		}
 
 	case 2: // document has two fields
+		if jsonValue, ok := doc["$code"]; ok {
+			code := bson.JavaScript{}
+			switch v := jsonValue.(type) {
+			case string:
+				code.Code = v
+			default:
+				return nil, errors.New("Expected $code field to have string value")
+			}
+
+			if jsonValue, ok = doc["$scope"]; ok {
+				switch v2 := jsonValue.(type) {
+				case map[string]interface{}:
+					x, err := ParseSpecialKeys(v2)
+					if err != nil {
+						return nil, err
+					}
+					code.Scope = x
+					return code, nil
+				default:
+					return nil, errors.New("Expected $scope field to contain map")
+				}
+			} else {
+				return nil, errors.New("Expected $scope field with $code field")
+			}
+		}
+
 		if jsonValue, ok := doc["$regex"]; ok {
 			regex := bson.RegEx{}
 
