@@ -163,7 +163,7 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 	if (fullp != NULL)
 		*fullp = !target_list;
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

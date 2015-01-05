@@ -292,9 +292,9 @@ __curlog_close(WT_CURSOR *cursor)
 	WT_TRET(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
-	__wt_scr_free(&cl->logrec);
-	__wt_scr_free(&cl->opkey);
-	__wt_scr_free(&cl->opvalue);
+	__wt_scr_free(session, &cl->logrec);
+	__wt_scr_free(session, &cl->opkey);
+	__wt_scr_free(session, &cl->opvalue);
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -363,9 +363,9 @@ err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
 		else {
 			__wt_free(session, cl->cur_lsn);
 			__wt_free(session, cl->next_lsn);
-			__wt_scr_free(&cl->logrec);
-			__wt_scr_free(&cl->opkey);
-			__wt_scr_free(&cl->opvalue);
+			__wt_scr_free(session, &cl->logrec);
+			__wt_scr_free(session, &cl->opkey);
+			__wt_scr_free(session, &cl->opvalue);
 			/*
 			 * NOTE:  We cannot get on the error path with the
 			 * readlock held.  No need to unlock it unless that

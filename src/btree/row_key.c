@@ -65,8 +65,8 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
-err:	__wt_scr_free(&key);
-	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &key);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -457,7 +457,7 @@ next:		switch (direction) {
 	}
 
 done:
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

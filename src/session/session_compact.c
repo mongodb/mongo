@@ -195,7 +195,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		WT_ERR(__session_compact_check_timeout(session, start_time));
 	}
 
-err:	__wt_scr_free(&t);
+err:	__wt_scr_free(session, &t);
 	return (ret);
 }
 

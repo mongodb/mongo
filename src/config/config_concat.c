@@ -67,6 +67,6 @@ __wt_config_concat(
 		--tmp->size;
 	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }

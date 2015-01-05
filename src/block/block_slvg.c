@@ -155,7 +155,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	*addr_sizep = WT_PTRDIFF(endp, addr);
 
 done:
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

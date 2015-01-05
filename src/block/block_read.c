@@ -44,7 +44,7 @@ __wt_bm_preload(WT_BM *bm,
 			WT_RET(__wt_scr_alloc(session, size, &tmp));
 			ret = __wt_block_read_off(
 			    session, block, tmp, offset, size, cksum);
-			__wt_scr_free(&tmp);
+			__wt_scr_free(session, &tmp);
 			WT_RET(ret);
 		}
 	}
