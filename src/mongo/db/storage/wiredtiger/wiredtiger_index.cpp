@@ -63,9 +63,9 @@ namespace {
 
     static const WiredTigerItem emptyItem(NULL, 0);
 
-    static const int kMinimumIndexVersion = 2;
-    static const int kCurrentIndexVersion = 2; // New indexes use this by default.
-    static const int kMaximumIndexVersion = 2;
+    static const int kMinimumIndexVersion = 3;
+    static const int kCurrentIndexVersion = 3; // New indexes use this by default.
+    static const int kMaximumIndexVersion = 3;
     BOOST_STATIC_ASSERT(kCurrentIndexVersion >= kMinimumIndexVersion);
     BOOST_STATIC_ASSERT(kCurrentIndexVersion <= kMaximumIndexVersion);
 
@@ -86,24 +86,6 @@ namespace {
             bb.appendAs(e, StringData());
         }
         return bb.obj();
-    }
-
-    // How RecordIds are stored on disk.
-    typedef int64_t RecordIdRepr;
-
-    RecordId getRecordIdAt(const void* ptr, size_t byteOffset = 0) {
-        RecordIdRepr repr;
-        memcpy(&repr, static_cast<const char*>(ptr) + byteOffset, sizeof(repr));
-        return RecordId(repr);
-    }
-
-    void putRecordId(void* dest, RecordId loc) {
-        const RecordIdRepr repr = loc.repr();
-        memcpy(dest, &repr, sizeof(repr));
-    }
-
-    void putRecordIdAtOffset(void* dest, size_t byteOffset, RecordId loc) {
-        putRecordId(static_cast<char*>(dest) + byteOffset, loc);
     }
 
     // taken from btree_logic.cpp
@@ -369,8 +351,10 @@ namespace {
 
         WT_ITEM value;
         invariantWTOK( c->get_value(c,&value) );
-        for (size_t offset = 0; offset < value.size; offset += sizeof(RecordIdRepr)) {
-            if (getRecordIdAt(value.data, offset) == loc)
+        BufReader br(value.data, value.size);
+        while (br.remaining()) {
+            const size_t bytes = KeyString::numBytesForRecordIdStartingAt(br.pos());
+            if (KeyString::decodeRecordIdStartingAt(br.skip(bytes)) == loc)
                 return false;
         }
         return true;
@@ -501,7 +485,7 @@ namespace {
                     // We are done with dups of the last key so we can insert it now.
                     doInsert();
                 }
-                invariant(_locs.empty());
+                invariant(!haveLoc());
             }
             else {
                 // Dup found!
@@ -515,14 +499,14 @@ namespace {
             }
 
             _key = newKey.getOwned();
-            _locs.push_back(loc.repr());
+            _locs.appendRecordId(loc);
 
             return Status::OK();
         }
 
         void commit(bool mayInterrupt) {
             WriteUnitOfWork uow( _txn );
-            if (!_locs.empty()) {
+            if (haveLoc()) {
                 // This handles inserting the last unique key.
                 doInsert();
             }
@@ -532,26 +516,30 @@ namespace {
     private:
         void doInsert() {
 
-            invariant(!_locs.empty());
+            invariant(haveLoc());
             
             KeyString data = KeyString::make( _key, _idx->_ordering );
             WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
             _cursor->set_key(_cursor, keyItem.Get());
 
-            invariant(_locs.size() > 0);
-            WiredTigerItem valueItem(&_locs.front(), _locs.size() * sizeof(RecordIdRepr));
+            invariant(_locs.getBuffer() > 0);
+            WiredTigerItem valueItem(_locs.getBuffer(), _locs.getSize());
             _cursor->set_value(_cursor, valueItem.Get());
 
             invariantWTOK(_cursor->insert(_cursor));
             invariantWTOK(_cursor->reset(_cursor));
 
-            _locs.clear();
+            _locs.reset();
+        }
+
+        bool haveLoc() const {
+            return _locs.getSize() > 0;
         }
 
         WiredTigerIndex* _idx;
         const bool _dupsAllowed;
         BSONObj _key;
-        std::vector<RecordIdRepr> _locs;
+        KeyString _locs;
     };
 
     SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder( OperationContext* txn,
@@ -689,34 +677,38 @@ namespace {
 
         WT_ITEM item;
         invariantWTOK( c->get_value(c, &item ) );
-        _uniqueLen = item.size / sizeof(RecordIdRepr);
+        _uniqueLen = item.size;
         invariant( _uniqueLen > 0 );
 
+        bool stopHere = false;
+        const char* base = static_cast<const char*>(item.data);
         if ( _forward ) {
             _uniquePos = 0;
-            for ( ; _uniquePos < _uniqueLen; _uniquePos++ ) {
-                const RecordId temp = getRecordIdAt(item.data, _uniquePos * sizeof(RecordIdRepr));
-                if ( temp == loc )
+            while (_uniquePos < _uniqueLen) {
+                const size_t bytes = KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
+                invariant(int(_uniquePos + bytes) <= _uniqueLen);
+                const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
+                if ( temp >= loc ) {
+                    stopHere = true;
                     break;
+                }
 
-                if ( loc < temp )
-                    break;
+                _uniquePos += bytes;
             }
         }
         else {
-            _uniquePos = _uniqueLen-1;
-            for ( ; _uniquePos >= 0; _uniquePos-- ) {
-                const RecordId temp = getRecordIdAt(item.data, _uniquePos * sizeof(RecordIdRepr));
-                if ( temp == loc )
+            _uniquePos = _uniqueLen;
+            while (_uniquePos > 0) {
+                _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
+                const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
+                if ( temp <= loc ) {
+                    stopHere = true;
                     break;
-
-                if ( temp < loc )
-                    break;
+                }
             }
-            _uniquePos = _uniqueLen - 1 - _uniquePos;
         }
 
-        if ( _uniquePos == _uniqueLen ) {
+        if (!stopHere) {
             // we need to move to next slot
             advance();
         }
@@ -777,29 +769,24 @@ namespace {
         WT_ITEM item;
         if ( _idx.unique() ) {
             invariantWTOK( c->get_value(c, &item ) );
+            const char* base = static_cast<const char*>(item.data);
             if ( _uniqueLen == -1 ) {
                 // first time at this spot
-                _uniqueLen = item.size / sizeof(RecordIdRepr);
+                _uniqueLen = item.size;
                 invariant( _uniqueLen > 0 );
-                _uniquePos = 0;
+                _uniquePos =
+                    _forward
+                    ? 0
+                    : _uniqueLen - KeyString::numBytesForRecordIdEndingAt(base + _uniqueLen - 1);
             }
 
-            RecordId loc;
-            int posToUse = _uniquePos;
-            if ( !_forward )
-                posToUse = _uniqueLen - 1 - _uniquePos;
-
-            loc = getRecordIdAt(item.data, posToUse * sizeof(RecordIdRepr));
-            invariant( posToUse >= 0 && posToUse < _uniqueLen );
-
-            return loc;
+            invariant( _uniquePos >= 0 && _uniquePos < _uniqueLen );
+            return KeyString::decodeRecordIdStartingAt(base + _uniquePos);
         }
-        invariantWTOK( c->get_key(c, &item) );
-        RecordIdRepr repr;
-        memcpy( &repr,
-                static_cast<const char*>(item.data) + item.size - sizeof(RecordIdRepr),
-                sizeof(RecordIdRepr) );
-        return RecordId( endian::bigToNative(repr) );
+
+        invariantWTOK( c->get_key(c, &item ) );
+        const char* base = static_cast<const char*>(item.data);
+        return KeyString::decodeRecordIdEndingAt(base + item.size - 1);
     }
 
     void WiredTigerIndex::IndexCursor::advance() {
@@ -807,24 +794,36 @@ namespace {
         if ( _eof )
             return;
 
+        WT_CURSOR *c = _cursor.get();
+
         if ( _idx.unique() ) {
             if ( _uniqueLen == -1 ) {
                 // we need to investigate
                 getRecordId();
             }
 
-            _uniquePos++; // advance
+            WT_ITEM item;
+            invariantWTOK( c->get_value(c, &item ) );
+            const char* base = static_cast<const char*>(item.data);
+            if (_forward) {
+                if ( _uniquePos < _uniqueLen ) {
+                    _uniquePos += KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
 
-            if ( _uniquePos < _uniqueLen ) {
-                return;
+                    if ( _uniquePos < _uniqueLen ) {
+                        return;
+                    }
+                }
             }
-
+            else {
+                if (_uniquePos > 0) {
+                    _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
+                    return;
+                }
+            }
         }
 
         _uniqueLen = -1;
 
-
-        WT_CURSOR *c = _cursor.get();
         int ret = _forward ? c->next(c) : c->prev(c);
         if ( ret == WT_NOTFOUND ) {
             _eof = true;
@@ -872,8 +871,8 @@ namespace {
 
         KeyString data = KeyString::make( key, _ordering );
         WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
-        RecordIdRepr locRepr = loc.repr();
-        WiredTigerItem valueItem( &locRepr, sizeof(locRepr) );
+        KeyString locs = KeyString::make(loc);
+        WiredTigerItem valueItem(locs.getBuffer(), locs.getSize());
         c->set_key( c, keyItem.Get() );
         c->set_value( c, valueItem.Get() );
         int ret = c->insert( c );
@@ -897,8 +896,8 @@ namespace {
         invariantWTOK( c->get_value(c, &old ) );
 
         // Optimizing common case: there is only one loc currently in the index.
-        if (old.size == sizeof(RecordIdRepr)) {
-            if (loc == getRecordIdAt(old.data)) {
+        if (old.size == KeyString::numBytesForRecordIdStartingAt(old.data)) {
+            if (loc == KeyString::decodeRecordIdStartingAt(old.data)) {
                 return Status::OK(); // already in index
             }
             else if (!dupsAllowed) {
@@ -910,9 +909,10 @@ namespace {
 
         std::set<RecordId> all;
 
-        // see if its already in the array
-        for ( size_t i = 0; i < (old.size/sizeof(RecordIdRepr)); i++ ) {
-            const RecordId temp = getRecordIdAt(old.data, i * sizeof(RecordIdRepr));
+        // see if it's already in the array
+        const char* base = static_cast<const char*>(old.data);
+        for (size_t i = 0; i < old.size; i += KeyString::numBytesForRecordIdStartingAt(base + i)) {
+            const RecordId temp = KeyString::decodeRecordIdStartingAt(base + i);
             if ( loc == temp )
                 return Status::OK();
             all.insert( RecordId(temp) );
@@ -925,16 +925,12 @@ namespace {
         all.insert( loc );
 
         // not in the array, add it to the back
-        size_t newSize = all.size() * sizeof(RecordIdRepr);
-        boost::scoped_array<char> bigger( new char[newSize] );
-
-        size_t offset = 0;
+        locs.reset();
         for ( std::set<RecordId>::const_iterator it = all.begin(); it != all.end(); ++it ) {
-            putRecordIdAtOffset(bigger.get(), offset, *it);
-            offset += sizeof(RecordIdRepr);
+            locs.appendRecordId(*it);
         }
 
-        valueItem = WiredTigerItem( bigger.get(), newSize );
+        valueItem = WiredTigerItem(locs.getBuffer(), locs.getSize());
         c->set_value( c, valueItem.Get() );
         return wtRCToStatus( c->update( c ) );
     }
@@ -967,32 +963,27 @@ namespace {
         WT_ITEM old;
         invariantWTOK( c->get_value(c, &old ) );
 
-        // see if its in the array
-        size_t num = old.size / sizeof(RecordIdRepr);
-        for ( size_t i = 0; i < num; i++ ) {
-            const RecordId temp = getRecordIdAt(old.data, i * sizeof(RecordIdRepr));
-            if ( loc != temp )
+        // see if it's in the array
+        KeyString newValue;
+        BufReader br(old.data, old.size);
+        while (br.remaining()) {
+            const size_t bytes = KeyString::numBytesForRecordIdStartingAt(br.pos());
+            const RecordId temp = KeyString::decodeRecordIdStartingAt(br.skip(bytes));
+            if ( loc == temp )
                 continue;
 
-            // we found it, now lets re-save array without it
-            size_t newSize = old.size - sizeof(RecordIdRepr);
-
-            if ( newSize == 0 ) {
-                // nothing left, just delete entry
-                invariantWTOK( c->remove(c) );
-                return;
-            }
-
-            boost::scoped_array<char> smaller( new char[newSize] );
-            size_t offset = i * sizeof(RecordIdRepr);
-            memcpy( smaller.get(), old.data, offset );
-            memcpy( smaller.get() + offset,
-                    static_cast<const char*>( old.data ) + offset + sizeof(RecordIdRepr),
-                    old.size - sizeof(RecordIdRepr) - offset );
-            WiredTigerItem valueItem = WiredTigerItem( smaller.get(), newSize );
-            c->set_value( c, valueItem.Get() );
-            invariantWTOK( c->update( c ) );
+            newValue.appendRecordId(temp);
         }
+
+        if (newValue.getSize() == 0) {
+            // We are deleting the only RecordId for this key.
+            invariantWTOK(c->remove(c));
+            return;
+        }
+
+        WiredTigerItem valueItem = WiredTigerItem(newValue.getBuffer(), newValue.getSize());
+        c->set_value( c, valueItem.Get() );
+        invariantWTOK( c->update( c ) );
     }
 
     // ------------------------------

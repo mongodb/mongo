@@ -52,19 +52,19 @@ TEST(KeyStringTest, Simple1) {
                      KeyString::make(b, ALL_ASCENDING, RecordId()));
 }
 
-#define ROUNDTRIP_ORDER(x, order) {                                     \
+#define ROUNDTRIP_ORDER(x, order) do {                                  \
         BSONObj _obj = x;                                               \
         KeyString ks = KeyString::make(_obj, order);                    \
         ASSERT_EQUALS(_obj, ks.toBson(order));                          \
-    }
+    } while (0)
 
-#define ROUNDTRIP(x) {                                               \
+#define ROUNDTRIP(x) do {                                            \
         ROUNDTRIP_ORDER(x, ALL_ASCENDING);                           \
         ROUNDTRIP_ORDER(x, Ordering::make(BSON("a" << 1)));          \
         ROUNDTRIP_ORDER(x, Ordering::make(BSON("a" << -1)));         \
-    }
+    } while (0)
 
-#define COMPARES_SAME(_x,_y) {                                   \
+#define COMPARES_SAME(_x,_y) do {                                \
         KeyString _xKS = KeyString::make(_x, ONE_ASCENDING);     \
         KeyString _yKS = KeyString::make(_y, ONE_ASCENDING);     \
         if (_x == _y) {                                          \
@@ -88,7 +88,7 @@ TEST(KeyStringTest, Simple1) {
         else {                                                   \
             ASSERT_GREATER_THAN(_yKS, _xKS);                     \
         }                                                        \
-    }
+    } while (0)
 
 TEST(KeyStringTest, ActualBytesDouble) {
     // just one test like this for utter sanity
@@ -625,6 +625,105 @@ TEST(KeyStringTest, NumberOrderLots) {
                           compareNumbers(numbers[i].firstElement(),
                                          numbers[j].firstElement()));
 
+        }
+    }
+}
+
+TEST(KeyStringTest, RecordIds) {
+    for (int i = 0; i < 63; i++) {
+        const RecordId rid = RecordId(1ll << i);
+
+        { // Test encoding / decoding of single RecordIds
+            const KeyString ks = KeyString::make(rid);
+            ASSERT_GTE(ks.getSize(), 2u);
+            ASSERT_LTE(ks.getSize(), 10u);
+
+            ASSERT_EQ(KeyString::numBytesForRecordIdStartingAt(ks.getBuffer()), ks.getSize());
+            ASSERT_EQ(KeyString::numBytesForRecordIdEndingAt(ks.getBuffer() + ks.getSize() - 1),
+                      ks.getSize());
+
+            ASSERT_EQ(KeyString::decodeRecordIdStartingAt(ks.getBuffer()), rid);
+            ASSERT_EQ(KeyString::decodeRecordIdEndingAt(ks.getBuffer() + ks.getSize() - 1), rid);
+
+            if (rid.isNormal()) {
+                ASSERT_GT(ks, KeyString::make(RecordId()));
+                ASSERT_GT(ks, KeyString::make(RecordId::min()));
+                ASSERT_LT(ks, KeyString::make(RecordId::max()));
+
+                ASSERT_GT(ks, KeyString::make(RecordId(rid.repr() - 1)));
+                ASSERT_LT(ks, KeyString::make(RecordId(rid.repr() + 1)));
+            }
+        }
+
+        for (int j = 0; j < 63; j++) {
+            RecordId other = RecordId(1ll << j);
+
+            if (rid == other) ASSERT_EQ(KeyString::make(rid), KeyString::make(other));
+            if (rid < other) ASSERT_LT(KeyString::make(rid), KeyString::make(other));
+            if (rid > other) ASSERT_GT(KeyString::make(rid), KeyString::make(other));
+
+            { // Test concatenating RecordIds like in a unique index
+                KeyString ks;
+                ks.appendRecordId(RecordId::max()); // uses all bytes
+                ks.appendRecordId(rid);
+                ks.appendRecordId(RecordId(0xDEADBEEF)); // uses some extra bytes
+                ks.appendRecordId(rid);
+                ks.appendRecordId(RecordId(1)); // uses no extra bytes
+                ks.appendRecordId(rid);
+                ks.appendRecordId(other);
+                ks.appendRecordId(rid);
+                ks.appendRecordId(RecordId(2));
+
+                {
+                    // forward scan
+                    const char* it = ks.getBuffer();
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId::max());
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(0xDEADBEEF));
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(1));
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), other);
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(2));
+                    it += KeyString::numBytesForRecordIdStartingAt(it);
+
+                    ASSERT_EQ(it, ks.getBuffer() + ks.getSize());
+                }
+
+                {
+                    // reverse scan
+                    const char* it = ks.getBuffer() + ks.getSize();
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(2));
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), other);
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(1));
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(0xDEADBEEF));
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
+                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
+                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId::max());
+
+                    ASSERT_EQ(it, ks.getBuffer());
+                }
+            }
         }
     }
 }

@@ -180,7 +180,7 @@ namespace mongo {
             bool _forward;
             bool _eof;
 
-            mutable int _uniquePos;
+            mutable int _uniquePos; // byte offset of start of current RecordId
             mutable int _uniqueLen;
 
             // For save/restorePosition check

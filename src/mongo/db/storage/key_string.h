@@ -42,8 +42,23 @@ namespace mongo {
     public:
         static const uint64_t kMaxBufferSize = 2048;
 
+        KeyString() : _size(0) {}
+
         static BSONObj toBson(const char* buffer, size_t len, Ordering ord);
         static BSONObj toBson(StringData data, Ordering ord);
+
+        static size_t numBytesForRecordIdStartingAt(const void* ptr) {
+            return 2 + (*static_cast<const unsigned char*>(ptr) >> 5); // stored in high 3 bits.
+        }
+        static size_t numBytesForRecordIdEndingAt(const void* ptr) {
+            return 2 + (*static_cast<const unsigned char*>(ptr) & 7); // stored in low 3 bits.
+        }
+        static RecordId decodeRecordIdEndingAt(const void* ptr) {
+            const char* base = static_cast<const char*>(ptr);
+            base -= numBytesForRecordIdEndingAt(ptr) - 1;
+            return decodeRecordIdStartingAt(base);
+        }
+        static RecordId decodeRecordIdStartingAt(const void* ptr);
 
         static KeyString make(const BSONObj& obj,
                               Ordering ord,
@@ -51,6 +66,20 @@ namespace mongo {
 
         static KeyString make(const BSONObj& obj,
                               Ordering ord);
+
+        static KeyString make(RecordId rid) {
+            KeyString ks;
+            ks.appendRecordId(rid);
+            return ks;
+        }
+
+        void appendRecordId(RecordId loc);
+
+        /**
+         * Resets to an empty state.
+         * Equivalent to but faster than *this = KeyString()
+         */
+        void reset() { _size = 0; }
 
         const char* getBuffer() const { return _buffer; }
         size_t getSize() const { return _size; }
@@ -65,11 +94,9 @@ namespace mongo {
         std::string toString() const;
 
     private:
-        KeyString() : _size(0) {}
 
         void _appendAllElementsForIndexing(const BSONObj& obj, Ordering ord);
 
-        void _appendRecordId(RecordId loc);
         void _appendBool(bool val, bool invert);
         void _appendDate(Date_t val, bool invert);
         void _appendTimestamp(OpTime val, bool invert);

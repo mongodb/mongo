@@ -36,6 +36,7 @@
 
 #include "mongo/base/data_view.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/platform/bits.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
@@ -170,7 +171,7 @@ namespace mongo {
     KeyString KeyString::make(const BSONObj& obj, Ordering ord, RecordId recordId) {
         KeyString out;
         out._appendAllElementsForIndexing(obj, ord);
-        out._appendRecordId(recordId);
+        out.appendRecordId(recordId);
         return out;
     }
 
@@ -204,16 +205,51 @@ namespace mongo {
         _append(kEnd, false);
     }
 
-    void KeyString::_appendRecordId(RecordId loc) {
+    void KeyString::appendRecordId(RecordId loc) {
+        // The RecordId encoding must be able to determine the full length starting from the last
+        // byte, without knowing where the first byte is since it is stored at the end of a
+        // KeyString, and we need to be able to read the RecordId without decoding the whole thing.
+        //
+        // This encoding places a number (N) between 0 and 7 in both the high 3 bits of the first
+        // byte and the low 3 bits of the last byte. This is the number of bytes between the first
+        // and last byte (ie total bytes is N + 2). The remaining bits of the first and last bytes
+        // are combined with the bits of the in-between bytes to store the 64-bit RecordId in
+        // big-endian order. This does not encode negative RecordIds to give maximum space to
+        // positive RecordIds which are the only ones that are allowed to be stored in an index.
+
         int64_t raw = loc.repr();
         if (raw < 0) {
-            // Note: we encode RecordId::min() and RecordId() the same
-            // which is ok, as they are never stored.
+            // Note: we encode RecordId::min() and RecordId() the same which is ok, as they are
+            // never stored so they will never be compared to each other.
             invariant(raw == RecordId::min().repr());
             raw = 0;
         }
-        uint64_t value = static_cast<uint64_t>(raw);
-        _append(endian::nativeToBig(value), false); // never invert RecordIds
+        const uint64_t value = static_cast<uint64_t>(raw);
+        const int bitsNeeded = 64 - countLeadingZeros64(raw);
+        const int extraBytesNeeded = bitsNeeded <= 10
+                                     ? 0
+                                     : ((bitsNeeded - 10) + 7) / 8; // ceil((bitsNeeded - 10) / 8)
+
+        // extraBytesNeeded must fit in 3 bits.
+        dassert(extraBytesNeeded >= 0 && extraBytesNeeded < 8);
+
+        // firstByte combines highest 5 bits of value with extraBytesNeeded.
+        const uint8_t firstByte = uint8_t((extraBytesNeeded << 5)
+                                          | (value >> (5 + (extraBytesNeeded * 8))));
+        // lastByte combines lowest 5 bits of value with extraBytesNeeded.
+        const uint8_t lastByte = uint8_t((value << 3) | extraBytesNeeded);
+
+        // RecordIds are never appended inverted.
+        _append(firstByte, false);
+        if (extraBytesNeeded) {
+            const uint64_t extraBytes = endian::nativeToBig(value >> 5);
+            // Only using the low-order extraBytesNeeded bytes of extraBytes.
+            _appendBytes(reinterpret_cast<const char*>(&extraBytes) + sizeof(extraBytes)
+                                                                    - extraBytesNeeded,
+                         extraBytesNeeded,
+                         false);
+        }
+        _append(lastByte, false);
     }
 
     void KeyString::_appendBool(bool val, bool invert) {
@@ -477,7 +513,7 @@ namespace mongo {
 
 
     // ----------------------------------------------------------------------
-    // -----------   TO BSON CODE -------------------------------------------
+    // ----------- DECODING CODE --------------------------------------------
     // ----------------------------------------------------------------------
 
     namespace {
@@ -723,6 +759,22 @@ namespace mongo {
 
     BSONObj KeyString::toBson(Ordering ord) const {
         return toBson(_buffer, _size, ord);
+    }
+
+    RecordId KeyString::decodeRecordIdStartingAt(const void* ptr) {
+        BufReader buf(ptr, numBytesForRecordIdStartingAt(ptr));
+
+        const uint8_t firstByte = readType<uint8_t>(&buf, false);
+        const uint8_t numExtraBytes = firstByte >> 5; // high 3 bits in firstByte
+        uint64_t repr = firstByte & 0x1f; // low 5 bits in firstByte
+        for (int i = 0; i < numExtraBytes; i++) {
+            repr = (repr << 8) | readType<uint8_t>(&buf, false);
+        }
+
+        const uint8_t lastByte = readType<uint8_t>(&buf, false);
+        invariant((lastByte & 0x7) == numExtraBytes);
+        repr = (repr << 5) | (lastByte >> 3); // fold in high 5 bits of last byte
+        return RecordId(repr);
     }
 
     // ----------------------------------------------------------------------
