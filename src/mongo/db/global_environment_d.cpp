@@ -93,9 +93,7 @@ namespace mongo {
         }
         if (_lockFile->createdByUncleanShutdown()) {
             warning() << "Detected unclean shutdown - "
-                      << _lockFile->getFilespec() << " is not empty. "
-                      << "This may prevent the current storage engine "
-                      << name << " from starting up.";
+                      << _lockFile->getFilespec() << " is not empty.";
         }
         uassertStatusOK(_lockFile->open());
 

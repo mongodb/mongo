@@ -38,6 +38,7 @@
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -56,6 +57,9 @@ namespace mongo {
             virtual ~WiredTigerFactory(){}
             virtual StorageEngine* create(const StorageGlobalParams& params,
                                           const StorageEngineLockFile& lockFile) const {
+                if (lockFile.createdByUncleanShutdown()) {
+                    warning() << "Recovering data from the last clean checkpoint.";
+                }
                 WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
                                                                  wiredTigerGlobalOptions.engineConfig,
                                                                  params.dur,
