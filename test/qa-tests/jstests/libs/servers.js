@@ -938,6 +938,10 @@ startMongoProgramNoConnect = function() {
                      '--authenticationDatabase=admin');
     }
 
+    if ( jsTestOptions().useSSL ) {
+        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHostnames");
+    }
+
     if (progName == 'mongo' && !_useWriteCommandsDefault()) {
         args = args.slice(1);
         args.unshift(progName, '--useLegacyWriteOps');
