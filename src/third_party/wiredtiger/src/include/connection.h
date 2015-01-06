@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -185,6 +186,8 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL	*sessions;	/* Session reference */
 	uint32_t	 session_size;	/* Session array size */
 	uint32_t	 session_cnt;	/* Session count */
+
+	size_t     session_scratch_max;	/* Max scratch memory per session */
 
 	/*
 	 * WiredTiger allocates space for a fixed number of hazard pointers

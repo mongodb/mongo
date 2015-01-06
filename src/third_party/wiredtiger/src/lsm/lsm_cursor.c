@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -1314,7 +1315,7 @@ __clsm_insert(WT_CURSOR *cursor)
 	WT_ERR(__clsm_deleted_encode(session, &cursor->value, &value, &buf));
 	ret = __clsm_put(session, clsm, &cursor->key, &value, 0);
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	WT_TRET(__clsm_leave(clsm));
 	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -1347,7 +1348,7 @@ __clsm_update(WT_CURSOR *cursor)
 		ret = __clsm_put(session, clsm, &cursor->key, &value, 1);
 	}
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	WT_TRET(__clsm_leave(clsm));
 	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);

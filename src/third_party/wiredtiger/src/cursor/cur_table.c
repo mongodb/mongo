@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -579,7 +580,7 @@ __curtable_update(WT_CURSOR *cursor)
 		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), 1));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
-	__wt_scr_free(&value_copy);
+	__wt_scr_free(session, &value_copy);
 	return (ret);
 }
 
@@ -688,7 +689,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 		    (start == NULL) ? NULL : start->cg_cursors[i],
 		    (stop == NULL) ? NULL : stop->cg_cursors[i]));
 
-err:	__wt_scr_free(&key);
+err:	__wt_scr_free(session, &key);
 	return (ret);
 }
 
@@ -956,6 +957,6 @@ err:		WT_TRET(__curtable_close(cursor));
 		*cursorp = NULL;
 	}
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }

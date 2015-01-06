@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -154,7 +155,7 @@ err:		/*
 	if (checkpoint && ci != NULL)
 		__wt_block_ckpt_destroy(session, ci);
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -657,7 +658,7 @@ err:	if (locked)
 		if ((ci = ckpt->bpriv) != NULL)
 			__wt_block_ckpt_destroy(session, ci);
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -741,7 +742,7 @@ __ckpt_update(WT_SESSION_IMPL *session,
 		    block->name, ckpt->name, (const char *)tmp->data));
 	}
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

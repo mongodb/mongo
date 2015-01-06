@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -415,7 +416,7 @@ __log_file_header(
 	if (end_lsn != NULL)
 		*end_lsn = tmp.slot_end_lsn;
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -440,7 +441,7 @@ __log_openfile(WT_SESSION_IMPL *session,
 	 * XXX - if we are not creating the file, we should verify the
 	 * log file header record for the magic number and versions here.
 	 */
-err:	__wt_scr_free(&path);
+err:	__wt_scr_free(session, &path);
 	return (ret);
 }
 
@@ -488,8 +489,8 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	 */
 	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 
-err:	__wt_scr_free(&from_path);
-	__wt_scr_free(&to_path);
+err:	__wt_scr_free(session, &from_path);
+	__wt_scr_free(session, &to_path);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
@@ -612,8 +613,8 @@ __wt_log_allocfile(
 	 */
 	WT_ERR(__wt_rename(session, from_path->data, to_path->data));
 
-err:	__wt_scr_free(&from_path);
-	__wt_scr_free(&to_path);
+err:	__wt_scr_free(session, &from_path);
+	__wt_scr_free(session, &to_path);
 	if (log_fh != NULL)
 		WT_TRET(__wt_close(session, log_fh));
 	return (ret);
@@ -635,7 +636,7 @@ __wt_log_remove(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "log_remove: remove log %s", (char *)path->data));
 	WT_ERR(__wt_remove(session, path->data));
-err:	__wt_scr_free(&path);
+err:	__wt_scr_free(session, &path);
 	return (ret);
 }
 
@@ -1075,7 +1076,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		*uncitem = swap;
 	}
 
-err:	__wt_scr_free(&uncitem);
+err:	__wt_scr_free(session, &uncitem);
 	return (ret);
 }
 
@@ -1366,7 +1367,7 @@ advance:
 				    &uncitem));
 				WT_ERR((*func)(session, uncitem, &rd_lsn,
 				    cookie, firstrecord));
-				__wt_scr_free(&uncitem);
+				__wt_scr_free(session, &uncitem);
 			} else
 				WT_ERR((*func)(session, &buf, &rd_lsn, cookie,
 				    firstrecord));
@@ -1389,7 +1390,7 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 	__wt_buf_free(session, &buf);
-	__wt_scr_free(&uncitem);
+	__wt_scr_free(session, &uncitem);
 	/*
 	 * If the caller wants one record and it is at the end of log,
 	 * return WT_NOTFOUND.
@@ -1538,7 +1539,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	}
 	ret = __log_write_internal(session, ip, lsnp, flags);
 
-err:	__wt_scr_free(&citem);
+err:	__wt_scr_free(session, &citem);
 	return (ret);
 }
 
@@ -1716,6 +1717,6 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	logrec->size += len;
 	WT_ERR(__wt_log_write(session, logrec, NULL, 0));
-err:	__wt_scr_free(&logrec);
+err:	__wt_scr_free(session, &logrec);
 	return (ret);
 }

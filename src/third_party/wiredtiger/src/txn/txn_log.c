@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -347,7 +348,7 @@ __wt_txn_checkpoint_log(
 		/* Cleanup any allocated resources */
 		WT_INIT_LSN(ckpt_lsn);
 		txn->ckpt_nsnapshot = 0;
-		__wt_scr_free(&txn->ckpt_snapshot);
+		__wt_scr_free(session, &txn->ckpt_snapshot);
 		txn->full_ckpt = 0;
 		break;
 	}

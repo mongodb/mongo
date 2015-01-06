@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -162,7 +163,7 @@ __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
 	if (fullp != NULL)
 		*fullp = !target_list;
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -593,7 +594,7 @@ __checkpoint_worker(
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
 	const char *name;
-	int deleted, force, hot_backup_locked, track_ckpt, was_modified;
+	int deleted, fake_ckpt, force, hot_backup_locked, was_modified;
 	char *name_alloc;
 
 	btree = S2BT(session);
@@ -604,14 +605,15 @@ __checkpoint_worker(
 	name_alloc = NULL;
 	hot_backup_locked = 0;
 	name_alloc = NULL;
-	track_ckpt = 1;
+	fake_ckpt = 0;
 	was_modified = btree->modified;
 
 	/*
-	 * Set the checkpoint LSN to the maximum LSN so that recovery will
-	 * never roll old changes forward over the non-logged changed in this
-	 * checkpoint.  If logging is enabled, a real checkpoint LSN will
-	 * be assigned later for this checkpoint and overwrite this.
+	 * Set the checkpoint LSN to the maximum LSN so that if logging is
+	 * disabled, recovery will never roll old changes forward over the
+	 * non-logged changes in this checkpoint.  If logging is enabled, a
+	 * real checkpoint LSN will be assigned later for this checkpoint and
+	 * overwrite this.
 	 */
 	WT_MAX_LSN(&ckptlsn);
 
@@ -821,7 +823,7 @@ __checkpoint_worker(
 					WT_ERR_MSG(session, ret,
 					    "block-manager checkpoint found "
 					    "for a bulk-loaded file");
-			track_ckpt = 0;
+			fake_ckpt = 1;
 			goto fake;
 		case WT_BTREE_SALVAGE:
 		case WT_BTREE_UPGRADE:
@@ -846,7 +848,7 @@ __checkpoint_worker(
 	 */
 	if (is_checkpoint)
 		if (btree->bulk_load_ok) {
-			track_ckpt = 0;
+			fake_ckpt = 1;
 			goto fake;
 		}
 
@@ -895,7 +897,15 @@ __checkpoint_worker(
 		if (F_ISSET(ckpt, WT_CKPT_ADD))
 			ckpt->write_gen = btree->write_gen;
 
-fake:	/* Update the object's metadata. */
+fake:	/*
+	 * If we're faking a checkpoint and logging is enabled, recovery should
+	 * roll forward any changes made between now and the next checkpoint,
+	 * so set the checkpoint LSN to the beginning of time.
+	 */
+	if (fake_ckpt && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		WT_INIT_LSN(&ckptlsn);
+
+	/* Update the object's metadata. */
 	WT_ERR(__wt_meta_ckptlist_set(
 	    session, dhandle->name, ckptbase, &ckptlsn));
 
@@ -906,7 +916,7 @@ fake:	/* Update the object's metadata. */
 	 * is being discarded, in which case the handle will be gone by the
 	 * time we try to apply or unroll the meta tracking event.
 	 */
-	if (track_ckpt) {
+	if (!fake_ckpt) {
 		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
