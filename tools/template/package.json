@@ -7,7 +7,11 @@
     "build": "gulp pack"
   },
   "author": "Thomas Rueckstiess <thomas@rueckstiess.net>",
-  "license": "",
+  "license": "MIT",
+  "repository" : { 
+    "type": "git", 
+    "url": "http://github.com/wiredtiger/wiredtiger.git" 
+  },
   "dependencies": {
     "ampersand-collection": "^1.3.17",
     "ampersand-collection-underscore-mixin": "^1.0.3",

@@ -14,10 +14,10 @@ To build the template, follow these steps:
 
 ### Usage
 
-Call the `wtstats.py` Python script with a stats file as argument, e.g.
+Call the `wtstats.py` Python script with a stats file as argument. The `test` subfolder contains a small example stats file to test: 
 
 ```
-python wtstats.py /path/to/my/WiredTigerStat.19.16
+python wtstats.py ./test/WiredTigerStat.fixture
 ```
 
 The script will create `wtstats.html` in the working directory, which can be viewed with any modern browser (latest versions of Chrome, Safari, FireFox, Internet Explorer supported).
