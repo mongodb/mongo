@@ -13,7 +13,7 @@ func TestManagerAttachAndDetach(t *testing.T) {
 	var manager *Manager
 
 	Convey("With an empty progress.Manager", t, func() {
-		manager = NewProgressBarManager(time.Second)
+		manager = NewProgressBarManager(writeBuffer, time.Second)
 		So(manager, ShouldNotBeNil)
 
 		Convey("adding 3 bars", func() {
@@ -22,21 +22,18 @@ func TestManagerAttachAndDetach(t *testing.T) {
 			pbar1 := &Bar{
 				Name:      "\nTEST1",
 				Watching:  watching,
-				Writer:    writeBuffer,
 				BarLength: 10,
 			}
 			manager.Attach(pbar1)
 			pbar2 := &Bar{
 				Name:      "\nTEST2",
 				Watching:  watching,
-				Writer:    writeBuffer,
 				BarLength: 10,
 			}
 			manager.Attach(pbar2)
 			pbar3 := &Bar{
 				Name:      "\nTEST3",
 				Watching:  watching,
-				Writer:    writeBuffer,
 				BarLength: 10,
 			}
 			manager.Attach(pbar3)
@@ -73,7 +70,6 @@ func TestManagerAttachAndDetach(t *testing.T) {
 					pbar4 := &Bar{
 						Name:      "\nTEST4",
 						Watching:  watching,
-						Writer:    writeBuffer,
 						BarLength: 10,
 					}
 					manager.Attach(pbar4)
@@ -110,20 +106,19 @@ func TestManagerStartAndStop(t *testing.T) {
 	writeBuffer := &bytes.Buffer{}
 	var manager *Manager
 
-	Convey("With a progress.Manager with a WaitTime of 10 ms and one bar", t, func() {
-		manager = NewProgressBarManager(time.Millisecond * 10)
+	Convey("With a progress.Manager with a waitTime of 10 ms and one bar", t, func() {
+		manager = NewProgressBarManager(writeBuffer, time.Millisecond*10)
 		So(manager, ShouldNotBeNil)
 		watching := NewCounter(10)
 		watching.Inc(5)
 		pbar := &Bar{
 			Name:      "\nTEST",
 			Watching:  watching,
-			Writer:    writeBuffer,
 			BarLength: 10,
 		}
 		manager.Attach(pbar)
 
-		So(manager.WaitTime, ShouldEqual, time.Millisecond*10)
+		So(manager.waitTime, ShouldEqual, time.Millisecond*10)
 		So(len(manager.bars), ShouldEqual, 1)
 
 		Convey("running the manager for 45 ms and stopping", func() {

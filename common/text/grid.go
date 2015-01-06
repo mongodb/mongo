@@ -1,6 +1,8 @@
 package text
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -119,5 +121,16 @@ func (gw *GridWriter) Flush(w io.Writer) {
 		if !lastRow {
 			fmt.Fprint(w, "\n")
 		}
+	}
+}
+
+//FlushRows writes the fully-formatted grid to the given io.Writer, but
+//gives each row its own Write() call instead of using newlines
+func (gw *GridWriter) FlushRows(w io.Writer) {
+	gridBuff := &bytes.Buffer{}
+	gw.Flush(gridBuff)
+	lineScanner := bufio.NewScanner(gridBuff)
+	for lineScanner.Scan() {
+		w.Write(lineScanner.Bytes())
 	}
 }

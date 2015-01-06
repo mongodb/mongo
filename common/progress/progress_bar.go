@@ -85,6 +85,10 @@ type Bar struct {
 // must be set up before calling this. Panics if Start has already been called.
 func (pb *Bar) Start() {
 	pb.validate()
+	// we only check for the writer if we're using a single bar without a manager
+	if pb.Writer == nil {
+		panic("Cannot use a Bar with an unset Writer")
+	}
 	pb.stopChan = make(chan struct{})
 
 	go pb.start()
@@ -95,9 +99,6 @@ func (pb *Bar) Start() {
 func (pb *Bar) validate() {
 	if pb.Watching == nil {
 		panic("Cannot use a Bar with a nil Watching")
-	}
-	if pb.Writer == nil {
-		panic("Cannot use a Bar with an unset Writer")
 	}
 	if pb.stopChan != nil {
 		panic("Cannot start a Bar more than once")
@@ -133,6 +134,19 @@ func (pb *Bar) renderToWriter() {
 		maxStr,
 		percent*100,
 	)
+}
+
+func (pb *Bar) renderToGridRow(grid *text.GridWriter) {
+	maxCount, currentCount := pb.Watching.Progress()
+	percent := float64(currentCount) / float64(maxCount)
+	maxStr, currentStr := pb.formatCounts()
+	grid.WriteCells(
+		drawBar(pb.BarLength, percent),
+		pb.Name,
+		fmt.Sprintf("%s/%s", currentStr, maxStr),
+		fmt.Sprintf("(%2.1f%%)", percent*100),
+	)
+	grid.EndRow()
 }
 
 // the main concurrent loop

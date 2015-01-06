@@ -119,5 +119,4 @@ func TestToolLoggerWriter(t *testing.T) {
 			})
 		})
 	})
-
 }

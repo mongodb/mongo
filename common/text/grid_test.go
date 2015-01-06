@@ -38,6 +38,12 @@ func TestWriteGrid(t *testing.T) {
 		output = buf.String()
 		So(output, ShouldStartWith,
 			"(0,0) (0,1) (0,2)\n(1,0) (1,1)")
+
+		buf = bytes.Buffer{}
+		gw.FlushRows(&buf)
+		output = buf.String()
+		So(output, ShouldStartWith,
+			"(0,0) (0,1) (0,2)(1,0) (1,1)")
 	})
 
 	Convey("Test grid writer width calculation", t, func() {

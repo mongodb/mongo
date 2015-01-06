@@ -2,17 +2,21 @@ package progress
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/text"
+	"io"
 	"sync"
 	"time"
 )
+
+const GridPadding = 2
 
 // Manager handles thread-safe synchronized progress bar writing, so that all
 // given progress bars are written in a group at a given interval.
 // The current implementation maintains insert order when printing,
 // such that new bars appear at the bottom of the group.
 type Manager struct {
-	WaitTime time.Duration
-
+	waitTime time.Duration
+	writer   io.Writer
 	bars     []*Bar
 	barsLock *sync.Mutex
 	stopChan chan struct{}
@@ -20,9 +24,10 @@ type Manager struct {
 
 // NewProgressBarManager returns an initialized Manager with the given
 // time.Duration to wait between writes
-func NewProgressBarManager(waitTime time.Duration) *Manager {
+func NewProgressBarManager(w io.Writer, waitTime time.Duration) *Manager {
 	return &Manager{
-		WaitTime: waitTime,
+		waitTime: waitTime,
+		writer:   w,
 		barsLock: &sync.Mutex{},
 	}
 }
@@ -76,23 +81,30 @@ func (manager *Manager) Detach(pb *Bar) {
 func (manager *Manager) renderAllBars() {
 	manager.barsLock.Lock()
 	defer manager.barsLock.Unlock()
-	for _, bar := range manager.bars {
-		bar.renderToWriter()
+	grid := &text.GridWriter{
+		ColumnPadding: GridPadding,
 	}
+	for _, bar := range manager.bars {
+		bar.renderToGridRow(grid)
+	}
+	grid.FlushRows(manager.writer)
 }
 
 // Start kicks of the timed batch writing of progress bars.
 func (manager *Manager) Start() {
+	if manager.writer == nil {
+		panic("Cannot use a progress.Manager with an unset Writer")
+	}
 	// we make the stop channel here so that we can stop and restart a manager
 	manager.stopChan = make(chan struct{})
 	go manager.start()
 }
 
 func (manager *Manager) start() {
-	if manager.WaitTime <= 0 {
-		manager.WaitTime = DefaultWaitTime
+	if manager.waitTime <= 0 {
+		manager.waitTime = DefaultWaitTime
 	}
-	ticker := time.NewTicker(manager.WaitTime)
+	ticker := time.NewTicker(manager.waitTime)
 	defer ticker.Stop()
 
 	for {

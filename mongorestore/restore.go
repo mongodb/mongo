@@ -26,7 +26,7 @@ const (
 func (restore *MongoRestore) RestoreIntents() error {
 
 	// start up the progress bar manager
-	restore.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)
+	restore.progressManager = progress.NewProgressBarManager(log.Writer(0), ProgressBarWaitTime)
 	restore.progressManager.Start()
 	defer restore.progressManager.Stop()
 
@@ -227,9 +227,8 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 		bar := &progress.Bar{
 			Name:      fmt.Sprintf("%v.%v", dbName, colName),
 			Watching:  watchProgressor,
-			Writer:    log.Writer(0),
 			BarLength: ProgressBarLength,
-			IsBytes: true,
+			IsBytes:   true,
 		}
 		restore.progressManager.Attach(bar)
 		defer restore.progressManager.Detach(bar)

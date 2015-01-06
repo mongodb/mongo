@@ -98,7 +98,7 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("--repair flag cannot be used on a mongos")
 	}
 	dump.manager = intents.NewIntentManager()
-	dump.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)
+	dump.progressManager = progress.NewProgressBarManager(log.Writer(0), ProgressBarWaitTime)
 	return nil
 }
 
@@ -415,7 +415,6 @@ func (dump *MongoDump) dumpQueryToWriter(
 	bar := &progress.Bar{
 		Name:      intent.Key(),
 		Watching:  dumpProgressor,
-		Writer:    log.Writer(0),
 		BarLength: ProgressBarLength,
 	}
 	dump.progressManager.Attach(bar)
