@@ -439,6 +439,9 @@ namespace {
                            newConfig,
                            myIndex));
 
+        // Make sure that the reconfigFinishFn doesn't finish until we've reset
+        // _heartbeatReconfigThread.
+        lk.lock();
         if (_currentState.primary()) {
             // If the primary is receiving a heartbeat reconfig, that strongly suggests
             // that there has been a force reconfiguration.  In any event, it might lead
