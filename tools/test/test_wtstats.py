@@ -25,7 +25,11 @@ def helper_delete_file(filename):
 
 def helper_cleanup():
     """ delete all html files in test directory """
-    for f in glob.glob('./test/*.html'):
+    patterns = ('*.json', '*.html', '*.pyc')
+    matches = []
+    for p in patterns:
+        matches.extend(glob.glob(os.path.join(test_dir, p)))
+    for f in matches: 
         helper_delete_file(f)
 
 
@@ -232,19 +236,32 @@ def test_list_option():
 
 
 @with_setup(setUp, tearDown)
+def test_json_option():
+    """ wtstats should additionally output json file with --json """
+
+    outfile = '_test_output_file.html'
+    helper_run_with_fixture({'--output': outfile, '--json': None})
+    data_html = helper_get_json_from_file(outfile)
+    with open(os.path.join(test_dir, '_test_output_file.json'), 'r') as jsonfile:
+        data_json = json.load(jsonfile)
+    
+    assert data_html == data_json
+
+
+@with_setup(setUp, tearDown)
 def test_all_option():
     """ wtstats should create grouped html files with --all """
 
     outfile = 'mystats.html'
     helper_run_with_fixture({'--output': outfile, '--all': None})
 
-    files = glob.glob('./test/*.html')
+    files = glob.glob(os.path.join(test_dir, '*.html'))
     
     # test some expected files
     assert len(files) > 1
-    assert './test/mystats.transaction.html' in files
-    assert './test/mystats.group.system.html' in files
-    assert './test/mystats.html' in files
+    assert os.path.join(test_dir, 'mystats.transaction.html') in files
+    assert os.path.join(test_dir, 'mystats.group.system.html') in files
+    assert os.path.join(test_dir, 'mystats.html') in files
 
 
     data = helper_get_json_from_file('mystats.transaction.html')
