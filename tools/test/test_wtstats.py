@@ -1,8 +1,10 @@
-""" To run this test suite, install nose with `pip install nose` and then
-    run `nosetests -v` from the `./tools` directory.
+""" 
+To run this test suite, install nose with `pip install nose` and then
+run `nosetests -v` from the `./tools` directory.
 """
 
 import os, sys, glob
+import re
 import json
 import types
 from nose import with_setup
@@ -55,22 +57,15 @@ def helper_run_with_fixture(kwargs=None):
         pass
 
 
-def helper_find_line(outfile, str):
+def helper_get_json_from_file(outfile):
     """ extracts the chart definition from the html file and returns the class initialization """
 
     with open(os.path.join(test_dir, outfile), 'r') as htmlfile:
-        html = htmlfile.readlines()
-        line = next((l for l in html if str in l), None)
-
-    return line
-
-def helper_parse_json_data(outfile):
-    """ extracts the data definition from the html file and parses the json data as python dict """
+        html = htmlfile.read()
     
-    substr = 'var data = '
-    data_line = helper_find_line(outfile, substr)
-    data = json.loads(data_line[data_line.find(substr) + len(substr) : data_line.rfind(';')])
-    
+    json_str = re.search(r'var data=(.*}),\w=window\.app', html).group(1)
+    data = json.loads(json_str)
+
     return data
 
 
@@ -145,7 +140,7 @@ def test_output_option():
     """ wtstats should use the specified filename with --output """
 
     outfile = '_foo_bar_baz.html'
-    helper_run_with_fixture({'--output': outfile, '--abstime': None})
+    helper_run_with_fixture({'--output': outfile})
     assert os.path.exists(os.path.join(test_dir, outfile))
     
 
@@ -186,49 +181,12 @@ def test_data_with_options():
     outfile = '_test_output_file.html'
     helper_run_with_fixture({'--output': outfile})
 
-    data = helper_parse_json_data(outfile)
-
+    data = helper_get_json_from_file(outfile)
     assert 'series' in data
-    assert 'chart' in data
-    assert 'xdata' in data
-
-    chart = data['chart']
-
-    assert 'extra' in chart
-    assert 'x_is_date' in chart
-    assert 'type' in chart
-    assert 'height' in chart
 
     serie = data['series'][0]
-
     assert 'values' in serie
     assert 'key' in serie
-    assert 'yAxis' in serie
-
-
-@with_setup(setUp, tearDown)
-def test_abstime_option():
-    """ wtstats should export unix epochs when running with --abstime """
-
-    outfile = '_test_output_file.html'
-    helper_run_with_fixture({'--output': outfile, '--abstime': None})
-    data = helper_parse_json_data(outfile)
-
-    assert data['chart']['extra']['x_axis_format'] == "%H:%M:%S"
-    assert data['chart']['x_is_date'] == True
-    assert type(data['xdata'][0]) == types.IntType
-    assert data['xdata'][0] > 1417700000000
-
-
-@with_setup(setUp, tearDown)
-def test_focus_option():
-    """ wtstats should create a lineWithFocusChart when using --focus """
-
-    outfile = '_test_output_file.html'
-    helper_run_with_fixture({'--output': outfile, '--focus': None})
-    data = helper_parse_json_data(outfile)
-
-    assert data['chart']['type'] == 'lineWithFocusChart'
 
 
 @with_setup(setUp, tearDown)
@@ -237,7 +195,7 @@ def test_include_option():
 
     outfile = '_test_output_file.html'
     helper_run_with_fixture({'--output': outfile, '--include': 'bytes'})
-    data = helper_parse_json_data(outfile)
+    data = helper_get_json_from_file(outfile)
 
     series_keys = map(lambda x: x['key'], data['series'])
     for key in series_keys:
@@ -251,7 +209,7 @@ def test_include_skip_prefix():
 
     outfile = '_test_output_file.html'
     helper_run_with_fixture({'--output': outfile, '--include': 'cache'})
-    data = helper_parse_json_data(outfile)
+    data = helper_get_json_from_file(outfile)
 
     series_keys = map(lambda x: x['key'], data['series'])
     for key in series_keys:
@@ -274,17 +232,6 @@ def test_list_option():
 
 
 @with_setup(setUp, tearDown)
-def test_right_option():
-    """ wtstats should create a multiChart with --right """
-
-    outfile = '_test_output_file.html'
-    helper_run_with_fixture({'--output': outfile, '--include': 'cache', '--right': 'conn'})
-
-    data = helper_parse_json_data(outfile)
-    assert data['chart']['type'] == 'multiChart'
-
-
-@with_setup(setUp, tearDown)
 def test_all_option():
     """ wtstats should create grouped html files with --all """
 
@@ -300,7 +247,7 @@ def test_all_option():
     assert './test/mystats.html' in files
 
 
-    data = helper_parse_json_data('mystats.transaction.html')
+    data = helper_get_json_from_file('mystats.transaction.html')
     series_keys = map(lambda x: x['key'], data['series'])
     for key in series_keys:
         assert key.startswith('transaction:')
