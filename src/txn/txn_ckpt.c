@@ -609,12 +609,11 @@ __checkpoint_worker(
 	was_modified = btree->modified;
 
 	/*
-	 * If logging is enabled and we checkpoint the file, a real checkpoint
-	 * LSN will be assigned later for this checkpoint and overwrite this.
-	 *
-	 * If logging is disabled, set the checkpoint LSN to the maximum LSN so
-	 * that recovery will never roll old changes forward over the
-	 * non-logged changed in this checkpoint.
+	 * Set the checkpoint LSN to the maximum LSN so that if logging is
+	 * disabled, recovery will never roll old changes forward over the
+	 * non-logged changes in this checkpoint.  If logging is enabled, a
+	 * real checkpoint LSN will be assigned later for this checkpoint and
+	 * overwrite this.
 	 */
 	WT_MAX_LSN(&ckptlsn);
 
