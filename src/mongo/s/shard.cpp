@@ -132,13 +132,6 @@ namespace mongo {
 
                 ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
 
-                if ( o[ ShardType::tags() ].type() == Array ) {
-                    vector<BSONElement> v = o[ ShardType::tags() ].Array();
-                    for ( unsigned j=0; j<v.size(); j++ ) {
-                        s->addTag( v[j].String() );
-                    }
-                }
-
                 _lookup[name] = s;
                 _installHost( host , s );
             }

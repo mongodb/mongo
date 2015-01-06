@@ -252,15 +252,18 @@ namespace mongo {
         // TODO: skip unresponsive shards and mark information as stale.
         //
 
-        vector<Shard> allShards;
-        Shard::getAllShards( allShards );
-        if ( allShards.size() < 2) {
+        ShardInfoMap shardInfo;
+        Status loadStatus = DistributionStatus::populateShardInfoMap(&shardInfo);
+
+        if (!loadStatus.isOK()) {
+            warning() << "failed to load shard metadata" << causedBy(loadStatus) << endl;
+            return;
+        }
+
+        if (shardInfo.size() < 2) {
             LOG(1) << "can't balance without more active shards" << endl;
             return;
         }
-        
-        ShardInfoMap shardInfo;
-        DistributionStatus::populateShardInfoMap(allShards, &shardInfo);
 
         OCCASIONALLY warnOnMultiVersion( shardInfo );
 
@@ -305,11 +308,10 @@ namespace mongo {
                 continue;
             }
 
-            for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ) {
+            for (ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i) {
                 // this just makes sure there is an entry in shardToChunksMap for every shard
-                Shard s = *i;
                 OwnedPointerVector<ChunkType>*& chunkList =
-                        shardToChunksMap.mutableMap()[s.getName()];
+                        shardToChunksMap.mutableMap()[i->first];
 
                 if (chunkList == NULL) {
                     chunkList = new OwnedPointerVector<ChunkType>();

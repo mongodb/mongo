@@ -187,13 +187,12 @@ namespace mongo {
         /** writes all state to log() */
         void dump() const;
         
-        static void populateShardInfoMap(const std::vector<Shard> allShards,
-                                         ShardInfoMap* shardInfo);
+        static Status populateShardInfoMap(ShardInfoMap* shardInfo);
 
         /**
          * Note: jumbo and versions are not set.
          */
-        static void populateShardToChunksMap(const std::vector<Shard>& allShards,
+        static void populateShardToChunksMap(const ShardInfoMap& allShards,
                                              const ChunkManager& chunkMgr,
                                              ShardToChunksMap* shardToChunksMap);
 
