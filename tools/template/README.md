@@ -2,7 +2,7 @@
 
 This subfolder contains the code to generate the `wtstats.html.template` file needed by the Python script `wtstats.py`, which is located in the `./tools` directory. 
 
-The template is generated as a node.js "single page" application using several open source frameworks, see [Dependencies](./tools/template/README.md#Dependencies) below. The `wtstats.py` Python script parses stats files, transforms the data and inserts it as JSON into the template. The resulting HTML page can be openend in the browser.
+The template is generated as a node.js "single page" application using several open source frameworks, see Dependencies below. The `wtstats.py` Python script parses stats files, transforms the data and inserts it as JSON into the template. The resulting HTML page can be openend in the browser.
 
 ### Build Process
 
