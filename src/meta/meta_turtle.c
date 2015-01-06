@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -37,7 +38,7 @@ __metadata_config(WT_SESSION_IMPL *session, char **metaconfp)
 	if (0) {
 err:		__wt_free(session, metaconf);
 	}
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -100,8 +101,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
-	__wt_scr_free(&key);
-	__wt_scr_free(&value);
+	__wt_scr_free(session, &key);
+	__wt_scr_free(session, &value);
 	return (ret);
 }
 
@@ -275,7 +276,7 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -331,6 +332,6 @@ err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 
 	if  (fh != NULL)
 		WT_TRET(__wt_close(session, fh));
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }

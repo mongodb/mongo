@@ -541,6 +541,9 @@ common_wiredtiger_open = [
         maximum expected number of sessions (including server
         threads)''',
         min='1'),
+    Config('session_scratch_max', '2MB', r'''
+        maximum memory to cache in each session''',
+        type='int', undoc=True),
     Config('transaction_sync', '', r'''
         how to sync log records when the transaction commits''',
         type='category', subconfig=[

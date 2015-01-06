@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -724,7 +725,7 @@ __split_multi_inmem(
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
 
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 	return (ret);
 }
 
@@ -1107,7 +1108,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	WT_ERR(__wt_row_ikey(
 	    session, 0, key->data, key->size, &child->key.ikey));
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
@@ -1317,7 +1318,7 @@ err:	if (split_ref[0] != NULL) {
 	}
 	if (right != NULL)
 		__wt_page_out(session, &right);
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 	return (ret);
 }
 

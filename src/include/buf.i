@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -119,12 +120,19 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
  *	Release a scratch buffer.
  */
 static inline void
-__wt_scr_free(WT_ITEM **bufp)
+__wt_scr_free(WT_SESSION_IMPL *session, WT_ITEM **bufp)
 {
 	WT_ITEM *buf;
 
 	if ((buf = *bufp) != NULL) {
 		*bufp = NULL;
+
+		if (session->scratch_cached + buf->memsize >=
+		    S2C(session)->session_scratch_max) {
+			__wt_free(session, buf->mem);
+			buf->memsize = 0;
+		} else
+			session->scratch_cached += buf->memsize;
 
 		buf->data = NULL;
 		buf->size = 0;

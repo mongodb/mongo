@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -118,7 +119,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	session = ds->session;
 	msg = ds->msg;
 
-	__wt_scr_free(&ds->tmp);
+	__wt_scr_free(session, &ds->tmp);
 
 	/*
 	 * Discard the buffer -- it shouldn't have anything in it, but might
@@ -127,7 +128,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	if (msg != NULL) {
 		if (msg->size != 0)
 			(void)__wt_msg(session, "%s", (char *)msg->mem);
-		__wt_scr_free(&ds->msg);
+		__wt_scr_free(session, &ds->msg);
 	}
 
 	/* Close any file we opened. */
@@ -207,7 +208,7 @@ __wt_debug_addr_print(
 	WT_RET(__wt_scr_alloc(session, 128, &buf));
 	fprintf(stderr, "%s\n",
 	    __wt_addr_string(session, addr, addr_size, buf));
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 
 	return (0);
 }
@@ -230,7 +231,7 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_ERR(bm->read(bm, session, buf, addr, addr_size));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -257,7 +258,7 @@ __wt_debug_offset_blind(
 	    session, S2BT(session)->bm->block, buf, offset));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -295,7 +296,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_bt_read(session, buf, addr, WT_PTRDIFF(endp, addr)));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -855,7 +856,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			__debug_row_skip(ds, insert);
 	}
 
-err:	__wt_scr_free(&key);
+err:	__wt_scr_free(session, &key);
 	return (ret);
 }
 
@@ -1023,7 +1024,7 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		__dmsg(ds, ", %s %s", type,
 		    __wt_addr_string(session, unpack->data, unpack->size, buf));
-		__wt_scr_free(&buf);
+		__wt_scr_free(session, &buf);
 		WT_RET(ret);
 		break;
 	}
@@ -1082,7 +1083,7 @@ __debug_cell_data(WT_DBG *ds,
 		    __wt_page_cell_data_ref(session, page, unpack, buf);
 		if (ret == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
-		__wt_scr_free(&buf);
+		__wt_scr_free(session, &buf);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

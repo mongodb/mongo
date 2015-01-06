@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -171,7 +172,7 @@ __wt_lsm_tree_bloom_name(WT_SESSION_IMPL *session,
 	    session, tmp, "file:%s-%06" PRIu32 ".bf", lsm_tree->filename, id));
 	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, retp));
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -191,7 +192,7 @@ __wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session,
 	    session, tmp, "file:%s-%06" PRIu32 ".lsm", lsm_tree->filename, id));
 	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, retp));
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -428,7 +429,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	if (0) {
 err:		WT_TRET(__lsm_tree_discard(session, lsm_tree, 0));
 	}
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
