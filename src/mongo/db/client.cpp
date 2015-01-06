@@ -432,6 +432,7 @@ namespace {
         fastmodinsert = false;
         upsert = false;
         keyUpdates = 0;  // unsigned, so -1 not possible
+        writeConflicts = 0;
         planSummary = "";
         execStats.reset();
         
@@ -501,6 +502,7 @@ namespace {
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
         OPDEBUG_TOSTRING_HELP( keyUpdates );
+        OPDEBUG_TOSTRING_HELP( writeConflicts );
         
         if ( extra.len() )
             s << " " << extra.str();
@@ -596,6 +598,7 @@ namespace {
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
+        OPDEBUG_APPEND_NUMBER( writeConflicts );
 
         b.appendNumber("numYield", curop.numYields());
 

@@ -288,10 +288,13 @@ namespace mongo {
     static Counter64 idhackCounter;
     static Counter64 scanAndOrderCounter;
     static Counter64 fastmodCounter;
+    static Counter64 writeConflictsCounter;
 
     static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
     static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
     static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
+    static ServerStatusMetricField<Counter64> displayWriteConflicts( "operation.writeConflicts",
+                                                                     &writeConflictsCounter );
 
     void OpDebug::recordStats() {
         if ( nreturned > 0 )
@@ -313,6 +316,8 @@ namespace mongo {
             scanAndOrderCounter.increment();
         if ( fastmod )
             fastmodCounter.increment();
+        if ( writeConflicts )
+            writeConflictsCounter.increment( writeConflicts );
     }
 
     CurOp::MaxTimeTracker::MaxTimeTracker() {

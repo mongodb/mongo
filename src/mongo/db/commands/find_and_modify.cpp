@@ -130,6 +130,7 @@ namespace mongo {
                     break;
                 }
                 catch (const WriteConflictException&) {
+                    txn->getCurOp()->debug().writeConflicts++;
                     if ( attempt++ > 1 ) {
                         log() << "got WriteConflictException on findAndModify for " << ns
                               <<  " retrying attempt: " << attempt;

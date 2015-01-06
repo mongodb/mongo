@@ -781,21 +781,27 @@ namespace mongo {
 
             // Do the update and return.
             BSONObj reFetched;
-            while ( 1 ) {
+            int attempt = 1;
+            while ( attempt++ ) {
                 try {
                     transformAndUpdate(reFetched.isEmpty() ? oldObj : reFetched , loc);
                     break;
                 }
                 catch ( const WriteConflictException& de ) {
-                    if ( !_params.request->isMulti() ) {
-                        // We don't handle this here as we handle at the top level
-                        throw;
-                    }
+                    _params.opDebug->writeConflicts++;
 
-                    log() << "Had WriteConflict in the middle of a multi-update, "
-                          << "retrying the current update";
+                    WriteConflictException::logAndBackoff( attempt,
+                                                           "multi-update",
+                                                           _collection->ns().ns() );
 
                     _txn->recoveryUnit()->commitAndRestart();
+
+                    if ( attempt > 2 ) {
+                        // This means someone else is in this same loop trying to update
+                        // the same doc.  Lets make sure we give them a chance to finish.
+                        pthread_yield();
+                    }
+
                     if ( !_collection->findDoc( _txn, loc, &reFetched ) ) {
                         // document was deleted, we're done here
                         break;

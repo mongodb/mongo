@@ -1282,8 +1282,9 @@ namespace mongo {
                 continue;
             }
 
+            OpDebug* debug = &txn->getCurOp()->debug();
+
             try {
-                OpDebug* debug = &txn->getCurOp()->debug();
                 invariant(collection);
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
@@ -1304,6 +1305,7 @@ namespace mongo {
                 result->getStats().upsertedID = resUpsertedID;
             }
             catch ( const WriteConflictException& dle ) {
+                debug->writeConflicts++;
                 if ( isMulti ) {
                     log() << "Had WriteConflict during multi update, aborting";
                     throw;
@@ -1390,6 +1392,7 @@ namespace mongo {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
+                txn->getCurOp()->debug().writeConflicts++;
                 WriteConflictException::logAndBackoff( attempt++, "delete", nss.ns() );
             }
             catch ( const DBException& ex ) {

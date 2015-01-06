@@ -608,6 +608,7 @@ namespace {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
+                op.debug().writeConflicts++;
                 if ( multi ) {
                     log(LogComponent::kWrite) << "Had WriteConflict during multi update, aborting";
                     throw;
@@ -711,6 +712,7 @@ namespace {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
+                op.debug().writeConflicts++;
                 WriteConflictException::logAndBackoff( attempt++, "delete", ns.toString() );
             }
         }

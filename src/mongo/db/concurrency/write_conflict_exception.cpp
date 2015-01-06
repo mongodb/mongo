@@ -52,20 +52,19 @@ namespace mongo {
                                                const StringData& operation,
                                                const StringData& ns) {
 
-        bool logByDefault = attempt > 3;
-        LOG(logByDefault ? 0 : 1) << "Caught WriteConflictException doing " << operation
-                                  << " on " << ns
-                                  << ", attempt: " << attempt << " retrying";
+        LOG(1) << "Caught WriteConflictException doing " << operation
+               << " on " << ns
+               << ", attempt: " << attempt << " retrying";
 
         // All numbers below chosen by guess and check against a few random benchmarks.
-        if (attempt < 2) {
-            // do nothing
+        if (attempt < 4) {
+            // no-op
         }
-        else if (attempt < 5) {
+        else if (attempt < 10) {
             sleepmillis(1);
         }
         else if (attempt < 100) {
-            sleepmillis(2);
+            sleepmillis(5);
         }
         else {
             sleepmillis(10);
