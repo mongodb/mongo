@@ -142,7 +142,7 @@ namespace mongo {
                                          " tracking";
                                 OIDMemberMap::iterator removeItr = itr;
                                 ++itr;
-                                _slaveMap.erase(_slaveMap.find(removeItr->first));
+                                _slaveMap.erase(removeItr->first);
                                 _members.erase(removeItr);
                                 continue;
                             }
