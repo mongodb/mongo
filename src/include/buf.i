@@ -132,7 +132,7 @@ __wt_scr_free(WT_SESSION_IMPL *session, WT_ITEM **bufp)
 			__wt_free(session, buf->mem);
 			buf->memsize = 0;
 		} else
-                        session->scratch_cached += buf->memsize;
+			session->scratch_cached += buf->memsize;
 
 		buf->data = NULL;
 		buf->size = 0;
