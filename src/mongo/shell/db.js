@@ -869,7 +869,7 @@ DB.prototype.serverBuildInfo = function(){
 }
 
 // Used to trim entries from the metrics.commands that have never been executed
-pruneServerStatus = function(tree) {
+getActiveCommands = function(tree) {
     var result = { };
     for (var i in tree) {
         if (!tree.hasOwnProperty(i))
@@ -887,7 +887,7 @@ pruneServerStatus = function(tree) {
             continue;
         }
         // Handles nested commands
-        var subStatus = pruneServerStatus(tree[i]);
+        var subStatus = getActiveCommands(tree[i]);
         if (Object.keys(subStatus).length > 0) {
             result[i] = tree[i];
         }
@@ -901,7 +901,10 @@ DB.prototype.serverStatus = function( options ){
         Object.extend( cmd, options );
     }
     var res = this._adminCommand( cmd );
-    res.metrics.commands = pruneServerStatus(res.metrics.commands);
+    // Only prune if we have a metrics tree with commands.
+    if (res.metrics && res.metrics.commands) {
+            res.metrics.commands = getActiveCommands(res.metrics.commands);
+    }
     return res;
 }
 
