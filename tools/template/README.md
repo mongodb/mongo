@@ -10,7 +10,7 @@ To build the template, follow these steps:
 
 1. change into the `./tools/template` directory
 2. run `npm install` to install all missing dependencies. 
-3. run `gulp pack`. It will build the template, pack everything into a single HTML file and copy it to its parent folder as `./tools/wtstats.html.template`. 
+3. run `npm run build` to build the template, pack everything into a single HTML file and copy it to its parent folder as `./tools/wtstats.html.template`. 
 
 ### Usage
 

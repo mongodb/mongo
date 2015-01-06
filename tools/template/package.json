@@ -4,7 +4,7 @@
   "description": "create a WiredTiger stats .html template",
   "main": "index.js",
   "scripts": {
-    "start": "gulp"
+    "build": "gulp pack"
   },
   "author": "Thomas Rueckstiess <thomas@rueckstiess.net>",
   "license": "",
