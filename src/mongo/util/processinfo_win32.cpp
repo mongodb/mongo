@@ -33,7 +33,6 @@
 
 #include <iostream>
 #include <psapi.h>
-#include <shlobj.h>
 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"
@@ -133,8 +132,8 @@ namespace mongo {
         }
 
         UINT size;
-        LPBYTE lpBuffer;
-        if (VerQueryValueA(verData.get(), "\\", (LPVOID *)&lpBuffer, &size) == 0) {
+        VS_FIXEDFILEINFO *verInfo;
+        if (VerQueryValueA(verData.get(), "\\", (LPVOID *)&verInfo, &size) == 0) {
             DWORD gle = GetLastError();
             warning() << "VerQueryValueA on " << filePath << " failed with " << errnoWithDescription(gle);
             return false;
@@ -145,7 +144,6 @@ namespace mongo {
             return false;
         }
 
-        VS_FIXEDFILEINFO *verInfo = (VS_FIXEDFILEINFO *)lpBuffer;
         fileVersionMS = verInfo->dwFileVersionMS;
         fileVersionLS = verInfo->dwFileVersionLS;
         return true;
@@ -155,22 +153,25 @@ namespace mongo {
     // is installed, zeroing out data files is unnecessary. The file version numbers used below
     // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
     bool isKB2731284OrLaterUpdateInstalled() {
-        char systemRoot[MAX_PATH];
-        if (FAILED(SHGetSpecialFolderPathA(NULL, systemRoot, CSIDL_SYSTEM, FALSE))) {
+        char systemDirectory[MAX_PATH];
+        if (!GetSystemDirectoryA(systemDirectory, sizeof(systemDirectory))) {
             DWORD gle = GetLastError();
-            warning() << "SHGetSpecialFolderPathA on CSIDL_SYSTEM failed with " << errnoWithDescription(gle);
+            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
             return false;
         }
 
-        string ntfsDotSysPath = systemRoot;
-        ntfsDotSysPath.append("\\drivers\\ntfs.sys");
+        string ntfsDotSysPath = systemDirectory;
+        if (ntfsDotSysPath.back() != '\\') {
+            ntfsDotSysPath.append("\\");
+        }
+        ntfsDotSysPath.append("drivers\\ntfs.sys");
         DWORD fileVersionMS;
         DWORD fileVersionLS;
         if (getFileVersion(ntfsDotSysPath.c_str(), fileVersionMS, fileVersionLS)) {
-            WORD fileVersionFirstNumber = (fileVersionMS >> 16) & 0xffff;
-            WORD fileVersionSecondNumber = fileVersionMS & 0xffff;
-            WORD fileVersionThirdNumber = (fileVersionLS >> 16) & 0xffff;
-            WORD fileVersionFourthNumber = fileVersionLS & 0xffff;
+            WORD fileVersionFirstNumber = HIWORD(fileVersionMS);
+            WORD fileVersionSecondNumber = LOWORD(fileVersionMS);
+            WORD fileVersionThirdNumber = HIWORD(fileVersionLS);
+            WORD fileVersionFourthNumber = LOWORD(fileVersionLS);
 
             if (fileVersionFirstNumber == 6 && fileVersionSecondNumber == 1 && fileVersionThirdNumber == 7600 &&
                     fileVersionFourthNumber >= 21296 && fileVersionFourthNumber <= 21999) {
