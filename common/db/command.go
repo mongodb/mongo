@@ -142,8 +142,7 @@ func (sp *SessionProvider) SupportsRepairCursor(db, collection string) (bool, er
 	}
 	if strings.Index(err.Error(), "no such cmd: repairCursor") > -1 {
 		// return a helpful error message for early server versions
-		return false, fmt.Errorf(
-			"--repair flag cannot be used on mongodb versions before 2.7.8.")
+		return false, fmt.Errorf("--repair flag cannot be used on mongodb versions before 2.7.8")
 	}
 	if strings.Index(err.Error(), "repair iterator not supported") > -1 {
 		// helpful error message if the storage engine does not support repair (WiredTiger)

@@ -15,37 +15,22 @@ Report any bugs, improvements, or new feature requests at https://jira.mongodb.o
 
  
 ####Setup
-
-Clone the repo and set your GOPATH to include the vendored dependencies by using the helper script `set_gopath.sh`
+Clone the repo and run `. ./set_gopath.sh` (`set_gopath.bat` on Windows) to setup your GOPATH:
 
 ```
 git clone https://github.com/mongodb/mongo-tools
 cd mongo-tools
-. set_gopath.sh
+. ./set_gopath.sh
 ```
 
 #### Building Tools
+To build the tools, you need to have Go version 1.3 and up.
 
-To build the tools, you need to have Go version 1.3 and up. Running the `build.sh` script will install all the tools to `./bin`.
-
-Alternatively, you can set GOBIN and use `go install`:
-
-```
-export GOBIN=bin
-go install mongodump/main/mongodump.go
-```
-
-An additional flag, `-tags`, can be passed to the `go install` command in order to install the tools with support for SSL and/or SASL. For example:
+An additional flag, `-tags`, can be passed to the `go build` command in order to build the tools with support for SSL and/or SASL. For example:
 
 ```
-go install -tags ssl mongoimport/main/mongoimport.go # install mongoimport with SSL support enabled
-go install -tags sasl mongoimport/main/mongoimport.go # install mongoimport with SASL support enabled
-go install -tags "ssl sasl" mongoimport/main/mongoimport.go # install mongoimport with both SASL and SSL
-```
-
-Alternatively, you can run `build.sh` with the appropriate arguments. For example:
-
-```
-build.sh ssl # install all the tools with SSL support enabled
-build.sh sasl ssl # install all the tools with both SASL and SSL support enabled
+mkdir bin
+go build -o bin/mongoimport mongoimport/main/mongoimport.go # build mongoimport
+go build -o bin/mongoimport -tags ssl mongoimport/main/mongoimport.go # build mongoimport with SSL support enabled
+go build -o bin/mongoimport -tags "ssl sasl" mongoimport/main/mongoimport.go # build mongoimport with SSL and SASL support enabled
 ```

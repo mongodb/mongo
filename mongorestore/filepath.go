@@ -78,9 +78,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 		}
 	}
 	if restore.InputOptions.OplogReplay && !foundOplog {
-		return fmt.Errorf(
-			"no %v/oplog.bson file to replay; make sure you run mongodump with --oplog.",
-			fullpath)
+		return fmt.Errorf("no %v/oplog.bson file to replay; make sure you run mongodump with --oplog", fullpath)
 	}
 	return nil
 }
@@ -104,7 +102,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 			collection, fileType := GetInfoFromFilename(entry.Name())
 			switch fileType {
 			case BSONFileType:
-				// Dumps of a single database (i.e. with the -d flag) may contain special 
+				// Dumps of a single database (i.e. with the -d flag) may contain special
 				// db-specific collections that start with a "$" (for example, $admin.system.users
 				// holds the users for a database that was dumped with --dumpDbUsersAndRoles enabled).
 				// If these special files manage to be included in a dump directory during a full

@@ -314,7 +314,6 @@ functions:
     params:
       working_dir: src
       script: |
-        chmod 700 go.sh
         chmod 700 set_gopath.sh
 
   "run tool unit tests":
@@ -919,7 +918,7 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          retVal=$(./go.sh run vendor/src/github.com/3rf/mongo-lint/golint/golint.go src);
+          retVal=$(. ./set_gopath.sh && go run vendor/src/github.com/3rf/mongo-lint/golint/golint.go mongo* bson* common/*);
           if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
 
 - name: log
@@ -1185,7 +1184,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          retVal=$(./go.sh tool vet .); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
+          retVal=$(. ./set_gopath.sh && go tool vet .); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
 
 buildvariants:
 #######################################

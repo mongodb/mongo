@@ -419,8 +419,8 @@ func (mongoImport *MongoImport) runInsertionWorker(readDocChan chan bson.D) (err
 	}
 	collection := session.DB(mongoImport.ToolOptions.DB).C(mongoImport.ToolOptions.Collection)
 	ignoreBlanks := mongoImport.IngestOptions.IgnoreBlanks && mongoImport.InputOptions.Type != JSON
-	documentBytes := make([]byte, 0)
-	documents := make([]bson.Raw, 0)
+	var documentBytes []byte
+	var documents []bson.Raw
 	numMessageBytes := 0
 
 readLoop:
@@ -481,7 +481,7 @@ func (mongoImport *MongoImport) handleUpsert(documents []bson.Raw, collection *m
 			_, err = collection.Upsert(selector, document)
 		}
 		if err == nil {
-			numInserted += 1
+			numInserted++
 		}
 		if err = filterIngestError(stopOnError, err); err != nil {
 			return numInserted, err
@@ -507,34 +507,33 @@ func (mongoImport *MongoImport) insert(documents []bson.Raw, collection *mgo.Col
 	if mongoImport.IngestOptions.Upsert {
 		numInserted, err = mongoImport.handleUpsert(documents, collection)
 		return err
-	} else {
-		if len(documents) == 0 {
-			return
-		}
-		bulk := collection.Bulk()
-		for _, document := range documents {
-			bulk.Insert(document)
-		}
-		if !maintainInsertionOrder {
-			bulk.Unordered()
-		}
+	}
+	if len(documents) == 0 {
+		return
+	}
+	bulk := collection.Bulk()
+	for _, document := range documents {
+		bulk.Insert(document)
+	}
+	if !maintainInsertionOrder {
+		bulk.Unordered()
+	}
 
-		// mgo.Bulk doesn't currently implement write commands so mgo.BulkResult
-		// isn't informative
-		_, err = bulk.Run()
+	// mgo.Bulk doesn't currently implement write commands so mgo.BulkResult
+	// isn't informative
+	_, err = bulk.Run()
 
-		// TOOLS-349: Note that this count may not be entirely accurate if some
-		// ingester workers insert when another errors out.
-		//
-		// Without write commands, we can't say for sure how many documents
-		// were inserted when we use bulk inserts so we assume the entire batch
-		// insert failed if an error is returned. The result is that we may
-		// report that less documents - than were actually inserted - were
-		// inserted into the database. This will change as soon as BulkResults
-		// are supported by the driver
-		if err == nil {
-			numInserted = len(documents)
-		}
+	// TOOLS-349: Note that this count may not be entirely accurate if some
+	// ingester workers insert when another errors out.
+	//
+	// Without write commands, we can't say for sure how many documents
+	// were inserted when we use bulk inserts so we assume the entire batch
+	// insert failed if an error is returned. The result is that we may
+	// report that less documents - than were actually inserted - were
+	// inserted into the database. This will change as soon as BulkResults
+	// are supported by the driver
+	if err == nil {
+		numInserted = len(documents)
 	}
 	return filterIngestError(stopOnError, err)
 }
