@@ -60,15 +60,10 @@ namespace mongo {
         globalEnvironmentExperiment = newGlobalEnvironment;
     }
 
-    bool supportsDocLocking() {
-        if (hasGlobalEnvironment()) {
-            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            if (globalStorageEngine != NULL) {
-                return globalStorageEngine->supportsDocLocking();
-            }
-        }
+    bool _supportsDocLocking = false;
 
-        return false;
+    bool supportsDocLocking() {
+        return _supportsDocLocking;
     }
 
     bool isMMAPV1() {

@@ -65,6 +65,8 @@ namespace mongo {
         return _storageEngine;
     }
 
+    extern bool _supportsDocLocking;
+
     void GlobalEnvironmentMongoD::setGlobalStorageEngine(const std::string& name) {
         // This should be set once.
         invariant(!_storageEngine);
@@ -106,6 +108,8 @@ namespace mongo {
         StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, canonicalName);
 
         guard.Dismiss();
+
+        _supportsDocLocking = _storageEngine->supportsDocLocking();
     }
 
     void GlobalEnvironmentMongoD::shutdownGlobalStorageEngineCleanly() {
