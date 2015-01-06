@@ -464,12 +464,15 @@ namespace mongo {
             }
         }
 
+        // Gather the list of collections to clone
         list<BSONObj> toClone;
-        if ( clonedColls ) clonedColls->clear();
+        if (clonedColls) {
+            clonedColls->clear();
+        }
+
         {
-            /* todo: we can put these releases inside dbclient or a dbclient specialization.
-               or just wait until we get rid of global lock anyway.
-               */
+            // getCollectionInfos may make a remote call, which may block indefinitely, so release
+            // the global lock that we are entering with.
             Lock::TempRelease tempRelease(txn->lockState());
 
             list<BSONObj> raw = _conn->getCollectionInfos( opts.fromDB );
@@ -496,7 +499,7 @@ namespace mongo {
                 verify( !e.eoo() );
                 verify( e.type() == String );
 
-                NamespaceString ns( opts.fromDB, e.valuestr() );
+                const NamespaceString ns(opts.fromDB, e.valuestr());
 
                 if( ns.isSystem() ) {
                     /* system.users and s.js is cloned -- but nothing else from system.
@@ -519,7 +522,10 @@ namespace mongo {
                     LOG(2) << "\t\t not ignoring collection " << ns;
                 }
 
-                if ( clonedColls ) clonedColls->insert( ns.ns() );
+                if (clonedColls) {
+                    clonedColls->insert(ns.ns());
+                }
+
                 toClone.push_back( collection.getOwned() );
             }
         }
@@ -531,27 +537,29 @@ namespace mongo {
                 const char* collectionName = collection["name"].valuestr();
                 BSONObj options = collection.getObjectField("options");
 
-                NamespaceString from_name( opts.fromDB, collectionName );
-                NamespaceString to_name( toDBName, collectionName );
+                const NamespaceString from_name(opts.fromDB, collectionName);
+                const NamespaceString to_name(toDBName, collectionName);
 
-                Database* db;
+                Database* db = dbHolder().openDb(txn, toDBName);
+
                 {
                     WriteUnitOfWork wunit(txn);
-                    // Copy releases the lock, so we need to re-load the database. This should
-                    // probably throw if the database has changed in between, but for now preserve
-                    // the existing behaviour.
-                    db = dbHolder().openDb(txn, toDBName);
 
                     // we defer building id index for performance - building it in batch is much
                     // faster
-                    Status createStatus = userCreateNS( txn, db, to_name.ns(), options,
-                                                        opts.logForRepl, false );
+                    Status createStatus = userCreateNS(txn,
+                                                       db,
+                                                       to_name.ns(),
+                                                       options,
+                                                       opts.logForRepl,
+                                                       false);
                     if ( !createStatus.isOK() ) {
                         errmsg = str::stream() << "failed to create collection \""
                                                << to_name.ns() << "\": "
                                                << createStatus.reason();
                         return false;
                     }
+
                     wunit.commit();
                 }
 
@@ -571,6 +579,9 @@ namespace mongo {
                      opts.mayBeInterrupted,
                      q);
 
+                // Copy releases the lock, so we need to re-load the database. This should
+                // probably throw if the database has changed in between, but for now preserve
+                // the existing behaviour.
                 db = dbHolder().get(txn, toDBName);
                 uassert(18645,
                         str::stream() << "database " << toDBName << " dropped during clone",

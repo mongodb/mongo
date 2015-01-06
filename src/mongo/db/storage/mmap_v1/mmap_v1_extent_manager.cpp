@@ -174,6 +174,18 @@ namespace mongo {
             _files.push_back( df.release() );
         }
 
+        // If this is a new database being created, instantiate the first file and one extent so
+        // we can have a coherent database.
+        if (_files.empty()) {
+            WriteUnitOfWork wuow(txn);
+            _createExtent(txn, initialSize(128), false);
+            wuow.commit();
+
+            // Commit the journal and all changes to disk so that even if exceptions occur during
+            // subsequent initialization, we won't have uncommited changes during file close.
+            getDur().commitNow(txn);
+        }
+
         return Status::OK();
     }
 

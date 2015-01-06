@@ -150,7 +150,7 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
-    NOINLINE_DECL void NamespaceIndex::init(OperationContext* txn) {
+    void NamespaceIndex::init(OperationContext* txn) {
         invariant(!_ht.get());
 
         unsigned long long len = 0;
@@ -223,12 +223,16 @@ namespace mongo {
             }
 
             if (_f.create(pathString, l, true)) {
-                // The writes done in this function must not be rolled back. If the containing
-                // UnitOfWork rolls back it should roll back to the state *after* these writes. This
-                // will leave the file empty, but available for future use. That is why we go
-                // directly to the global dur dirty list rather than going through the
-                // OperationContext.
-                getDur().createdFile(pathString, l); // always a new file
+                // The writes done in this function must not be rolled back. This will leave the
+                // file empty, but available for future use. That is why we go directly to the
+                // global dur dirty list rather than going through the OperationContext.
+                getDur().createdFile(pathString, l);
+
+                // Commit the journal and all changes to disk so that even if exceptions occur
+                // during subsequent initialization, we won't have uncommited changes during file
+                // close.
+                getDur().commitNow(txn);
+
                 len = l;
                 invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);
 

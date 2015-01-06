@@ -168,32 +168,20 @@ namespace {
         invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
         try {
-            _init( txn );
+            // First init the .ns file. If this fails, we may leak the .ns file, but this is OK
+            // because subsequent openDB will go through this code path again.
+            _namespaceIndex.init(txn);
 
-            std::list<std::string> namespaces;
-            _namespaceIndex.getCollectionNamespaces( &namespaces );
-            for ( std::list<std::string>::const_iterator i = namespaces.begin();
-                  i != namespaces.end(); // we add to the list in the loop so can't cache end().
-                  ++i ) {
-
-                const std::string& ns = *i;
-                Entry*& entry = _collections[ns];
-
-                // Entry was already loaded for system.indexes and system.namespaces in _init. That
-                // is ok, since they can't have indexes on them anyway.
-                if (!entry) {
-                    entry = new Entry();
-                    _insertInCache(txn, ns, entry);
-
-                    // Add the indexes on this namespace to the list of namespaces to load.
-                    std::vector<std::string> indexNames;
-                    entry->catalogEntry->getAllIndexes(txn, &indexNames);
-                    for (size_t i = 0; i < indexNames.size(); i++) {
-                        namespaces.push_back(
-                            IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
-                    }
-                }
+            // Initialize the extent manager. This will create the first data file (.0) if needed
+            // and if this fails we would leak the .ns file above. Leaking the .ns or .0 file is
+            // acceptable, because subsequent openDB calls will exercise the code path again.
+            Status s = _extentManager.init(txn);
+            if (!s.isOK()) {
+                msgasserted(16966, str::stream() << "_extentManager.init failed: " << s.toString());
             }
+
+            // This is the actual loading of the on-disk structures into cache.
+            _init( txn );
         }
         catch (const DBException& dbe) {
             warning() << "database " << path << " " << name
@@ -515,15 +503,6 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
-        // First init the .ns file
-        _namespaceIndex.init(txn);
-
-        // Initialize the extent manager
-        Status s = _extentManager.init(txn);
-        if (!s.isOK()) {
-            msgasserted(16966, str::stream() << "_extentManager.init failed: " << s.toString());
-        }
-
         WriteUnitOfWork wunit(txn);
 
         // Upgrade freelist
@@ -584,10 +563,6 @@ namespace {
                                                                md,
                                                                &_extentManager,
                                                                false));
-
-            if (nsEntry->recordStore->storageSize(txn) == 0) {
-                nsEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
-            }
         }
 
         if (!indexEntry) {
@@ -603,10 +578,6 @@ namespace {
                                                                   md,
                                                                   &_extentManager,
                                                                   true));
-
-            if (indexEntry->recordStore->storageSize(txn) == 0) {
-                indexEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
-            }
         }
 
         if (isSystemIndexesGoingToBeNew) {
@@ -630,6 +601,37 @@ namespace {
         }
 
         wunit.commit();
+
+        // Now put everything in the cache of namespaces. None of the operations below do any
+        // transactional operations.
+        std::list<std::string> namespaces;
+        _namespaceIndex.getCollectionNamespaces(&namespaces);
+
+        for (std::list<std::string>::const_iterator i = namespaces.begin();
+             i != namespaces.end(); // we add to the list in the loop so can't cache end().
+             i++) {
+
+            const std::string& ns = *i;
+            Entry*& entry = _collections[ns];
+
+            // The two cases where entry is not null is for system.indexes and system.namespaces,
+            // which we manually instantiated above. It is OK to skip these two collections,
+            // because they don't have indexes on them anyway.
+            if (entry) {
+                continue;
+            }
+
+            entry = new Entry();
+            _insertInCache(txn, ns, entry);
+
+            // Add the indexes on this namespace to the list of namespaces to load.
+            std::vector<std::string> indexNames;
+            entry->catalogEntry->getAllIndexes(txn, &indexNames);
+
+            for (size_t i = 0; i < indexNames.size(); i++) {
+                namespaces.push_back(IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
+            }
+        }
     }
 
     Status MMAPV1DatabaseCatalogEntry::createCollection( OperationContext* txn,

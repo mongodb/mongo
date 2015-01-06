@@ -581,8 +581,9 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
+
+            WriteUnitOfWork wunit(txn);
 
             // Create collection.
             status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
