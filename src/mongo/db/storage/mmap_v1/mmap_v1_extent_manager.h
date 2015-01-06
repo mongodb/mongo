@@ -188,7 +188,7 @@ namespace mongo {
                                      int size,
                                      bool enforceQuota );
 
-        boost::filesystem::path fileName( int n ) const;
+        boost::filesystem::path _fileName(int n) const;
 
 // -----
 

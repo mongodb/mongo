@@ -176,8 +176,8 @@ namespace mongo {
 
         const std::string _path;
 
-        MmapV1ExtentManager _extentManager;
         NamespaceIndex _namespaceIndex;
+        MmapV1ExtentManager _extentManager;
         CollectionMap _collections;
     };
 }

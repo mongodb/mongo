@@ -150,28 +150,40 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
-    NOINLINE_DECL void NamespaceIndex::init( OperationContext* txn ) {
+    NOINLINE_DECL void NamespaceIndex::init(OperationContext* txn) {
         invariant(!_ht.get());
 
         unsigned long long len = 0;
-        boost::filesystem::path nsPath = path();
-        string pathString = nsPath.string();
-        void *p = 0;
-        if ( boost::filesystem::exists(nsPath) ) {
-            if( _f.open(pathString, true) ) {
+
+        const boost::filesystem::path nsPath = path();
+        const std::string pathString = nsPath.string();
+
+        void* p = 0;
+
+        if (boost::filesystem::exists(nsPath)) {
+            if (_f.open(pathString, true)) {
                 len = _f.length();
-                if ( len % (1024*1024) != 0 ) {
-                    log() << "bad .ns file: " << pathString << endl;
-                    uassert( 10079 ,  "bad .ns file length, cannot open database", len % (1024*1024) == 0 );
+
+                if (len % (1024 * 1024) != 0) {
+                    StringBuilder sb;
+                    sb << "Invalid length: " << len
+                       << " for .ns file: " << pathString << ". Cannot open database";
+
+                    log() << sb.str();
+                    uassert(10079, sb.str(), len % (1024 * 1024) == 0);
                 }
+
                 p = _f.getView();
             }
         }
         else {
             // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
-            massert(10343, "bad mmapv1GlobalOptions.lenForNewNsFiles",
+            massert(10343,
+                    "bad mmapv1GlobalOptions.lenForNewNsFiles",
                     mmapv1GlobalOptions.lenForNewNsFiles >= 1024*1024);
+
             maybeMkdir();
+
             unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
             log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
 
@@ -183,10 +195,15 @@ namespace mongo {
 
                 File file;
                 file.open(pathString.c_str());
-                massert(18825, str::stream() << "couldn't create file " << pathString, file.is_open());
-                for (fileofs ofs = 0; ofs < l && !file.bad(); ofs += kBlockSize ) {
+
+                massert(18825,
+                        str::stream() << "couldn't create file " << pathString,
+                        file.is_open());
+
+                for (fileofs ofs = 0; ofs < l && !file.bad(); ofs += kBlockSize) {
                     file.write(ofs, &zeros[0], kBlockSize);
                 }
+
                 if (file.bad()) {
                     try {
                         boost::filesystem::remove(pathString);
@@ -199,10 +216,13 @@ namespace mongo {
                 else {
                     file.fsync();
                 }
-                massert(18826, str::stream() << "failure writing file " << pathString, !file.bad() );
+
+                massert(18826,
+                        str::stream() << "failure writing file " << pathString,
+                        !file.bad());
             }
 
-            if ( _f.create(pathString, l, true) ) {
+            if (_f.create(pathString, l, true)) {
                 // The writes done in this function must not be rolled back. If the containing
                 // UnitOfWork rolls back it should roll back to the state *after* these writes. This
                 // will leave the file empty, but available for future use. That is why we go
@@ -210,10 +230,11 @@ namespace mongo {
                 // OperationContext.
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
-                verify(len == mmapv1GlobalOptions.lenForNewNsFiles);
+                invariant(len == mmapv1GlobalOptions.lenForNewNsFiles);
+
                 p = _f.getView();
 
-                if ( p ) {
+                if (p) {
                     // we do this so the durability system isn't mad at us for
                     // only initiating file and not doing a write
                     // grep for 17388
@@ -223,11 +244,11 @@ namespace mongo {
         }
 
         if (p == 0) {
-            log() << "error couldn't open file " << pathString << " terminating" << endl;
+            severe() << "error couldn't open file " << pathString << " terminating" << endl;
             invariant(false);
         }
 
-        invariant( len <= 0x7fffffff );
+        invariant(len <= 0x7fffffff);
         _ht.reset(new NamespaceHashTable(p, (int) len, "namespace index"));
     }
 

@@ -114,7 +114,7 @@ namespace mongo {
         _recordAccessTracker = &mmapEngine->getRecordAccessTracker();
     }
 
-    boost::filesystem::path MmapV1ExtentManager::fileName( int n ) const {
+    boost::filesystem::path MmapV1ExtentManager::_fileName(int n) const {
         stringstream ss;
         ss << _dbname << '.' << n;
         boost::filesystem::path fullName( _path );
@@ -126,14 +126,15 @@ namespace mongo {
 
 
     Status MmapV1ExtentManager::init(OperationContext* txn) {
-        verify(_files.empty());
+        invariant(_files.empty());
 
-        for ( int n = 0; n < DiskLoc::MaxFiles; n++ ) {
-            boost::filesystem::path fullName = fileName( n );
-            if ( !boost::filesystem::exists( fullName ) )
+        for (int n = 0; n < DiskLoc::MaxFiles; n++) {
+            const boost::filesystem::path fullName = _fileName(n);
+            if (!boost::filesystem::exists(fullName)) {
                 break;
+            }
 
-            string fullNameString = fullName.string();
+            const std::string fullNameString = fullName.string();
 
             {
                 // If the file is uninitialized we exit the loop because it is just prealloced. We
@@ -143,22 +144,25 @@ namespace mongo {
                 File preview;
                 preview.open(fullNameString.c_str(), /*readOnly*/ true);
                 invariant(preview.is_open());
-                if (preview.len() < sizeof(DataFileHeader))
-                    break; // can't be initialized if too small.
+
+                // File can't be initialized if too small.
+                if (preview.len() < sizeof(DataFileHeader)) {
+                    break;
+                }
 
                 // This is the equivalent of DataFileHeader::uninitialized().
                 int version;
                 preview.read(0, reinterpret_cast<char*>(&version), sizeof(version));
                 invariant(!preview.bad());
-                if (version == 0)
+                if (version == 0) {
                     break;
-
+                }
             }
 
-            auto_ptr<DataFile> df( new DataFile(n) );
+            auto_ptr<DataFile> df(new DataFile(n));
 
             Status s = df->openExisting(fullNameString.c_str());
-            if ( !s.isOK() ) {
+            if (!s.isOK()) {
                 return s;
             }
 
@@ -213,7 +217,7 @@ namespace mongo {
 
         {
             auto_ptr<DataFile> allocFile(new DataFile(allocFileId));
-            const string allocFileName = fileName(allocFileId).string();
+            const string allocFileName = _fileName(allocFileId).string();
 
             Timer t;
 
@@ -232,7 +236,7 @@ namespace mongo {
         // Preallocate is asynchronous
         if (preallocateNextFile) {
             auto_ptr<DataFile> nextFile(new DataFile(allocFileId + 1));
-            const string nextFileName = fileName(allocFileId + 1).string();
+            const string nextFileName = _fileName(allocFileId + 1).string();
 
             nextFile->open(txn, nextFileName.c_str(), minSize, false);
         }
@@ -246,9 +250,11 @@ namespace mongo {
     }
 
     long long MmapV1ExtentManager::fileSize() const {
-        long long size=0;
-        for ( int n = 0; boost::filesystem::exists( fileName(n) ); n++)
-            size += boost::filesystem::file_size( fileName(n) );
+        long long size = 0;
+        for (int n = 0; boost::filesystem::exists(_fileName(n)); n++) {
+            size += boost::filesystem::file_size(_fileName(n));
+        }
+
         return size;
     }
 

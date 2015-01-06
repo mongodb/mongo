@@ -162,8 +162,8 @@ namespace {
                                                             bool transient )
         : DatabaseCatalogEntry( name ),
           _path( path.toString() ),
-          _extentManager( name, path, directoryPerDB ),
-          _namespaceIndex( _path, name.toString() ) {
+          _namespaceIndex(_path, name.toString()),
+          _extentManager(name, path, directoryPerDB) {
 
         invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
@@ -524,12 +524,14 @@ namespace {
     }
 
     void MMAPV1DatabaseCatalogEntry::_init( OperationContext* txn ) {
+        // First init the .ns file
+        _namespaceIndex.init(txn);
+
+        // Initialize the extent manager
         Status s = _extentManager.init(txn);
         if (!s.isOK()) {
             msgasserted(16966, str::stream() << "_extentManager.init failed: " << s.toString());
         }
-
-        _namespaceIndex.init(txn);
 
         // Upgrade freelist
         const NamespaceString oldFreeList(name(), "$freelist");
@@ -583,8 +585,9 @@ namespace {
                                                                  &_extentManager,
                                                                  false ) );
 
-            if ( nsEntry->recordStore->storageSize( txn ) == 0 )
-                nsEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), false );
+            if (nsEntry->recordStore->storageSize(txn) == 0) {
+                nsEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
+            }
         }
 
         if ( !indexEntry ) {
@@ -599,8 +602,9 @@ namespace {
                                                                     &_extentManager,
                                                                     true ) );
 
-            if ( indexEntry->recordStore->storageSize( txn ) == 0 )
-                indexEntry->recordStore->increaseStorageSize( txn, _extentManager.initialSize( 128 ), false );
+            if (indexEntry->recordStore->storageSize(txn) == 0) {
+                indexEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
+            }
         }
 
         if ( isSystemIndexesGoingToBeNew ) {

@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-    class ExtentManager;
     class OperationContext;
 
 #pragma pack(1)
@@ -141,10 +140,10 @@ namespace mongo {
 
 
     class DataFile {
-        friend class BasicCursor;
-        friend class MmapV1ExtentManager;
     public:
-        DataFile(int fn) : _mb(0), fileNo(fn) { }
+        DataFile(int fn) : _fileNo(fn), _mb(NULL) {
+
+        }
 
         /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
         Status openExisting(const char *filename );
@@ -170,8 +169,11 @@ namespace mongo {
         void flush( bool sync );
 
     private:
+        friend class MmapV1ExtentManager;
+
+
         void badOfs(int) const;
-        int defaultSize( const char *filename ) const;
+        int _defaultSize() const;
 
         void grow(DiskLoc dl, int size);
 
@@ -179,9 +181,11 @@ namespace mongo {
         DataFileHeader* header() { return static_cast<DataFileHeader*>( _mb ); }
         const DataFileHeader* header() const { return static_cast<DataFileHeader*>( _mb ); }
 
+
+        const int _fileNo;
+
         DurableMappedFile mmf;
         void *_mb; // the memory mapped view
-        int fileNo;
     };
 
 
