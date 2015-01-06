@@ -60,7 +60,7 @@ gulp.task('js', function() {
   // Uglify for compression if not in DEBUG.
   if (!DEBUG) {
     return b.pipe(buffer())
-      .pipe(uglify())
+      .pipe(uglify({mangle: { except: ["data"] }}))
       .pipe(gulp.dest(BUILD));
   } else {
     return b.pipe(gulp.dest(BUILD));
