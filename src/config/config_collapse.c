@@ -73,7 +73,7 @@ __wt_config_collapse(
 		--tmp->size;
 	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -197,8 +197,8 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	__wt_scr_free(&kb);
-	__wt_scr_free(&vb);
+err:	__wt_scr_free(session, &kb);
+	__wt_scr_free(session, &vb);
 	return (ret);
 }
 
@@ -306,7 +306,7 @@ __config_merge_format(
 
 	ret = __wt_strndup(session, build->data, build->size, config_ret);
 
-err:	__wt_scr_free(&build);
+err:	__wt_scr_free(session, &build);
 	return (ret);
 }
 

@@ -127,8 +127,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	    (int)a->size, (const char *)a->data,
 	    (int)b->size, (const char *)b->data);
 
-err:	__wt_scr_free(&a);
-	__wt_scr_free(&b);
+err:	__wt_scr_free(session, &a);
+	__wt_scr_free(session, &b);
 	return (ret);
 }
 

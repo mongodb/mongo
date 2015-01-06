@@ -117,7 +117,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
 	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -174,7 +174,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		ip = buf;
 	}
 	WT_ERR(__wt_verify_dsk(session, "[write-check]", ip));
-	__wt_scr_free(&tmp);
+	__wt_scr_free(session, &tmp);
 #endif
 
 	/*
@@ -299,6 +299,6 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
 	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }

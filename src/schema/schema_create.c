@@ -123,7 +123,7 @@ __create_file(WT_SESSION_IMPL *session,
 	else
 		WT_ERR(__wt_session_release_btree(session));
 
-err:	__wt_scr_free(&val);
+err:	__wt_scr_free(session, &val);
 	__wt_free(session, fileconf);
 	return (ret);
 }

@@ -443,6 +443,6 @@ err:		WT_TRET(__curindex_close(cursor));
 		*cursorp = NULL;
 	}
 
-	__wt_scr_free(&tmp);
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }

@@ -181,7 +181,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		break;
 	}
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -372,7 +372,7 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 	WT_RET(__wt_scr_alloc(session, strlen(conn->stat_path) + 128, &tmp));
 	WT_ERR(__statlog_log_one(session, NULL, tmp));
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

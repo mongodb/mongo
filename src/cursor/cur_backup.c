@@ -448,7 +448,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 

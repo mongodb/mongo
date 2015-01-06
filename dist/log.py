@@ -125,8 +125,7 @@ __wt_logrec_alloc(WT_SESSION_IMPL *session, size_t size, WT_ITEM **logrecp)
 void
 __wt_logrec_free(WT_SESSION_IMPL *session, WT_ITEM **logrecp)
 {
-\tWT_UNUSED(session);
-\t__wt_scr_free(logrecp);
+\t__wt_scr_free(session, logrecp);
 }
 
 int
