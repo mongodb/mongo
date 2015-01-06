@@ -126,9 +126,9 @@ namespace mongo {
 
         void _appendStringLike(StringData str, bool invert);
         void _appendBson(const BSONObj& obj, bool invert);
-        void _appendSmallDouble(double magnitude, bool invert);
-        void _appendLargeDouble(double magnitude, bool invert);
-        void _appendLargeInt64(long long magnitude, bool invert);
+        void _appendSmallDouble(double value, bool invert);
+        void _appendLargeDouble(double value, bool invert);
+        void _appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert);
 
         template <typename T> void _append(const T& thing, bool invert);
         void _appendBytes(const void* source, size_t bytes, bool invert);

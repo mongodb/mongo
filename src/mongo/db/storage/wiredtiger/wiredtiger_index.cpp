@@ -63,9 +63,9 @@ namespace {
 
     static const WiredTigerItem emptyItem(NULL, 0);
 
-    static const int kMinimumIndexVersion = 3;
-    static const int kCurrentIndexVersion = 3; // New indexes use this by default.
-    static const int kMaximumIndexVersion = 3;
+    static const int kMinimumIndexVersion = 4;
+    static const int kCurrentIndexVersion = 4; // New indexes use this by default.
+    static const int kMaximumIndexVersion = 4;
     BOOST_STATIC_ASSERT(kCurrentIndexVersion >= kMinimumIndexVersion);
     BOOST_STATIC_ASSERT(kCurrentIndexVersion <= kMaximumIndexVersion);
 
