@@ -14,34 +14,46 @@ load('jstests/top/util/mongotop_common.js');
     db = conn.getDB('foo');
 
     // concurrently insert documents into thousands of collections
-    var stressShell = '\nprint(\'starting write\'); \n' +
-    'for (var i = 0; i < 2000; ++i) { \n' +
-    '  startParallelShell(" ' +
-    '    db.getSiblingDB(\'admin\').auth(\'' + authUser + '\',\'' + authPassword + '\'); ' +
-    '    var dbName = (Math.random() + 1).toString(36).substring(7); ' +
-    '    var clName = (Math.random() + 1).toString(36).substring(7); ' +
-    '    for (var i = 0; i < 10000; ++i) { ' +
-    '      db.getSiblingDB(dbName).getCollection(clName).insert({ x: i }); ' +
-    '    } ' +
-    '  "); \n' +
-    '} \n';
- 
-    startParallelShell(stressShell);
+    var stressShell = '\nprint(\'starting read/write stress test\'); \n' +
+    '   if (\'' + passthrough.name + '\' === \'auth\')' +
+    '       db.getSiblingDB(\'admin\').auth(\'' + authUser + '\',\'' + authPassword + '\'); ' +
+    '   var dbName = (Math.random() + 1).toString(36).substring(7); ' +
+    '   var clName = (Math.random() + 1).toString(36).substring(7); ' +
+    '   for (var i = 0; i < 10000; ++i) { ' +
+    '       db.getSiblingDB(dbName).getCollection(clName).find({ x: i }).forEach(); \n' +
+    '       sleep(1); \n' +
+    '       db.getSiblingDB(dbName).getCollection(clName).insert({ x: i }); \n' +
+    '       sleep(1);\n' +
+    '   }\n';
+
+    for (var i = 0; i < 10; ++i)
+        startParallelShell(stressShell);
 
     // wait a bit for the stress to kick in
-    sleep(7000);
+    sleep(5000);
+    jsTest.log('Current operation(s)');
+    printjson(db.currentOp());
 
     // ensure tool runs without error
     clearRawMongoProgramOutput();
     assert.eq(runMongoProgram.apply(this, ['mongotop', '--port', conn.port, '--json', '--rowcount', 1].concat(passthrough.args)), 0, 'failed 1');
 
-    // ensure tool runs without error
-    clearRawMongoProgramOutput();
-    assert.eq(runMongoProgram.apply(this, ['mongotop', '--port', conn.port, '--json', '--rowcount', 1].concat(passthrough.args)), 0, 'failed 1');
+    var output = '';
+    var shellOutput = rawMongoProgramOutput();
+    jsTest.log('shell output: ' + shellOutput);
+    shellOutput.split('\n').forEach(function(line) {
+        if (line.match(shellOutputRegex)) {
+            output = line;
+            jsTest.log('raw output: ' + output);
+        }
+    });
 
     t.stop();
   };
 
   // run with plain and auth passthroughs
-    runTests(standaloneTopology, plain);
+  passthroughs.forEach(function(passthrough) {
+    runTests(standaloneTopology, passthrough);
+    runTests(replicaSetTopology, passthrough);
+  });
 })();
