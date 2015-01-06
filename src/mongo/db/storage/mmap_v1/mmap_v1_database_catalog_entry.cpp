@@ -168,8 +168,6 @@ namespace {
         invariant(txn->lockState()->isDbLockedForMode(name, MODE_X));
 
         try {
-            WriteUnitOfWork wunit(txn);
-
             _init( txn );
 
             std::list<std::string> namespaces;
@@ -177,10 +175,12 @@ namespace {
             for ( std::list<std::string>::const_iterator i = namespaces.begin();
                   i != namespaces.end(); // we add to the list in the loop so can't cache end().
                   ++i ) {
+
                 const std::string& ns = *i;
                 Entry*& entry = _collections[ns];
-                // entry was already loaded for system.indexes and system.namespaces in
-                // _init. That is ok, since they can't have indexes on them anyway.
+
+                // Entry was already loaded for system.indexes and system.namespaces in _init. That
+                // is ok, since they can't have indexes on them anyway.
                 if (!entry) {
                     entry = new Entry();
                     _insertInCache(txn, ns, entry);
@@ -193,26 +193,17 @@ namespace {
                             IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
                     }
                 }
-
-                DataFileVersion version = _extentManager.getFileFormat(txn);
-                if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
-                    // Any DB that can be opened and written to gets this flag set.
-                    version.setMayHave28Freelist();
-                    _extentManager.setFileFormat(txn, version);
-                }
             }
-
-            wunit.commit();
         }
-        catch(std::exception& e) {
-            log() << "warning database " << path << " " << name << " could not be opened";
-            DBException* dbe = dynamic_cast<DBException*>(&e);
-            if (dbe) {
-                log() << "DBException " << dbe->getCode() << ": " << e.what() << endl;
-            }
-            else {
-                log() << e.what() << endl;
-            }
+        catch (const DBException& dbe) {
+            warning() << "database " << path << " " << name
+                      << " could not be opened due to DBException " << dbe.getCode() << ": "
+                      << dbe.what();
+            throw;
+        }
+        catch (const std::exception& e) {
+            warning() << "database " << path << " " << name
+                      << " could not be opened " << e.what();
             throw;
         }
     }
@@ -523,7 +514,7 @@ namespace {
         _namespaceIndex.add_ns( txn, ns, DiskLoc(), false );
     }
 
-    void MMAPV1DatabaseCatalogEntry::_init( OperationContext* txn ) {
+    void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
         // First init the .ns file
         _namespaceIndex.init(txn);
 
@@ -532,6 +523,8 @@ namespace {
         if (!s.isOK()) {
             msgasserted(16966, str::stream() << "_extentManager.init failed: " << s.toString());
         }
+
+        WriteUnitOfWork wunit(txn);
 
         // Upgrade freelist
         const NamespaceString oldFreeList(name(), "$freelist");
@@ -546,82 +539,97 @@ namespace {
             _namespaceIndex.kill_ns(txn, oldFreeList.ns());
         }
 
-        const NamespaceString nsi( name(), "system.indexes" );
-        const NamespaceString nsn( name(), "system.namespaces" );
+        DataFileVersion version = _extentManager.getFileFormat(txn);
+        if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
+            // Any DB that can be opened and written to gets this flag set.
+            version.setMayHave28Freelist();
+            _extentManager.setFileFormat(txn, version);
+        }
 
-        bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details( nsn.toString() ) == NULL;
-        bool isSystemIndexesGoingToBeNew = _namespaceIndex.details( nsi.toString() ) == NULL;
+        const NamespaceString nsi(name(), "system.indexes");
+        const NamespaceString nsn(name(), "system.namespaces");
+
+        bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details(nsn.toString()) == NULL;
+        bool isSystemIndexesGoingToBeNew = _namespaceIndex.details(nsi.toString()) == NULL;
 
         _ensureSystemCollection(txn, nsn.toString());
         _ensureSystemCollection(txn, nsi.toString());
 
-        if ( isSystemNamespacesGoingToBeNew ) {
+        if (isSystemNamespacesGoingToBeNew) {
             txn->recoveryUnit()->registerChange(new EntryInsertion(nsn.toString(), this));
         }
-        if ( isSystemIndexesGoingToBeNew ) {
+        if (isSystemIndexesGoingToBeNew) {
             txn->recoveryUnit()->registerChange(new EntryInsertion(nsi.toString(), this));
         }
 
         Entry*& indexEntry = _collections[nsi.toString()];
         Entry*& nsEntry = _collections[nsn.toString()];
 
-        NamespaceDetails* indexDetails = _namespaceIndex.details( nsi.toString() );
-        NamespaceDetails* nsDetails = _namespaceIndex.details( nsn.toString() );
+        NamespaceDetails* const indexDetails = _namespaceIndex.details(nsi.toString());
+        NamespaceDetails* const nsDetails = _namespaceIndex.details(nsn.toString());
 
         // order has to be:
         // 1) ns rs
         // 2) i rs
         // 3) catalog entries
 
-        if ( !nsEntry ) {
+        if (!nsEntry) {
             nsEntry = new Entry();
 
-            NamespaceDetailsRSV1MetaData* md = new NamespaceDetailsRSV1MetaData( nsn.toString(),
-                                                                                 nsDetails,
-                                                                                 NULL );
-            nsEntry->recordStore.reset( new SimpleRecordStoreV1( txn,
-                                                                 nsn.toString(),
-                                                                 md,
-                                                                 &_extentManager,
-                                                                 false ) );
+            NamespaceDetailsRSV1MetaData* md = new NamespaceDetailsRSV1MetaData(nsn.toString(),
+                                                                                nsDetails,
+                                                                                NULL);
+            nsEntry->recordStore.reset(new SimpleRecordStoreV1(txn,
+                                                               nsn.toString(),
+                                                               md,
+                                                               &_extentManager,
+                                                               false));
 
             if (nsEntry->recordStore->storageSize(txn) == 0) {
                 nsEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
             }
         }
 
-        if ( !indexEntry ) {
+        if (!indexEntry) {
             indexEntry = new Entry();
 
-            NamespaceDetailsRSV1MetaData* md = new NamespaceDetailsRSV1MetaData( nsi.toString(),
-                                                                                 indexDetails,
-                                                                                 nsEntry->recordStore.get() );
-            indexEntry->recordStore.reset( new SimpleRecordStoreV1( txn,
-                                                                    nsi.toString(),
-                                                                    md,
-                                                                    &_extentManager,
-                                                                    true ) );
+            NamespaceDetailsRSV1MetaData* md =
+                new NamespaceDetailsRSV1MetaData(nsi.toString(),
+                                                 indexDetails,
+                                                 nsEntry->recordStore.get());
+
+            indexEntry->recordStore.reset(new SimpleRecordStoreV1(txn,
+                                                                  nsi.toString(),
+                                                                  md,
+                                                                  &_extentManager,
+                                                                  true));
 
             if (indexEntry->recordStore->storageSize(txn) == 0) {
                 indexEntry->recordStore->increaseStorageSize(txn, _extentManager.initialSize(128), false);
             }
         }
 
-        if ( isSystemIndexesGoingToBeNew ) {
+        if (isSystemIndexesGoingToBeNew) {
             _addNamespaceToNamespaceCollection(txn, nsi.toString(), NULL);
         }
 
-        if ( !nsEntry->catalogEntry )
-            nsEntry->catalogEntry.reset( new NamespaceDetailsCollectionCatalogEntry( nsn.toString(),
-                                                                                     nsDetails,
-                                                                                     indexEntry->recordStore.get(),
-                                                                                     this ) );
+        if (!nsEntry->catalogEntry) {
+            nsEntry->catalogEntry.reset(
+                        new NamespaceDetailsCollectionCatalogEntry(nsn.toString(),
+                                                                   nsDetails,
+                                                                   indexEntry->recordStore.get(),
+                                                                   this));
+        }
 
-        if ( !indexEntry->catalogEntry )
-            indexEntry->catalogEntry.reset( new NamespaceDetailsCollectionCatalogEntry( nsi.toString(),
-                                                                                        indexDetails,
-                                                                                        indexEntry->recordStore.get(),
-                                                                                        this ) );
+        if (!indexEntry->catalogEntry) {
+            indexEntry->catalogEntry.reset(
+                        new NamespaceDetailsCollectionCatalogEntry(nsi.toString(),
+                                                                   indexDetails,
+                                                                   indexEntry->recordStore.get(),
+                                                                   this));
+        }
+
+        wunit.commit();
     }
 
     Status MMAPV1DatabaseCatalogEntry::createCollection( OperationContext* txn,

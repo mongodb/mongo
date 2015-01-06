@@ -46,7 +46,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/random.h"
-#include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"

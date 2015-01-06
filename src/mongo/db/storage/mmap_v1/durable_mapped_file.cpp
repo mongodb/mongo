@@ -285,16 +285,16 @@ namespace mongo {
         try { 
             LOG(3) << "mmf close " << filename();
 
-            // Only notifiy the durability system if the file was actually opened
-            if (view_write()) {
-                dur::closingFileNotification();
-            }
+            // Notify the durability system that we are closing a file.
+            dur::closingFileNotification();
 
             LockMongoFilesExclusive lk;
             privateViews.remove(_view_private, length());
             _view_write = _view_private = 0;
             MemoryMappedFile::close();
         }
-        catch(...) { error() << "exception in ~DurableMappedFile"; }
+        catch (...) {
+            error() << "exception in ~DurableMappedFile";
+        }
     }
 }

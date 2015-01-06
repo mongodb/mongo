@@ -147,8 +147,7 @@ namespace mongo {
             /** record/note an intent to write */
             void note(void* p, int len);
 
-            std::vector< boost::shared_ptr<DurOp> >& ops() {
-                groupCommitMutex.dassertLocked(); // this is what really makes the below safe
+            const std::vector<boost::shared_ptr<DurOp> >& ops() const {
                 return _intentsAndDurOps._durOps;                
             }
 
