@@ -77,7 +77,7 @@ namespace {
             setConnectionId(connectionId);
         }
 
-        MessageHandler* const getHandler() const { return _handler; }
+        MessageHandler* getHandler() const { return _handler; }
 
     private:
         // Not owned.
