@@ -561,8 +561,7 @@ namespace {
         // Pre-allocated buffer for building the journal
         AlignedBuilder journalBuilder(4 * 1024 * 1024);
 
-        // Used as an estimate of how much / how fast to remap
-        uint64_t commitCounter(0);
+        // Used as an estimate of how much to remap
         uint64_t estimatedPrivateMapSize(0);
         uint64_t remapLastTimestamp(0);
 
@@ -616,53 +615,32 @@ namespace {
                     PREPLOGBUFFER(h, journalBuilder);
 
                     estimatedPrivateMapSize += commitJob.bytes();
-                    commitCounter++;
 
                     // Need to reset the commit job's contents while under the S flush lock,
                     // because otherwise someone might have done a write and this would wipe out
                     // their changes without ever being committed.
                     commitJob.committingReset();
 
-                    const bool shouldRemap =
-                        (estimatedPrivateMapSize >= UncommittedBytesLimit) ||
-                        (commitCounter % NumCommitsBeforeRemap == 0) ||
-                        (mmapv1GlobalOptions.journalOptions &
-                            MMAPV1Options::JournalAlwaysRemap);
+                    // We want to remap all private views about every 2 seconds. There could be
+                    // ~1000 views so we do a little each pass. There will be copy on write faults
+                    // after remapping, so doing a little bit at a time will avoid big load spikes
+                    // when the pages are touched.
+                    //
+                    // TODO: Instead of the time-based logic above, consider using ProcessInfo and
+                    //       watching for getResidentSize to drop, which is more precise.
+                    double remapFraction = (curTimeMicros64() - remapLastTimestamp) / 2000000.0;
 
-                    double remapFraction = 0.0;
-
-                    // Now that the in-memory modifications have been collected, we can potentially
-                    // release the flush lock if remap is not necessary.
-                    if (shouldRemap) {
-                        // We want to remap all private views about every 2 seconds. There could be
-                        // ~1000 views so we do a little each pass. There will be copy on write
-                        // faults after remapping, so doing a little bit at a time will avoid big
-                        // load spikes when the pages are touched.
-                        //
-                        // TODO: Instead of the time-based logic above, consider using ProcessInfo
-                        //       and watching for getResidentSize to drop, which is more precise.
-                        remapFraction = (curTimeMicros64() - remapLastTimestamp) / 2000000.0;
-
-                        if (mmapv1GlobalOptions.journalOptions &
-                                    MMAPV1Options::JournalAlwaysRemap) {
-                            remapFraction = 1;
-                        }
-                        else {
-                            // We don't want to get close to the UncommittedBytesLimit
-                            const double f =
-                                estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
-                            if (f > remapFraction) {
-                                remapFraction = f;
-                            }
-                        }
+                    if (mmapv1GlobalOptions.journalOptions &
+                                MMAPV1Options::JournalAlwaysRemap) {
+                        remapFraction = 1;
                     }
                     else {
-                        LOG(4) << "groupCommit early release flush lock";
-
-                        // We will not be doing a remap so drop the flush lock. That way we will be
-                        // doing the journal I/O outside of lock, so other threads can proceed.
-                        invariant(!shouldRemap);
-                        autoFlushLock.release();
+                        // We don't want to get close to the UncommittedBytesLimit
+                        const double f =
+                            estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
+                        if (f > remapFraction) {
+                            remapFraction = f;
+                        }
                     }
 
                     // This performs an I/O to the journal file
@@ -681,19 +659,16 @@ namespace {
                     // is requested it would write the latest.
                     WRITETODATAFILES(h, journalBuilder);
 
-                    // Data has now been written to the shared view. If remap was requested, we
-                    // would still be holding the S flush lock here, so just upgrade it and
-                    // perform the remap.
-                    if (shouldRemap) {
-                        autoFlushLock.upgradeFlushLockToExclusive();
-                        remapPrivateView(remapFraction);
+                    // Data has now been written to the shared view. Upgrade the flush lock to X so
+                    // no writes can happen and remap the private view.
+                    autoFlushLock.upgradeFlushLockToExclusive();
+                    remapPrivateView(remapFraction);
 
-                        autoFlushLock.release();
+                    autoFlushLock.release();
 
-                        // Reset the private map estimate outside of the lock
-                        estimatedPrivateMapSize = 0;
-                        remapLastTimestamp = curTimeMicros64();
-                    }
+                    // Reset the private map estimate outside of the lock
+                    estimatedPrivateMapSize = 0;
+                    remapLastTimestamp = curTimeMicros64();
 
                     // Do this reset after all locks have been released in order to not do
                     // unnecessary work under lock.
