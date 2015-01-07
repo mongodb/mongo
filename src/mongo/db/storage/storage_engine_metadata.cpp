@@ -99,26 +99,6 @@ namespace {
         return metadata;
     }
 
-    // static
-    Status StorageEngineMetadata::updateIfMissing(const std::string& dbpath,
-                                                  const std::string& storageEngine) {
-        boost::filesystem::path metadataPath =
-            boost::filesystem::path(dbpath) / kMetadataBasename;
-
-        if (boost::filesystem::exists(metadataPath)) {
-            return Status::OK();
-        }
-
-        StorageEngineMetadata metadata(dbpath);
-        metadata.setStorageEngine(storageEngine);
-        Status status = metadata.write();
-        if (!status.isOK()) {
-            warning() << "Unable to update storage engine metadata in " << dbpath
-                      << ": " << status.toString();
-        }
-        return status;
-    }
-
     StorageEngineMetadata::StorageEngineMetadata(const std::string& dbpath)
         : _dbpath(dbpath) {
         reset();

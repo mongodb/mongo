@@ -66,14 +66,6 @@ namespace mongo {
                                                              const std::string& storageEngine);
 
         /**
-         * Writes a new metadata file in the data directory if it's missing.
-         * Returns OK if the metadata exists, or if it's missing and there was no
-         * issue overwriting it.
-         * Otherwise, returns status from  write().
-         */
-        static Status updateIfMissing(const std::string& dbpath, const std::string& storageEngine);
-
-        /**
          * Sets fields to defaults.
          * Use read() load metadata from file.
          */

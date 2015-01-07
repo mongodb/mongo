@@ -329,41 +329,6 @@ namespace {
         ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine2"), UserException);
     }
 
-    TEST(StorageEngineMetadataTest, UpdateIfMissingNoExistingMetadata) {
-        TempDir tempDir("StorageEngineMetadataTest_UpdateIfMissingNoExistingMetadata");
-        ASSERT_OK(StorageEngineMetadata::updateIfMissing(tempDir.path(), "storageEngine1"));
-        // Read back storage engine name.
-        {
-            StorageEngineMetadata metadata(tempDir.path());
-            ASSERT_OK(metadata.read());
-            ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
-        }
-    }
-
-    // Do not overwrite existing metadata file.
-    TEST(StorageEngineMetadataTest, UpdateIfMissingMetadataExists) {
-        TempDir tempDir("StorageEngineMetadataTest_UpdateIfMissingMetadataExists");
-        {
-            StorageEngineMetadata metadata(tempDir.path());
-            metadata.setStorageEngine("storageEngine1");
-            ASSERT_OK(metadata.write());
-        }
-        // Invoke update() with a different storage engine name.
-        // This should not modify the existings file.
-        ASSERT_OK(StorageEngineMetadata::updateIfMissing(tempDir.path(), "storageEngine2"));
-        // Read back storage engine name.
-        {
-            StorageEngineMetadata metadata(tempDir.path());
-            ASSERT_OK(metadata.read());
-            ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
-        }
-    }
-
-    TEST(StorageEngineMetadataTest, UpdateIfMissingInvalidDirectory) {
-        // Should warn and return write() status if we fail to update the metadata file.
-        ASSERT_NOT_OK(StorageEngineMetadata::updateIfMissing("no_such_directory", "engine1"));
-    }
-
     TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {
         // It is fine to provide an invalid data directory as long as we do not
         // call read() or write().
