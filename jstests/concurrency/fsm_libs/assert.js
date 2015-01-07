@@ -1,3 +1,4 @@
+'use strict';
 
 /**
  * Helpers for controlling under which situations an assert is actually executed.
@@ -37,7 +38,7 @@ var AssertLevel = (function() {
 })();
 
 if (typeof globalAssertLevel === 'undefined') {
-    var globalAssertLevel = AssertLevel.ALWAYS;
+    var globalAssertLevel = AssertLevel.OWN_DB;
 }
 
 var assertWithLevel = function(level) {

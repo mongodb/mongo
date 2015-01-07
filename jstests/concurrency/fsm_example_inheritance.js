@@ -1,4 +1,6 @@
-load('jstests/concurrency/fsm_libs/runner.js'); // for extendWorkload
+'use strict';
+
+load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_example.js'); // for $config
 
 // extendWorkload takes a $config object and a callback, and returns an extended $config object.
