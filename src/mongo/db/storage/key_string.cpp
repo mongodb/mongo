@@ -158,9 +158,11 @@ namespace mongo {
 
         const uint8_t kEnd = 0x4;
 
-        const uint8_t kEqual = 0x2;
-        const uint8_t kLess = kEqual - 1;
-        const uint8_t kGreater = kEqual + 1;
+        // These overlay with CType or kEnd bytes and therefor must be less/greater than all of
+        // them (and their inverses). They also can't equal 0 or 255 since that would collide with
+        // the encoding of NUL bytes in strings as "\x00\xff".
+        const uint8_t kLess = 1;
+        const uint8_t kGreater = 254;
     } // namespace
 
     // some utility functions
@@ -236,7 +238,6 @@ namespace mongo {
 
             // These are used in IndexEntryComparison::makeQueryObject()
             switch (*elem.fieldName()) {
-            case '\0': _append(kEqual, false); break;
             case 'l':  _append(kLess, false); break;
             case 'g':  _append(kGreater, false); break;
             }
@@ -716,15 +717,15 @@ namespace mongo {
                     // size was stored in 4 bytes.
                     size = endian::bigToNative(readType<uint32_t>(reader, inverted));
                 }
-                BinDataType type = BinDataType(readType<uint8_t>(reader, inverted));
+                BinDataType subType = BinDataType(readType<uint8_t>(reader, inverted));
                 const void* ptr = reader->skip(size);
                 if (!inverted) {
-                    *stream << BSONBinData(ptr, size, type);
+                    *stream << BSONBinData(ptr, size, subType);
                 }
                 else {
                     boost::scoped_array<char> flipped(new char[size]);
                     memcpy_flipBits(flipped.get(), ptr, size);
-                    *stream << BSONBinData(flipped.get(), size, type);
+                    *stream << BSONBinData(flipped.get(), size, subType);
                 }
                 break;
             }
@@ -770,9 +771,9 @@ namespace mongo {
             case CType::kArray: {
                 BSONObjBuilder subArr(stream->subarrayStart());
                 int index = 0;
-                uint8_t type;
-                while ((type = readType<uint8_t>(reader, inverted)) != 0) {
-                    toBsonValue(type,
+                uint8_t elemType;
+                while ((elemType = readType<uint8_t>(reader, inverted)) != 0) {
+                    toBsonValue(elemType,
                                 reader,
                                 inverted,
                                 &(subArr << BSONObjBuilder::numStr(index++)));
@@ -880,14 +881,17 @@ namespace mongo {
         for (int i = 0; reader.remaining(); i++) {
             const bool invert = (ord.get(i) == -1);
             uint8_t type = readType<uint8_t>(&reader, invert);
+            if (type == kLess || type == kGreater) {
+                // This was just a discriminator which is logically part of the previous field. This
+                // will only be encountered on queries, not in the keys stored in an index.
+                // Note: this should probably affect the BSON key name of the last field, but it
+                // must be read *after* the value so it isn't possible.
+                type = readType<uint8_t>(&reader, invert);
+            }
+
             if (type == kEnd)
                 break;
             toBsonValue(type, &reader, invert, &(builder << ""));
-
-            // discriminator
-            // Note: this should probably affect the BSON key name, but it must be read
-            // *after* the value so it isn't possible.
-            reader.read<uint8_t>();
         }
         return builder.obj();
     }

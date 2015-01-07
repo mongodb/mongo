@@ -97,12 +97,11 @@ TEST(KeyStringTest, ActualBytesDouble) {
     KeyString ks = KeyString::make(a, ALL_ASCENDING);
     log() << "size: " << ks.getSize() << " hex [" << toHex(ks.getBuffer(), ks.getSize()) << "]";
 
-    ASSERT_EQUALS(11U, ks.getSize());
+    ASSERT_EQUALS(10U, ks.getSize());
 
     string hex = "2B" // kNumericPositive1ByteInt
         "0B" // (5 << 1) | 1
         "02000000000000" // fractional bytes of double
-        "02" // kEqual
         "04"; // kEnd
 
     ASSERT_EQUALS(hex,
@@ -110,17 +109,17 @@ TEST(KeyStringTest, ActualBytesDouble) {
 
     ks = KeyString::make(a, Ordering::make(BSON("a" << -1)));
 
-    ASSERT_EQUALS(11U, ks.getSize());
+    ASSERT_EQUALS(10U, ks.getSize());
 
 
-    // last 2 bytes don't get flipped
+    // last byte (kEnd) doesn't get flipped
     string hexFlipped;
-    for ( size_t i = 0; i < hex.size()-4; i += 2 ) {
+    for ( size_t i = 0; i < hex.size()-2; i += 2 ) {
         char c = fromHex(hex.c_str() + i);
         c = ~c;
         hexFlipped += toHex(&c, 1);
     }
-    hexFlipped += hex.substr(hex.size()-4);
+    hexFlipped += hex.substr(hex.size()-2);
 
     ASSERT_EQUALS(hexFlipped,
                   toHex(ks.getBuffer(), ks.getSize()));
