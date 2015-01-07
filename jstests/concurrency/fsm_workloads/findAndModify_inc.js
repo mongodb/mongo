@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * findAndModify_inc.js
  *
@@ -49,8 +51,8 @@ var $config = (function() {
     }
 
     return {
-        threadCount: 30,
-        iterations: 100,
+        threadCount: 20,
+        iterations: 20,
         states: states,
         transitions: transitions,
         setup: setup

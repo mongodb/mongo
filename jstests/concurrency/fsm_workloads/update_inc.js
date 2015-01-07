@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * update_inc.js
  *
@@ -56,8 +58,8 @@ var $config = (function() {
     }
 
     return {
-        threadCount: 30,
-        iterations: 100,
+        threadCount: 5,
+        iterations: 10,
         data: data,
         states: states,
         transitions: transitions,

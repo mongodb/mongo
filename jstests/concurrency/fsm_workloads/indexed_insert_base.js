@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * indexed_insert_base.js
  *
@@ -7,6 +9,25 @@
  */
 var $config = (function() {
 
+    function makeSortSpecFromIndexSpec(ixSpec) {
+        var sort = {};
+
+        for (var field in ixSpec) {
+            if (!ixSpec.hasOwnProperty(field)) {
+                continue;
+            }
+
+            var order = ixSpec[field];
+            if (order !== 1 && order !== -1) { // e.g. '2d' or '2dsphere'
+                order = 1;
+            }
+
+            sort[field] = order;
+        }
+
+        return sort;
+    }
+
     var states = {
         init: function init(db, collName) {
             this.nInserted = 0;
@@ -15,6 +36,7 @@ var $config = (function() {
 
         insert: function insert(db, collName) {
             var res = db[collName].insert(this.getDoc());
+            assertAlways.writeOK(res);
             assertAlways.eq(1, res.nInserted, tojson(res));
             this.nInserted += this.docsPerInsert;
         },
@@ -24,9 +46,24 @@ var $config = (function() {
             var count = db[collName].find(this.getDoc()).sort({ $natural: 1 }).itcount();
             assertWhenOwnColl.eq(count, this.nInserted);
 
-            // index scan
-            count = db[collName].find(this.getDoc()).sort(this.getIndexSpec()).itcount();
-            assertWhenOwnColl.eq(count, this.nInserted);
+            // Use hint() to force an index scan, but only when an appropriate index exists.
+            // We can only use hint() when the index exists and we know that the collection
+            // is not being potentially modified by other workloads.
+            var ownColl = false;
+            assertWhenOwnColl(function() { ownColl = true; });
+            if (this.indexExists && ownColl) {
+                var count = db[collName].find(this.getDoc()).hint(this.getIndexSpec()).itcount();
+                assertWhenOwnColl.eq(count, this.nInserted);
+            }
+
+            // Otherwise, impose a sort ordering over the collection scan
+            else {
+                // For single and compound-key indexes, the index specification is a
+                // valid sort spec; however, for geospatial and text indexes it is not
+                var sort = makeSortSpecFromIndexSpec(this.getIndexSpec());
+                count = db[collName].find(this.getDoc()).sort(sort).itcount();
+                assertWhenOwnColl.eq(count, this.nInserted);
+            }
         }
     };
 
@@ -37,21 +74,23 @@ var $config = (function() {
     };
 
     function setup(db, collName) {
-        db[collName].ensureIndex(this.getIndexSpec());
+        var res = db[collName].ensureIndex(this.getIndexSpec());
+        assertAlways.commandWorked(res);
+        this.indexExists = true;
     }
 
     return {
-        threadCount: 30,
-        iterations: 100,
+        threadCount: 20,
+        iterations: 50,
         states: states,
         transitions: transitions,
         data: {
-            getIndexSpec: function() {
+            getIndexSpec: function getIndexSpec() {
                 var ixSpec = {};
                 ixSpec[this.indexedField] = 1;
                 return ixSpec;
             },
-            getDoc: function() {
+            getDoc: function getDoc() {
                 var doc = {};
                 doc[this.indexedField] = this.indexedValue;
                 return doc;
