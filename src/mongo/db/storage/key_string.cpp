@@ -194,6 +194,29 @@ namespace mongo {
             return StringData(start, actualBytes);
         }
 
+        /**
+         * scratch must be empty when passed in. It will be used if there is a NUL byte in the
+         * output string. In that case the returned StringData will point into scratch, otherwise
+         * it will point directly into the input buffer.
+         */
+        StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
+            const StringData initial = readCString(reader);
+            if (reader->peek<unsigned char>() != 0xFF)
+                return initial; // Don't alloc or copy for simple case with no NUL bytes.
+
+            scratch->append(initial.rawData(), initial.size());
+            while (reader->peek<unsigned char>() == 0xFF) {
+                // Each time we enter this loop it means we hit a NUL byte encoded as "\x00\xFF".
+                *scratch += '\0';
+                reader->skip(1);
+
+                const StringData nextPart = readCString(reader);
+                scratch->append(nextPart.rawData(), nextPart.size());
+            }
+
+            return *scratch;
+        }
+
         string readInvertedCString(BufReader* reader) {
             const char* start = static_cast<const char*>(reader->pos());
             const char* end = static_cast<const char*>(memchr(start, 0xFF, reader->remaining()));
@@ -206,6 +229,34 @@ namespace mongo {
             }
             reader->skip(1 + actualBytes);
             return s;
+        }
+
+        string readInvertedCStringWithNuls(BufReader* reader) {
+            std::string out;
+            do {
+                if (!out.empty()) {
+                    // If this isn't our first pass through the loop it means we hit an NUL byte
+                    // encoded as "\xFF\00" in our inverted string.
+                    reader->skip(1);
+                    out += '\xFF'; // will be flipped to '\0' with rest of out before returning.
+                }
+
+                const char* start = static_cast<const char*>(reader->pos());
+                const char* end = static_cast<const char*>(
+                                    memchr(start, 0xFF, reader->remaining()));
+                invariant(end);
+                size_t actualBytes = end - start;
+                invariant(out.size() + actualBytes < KeyString::kMaxBufferSize);
+
+                out.append(start, actualBytes);
+                reader->skip(1 + actualBytes);
+            } while (reader->peek<unsigned char>() == 0x00);
+
+            for (size_t i = 0; i < out.size(); i++) {
+                out[i] = ~out[i];
+            }
+
+            return out;
         }
     } // namespace
 
@@ -524,7 +575,6 @@ namespace mongo {
                 _append(int8_t(0), invert);
                 break;
             }
-            invariant(!invert); // TODO readInvertedCString not done yet for this
 
             // replace "\x00" with "\x00\xFF"
             _appendBytes("\x00\xFF", 2, invert);
@@ -678,31 +728,35 @@ namespace mongo {
                 break;
 
             case CType::kString:
-                if (inverted)
-                    *stream << readInvertedCString(reader);
-                else
-                    *stream << readCString(reader);
+                if (inverted) {
+                    *stream << readInvertedCStringWithNuls(reader);
+                }
+                else  {
+                    std::string scratch;
+                    *stream << readCStringWithNuls(reader, &scratch);
+                }
                 break;
 
             case CType::kCode: {
                 if (inverted) {
-                    *stream << BSONCode(readInvertedCString(reader));
+                    *stream << BSONCode(readInvertedCStringWithNuls(reader));
                 }
                 else {
-                    *stream << BSONCode(readCString(reader));
+                    std::string scratch;
+                    *stream << BSONCode(readCStringWithNuls(reader, &scratch));
                 }
                 break;
             }
 
             case CType::kCodeWithScope: {
-                string save;
-                StringData code;
+                std::string scratch;
+                StringData code; // will point to either scratch or the raw encoded bytes.
                 if (inverted) {
-                    save = readInvertedCString(reader);
-                    code = save;
+                    scratch = readInvertedCStringWithNuls(reader);
+                    code = scratch;
                 }
                 else {
-                    code = readCString(reader);
+                    code = readCStringWithNuls(reader, &scratch);
                 }
                 // Not going to optimize CodeWScope.
                 BSONObjBuilder scope;

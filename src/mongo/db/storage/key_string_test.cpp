@@ -372,6 +372,10 @@ const std::vector<BSONObj>& getInterestingElements() {
     if (!elements.empty()) {
         return elements;
     }
+    
+    // These are used to test strings that include NUL bytes.
+    const StringData ball("ball", StringData::LiteralTag());
+    const StringData ball00n("ball\0\0n", StringData::LiteralTag());
 
     elements.push_back(BSON("" << 1));
     elements.push_back(BSON("" << 1.0));
@@ -381,14 +385,11 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << 112353998331165715LL));
     elements.push_back(BSON("" << 112353998331165710LL));
     elements.push_back(BSON("" << 1123539983311657199LL));
-
-    // todo: I think this behavior is good, but woCompare is wrong
-    //elements.push_back(BSON("" << 123456789123456789.123));
-    //elements.push_back(BSON("" << -123456789123456789.123));
-    //elements.push_back(BSON("" << 112353998331165715.0));
-    //elements.push_back(BSON("" << 112353998331165710.0));
-    //elements.push_back(BSON("" << 1123539983311657199.0));
-
+    elements.push_back(BSON("" << 123456789123456789.123));
+    elements.push_back(BSON("" << -123456789123456789.123));
+    elements.push_back(BSON("" << 112353998331165715.0));
+    elements.push_back(BSON("" << 112353998331165710.0));
+    elements.push_back(BSON("" << 1123539983311657199.0));
     elements.push_back(BSON("" << std::numeric_limits<double>::quiet_NaN()));
     elements.push_back(BSON("" << 0.0));
     elements.push_back(BSON("" << -0.0));
@@ -401,7 +402,13 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << 12312312.2123123123123));
     elements.push_back(BSON("" << "aaa"));
     elements.push_back(BSON("" << "AAA"));
+    elements.push_back(BSON("" << ball));
+    elements.push_back(BSON("" << ball00n));
+    elements.push_back(BSON("" << BSONSymbol(ball)));
+    elements.push_back(BSON("" << BSONSymbol(ball00n)));
     elements.push_back(BSON("" << BSON("a" << 5)));
+    elements.push_back(BSON("" << BSON("a" << 6)));
+    elements.push_back(BSON("" << BSON("b" << 6)));
     elements.push_back(BSON("" << BSON_ARRAY("a" << 5)));
     elements.push_back(BSON("" << BSONNULL));
     elements.push_back(BSON("" << BSONUndefined));
@@ -409,26 +416,15 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << OID("abcdefabcdefabcdefabcdef")));
     elements.push_back(BSON("" << Date_t(123)));
     elements.push_back(BSON("" << BSONCode("abc_code")));
-    elements.push_back(BSON("" << BSONCodeWScope("def_code", BSON("x_scope" << "a"))));
-
-
-    {
-        BSONObjBuilder b;
-        b.appendBool("", true);
-        elements.push_back(b.obj());
-    }
-
-    {
-        BSONObjBuilder b;
-        b.appendBool("", false);
-        elements.push_back(b.obj());
-    }
-
-    {
-        BSONObjBuilder b;
-        b.appendBool("", false);
-        elements.push_back(b.obj());
-    }
+    elements.push_back(BSON("" << BSONCode(ball)));
+    elements.push_back(BSON("" << BSONCode(ball00n)));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code1", BSON("x_scope" << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "a"))));
+    elements.push_back(BSON("" << BSONCodeWScope("def_code2", BSON("x_scope" << "b"))));
+    elements.push_back(BSON("" << BSONCodeWScope(ball, BSON("a" << 1))));
+    elements.push_back(BSON("" << BSONCodeWScope(ball00n, BSON("a" << 1))));
+    elements.push_back(BSON("" << true));
+    elements.push_back(BSON("" << false));
 
     return elements;
 }
@@ -437,21 +433,33 @@ void testPermutation(const std::vector<BSONObj>& elements,
                      const std::vector<BSONObj>& orderings,
                      bool debug) {
 
+    // Note this is O(|orderings| * |elements|**4) for AllPerm2Compare.
+    // If this becomes a bottleneck, we can sort elements for each ordering and then only look at
+    // adjacent cases. Since KeyStrings are compared using memcmp we can assume it provides a total
+    // ordering such that there won't be cases where (a < b && b < c && !(a < c)). This test still
+    // needs to ensure that it provides the *correct* total ordering.
     for (size_t k = 0; k < orderings.size(); k++) {
         BSONObj orderObj = orderings[k];
         Ordering ordering = Ordering::make(orderObj);
-        if (debug) log() << orderObj;
+        if (debug) log() << "ordering: " << orderObj;
         for (size_t i = 0; i < elements.size(); i++) {
             const BSONObj& o1 = elements[i];
-            if (debug) log() << "\t" << o1;
+            if (debug) log() << "\to1: " << o1;
             ROUNDTRIP(o1);
             KeyString k1 = KeyString::make(o1, ordering);
             ASSERT_EQUALS(o1, k1.toBson(ordering));
 
+            KeyString l1 = KeyString::make(BSON("l" << o1.firstElement()), ordering); // kLess
+            KeyString g1 = KeyString::make(BSON("g" << o1.firstElement()), ordering); // kGreater
+            ASSERT_LT(l1, k1);
+            ASSERT_GT(g1, k1);
+
             for (size_t j = 0; j < elements.size(); j++) {
                 const BSONObj& o2 = elements[j];
-                if (debug) log() << "\t\t" << o2;
+                if (debug) log() << "\t\t o2: " << o2;
                 KeyString k2 = KeyString::make(o2, ordering);
+                KeyString g2 = KeyString::make(BSON("g" << o2.firstElement()), ordering);
+                KeyString l2 = KeyString::make(BSON("l" << o2.firstElement()), ordering);
 
                 int c1 = o1.woCompare(o2, ordering);
                 if (c1 < 0) c1 = -1;
@@ -462,19 +470,37 @@ void testPermutation(const std::vector<BSONObj>& elements,
                 //log() << "\n" << k1 << "\n" << k2;
 
                 ASSERT_EQUALS(c1, c2);
+                ASSERT_EQUALS(-c2, k2.compare(k1));
 
-                if (c2 == 0) {
-                    ASSERT_EQUALS(c2, k2.compare(k1));
+                // Test the query encodings using kLess and kGreater
+                int firstElementComp = o1.firstElement().woCompare(o2.firstElement());
+                if (ordering.descending(1))
+                    firstElementComp = -firstElementComp;
+
+                if (firstElementComp == 0) {
+                    // If they share a first element then l1/g1 should equal l2/g2 and l1 should be
+                    // less than both and g1 should be greater than both.
+                    ASSERT_EQ(l1, l2);
+                    ASSERT_EQ(g1, g2);
+                    ASSERT_LT(l1, k2);
+                    ASSERT_GT(g1, k2);
+                }
+                else if (firstElementComp < 0) {
+                    // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
+                    ASSERT_LT(g1, k2);
+                    ASSERT_GT(l2, k1);
                 }
                 else {
-                    ASSERT_EQUALS(-c2, k2.compare(k1));
+                    // k1 is greater than k2. Less(k1) and Greater(k2) should be between them.
+                    ASSERT_LT(g2, k1);
+                    ASSERT_GT(l1, k2);
                 }
             }
         }
     }
 }
 
-TEST(KeyStringTest, AllPremCompare) {
+TEST(KeyStringTest, AllPermCompare) {
     const std::vector<BSONObj>& elements = getInterestingElements();
 
     for (size_t i = 0; i < elements.size(); i++) {
@@ -490,7 +516,7 @@ TEST(KeyStringTest, AllPremCompare) {
     testPermutation(elements, orderings, false);
 }
 
-TEST(KeyStringTest, AllPrem2Compare) {
+TEST(KeyStringTest, AllPerm2Compare) {
     const std::vector<BSONObj>& baseElements = getInterestingElements();
 
     std::vector<BSONObj> elements;
