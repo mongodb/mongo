@@ -806,20 +806,28 @@ namespace mongo {
 
             // Do the update and return.
             BSONObj reFetched;
-            int attempt = 1;
+            uint64_t attempt = 1;
+
             while ( attempt++ ) {
                 try {
                     transformAndUpdate(reFetched.isEmpty() ? oldObj : reFetched , loc);
                     break;
                 }
                 catch ( const WriteConflictException& de ) {
+                    if ( !_params.request->isMulti() ) {
+                        // We don't handle this here as we handle at the top level.
+                        throw;
+                    }
+
                     _params.opDebug->writeConflicts++;
+
+                    _txn->recoveryUnit()->commitAndRestart();
+
+                    _txn->checkForInterrupt();
 
                     WriteConflictException::logAndBackoff( attempt,
                                                            "multi-update",
                                                            _collection->ns().ns() );
-
-                    _txn->recoveryUnit()->commitAndRestart();
 
                     if ( attempt > 2 ) {
                         // This means someone else is in this same loop trying to update
