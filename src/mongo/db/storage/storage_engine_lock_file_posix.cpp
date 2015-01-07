@@ -95,7 +95,7 @@ namespace {
         }
 
         int lockFile = ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-        if (lockFile <= 0) {
+        if (lockFile < 0) {
             int errorcode = errno;
             return Status(ErrorCodes::DBPathInUse, str::stream()
                 << "Unable to create/open lock file: "
