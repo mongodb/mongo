@@ -119,7 +119,7 @@ namespace {
                                     &_electionFinishedEvent);
 
 
-        invariant(_rsConfig.getMemberAt(_thisMembersConfigIndex).isElectable());
+        invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
         OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
 
         if (lastOpTimeApplied == OpTime()) {
@@ -133,7 +133,7 @@ namespace {
                 &_replExecutor,
                 lastOpTimeApplied,
                 _rsConfig,
-                _thisMembersConfigIndex,
+                _selfIndex,
                 _topCoord->getMaybeUpHostAndPorts(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onFreshnessCheckComplete, this));
         if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -166,7 +166,7 @@ namespace {
             case FreshnessChecker::None:
                 break;
             case FreshnessChecker::FreshnessTie:
-                if ((_thisMembersConfigIndex != 0) && !_sleptLastElection) {
+                if ((_selfIndex != 0) && !_sleptLastElection) {
                     const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
                     const Date_t nextCandidateTime = now + ms;
                     log() << "replSet possible election tie; sleeping " << ms << "ms until " <<
@@ -204,7 +204,7 @@ namespace {
         StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electCmdRunner->start(
                 &_replExecutor,
                 _rsConfig,
-                _thisMembersConfigIndex,
+                _selfIndex,
                 _topCoord->getMaybeUpHostAndPorts(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete, this));
         if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {

@@ -157,10 +157,10 @@ namespace {
         _replExecutor(network, prngSeed),
         _externalState(externalState),
         _inShutdown(false),
-        _currentState(MemberState::RS_STARTUP),
+        _memberState(MemberState::RS_STARTUP),
         _isWaitingForDrainToComplete(false),
         _rsConfigState(kConfigPreStart),
-        _thisMembersConfigIndex(-1),
+        _selfIndex(-1),
         _sleptLastElection(false),
         _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.slave)),
         _canServeNonLocalReads(0U) {
@@ -383,13 +383,13 @@ namespace {
         return _replMode;
     }
 
-    MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
+    MemberState ReplicationCoordinatorImpl::getMemberState() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        return _getCurrentMemberState_inlock();
+        return _getMemberState_inlock();
     }
 
-    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
-        return _currentState;
+    MemberState ReplicationCoordinatorImpl::_getMemberState_inlock() const {
+        return _memberState;
     }
 
     Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
@@ -397,8 +397,8 @@ namespace {
         invariant(_rsConfig.isInitialized());
         uassert(28524,
                 "Node not a member of the current set configuration",
-                _thisMembersConfigIndex != -1);
-        return _rsConfig.getMemberAt(_thisMembersConfigIndex).getSlaveDelay();
+                _selfIndex != -1);
+        return _rsConfig.getMemberAt(_selfIndex).getSlaveDelay();
     }
 
     void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
@@ -488,7 +488,7 @@ namespace {
         _topCoord->setFollowerMode(newState.s);
 
         const PostMemberStateUpdateAction action =
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            _updateMemberStateFromTopologyCoordinator_inlock();
         *success = true;
         _replExecutor.signalEvent(finishedSettingFollowerMode);
         lk.unlock();
@@ -590,7 +590,7 @@ namespace {
         SlaveInfoVector oldSlaveInfos;
         _slaveInfo.swap(oldSlaveInfos);
 
-        if (_thisMembersConfigIndex == -1) {
+        if (_selfIndex == -1) {
             // If we aren't in the config then the only data we care about is for ourself
             for (SlaveInfoVector::const_iterator it = oldSlaveInfos.begin();
                     it != oldSlaveInfos.end(); ++it) {
@@ -615,7 +615,7 @@ namespace {
             for (SlaveInfoVector::const_iterator it = oldSlaveInfos.begin();
                     it != oldSlaveInfos.end(); ++it) {
                 if ((it->memberId == memberId && it->hostAndPort == memberHostAndPort)
-                        || (i == _thisMembersConfigIndex && it->self)) {
+                        || (i == _selfIndex && it->self)) {
                     slaveInfo = *it;
                 }
             }
@@ -635,12 +635,12 @@ namespace {
         }
         else {
             invariant(_settings.usingReplSets());
-            if (_thisMembersConfigIndex == -1) {
+            if (_selfIndex == -1) {
                 invariant(_slaveInfo.size() == 1);
                 return 0;
             }
             else {
-                return _thisMembersConfigIndex;
+                return _selfIndex;
             }
         }
     }
@@ -697,7 +697,7 @@ namespace {
         if (_getReplicationMode_inlock() != modeReplSet) {
             return;
         }
-        if (_getCurrentMemberState_inlock().primary()) {
+        if (_getMemberState_inlock().primary()) {
             return;
         }
         lock->unlock();
@@ -724,7 +724,7 @@ namespace {
     Status ReplicationCoordinatorImpl::_setLastOptime_inlock(
             const UpdatePositionArgs::UpdateInfo& args) {
 
-        if (_thisMembersConfigIndex == -1) {
+        if (_selfIndex == -1) {
             // Ignore updates when we're in state REMOVED
             return Status(ErrorCodes::NotMasterOrSecondaryCode,
                           "Received replSetUpdatePosition command but we are in state REMOVED");
@@ -732,7 +732,7 @@ namespace {
         invariant(_getReplicationMode_inlock() == modeReplSet);
 
         if (args.rid == _getMyRID_inlock() ||
-                args.memberId == _rsConfig.getMemberAt(_thisMembersConfigIndex).getId()) {
+                args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
             // Do not let remote nodes tell us what our optime is.
             return Status::OK();
         }
@@ -937,7 +937,7 @@ namespace {
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
-        if (replMode == modeReplSet && !_currentState.primary()) {
+        if (replMode == modeReplSet && !_memberState.primary()) {
             return StatusAndDuration(Status(ErrorCodes::NotMaster,
                                             "Not master while waiting for replication"),
                                      Milliseconds(timer->millis()));
@@ -1011,7 +1011,7 @@ namespace {
         const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
         const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
-        if (!getCurrentMemberState().primary()) {
+        if (!getMemberState().primary()) {
             // Note this check is inherently racy - it's always possible for the node to
             // stepdown from some other path before we acquire the global shared lock, but
             // that's okay because we are resiliant to that happening in _stepDownContinue.
@@ -1137,7 +1137,7 @@ namespace {
 
             boost::unique_lock<boost::mutex> lk(_mutex);
             const PostMemberStateUpdateAction action =
-                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+                _updateMemberStateFromTopologyCoordinator_inlock();
             lk.unlock();
             _performPostMemberStateUpdateAction(action);
             *result = Status::OK();
@@ -1194,7 +1194,7 @@ namespace {
         if (_settings.usingReplSets()) {
             boost::lock_guard<boost::mutex> lock(_mutex);
             if (_getReplicationMode_inlock() == modeReplSet &&
-                    _getCurrentMemberState_inlock().primary()) {
+                    _getMemberState_inlock().primary()) {
                 return true;
             }
             return false;
@@ -1278,7 +1278,7 @@ namespace {
             return false;
         }
         // see SERVER-6671
-        MemberState ms = _getCurrentMemberState_inlock();
+        MemberState ms = _getMemberState_inlock();
         switch ( ms.s ) {
         case MemberState::RS_SECONDARY:
         case MemberState::RS_RECOVERING:
@@ -1310,7 +1310,7 @@ namespace {
     }
 
     int ReplicationCoordinatorImpl::_getMyId_inlock() const {
-        const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        const MemberConfig& self = _rsConfig.getMemberAt(_selfIndex);
         return self.getId();
     }
 
@@ -1428,7 +1428,7 @@ namespace {
                 entry.append("optime", itr->opTime);
                 entry.append("host", itr->hostAndPort.toString());
                 if (_getReplicationMode_inlock() == modeReplSet) {
-                    if (_thisMembersConfigIndex == -1) {
+                    if (_selfIndex == -1) {
                         continue;
                     }
                     invariant(itr->memberId >= 0);
@@ -1498,7 +1498,7 @@ namespace {
         }
 
         boost::unique_lock<boost::mutex> lk(_mutex);
-        if (_getCurrentMemberState_inlock().primary()) {
+        if (_getMemberState_inlock().primary()) {
             *result = Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             return;
         }
@@ -1523,7 +1523,7 @@ namespace {
         }
 
         const PostMemberStateUpdateAction action =
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            _updateMemberStateFromTopologyCoordinator_inlock();
         *result = Status::OK();
         lk.unlock();
         _performPostMemberStateUpdateAction(action);
@@ -1631,7 +1631,7 @@ namespace {
                 getMyLastOptime(),
                 response);
         if ((outStatus->isOK() || *outStatus == ErrorCodes::InvalidReplicaSetConfig) &&
-                _thisMembersConfigIndex < 0) {
+                _selfIndex < 0) {
             // If this node does not belong to the configuration it knows about, send heartbeats
             // back to any node that sends us a heartbeat, in case one of those remote nodes has
             // a configuration that contains us.  Chances are excellent that it will, since that
@@ -1675,10 +1675,10 @@ namespace {
 
         invariant(_rsConfig.isInitialized());
 
-        if (!args.force && !_getCurrentMemberState_inlock().primary()) {
+        if (!args.force && !_getMemberState_inlock().primary()) {
             return Status(ErrorCodes::NotMaster, str::stream() <<
                           "replSetReconfig should only be run on PRIMARY, but my state is " <<
-                          _getCurrentMemberState_inlock().toString() <<
+                          _getMemberState_inlock().toString() <<
                           "; use the \"force\" argument to override");
         }
 
@@ -1891,16 +1891,16 @@ namespace {
     }
 
     ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-    ReplicationCoordinatorImpl::_updateCurrentMemberStateFromTopologyCoordinator_inlock() {
+    ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         const MemberState newState = _topCoord->getMemberState();
-        if (newState == _currentState) {
+        if (newState == _memberState) {
             if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
                 return kActionWinElection;
             }
             return kActionNone;
         }
         PostMemberStateUpdateAction result;
-        if (_currentState.primary() || newState.removed()) {
+        if (_memberState.primary() || newState.removed()) {
             // Wake up any threads blocked in awaitReplication, close connections, etc.
             for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                  it != _replicationWaiterList.end(); ++it) {
@@ -1913,7 +1913,7 @@ namespace {
             result = kActionCloseAllConnections;
         }
         else {
-            if (_currentState.secondary() && !newState.primary()) {
+            if (_memberState.secondary() && !newState.primary()) {
                 // Switching out of SECONDARY, but not to PRIMARY.
                 _canServeNonLocalReads.store(0U);
             }
@@ -1930,7 +1930,7 @@ namespace {
             result = kActionWinElection;
         }
 
-        _currentState = newState;
+        _memberState = newState;
         log() << "transition to " << newState.toString() << rsLog;
         return result;
     }
@@ -1954,7 +1954,7 @@ namespace {
             _topCoord->processWinElection(_electionId, getNextGlobalOptime());
             _isWaitingForDrainToComplete = true;
             const PostMemberStateUpdateAction nextAction =
-                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+                _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);
             lk.unlock();
             _performPostMemberStateUpdateAction(nextAction);
@@ -2057,12 +2057,12 @@ namespace {
                  myOptime);
          _rsConfig = newConfig;
          log() << "new replica set config in use: " << _rsConfig.toBSON() << rsLog;
-         _thisMembersConfigIndex = myIndex;
+         _selfIndex = myIndex;
 
          const PostMemberStateUpdateAction action =
-             _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+             _updateMemberStateFromTopologyCoordinator_inlock();
          _updateSlaveInfoFromConfig_inlock();
-         if (_thisMembersConfigIndex >= 0) {
+         if (_selfIndex >= 0) {
              // Don't send heartbeats if we're not in the config, if we get re-added one of the
              // nodes in the set will contact us.
              _startHeartbeats();
@@ -2097,7 +2097,7 @@ namespace {
             somethingChanged = true;
         }
 
-        if (somethingChanged && !_getCurrentMemberState_inlock().primary()) {
+        if (somethingChanged && !_getMemberState_inlock().primary()) {
             lock.unlock();
             _externalState->forwardSlaveProgress(); // Must do this outside _mutex
         }
@@ -2110,7 +2110,7 @@ namespace {
 
         boost::unique_lock<boost::mutex> lock(_mutex);
         if (_getReplicationMode_inlock() == modeReplSet) {
-            if (_thisMembersConfigIndex == -1) {
+            if (_selfIndex == -1) {
                 // Ignore updates when we're in state REMOVED
                 return Status(ErrorCodes::NotMasterOrSecondaryCode,
                               "Received replSetUpdatePosition command but we are in state REMOVED");
@@ -2131,7 +2131,7 @@ namespace {
             slaveInfo->rid = handshake.getRid();
             slaveInfo->hostAndPort = member->getHostAndPort();
 
-            if (!_getCurrentMemberState_inlock().primary()) {
+            if (!_getMemberState_inlock().primary()) {
                 lock.unlock();
                 _externalState->forwardSlaveHandshake(); // must do outside _mutex
             }
@@ -2156,10 +2156,10 @@ namespace {
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        if (_thisMembersConfigIndex == -1) {
+        if (_selfIndex == -1) {
             return true;
         }
-        const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        const MemberConfig& self = _rsConfig.getMemberAt(_selfIndex);
         return self.shouldBuildIndexes();
     }
 
@@ -2187,12 +2187,12 @@ namespace {
         invariant(_settings.usingReplSets());
 
         std::vector<HostAndPort> nodes;
-        if (_thisMembersConfigIndex == -1) {
+        if (_selfIndex == -1) {
             return nodes;
         }
 
         for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
-            if (i == _thisMembersConfigIndex)
+            if (i == _selfIndex)
                 continue;
 
             nodes.push_back(_rsConfig.getMemberAt(i).getHostAndPort());
@@ -2242,7 +2242,7 @@ namespace {
             return Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
         }
 
-        if (getCurrentMemberState().startup()) {
+        if (getMemberState().startup()) {
             result->append("info", "run rs.initiate(...) if not yet done for the set");
             return Status(ErrorCodes::NotYetInitialized, "no replset config has been received");
         }

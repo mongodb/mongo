@@ -1412,7 +1412,7 @@ namespace mongo {
         if (!c->maintenanceOk()
                 && replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
                 && !replCoord->canAcceptWritesForDatabase(dbname)
-                && !replCoord->getCurrentMemberState().secondary()) {
+                && !replCoord->getMemberState().secondary()) {
             result.append( "note" , "from execCommand" );
             appendCommandStatus(result, false, "node is recovering");
             return;

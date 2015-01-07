@@ -107,7 +107,7 @@ namespace repl {
 
     bool SyncSourceFeedback::replHandshake(OperationContext* txn) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (replCoord->getCurrentMemberState().primary()) {
+        if (replCoord->getMemberState().primary()) {
             // primary has no one to handshake to
             return true;
         }
@@ -194,7 +194,7 @@ namespace repl {
 
     Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (replCoord->getCurrentMemberState().primary()) {
+        if (replCoord->getMemberState().primary()) {
             // primary has no one to update to
             return Status::OK();
         }
@@ -266,7 +266,7 @@ namespace repl {
                 _handshakeNeeded = false;
             }
 
-            MemberState state = replCoord->getCurrentMemberState();
+            MemberState state = replCoord->getMemberState();
             if (state.primary() || state.startup()) {
                 _resetConnection();
                 continue;

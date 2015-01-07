@@ -57,7 +57,7 @@ namespace {
     };
 
     void ReplCoordHBTest::assertMemberState(const MemberState expected, std::string msg) {
-        const MemberState actual = getReplCoord()->getCurrentMemberState();
+        const MemberState actual = getReplCoord()->getMemberState();
         ASSERT(expected == actual) << "Expected coordinator to report state " <<
             expected.toString() << " but found " << actual.toString() << " - " << msg;
     }

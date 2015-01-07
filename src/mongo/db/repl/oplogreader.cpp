@@ -173,7 +173,7 @@ namespace repl {
                 if (!worked) {
                     warning() << "Failed to transition into "
                               << MemberState(MemberState::RS_RECOVERING)
-                              << ". Current state: " << replCoord->getCurrentMemberState();
+                              << ". Current state: " << replCoord->getMemberState();
                 }
                 return;
             }

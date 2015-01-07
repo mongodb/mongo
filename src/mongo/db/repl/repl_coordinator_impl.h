@@ -86,7 +86,7 @@ namespace repl {
 
         virtual Mode getReplicationMode() const;
 
-        virtual MemberState getCurrentMemberState() const;
+        virtual MemberState getMemberState() const;
 
         virtual bool isInPrimaryOrSecondaryState() const;
 
@@ -275,7 +275,7 @@ namespace repl {
         };
 
         /**
-         * Type describing actions to take after a change to the MemberState _currentState.
+         * Type describing actions to take after a change to the MemberState _memberState.
          */
         enum PostMemberStateUpdateAction {
             kActionNone,
@@ -557,7 +557,7 @@ namespace repl {
                                 int targetIndex);
 
 
-        MemberState _getCurrentMemberState_inlock() const;
+        MemberState _getMemberState_inlock() const;
 
         /**
          * Returns the current replication mode. This method requires the caller to be holding
@@ -608,14 +608,14 @@ namespace repl {
         void _setConfigState_inlock(ConfigState newState);
 
         /**
-         * Updates the cached value, _currentState, to match _topCoord's reported
+         * Updates the cached value, _memberState, to match _topCoord's reported
          * member state, from getMemberState().
          *
          * Returns an enum indicating what action to take after releasing _mutex, if any.
          * Call performPostMemberStateUpdateAction on the return value after releasing
          * _mutex.
          */
-        PostMemberStateUpdateAction _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        PostMemberStateUpdateAction _updateMemberStateFromTopologyCoordinator_inlock();
 
         /**
          * Performs a post member-state update action.  Do not call while holding _mutex.
@@ -813,7 +813,7 @@ namespace repl {
         SlaveInfoVector _slaveInfo;                                                       // (M)
 
         // Current ReplicaSet state.
-        MemberState _currentState;                                                        // (MX)
+        MemberState _memberState;                                                         // (MX)
 
         // True if we are waiting for the applier to finish draining.
         bool _isWaitingForDrainToComplete;                                                // (M)
@@ -831,7 +831,7 @@ namespace repl {
         ReplicaSetConfig _rsConfig;                                                       // (MX)
 
         // This member's index position in the current config.
-        int _thisMembersConfigIndex;                                                      // (MX)
+        int _selfIndex;                                                                   // (MX)
 
         // Vector of events that should be signaled whenever new heartbeat data comes in.
         std::vector<ReplicationExecutor::EventHandle> _stepDownWaiters;                   // (X)

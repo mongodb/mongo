@@ -178,7 +178,7 @@ namespace {
 
     void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
                                                                        OpTime optime) {
-        invariant(_thisMembersConfigIndex >= 0);
+        invariant(_selfIndex >= 0);
         invariant(targetIndex >= 0);
 
         SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
@@ -197,10 +197,10 @@ namespace {
         switch (action.getAction()) {
         case HeartbeatResponseAction::NoAction:
             // Update the cached member state if different than the current topology member state
-            if (_currentState != _topCoord->getMemberState()) {
+            if (_memberState != _topCoord->getMemberState()) {
                 boost::unique_lock<boost::mutex> lk(_mutex);
                 const PostMemberStateUpdateAction postUpdateAction =
-                    _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+                    _updateMemberStateFromTopologyCoordinator_inlock();
                 lk.unlock();
                 _performPostMemberStateUpdateAction(postUpdateAction);
             }
@@ -213,11 +213,11 @@ namespace {
             _startElectSelf();
             break;
         case HeartbeatResponseAction::StepDownSelf:
-            invariant(action.getPrimaryConfigIndex() == _thisMembersConfigIndex);
+            invariant(action.getPrimaryConfigIndex() == _selfIndex);
             _heartbeatStepDownStart();
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {
-            invariant(action.getPrimaryConfigIndex() != _thisMembersConfigIndex);
+            invariant(action.getPrimaryConfigIndex() != _selfIndex);
             _requestRemotePrimaryStepdown(
                     _rsConfig.getMemberAt(action.getPrimaryConfigIndex()).getHostAndPort());
             break;
@@ -282,7 +282,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         _topCoord->stepDownIfPending();
         const PostMemberStateUpdateAction action =
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            _updateMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
         _performPostMemberStateUpdateAction(action);
     }
@@ -442,7 +442,7 @@ namespace {
         // Make sure that the reconfigFinishFn doesn't finish until we've reset
         // _heartbeatReconfigThread.
         lk.lock();
-        if (_currentState.primary()) {
+        if (_memberState.primary()) {
             // If the primary is receiving a heartbeat reconfig, that strongly suggests
             // that there has been a force reconfiguration.  In any event, it might lead
             // to this node stepping down as primary, so we'd better do it with the global
@@ -467,7 +467,7 @@ namespace {
         invariant(!_rsConfig.isInitialized() ||
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
 
-        if (_getCurrentMemberState_inlock().primary() && !cbData.txn) {
+        if (_getMemberState_inlock().primary() && !cbData.txn) {
             // Not having an OperationContext in the CallbackData means we definitely aren't holding
             // the global lock.  Since we're primary and this reconfig could cause us to stepdown,
             // reschedule this work with the global exclusive lock so the stepdown is safe.
@@ -538,7 +538,7 @@ namespace {
         const Date_t now = _replExecutor.now();
         _seedList.clear();
         for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
-            if (i == _thisMembersConfigIndex) {
+            if (i == _selfIndex) {
                 continue;
             }
             _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);

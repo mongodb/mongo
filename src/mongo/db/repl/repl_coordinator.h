@@ -131,7 +131,7 @@ namespace repl {
          * Returns the current replica set state of this node (PRIMARY, SECONDARY, STARTUP, etc).
          * It is invalid to call this unless getReplicationMode() == modeReplSet.
          */
-        virtual MemberState getCurrentMemberState() const = 0;
+        virtual MemberState getMemberState() const = 0;
 
         /**
          * Returns true if this node is in state PRIMARY or SECONDARY.
@@ -139,7 +139,7 @@ namespace repl {
          * It is invalid to call this unless getReplicationMode() == modeReplSet.
          *
          * This method may be optimized to reduce synchronization overhead compared to
-         * reading the current member state with getCurrentMemberState().
+         * reading the current member state with getMemberState().
          */
         virtual bool isInPrimaryOrSecondaryState() const = 0;
 

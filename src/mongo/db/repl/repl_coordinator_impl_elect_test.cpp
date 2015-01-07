@@ -140,8 +140,8 @@ namespace {
 
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
-        ASSERT(getReplCoord()->getCurrentMemberState().primary()) <<
-            getReplCoord()->getCurrentMemberState().toString();
+        ASSERT(getReplCoord()->getMemberState().primary()) <<
+            getReplCoord()->getMemberState().toString();
         ASSERT(getReplCoord()->isWaitingForApplierToDrain());
 
         // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.

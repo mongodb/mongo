@@ -101,7 +101,7 @@ namespace {
         start();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1, countLogLinesContaining("Did not find local "));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithEmptyConfig) {
@@ -111,14 +111,14 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         // Starting uninitialized, show that we can perform the initiate behavior.
         BSONObjBuilder result1;
@@ -153,7 +153,7 @@ namespace {
         BSONObjBuilder result;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         // Having failed to initiate once, show that we can now initiate.
         BSONObjBuilder result1;
@@ -216,7 +216,7 @@ namespace {
     TEST_F(ReplCoordTest, InitiateFailsIfQuorumNotMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -241,13 +241,13 @@ namespace {
         ASSERT_EQUALS(startDate + 10, getNet()->now());
         prsiThread.join();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiatePassesIfQuorumMet) {
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         ReplSetHeartbeatArgs hbArgs;
         hbArgs.setSetName("mySet");
@@ -284,7 +284,7 @@ namespace {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -296,14 +296,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
         OperationContextNoop txn;
         init("");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
@@ -315,14 +315,14 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, InitiateFailsWhileStoringLocalConfigDocument) {
         OperationContextNoop txn;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 
         BSONObjBuilder result1;
         getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
@@ -336,7 +336,7 @@ namespace {
                              "members" << BSON_ARRAY(
                                      BSON("_id" << 0 << "host" << "node1:12345"))),
                         &result1));
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
@@ -1039,7 +1039,7 @@ namespace {
 
         Status status = getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(0));
         ASSERT_EQUALS(ErrorCodes::NotMaster, status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     }
 
     TEST_F(StepDownTest, StepDownTimeoutAcquiringGlobalLock) {
@@ -1057,7 +1057,7 @@ namespace {
 
         Status status = getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     }
 
     TEST_F(StepDownTest, StepDownNoWaiting) {
@@ -1095,13 +1095,13 @@ namespace {
         exitNetwork();
 
 
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
         enterNetwork(); // So we can safely inspect the topology coordinator
         ASSERT_EQUALS(Date_t(getNet()->now().millis + 1000), getTopoCoord().getStepDownTime());
         ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
         exitNetwork();
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     }
 
     TEST_F(ReplCoordTest, StepDownAndBackUpSingleNode) {
@@ -1115,13 +1115,13 @@ namespace {
         OperationContextReplMock txn;
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000)));
         getNet()->enterNetwork(); // Must do this before inspecting the topocoord
         Date_t stepdownUntil = Date_t(getNet()->now().millis + 1000);
         ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
         ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
         // Now run time forward and make sure that the node becomes primary again when the stepdown
         // period ends.
@@ -1129,7 +1129,7 @@ namespace {
         ASSERT_EQUALS(stepdownUntil, getNet()->now());
         ASSERT_TRUE(getTopoCoord().getMemberState().primary());
         getNet()->exitNetwork();
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     }
 
     /**
@@ -1216,7 +1216,7 @@ namespace {
         runner.start(&txn);
         Status status = runner.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
         // Now use "force" to force it to step down even though no one is caught up
         runner.reset();
@@ -1229,12 +1229,12 @@ namespace {
             getNet()->runUntil(startDate + 1000);
         }
         getNet()->exitNetwork();
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
         runner.setForce(true);
         runner.start(&txn);
         status = runner.getResult();
         ASSERT_OK(status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     }
 
@@ -1283,7 +1283,7 @@ namespace {
         exitNetwork();
 
         ASSERT_OK(runner.getResult());
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     }
 
     TEST_F(StepDownTest, InterruptStepDown) {
@@ -1302,7 +1302,7 @@ namespace {
         runner.setStepDownTime(Milliseconds(60000));
 
         simulateSuccessfulElection();
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
         runner.start(&txn);
 
@@ -1312,12 +1312,12 @@ namespace {
         getReplCoord()->interrupt(opID);
 
         ASSERT_EQUALS(ErrorCodes::Interrupted, runner.getResult());
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
         init();
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeMaster) {
@@ -1344,7 +1344,7 @@ namespace {
         settings.replSet = "mySet/node1:12345";
         init(settings);
         ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
-        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getCurrentMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
@@ -1483,19 +1483,19 @@ namespace {
         // Can't unset maintenance mode if it was never set to begin with.
         Status status = getReplCoord()->setMaintenanceMode(false);
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
         // valid set
         ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+        ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
 
         // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
         getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 
         // When we go back to SECONDARY, we still observe RECOVERING because of maintenance mode.
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+        ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
 
         // Can set multiple times
         ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
@@ -1510,35 +1510,35 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         // Unsetting maintenance mode changes our state to secondary if maintenance mode was
         // the only thinking keeping us out of it.
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
         // From rollback, entering and exiting maintenance mode doesn't change perceived
         // state.
         getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
         ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
         ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
 
         // Rollback is sticky even if entered while in maintenance mode.
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
         ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+        ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
         getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
         ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
         // Can't modify maintenance mode when PRIMARY
          simulateSuccessfulElection();
 
         status = getReplCoord()->setMaintenanceMode(true);
         ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
         simulateStepDownOnIsolation();
 
@@ -1684,7 +1684,7 @@ namespace {
                                                                  "key2" << "value2")))),
                 h4);
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
         IsMasterResponse response;
         getReplCoord()->fillIsMasterForReplSet(&response);

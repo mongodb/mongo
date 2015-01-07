@@ -56,7 +56,7 @@ namespace repl {
 
         virtual Mode getReplicationMode() const;
 
-        virtual MemberState getCurrentMemberState() const;
+        virtual MemberState getMemberState() const;
 
         virtual bool isInPrimaryOrSecondaryState() const;
 

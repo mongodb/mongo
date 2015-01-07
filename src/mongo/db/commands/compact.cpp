@@ -87,7 +87,7 @@ namespace mongo {
             const std::string nsToCompact = parseNsCollectionRequired(db, cmdObj);
 
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-            if (replCoord->getCurrentMemberState().primary() && !cmdObj["force"].trueValue()) {
+            if (replCoord->getMemberState().primary() && !cmdObj["force"].trueValue()) {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }

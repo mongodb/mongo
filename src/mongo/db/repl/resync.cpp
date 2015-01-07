@@ -72,7 +72,7 @@ namespace repl {
 
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                const MemberState memberState = replCoord->getCurrentMemberState();
+                const MemberState memberState = replCoord->getMemberState();
                 if (memberState.startup()) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotYetInitialized,
                                                               "no replication yet active"));

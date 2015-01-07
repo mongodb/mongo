@@ -393,7 +393,7 @@ namespace {
          ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
          getReplCoord()->setMyLastOptime(OpTime(100,0));
          simulateSuccessfulElection();
-         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
          // set hbreconfig to hang while in progress
          getExternalState()->setStoreLocalConfigDocumentToHang(true);

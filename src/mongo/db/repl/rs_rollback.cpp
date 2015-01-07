@@ -728,7 +728,7 @@ namespace {
          *  also, this is better for status reporting - we know what is happening.
          */
         if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            warning() << "Cannot transition from " << replCoord->getCurrentMemberState() <<
+            warning() << "Cannot transition from " << replCoord->getMemberState() <<
                 " to " << MemberState(MemberState::RS_ROLLBACK);
             return 0;
         }
@@ -782,7 +782,7 @@ namespace {
         if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
             warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING) <<
                 "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK) <<
-                "but found self in " << replCoord->getCurrentMemberState();
+                "but found self in " << replCoord->getMemberState();
         }
 
         return 0;
