@@ -14,7 +14,7 @@ func TestISODateValue(t *testing.T) {
             var jsonMap map[string]interface{}
 
             key := "key"
-            value := "ISODate(\"2006-01-02T15:04Z0700\")"
+            value := "ISODate(\"2006-01-02T15:04-0700\")"
             data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
             err := Unmarshal([]byte(data), &jsonMap)
@@ -22,7 +22,7 @@ func TestISODateValue(t *testing.T) {
 
             jsonValue, ok := jsonMap[key].(ISODate)
             So(ok, ShouldBeTrue)
-            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04Z0700"))
+            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04-0700"))
         })
 
         Convey("works for multiple keys", func() {
@@ -53,7 +53,7 @@ func TestISODateValue(t *testing.T) {
             var jsonMap map[string]interface{}
 
             key := "key"
-            value := "ISODate(\"2006-01-02T15:04Z0700\")"
+            value := "ISODate(\"2006-01-02T15:04-0700\")"
             data := fmt.Sprintf(`{"%v":[%v,%v,%v]}`,
                 key, value, value, value)
 
@@ -66,15 +66,15 @@ func TestISODateValue(t *testing.T) {
             for _, _jsonValue := range jsonArray {
                 jsonValue, ok := _jsonValue.(ISODate)
                 So(ok, ShouldBeTrue)
-                So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04Z0700"))
+                So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04-0700"))
             }
         })
 
-        Convey("will take valid format 2006-01-02T15:04:05.000Z0700", func() {
+        Convey("will take valid format 2006-01-02T15:04:05.000-0700", func() {
             var jsonMap map[string]interface{}
 
             key := "key"
-            value := "ISODate(\"2006-01-02T15:04:05.000Z0700\")"
+            value := "ISODate(\"2006-01-02T15:04:05.000-0700\")"
             data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
             err := Unmarshal([]byte(data), &jsonMap)
@@ -82,15 +82,15 @@ func TestISODateValue(t *testing.T) {
 
             jsonValue, ok := jsonMap[key].(ISODate)
             So(ok, ShouldBeTrue)
-            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04:05.000Z0700"))
+            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04:05.000-0700"))
         })
 
 
-        Convey("will take valid format 2006-01-02T15:04:05Z0700", func() {
+        Convey("will take valid format 2006-01-02T15:04:05", func() {
             var jsonMap map[string]interface{}
 
             key := "key"
-            value := "ISODate(\"2014-01-02T15:04:05Z0700\")"
+            value := "ISODate(\"2014-01-02T15:04:05Z\")"
             data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
             err := Unmarshal([]byte(data), &jsonMap)
@@ -98,15 +98,15 @@ func TestISODateValue(t *testing.T) {
 
             jsonValue, ok := jsonMap[key].(ISODate)
             So(ok, ShouldBeTrue)
-            So(jsonValue, ShouldEqual, ISODate("2014-01-02T15:04:05Z0700"))
+            So(jsonValue, ShouldEqual, ISODate("2014-01-02T15:04:05Z"))
         })
 
 
-        Convey("will take valid format 2006-01-02T15:04Z0700", func() {
+        Convey("will take valid format 2006-01-02T15:04-0700", func() {
             var jsonMap map[string]interface{}
 
             key := "key"
-            value := "ISODate(\"2006-01-02T15:04Z0700\")"
+            value := "ISODate(\"2006-01-02T15:04-0700\")"
             data := fmt.Sprintf(`{"%v":%v}`, key, value)
 
             err := Unmarshal([]byte(data), &jsonMap)
@@ -114,7 +114,7 @@ func TestISODateValue(t *testing.T) {
 
             jsonValue, ok := jsonMap[key].(ISODate)
             So(ok, ShouldBeTrue)
-            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04Z0700"))
+            So(jsonValue, ShouldEqual, ISODate("2006-01-02T15:04-0700"))
         })
 
 
