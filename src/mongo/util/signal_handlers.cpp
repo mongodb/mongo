@@ -224,4 +224,12 @@ namespace {
 #endif
     }
 
+#ifdef _WIN32
+    void removeControlCHandler() {
+        massert(28596,
+            "Couldn't unregister Windows Ctrl-C handler",
+            SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), FALSE));
+    }
+#endif
+
 } // namespace mongo

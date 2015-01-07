@@ -44,6 +44,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
@@ -565,6 +566,10 @@ namespace {
     void startService() {
 
         fassert(16454, _startService);
+
+        // Remove the Control-C handler so that we properly process SERVICE_CONTROL_SHUTDOWN
+        // via the service handler instead of CTRL_SHUTDOWN_EVENT via the Control-C Handler
+        removeControlCHandler();
 
         SERVICE_TABLE_ENTRYW dispTable[] = {
             { const_cast<LPWSTR>(_serviceName.c_str()), (LPSERVICE_MAIN_FUNCTION)initService },
