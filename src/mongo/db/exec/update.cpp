@@ -799,7 +799,11 @@ namespace mongo {
                     if ( attempt > 2 ) {
                         // This means someone else is in this same loop trying to update
                         // the same doc.  Lets make sure we give them a chance to finish.
-                        pthread_yield();
+#if !defined(_WIN32)
+                        sched_yield();
+#else
+                        SwitchToThread();
+#endif
                     }
 
                     if ( !_collection->findDoc( _txn, loc, &reFetched ) ) {
