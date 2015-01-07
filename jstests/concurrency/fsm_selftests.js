@@ -1,3 +1,5 @@
+'use strict';
+
 /*
  * This file tests the FSM test framework.
  */

@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * indexed_insert_unordered_bulk.js
  *
@@ -6,12 +8,14 @@
  *
  * Uses an unordered, bulk operation to perform the inserts.
  */
-load('jstests/concurrency/fsm_libs/runner.js'); // for extendWorkload
+load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
 load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
 
-    $config.states.insert = function(db, collName) {
+    $config.data.indexedField = 'indexed_insert_unordered_bulk';
+
+    $config.states.insert = function insert(db, collName) {
         var doc = {};
         doc[this.indexedField] = this.indexedValue;
 
@@ -19,7 +23,9 @@ var $config = extendWorkload($config, function($config, $super) {
         for (var i = 0; i < this.docsPerInsert; ++i) {
             bulk.insert(doc);
         }
-        assertWhenOwnColl.writeOK(bulk.execute());
+        var res = bulk.execute();
+        assertAlways.writeOK(res);
+        assertAlways.eq(this.docsPerInsert, res.nInserted, tojson(res));
 
         this.nInserted += this.docsPerInsert;
     };

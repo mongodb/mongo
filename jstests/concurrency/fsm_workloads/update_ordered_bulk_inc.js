@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * update_ordered_bulk_inc.js
  *
@@ -36,9 +38,9 @@ var $config = (function() {
             var docs = db[collName].find().toArray();
             assertWhenOwnColl.eq(this.docCount, docs.length);
 
-            docs.forEach(function (doc) {
+            docs.forEach(function(doc) {
                 assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
-            });
+            }, this);
         }
     };
 
@@ -56,8 +58,8 @@ var $config = (function() {
     }
 
     return {
-        threadCount: 30,
-        iterations: 100,
+        threadCount: 10,
+        iterations: 20,
         states: states,
         transitions: transitions,
         setup: setup,

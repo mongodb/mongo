@@ -1,8 +1,16 @@
+'use strict';
+
+load('jstests/concurrency/fsm_libs/assert.js');
+load('jstests/concurrency/fsm_libs/cluster.js'); // for Cluster.isStandalone
+load('jstests/concurrency/fsm_libs/parse_config.js'); // for parseConfig
+
 var workerThread = (function() {
 
     // workloads = list of workload filenames
-    // args.tid = the thread identifier
-    // args.latch = the CountDownLatch instance for starting all threads
+    // args.data = 'this' parameter passed to the FSM state functions
+    // args.data.tid = the thread identifier
+    // args.host = the address to make a new connection to
+    // args.latch = CountDownLatch instance for starting all threads
     // args.dbName = the database name
     // args.collName = the collection name
     // args.clusterOptions = the configuration of the cluster
@@ -13,28 +21,31 @@ var workerThread = (function() {
         var myDB;
         var configs = {};
 
-        try {
-            load('jstests/concurrency/fsm_libs/assert.js');
-            globalAssertLevel = args.globalAssertLevel;
+        globalAssertLevel = args.globalAssertLevel;
 
-            if (args.clusterOptions.addr) {
-                // We won't use the implicit db connection created within the thread's scope, so
-                // forcibly clean it up before creating a new connection.
+        try {
+            if (Cluster.isStandalone(args.clusterOptions)) {
+                myDB = db.getSiblingDB(args.dbName);
+            } else {
+                // The implicit database connection created within the thread's scope
+                // is unneeded, so forcibly clean it up
                 db = null;
                 gc();
 
-                myDB = new Mongo(args.clusterOptions.addr).getDB(args.dbName);
-            } else {
-                myDB = db.getSiblingDB(args.dbName);
+                myDB = new Mongo(args.host).getDB(args.dbName);
             }
 
-            load('jstests/concurrency/fsm_libs/runner.js'); // for parseConfig
             workloads.forEach(function(workload) {
-                load(workload);
+                load(workload); // for $config
                 var config = parseConfig($config); // to normalize
-                config.data.tid = args.tid;
+
+                // Copy any modifications that were made to $config.data
+                // during the setup function of the workload
+                var data = Object.extend({}, args.data, true);
+                data = Object.extend(data, config.data, true);
+
                 configs[workload] = {
-                    data: config.data,
+                    data: data,
                     db: myDB,
                     collName: args.collName,
                     startState: config.startState,

@@ -1,3 +1,5 @@
+'use strict';
+
 var fsm = (function() {
     // args.data = 'this' object of the state functions
     // args.db = database object
@@ -12,7 +14,9 @@ var fsm = (function() {
     function runFSM(args) {
         var currentState = args.startState;
         for (var i = 0; i < args.iterations; ++i) {
-            args.states[currentState].call(args.data, args.db, args.collName);
+            var fn = args.states[currentState];
+            assert.eq('function', typeof fn, 'states.' + currentState + ' is not a function');
+            fn.call(args.data, args.db, args.collName);
             var nextState = getWeightedRandomChoice(args.transitions[currentState], Random.rand());
             currentState = nextState;
         }
@@ -28,7 +32,7 @@ var fsm = (function() {
         assert.lt(randVal, 1);
 
         var states = Object.keys(doc);
-        assert.gt(states.length, 0, "transition must have at least one state to transition to");
+        assert.gt(states.length, 0, 'transition must have at least one state to transition to');
 
         // weights = [ 0.25, 0.5, 0.25 ]
         // => accumulated = [ 0.25, 0.75, 1 ]

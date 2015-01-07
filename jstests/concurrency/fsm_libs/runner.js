@@ -1,586 +1,428 @@
-load('jstests/libs/parallelTester.js');
+'use strict';
+
 load('jstests/concurrency/fsm_libs/assert.js');
-load('jstests/concurrency/fsm_libs/utils.js');
-load('jstests/concurrency/fsm_libs/worker_thread.js');
+load('jstests/concurrency/fsm_libs/cluster.js');
+load('jstests/concurrency/fsm_libs/name_utils.js');
+load('jstests/concurrency/fsm_libs/parse_config.js');
+load('jstests/concurrency/fsm_libs/thread_mgr.js');
 
+var runner = (function() {
 
-/** extendWorkload usage:
- *
- * $config = extendWorkload($config, function($config, $super) {
- *   // ... modify $config ...
- *   $config.foo = function() { // override a method
- *     $super.foo.call(this, arguments); // call super
- *   };
- *   return $config;
- * });
- */
-function extendWorkload($config, callback) {
-    assert.eq(2, arguments.length,
-              "extendWorkload must be called with 2 arguments: $config and callback");
-    assert.eq('function', typeof callback,
-              "2nd argument to extendWorkload must be a callback");
-    assert.eq(2, callback.length,
-              "2nd argument to extendWorkload must take 2 arguments: $config and $super");
-    var parsedSuperConfig = parseConfig($config);
-    var childConfig = Object.extend({}, parsedSuperConfig, true);
-    return callback(childConfig, parsedSuperConfig);
-}
+    function validateExecutionMode(mode) {
+        var allowedKeys = [
+            'composed',
+            'parallel'
+        ];
 
-function runWorkloadsSerially(workloads, clusterOptions) {
-    if (typeof workloads === 'string') {
-        workloads = [workloads];
-    }
-    assert.gt(workloads.length, 0);
-    workloads.forEach(function(workload) {
-        // 'workload' is a JS file expected to set the global $config variable to an object.
-        load(workload);
-        assert.neq(typeof $config, 'undefined');
-
-        _runWorkload(workload, $config, clusterOptions);
-    });
-}
-
-function runWorkloadsInParallel(workloads, clusterOptions) {
-    assert.gt(workloads.length, 0);
-
-    var context = {};
-    workloads.forEach(function(workload) {
-        // 'workload' is a JS file expected to set the global $config variable to an object.
-        load(workload);
-        assert.neq(typeof $config, 'undefined');
-        context[workload] = { config: $config };
-    });
-
-    _runAllWorkloads(workloads, context, clusterOptions);
-}
-
-function runMixtureOfWorkloads(workloads, clusterOptions) {
-    assert.gt(workloads.length, 0);
-
-    var context = {};
-    workloads.forEach(function(workload) {
-        // 'workload' is a JS file expected to set the global $config variable to an object.
-        load(workload);
-        assert.neq(typeof $config, 'undefined');
-        context[workload] = { config: $config };
-    });
-
-    clusterOptions = Object.extend({}, clusterOptions, true); // defensive deep copy
-    clusterOptions.sameDB = true;
-    clusterOptions.sameCollection = true;
-
-    var cluster = setupCluster(clusterOptions, 'fakedb');
-    globalAssertLevel = AssertLevel.ALWAYS;
-
-    var cleanup = [];
-    var errors = [];
-
-    try {
-        prepareCollections(workloads, context, cluster, clusterOptions);
-        cleanup = setUpWorkloads(workloads, context);
-
-        var threads = makeAllThreads(workloads, context, clusterOptions, true);
-
-        joinThreads(threads).forEach(function(err) {
-            errors.push(err);
+        Object.keys(mode).forEach(function(option) {
+            assert.contains(option, allowedKeys,
+                            'invalid option: ' + tojson(option) +
+                            '; valid options are: ' + tojson(allowedKeys));
         });
 
-    } finally {
-        // TODO: does order of calling 'config.teardown' matter?
-        cleanup.forEach(function(teardown) {
-            try {
-                teardown.fn.call(teardown.data, teardown.db, teardown.collName);
-            } catch (err) {
-                print('Teardown function threw an exception:\n' + err.stack);
-            }
-        });
+        mode.composed = mode.composed || false;
+        assert.eq('boolean', typeof mode.composed);
 
-        cluster.teardown();
+        mode.parallel = mode.parallel || false;
+        assert.eq('boolean', typeof mode.parallel);
+
+        assert(!mode.composed || !mode.parallel,
+               "properties 'composed' and 'parallel' cannot both be true");
+
+        return mode;
     }
 
-    throwError(errors);
-}
-
-// Validate the config object and return a normalized copy of it.
-// Normalized means all optional parameters are set to their default values,
-// and any parameters that need to be coerced have been coerced.
-function parseConfig(config) {
-    // make a deep copy so we can mutate config without surprising the caller
-    config = Object.extend({}, config, true);
-    var allowedKeys = [
-        'data',
-        'iterations',
-        'setup',
-        'startState',
-        'states',
-        'teardown',
-        'threadCount',
-        'transitions'
-    ];
-    Object.keys(config).forEach(function(k) {
-        assert.gte(allowedKeys.indexOf(k), 0,
-                   "invalid config parameter: " + k + ". valid parameters are: " +
-                   tojson(allowedKeys));
-    });
-
-    assert.eq('number', typeof config.threadCount);
-
-    assert.eq('number', typeof config.iterations);
-
-    config.startState = config.startState || 'init';
-    assert.eq('string', typeof config.startState);
-
-    assert.eq('object', typeof config.states);
-    assert.gt(Object.keys(config.states).length, 0);
-    Object.keys(config.states).forEach(function(k) {
-        assert.eq('function', typeof config.states[k],
-                   "config.states." + k + " is not a function");
-        assert.eq(2, config.states[k].length,
-                  "state functions should accept 2 parameters: db and collName");
-    });
-
-    // assert all states mentioned in config.transitions are present in config.states
-    assert.eq('object', typeof config.transitions);
-    assert.gt(Object.keys(config.transitions).length, 0);
-    Object.keys(config.transitions).forEach(function(fromState) {
-        assert(config.states.hasOwnProperty(fromState),
-               "config.transitions contains a state not in config.states: " + fromState);
-
-        assert.gt(Object.keys(config.transitions[fromState]).length, 0);
-        Object.keys(config.transitions[fromState]).forEach(function(toState) {
-            assert(config.states.hasOwnProperty(toState),
-                   "config.transitions." + fromState +
-                   " contains a state not in config.states: " + toState);
-            assert.eq('number', typeof config.transitions[fromState][toState],
-                      "transitions." + fromState + "." + toState + " should be a number");
-        });
-    });
-
-    config.setup = config.setup || function(){};
-    assert.eq('function', typeof config.setup);
-
-    config.teardown = config.teardown || function(){};
-    assert.eq('function', typeof config.teardown);
-
-    config.data = config.data || {};
-    assert.eq('object', typeof config.data);
-
-    return config;
-}
-
-function setupCluster(clusterOptions, dbName) {
-    var cluster = {};
-
-    var allowedKeys = [
-        'masterSlave',
-        'replication',
-        'sameCollection',
-        'sameDB',
-        'seed',
-        'sharded'
-    ];
-    Object.keys(clusterOptions).forEach(function(opt) {
-        assert(0 <= allowedKeys.indexOf(opt),
-               "invalid option: " + tojson(opt) + ". valid options are: " + tojson(allowedKeys));
-    });
-
-    var verbosityLevel = 1;
-    if (clusterOptions.sharded) {
-        // TODO: allow 'clusterOptions' to specify the number of shards
-        var shardConfig = {
-            shards: 2,
-            mongos: 1,
-            verbose: verbosityLevel
-        };
-
-        // TODO: allow 'clusterOptions' to specify an 'rs' config
-        if (clusterOptions.replication) {
-            shardConfig.rs = {
-                nodes: 3,
-                verbose: verbosityLevel
-            };
+    function validateExecutionOptions(mode, options) {
+        var allowedKeys = [];
+        if (mode.parallel || mode.composed) {
+            allowedKeys.push('numSubsets');
+            allowedKeys.push('subsetSize');
+        }
+        if (mode.composed) {
+            allowedKeys.push('composeProb');
+            allowedKeys.push('iterations');
         }
 
-        var st = new ShardingTest(shardConfig);
-        st.stopBalancer();
-        var mongos = st.s;
+        Object.keys(options).forEach(function(option) {
+            assert.contains(option, allowedKeys,
+                            'invalid option: ' + tojson(option) +
+                            '; valid options are: ' + tojson(allowedKeys));
+        });
 
-        clusterOptions.addr = mongos.host;
-        cluster.db = mongos.getDB(dbName);
-        cluster.shardCollection = function() {
-            st.shardColl.apply(st, arguments);
-        };
-        cluster.teardown = function() {
-            st.stop();
-        };
-    } else if (clusterOptions.replication) {
-        // TODO: allow 'clusterOptions' to specify the number of nodes
-        var replSetConfig = {
-            nodes: 3,
-            nodeOptions: { verbose: verbosityLevel }
-        };
+        if (typeof options.subsetSize !== 'undefined') {
+            assert.eq('number', typeof options.subsetSize);
+            assert.gt(options.subsetSize, 1);
+            assert.eq(options.subsetSize, Math.floor(options.subsetSize),
+                      'expected subset size to be an integer');
+        }
 
-        var rst = new ReplSetTest(replSetConfig);
-        rst.startSet();
+        if (typeof options.numSubsets !== 'undefined') {
+            assert.eq('number', typeof options.numSubsets);
+            assert.gt(options.numSubsets, 0);
+            assert.eq(options.numSubsets, Math.floor(options.numSubsets),
+                      'expected number of subsets to be an integer');
+        }
 
-        // Send the replSetInitiate command and wait for initiation
-        rst.initiate();
-        rst.awaitSecondaryNodes();
+        if (typeof options.iterations !== 'undefined') {
+            assert.eq('number', typeof options.iterations);
+            assert.gt(options.iterations, 0);
+            assert.eq(options.iterations, Math.floor(options.iterations),
+                      'expected number of iterations to be an integer');
+        }
 
-        var primary = rst.getPrimary();
+        if (typeof options.composeProb !== 'undefined') {
+            assert.eq('number', typeof options.composeProb);
+            assert.gt(options.composeProb, 0);
+            assert.lte(options.composeProb, 1);
+        }
 
-        clusterOptions.addr = primary.host;
-        cluster.db = primary.getDB(dbName);
-        cluster.teardown = function() {
-            rst.stopSet();
-        };
-    } else if (clusterOptions.masterSlave) {
-        var rt = new ReplTest('replTest');
-
-        var master = rt.start(true);
-        var slave = rt.start(false);
-
-        master.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
-        slave.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
-
-        clusterOptions.addr = master.host;
-        cluster.db = master.getDB(dbName);
-        cluster.teardown = function() {
-            rt.stop();
-        };
-    } else { // standalone server
-        cluster.db = db.getSiblingDB(dbName);
-        cluster.db.adminCommand({ setParameter: 1, logLevel: verbosityLevel });
-        cluster.teardown = function() {};
+        return options;
     }
 
-    return cluster;
-}
+    /**
+     * Returns an array containing sets of workloads.
+     * Each set of workloads is executed together according to the execution mode.
+     *
+     * For example, returning [ [ workload1, workload2 ], [ workload2, workload3 ] ]
+     * when 'executionMode.parallel == true' causes workloads #1 and #2 to be
+     * executed simultaneously, followed by workloads #2 and #3 together.
+     */
+    function scheduleWorkloads(workloads, executionMode, executionOptions) {
+        if (!executionMode.composed && !executionMode.parallel) { // serial execution
+            return Array.shuffle(workloads).map(function(workload) {
+                return [workload]; // run each workload by itself
+            });
+        }
 
-function _runWorkload(workload, config, clusterOptions) {
-    var context = {};
-    context[workload] = { config: config };
-    _runAllWorkloads([workload], context, clusterOptions);
-}
+        var schedule = [];
 
-// TODO: give this function a more descriptive name?
-// Calls the 'config.setup' function for each workload, and returns
-// an array of 'config.teardown' functions to execute with the appropriate
-// arguments. Note that the implementation relies on having 'db' and 'collName'
-// set as properties on context[workload].
-function setUpWorkloads(workloads, context) {
-    return workloads.map(function(workload) {
+        // Take 'numSubsets' random subsets of the workloads, each
+        // of size 'subsetSize'. Each workload must get scheduled
+        // once before any workload can be scheduled again.
+        var subsetSize = executionOptions.subsetSize || 10;
+
+        // If the number of subsets is not specified, then have each
+        // workload get scheduled 2 to 3 times.
+        var numSubsets = executionOptions.numSubsets;
+        if (!numSubsets) {
+            numSubsets = Math.ceil(2.5 * workloads.length / subsetSize);
+        }
+
+        workloads = workloads.slice(0); // copy
+        workloads = Array.shuffle(workloads);
+
+        var start = 0;
+        var end = subsetSize;
+
+        while (schedule.length < numSubsets) {
+            schedule.push(workloads.slice(start, end));
+
+            start = end;
+            end += subsetSize;
+
+            // Check if there are not enough elements remaining in
+            // 'workloads' to make a subset of size 'subsetSize'.
+            if (end > workloads.length) {
+                // Re-shuffle the beginning of the array, and prepend it
+                // with the workloads that have not been scheduled yet.
+                var temp = Array.shuffle(workloads.slice(0, start));
+                for (var i = workloads.length - 1; i >= start; --i) {
+                    temp.unshift(workloads[i]);
+                }
+                workloads = temp;
+
+                start = 0;
+                end = subsetSize;
+            }
+        }
+
+        return schedule;
+    }
+
+    function prepareCollections(workloads, context, cluster, clusterOptions) {
+        var dbName, collName, myDB;
+        var firstWorkload = true;
+
+        workloads.forEach(function(workload) {
+            if (firstWorkload || !clusterOptions.sameCollection) {
+                if (firstWorkload || !clusterOptions.sameDB) {
+                    dbName = uniqueDBName();
+                }
+                collName = uniqueCollName();
+
+                myDB = cluster.getDB(dbName);
+                myDB[collName].drop();
+
+                if (cluster.isSharded()) {
+                    // TODO: allow 'clusterOptions' to specify the shard key and split
+                    cluster.shardCollection(myDB[collName], { _id: 'hashed' }, false);
+                }
+            }
+
+            context[workload].db = myDB;
+            context[workload].dbName = dbName;
+            context[workload].collName = collName;
+
+            firstWorkload = false;
+        });
+    }
+
+    function dropAllDatabases(db, blacklist) {
+        var res = db.adminCommand('listDatabases');
+        assert.commandWorked(res);
+
+        res.databases.forEach(function(dbInfo) {
+            if (!Array.contains(blacklist, dbInfo.name)) {
+                var res = db.getSiblingDB(dbInfo.name).dropDatabase();
+                assert.commandWorked(res);
+                assert.eq(dbInfo.name, res.dropped);
+            }
+        });
+    }
+
+    function cleanupWorkloadData(workloads, context, clusterOptions) {
+        // If no other workloads will be using this collection,
+        // then drop it to avoid having too many files open
+        if (!clusterOptions.sameCollection) {
+            workloads.forEach(function(workload) {
+                var config = context[workload];
+                config.db[config.collName].drop();
+            });
+        }
+
+        // If no other workloads will be using this database,
+        // then drop it to avoid having too many files open
+        if (!clusterOptions.sameDB) {
+            workloads.forEach(function(workload) {
+                var config = context[workload];
+                config.db.dropDatabase();
+            });
+        }
+    }
+
+    function throwError(workerErrs) {
+
+        // Returns an array containing all unique values from the specified array
+        // and their corresponding number of occurrences in the original array.
+        function freqCount(arr) {
+            var unique = [];
+            var freqs = [];
+
+            arr.forEach(function(item) {
+                var i = unique.indexOf(item);
+                if (i < 0) {
+                    unique.push(item);
+                    freqs.push(1);
+                } else {
+                    freqs[i]++;
+                }
+            });
+
+            return unique.map(function(value, i) {
+                return { value: value, freq: freqs[i] };
+            });
+        }
+
+        // Indents a multiline string with the specified number of spaces.
+        function indent(str, size) {
+            var prefix = new Array(size + 1).join(' ');
+            return prefix + str.split('\n').join('\n' + prefix);
+        }
+
+        function pluralize(str, num) {
+            var suffix = num > 1 ? 's' : '';
+            return num + ' ' + str + suffix;
+        }
+
+        function prepareMsg(stackTraces) {
+            var uniqueTraces = freqCount(stackTraces);
+            var numUniqueTraces = uniqueTraces.length;
+
+            // Special case message when threads all have the same trace
+            if (numUniqueTraces === 1) {
+                return pluralize('thread', stackTraces.length) + ' threw\n\n' +
+                       indent(uniqueTraces[0].value, 8);
+            }
+
+            var summary = pluralize('thread', stackTraces.length) + ' threw ' +
+                          numUniqueTraces + ' different exceptions:\n\n';
+
+            return summary + uniqueTraces.map(function(obj) {
+                var line = pluralize('thread', obj.freq) + ' threw\n';
+                return indent(line + obj.value, 8);
+            }).join('\n\n');
+        }
+
+        if (workerErrs.length > 0) {
+            var stackTraces = workerErrs.map(function(e) {
+                return e.stack || e.err;
+            });
+
+            var err = new Error(prepareMsg(stackTraces) + '\n');
+
+            // Avoid having any stack traces omitted from the logs
+            var maxLogLine = 10 * 1024; // 10KB
+
+            // Check if the combined length of the error message and the stack traces
+            // exceeds the maximum line-length the shell will log
+            if (err.stack.length >= maxLogLine) {
+                print(err.stack);
+                throw new Error('stack traces would have been snipped, see logs');
+            }
+
+            throw err;
+        }
+    }
+
+    function setupWorkload(workload, context) {
         var myDB = context[workload].db;
         var collName = context[workload].collName;
 
         var config = context[workload].config;
-        config = parseConfig(config);
         config.setup.call(config.data, myDB, collName);
-
-        return {
-            fn: config.teardown,
-            data: config.data,
-            db: myDB,
-            collName: collName
-        };
-    });
-}
-
-function prepareCollections(workloads, context, cluster, clusterOptions) {
-    var dbName, collName, myDB;
-    var firstWorkload = true;
-
-    // Clean up the state left behind by other tests in the concurrency suite
-    // to avoid having too many open files
-    db.dropDatabase();
-
-    workloads.forEach(function(workload) {
-        if (firstWorkload || !clusterOptions.sameCollection) {
-            if (firstWorkload || !clusterOptions.sameDB) {
-                dbName = uniqueDBName();
-            }
-            collName = uniqueCollName();
-
-            myDB = cluster.db.getSiblingDB(dbName);
-            myDB[collName].drop();
-
-            if (clusterOptions.sharded) {
-                // TODO: allow 'clusterOptions' to specify the shard key and split
-                cluster.shardCollection(myDB[collName], { _id: 'hashed' }, false);
-            }
-        }
-
-        context[workload].db = myDB;
-        context[workload].dbName = dbName;
-        context[workload].collName = collName;
-
-        firstWorkload = false;
-    });
-}
-
-/* This is the function that most other run*Workload* functions delegate to.
- * It takes an array of workload filenames and runs them all in parallel.
- *
- * TODO: document the other two parameters
- */
-function _runAllWorkloads(workloads, context, clusterOptions) {
-    clusterOptions = Object.extend({}, clusterOptions, true); // defensive deep copy
-    var cluster = setupCluster(clusterOptions, 'fakedb');
-
-    // Determine how strong to make assertions while simultaneously executing different workloads
-    var assertLevel = AssertLevel.OWN_DB;
-    if (clusterOptions.sameDB) {
-        // The database is shared by multiple workloads, so only make the asserts
-        // that apply when the collection is owned by an individual workload
-        assertLevel = AssertLevel.OWN_COLL;
-    }
-    if (clusterOptions.sameCollection) {
-        // The collection is shared by multiple workloads, so only make the asserts
-        // that always apply
-        assertLevel = AssertLevel.ALWAYS;
-    }
-    globalAssertLevel = assertLevel;
-
-    var cleanup = [];
-    var errors = [];
-
-    try {
-        prepareCollections(workloads, context, cluster, clusterOptions);
-        cleanup = setUpWorkloads(workloads, context);
-
-        var threads = makeAllThreads(workloads, context, clusterOptions, false);
-
-        joinThreads(threads).forEach(function(err) {
-            errors.push(err);
-        });
-    } finally {
-        // TODO: does order of calling 'config.teardown' matter?
-        cleanup.forEach(function(teardown) {
-            try {
-                teardown.fn.call(teardown.data, teardown.db, teardown.collName);
-            } catch (err) {
-                print('Teardown function threw an exception:\n' + err.stack);
-            }
-        });
-
-        cluster.teardown();
     }
 
-    throwError(errors);
-}
+    function teardownWorkload(workload, context) {
+        var myDB = context[workload].db;
+        var collName = context[workload].collName;
 
-function makeAllThreads(workloads, context, clusterOptions, compose) {
-    var threadFn, getWorkloads;
-    if (compose) {
-        // Worker threads need to load() all workloads when composed
-        threadFn = workerThread.composed;
-        getWorkloads = function() { return workloads; };
-    } else {
-        // Worker threads only need to load() the specified workload
-        threadFn = workerThread.fsm;
-        getWorkloads = function(workload) { return [workload]; };
-    }
-
-    function sumRequestedThreads() {
-        return Array.sum(workloads.map(function(wl) {
-            return context[wl].config.threadCount;
-        }));
-    }
-
-    // TODO: pick a better cap for maximum allowed threads?
-    var maxAllowedThreads = 100;
-    var requestedNumThreads = sumRequestedThreads();
-    if (requestedNumThreads > maxAllowedThreads) {
-        print('\n\ntoo many threads requested: ' + requestedNumThreads);
-        // Scale down the requested '$config.threadCount' values to make
-        // them sum to less than 'maxAllowedThreads'
-        var factor = maxAllowedThreads / requestedNumThreads;
-        workloads.forEach(function(workload) {
-            var threadCount = context[workload].config.threadCount;
-            threadCount = Math.floor(factor * threadCount);
-            threadCount = Math.max(1, threadCount); // ensure workload is executed
-            context[workload].config.threadCount = threadCount;
-        });
-    }
-    var numThreads = sumRequestedThreads();
-    print('using num threads: ' + numThreads);
-    assert.lte(numThreads, maxAllowedThreads);
-
-    var latch = new CountDownLatch(numThreads);
-
-    var threads = [];
-
-    jsTest.log(workloads.join('\n'));
-    Random.setRandomSeed(clusterOptions.seed);
-
-    var tid = 0;
-    workloads.forEach(function(workload) {
-        var workloadsToLoad = getWorkloads(workload);
         var config = context[workload].config;
+        config.teardown.call(config.data, myDB, collName);
+    }
 
-        for (var i = 0; i < config.threadCount; ++i) {
-            var args = {
-                tid: tid++,
-                latch: latch,
-                dbName: context[workload].dbName,
-                collName: context[workload].collName,
-                clusterOptions: clusterOptions,
-                seed: Random.randInt(1e13), // contains range of Date.getTime()
-                globalAssertLevel: globalAssertLevel
-            };
+    function runWorkloads(workloads, clusterOptions, executionMode, executionOptions) {
+        assert.gt(workloads.length, 0, 'need at least one workload to run');
 
-            // Wrap threadFn with try/finally to make sure it always closes the db connection
-            // that is implicitly created within the thread's scope.
-            var guardedThreadFn = function(threadFn, args) {
+        executionMode = validateExecutionMode(executionMode);
+        Object.freeze(executionMode); // immutable after validation (and normalization)
+
+        Object.freeze(executionOptions); // immutable prior to validation
+        validateExecutionOptions(executionMode, executionOptions);
+
+        if (executionMode.composed) {
+            clusterOptions.sameDB = true;
+            clusterOptions.sameCollection = true;
+        }
+        Object.freeze(clusterOptions);
+
+        // Determine how strong to make assertions while simultaneously executing
+        // different workloads
+        var assertLevel = AssertLevel.OWN_DB;
+        if (clusterOptions.sameDB) {
+            // The database is shared by multiple workloads, so only make the asserts
+            // that apply when the collection is owned by an individual workload
+            assertLevel = AssertLevel.OWN_COLL;
+        }
+        if (clusterOptions.sameCollection) {
+            // The collection is shared by multiple workloads, so only make the asserts
+            // that always apply
+            assertLevel = AssertLevel.ALWAYS;
+        }
+        globalAssertLevel = assertLevel;
+
+        var context = {};
+        workloads.forEach(function(workload) {
+            load(workload); // for $config
+            assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
+            context[workload] = { config: parseConfig($config) };
+        });
+
+        var threadMgr = new ThreadManager(clusterOptions, executionMode);
+
+        var cluster = new Cluster(clusterOptions);
+        cluster.setup();
+
+        // Clean up the state left behind by other tests in the concurrency suite
+        // to avoid having too many open files
+        dropAllDatabases(cluster.getDB('test'),
+                         ['admin', 'config', 'local', '$external'] /* blacklist */);
+
+        var maxAllowedConnections = 100;
+        Random.setRandomSeed(clusterOptions.seed);
+
+        try {
+            var schedule = scheduleWorkloads(workloads, executionMode, executionOptions);
+            schedule.forEach(function(workloads) {
+                var cleanup = [];
+                var errors = [];
+                var teardownFailed = false;
+                var startTime, endTime, totalTime;
+
+                jsTest.log(workloads.join('\n'));
+
+                prepareCollections(workloads, context, cluster, clusterOptions);
+
                 try {
-                    return threadFn.apply(this, args);
+                    workloads.forEach(function(workload) {
+                        setupWorkload(workload, context);
+                        cleanup.push(workload);
+                    });
+
+                    startTime = new Date();
+                    threadMgr.init(workloads, context, maxAllowedConnections);
+                    threadMgr.spawnAll(cluster.getHost(), executionOptions);
+                    threadMgr.checkFailed(0.2);
+
+                    errors = threadMgr.joinAll();
                 } finally {
-                    db = null;
-                    gc();
+                    endTime = new Date();
+                    cleanup.forEach(function(workload) {
+                        try {
+                            teardownWorkload(workload, context);
+                        } catch (err) {
+                            print('Workload teardown function threw an exception:\n' + err.stack);
+                            teardownFailed = true;
+                        }
+                    });
+
+                    totalTime = endTime.getTime() - startTime.getTime();
+                    assert.gte(totalTime, 0);
+                    if (!executionMode.parallel && !executionMode.composed) {
+                        jsTest.log(workloads[0] + ': Workload completed in ' + totalTime + ' ms');
+                    }
                 }
-            };
 
-            var t = new ScopedThread(guardedThreadFn, threadFn, [workloadsToLoad, args]);
-            threads.push(t);
-            t.start();
+                // Only drop the collections/databases if all the workloads ran successfully
+                if (!errors.length && !teardownFailed) {
+                    cleanupWorkloadData(workloads, context, clusterOptions);
+                }
 
-            // Wait a little before starting the next thread
-            // to avoid creating new connections at the same time
-            sleep(10);
+                throwError(errors);
+
+                if (teardownFailed) {
+                    throw new Error('workload teardown function(s) failed, see logs');
+                }
+            });
+        } finally {
+            cluster.teardown();
         }
-    });
-
-    var failedThreadIndexes = [];
-    while (latch.getCount() > 0) {
-        threads.forEach(function(t, i) {
-            if (t.hasFailed() && !Array.contains(failedThreadIndexes, i)) {
-                failedThreadIndexes.push(i);
-                latch.countDown();
-            }
-        });
-
-        sleep(100);
     }
 
-    var failedThreads = failedThreadIndexes.length;
-    if (failedThreads > 0) {
-        print(failedThreads + ' thread(s) threw a JS or C++ exception while spawning');
-    }
+    return {
+        serial: function serial(workloads, clusterOptions, executionOptions) {
+            clusterOptions = clusterOptions || {};
+            executionOptions = executionOptions || {};
 
-    var allowedFailure = 0.2;
-    if (failedThreads / numThreads > allowedFailure) {
-        throw new Error('Too many worker threads failed to spawn - aborting');
-    }
+            runWorkloads(workloads, clusterOptions, {}, executionOptions);
+        },
 
-    return threads;
-}
+        parallel: function parallel(workloads, clusterOptions, executionOptions) {
+            clusterOptions = clusterOptions || {};
+            executionOptions = executionOptions || {};
 
-function joinThreads(workerThreads) {
-    var workerErrs = [];
+            runWorkloads(workloads, clusterOptions, { parallel: true }, executionOptions);
+        },
 
-    workerThreads.forEach(function(t) {
-        t.join();
+        composed: function composed(workloads, clusterOptions, executionOptions) {
+            clusterOptions = clusterOptions || {};
+            executionOptions = executionOptions || {};
 
-        var data = t.returnData();
-        if (data && !data.ok) {
-            workerErrs.push(data);
+            runWorkloads(workloads, clusterOptions, { composed: true }, executionOptions);
         }
-    });
+    };
 
-    return workerErrs;
-}
+})();
 
-function throwError(workerErrs) {
-
-    // Returns an array containing all unique values from the specified array
-    // and their corresponding number of occurrences in the original array.
-    function freqCount(arr) {
-        var unique = [];
-        var freqs = [];
-
-        arr.forEach(function(item) {
-            var i = unique.indexOf(item);
-            if (i < 0) {
-                unique.push(item);
-                freqs.push(1);
-            } else {
-                freqs[i]++;
-            }
-        });
-
-        return unique.map(function(value, i) {
-            return { value: value, freq: freqs[i] };
-        });
-    }
-
-    // Indents a multiline string with the specified number of spaces.
-    function indent(str, size) {
-        var prefix = new Array(size + 1).join(' ');
-        return prefix + str.split('\n').join('\n' + prefix);
-    }
-
-    function pluralize(str, num) {
-        var suffix = num > 1 ? 's' : '';
-        return num + ' ' + str + suffix;
-    }
-
-    function prepareMsg(stackTraces) {
-        var uniqueTraces = freqCount(stackTraces);
-        var numUniqueTraces = uniqueTraces.length;
-
-        // Special case message when threads all have the same trace
-        if (numUniqueTraces === 1) {
-            return pluralize('thread', stackTraces.length) + ' threw\n\n' +
-                   indent(uniqueTraces[0].value, 8);
-        }
-
-        var summary = pluralize('thread', stackTraces.length) + ' threw ' +
-                      numUniqueTraces + ' different exceptions:\n\n';
-
-        return summary + uniqueTraces.map(function(obj) {
-            var line = pluralize('thread', obj.freq) + ' threw\n';
-            return indent(line + obj.value, 8);
-        }).join('\n\n');
-    }
-
-    if (workerErrs.length > 0) {
-        var stackTraces = workerErrs.map(function(e) {
-            return e.stack || e.err;
-        });
-
-        var err = new Error(prepareMsg(stackTraces) + '\n');
-
-        // Avoid having any stack traces omitted from the logs
-        var maxLogLine = 10 * 1024; // 10KB
-
-        // Check if the combined length of the error message and the stack traces
-        // exceeds the maximum line-length the shell will log
-        if (err.stack.length >= maxLogLine) {
-            print(err.stack);
-            throw new Error('stack traces would have been snipped, see logs');
-        }
-
-        throw err;
-    }
-}
-
-workerThread.fsm = function(workloads, args) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/concurrency/fsm_libs/fsm.js'); // for fsm.run
-
-    return workerThread.main(workloads, args, function(configs) {
-        var workloads = Object.keys(configs);
-        assert.eq(1, workloads.length);
-        fsm.run(configs[workloads[0]]);
-    });
-};
-
-workerThread.composed = function(workloads, args) {
-    load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread.main
-    load('jstests/concurrency/fsm_libs/composer.js'); // for composer.run
-
-    return workerThread.main(workloads, args, function(configs) {
-        // TODO: make mixing probability configurable
-        composer.run(workloads, configs, 0.1);
-    });
-};
+var runWorkloadsSerially = runner.serial;
+var runWorkloadsInParallel = runner.parallel;
+var runCompositionOfWorkloads = runner.composed;
