@@ -1,5 +1,3 @@
-// wiredtiger_global_options.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -30,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -50,13 +50,6 @@ namespace mongo {
                                             "maximum amount of memory to allocate for cache; "
                                             "defaults to 1/2 of physical RAM")
             .validRange(1,10000);
-        wiredTigerOptions.addOptionChaining("storage.wiredTiger.engineConfig.checkpointDelaySecs",
-                                            "wiredTigerCheckpointDelaySecs",
-                                            moe::Int,
-                                            "seconds to wait between each checkpoint; "
-                                            "setting this value to 0 turns off checkpoints")
-            .validRange(0, 100000)
-            .setDefault(moe::Value(60));
         wiredTigerOptions.addOptionChaining(
             "storage.wiredTiger.engineConfig.statisticsLogDelaySecs",
             "wiredTigerStatisticsLogDelaySecs",
@@ -120,9 +113,9 @@ namespace mongo {
             wiredTigerGlobalOptions.cacheSizeGB =
                 params["storage.wiredTiger.engineConfig.cacheSizeGB"].as<int>();
         }
-        if (params.count("storage.wiredTiger.engineConfig.checkpointDelaySecs")) {
+        if (params.count("storage.syncPeriodSecs")) {
             wiredTigerGlobalOptions.checkpointDelaySecs =
-                params["storage.wiredTiger.engineConfig.checkpointDelaySecs"].as<int>();
+                static_cast<size_t>(params["storage.syncPeriodSecs"].as<double>());
         }
         if (params.count("storage.wiredTiger.engineConfig.statisticsLogDelaySecs")) {
             wiredTigerGlobalOptions.statisticsLogDelaySecs =

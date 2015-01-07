@@ -223,13 +223,9 @@ namespace mongo {
                 "use a smaller default file size",
                 "storage.smallFiles");
 
-        storage_options.addOptionChaining("storage.mmapv1.syncPeriodSecs", "syncdelay",
-                moe::Double,
-                "seconds between disk syncs (0=never, but not recommended)",
-                "storage.syncPeriodSecs")
-            // Note: this default is used by checkpointDelaySecs in WiredTiger options.
-            // Be careful changing this value.
-                                         .setDefault(moe::Value(60.0));
+        storage_options.addOptionChaining("storage.syncPeriodSecs", "syncdelay", moe::Double,
+                "seconds between disk syncs (0=never, but not recommended)")
+            .setDefault(moe::Value(60.0));
 
         // Upgrade and repair are disallowed in JSON configs since they trigger very heavyweight
         // actions rather than specify configuration data
@@ -942,8 +938,8 @@ namespace mongo {
             serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
         }
 
-        if ( params.count("storage.mmapv1.syncPeriodSecs")) {
-            mmapv1GlobalOptions.syncdelay = params["storage.mmapv1.syncPeriodSecs"].as<double>();
+        if ( params.count("storage.syncPeriodSecs")) {
+            storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
         }
 
         if (params.count("storage.directoryPerDB")) {

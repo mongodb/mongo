@@ -51,28 +51,4 @@ expectedResult = {
 testGetCmdLineOptsMongod({ config : "jstests/libs/config_files/disable_noprealloc.ini" },
                          expectedResult);
 
-// Test that --syncdelay is an alias for both mmapv1 and wiredtiger options
-// This test should only run on 64-bit systems that support WiredTiger
-if (db.serverBuildInfo().bits == 32) {
-    jsTest.log("Skipping syncdelay command line option on 32-bit");
-} else {
-    jsTest.log("Testing syncdelay command line option");
-    var expectedResult = {
-        "parsed" : {
-            "storage" : {
-                "mmapv1" : {
-                    "syncPeriodSecs" : 2
-                },
-                "wiredTiger" : {
-                    "engineConfig" : {
-                        "checkpointDelaySecs" : 2
-                    }
-                }
-            }
-        }
-    };
-    testGetCmdLineOptsMongod({ syncdelay : 2 }, expectedResult);
-}
-
-
 print(baseName + " succeeded.");

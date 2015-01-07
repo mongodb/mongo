@@ -96,17 +96,4 @@ namespace mongo {
         }
     } journalCommitIntervalSetting;
 
-
-
-    /**
-     * Specify the interval in seconds between fsync operations where mongod flushes its
-     * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
-     * In almost every situation you should not set this value and use the default setting.
-     */
-    ExportedServerParameter<double> SyncdelaySetting(ServerParameterSet::getGlobal(),
-                                                     "syncdelay",
-                                                     &mmapv1GlobalOptions.syncdelay,
-                                                     true,
-                                                     true);
-
 } // namespace mongo

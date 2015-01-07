@@ -44,8 +44,8 @@ namespace mongo {
             preallocj(true),
             prealloc(false),
             journalCommitInterval(0), // 0 means use default
-            quota(false), quotaFiles(8),
-            syncdelay(60) { }
+            quota(false),
+            quotaFiles(8) {}
 
         // --nssize
         // Specifies the default size for namespace files, which are files that end in .ns.
@@ -89,13 +89,6 @@ namespace mongo {
         // Modifies the limit on the number of data files per database.
         // --quotaFiles option requires that you set --quota.
         int quotaFiles;        // --quotaFiles
-
-        // --syncdelay
-        // Controls how much time can pass before MongoDB flushes data to the data files
-        // via an fsync operation.
-        // Do not set this value on production systems.
-        // In almost every situation, you should use the default setting.
-        double syncdelay;      // seconds between fsyncs
     };
 
     extern MMAPV1Options mmapv1GlobalOptions;

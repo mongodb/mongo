@@ -52,7 +52,10 @@ namespace mongo {
             engine("mmapv1"),
             dbpath(kDefaultDbPath),
             upgrade(false),
-            repair(false) {
+            repair(false),
+            noTableScan(false),
+            directoryperdb(false),
+            syncdelay(60.0) {
             dur = false;
 #if defined(_DURABLEDEFAULTON)
             dur = true;
@@ -98,6 +101,13 @@ namespace mongo {
         // When applied to an existing system, the directoryPerDB option alters
         // the storage pattern of the data directory.
         bool directoryperdb;
+
+        // --syncdelay
+        // Controls how much time can pass before MongoDB flushes data to the data files
+        // via an fsync operation.
+        // Do not set this value on production systems.
+        // In almost every situation, you should use the default setting.
+        double syncdelay;      // seconds between fsyncs
     };
 
     extern StorageGlobalParams storageGlobalParams;
