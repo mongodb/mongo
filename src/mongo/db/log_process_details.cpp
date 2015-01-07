@@ -58,6 +58,7 @@ namespace mongo {
         printOpenSSLVersion();
         printSysInfo();
         printAllocator();
+        printStorageEngineList();
         printCommandLineOpts();
     }
 

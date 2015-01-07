@@ -30,6 +30,8 @@
 
 #include <string>
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
     class BSONObjBuilder;
 
@@ -45,6 +47,9 @@ namespace mongo {
 
     const std::string openSSLVersion(const std::string &prefix = "", const std::string &suffix = "");
     void printOpenSSLVersion();
+
+    const BSONArray storageEngineList();
+    void printStorageEngineList();
 
     std::string sysInfo();
     void printSysInfo();
