@@ -1,11 +1,16 @@
 (function() {
 
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
     // Tests running mongoimport with bad command line options.
 
     jsTest.log('Testing running import with bad command line options');
 
-    var toolTest = new ToolTest('incompatible_flags');
-    var db1 = toolTest.startDB('foo');
+    var toolTest = getToolTest('bad_options');
+    var commonToolArgs = getCommonToolArguments()
+    var db1 = toolTest.db
 
     //Make a dummy file to import by writing a test collection and exporting it
     assert.eq( 0 , db1.c.count() , "setup1" );

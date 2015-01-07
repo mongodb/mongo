@@ -1,5 +1,12 @@
 (function() {
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
     jsTest.log('Testing running import with various data types');
+
+    var toolTest = getToolTest('import');
+    var db1 = toolTest.db
+    var commonToolArgs = getCommonToolArguments()
 
     var testDoc = {
       _id : ObjectId(),
@@ -17,15 +24,12 @@
     }
 
 
-    var toolTest = new ToolTest('import');
-    var db1 = toolTest.startDB('foo');
-
     //Make a dummy file to import by writing a test collection and exporting it
     assert.eq( 0 , db1.c.count() , "setup1" );
     db1.c.save(testDoc)
-    toolTest.runTool( "export" , "--out" , toolTest.extFile , "-d" , toolTest.baseName , "-c" , db1.c.getName());
+    toolTest.runTool.apply(toolTest, ["export" , "--out" , toolTest.extFile , "-d" , toolTest.baseName , "-c" , db1.c.getName()].concat(commonToolArgs));
 
-    var ret = toolTest.runTool("import", "--file",toolTest.extFile, "--db", "imported", "--collection", "testcoll2")
+    var ret = toolTest.runTool.apply(toolTest, ["import", "--file",toolTest.extFile, "--db", "imported", "--collection", "testcoll2"].concat(commonToolArgs))
     var postImportDoc = db1.c.getDB().getSiblingDB("imported").testcoll2.findOne()
 
 
@@ -36,7 +40,6 @@
       jsTest.log("checking field", docKeys[i])
       assert.eq(testDoc[docKeys[i]], postImportDoc[docKeys[i]], "imported field " + docKeys[i] + " does not match original")
     }
-
 
     toolTest.stop();
 }());

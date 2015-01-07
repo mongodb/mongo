@@ -1,10 +1,14 @@
 (function() {
-    jsTest.log('Testing running import with headerline');
 
-    var toolTest = new ToolTest('import_writes');
-    var db1 = toolTest.startDB('foo');
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
 
-    var db = db1.getDB().getSiblingDB("droptest")
+    jsTest.log('Testing running import with bad command line options');
+
+    var toolTest = getToolTest('import_writes');
+    var db = toolTest.db.getSiblingDB("droptest")
+    var commonToolArgs = getCommonToolArguments()
 
     // Verify that --drop works.
     // put a test doc in the collection, run import with --drop,
@@ -12,13 +16,13 @@
     // docs are left.
     db.c.insert({x:1})
     assert.eq(db.c.count(), 1, "collection count should be 1 at setup")
-    var ret = toolTest.runTool("import", "--file",
+    var ret = toolTest.runTool.apply(toolTest, ["import", "--file",
       "jstests/import/testdata/csv_header.csv",
       "--type=csv",
       "--db", db.getName(),
       "--collection", db.c.getName(),
       "--headerline",
-      "--drop")
+      "--drop"].concat(commonToolArgs))
 
     // test csv file contains 3 docs and collection should have been dropped, so the doc we inserted
     // should be gone and only the docs from the test file should be in the collection.
@@ -28,13 +32,13 @@
 
     // --drop on a non-existent collection should not cause error
     db.c.drop()
-    var ret = toolTest.runTool("import", "--file",
+    var ret = toolTest.runTool.apply(toolTest, ["import", "--file",
       "jstests/import/testdata/csv_header.csv",
       "--type=csv",
       "--db", db.getName(),
       "--collection", db.c.getName(),
       "--headerline",
-      "--drop")
+      "--drop"].concat(commonToolArgs))
     assert.eq(ret, 0)
     assert.eq(db.c.count(), 3)
 
