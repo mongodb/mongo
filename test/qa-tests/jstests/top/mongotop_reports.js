@@ -84,11 +84,11 @@ load('jstests/top/util/mongotop_common.js');
     assert.eq(runMongoProgram.apply(this, ['mongotop', '--port', conn.port, '--json', '--rowcount', 1].concat(passthrough.args)), 0, 'failed 1');
     var output = '';
     var shellOutput = rawMongoProgramOutput();
-    jsTest.log("shell output: " + shellOutput);
-    shellOutput.split("\n").forEach(function(line) {
+    jsTest.log('shell output: ' + shellOutput);
+    shellOutput.split('\n').forEach(function(line) {
       if (line.match(shellOutputRegex)) {
         output = line;
-        jsTest.log("raw output: " + output);
+        jsTest.log('raw output: ' + output);
       }
     });
 
@@ -97,8 +97,8 @@ load('jstests/top/util/mongotop_common.js');
 
     // ensure only the active namespaces reports a non-zero value
     for (var namespace in parsedOutput.totals) {
-      var isAuthActivity = namespace.startsWith('admin.system');
-      var isReplActivity = namespace.startsWith('local.');
+      var isAuthActivity = namespace.indexOf('.system.') !== -1;
+      var isReplActivity = namespace.indexOf('local.') !== -1;
 
       // authentication and replication activity should be ignored
       if (isAuthActivity || isReplActivity) {

@@ -72,6 +72,10 @@ var replicaSetTopology = {
     this.replTest.initiate();
     jsTest.log('Initiated replica set');
 
+    // block till the set is fully operational
+    this.replTest.awaitSecondaryNodes();
+    jsTest.log('Replica set fully operational');
+
     // set up the auth user if needed
     if (requiresAuth(passthrough)) {
       runAuthSetup(this);

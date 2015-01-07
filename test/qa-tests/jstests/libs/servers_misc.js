@@ -333,14 +333,6 @@ function startParallelShell( jsCode, port, noConnect ){
         args.push("--port", port);
     }
 
-    if( jsTestOptions().useSSL ) {
-        args.push( "--ssl" )
-        args.push( "--sslPEMKeyFile" )
-        args.push( "jstests/libs/client.pem" )
-        args.push( "--sslCAFile" )
-        args.push( "jstests/libs/ca.pem" )
-    }
-
     x = startMongoProgramNoConnect.apply(null, args);
     return function(){
         waitProgram( x );
