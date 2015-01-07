@@ -97,9 +97,9 @@ func (exp *MongoExport) ValidateSettings() error {
 	return nil
 }
 
-// getOutputWriter returns an io.Writer corresponding to the output location
-// specified in the options.
-func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
+// getOutputWriter opens and returns an io.WriteCloser for the output specified by the config
+// options, or nil if none is set. The caller is responsible for closing it.
+func (exp *MongoExport) GetOutputWriter() (io.WriteCloser, error) {
 	if exp.OutputOpts.OutputFile != "" {
 		// If the directory in which the output file is to be
 		// written does not exist, create it
@@ -115,7 +115,8 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 		}
 		return file, err
 	}
-	return os.Stdout, nil
+	// No writer, so caller should assume Stdout (or some other reasonable default)
+	return nil, nil
 }
 
 // Take a comma-delimited set of field names and build a selector doc for query projection.
@@ -254,13 +255,7 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 // Export executes the entire export operation. It returns an integer of the count
 // of documents successfully exported, and a non-nil error if something went wrong
 // during the export operation.
-func (exp *MongoExport) Export() (int64, error) {
-	out, err := exp.getOutputWriter()
-	if err != nil {
-		return 0, err
-	}
-	defer out.Close()
-
+func (exp *MongoExport) Export(out io.Writer) (int64, error) {
 	count, err := exp.exportInternal(out)
 	return count, err
 }

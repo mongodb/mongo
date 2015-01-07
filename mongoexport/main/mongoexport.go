@@ -68,7 +68,18 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 
-	numDocs, err := exporter.Export()
+	writer, err := exporter.GetOutputWriter()
+	if err != nil {
+		log.Logf(log.Always, "error opening output stream: %v", err)
+		os.Exit(util.ExitError)
+	}
+	if writer == nil {
+		writer = os.Stdout
+	} else {
+		defer writer.Close()
+	}
+
+	numDocs, err := exporter.Export(writer)
 	if err != nil {
 		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
@@ -79,4 +90,5 @@ func main() {
 	} else {
 		log.Logf(log.Always, "exported %v records", numDocs)
 	}
+
 }
