@@ -79,6 +79,18 @@ env.Library(
         ]
     )
 
+env.CppUnitTest(
+    target='storage_engine_mmap_v1_init_test',
+    source=['mmap_v1_init_test.cpp',
+            ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/serveronly',
+        '$BUILD_DIR/mongo/coreserver',
+        '$BUILD_DIR/mongo/coredb',
+        ],
+    NO_CRUTCH=True,
+    )
+
 env.CppUnitTest(target = 'record_access_tracker_test',
                 source = ['record_access_tracker_test.cpp'],
                 LIBDEPS = ['record_access_tracker',

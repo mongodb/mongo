@@ -80,7 +80,13 @@ namespace mongo {
         std::string canonicalName = factory->getCanonicalName().toString();
 
         // Do not proceed if data directory has been used by a different storage engine previously.
-        StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
+
+        // Validate options in metadata against current startup options.
+        if (metadata.get()) {
+            uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
+        }
 
         try {
             _lockFile.reset(new StorageEngineLockFile(storageGlobalParams.dbpath));
@@ -103,7 +109,12 @@ namespace mongo {
         uassertStatusOK(_lockFile->writePid());
 
         // Write a new metadata file if it is not present.
-        StorageEngineMetadata::updateIfMissing(storageGlobalParams.dbpath, canonicalName);
+        if (!metadata.get()) {
+            metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
+            metadata->setStorageEngine(canonicalName);
+            metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
+            uassertStatusOK(metadata->write());
+        }
 
         guard.Dismiss();
 

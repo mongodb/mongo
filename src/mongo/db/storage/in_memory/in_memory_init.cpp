@@ -62,6 +62,15 @@ namespace mongo {
             virtual Status validateIndexStorageOptions(const BSONObj& options) const {
                 return Status::OK();
             }
+
+            virtual Status validateMetadata(const StorageEngineMetadata& metadata,
+                                            const StorageGlobalParams& params) const {
+                return Status::OK();
+            }
+
+            virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+                return BSONObj();
+            }
         };
 
     } // namespace
