@@ -53,6 +53,9 @@ namespace {
         ASSERT_LT(BSON("" << 0.0), BSON("" << std::numeric_limits<double>::denorm_min()));
         ASSERT_GT(BSON("" << 0.0), BSON("" << -std::numeric_limits<double>::denorm_min()));
 
+        ASSERT_LT(BSON("" << 1.0), BSON("" << (1.0 + std::numeric_limits<double>::epsilon())));
+        ASSERT_GT(BSON("" << -1.0), BSON("" << (-1.0 - std::numeric_limits<double>::epsilon())));
+
         ASSERT_EQ(BSON("" << 0.0), BSON("" << -0.0));
 
         ASSERT_GT(BSON("" << std::numeric_limits<double>::infinity()), BSON("" << 0.0));
@@ -63,13 +66,13 @@ namespace {
 
         ASSERT_LT(BSON("" << -std::numeric_limits<double>::infinity()), BSON("" << 0.0));
         ASSERT_LT(BSON("" << -std::numeric_limits<double>::infinity()),
-                  BSON("" << std::numeric_limits<double>::min())); // min is finite
+                  BSON("" << -std::numeric_limits<double>::max()));
         ASSERT_LT(BSON("" << -std::numeric_limits<double>::infinity()),
                   BSON("" << std::numeric_limits<double>::infinity()));
 
         ASSERT_LT(BSON("" << std::numeric_limits<double>::quiet_NaN()), BSON("" << 0.0));
         ASSERT_LT(BSON("" << std::numeric_limits<double>::quiet_NaN()),
-                  BSON("" << std::numeric_limits<double>::min()));
+                  BSON("" << -std::numeric_limits<double>::max()));
         ASSERT_LT(BSON("" << std::numeric_limits<double>::quiet_NaN()),
                   BSON("" << std::numeric_limits<double>::infinity()));
         ASSERT_LT(BSON("" << std::numeric_limits<double>::quiet_NaN()),
@@ -98,6 +101,9 @@ namespace {
 
         ASSERT_LT(BSON("" << 0ll), BSON("" << std::numeric_limits<double>::denorm_min()));
         ASSERT_GT(BSON("" << 0ll), BSON("" << -std::numeric_limits<double>::denorm_min()));
+
+        ASSERT_LT(BSON("" << 1ll), BSON("" << (1.0 + std::numeric_limits<double>::epsilon())));
+        ASSERT_GT(BSON("" << -1ll), BSON("" << (-1.0 - std::numeric_limits<double>::epsilon())));
 
         ASSERT_GT(BSON("" << std::numeric_limits<double>::infinity()), BSON("" << 0ll));
         ASSERT_GT(BSON("" << std::numeric_limits<double>::infinity()),
@@ -163,7 +169,7 @@ namespace {
             const long long minLL = std::numeric_limits<long long>::min();
             const double closestBelow = -9223372036854777856.0; // -2**63 - epsilon
             const double equal = -9223372036854775808.0; // 2**63
-            const double closestAbove = 9223372036854774784.0; // -2**63 + epsilon
+            const double closestAbove = -9223372036854774784.0; // -2**63 + epsilon
 
             invariant(static_cast<double>(minLL) == equal);
             invariant(static_cast<long long>(equal) == minLL);

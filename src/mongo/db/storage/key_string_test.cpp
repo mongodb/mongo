@@ -390,9 +390,6 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << 112353998331165715.0));
     elements.push_back(BSON("" << 112353998331165710.0));
     elements.push_back(BSON("" << 1123539983311657199.0));
-    elements.push_back(BSON("" << std::numeric_limits<double>::quiet_NaN()));
-    elements.push_back(BSON("" << 0.0));
-    elements.push_back(BSON("" << -0.0));
     elements.push_back(BSON("" << 5.0));
     elements.push_back(BSON("" << 5));
     elements.push_back(BSON("" << 2));
@@ -412,7 +409,6 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << BSON_ARRAY("a" << 5)));
     elements.push_back(BSON("" << BSONNULL));
     elements.push_back(BSON("" << BSONUndefined));
-    elements.push_back(BSON("" << 5 << "" << 7));
     elements.push_back(BSON("" << OID("abcdefabcdefabcdefabcdef")));
     elements.push_back(BSON("" << Date_t(123)));
     elements.push_back(BSON("" << BSONCode("abc_code")));
@@ -426,22 +422,113 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << true));
     elements.push_back(BSON("" << false));
 
+    //
+    // Interesting numeric cases
+    //
+
+    elements.push_back(BSON("" << 0.0));
+    elements.push_back(BSON("" << -0.0));
+    elements.push_back(BSON("" << std::numeric_limits<double>::quiet_NaN()));
+    elements.push_back(BSON("" << std::numeric_limits<double>::signaling_NaN())); // TODO hex float
+    elements.push_back(BSON("" << std::numeric_limits<double>::infinity()));
+    elements.push_back(BSON("" << -std::numeric_limits<double>::infinity()));
+    elements.push_back(BSON("" << std::numeric_limits<double>::max()));
+    elements.push_back(BSON("" << -std::numeric_limits<double>::max()));
+    elements.push_back(BSON("" << std::numeric_limits<double>::min()));
+    elements.push_back(BSON("" << -std::numeric_limits<double>::min()));
+    elements.push_back(BSON("" << std::numeric_limits<double>::denorm_min()));
+    elements.push_back(BSON("" << -std::numeric_limits<double>::denorm_min()));
+    elements.push_back(BSON("" << std::numeric_limits<double>::denorm_min()));
+    elements.push_back(BSON("" << -std::numeric_limits<double>::denorm_min()));
+
+    elements.push_back(BSON("" << std::numeric_limits<long long>::max()));
+    elements.push_back(BSON("" << -std::numeric_limits<long long>::max()));
+    elements.push_back(BSON("" << std::numeric_limits<long long>::min()));
+
+    elements.push_back(BSON("" << std::numeric_limits<int>::max()));
+    elements.push_back(BSON("" << -std::numeric_limits<int>::max()));
+    elements.push_back(BSON("" << std::numeric_limits<int>::min()));
+
+    for (int powerOfTwo = 0; powerOfTwo < 63; powerOfTwo++) {
+        const long long lNum = 1ll << powerOfTwo;
+        const double dNum = double(lNum);
+
+        // All powers of two in this range can be represented exactly as doubles.
+        invariant(lNum == static_cast<long long>(dNum));
+
+        elements.push_back(BSON("" << lNum));
+        elements.push_back(BSON("" << -lNum));
+
+        elements.push_back(BSON("" << dNum));
+        elements.push_back(BSON("" << -dNum));
+
+
+        elements.push_back(BSON("" << (lNum + 1)));
+        elements.push_back(BSON("" << (lNum - 1)));
+        elements.push_back(BSON("" << (-lNum + 1)));
+        elements.push_back(BSON("" << (-lNum - 1)));
+
+        if (powerOfTwo <= 52) { // is dNum - 0.5 representable?
+            elements.push_back(BSON("" << (dNum - 0.5)));
+            elements.push_back(BSON("" << -(dNum - 0.5)));
+        }
+
+        if (powerOfTwo <= 51) { // is dNum + 0.5 representable?
+            elements.push_back(BSON("" << (dNum + 0.5)));
+            elements.push_back(BSON("" << -(dNum + 0.5)));
+        }
+    }
+
+    {
+        // Numbers around +/- numeric_limits<long long>::max() which can't be represented
+        // precisely as a double.
+        const long long maxLL = std::numeric_limits<long long>::max();
+        const double closestAbove = 9223372036854775808.0; // 2**63
+        const double closestBelow = 9223372036854774784.0; // 2**63 - epsilon
+
+        elements.push_back(BSON("" << maxLL));
+        elements.push_back(BSON("" << (maxLL - 1)));
+        elements.push_back(BSON("" << closestAbove));
+        elements.push_back(BSON("" << closestBelow));
+
+        elements.push_back(BSON("" << -maxLL));
+        elements.push_back(BSON("" << -(maxLL - 1)));
+        elements.push_back(BSON("" << -closestAbove));
+        elements.push_back(BSON("" << -closestBelow));
+    }
+
+    {
+        // Numbers around numeric_limits<long long>::min() which can be represented precisely as
+        // a double, but not as a positive long long.
+        const long long minLL = std::numeric_limits<long long>::min();
+        const double closestBelow = -9223372036854777856.0; // -2**63 - epsilon
+        const double equal = -9223372036854775808.0; // 2**63
+        const double closestAbove = -9223372036854774784.0; // -2**63 + epsilon
+
+        elements.push_back(BSON("" << minLL));
+        elements.push_back(BSON("" << equal));
+        elements.push_back(BSON("" << closestAbove));
+        elements.push_back(BSON("" << closestBelow));
+    }
+
     return elements;
 }
 
-void testPermutation(const std::vector<BSONObj>& elements,
+void testPermutation(const std::vector<BSONObj>& elementsOrig,
                      const std::vector<BSONObj>& orderings,
                      bool debug) {
 
-    // Note this is O(|orderings| * |elements|**4) for AllPerm2Compare.
-    // If this becomes a bottleneck, we can sort elements for each ordering and then only look at
-    // adjacent cases. Since KeyStrings are compared using memcmp we can assume it provides a total
-    // ordering such that there won't be cases where (a < b && b < c && !(a < c)). This test still
-    // needs to ensure that it provides the *correct* total ordering.
+    // Since KeyStrings are compared using memcmp we can assume it provides a total ordering such
+    // that there won't be cases where (a < b && b < c && !(a < c)). This test still needs to ensure
+    // that it provides the *correct* total ordering.
     for (size_t k = 0; k < orderings.size(); k++) {
         BSONObj orderObj = orderings[k];
         Ordering ordering = Ordering::make(orderObj);
         if (debug) log() << "ordering: " << orderObj;
+
+        std::vector<BSONObj> elements = elementsOrig;
+        std::stable_sort(elements.begin(), elements.end(), BSONObjCmp(orderObj));
+
         for (size_t i = 0; i < elements.size(); i++) {
             const BSONObj& o1 = elements[i];
             if (debug) log() << "\to1: " << o1;
@@ -454,28 +541,29 @@ void testPermutation(const std::vector<BSONObj>& elements,
             ASSERT_LT(l1, k1);
             ASSERT_GT(g1, k1);
 
-            for (size_t j = 0; j < elements.size(); j++) {
-                const BSONObj& o2 = elements[j];
+            if (i + 1 < elements.size()) {
+                const BSONObj& o2 = elements[i + 1];
                 if (debug) log() << "\t\t o2: " << o2;
                 KeyString k2 = KeyString::make(o2, ordering);
                 KeyString g2 = KeyString::make(BSON("g" << o2.firstElement()), ordering);
                 KeyString l2 = KeyString::make(BSON("l" << o2.firstElement()), ordering);
 
-                int c1 = o1.woCompare(o2, ordering);
-                if (c1 < 0) c1 = -1;
-                else if (c1 > 1) c1 = 1;
+                int bsonCmp = o1.woCompare(o2, ordering);
+                invariant(bsonCmp <= 0); // We should be sorted...
 
-                int c2 = k1.compare(k2);
-
-                //log() << "\n" << k1 << "\n" << k2;
-
-                ASSERT_EQUALS(c1, c2);
-                ASSERT_EQUALS(-c2, k2.compare(k1));
+                if (bsonCmp == 0) {
+                    ASSERT_EQ(k1, k2);
+                }
+                else {
+                    ASSERT_LT(k1, k2);
+                }
 
                 // Test the query encodings using kLess and kGreater
                 int firstElementComp = o1.firstElement().woCompare(o2.firstElement());
                 if (ordering.descending(1))
                     firstElementComp = -firstElementComp;
+
+                invariant(firstElementComp <= 0);
 
                 if (firstElementComp == 0) {
                     // If they share a first element then l1/g1 should equal l2/g2 and l1 should be
@@ -485,15 +573,10 @@ void testPermutation(const std::vector<BSONObj>& elements,
                     ASSERT_LT(l1, k2);
                     ASSERT_GT(g1, k2);
                 }
-                else if (firstElementComp < 0) {
+                else {
                     // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
                     ASSERT_LT(g1, k2);
                     ASSERT_GT(l2, k1);
-                }
-                else {
-                    // k1 is greater than k2. Less(k1) and Greater(k2) should be between them.
-                    ASSERT_LT(g2, k1);
-                    ASSERT_GT(l1, k2);
                 }
             }
         }
@@ -509,7 +592,6 @@ TEST(KeyStringTest, AllPermCompare) {
     }
 
     std::vector<BSONObj> orderings;
-    orderings.push_back(BSONObj());
     orderings.push_back(BSON("a" << 1));
     orderings.push_back(BSON("a" << -1));
 
@@ -538,7 +620,6 @@ TEST(KeyStringTest, AllPerm2Compare) {
     }
 
     std::vector<BSONObj> orderings;
-    orderings.push_back(BSONObj());
     orderings.push_back(BSON("a" << 1 << "b" << 1));
     orderings.push_back(BSON("a" << -1 << "b" << 1));
     orderings.push_back(BSON("a" << 1 << "b" << -1));
