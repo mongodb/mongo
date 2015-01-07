@@ -181,6 +181,7 @@ KV
 KVS
 Kanowski's
 Kounavis
+LANGID
 LEX
 LF
 LIBBZ
@@ -437,6 +438,7 @@ btmem
 btree
 btrees
 buf
+buflen
 bufs
 bufsz
 builtin
