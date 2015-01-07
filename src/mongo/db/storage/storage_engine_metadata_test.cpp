@@ -134,6 +134,21 @@ namespace {
         }
     }
 
+    TEST(StorageEngineMetadataTest, InvalidMetadataFileStorageEngineOptionsFieldNotObject) {
+        TempDir tempDir("StorageEngineMetadataTest_IgnoreUnknownField");
+        {
+            std::string filename(tempDir.path() + "/storage.bson");
+            std::ofstream ofs(filename.c_str());
+            BSONObj obj = fromjson("{storage: {engine: \"storageEngine1\", options: 123}}");
+            ofs.write(obj.objdata(), obj.objsize());
+            ofs.flush();
+        }
+        {
+            StorageEngineMetadata metadata(tempDir.path());
+            ASSERT_NOT_OK(metadata.read());
+        }
+    }
+
     // Metadata parser should ignore unknown metadata fields.
     TEST(StorageEngineMetadataTest, IgnoreUnknownField) {
         TempDir tempDir("StorageEngineMetadataTest_IgnoreUnknownField");
@@ -148,6 +163,7 @@ namespace {
             StorageEngineMetadata metadata(tempDir.path());
             ASSERT_OK(metadata.read());
             ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
+            ASSERT_TRUE(metadata.getStorageEngineOptions().isEmpty());
         }
     }
 
@@ -161,9 +177,11 @@ namespace {
 
     TEST(StorageEngineMetadataTest, Roundtrip) {
         TempDir tempDir("StorageEngineMetadataTest_Roundtrip");
+        BSONObj options = fromjson("{x: 1}");
         {
             StorageEngineMetadata metadata(tempDir.path());
             metadata.setStorageEngine("storageEngine1");
+            metadata.setStorageEngineOptions(options);
             ASSERT_OK(metadata.write());
         }
         // Read back storage engine name.
@@ -171,12 +189,19 @@ namespace {
             StorageEngineMetadata metadata(tempDir.path());
             ASSERT_OK(metadata.read());
             ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
+            ASSERT_EQUALS(options, metadata.getStorageEngineOptions());
+
+            metadata.reset();
+            ASSERT_TRUE(metadata.getStorageEngine().empty());
+            ASSERT_TRUE(metadata.getStorageEngineOptions().isEmpty());
         }
     }
 
     TEST(StorageEngineMetadataTest, ValidateEmptyDirectory) {
         TempDir tempDir("StorageEngineMetadataTest_ValidateEmptyDirectory");
-        StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
+        ASSERT_FALSE(metadata.get());
     }
 
     // Data directory is not empty but metadata is missing.
@@ -189,7 +214,9 @@ namespace {
             std::ofstream ofs(filename.c_str());
             ofs << "unused data" << std::endl;
         }
-        StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        ASSERT_FALSE(metadata.get());
     }
 
     // Data directory is not empty but metadata is missing.
@@ -216,7 +243,9 @@ namespace {
             std::ofstream ofs(filename.c_str());
             ofs << "unused data" << std::endl;
         }
-        StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        ASSERT_FALSE(metadata.get());
     }
 
     // Data directory is not empty but metadata is missing.
@@ -243,7 +272,9 @@ namespace {
             std::ofstream ofs(filename.c_str());
             ofs << "unused data" << std::endl;
         }
-        StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
+        ASSERT_FALSE(metadata.get());
     }
 
     // Data directory is not empty but metadata is missing.
@@ -256,7 +287,9 @@ namespace {
             std::ofstream ofs(filename.c_str());
             ofs << "unused data" << std::endl;
         }
-        StorageEngineMetadata::validate(tempDir.path(), "engine1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "engine1");
+        ASSERT_FALSE(metadata.get());
     }
 
     TEST(StorageEngineMetadataTest, ValidateMetadataMatchesStorageEngine) {
@@ -266,7 +299,10 @@ namespace {
             metadata.setStorageEngine("storageEngine1");
             ASSERT_OK(metadata.write());
         }
-        StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
+        ASSERT_TRUE(metadata.get());
+        ASSERT_EQUALS("storageEngine1", metadata->getStorageEngine());
     }
 
     TEST(StorageEngineMetadataTest, ValidateMetadataDifferentFromStorageEngine) {
@@ -326,6 +362,37 @@ namespace {
     TEST(StorageEngineMetadataTest, UpdateIfMissingInvalidDirectory) {
         // Should warn and return write() status if we fail to update the metadata file.
         ASSERT_NOT_OK(StorageEngineMetadata::updateIfMissing("no_such_directory", "engine1"));
+    }
+
+    TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {
+        // It is fine to provide an invalid data directory as long as we do not
+        // call read() or write().
+        StorageEngineMetadata metadata("no_such_directory");
+        BSONObj options = fromjson("{x: true, y: false, z: 123}");
+        metadata.setStorageEngineOptions(options);
+
+        // Non-existent field.
+        ASSERT_OK(metadata.validateStorageEngineOption("w", true));
+        ASSERT_OK(metadata.validateStorageEngineOption("w", false));
+
+        // Non-boolean field.
+        Status status = metadata.validateStorageEngineOption("z", true);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+        status = metadata.validateStorageEngineOption("z", false);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+
+        // Boolean fields.
+        ASSERT_OK(metadata.validateStorageEngineOption("x", true));
+        status = metadata.validateStorageEngineOption("x", false);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+
+        ASSERT_OK(metadata.validateStorageEngineOption("y", false));
+        status = metadata.validateStorageEngineOption("y", true);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
     }
 
 }  // namespace

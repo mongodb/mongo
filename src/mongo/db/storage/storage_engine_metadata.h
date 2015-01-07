@@ -1,5 +1,3 @@
-// storage_engine_metadata.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -30,10 +28,12 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -45,12 +45,14 @@ namespace mongo {
      */
     class StorageEngineMetadata {
         MONGO_DISALLOW_COPYING(StorageEngineMetadata);
+
     public:
 
         /**
          * Validates metadata in data directory against current storage engine.
          * 1) If the metadata file exists, ensure that the information in the file
          *    is consistent with the current storage engine. Otherwise, raise an error.
+         *    Returns the metadata object on successful validation.
          * 2) If the metadata file exists but is not readable (eg. corrupted), raise an error.
          * 3) If the metadata file does not exist, look for local.ns or local/local.ns
          *    in the data directory. If we detect either file, raise an error
@@ -58,8 +60,10 @@ namespace mongo {
          *    This makes validation more forgiving of situations where
          *    application data is placed in the data directory prior
          *    to server start up.
+         *    Returns NULL on successful validation.
          */
-        static void validate(const std::string& dbpath, const std::string& storageEngine);
+        static std::auto_ptr<StorageEngineMetadata> validate(const std::string& dbpath,
+                                                             const std::string& storageEngine);
 
         /**
          * Writes a new metadata file in the data directory if it's missing.
@@ -83,9 +87,19 @@ namespace mongo {
         const std::string& getStorageEngine() const;
 
         /**
+         * Returns storage engine options in metadata.
+         */
+        const BSONObj& getStorageEngineOptions() const;
+
+        /**
          * Sets name of storage engine in metadata.
          */
         void setStorageEngine(const std::string& storageEngine);
+
+        /**
+         * Sets storage engine options in metadata.
+         */
+        void setStorageEngineOptions(const BSONObj& storageEngineOptions);
 
         /**
          * Resets fields to default values.
@@ -102,9 +116,17 @@ namespace mongo {
          */
         Status write() const;
 
+        /**
+         * Validates a single field in the storage engine options.
+         * Currently, only boolean fields are supported.
+         */
+        template <typename T>
+        Status validateStorageEngineOption(const StringData& fieldName, T expectedValue) const;
+
     private:
         std::string _dbpath;
         std::string _storageEngine;
+        BSONObj _storageEngineOptions;
     };
 
 }  // namespace mongo
