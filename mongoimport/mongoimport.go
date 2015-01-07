@@ -29,6 +29,8 @@ const (
 	maxBSONSize         = 16 * (1024 * 1024)
 	maxMessageSizeBytes = 2 * maxBSONSize
 	workerBufferSize    = 16
+
+	ProgressBarLength = 24
 )
 
 // Wrapper for MongoImport functionality
@@ -235,8 +237,8 @@ func (mongoImport *MongoImport) getSourceReader() (io.ReadCloser, int64, error) 
 
 	log.Logf(log.Info, "reading from stdin")
 
-	// Stdin has undefined max size, so no progressor
-	return os.Stdin, -1, nil
+	// Stdin has undefined max size, so return 0
+	return os.Stdin, 0, nil
 }
 
 // fileSizeProgressor implements Progressor to allow a sizeTracker to hook up with a
@@ -271,15 +273,15 @@ func (mongoImport *MongoImport) ImportDocuments() (uint64, error) {
 		}
 	}
 
-	if fileSize > 0 {
-		bar := &progress.Bar{
-			Name:     fmt.Sprintf("%v.%v", mongoImport.ToolOptions.DB, mongoImport.ToolOptions.Collection),
-			Watching: &fileSizeProgressor{fileSize, inputReader},
-			Writer:   log.Writer(0),
-			IsBytes:  true,
-		}
-		bar.Start()
+	bar := &progress.Bar{
+		Name:      fmt.Sprintf("%v.%v", mongoImport.ToolOptions.DB, mongoImport.ToolOptions.Collection),
+		Watching:  &fileSizeProgressor{fileSize, inputReader},
+		Writer:    log.Writer(0),
+		BarLength: ProgressBarLength,
+		IsBytes:   true,
 	}
+	bar.Start()
+	defer bar.Stop()
 
 	return mongoImport.importDocuments(inputReader)
 }

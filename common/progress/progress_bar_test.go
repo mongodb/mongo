@@ -57,6 +57,27 @@ func TestBasicProgressBar(t *testing.T) {
 	})
 }
 
+func TestProgressBarWithNoMax(t *testing.T) {
+	writeBuffer := &bytes.Buffer{}
+
+	Convey("With a simple ProgressBar with no max value", t, func() {
+		watching := NewCounter(0)
+		watching.Inc(5)
+		pbar := &Bar{
+			Name:     "test",
+			Watching: watching,
+			Writer:   writeBuffer,
+		}
+		Convey("rendering the progress should still work, but not draw a bar", func() {
+			pbar.renderToWriter()
+			So(writeBuffer.String(), ShouldContainSubstring, "5")
+			So(writeBuffer.String(), ShouldContainSubstring, "test")
+			So(writeBuffer.String(), ShouldNotContainSubstring, "[")
+			So(writeBuffer.String(), ShouldNotContainSubstring, "]")
+		})
+	})
+}
+
 func TestBarConcurrency(t *testing.T) {
 	writeBuffer := &bytes.Buffer{}
 

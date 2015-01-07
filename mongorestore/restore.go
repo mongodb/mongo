@@ -221,18 +221,14 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	collection := session.DB(dbName).C(colName)
 
 	watchProgressor := progress.NewCounter(fileSize)
-	// only print progress bar if we know the bounds
-	// TODO have useful progress meters when max=0
-	if fileSize > 0 {
-		bar := &progress.Bar{
-			Name:      fmt.Sprintf("%v.%v", dbName, colName),
-			Watching:  watchProgressor,
-			BarLength: ProgressBarLength,
-			IsBytes:   true,
-		}
-		restore.progressManager.Attach(bar)
-		defer restore.progressManager.Detach(bar)
+	bar := &progress.Bar{
+		Name:      fmt.Sprintf("%v.%v", dbName, colName),
+		Watching:  watchProgressor,
+		BarLength: ProgressBarLength,
+		IsBytes:   true,
 	}
+	restore.progressManager.Attach(bar)
+	defer restore.progressManager.Detach(bar)
 
 	MaxInsertThreads := restore.ToolOptions.BulkWriters
 	if restore.OutputOptions.MaintainInsertionOrder {

@@ -40,8 +40,9 @@ func NewCounter(max int64) *countProgressor {
 
 // Progressor can be implemented to allow an object to hook up to a progress.Bar.
 type Progressor interface {
-	// Progress returns a pair of integers: the current amount completed, and the total amount
-	// to reach 100%. This method is called by progress.Bar to determine what percentage to display.
+	// Progress returns a pair of integers: the total amount to reach 100%, and
+	// the amount completed. This method is called by progress.Bar to
+	// determine what percentage to display.
 	Progress() (int64, int64)
 }
 
@@ -125,8 +126,14 @@ func (pb *Bar) formatCounts() (string, string) {
 // computes all necessary values renders to the bar's Writer
 func (pb *Bar) renderToWriter() {
 	maxCount, currentCount := pb.Watching.Progress()
-	percent := float64(currentCount) / float64(maxCount)
 	maxStr, currentStr := pb.formatCounts()
+	if maxCount == 0 {
+		// if we have no max amount, just print a count
+		fmt.Fprintf(pb.Writer, "%v\t%v", pb.Name, currentStr)
+		return
+	}
+	// otherwise, print a bar and percents
+	percent := float64(currentCount) / float64(maxCount)
 	fmt.Fprintf(pb.Writer, "%v %v\t%s/%s (%2.1f%%)",
 		drawBar(pb.BarLength, percent),
 		pb.Name,
@@ -138,14 +145,19 @@ func (pb *Bar) renderToWriter() {
 
 func (pb *Bar) renderToGridRow(grid *text.GridWriter) {
 	maxCount, currentCount := pb.Watching.Progress()
-	percent := float64(currentCount) / float64(maxCount)
 	maxStr, currentStr := pb.formatCounts()
-	grid.WriteCells(
-		drawBar(pb.BarLength, percent),
-		pb.Name,
-		fmt.Sprintf("%s/%s", currentStr, maxStr),
-		fmt.Sprintf("(%2.1f%%)", percent*100),
-	)
+	if maxCount == 0 {
+		// if we have no max amount, just print a count
+		grid.WriteCells(pb.Name, currentStr)
+	} else {
+		percent := float64(currentCount) / float64(maxCount)
+		grid.WriteCells(
+			drawBar(pb.BarLength, percent),
+			pb.Name,
+			fmt.Sprintf("%s/%s", currentStr, maxStr),
+			fmt.Sprintf("(%2.1f%%)", percent*100),
+		)
+	}
 	grid.EndRow()
 }
 
