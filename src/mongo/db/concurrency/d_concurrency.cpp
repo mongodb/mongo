@@ -30,6 +30,8 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
+#include <string>
+
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
@@ -48,6 +50,10 @@ namespace mongo {
 
     //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
+
+    // Local Oplog. Used by OplogLock.
+    static const ResourceId resourceIdOplog =
+                    ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
 
     DBTryLockTimeoutException::DBTryLockTimeoutException() {}
     DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }
@@ -213,6 +219,29 @@ namespace mongo {
         }
     }
 
+namespace {
+    boost::mutex oplogSerialization; // for OplogIntentWriteLock
+} // namespace
+
+    Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)
+          : _lockState(lockState),
+            _serialized(false) {
+        _lockState->lock(resourceIdOplog, MODE_IX);
+    }
+
+    Lock::OplogIntentWriteLock::~OplogIntentWriteLock() {
+        if (_serialized) {
+            oplogSerialization.unlock();
+        }
+        _lockState->unlock(resourceIdOplog);
+    }
+
+    void Lock::OplogIntentWriteLock::serializeIfNeeded() {
+        if (!supportsDocLocking() && !_serialized) {
+            oplogSerialization.lock();
+            _serialized = true;
+        }
+    }
 
     Lock::ResourceLock::ResourceLock(Locker* lockState, ResourceId rid, LockMode mode)
             : _rid(rid),

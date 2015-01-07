@@ -191,6 +191,22 @@ namespace mongo {
             Locker* const _lockState;
         };
 
+        /**
+         * Like the CollectionLock, but optimized for the local oplog. Always locks in MODE_IX,
+         * must call serializeIfNeeded() before doing any concurrent operations in order to
+         * support storage engines without document level locking. It is an error, checked with a
+         * dassert(), to not have a suitable database lock when taking this lock.
+         */
+        class OplogIntentWriteLock {
+            MONGO_DISALLOW_COPYING(OplogIntentWriteLock);
+        public:
+            explicit OplogIntentWriteLock(Locker* lockState);
+            ~OplogIntentWriteLock();
+            void serializeIfNeeded();
+        private:
+            Locker* const _lockState;
+            bool _serialized;
+        };
 
         /**
          * General purpose RAII wrapper for a resource managed by the lock manager

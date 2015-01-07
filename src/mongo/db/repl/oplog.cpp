@@ -220,7 +220,7 @@ namespace {
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-        Lock::CollectionLock lk2(txn->lockState(), rsoplog, MODE_IX);
+        Lock::OplogIntentWriteLock oplogLk(txn->lockState());
 
         DEV verify( logNS == 0 ); // check this was never a master/slave master
 
@@ -241,11 +241,12 @@ namespace {
         Client::Context ctx(txn, rsoplog, localDB);
         WriteUnitOfWork wunit(txn);
 
-        std::pair<OpTime,long long> slot = getNextOpTime(txn,
-                                                         localOplogRSCollection,
-                                                         ns,
-                                                         replCoord,
-                                                         opstr);
+        oplogLk.serializeIfNeeded();
+        std::pair<OpTime, long long> slot = getNextOpTime(txn,
+                                                          localOplogRSCollection,
+                                                          ns,
+                                                          replCoord,
+                                                          opstr);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
