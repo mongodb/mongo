@@ -67,5 +67,4 @@ func main() {
 		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
-
 }

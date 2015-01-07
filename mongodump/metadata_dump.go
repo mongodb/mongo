@@ -69,7 +69,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		if optsD, ok := opts.(bson.D); ok {
 			meta.Options = optsD.Map()
 		} else {
-			return fmt.Errorf("Collection options contains invalid data: %v", opts)
+			return fmt.Errorf("collection options contains invalid data: %v", opts)
 		}
 	}
 

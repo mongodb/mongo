@@ -2,12 +2,13 @@ package mongodump
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 )
 
-//TODO move this to common if any of the other tools need it
 type Oplog struct {
 	Timestamp bson.MongoTimestamp `bson:"ts"`
 	HistoryID int64               `bson:"h"`
@@ -37,8 +38,6 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 		return fmt.Errorf("not connected to master")
 	}
 
-	// TODO stop assuming master/slave, be smarter and check if it is really
-	// master/slave...though to be fair legacy mongodump doesn't do this either...
 	log.Logf(log.DebugLow, "not connected to a replica set, assuming master/slave")
 	log.Logf(log.DebugHigh, "oplog located in local.oplog.$main")
 	dump.oplogCollection = "oplog.$main"
@@ -76,4 +75,20 @@ func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, 
 		return false, nil
 	}
 	return true, nil
+}
+
+// DumpOplogAfterTimestamp takes a timestamp and writer and dumps all oplog entries after
+// the given timestamp to the writer. Returns any errors that occur.
+func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp, out io.Writer) error {
+	session, err := dump.sessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+	session.SetSocketTimeout(0)
+	session.SetPrefetch(1.0) //mimic exhaust cursor
+	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
+	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
+	return dump.dumpQueryToWriter(
+		oplogQuery, &intents.Intent{DB: "local", C: dump.oplogCollection}, out)
 }

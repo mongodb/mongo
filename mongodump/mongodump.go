@@ -11,6 +11,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -28,18 +29,17 @@ const (
 
 type MongoDump struct {
 	// basic mongo tool options
-	ToolOptions *options.ToolOptions
-
+	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions
 	OutputOptions *OutputOptions
 
-	sessionProvider *db.SessionProvider
-
 	// useful internals that we don't directly expose as options
+	sessionProvider *db.SessionProvider
 	manager         *intents.Manager
 	useStdout       bool
 	query           bson.M
 	oplogCollection string
+	oplogStart      bson.MongoTimestamp
 	isMongos        bool
 	authVersion     int
 	progressManager *progress.Manager
@@ -57,7 +57,7 @@ func (dump *MongoDump) ValidateOptions() error {
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("must specify a database when running with dumpDbUsersAndRoles")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.Collection != "":
-		return fmt.Errorf("cannot specify a collection when running with dumpDbUsersAndRoles") //TODO: why?
+		return fmt.Errorf("cannot specify a collection when running with dumpDbUsersAndRoles")
 	case dump.OutputOptions.Oplog && dump.ToolOptions.Namespace.DB != "":
 		return fmt.Errorf("--oplog mode only supported on full dumps")
 	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.Namespace.Collection != "":
@@ -77,18 +77,17 @@ func (dump *MongoDump) ValidateOptions() error {
 func (dump *MongoDump) Init() error {
 	err := dump.ValidateOptions()
 	if err != nil {
-		return fmt.Errorf("Bad Option: %v", err)
+		return fmt.Errorf("bad option: %v", err)
 	}
 	if dump.OutputOptions.Out == "-" {
 		dump.useStdout = true
 	}
 	dump.sessionProvider, err = db.NewSessionProvider(*dump.ToolOptions)
 	if err != nil {
-		return fmt.Errorf("Can't create session: %v", err)
+		return fmt.Errorf("can't create session: %v", err)
 	}
 	// ensure we allow secondary reads
 	dump.sessionProvider.SetFlags(db.Monotonic)
-
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
 		return err
@@ -118,7 +117,7 @@ func (dump *MongoDump) Dump() error {
 		}
 		asMap, ok := convertedJSON.(map[string]interface{})
 		if !ok {
-			// unlikely to be reached, TODO: think about what could make this happen
+			// unlikely to be reached
 			return fmt.Errorf("query is not in proper format")
 		}
 		dump.query = bson.M(asMap)
@@ -166,8 +165,6 @@ func (dump *MongoDump) Dump() error {
 		}
 	}
 
-	var oplogStart bson.MongoTimestamp
-
 	// If oplog capturing is enabled, we first check the most recent
 	// oplog entry and save its timestamp, this will let us later
 	// copy all oplog entries that occurred while dumping, creating
@@ -178,7 +175,7 @@ func (dump *MongoDump) Dump() error {
 			return fmt.Errorf("error finding oplog: %v", err)
 		}
 		log.Logf(log.Info, "getting most recent oplog timestamp")
-		oplogStart, err = dump.getOplogStartTime()
+		dump.oplogStart, err = dump.getOplogStartTime()
 		if err != nil {
 			return fmt.Errorf("error getting oplog start: %v", err)
 		}
@@ -188,6 +185,7 @@ func (dump *MongoDump) Dump() error {
 	dump.progressManager.Start()
 	defer dump.progressManager.Stop()
 
+	// dump all queued collections
 	if err := dump.DumpIntents(); err != nil {
 		return err
 	}
@@ -197,8 +195,8 @@ func (dump *MongoDump) Dump() error {
 	// we check to see if the oplog has rolled over (i.e. the most recent entry when
 	// we started still exist, so we know we haven't lost data)
 	if dump.OutputOptions.Oplog {
-		log.Logf(log.DebugLow, "checking if oplog entry %v still exists", oplogStart)
-		exists, err := dump.checkOplogTimestampExists(oplogStart)
+		log.Logf(log.DebugLow, "checking if oplog entry %v still exists", dump.oplogStart)
+		exists, err := dump.checkOplogTimestampExists(dump.oplogStart)
 		if !exists {
 			return fmt.Errorf(
 				"oplog overflow: mongodump was unable to capture all new oplog entries during execution")
@@ -206,7 +204,7 @@ func (dump *MongoDump) Dump() error {
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)
 		}
-		log.Logf(log.DebugHigh, "oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugHigh, "oplog entry %v still exists", dump.oplogStart)
 
 		// dump oplog in root of the dump folder
 		oplogFilepath := filepath.Join(dump.OutputOptions.Out, "oplog.bson")
@@ -214,32 +212,17 @@ func (dump *MongoDump) Dump() error {
 		if err != nil {
 			return fmt.Errorf("error creating bson file `%v`: %v", oplogFilepath, err)
 		}
-
 		log.Logf(log.Always, "writing captured oplog to %v", oplogFilepath)
-		//TODO encapsulate this logic
-		session, err := dump.sessionProvider.GetSession()
+		err = dump.DumpOplogAfterTimestamp(dump.oplogStart, oplogOut)
 		if err != nil {
-			return err
-		}
-		defer session.Close()
-		session.SetSocketTimeout(0)
-		session.SetPrefetch(1.0) //mimic exhaust cursor
-		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
-		oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
-		if err != nil {
-			return err
-		}
-		err = dump.dumpQueryToWriter(
-			oplogQuery, &intents.Intent{DB: "local", C: dump.oplogCollection}, oplogOut)
-		if err != nil {
-			return err
+			return fmt.Errorf("error dumping oplog: %v", err)
 		}
 
 		// check the oplog for a rollover one last time, to avoid a race condition
 		// wherein the oplog rolls over in the time after our first check, but before
 		// we copy it.
-		log.Logf(log.DebugLow, "checking again if oplog entry %v still exists", oplogStart)
-		exists, err = dump.checkOplogTimestampExists(oplogStart)
+		log.Logf(log.DebugLow, "checking again if oplog entry %v still exists", dump.oplogStart)
+		exists, err = dump.checkOplogTimestampExists(dump.oplogStart)
 		if !exists {
 			return fmt.Errorf(
 				"oplog overflow: mongodump was unable to capture all new oplog entries during execution")
@@ -247,7 +230,7 @@ func (dump *MongoDump) Dump() error {
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)
 		}
-		log.Logf(log.DebugHigh, "oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugHigh, "oplog entry %v still exists", dump.oplogStart)
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
@@ -276,9 +259,7 @@ func (dump *MongoDump) DumpIntents() error {
 	if dump.ToolOptions != nil && dump.ToolOptions.HiddenOptions != nil {
 		jobs = dump.ToolOptions.HiddenOptions.MaxProcs
 	}
-	if jobs <= 0 {
-		jobs = 1
-	}
+	jobs = util.MaxInt(jobs, 1)
 	if jobs > 1 {
 		dump.manager.Finalize(intents.LongestTaskFirst)
 	} else {
@@ -294,7 +275,9 @@ func (dump *MongoDump) DumpIntents() error {
 			for {
 				intent := dump.manager.Pop()
 				if intent == nil {
-					break
+					log.Logf(log.DebugHigh, "ending dump routine with id=%v, no more work to do", id)
+					resultChan <- nil
+					return
 				}
 				err := dump.DumpIntent(intent)
 				if err != nil {
@@ -303,18 +286,13 @@ func (dump *MongoDump) DumpIntents() error {
 				}
 				dump.manager.Finish(intent)
 			}
-			log.Logf(log.DebugHigh, "ending dump routine with id=%v, no more work to do", id)
-			resultChan <- nil
 		}(i)
 	}
 
 	// wait until all goroutines are done or one of them errors out
 	for i := 0; i < jobs; i++ {
-		select {
-		case err := <-resultChan:
-			if err != nil {
-				return err
-			}
+		if err := <-resultChan; err != nil {
+			return err
 		}
 	}
 
@@ -420,9 +398,6 @@ func (dump *MongoDump) dumpQueryToWriter(
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
 
-	// We run the result iteration in its own goroutine,
-	// this allows disk i/o to not block reads from the db,
-	// which gives a slight speedup on benchmarks
 	iter := query.Iter()
 	return dump.dumpIterToWriter(iter, writer, dumpProgressor)
 }
@@ -432,16 +407,16 @@ func (dump *MongoDump) dumpQueryToWriter(
 func (dump *MongoDump) dumpIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable) error {
 
+	// We run the result iteration in its own goroutine,
+	// this allows disk i/o to not block reads from the db,
+	// which gives a slight speedup on benchmarks
 	buffChan := make(chan []byte)
 	go func() {
 		for {
 			raw := &bson.Raw{}
-			if err := iter.Err(); err != nil {
-				log.Logf(log.Always, "error reading from db: %v", err)
-			}
 			next := iter.Next(raw)
-
 			if !next {
+				// we check the iterator for errors below
 				close(buffChan)
 				return
 			}
@@ -455,8 +430,7 @@ func (dump *MongoDump) dumpIterToWriter(
 	}()
 
 	// wrap writer in buffer to reduce load on disk
-	// TODO extensive optimization on buffer size
-	w := bufio.NewWriterSize(writer, 1024*32)
+	w := bufio.NewWriterSize(writer, 32*1024)
 
 	// while there are still results in the database,
 	// grab results from the goroutine and write them to filesystem
@@ -474,6 +448,8 @@ func (dump *MongoDump) dumpIterToWriter(
 		}
 		progressCount.Inc(1)
 	}
+
+	// flush all remaining disk writes then exit
 	err := w.Flush()
 	if err != nil {
 		return fmt.Errorf("error flushing file writer: %v", err)

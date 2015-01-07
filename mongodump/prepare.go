@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// shouldSkipCollection returns true when a collection name is excluded 
+// shouldSkipCollection returns true when a collection name is excluded
 // by the mongodump options
 func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 	for _, excludedCollection := range dump.OutputOptions.ExcludedCollections {
@@ -25,12 +25,9 @@ func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 	return false
 }
 
-//output path creates a path for the collection to be written to (sans file extension)
+// outputPath creates a path for the collection to be written to (sans file extension)
 func (dump *MongoDump) outputPath(dbName, colName string) string {
-	fullPath := dump.OutputOptions.Out
-	fullPath = filepath.Join(fullPath, dbName)
-	fullPath = filepath.Join(fullPath, colName)
-	return fullPath
+	return filepath.Join(dump.OutputOptions.Out, dbName, colName)
 }
 
 // CreateIntentsForCollection builds an intent for a given collection and
