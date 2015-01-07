@@ -31,8 +31,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
-#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/unittest/unittest.h"
 

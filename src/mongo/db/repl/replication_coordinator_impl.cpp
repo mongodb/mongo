@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_impl.h"
 
 #include <algorithm>
 #include <boost/thread.hpp>

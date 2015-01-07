@@ -59,7 +59,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context_impl.h"

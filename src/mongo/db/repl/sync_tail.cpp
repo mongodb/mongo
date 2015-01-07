@@ -50,7 +50,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/exit.h"

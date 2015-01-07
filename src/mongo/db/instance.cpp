@@ -77,7 +77,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/atomic_word.h"

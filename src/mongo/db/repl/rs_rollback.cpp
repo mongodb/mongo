@@ -51,8 +51,8 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/repl/repl_coordinator.h"
-#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 

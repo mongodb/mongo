@@ -34,8 +34,8 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/util/time_support.h"
 

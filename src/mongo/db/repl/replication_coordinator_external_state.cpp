@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 
 namespace mongo {
 namespace repl {

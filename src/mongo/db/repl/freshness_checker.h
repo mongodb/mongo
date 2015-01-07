@@ -33,8 +33,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/optime.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 
 namespace mongo {

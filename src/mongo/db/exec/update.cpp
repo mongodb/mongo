@@ -38,7 +38,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
 

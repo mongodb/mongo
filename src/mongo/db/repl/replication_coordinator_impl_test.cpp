@@ -42,13 +42,13 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
-#include "mongo/db/repl/repl_coordinator.h" // ReplSetReconfigArgs
-#include "mongo/db/repl/repl_coordinator_external_state_mock.h"
-#include "mongo/db/repl/repl_coordinator_impl.h"
-#include "mongo/db/repl/repl_coordinator_test_fixture.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h" // ReplSetReconfigArgs
+#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
+#include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"

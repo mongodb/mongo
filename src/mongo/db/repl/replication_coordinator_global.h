@@ -26,18 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinator::ReplicationCoordinator() {}
-    ReplicationCoordinator::~ReplicationCoordinator() {}
-
-    // TODO(dannenberg) remove when master slave is removed
-    const char *replAllDead = 0;
+    ReplicationCoordinator* getGlobalReplicationCoordinator();
+    void setGlobalReplicationCoordinator(ReplicationCoordinator* coordinator);
 
 } // namespace repl
 } // namespace mongo

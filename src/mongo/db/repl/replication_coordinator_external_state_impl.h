@@ -33,7 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 
 namespace mongo {

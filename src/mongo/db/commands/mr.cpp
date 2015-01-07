@@ -52,7 +52,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"

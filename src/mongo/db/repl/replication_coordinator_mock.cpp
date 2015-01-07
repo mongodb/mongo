@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator_mock.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/write_concern_options.h"

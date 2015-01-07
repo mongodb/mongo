@@ -48,7 +48,7 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/rs_initialsync.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"

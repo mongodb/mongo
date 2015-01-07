@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator_external_state_mock.h"
+#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"

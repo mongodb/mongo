@@ -41,7 +41,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/range_preserver.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

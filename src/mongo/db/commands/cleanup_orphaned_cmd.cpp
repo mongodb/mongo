@@ -43,7 +43,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_deleter_service.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/range_arithmetic.h"

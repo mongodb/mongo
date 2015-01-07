@@ -35,7 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_coordinator_external_state.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

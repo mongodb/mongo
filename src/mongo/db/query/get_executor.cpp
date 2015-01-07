@@ -64,7 +64,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/stage_builder.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"

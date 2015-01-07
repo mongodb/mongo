@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"

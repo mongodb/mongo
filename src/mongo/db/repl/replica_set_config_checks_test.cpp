@@ -30,10 +30,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_coordinator_external_state.h"
-#include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
+#include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

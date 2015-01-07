@@ -26,15 +26,24 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
 namespace repl {
 
-    ReplicationCoordinator* getGlobalReplicationCoordinator();
-    void setGlobalReplicationCoordinator(ReplicationCoordinator* coordinator);
+namespace {
+    ReplicationCoordinator* coordinator = NULL;
+} // namespace
+
+    ReplicationCoordinator* getGlobalReplicationCoordinator() {
+        return coordinator;
+    }
+
+    void setGlobalReplicationCoordinator(ReplicationCoordinator* newCoordinator) {
+        coordinator = newCoordinator;
+    }
 
 } // namespace repl
 } // namespace mongo

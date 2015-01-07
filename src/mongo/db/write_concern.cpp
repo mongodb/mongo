@@ -34,7 +34,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/storage_engine.h"

@@ -28,22 +28,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
 namespace repl {
 
-namespace {
-    ReplicationCoordinator* coordinator = NULL;
-} // namespace
+    ReplicationCoordinator::ReplicationCoordinator() {}
+    ReplicationCoordinator::~ReplicationCoordinator() {}
 
-    ReplicationCoordinator* getGlobalReplicationCoordinator() {
-        return coordinator;
-    }
-
-    void setGlobalReplicationCoordinator(ReplicationCoordinator* newCoordinator) {
-        coordinator = newCoordinator;
-    }
+    // TODO(dannenberg) remove when master slave is removed
+    const char *replAllDead = 0;
 
 } // namespace repl
 } // namespace mongo
