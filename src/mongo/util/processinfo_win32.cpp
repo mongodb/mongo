@@ -153,14 +153,28 @@ namespace mongo {
     // is installed, zeroing out data files is unnecessary. The file version numbers used below
     // are taken from the Hotfix File Information at http://support.microsoft.com/kb/2731284.
     bool isKB2731284OrLaterUpdateInstalled() {
-        char systemDirectory[MAX_PATH];
-        if (!GetSystemDirectoryA(systemDirectory, sizeof(systemDirectory))) {
+        UINT pathBufferSize = GetSystemDirectoryA(NULL, 0);
+        if (pathBufferSize == 0) {
             DWORD gle = GetLastError();
             warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
             return false;
         }
 
-        string ntfsDotSysPath = systemDirectory;
+        boost::scoped_array<char> systemDirectory(new char[pathBufferSize]);
+        UINT systemDirectoryPathLen;
+        systemDirectoryPathLen = GetSystemDirectoryA(systemDirectory.get(), pathBufferSize);
+        if (systemDirectoryPathLen == 0) {
+            DWORD gle = GetLastError();
+            warning() << "GetSystemDirectoryA failed with " << errnoWithDescription(gle);
+            return false;
+        }
+
+        if (systemDirectoryPathLen != pathBufferSize - 1) {
+            warning() << "GetSystemDirectoryA returned unexpected path length";
+            return false;
+        }
+
+        string ntfsDotSysPath = systemDirectory.get();
         if (ntfsDotSysPath.back() != '\\') {
             ntfsDotSysPath.append("\\");
         }
