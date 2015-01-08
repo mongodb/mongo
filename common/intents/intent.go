@@ -21,7 +21,7 @@ type Intent struct {
 	Size int64
 }
 
-func (it *Intent) Key() string {
+func (it *Intent) Namespace() string {
 	return it.DB + "." + it.C
 }
 
@@ -150,7 +150,7 @@ func (manager *Manager) Put(intent *Intent) {
 	// into the same intent. This is done to allow for simple
 	// pairing of BSON + metadata without keeping track of the
 	// state of the filepath walker
-	if existing := manager.intents[intent.Key()]; existing != nil {
+	if existing := manager.intents[intent.Namespace()]; existing != nil {
 		// merge new intent into old intent
 		if existing.BSONPath == "" {
 			existing.BSONPath = intent.BSONPath
@@ -165,7 +165,7 @@ func (manager *Manager) Put(intent *Intent) {
 	}
 
 	// if key doesn't already exist, add it to the manager
-	manager.intents[intent.Key()] = intent
+	manager.intents[intent.Namespace()] = intent
 	manager.intentsByDiscoveryOrder = append(manager.intentsByDiscoveryOrder, intent)
 }
 

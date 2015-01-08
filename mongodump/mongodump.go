@@ -325,7 +325,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	}
 
 	if dump.useStdout {
-		log.Logf(log.Always, "writing %v to stdout", intent.Key())
+		log.Logf(log.Always, "writing %v to stdout", intent.Namespace())
 		return dump.dumpQueryToWriter(findQuery, intent, os.Stdout)
 	}
 
@@ -341,20 +341,20 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	defer out.Close()
 
 	if !dump.OutputOptions.Repair {
-		log.Logf(log.Always, "writing %v to %v", intent.Key(), outFilepath)
+		log.Logf(log.Always, "writing %v to %v", intent.Namespace(), outFilepath)
 		if err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
 			return err
 		}
 	} else {
 		// handle repairs as a special case, since we cannot count them
-		log.Logf(log.Always, "writing repair of %v to %v", intent.Key(), outFilepath)
+		log.Logf(log.Always, "writing repair of %v to %v", intent.Namespace(), outFilepath)
 		repairIter := session.DB(intent.DB).C(intent.C).Repair()
 		repairCounter := progress.NewCounter(1) // this counter is ignored
 		if err := dump.dumpIterToWriter(repairIter, out, repairCounter); err != nil {
 			return fmt.Errorf("repair error: %v", err)
 		}
 		log.Logf(log.Always,
-			"\trepair cursor found %v documents in %v", repairCounter, intent.Key())
+			"\trepair cursor found %v documents in %v", repairCounter, intent.Namespace())
 	}
 
 	// don't dump metatdata for SystemIndexes collection
@@ -369,12 +369,12 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	}
 	defer metaOut.Close()
 
-	log.Logf(log.Always, "writing %v metadata to %v", intent.Key(), metadataFilepath)
+	log.Logf(log.Always, "writing %v metadata to %v", intent.Namespace(), metadataFilepath)
 	if err = dump.dumpMetadataToWriter(intent.DB, intent.C, metaOut); err != nil {
 		return err
 	}
 
-	log.Logf(log.Always, "done dumping %v", intent.Key())
+	log.Logf(log.Always, "done dumping %v", intent.Namespace())
 	return nil
 }
 
@@ -391,7 +391,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 
 	dumpProgressor := progress.NewCounter(int64(total))
 	bar := &progress.Bar{
-		Name:      intent.Key(),
+		Name:      intent.Namespace(),
 		Watching:  dumpProgressor,
 		BarLength: ProgressBarLength,
 	}

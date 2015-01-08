@@ -60,12 +60,12 @@ func (dump *MongoDump) CreateIntentForCollection(dbName, colName string) error {
 
 	count, err := session.DB(dbName).C(colName).Count()
 	if err != nil {
-		return fmt.Errorf("error counting %v: %v", intent.Key(), err)
+		return fmt.Errorf("error counting %v: %v", intent.Namespace(), err)
 	}
 	intent.Size = int64(count)
 	dump.manager.Put(intent)
 
-	log.Logf(log.DebugLow, "enqueued collection '%v'", intent.Key())
+	log.Logf(log.DebugLow, "enqueued collection '%v'", intent.Namespace())
 
 	return nil
 }

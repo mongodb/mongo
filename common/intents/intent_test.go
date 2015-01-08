@@ -71,7 +71,7 @@ func TestIntentManager(t *testing.T) {
 				So(peeked, ShouldNotBeNil)
 				So(peeked, ShouldResemble, manager.intentsByDiscoveryOrder[0])
 
-				Convey("modifying the returned copy should not modify the original", func(){
+				Convey("modifying the returned copy should not modify the original", func() {
 					peeked.DB = "SHINY NEW VALUE"
 					So(peeked, ShouldNotResemble, manager.intentsByDiscoveryOrder[0])
 				})

@@ -151,7 +151,7 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 	// first, sanitize the indexes
 	for _, index := range indexes {
 		// update the namespace of the index before inserting
-		index.Options["ns"] = intent.Key()
+		index.Options["ns"] = intent.Namespace()
 
 		// check for length violations before building the command
 		fullIndexName := fmt.Sprintf("%v.$%v", index.Options["ns"], index.Options["name"])

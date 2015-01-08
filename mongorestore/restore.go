@@ -46,7 +46,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 					}
 					err := restore.RestoreIntent(intent)
 					if err != nil {
-						resultChan <- fmt.Errorf("%v: %v", intent.Key(), err)
+						resultChan <- fmt.Errorf("%v: %v", intent.Namespace(), err)
 						return
 					}
 					restore.manager.Finish(intent)
@@ -67,7 +67,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 	for intent := restore.manager.Pop(); intent != nil; intent = restore.manager.Pop() {
 		err := restore.RestoreIntent(intent)
 		if err != nil {
-			return fmt.Errorf("%v: %v", intent.Key(), err)
+			return fmt.Errorf("%v: %v", intent.Namespace(), err)
 		}
 		restore.manager.Finish(intent)
 	}
@@ -84,16 +84,16 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	}
 
 	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
-		log.Logf(log.Always, "restoring to existing collection %v without dropping", intent.Key())
+		log.Logf(log.Always, "restoring to existing collection %v without dropping", intent.Namespace())
 		log.Log(log.Always, "Important: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
 		if collectionExists {
 			if strings.HasPrefix(intent.C, "system.") {
-				log.Logf(log.Always, "cannot drop system collection %v, skipping", intent.Key())
+				log.Logf(log.Always, "cannot drop system collection %v, skipping", intent.Namespace())
 			} else {
-				log.Logf(log.Info, "dropping collection %v before restoring", intent.Key())
+				log.Logf(log.Info, "dropping collection %v before restoring", intent.Namespace())
 				err = restore.DropCollection(intent)
 				if err != nil {
 					return err // no context needed
@@ -101,7 +101,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 				collectionExists = false
 			}
 		} else {
-			log.Logf(log.DebugLow, "collection %v doesn't exist, skipping drop command", intent.Key())
+			log.Logf(log.DebugLow, "collection %v doesn't exist, skipping drop command", intent.Namespace())
 		}
 	}
 
@@ -132,13 +132,13 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		if !restore.OutputOptions.NoOptionsRestore {
 			if options != nil {
 				if !collectionExists {
-					log.Logf(log.Info, "creating collection %v using options from metadata", intent.Key())
+					log.Logf(log.Info, "creating collection %v using options from metadata", intent.Namespace())
 					err = restore.CreateCollection(intent, options)
 					if err != nil {
-						return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
+						return fmt.Errorf("error creating collection %v: %v", intent.Namespace(), err)
 					}
 				} else {
-					log.Logf(log.Info, "collection %v already exists", intent.Key())
+					log.Logf(log.Info, "collection %v already exists", intent.Namespace())
 				}
 			} else {
 				log.Log(log.Info, "no collection options to restore")
@@ -150,7 +150,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	// then do bson
 	if intent.BSONPath != "" {
-		log.Logf(log.Always, "restoring %v from file %v", intent.Key(), intent.BSONPath)
+		log.Logf(log.Always, "restoring %v from file %v", intent.Namespace(), intent.BSONPath)
 		var rawBSONSource io.ReadCloser
 		var size int64
 
@@ -184,16 +184,16 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
-		log.Logf(log.Always, "restoring indexes for collection %v from metadata", intent.Key())
+		log.Logf(log.Always, "restoring indexes for collection %v from metadata", intent.Namespace())
 		err = restore.CreateIndexes(intent, indexes)
 		if err != nil {
-			return fmt.Errorf("error creating indexes for %v: %v", intent.Key(), err)
+			return fmt.Errorf("error creating indexes for %v: %v", intent.Namespace(), err)
 		}
 	} else {
 		log.Log(log.Always, "no indexes to restore")
 	}
 
-	log.Logf(log.Always, "finished restoring %v", intent.Key())
+	log.Logf(log.Always, "finished restoring %v", intent.Namespace())
 	return nil
 }
 

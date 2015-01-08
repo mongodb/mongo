@@ -124,7 +124,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 					Size:     entry.Size(),
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 				}
-				log.Logf(log.Info, "found collection %v bson to restore", intent.Key())
+				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			case MetadataFileType:
 				usesMetadataFiles = true
@@ -133,7 +133,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 					C:            collection,
 					MetadataPath: filepath.Join(fullpath, entry.Name()),
 				}
-				log.Logf(log.Info, "found collection %v metadata to restore", intent.Key())
+				log.Logf(log.Info, "found collection %v metadata to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			default:
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
