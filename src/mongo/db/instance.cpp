@@ -224,10 +224,12 @@ namespace mongo {
         if( ex ){
 
             op.debug().exceptionInfo = ex->getInfo();
-            log() << "assertion " << ex->toString() << " ns:" << q.ns << " query:" <<
+            log(LogComponent::kQuery) <<
+                "assertion " << ex->toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
             if( q.ntoskip || q.ntoreturn )
-                log() << " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
+                log(LogComponent::kQuery) <<
+                    " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
 
             SendStaleConfigException* scex = NULL;
             if ( ex->getCode() == SendStaleConfigCode ) scex = static_cast<SendStaleConfigException*>( ex.get() );
@@ -242,7 +244,7 @@ namespace mongo {
             BSONObj errObj = err.done();
 
             if( scex ){
-                log() << "stale version detected during query over "
+                log(LogComponent::kQuery) << "stale version detected during query over "
                       << q.ns << " : " << errObj << endl;
             }
 
@@ -1122,7 +1124,7 @@ namespace mongo {
 
         invariant(LOCK_OK == result);
 
-        log() << "now exiting" << endl;
+        log(LogComponent::kControl) << "now exiting" << endl;
 
         // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
         // and data files, close sockets, etc.
@@ -1150,7 +1152,7 @@ namespace mongo {
 
         audit::logShutdown(currentClient.get());
 
-        log() << "dbexit: " << why << " rc: " << rc;
+        log(LogComponent::kControl) << "dbexit: " << why << " rc: " << rc;
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
