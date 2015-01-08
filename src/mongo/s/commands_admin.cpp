@@ -787,10 +787,10 @@ namespace mongo {
                         WriteConcernOptions noThrottle;
                         if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
                                                   &noThrottle, true, 0, moveResult)) {
-                            warning().stream()
-                                      << "Couldn't move chunk " << chunk << " to shard "  << to
-                                      << " while sharding collection " << ns << ". Reason: "
-                                      <<  moveResult << endl;
+                            warning() << "couldn't move chunk " << chunk->toString()
+                                      << " to shard " << to
+                                      << " while sharding collection " << ns
+                                      << ". Reason: " <<  moveResult;
                         }
                     }
 
@@ -811,10 +811,10 @@ namespace mongo {
                             if ( ! subSplits.empty() ){
                                 Status status = currentChunk->multiSplit(subSplits, NULL);
                                 if ( !status.isOK() ){
-                                    warning().stream()
-                                        << "Couldn't split chunk " << currentChunk
-                                        << " while sharding collection " << ns << ". Reason: "
-                                        << status << endl;
+                                    warning() << "couldn't split chunk "
+                                              << currentChunk->toString()
+                                              << " while sharding collection " << ns
+                                              << causedBy(status);
                                 }
                                 subSplits.clear();
                             }
