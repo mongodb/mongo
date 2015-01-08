@@ -782,7 +782,6 @@ namespace PlanRankingTests {
 
             // Use index on 'b'.
             QuerySolution* soln = pickBestPlan(cq);
-            std::cerr << "PlanRankingWorkPlansLongEnough: soln=" << soln->toString() << std::endl;
             ASSERT(QueryPlannerTestLib::solutionMatches(
                         "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
                         soln->root.get()));
