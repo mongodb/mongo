@@ -260,17 +260,15 @@ namespace mongo {
         }
     } // namespace
 
-    KeyString KeyString::make(const BSONObj& obj, Ordering ord, RecordId recordId) {
-        KeyString out;
-        out._appendAllElementsForIndexing(obj, ord);
-        out.appendRecordId(recordId);
-        return out;
+    void KeyString::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
+        resetToEmpty();
+        _appendAllElementsForIndexing(obj, ord);
+        appendRecordId(recordId);
     }
 
-    KeyString KeyString::make(const BSONObj& obj, Ordering ord) {
-        KeyString out;
-        out._appendAllElementsForIndexing(obj, ord);
-        return out;
+    void KeyString::resetToKey(const BSONObj& obj, Ordering ord) {
+        resetToEmpty();
+        _appendAllElementsForIndexing(obj, ord);
     }
 
     // ----------------------------------------------------------------------

@@ -62,10 +62,17 @@ namespace mongo {
 
         static KeyString make(const BSONObj& obj,
                               Ordering ord,
-                              RecordId recordId);
+                              RecordId recordId) {
+            KeyString out;
+            out.resetToKey(obj, ord, recordId);
+            return out;
+        }
 
-        static KeyString make(const BSONObj& obj,
-                              Ordering ord);
+        static KeyString make(const BSONObj& obj, Ordering ord) {
+            KeyString out;
+            out.resetToKey(obj, ord);
+            return out;
+        }
 
         static KeyString make(RecordId rid) {
             KeyString ks;
@@ -79,10 +86,17 @@ namespace mongo {
          * Resets to an empty state.
          * Equivalent to but faster than *this = KeyString()
          */
-        void reset() { _size = 0; }
+        void resetToEmpty() { _size = 0; }
+        void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
+        void resetToKey(const BSONObj& obj, Ordering ord);
+        void resetFromBuffer(const void* buffer, size_t size) {
+            _size = size;
+            memcpy(_buffer, buffer, size);
+        }
 
         const char* getBuffer() const { return _buffer; }
         size_t getSize() const { return _size; }
+        bool isEmpty() const { return _size == 0; }
 
         int compare(const KeyString& other) const;
 

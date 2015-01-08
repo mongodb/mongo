@@ -523,7 +523,7 @@ namespace {
             invariantWTOK(_cursor->insert(_cursor));
             invariantWTOK(_cursor->reset(_cursor));
 
-            _locs.reset();
+            _locs.resetToEmpty();
         }
 
         bool haveLoc() const {
@@ -548,7 +548,8 @@ namespace {
              _cursor(idx.uri(), idx.instanceId(), false, txn),
              _idx(idx),
              _forward(forward),
-             _eof(true) {
+             _eof(true),
+             _isKeyCurrent(false) {
         }
 
         virtual int getDirection() const { return _forward ? 1 : -1; }
@@ -563,16 +564,21 @@ namespace {
             else if ( _eof || other._eof )
                 return false;
 
-            // TODO: make fast remaining parts fast
+            // Check the locs first since they are likely to differ and comparing them is fast.
             if ( getRecordId() != other.getRecordId() )
                 return false;
 
-            return getKey() == other.getKey();
+            loadKeyIfNeeded();
+            other.loadKeyIfNeeded();
+
+            return _key.getSize() == other._key.getSize()
+                && memcmp(_key.getBuffer(), other._key.getBuffer(), _key.getSize()) == 0;
         }
 
         bool locate(const BSONObj &key, const RecordId& loc) {
             const BSONObj finalKey = stripFieldNames(key);
-            bool result = _locate(finalKey, loc);
+            fillKey(finalKey, loc);
+            bool result = _locate(loc);
 
             // An explicit search at the start of the range should always return false
             if (loc == RecordId::min() || loc == RecordId::max() )
@@ -590,7 +596,8 @@ namespace {
                              keyBegin, keyBeginLen,
                              afterKey, keyEnd, keyEndInclusive, getDirection() );
 
-            _locate(key, RecordId());
+            fillKey(key, RecordId());
+            _locate(RecordId());
         }
 
         void customLocate(const BSONObj& keyBegin,
@@ -603,25 +610,21 @@ namespace {
 
 
         BSONObj getKey() const {
-            WT_CURSOR *c = _cursor.get();
-            WT_ITEM keyItem;
-            int ret = c->get_key(c, &keyItem);
-            invariantWTOK(ret);
+            if (_isKeyCurrent && !_keyBson.isEmpty())
+                return _keyBson;
 
-            BSONObj key = KeyString::toBson( static_cast<const char*>(keyItem.data),
-                                             keyItem.size,
-                                             _idx.ordering() );
+            loadKeyIfNeeded();
+            _keyBson = _key.toBson(_idx.ordering());
 
-            TRACE_INDEX << " returning key: " << key;
-            return key;
+            TRACE_INDEX << " returning key: " << _keyBson;
+            return _keyBson;
         }
 
         void savePosition() {
             _savedForCheck = _txn->recoveryUnit();
 
             if ( !wt_keeptxnopen() && !_eof ) {
-                // TODO: use KeyString
-                _savedKey = getKey().getOwned();
+                loadKeyIfNeeded();
                 _savedLoc = getRecordId();
                 _cursor.reset();
             }
@@ -635,14 +638,19 @@ namespace {
             invariant( _savedForCheck == txn->recoveryUnit() );
 
             if ( !wt_keeptxnopen() && !_eof ) {
-                _locate(_savedKey, _savedLoc);
+                _locate(_savedLoc);
             }
         }
 
     protected:
-        virtual bool _locate(const BSONObj &key, RecordId loc) = 0;
+        // Uses _key for the key.
+        virtual bool _locate(RecordId loc) = 0;
+
+        // Must invalidateCache()
+        virtual void fillKey(const BSONObj& key, RecordId loc) = 0;
 
         void advanceWTCursor() {
+            invalidateCache();
             WT_CURSOR *c = _cursor.get();
             int ret = _forward ? c->next(c) : c->prev(c);
             if ( ret == WT_NOTFOUND ) {
@@ -653,13 +661,14 @@ namespace {
             _eof = false;
         }
 
-        // Returns true on exact match
-        bool seekWTCursor(const KeyString& keyString) {
+        // Seeks to _key. Returns true on exact match.
+        bool seekWTCursor() {
+            invalidateCache();
             WT_CURSOR *c = _cursor.get();
 
             int cmp = -1;
-            const WiredTigerItem key( keyString.getBuffer(), keyString.getSize() );
-            c->set_key(c, key.Get() );
+            const WiredTigerItem keyItem(_key.getBuffer(), _key.getSize());
+            c->set_key(c, keyItem.Get());
 
             int ret = c->search_near(c, &cmp);
             if ( ret == WT_NOTFOUND ) {
@@ -668,46 +677,70 @@ namespace {
                 return false;
             }
             invariantWTOK( ret );
+            _eof = false;
 
             TRACE_CURSOR << "\t cmp: " << cmp;
 
+            if (cmp == 0) {
+                // Found it! This means _key must be current. Double check in DEV mode.
+                _isKeyCurrent = true;
+                dassertKeyCacheIsValid();
+                return true;
+            }
+
             // Make sure we land on a matching key
-            if ( cmp < 0 ) {
-                if ( _forward ) {
+            if (_forward) {
+                // We need to be >=
+                if (cmp < 0) {
                     ret = c->next(c);
                 }
-                else {
-                    // do nothing
-                }
             }
-            else if ( cmp > 0 ) {
-                if ( _forward ) {
-                    // do nothing
-                }
-                else {
+            else {
+                // We need to be <=
+                if (cmp > 0) {
                     ret = c->prev(c);
                 }
             }
 
-            _eof = ret == WT_NOTFOUND;
-
-            if ( _eof ) {
+            if (ret == WT_NOTFOUND) {
+                _eof = true;
                 TRACE_CURSOR << "\t eof " << ret << " _forward: " << _forward;
-                return false;
+            }
+            else {
+                invariantWTOK(ret);
             }
 
-            invariantWTOK(ret);
+            return false;
+        }
 
-            WT_ITEM currentKey;
-            invariantWTOK(c->get_key(c, &currentKey));
-
-            if ( keyString.getSize() != currentKey.size ||
-                 memcmp( keyString.getBuffer(), currentKey.data, currentKey.size ) ) {
-                TRACE_CURSOR << "\t key != " << getKey();
-                return false;
+        void loadKeyIfNeeded() const {
+            if (_isKeyCurrent) {
+                dassertKeyCacheIsValid();
+                return;
             }
 
-            return true;
+            WT_CURSOR *c = _cursor.get();
+            WT_ITEM item;
+            invariantWTOK(c->get_key(c, &item));
+            _key.resetFromBuffer(item.data, item.size);
+            _isKeyCurrent = true;
+        }
+
+        virtual void invalidateCache() {
+            _isKeyCurrent = false;
+            _keyBson = BSONObj();
+        }
+
+        virtual void dassertKeyCacheIsValid() const {
+            DEV {
+                invariant(_isKeyCurrent);
+
+                WT_ITEM item;
+                WT_CURSOR *c = _cursor.get();
+                invariantWTOK(c->get_key(c, &item));
+                invariant(item.size == _key.getSize());
+                invariant(memcmp(item.data, _key.getBuffer(), item.size) == 0);
+            }
         }
 
         OperationContext *_txn;
@@ -716,10 +749,14 @@ namespace {
         const bool _forward;
         bool _eof;
 
-        // For save/restorePosition check
+        // For save/restorePosition
         RecoveryUnit* _savedForCheck;
-        BSONObj _savedKey;
         RecordId _savedLoc;
+
+        // These are all lazily loaded caches.
+        mutable BSONObj _keyBson; // if isEmpty, it is invalid and must be loaded from _key.
+        mutable bool _isKeyCurrent; // true if _key matches where the cursor is pointing
+        mutable KeyString _key;
     };
 
     class WiredTigerIndexStandardCursor : public WiredTigerIndexCursorBase {
@@ -729,8 +766,13 @@ namespace {
             : WiredTigerIndexCursorBase(idx, txn, forward) {
         }
 
-        bool _locate(const BSONObj &key, RecordId loc) {
-            TRACE_CURSOR << " _locate " << key << " " << loc
+        virtual void invalidateCache() {
+            WiredTigerIndexCursorBase::invalidateCache();
+            _loc = RecordId();
+        }
+
+        virtual void fillKey(const BSONObj& key, RecordId loc) {
+            TRACE_CURSOR << " fillKey " << key << " " << loc
                          << (_forward ? " forward" : " backward");
 
             // Null cursors should start at the zero key to maintain search ordering in the
@@ -739,47 +781,63 @@ namespace {
             if (loc.isNull())
                 loc = _forward ? RecordId::min() : RecordId::max();
 
-            return seekWTCursor(KeyString::make(key, _idx.ordering(), loc));
+            _key.resetToKey(key, _idx.ordering(), loc);
+            invalidateCache();
         }
 
-        RecordId getRecordId() const {
+        virtual bool _locate(RecordId loc) {
+            // loc already encoded in _key
+            return seekWTCursor();
+        }
+
+        virtual RecordId getRecordId() const {
             if ( _eof )
                 return RecordId();
 
-            WT_CURSOR *c = _cursor.get();
-            WT_ITEM item;
-            invariantWTOK( c->get_key(c, &item ) );
-            const char* base = static_cast<const char*>(item.data);
-            return KeyString::decodeRecordIdEndingAt(base + item.size - 1);
+            if (_loc.isNull()) {
+                loadKeyIfNeeded();
+                _loc = KeyString::decodeRecordIdEndingAt(_key.getBuffer() + _key.getSize() - 1);
+            }
+
+            dassert(!_loc.isNull());
+            return _loc;
         }
 
-        void advance() {
+        virtual void advance() {
             // Advance on a cursor at the end is a no-op
             if (_eof) return;
             advanceWTCursor();
         }
+
+    private:
+        mutable RecordId _loc;
     };
 
     class WiredTigerIndexUniqueCursor : public WiredTigerIndexCursorBase {
     public:
         WiredTigerIndexUniqueCursor(const WiredTigerIndex& idx, OperationContext *txn, bool forward)
-            : WiredTigerIndexCursorBase(idx, txn, forward), _uniquePos(0), _uniqueLen(-1) {
+            : WiredTigerIndexCursorBase(idx, txn, forward), _recordsIndex(0) {
         }
 
-        bool _locate(const BSONObj &key, RecordId loc) {
-            _uniqueLen = -1;
+        virtual void invalidateCache() {
+            WiredTigerIndexCursorBase::invalidateCache();
+            _records.clear();
+        }
 
-            WT_CURSOR *c = _cursor.get();
-
-            TRACE_CURSOR << " _locate " << key << " " << loc
+        virtual void fillKey(const BSONObj& key, RecordId loc) {
+            TRACE_CURSOR << " fillKey " << key << " " << loc
                          << (_forward ? " forward" : " backward");
 
-            if (!seekWTCursor(KeyString::make(key, _idx.ordering())))
+            invalidateCache();
+            _key.resetToKey(key, _idx.ordering()); // loc doesn't go in _key for unique indexes
+        }
+
+        virtual bool _locate(RecordId loc) {
+            if (!seekWTCursor()) {
+                // If didn't seek to exact key, start at beginning of wherever we ended up.
                 return false;
-
+            }
             dassert(!_eof);
-
-            // now we need to check if we have an array situation
 
             if ( loc.isNull() ) {
                 // Null loc means means start and beginning or end of array as needed.
@@ -787,112 +845,79 @@ namespace {
                 return true;
             }
 
+            // If we get here we need to make sure we are positioned at the correct point of the
+            // _records vector.
             TRACE_CURSOR << "\t in weird";
 
-            // we're looking for a specific RecordId, lets see if we can find
-
-            WT_ITEM item;
-            invariantWTOK( c->get_value(c, &item ) );
-            _uniqueLen = item.size;
-            invariant( _uniqueLen > 0 );
-
-            bool stopHere = false;
-            const char* base = static_cast<const char*>(item.data);
             if ( _forward ) {
-                _uniquePos = 0;
-                while (_uniquePos < _uniqueLen) {
-                    const size_t bytes = KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
-                    invariant(int(_uniquePos + bytes) <= _uniqueLen);
-                    const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
-                    if ( temp >= loc ) {
-                        stopHere = true;
-                        break;
+                while (getRecordId() < loc) {
+                    _recordsIndex++;
+                    if (_recordsIndex == _records.size()) {
+                        // This means we exhausted the scan and didn't find a record in range.
+                        advanceWTCursor();
+                        return false;
                     }
-
-                    _uniquePos += bytes;
                 }
             }
             else {
-                _uniquePos = _uniqueLen;
-                while (_uniquePos > 0) {
-                    _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
-                    const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
-                    if ( temp <= loc ) {
-                        stopHere = true;
-                        break;
+                while (getRecordId() > loc) {
+                    _recordsIndex++;
+                    if (_recordsIndex == _records.size()) {
+                        advanceWTCursor();
+                        return false;
                     }
                 }
-            }
-
-            if (!stopHere) {
-                // we need to move to next slot
-                advanceWTCursor();
             }
 
             return true;
         }
 
-        RecordId getRecordId() const {
+        virtual RecordId getRecordId() const {
             if ( _eof )
                 return RecordId();
 
-            WT_CURSOR *c = _cursor.get();
-            WT_ITEM item;
-            invariantWTOK( c->get_value(c, &item ) );
-            const char* base = static_cast<const char*>(item.data);
-            if ( _uniqueLen == -1 ) {
-                // first time checking RecordId. Fetch and decode.
-                _uniqueLen = item.size;
-                invariant( _uniqueLen > 0 );
-                _uniquePos =
-                    _forward
-                    ? 0
-                    : _uniqueLen - KeyString::numBytesForRecordIdEndingAt(base + _uniqueLen - 1);
+            if (_records.empty()) {
+                _recordsIndex = 0;
+
+                WT_CURSOR *c = _cursor.get();
+                WT_ITEM item;
+                invariantWTOK( c->get_value(c, &item ) );
+                BufReader br(item.data, item.size);
+                while (br.remaining()) {
+                    const size_t bytes = KeyString::numBytesForRecordIdStartingAt(br.pos());
+                    _records.push_back(KeyString::decodeRecordIdStartingAt(br.skip(bytes)));
+                }
+                invariant(!_records.empty());
+
+                if (!_forward)
+                    std::reverse(_records.begin(), _records.end());
             }
 
-            invariant( _uniquePos >= 0 && _uniquePos < _uniqueLen );
-            return KeyString::decodeRecordIdStartingAt(base + _uniquePos);
+            dassert(!_records[_recordsIndex].isNull());
+            return _records[_recordsIndex];
         }
 
-        void advance() {
+        virtual void advance() {
             // Advance on a cursor at the end is a no-op
             if ( _eof )
                 return;
 
             // We may just be advancing withing the RecordIds for this key.
-            WT_CURSOR *c = _cursor.get();
-            if ( _uniqueLen == -1 ) {
-                // we need to investigate
+
+            if (_records.empty()) {
+                // Prime the cache.
                 getRecordId();
             }
 
-            WT_ITEM item;
-            invariantWTOK( c->get_value(c, &item ) );
-            const char* base = static_cast<const char*>(item.data);
-            if (_forward) {
-                if ( _uniquePos < _uniqueLen ) {
-                    _uniquePos += KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
-
-                    if ( _uniquePos < _uniqueLen ) {
-                        return;
-                    }
-                }
+            _recordsIndex++;
+            if (_recordsIndex == _records.size()) {
+                advanceWTCursor();
             }
-            else {
-                if (_uniquePos > 0) {
-                    _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
-                    return;
-                }
-            }
-
-            // done with this key, go to next.
-            _uniqueLen = -1;
-            advanceWTCursor();
         }
 
     private:
-        mutable int _uniquePos; // byte offset of start of current RecordId
-        mutable int _uniqueLen;
+        mutable size_t _recordsIndex;
+        mutable std::vector<RecordId> _records;
     };
 
 } // namespace
@@ -975,7 +1000,7 @@ namespace {
         all.insert( loc );
 
         // not in the array, add it to the back
-        locs.reset();
+        locs.resetToEmpty();
         for ( std::set<RecordId>::const_iterator it = all.begin(); it != all.end(); ++it ) {
             locs.appendRecordId(*it);
         }
