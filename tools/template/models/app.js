@@ -26,8 +26,6 @@ var App = module.exports = AmpersandState.extend({
         var group = 'stats';
         var name = serie.key;
       }
-      debug('group:', group);
-      debug('name:', name);
 
       var data = _.sortBy(
         _.map(serie.values, function (v, k) {

@@ -19,7 +19,6 @@
     "ampersand-state": "^4.4.1",
     "ampersand-subcollection": "^1.5.0",
     "ampersand-view": "^7.2.0",
-    "ampersand-view-switcher": "^1.1.2",
     "bootstrap": "https://github.com/twbs/bootstrap/archive/v3.2.0.tar.gz",
     "d3": "^3.5.2",
     "font-awesome": "https://github.com/FortAwesome/Font-Awesome/archive/v4.2.0.tar.gz",
