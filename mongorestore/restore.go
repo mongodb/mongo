@@ -236,25 +236,6 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	}
 	docChan := make(chan bson.Raw, InsertBufferFactor)
 	resultChan := make(chan error, MaxInsertThreads)
-	killChan := make(chan struct{})
-	// make sure goroutines clean up on error
-	defer close(killChan)
-
-	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int64, InsertBufferFactor)
-	go func() {
-		for {
-			select {
-			case size, alive := <-bytesReadChan:
-				if !alive {
-					return
-				}
-				watchProgressor.Inc(size)
-			case <-killChan:
-				return
-			}
-		}
-	}()
 
 	go func() {
 		doc := bson.Raw{}
@@ -269,48 +250,39 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	for i := 0; i < MaxInsertThreads; i++ {
 		go func() {
 			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
-			for {
-				select {
-				case rawDoc, alive := <-docChan:
-					if !alive {
-						err := bulk.Flush()
-						if err != nil {
-							if !db.IsConnectionError(err) && !restore.OutputOptions.StopOnError {
-								// Suppress this error since it's not a severe connection error and
-								// the user has not specified --stopOnError
-								log.Logf(log.Always, "error: %v", err)
-								err = nil
-							}
-						}
-						resultChan <- err
+			for rawDoc := range docChan {
+				if restore.objCheck {
+					//TODO encapsulate to reuse bson obj??
+					err := bson.Unmarshal(rawDoc.Data, &bson.D{})
+					if err != nil {
+						resultChan <- fmt.Errorf("invalid object: %v", err)
 						return
 					}
-					if restore.objCheck {
-						//TODO encapsulate to reuse bson obj??
-						err := bson.Unmarshal(rawDoc.Data, &bson.D{})
-						if err != nil {
-							resultChan <- fmt.Errorf("invalid object: %v", err)
-							return
-						}
-					}
+				}
 
-					err := bulk.Insert(rawDoc)
-					if err != nil {
-
-						if db.IsConnectionError(err) || restore.OutputOptions.StopOnError {
-							// Propagate this error, since it's either a fatal connection error
-							// or the user has turned on --stopOnError
-							resultChan <- err
-						} else {
-							// Otherwise just log the error but don't propagate it.
-							log.Logf(log.Always, "error: %v", err)
-						}
+				if err := bulk.Insert(rawDoc); err != nil {
+					if db.IsConnectionError(err) || restore.OutputOptions.StopOnError {
+						// Propagate this error, since it's either a fatal connection error
+						// or the user has turned on --stopOnError
+						resultChan <- err
+					} else {
+						// Otherwise just log the error but don't propagate it.
+						log.Logf(log.Always, "error: %v", err)
 					}
-					bytesReadChan <- int64(len(rawDoc.Data))
-				case <-killChan:
-					return
+				}
+				watchProgressor.Inc(int64(len(rawDoc.Data)))
+			}
+			err := bulk.Flush()
+			if err != nil {
+				if !db.IsConnectionError(err) && !restore.OutputOptions.StopOnError {
+					// Suppress this error since it's not a severe connection error and
+					// the user has not specified --stopOnError
+					log.Logf(log.Always, "error: %v", err)
+					err = nil
 				}
 			}
+			resultChan <- err
+			return
 		}()
 
 		// sleep to prevent all threads from inserting at the same time at start
