@@ -1,5 +1,9 @@
 (function() {
 
+    // skip tests requiring wiredTiger storage engine on pre 2.8 mongod
+    if (TestData && TestData.storageEngine === 'wiredTiger')
+        return
+
     // Tests using mongorestore with --restoreDbUsersAndRoles, using a dump from
     // a 2.8 mongod and restoring to a 2.6 mongod, which should fail.
 

@@ -1,5 +1,9 @@
 (function() {
 
+    // skip tests requiring wiredTiger storage engine on pre 2.8 mongod
+    if (TestData && TestData.storageEngine === 'wiredTiger')
+        return
+
     // Tests using mongorestore to restore a dump from a 2.6 mongod to a 2.8 mongod.
 
     jsTest.log('Testing running mongorestore restoring data from a 2.6 mongod to'+
