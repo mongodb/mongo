@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	MongodProcess = "mongod"
 	MongosProcess = "mongos"
 )
 
@@ -673,7 +672,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 
 	returnVal.Time = newStat.SampleTime
 	returnVal.IsMongos =
-		(newStat.ShardCursorType != nil || newStat.Process == MongosProcess)
+		(newStat.ShardCursorType != nil || strings.HasPrefix(newStat.Process, MongosProcess))
 
 	if util.IsTruthy(oldStat.Mem.Supported) {
 		if !returnVal.IsMongos {
