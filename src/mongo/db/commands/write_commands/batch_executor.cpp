@@ -632,7 +632,8 @@ namespace mongo {
                    << ", continuing " << causedBy( opError->getErrMessage() ) << endl;
         }
 
-        bool logAll = logger::globalLogDomain()->shouldLog( logger::LogSeverity::Debug( 1 ) );
+        bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kWrite,
+                                                           logger::LogSeverity::Debug(1));
         bool logSlow = executionTime
                        > ( serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs() );
 

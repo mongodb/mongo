@@ -98,19 +98,6 @@ namespace mongo {
     using boost::scoped_ptr;
     using logger::LogComponent;
 
-namespace {
-    inline LogComponent logComponentForOp(int op) {
-        switch (op) {
-        case dbInsert:
-        case dbUpdate:
-        case dbDelete:
-            return LogComponent::kWrite;
-        default:
-            return LogComponent::kQuery;
-        }
-    }
-}  // namespace
-
     // for diaglog
     inline void opread(Message& m) {
         if (_diaglog.getLevel() & 2) {
@@ -389,7 +376,18 @@ namespace {
         debug.op = op;
 
         long long logThreshold = serverGlobalParams.slowMS;
-        bool shouldLog = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
+        LogComponent responseComponent(LogComponent::kQuery);
+        if (op == dbInsert ||
+            op == dbDelete ||
+            op == dbUpdate) {
+            responseComponent = LogComponent::kWrite;
+        }
+        else if (isCommand) {
+            responseComponent = LogComponent::kCommand;
+        }
+
+        bool shouldLog = logger::globalLogDomain()->shouldLog(responseComponent, 
+                                                              logger::LogSeverity::Debug(1));
 
         if ( op == dbQuery ) {
             receivedQuery(txn, c , dbresponse, m, fromDBDirectClient );
@@ -464,14 +462,14 @@ namespace {
              }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
-                MONGO_LOG_COMPONENT(3, logComponentForOp(op))
+                MONGO_LOG_COMPONENT(3, responseComponent)
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
             catch (const AssertionException& e) {
                 setLastError(e.getCode(), e.getInfo().msg.c_str());
-                MONGO_LOG_COMPONENT(3, logComponentForOp(op))
+                MONGO_LOG_COMPONENT(3, responseComponent)
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
@@ -485,18 +483,18 @@ namespace {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            MONGO_LOG_COMPONENT(0, logComponentForOp(op))
+            MONGO_LOG_COMPONENT(0, responseComponent)
                     << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if (txn->lockState()->isReadLocked()) {
-                MONGO_LOG_COMPONENT(1, logComponentForOp(op))
+                MONGO_LOG_COMPONENT(1, responseComponent)
                         << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
-                MONGO_LOG_COMPONENT(1, logComponentForOp(op))
+                MONGO_LOG_COMPONENT(1, responseComponent)
                         << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
