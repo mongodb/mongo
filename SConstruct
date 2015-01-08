@@ -622,9 +622,14 @@ if has_option( "cc-use-shell-environment" ):
     env["CC"] = os.getenv("CC");
 
 if has_option( "cxx" ):
-    env["CC"] = get_option( "cxx" )
+    if not has_option( "cc" ):
+        print "Must specify C compiler when specifying C++ compiler"
+        exit(1)
     env["CXX"] = get_option( "cxx" )
 if has_option( "cc" ):
+    if not has_option( "cxx" ):
+        print "Must specify C++ compiler when specifying C compiler"
+        exit(1)
     env["CC"] = get_option( "cc" )
 
 if has_option( "ld" ):
