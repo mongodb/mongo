@@ -214,7 +214,7 @@ namespace {
            << _commits << '\t'
            << _journaledBytes / 1000000.0 << '\t'
            << _writeToDataFilesBytes / 1000000.0 << '\t'
-           << 0 << '\t'
+           << _commitsInWriteLock << '\t'
            << 0 << '\t'
            << (unsigned) (_prepLogBufferMicros / 1000) << '\t'
            << (unsigned) (_writeToJournalMicros / 1000) << '\t'
@@ -611,6 +611,8 @@ namespace {
                 // The commit logic itself
                 LOG(4) << "groupCommit begin";
 
+                Timer t;
+
                 OperationContextImpl txn;
                 AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
@@ -688,6 +690,8 @@ namespace {
                 }
 
                 stats.curr()->_commits++;
+                stats.curr()->_commitsInWriteLock++;
+                stats.curr()->_commitsInWriteLockMicros += t.micros();
 
                 LOG(4) << "groupCommit end";
             }

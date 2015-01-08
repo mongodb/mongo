@@ -32,7 +32,6 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/lock_manager.h"
 
 namespace mongo {

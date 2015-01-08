@@ -18,6 +18,7 @@ env.Library(
         'd_concurrency.cpp',
         'lock_manager.cpp',
         'lock_state.cpp',
+        'lock_stats.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
@@ -36,6 +37,7 @@ env.CppUnitTest(
             'fast_map_noalloc_test.cpp',
             'lock_manager_test.cpp',
             'lock_state_test.cpp',
+            'lock_stats_test.cpp',
     ],
     LIBDEPS=[
         'lock_manager'

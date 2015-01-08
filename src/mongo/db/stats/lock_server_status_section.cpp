@@ -30,13 +30,16 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
 
     class GlobalLockServerStatusSection : public ServerStatusSection {
     public:
-        GlobalLockServerStatusSection() : ServerStatusSection("globalLock"){
+        GlobalLockServerStatusSection() : ServerStatusSection("globalLock") {
             _started = curTimeMillis64();
         }
 
@@ -121,21 +124,23 @@ namespace mongo {
 
     class LockStatsServerStatusSection : public ServerStatusSection {
     public:
-        LockStatsServerStatusSection() : ServerStatusSection("locks"){}
+        LockStatsServerStatusSection() : ServerStatusSection("locks") { }
+
         virtual bool includeByDefault() const { return true; }
 
-        BSONObj generateSection(OperationContext* txn,
-                                const BSONElement& configElement) const {
+        virtual BSONObj generateSection(OperationContext* txn,
+                                        const BSONElement& configElement) const {
+            BSONObjBuilder ret;
 
-            BSONObjBuilder b;
+            LockStats stats;
+            reportGlobalLockingStats(&stats);
 
-            // SERVER-14978: Need to report the global and per-DB lock stats here
-            //
-            // b.append(".", qlk.stats.report());
+            stats.report(&ret);
 
-            return b.obj();
+            return ret.obj();
         }
 
     } lockStatsServerStatusSection;
 
+} // namespace
 } // namespace mongo

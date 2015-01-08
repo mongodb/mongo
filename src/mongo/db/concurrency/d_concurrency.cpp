@@ -51,9 +51,6 @@ namespace mongo {
     //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
 
-    // Local Oplog. Used by OplogLock.
-    static const ResourceId resourceIdOplog =
-                    ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
 
     DBTryLockTimeoutException::DBTryLockTimeoutException() {}
     DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }

@@ -43,7 +43,6 @@ namespace {
     const int NUM_PERF_ITERS = 1000*1000; // numeber of iterations to use for lock perf
 }
 
-    using boost::shared_ptr;
 
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -289,7 +288,7 @@ namespace {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
             std::vector<boost::shared_ptr<LockerForTests> > lockers(numLockers);
             for (int i = 0; i < numLockers; i++) {
-                lockers[i].reset(new LockerForTests());
+                lockers[i].reset(new LockerForTests(MODE_S));
             }
 
             DefaultLockerImpl locker;

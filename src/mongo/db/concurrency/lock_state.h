@@ -31,8 +31,8 @@
 #include <queue>
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
-#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
 
@@ -147,15 +147,25 @@ namespace mongo {
          *
          * In other words for each call to lockBegin, which does not return LOCK_OK, there needs to
          * be a corresponding call to either lockComplete or unlock.
+         *
+         * NOTE: These methods are not public and should only be used inside the class
+         * implementation and for unit-tests and not called directly.
          */
         LockResult lockBegin(ResourceId resId, LockMode mode);
 
         /**
          * Waits for the completion of a lock, previously requested through lockBegin or
-         * lockGlobalBegin. Must only be called, if lockBegin returned LOCK_WAITING. The resId
-         * argument must match what was previously passed to lockBegin.
+         * lockGlobalBegin. Must only be called, if lockBegin returned LOCK_WAITING.
+         *
+         * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
+         * @param mode Mode which was passed to an earlier lockBegin call. Must match.
+         * @param timeoutMs How long to wait for the lock acquisition to complete.
+         * @param checkDeadlock whether to perform deadlock detection while waiting.
          */
-        LockResult lockComplete(ResourceId resId, unsigned timeoutMs, bool checkDeadlock);
+        LockResult lockComplete(ResourceId resId,
+                                LockMode mode,
+                                unsigned timeoutMs,
+                                bool checkDeadlock);
 
     private:
 
@@ -192,6 +202,10 @@ namespace mongo {
         // Reuse the notification object across requests so we don't have to create a new mutex
         // and condition variable every time.
         CondVarLockGrantNotification _notify;
+
+        // Timer for measuring duration and timeouts. This value is set when lock acquisition is
+        // about to wait and is sampled at grant time.
+        uint64_t _requestStartTime;
 
         // Delays release of exclusive/intent-exclusive locked resources until the write unit of
         // work completes. Value of 0 means we are not inside a write unit of work.

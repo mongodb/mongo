@@ -34,8 +34,8 @@ namespace mongo {
     TEST(Deadlock, NoDeadlock) {
         const ResourceId resId(RESOURCE_DATABASE, std::string("A"));
 
-        LockerForTests locker1;
-        LockerForTests locker2;
+        LockerForTests locker1(MODE_IS);
+        LockerForTests locker2(MODE_IS);
 
         ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_S));
         ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resId, MODE_S));
@@ -51,8 +51,8 @@ namespace mongo {
         const ResourceId resIdA(RESOURCE_DATABASE, std::string("A"));
         const ResourceId resIdB(RESOURCE_DATABASE, std::string("B"));
 
-        LockerForTests locker1;
-        LockerForTests locker2;
+        LockerForTests locker1(MODE_IX);
+        LockerForTests locker2(MODE_IX);
 
         ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
         ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
@@ -77,8 +77,8 @@ namespace mongo {
     TEST(Deadlock, SimpleUpgrade) {
         const ResourceId resId(RESOURCE_DATABASE, std::string("A"));
 
-        LockerForTests locker1;
-        LockerForTests locker2;
+        LockerForTests locker1(MODE_IX);
+        LockerForTests locker2(MODE_IX);
 
         // Both acquire lock in intent mode
         ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_IX));
@@ -103,9 +103,9 @@ namespace mongo {
         const ResourceId resIdA(RESOURCE_DATABASE, std::string("A"));
         const ResourceId resIdB(RESOURCE_DATABASE, std::string("B"));
 
-        LockerForTests locker1;
-        LockerForTests locker2;
-        LockerForTests lockerIndirect;
+        LockerForTests locker1(MODE_IX);
+        LockerForTests locker2(MODE_IX);
+        LockerForTests lockerIndirect(MODE_IX);
 
         ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
         ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
@@ -138,9 +138,9 @@ namespace mongo {
         const ResourceId resIdFlush(RESOURCE_MMAPV1_FLUSH, 1);
         const ResourceId resIdDb(RESOURCE_DATABASE, 2);
 
-        LockerForTests flush;
-        LockerForTests reader;
-        LockerForTests writer;
+        LockerForTests flush(MODE_IX);
+        LockerForTests reader(MODE_IS);
+        LockerForTests writer(MODE_IX);
 
         // This sequence simulates the deadlock which occurs during flush
         ASSERT_EQUALS(LOCK_OK, writer.lockBegin(resIdFlush, MODE_IX));

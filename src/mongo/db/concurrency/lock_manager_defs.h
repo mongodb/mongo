@@ -212,6 +212,11 @@ namespace mongo {
     // Type to uniquely identify a given locker object
     typedef uint64_t LockerId;
 
+    // Hardcoded resource id for the oplog collection, which is special-cased both for resource
+    // acquisition purposes and for statistics reporting.
+    extern const ResourceId resourceIdLocalDB;
+    extern const ResourceId resourceIdOplog;
+
 
     /**
      * Interface on which granted lock requests will be notified. See the contract for the notify
