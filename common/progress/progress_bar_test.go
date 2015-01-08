@@ -176,7 +176,7 @@ func TestBarUnits(t *testing.T) {
 
 		Convey("the written output should contain units", func() {
 			pbar.renderToWriter()
-			So(writeBuffer.String(), ShouldContainSubstring, "KB")
+			So(writeBuffer.String(), ShouldContainSubstring, "B")
 			So(writeBuffer.String(), ShouldContainSubstring, "MB")
 		})
 	})
