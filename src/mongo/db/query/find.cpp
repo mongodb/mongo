@@ -663,7 +663,6 @@ namespace mongo {
             BSONObj explainObj = explainBob.obj();
             bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
 
-            curop.debug().iscommand = true;
             // TODO: Does this get overwritten/do we really need to set this twice?
             curop.debug().query = q.query;
 
