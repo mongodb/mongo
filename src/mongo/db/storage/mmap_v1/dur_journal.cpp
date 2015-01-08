@@ -726,7 +726,7 @@ namespace mongo {
         void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             Timer t;
             j.journal(h, uncompressed);
-            stats.curr->_writeToJournalMicros += t.micros();
+            stats.curr()->_writeToJournalMicros += t.micros();
         }
         void Journal::journal(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             static AlignedBuilder b(32*1024*1024);
@@ -775,11 +775,11 @@ namespace mongo {
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 verify( _curLogFile );
 
-                stats.curr->_uncompressedBytes += uncompressed.len();
+                stats.curr()->_uncompressedBytes += uncompressed.len();
                 unsigned w = b.len();
                 _written += w;
                 verify( w <= L );
-                stats.curr->_journaledBytes += L;
+                stats.curr()->_journaledBytes += L;
                 _curLogFile->synchronousAppend((const void *) b.buf(), L);
                 _rotate();
             }

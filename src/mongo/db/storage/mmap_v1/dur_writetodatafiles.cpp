@@ -70,8 +70,9 @@ namespace mongo {
         void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             Timer t;
             WRITETODATAFILES_Impl1(h, uncompressed);
-            long long m = t.micros();
-            stats.curr->_writeToDataFilesMicros += m;
+            const long long m = t.micros();
+
+            stats.curr()->_writeToDataFilesMicros += m;
             LOG(2) << "journal WRITETODATAFILES " << m / 1000.0 << "ms" << endl;
         }
 

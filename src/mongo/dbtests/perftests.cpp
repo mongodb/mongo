@@ -214,8 +214,9 @@ namespace PerfTests {
         void say(unsigned long long n, long long us, string s) {
             unsigned long long rps = (n*1000*1000)/(us > 0 ? us : 1);
             cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << us/1000 << "ms ";
-            if( showDurStats() )
-                cout << dur::stats.curr->_asCSV();
+            if (showDurStats()) {
+                cout << dur::stats.curr()->_asCSV();
+            }
             cout << endl;
 
             if( conn && !conn->isFailed() ) {
@@ -265,8 +266,10 @@ namespace PerfTests {
                     b.append("rps", (int) rps);
                     b.append("millis", us/1000);
                     b.appendBool("dur", storageGlobalParams.dur);
-                    if (showDurStats() && storageGlobalParams.dur)
-                        b.append("durStats", dur::stats.curr->_asObj());
+                    if (showDurStats() && storageGlobalParams.dur) {
+                        b.append("durStats", dur::stats.asObj());
+                    }
+
                     {
                         bob inf;
                         inf.append("version", versionString);
@@ -315,8 +318,6 @@ namespace PerfTests {
             client()->dropCollection(ns());
             prep();
             int hlm = howLong();
-            dur::stats._intervalMicros = 0; // no auto rotate
-            dur::stats.curr->reset();
             mongo::Timer t;
             n = 0;
             const unsigned int Batch = batchSize();
@@ -343,7 +344,7 @@ namespace PerfTests {
             string test2name = name2();
             {
                 if( test2name != name() ) {
-                    dur::stats.curr->reset();
+                    dur::stats.curr()->reset();
                     mongo::Timer t;
                     unsigned long long n = 0;
                     while( 1 ) {
@@ -1421,7 +1422,7 @@ namespace PerfTests {
             pstatsConnect();
             cout
                 << "stats test                                       rps------  time-- "
-                << dur::stats.curr->_CSVHeader() << endl;
+                << dur::stats.curr()->_CSVHeader() << endl;
             if( profiling ) {
                 add< Insert1 >();
             }

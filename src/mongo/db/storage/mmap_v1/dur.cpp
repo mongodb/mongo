@@ -121,6 +121,9 @@ namespace {
     // Remap loop state
     unsigned remapFileToStartAt;
 
+    // How frequently to reset the durability statistics
+    enum { DurStatsResetIntervalMillis = 3 * 1000 };
+
 
     /**
      * MMAP V1 durability server status section.
@@ -171,75 +174,75 @@ namespace {
     // Stats
     //
 
+    Stats::Stats() : _currIdx(0) {
+
+    }
+
+    void Stats::reset() {
+        // Seal the current metrics
+        _stats[_currIdx]._durationMillis = _stats[_currIdx].getCurrentDurationMillis();
+
+        // Use a new metric
+        const unsigned newCurrIdx = (_currIdx + 1) % (sizeof(_stats) / sizeof(_stats[0]));
+        _stats[newCurrIdx].reset();
+
+        _currIdx = newCurrIdx;
+    }
+
+    BSONObj Stats::asObj() const {
+        // Use the previous statistic
+        const S& stats = _stats[(_currIdx - 1) % (sizeof(_stats) / sizeof(_stats[0]))];
+
+        BSONObjBuilder builder;
+        stats._asObj(&builder);
+
+        return builder.obj();
+    }
+
     void Stats::S::reset() {
         memset(this, 0, sizeof(*this));
+        _startTimeMicros = curTimeMicros64();
     }
 
-    Stats::Stats() {
-        _a.reset();
-        _b.reset();
-        curr = &_a;
-        _intervalMicros = 3000000;
+    std::string Stats::S::_CSVHeader() const {
+        return "cmts\t jrnMB\t wrDFMB\t cIWLk\t early\t prpLgB\t wrToJ\t wrToDF\t rmpPrVw";
     }
 
-    Stats::S * Stats::other() {
-        return curr == &_a ? &_b : &_a;
-    }
-
-    string Stats::S::_CSVHeader() {
-        return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
-    }
-
-    string Stats::S::_asCSV() {
+    std::string Stats::S::_asCSV() const {
         stringstream ss;
         ss << setprecision(2)
            << _commits << '\t'
-           << fixed << _journaledBytes / 1000000.0 << '\t'
-           <<  _writeToDataFilesBytes / 1000000.0 << '\t'
+           << _journaledBytes / 1000000.0 << '\t'
+           << _writeToDataFilesBytes / 1000000.0 << '\t'
            << 0 << '\t'
            << 0 << '\t'
-           << (unsigned) (_prepLogBufferMicros/1000) << '\t'
-           << (unsigned) (_writeToJournalMicros/1000) << '\t'
-           << (unsigned) (_writeToDataFilesMicros/1000) << '\t'
-           << (unsigned) (_remapPrivateViewMicros/1000);
+           << (unsigned) (_prepLogBufferMicros / 1000) << '\t'
+           << (unsigned) (_writeToJournalMicros / 1000) << '\t'
+           << (unsigned) (_writeToDataFilesMicros / 1000) << '\t'
+           << (unsigned) (_remapPrivateViewMicros / 1000) << '\t'
+           << (unsigned) (_commitsInWriteLockMicros / 1000) << '\t';
 
         return ss.str();
     }
 
-    BSONObj Stats::S::_asObj() {
-        BSONObjBuilder b;
+    void Stats::S::_asObj(BSONObjBuilder* builder) const {
+        BSONObjBuilder& b = *builder;
         b << "commits" << _commits
           << "journaledMB" << _journaledBytes / 1000000.0
           << "writeToDataFilesMB" << _writeToDataFilesBytes / 1000000.0
-          << "compression" << _journaledBytes / (_uncompressedBytes+1.0)
-          << "commitsInWriteLock" << 0
+          << "compression" << _journaledBytes / (_uncompressedBytes + 1.0)
+          << "commitsInWriteLock" << _commitsInWriteLock
           << "earlyCommits" << 0
-          << "timeMs" << BSON("dt" << _dtMillis <<
-                              "prepLogBuffer" << (unsigned) (_prepLogBufferMicros/1000) <<
-                              "writeToJournal" << (unsigned) (_writeToJournalMicros/1000) <<
-                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
-                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000));
+          << "timeMs" << BSON("dt" << _durationMillis <<
+                              "prepLogBuffer" << (unsigned) (_prepLogBufferMicros / 1000) <<
+                              "writeToJournal" << (unsigned) (_writeToJournalMicros / 1000) <<
+                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros / 1000) <<
+                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros / 1000) <<
+                              "commitsInWriteLockMicros"
+                                    << (unsigned)(_commitsInWriteLockMicros / 1000));
 
         if (mmapv1GlobalOptions.journalCommitInterval != 0) {
             b << "journalCommitIntervalMs" << mmapv1GlobalOptions.journalCommitInterval;
-        }
-
-        return b.obj();
-    }
-
-    BSONObj Stats::asObj() {
-        return other()->_asObj();
-    }
-
-    void Stats::rotate() {
-        unsigned long long now = curTimeMicros64();
-        unsigned long long dt = now - _lastRotate;
-        if( dt >= _intervalMicros && _intervalMicros ) {
-            // rotate
-            curr->_dtMillis = (unsigned) (dt/1000);
-            _lastRotate = now;
-            curr = other();
-            curr->reset();
         }
     }
 
@@ -519,7 +522,7 @@ namespace {
         try {
             Timer t;
             _remapPrivateView(fraction);
-            stats.curr->_remapPrivateViewMicros += t.micros();
+            stats.curr()->_remapPrivateViewMicros += t.micros();
 
             LOG(4) << "remapPrivateView end";
             return;
@@ -580,7 +583,10 @@ namespace {
             // +1 so it never goes down to zero
             const unsigned oneThird = (ms / 3) + 1;
 
-            stats.rotate();
+            // Reset the stats based on the reset interval
+            if (stats.curr()->getCurrentDurationMillis() > DurStatsResetIntervalMillis) {
+                stats.reset();
+            }
 
             try {
                 boost::mutex::scoped_lock lock(flushMutex);
@@ -681,7 +687,8 @@ namespace {
                     journalBuilder.reset();
                 }
 
-                stats.curr->_commits++;
+                stats.curr()->_commits++;
+
                 LOG(4) << "groupCommit end";
             }
             catch (DBException& e) {

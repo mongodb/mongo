@@ -199,7 +199,7 @@ namespace mongo {
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
             _PREPLOGBUFFER(outHeader, outBuffer);
-            stats.curr->_prepLogBufferMicros += t.micros();
+            stats.curr()->_prepLogBufferMicros += t.micros();
         }
     }
 }

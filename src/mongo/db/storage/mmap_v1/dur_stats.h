@@ -37,37 +37,54 @@ namespace mongo {
             uncommon (from a serverStatus command and such).  Thus, there should not be multicore chatter overhead.
         */
         struct Stats {
-            Stats();
-            void rotate();
-            BSONObj asObj();
-            unsigned _intervalMicros;
 
             struct S {
-                BSONObj _asObj();
-                std::string _asCSV();
-                std::string _CSVHeader();
+                std::string _CSVHeader() const;
+                std::string _asCSV() const;
+
+                void _asObj(BSONObjBuilder* builder) const;
+
                 void reset();
 
+                uint64_t getCurrentDurationMillis() const {
+                    return ((curTimeMicros64() - _startTimeMicros) / 1000);
+                }
+
+
+                // Not reported. Internal use only.
+                uint64_t _startTimeMicros;
+
+                // Reported statistics
+                unsigned _durationMillis;
+
                 unsigned _commits;
-                unsigned long long _journaledBytes;
-                unsigned long long _uncompressedBytes;
-                unsigned long long _writeToDataFilesBytes;
+                unsigned _commitsInWriteLock;
 
-                long long _prepLogBufferMicros;
-                long long _writeToJournalMicros;
-                long long _writeToDataFilesMicros;
-                long long _remapPrivateViewMicros;
+                uint64_t _journaledBytes;
+                uint64_t _uncompressedBytes;
+                uint64_t _writeToDataFilesBytes;
 
-                int _dtMillis;
+                uint64_t _prepLogBufferMicros;
+                uint64_t _writeToJournalMicros;
+                uint64_t _writeToDataFilesMicros;
+                uint64_t _remapPrivateViewMicros;
+                uint64_t _commitsInWriteLockMicros;
             };
 
-            S *curr;
-        private:
-            S _a,_b;
-            unsigned long long _lastRotate;
-            S* other();
-        };
-        extern Stats stats;
 
+            Stats();
+            void reset();
+
+            BSONObj asObj() const;
+
+            const S* curr() const { return &_stats[_currIdx]; }
+            S* curr() { return &_stats[_currIdx]; }
+
+        private:
+            S _stats[5];
+            unsigned _currIdx;
+        };
+
+        extern Stats stats;
     }
 }
