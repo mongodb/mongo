@@ -30,10 +30,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 
@@ -112,11 +109,6 @@ namespace mongo {
             _intentsAndDurOps._durOps.push_back(p);
         }
 
-        void CommitJob::commitingBegin() {
-            _commitNumber = _notify.now();
-            stats.curr->_commits++;
-        }
-
         void CommitJob::committingReset() {
             _hasWritten = false;
             _intentsAndDurOps.clear();
@@ -125,10 +117,10 @@ namespace mongo {
 
         CommitJob::CommitJob() : 
             groupCommitMutex("groupCommit"),
-            _hasWritten(false)
-        { 
-            _commitNumber = 0;
-            _bytes = 0;
+            _hasWritten(false),
+            _lastNotedPos(0),
+            _bytes(0) {
+
         }
 
         void CommitJob::note(void* p, int len) {
@@ -138,14 +130,14 @@ namespace mongo {
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
 
-            if( !_intentsAndDurOps._alreadyNoted.checkAndSet(p, len) ) {
+            if (!_intentsAndDurOps._alreadyNoted.checkAndSet(p, len)) {
 
                 /** tips for debugging:
                         if you have an incorrect diff between data files in different folders
                         (see jstests/dur/quick.js for example),
                         turn this on and see what is logged.  if you have a copy of its output from before the
                         regression, a simple diff of these lines would tell you a lot likely.
-                */
+                        */
 #if 0 && defined(_DEBUG)
                 {
                     static int n;
@@ -165,29 +157,27 @@ namespace mongo {
                 }
 #endif
 
-                // remember intent. we will journal it in a bit
+                // Remember intent. We will journal it in a bit.
                 _intentsAndDurOps.insertWriteIntent(p, len);
 
-                {
-                    // a bit over conservative in counting pagebytes used
-                    static size_t lastPos; // note this doesn't reset with each commit, but that is ok we aren't being that precise
-                    size_t x = ((size_t) p) & ~0xfff; // round off to page address (4KB)
-                    if( x != lastPos ) { 
-                        lastPos = x;
-                        unsigned b = (len+4095) & ~0xfff;
-                        _bytes += b;
+                // Round off to page address (4KB)
+                const size_t x = ((size_t)p) & ~0xfff;
 
-                        if (_bytes > UncommittedBytesLimit * 3) {
-                            static time_t lastComplain;
-                            static unsigned nComplains;
-                            // throttle logging
-                            if( ++nComplains < 100 || time(0) - lastComplain >= 60 ) {
-                                lastComplain = time(0);
-                                warning() << "DR102 too much data written uncommitted " << _bytes/1000000.0 << "MB" << endl;
-                                if( nComplains < 10 || nComplains % 10 == 0 ) {
-                                    // wassert makes getLastError show an error, so we just print stack trace
-                                    printStackTrace();
-                                }
+                if (x != _lastNotedPos) {
+                    _lastNotedPos = x;
+                    unsigned b = (len + 4095) & ~0xfff;
+                    _bytes += b;
+
+                    if (_bytes > UncommittedBytesLimit * 3) {
+                        static time_t lastComplain;
+                        static unsigned nComplains;
+                        // throttle logging
+                        if (++nComplains < 100 || time(0) - lastComplain >= 60) {
+                            lastComplain = time(0);
+                            warning() << "DR102 too much data written uncommitted " << _bytes / 1000000.0 << "MB" << endl;
+                            if (nComplains < 10 || nComplains % 10 == 0) {
+                                // wassert makes getLastError show an error, so we just print stack trace
+                                printStackTrace();
                             }
                         }
                     }

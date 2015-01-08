@@ -70,8 +70,6 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    using boost::shared_ptr;
-
     /**
      * Thrown when a journal section is corrupt. This is considered OK as long as it occurs while
      * processing the last file. Processing stops at the first corrupt section.
@@ -94,7 +92,7 @@ namespace mongo {
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
 
             // if not one of the two simple JEntry's above, this is the operation:
-            shared_ptr<DurOp> op;
+            boost::shared_ptr<DurOp> op;
         };
 
         void removeJournalFiles();
@@ -608,12 +606,6 @@ namespace mongo {
             OperationContextImpl txn;
             ScopedTransaction transaction(&txn, MODE_X);
             Lock::GlobalWrite lk(txn.lockState());
-
-            // can't lock groupCommitMutex here as
-            //   DurableMappedFile::close()->closingFileNotication()->groupCommit() will lock it
-            //   and that would be recursive.
-            //
-            // SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
             _recover(); // throws on interruption
         }

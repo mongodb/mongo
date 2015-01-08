@@ -102,6 +102,10 @@ namespace {
     boost::mutex flushMutex;
     boost::condition_variable flushRequested;
 
+    // for getlasterror fsync:true acknowledgements
+    NotifyAll::When commitNumber(0);
+    NotifyAll commitNotify;
+
     // When set, the flush thread will exit
     AtomicUInt32 shutdownRequested(0);
 
@@ -281,19 +285,19 @@ namespace {
     //
 
     bool DurableImpl::commitNow(OperationContext* txn) {
-        NotifyAll::When when = commitJob._notify.now();
+        NotifyAll::When when = commitNotify.now();
 
         AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
 
         // There is always just one waiting anyways
         flushRequested.notify_one();
-        commitJob._notify.waitFor(when);
+        commitNotify.waitFor(when);
 
         return true;
     }
 
     bool DurableImpl::awaitCommit() {
-        commitJob._notify.awaitBeyondNow();
+        commitNotify.awaitBeyondNow();
         return true;
     }
 
@@ -329,11 +333,11 @@ namespace {
     }
 
     void DurableImpl::commitAndStopDurThread() {
-        NotifyAll::When when = commitJob._notify.now();
+        NotifyAll::When when = commitNotify.now();
 
         // There is always just one waiting anyways
         flushRequested.notify_one();
-        commitJob._notify.waitFor(when);
+        commitNotify.waitFor(when);
 
         shutdownRequested.store(1);
     }
@@ -585,7 +589,7 @@ namespace {
                         break;
                     }
 
-                    if (commitJob._notify.nWaiting()) {
+                    if (commitNotify.nWaiting()) {
                         // One or more getLastError j:true is pending
                         break;
                     }
@@ -602,13 +606,13 @@ namespace {
                 OperationContextImpl txn;
                 AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
-                commitJob.commitingBegin();
+                commitNumber = commitNotify.now();
 
                 if (!commitJob.hasWritten()) {
                     // getlasterror request could have came after the data was already committed.
                     // No need to call committingReset though, because we have not done any
                     // writes (hasWritten == false).
-                    commitJob.committingNotifyCommitted();
+                    commitNotify.notifyAll(commitNumber);
                 }
                 else {
                     JSectHeader h;
@@ -653,7 +657,7 @@ namespace {
                     // journalBuilder and hence will not be persisted, but in this case
                     // commitJob.commitingBegin() bumps the commit number, so those writers will
                     // wait for the next run of this loop.
-                    commitJob.committingNotifyCommitted();
+                    commitNotify.notifyAll(commitNumber);
 
                     // Apply the journal entries on top of the shared view so that when flush
                     // is requested it would write the latest.
@@ -675,6 +679,7 @@ namespace {
                     journalBuilder.reset();
                 }
 
+                stats.curr->_commits++;
                 LOG(4) << "groupCommit end";
             }
             catch (DBException& e) {

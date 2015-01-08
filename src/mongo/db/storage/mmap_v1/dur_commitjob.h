@@ -138,7 +138,6 @@ namespace mongo {
             ~CommitJob(){ verify(!"shouldn't destroy CommitJob!"); }
 
         public:
-            SimpleMutex groupCommitMutex;
             CommitJob();
 
             /** note an operation other than a "basic write". threadsafe (locks in the impl) */
@@ -157,12 +156,6 @@ namespace mongo {
             bool hasWritten() const { return _hasWritten; }
 
         public:
-            /** these called by the groupCommit code as it goes along */
-            void commitingBegin();
-            /** the commit code calls this when data reaches the journal (on disk) */
-            void committingNotifyCommitted() { 
-                _notify.notifyAll(_commitNumber); 
-            }
 
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */
             void committingReset();
@@ -179,14 +172,17 @@ namespace mongo {
                 return _intentsAndDurOps._intents;
             }
 
-            bool _hasWritten;
+            SimpleMutex groupCommitMutex;
 
         private:
-            NotifyAll::When _commitNumber;
+            // Contains the write intents
+            bool _hasWritten;
             IntentsAndDurOps _intentsAndDurOps;
+
+            // Used to count the private map used bytes. Note that _lastNotedPos doesn't reset
+            // with each commit, but that is ok we aren't being that precise.
+            size_t _lastNotedPos;
             size_t _bytes;
-        public:
-            NotifyAll _notify;                  // for getlasterror fsync:true acknowledgements
         };
 
         extern CommitJob& commitJob;

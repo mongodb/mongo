@@ -41,6 +41,7 @@ namespace mongo {
             void rotate();
             BSONObj asObj();
             unsigned _intervalMicros;
+
             struct S {
                 BSONObj _asObj();
                 std::string _asCSV();
@@ -59,6 +60,7 @@ namespace mongo {
 
                 int _dtMillis;
             };
+
             S *curr;
         private:
             S _a,_b;
