@@ -375,6 +375,23 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "cleanupOrphaned",
+            command: {cleanupOrphaned: firstDbName + ".x"},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_clusterManager,
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["cleanupOrphaned"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
             testname: "cloneCollection_1",
             command: {cloneCollection: firstDbName + ".x"},
             skipSharded: true,
