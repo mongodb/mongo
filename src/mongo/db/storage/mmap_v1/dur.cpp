@@ -83,6 +83,8 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/aligned_builder.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"

@@ -42,13 +42,8 @@
 #include <iostream>
 #include <sys/stat.h>
 
-#include "mongo/db/curop.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/db.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/mmap_v1/catalog/namespace.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
@@ -65,8 +60,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
-
-using namespace mongoutils;
 
 namespace mongo {
 

@@ -28,14 +28,14 @@
 
 #pragma once
 
-#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
+#include <string>
+#include <vector>
+
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
     class OperationContext;
-
-    void mongoAbort(const char *msg);
-    void abort(); // not defined -- use mongoAbort() instead
 
 namespace dur {
 

@@ -36,6 +36,7 @@
 #include <string>
 
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 

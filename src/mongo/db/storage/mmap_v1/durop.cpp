@@ -34,19 +34,17 @@
 
 #include "mongo/db/storage/mmap_v1/durop.h"
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
-#include "mongo/util/alignedbuilder.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-
-using namespace mongoutils;
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/shared_ptr.hpp>
 
 namespace mongo {
 

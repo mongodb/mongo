@@ -1,5 +1,3 @@
-// dbcommands_admin.cpp
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -28,17 +26,7 @@
  *    it in the license file.
  */
 
-/**
-   this file has dbcommands that are for dba type administration
-   mostly around dbs and collections
-   NOT system stuff
-*/
-
-
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -57,8 +45,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/alignedbuilder.h"
 #include "mongo/util/background.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/paths.h"

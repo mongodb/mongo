@@ -2,7 +2,8 @@ Import("env")
 
 env.Library(
     target = 'storage_mmapv1',
-    source = [ "catalog/hashtab.cpp",
+    source = [ "aligned_builder.cpp",
+               "catalog/hashtab.cpp",
                "catalog/index_details.cpp",
                "catalog/namespace.cpp",
                "catalog/namespace_details.cpp",
@@ -20,6 +21,7 @@ env.Library(
                "dur_recover.cpp",
                "dur_journal.cpp",
                "dur_recovery_unit.cpp",
+               "journal_latency_test_cmd.cpp",
                "mmap_v1_database_catalog_entry.cpp",
                "mmap_v1_engine.cpp",
                "mmap_v1_extent_manager.cpp",

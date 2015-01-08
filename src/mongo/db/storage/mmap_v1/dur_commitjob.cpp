@@ -37,7 +37,7 @@
 #include <boost/shared_ptr.hpp>
 #include <iostream>
 
-#include "mongo/db/client.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/threadlocal.h"
