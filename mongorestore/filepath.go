@@ -33,7 +33,6 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 		return baseName, MetadataFileType
 	case strings.HasSuffix(baseFileName, ".bin"):
 		// .bin supported for legacy reasons
-		// TODO: should we do this?
 		baseName := strings.TrimSuffix(baseFileName, ".bin")
 		return baseName, BSONFileType
 	case strings.HasSuffix(baseFileName, ".bson"):
@@ -67,7 +66,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 				}
 				foundOplog = true
 				restore.manager.Put(&intents.Intent{
-					C:        "oplog", //TODO make this a helper in intent
+					C:        "oplog",
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 					Size:     entry.Size(),
 				})
@@ -92,7 +91,6 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 	if err != nil {
 		return fmt.Errorf("error reading db folder %v: %v", db, err)
 	}
-	//TODO check if we still want to even deal with this
 	usesMetadataFiles := hasMetadataFiles(entries)
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -167,7 +165,6 @@ func (restore *MongoRestore) CreateIntentForCollection(
 		collection, db, fullpath)
 
 	// avoid actual file handling if we are using stdin
-	// TODO encapsulate this is a cleaner way
 	if restore.useStdin {
 		intent := &intents.Intent{
 			DB:       db,

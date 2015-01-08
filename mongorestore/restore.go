@@ -40,7 +40,9 @@ func (restore *MongoRestore) RestoreIntents() error {
 				for {
 					intent := restore.manager.Pop()
 					if intent == nil {
-						break
+						log.Logf(log.DebugHigh, "ending restore routine with id=%v, no more work to do", id)
+						resultChan <- nil // done
+						return
 					}
 					err := restore.RestoreIntent(intent)
 					if err != nil {
@@ -49,18 +51,13 @@ func (restore *MongoRestore) RestoreIntents() error {
 					}
 					restore.manager.Finish(intent)
 				}
-				log.Logf(log.DebugHigh, "ending restore routine with id=%v, no more work to do", id)
-				resultChan <- nil // done
 			}(i)
 		}
 
 		// wait until all goroutines are done or one of them errors out
 		for i := 0; i < restore.OutputOptions.NumParallelCollections; i++ {
-			select {
-			case err := <-resultChan:
-				if err != nil {
-					return err
-				}
+			if err := <-resultChan; err != nil {
+				return err
 			}
 		}
 		return nil
@@ -79,7 +76,6 @@ func (restore *MongoRestore) RestoreIntents() error {
 
 // RestoreIntent does the bulk of the logic to restore a collection
 // from the BSON and metadata files linked to in the given intent.
-// TODO: overly didactic comments on each step
 func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	collectionExists, err := restore.CollectionExists(intent)
@@ -89,7 +85,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
 		log.Logf(log.Always, "restoring to existing collection %v without dropping", intent.Key())
-		log.Log(log.Always, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
+		log.Log(log.Always, "Important: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
@@ -98,16 +94,9 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 				log.Logf(log.Always, "cannot drop system collection %v, skipping", intent.Key())
 			} else {
 				log.Logf(log.Info, "dropping collection %v before restoring", intent.Key())
-				// TODO(erf) maybe encapsulate this so that the session is closed sooner
-				session, err := restore.SessionProvider.GetSession()
-				session.SetSocketTimeout(0)
+				err = restore.DropCollection(intent)
 				if err != nil {
-					return fmt.Errorf("error establishing connection: %v", err)
-				}
-				defer session.Close()
-				err = session.DB(intent.DB).C(intent.C).DropCollection()
-				if err != nil {
-					return fmt.Errorf("error dropping collection: %v", err)
+					return err // no context needed
 				}
 				collectionExists = false
 			}
@@ -129,7 +118,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		}
 	}
 
-	// first create collection with options
+	// first create the collection with options from the metadata file
 	if intent.MetadataPath != "" {
 		log.Logf(log.Always, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
@@ -166,7 +155,9 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		var size int64
 
 		if restore.useStdin {
-			rawBSONSource = os.Stdin
+			// closing stdin results in inconsistent behavior between
+			// environments, so we just avoid closing it
+			rawBSONSource = ioutil.NopCloser(os.Stdin)
 			log.Log(log.Always, "restoring from stdin")
 		} else {
 			fileInfo, err := os.Lstat(intent.BSONPath)
@@ -252,14 +243,12 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			bulk := db.NewBufferedBulkInserter(collection, restore.ToolOptions.BulkBufferSize, !restore.OutputOptions.StopOnError)
 			for rawDoc := range docChan {
 				if restore.objCheck {
-					//TODO encapsulate to reuse bson obj??
 					err := bson.Unmarshal(rawDoc.Data, &bson.D{})
 					if err != nil {
 						resultChan <- fmt.Errorf("invalid object: %v", err)
 						return
 					}
 				}
-
 				if err := bulk.Insert(rawDoc); err != nil {
 					if db.IsConnectionError(err) || restore.OutputOptions.StopOnError {
 						// Propagate this error, since it's either a fatal connection error
@@ -286,7 +275,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 		}()
 
 		// sleep to prevent all threads from inserting at the same time at start
-		time.Sleep(time.Duration(i) * 10 * time.Millisecond) //FIXME magic numbers
+		time.Sleep(time.Duration(i) * 10 * time.Millisecond)
 	}
 
 	// wait until all insert jobs finish

@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	//TODO we need a better solution for this
+	// bump up the verbosity to make checking debug log output possible
 	log.SetVerbosity(&options.Verbosity{
 		Verbose: []bool{true, true, true, true},
 	})

@@ -73,7 +73,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	return meta.Options, meta.Indexes, nil
 }
 
-//TODO test this
+// IndexesFromBSON extracts index information from bson files and preserves order
 func (restore *MongoRestore) IndexesFromBSON(intent *intents.Intent, bsonFile string) ([]IndexDocument, error) {
 	log.Logf(log.DebugLow, "scanning %v for indexes on %v collections", bsonFile, intent.C)
 
@@ -216,7 +216,6 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 	err = indexCollection.Insert(index)
 	if err != nil {
 		return fmt.Errorf("insert error: %v", err)
-		//TODO, more error checking? Audit this...
 	}
 
 	return nil
@@ -283,7 +282,9 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return err
 	}
 	if tempColExists {
-		return fmt.Errorf("temporary collection admin.%v already exists", tempCol) //TODO(erf) make this more helpful
+		return fmt.Errorf("temporary collection admin.%v already exists. "+
+			"Drop it or specify new temporary collections with --tempUsersColl "+
+			"and --tempRolesColl", tempCol)
 	}
 
 	log.Logf(log.DebugLow, "restoring %v to temporary collection", collectionType)
@@ -370,7 +371,6 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 			// If we are using --restoreDbUsersAndRoles, we cannot guarantee an
 			// $admin.system.version collection from a 2.6 server,
 			// so we can assume up to version 3.
-			//TODO better logs?
 			log.Logf(log.Always, "no system.version bson file found in '%v' database dump", restore.ToolOptions.DB)
 			log.Log(log.Always, "warning: assuming users and roles collections are of auth version 3")
 			log.Log(log.Always, "if users are from an earlier version of MongoDB, they may not restore properly")
@@ -466,4 +466,20 @@ func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
 		}
 	}
 	return false
+}
+
+// DropCollection takes a collection intent and drops it, returning all
+// errors that occur
+func (restore *MongoRestore) DropCollection(intent *intents.Intent) error {
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing connection: %v", err)
+	}
+	defer session.Close()
+	session.SetSocketTimeout(0)
+	err = session.DB(intent.DB).C(intent.C).DropCollection()
+	if err != nil {
+		return fmt.Errorf("error dropping collection: %v", err)
+	}
+	return nil
 }
