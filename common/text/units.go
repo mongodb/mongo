@@ -4,12 +4,16 @@ import (
 	"fmt"
 )
 
-const decimal = 1000
-const binary = 1024
+const (
+	decimal = 1000
+	binary  = 1024
+)
 
-var longByteUnits []string = []string{"B", "KB", "MB", "GB"}
-var shortByteUnits []string = []string{"B", "K", "M", "G"}
-var shortBitUnits []string = []string{"b", "k", "m", "g"}
+var (
+	longByteUnits  = []string{"B", "KB", "MB", "GB"}
+	shortByteUnits = []string{"B", "K", "M", "G"}
+	shortBitUnits  = []string{"b", "k", "m", "g"}
+)
 
 // FormatByteAmount takes an int64 representing a size in bytes and
 // returns a formatted string of a minimum amount of significant figures.
