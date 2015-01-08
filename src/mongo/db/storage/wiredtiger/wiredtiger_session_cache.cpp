@@ -56,7 +56,9 @@ namespace mongo {
         }
     }
 
-    WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id) {
+    WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri,
+                                            uint64_t id,
+                                            bool forRecordStore) {
         {
             Cursors& cursors = _curmap[id];
             if ( !cursors.empty() ) {
@@ -67,7 +69,11 @@ namespace mongo {
             }
         }
         WT_CURSOR* c = NULL;
-        int ret = _session->open_cursor(_session, uri.c_str(), NULL, "overwrite=false", &c);
+        int ret = _session->open_cursor(_session,
+                                        uri.c_str(),
+                                        NULL,
+                                        forRecordStore ? "" : "overwrite=false",
+                                        &c);
         if (ret != ENOENT)
             invariantWTOK(ret);
         if ( c ) _cursorsOut++;

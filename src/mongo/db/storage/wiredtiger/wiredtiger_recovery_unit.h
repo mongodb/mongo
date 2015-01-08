@@ -121,8 +121,14 @@ namespace mongo {
      */
     class WiredTigerCursor {
     public:
-        WiredTigerCursor(const std::string& uri, uint64_t uriID, OperationContext* txn);
-        WiredTigerCursor(const std::string& uri, uint64_t uriID, WiredTigerRecoveryUnit* ru);
+        WiredTigerCursor(const std::string& uri,
+                         uint64_t uriID,
+                         bool forRecordStore,
+                         OperationContext* txn);
+        WiredTigerCursor(const std::string& uri,
+                         uint64_t uriID,
+                         bool forRecordStore,
+                         WiredTigerRecoveryUnit* ru);
         ~WiredTigerCursor();
 
 
@@ -141,7 +147,10 @@ namespace mongo {
         void assertInActiveTxn() const { _ru->assertInActiveTxn(); }
 
     private:
-        void _init( const std::string& uri, uint64_t uriID, WiredTigerRecoveryUnit* ru );
+        void _init( const std::string& uri,
+                    uint64_t uriID,
+                    bool forRecordStore,
+                    WiredTigerRecoveryUnit* ru );
 
         uint64_t _uriID;
         WiredTigerRecoveryUnit* _ru; // not owned

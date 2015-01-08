@@ -100,7 +100,7 @@ namespace mongo {
     StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx,
                                                         const StringData& uri) {
         invariant(opCtx);
-        WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, opCtx);
+        WiredTigerCursor curwrap("metadata:", WiredTigerSession::kMetadataCursorId, false, opCtx);
         WT_CURSOR* cursor = curwrap.get();
         invariant(cursor);
         std::string strUri = uri.toString();

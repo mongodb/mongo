@@ -243,19 +243,28 @@ namespace mongo {
 
     // ---------------------
 
-    WiredTigerCursor::WiredTigerCursor(const std::string& uri, uint64_t id, WiredTigerRecoveryUnit* ru) {
-        _init( uri, id, ru );
+    WiredTigerCursor::WiredTigerCursor(const std::string& uri,
+                                       uint64_t id,
+                                       bool forRecordStore,
+                                       WiredTigerRecoveryUnit* ru) {
+        _init( uri, id, forRecordStore, ru );
     }
 
-    WiredTigerCursor::WiredTigerCursor(const std::string& uri, uint64_t id, OperationContext* txn) {
-        _init( uri, id, WiredTigerRecoveryUnit::get( txn ) );
+    WiredTigerCursor::WiredTigerCursor(const std::string& uri,
+                                       uint64_t id,
+                                       bool forRecordStore,
+                                       OperationContext* txn) {
+        _init( uri, id, forRecordStore, WiredTigerRecoveryUnit::get( txn ) );
     }
 
-    void WiredTigerCursor::_init( const std::string& uri, uint64_t id, WiredTigerRecoveryUnit* ru ) {
+    void WiredTigerCursor::_init( const std::string& uri,
+                                  uint64_t id,
+                                  bool forRecordStore,
+                                  WiredTigerRecoveryUnit* ru ) {
         _uriID = id;
         _ru = ru;
         _session = _ru->getSession();
-        _cursor = _session->getCursor( uri, id );
+        _cursor = _session->getCursor( uri, id, forRecordStore );
         if ( !_cursor ) {
             error() << "no cursor for uri: " << uri;
         }

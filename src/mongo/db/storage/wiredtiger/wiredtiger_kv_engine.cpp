@@ -464,7 +464,7 @@ namespace mongo {
 
     std::vector<std::string> WiredTigerKVEngine::getAllIdents( OperationContext* opCtx ) const {
         std::vector<std::string> all;
-        WiredTigerCursor cursor( "metadata:", WiredTigerSession::kMetadataCursorId, opCtx );
+        WiredTigerCursor cursor( "metadata:", WiredTigerSession::kMetadataCursorId, false, opCtx );
         WT_CURSOR* c = cursor.get();
         if ( !c )
             return all;

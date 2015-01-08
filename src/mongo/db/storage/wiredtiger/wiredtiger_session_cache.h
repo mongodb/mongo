@@ -71,7 +71,9 @@ namespace mongo {
 
         WT_SESSION* getSession() const { return _session; }
 
-        WT_CURSOR* getCursor(const std::string& uri, uint64_t id);
+        WT_CURSOR* getCursor(const std::string& uri,
+                             uint64_t id,
+                             bool forRecordStore);
         void releaseCursor(uint64_t id, WT_CURSOR *cursor);
 
         void closeAllCursors();

@@ -219,7 +219,7 @@ namespace {
         if (!s.isOK())
             return s;
 
-        WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        WiredTigerCursor curwrap(_uri, _instanceId, false, txn);
         curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
 
@@ -233,7 +233,7 @@ namespace {
         invariant(loc.isNormal());
         dassert(!hasFieldNames(key));
 
-        WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        WiredTigerCursor curwrap(_uri, _instanceId, false, txn);
         curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
@@ -312,7 +312,7 @@ namespace {
         invariant(!hasFieldNames(key));
         invariant(unique());
 
-        WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        WiredTigerCursor curwrap(_uri, _instanceId, false, txn);
         WT_CURSOR *c = curwrap.get();
 
         if ( isDup(c, key, loc) )
@@ -321,7 +321,7 @@ namespace {
     }
 
     bool WiredTigerIndex::isEmpty(OperationContext* txn) {
-        WiredTigerCursor curwrap(_uri, _instanceId, txn);
+        WiredTigerCursor curwrap(_uri, _instanceId, false, txn);
         WT_CURSOR *c = curwrap.get();
         if (!c)
             return true;
@@ -565,7 +565,7 @@ namespace {
             OperationContext *txn,
             bool forward)
        : _txn(txn),
-         _cursor(idx.uri(), idx.instanceId(), txn ),
+         _cursor(idx.uri(), idx.instanceId(), false, txn ),
          _idx(idx),
          _forward(forward),
          _eof(true),

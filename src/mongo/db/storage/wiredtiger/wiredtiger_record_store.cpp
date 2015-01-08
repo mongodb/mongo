@@ -297,7 +297,7 @@ namespace {
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
         // ownership passes to the shared_array created below
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
@@ -311,7 +311,7 @@ namespace {
 
     bool WiredTigerRecordStore::findRecord( OperationContext* txn,
                                             const RecordId& loc, RecordData* out ) const {
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
@@ -324,7 +324,7 @@ namespace {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const RecordId& loc ) {
-        WiredTigerCursor cursor( _uri, _instanceId, txn );
+        WiredTigerCursor cursor( _uri, _instanceId, true, txn );
         cursor.assertInActiveTxn();
         WT_CURSOR *c = cursor.get();
         c->set_key(c, _makeKey(loc));
@@ -392,7 +392,7 @@ namespace {
             docsOverCap = numRecords - _cappedMaxDocs;
 
         try {
-            WiredTigerCursor curwrap( _uri, _instanceId, txn);
+            WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
             WT_CURSOR *c = curwrap.get();
             RecordId oldest;
             int ret = 0;
@@ -488,7 +488,7 @@ namespace {
             loc = _nextId();
         }
 
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
@@ -544,7 +544,7 @@ namespace {
                                                               int len,
                                                               bool enforceQuota,
                                                               UpdateMoveNotifier* notifier ) {
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();
         invariant( c );
@@ -561,7 +561,7 @@ namespace {
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
-        ret = c->update(c);
+        ret = c->insert(c);
         invariantWTOK(ret);
 
         _increaseDataSize(txn, len - old_length);
@@ -842,7 +842,7 @@ namespace {
             _oplogSetStartHack( wru );
         }
 
-        WiredTigerCursor cursor(_uri, _instanceId, txn);
+        WiredTigerCursor cursor(_uri, _instanceId, true, txn);
         WT_CURSOR* c = cursor.get();
 
         int cmp;
@@ -942,7 +942,7 @@ namespace {
           _txn( txn ),
           _forward( dir == CollectionScanParams::FORWARD ),
           _forParallelCollectionScan( forParallelCollectionScan ),
-          _cursor( new WiredTigerCursor( rs.getURI(), rs.instanceId(), txn ) ),
+          _cursor( new WiredTigerCursor( rs.getURI(), rs.instanceId(), true, txn ) ),
           _eof(false),
           _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
         RS_ITERATOR_TRACE("start");
@@ -1111,7 +1111,7 @@ namespace {
             // parallel collection scan or something
             needRestore = true;
             _savedRecoveryUnit = txn->recoveryUnit();
-            _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), txn ) );
+            _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), true, txn ) );
             _forParallelCollectionScan = false; // we only do this the first time
         }
 
