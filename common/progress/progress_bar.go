@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/text"
 	"io"
+	"sync"
 	"time"
 )
 
 const (
 	DefaultWaitTime = 3 * time.Second
-
 	BarFilling = "#"
 	BarEmpty   = "."
 	BarLeft    = "["
@@ -21,21 +21,28 @@ const (
 type countProgressor struct {
 	max     int64
 	current int64
+	*sync.Mutex
 }
 
-func (sp *countProgressor) Progress() (int64, int64) {
-	return sp.max, sp.current
+func (c *countProgressor) Progress() (int64, int64) {
+	c.Lock()
+	defer c.Unlock()
+	return c.max, c.current
 }
-func (sp *countProgressor) Inc(amount int64) {
-	sp.current += amount
+func (c *countProgressor) Inc(amount int64) {
+	c.Lock()
+	defer c.Unlock()
+	c.current += amount
 }
 
-func (sp *countProgressor) Set(amount int64) {
-	sp.current = amount
+func (c *countProgressor) Set(amount int64) {
+	c.Lock()
+	defer c.Unlock()
+	c.current = amount
 }
 
 func NewCounter(max int64) *countProgressor {
-	return &countProgressor{max, 0}
+	return &countProgressor{max, 0, &sync.Mutex{}}
 }
 
 // Progressor can be implemented to allow an object to hook up to a progress.Bar.
