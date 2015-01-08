@@ -265,28 +265,6 @@ func (slice LockUsages) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func formatNet(diff int64) string {
-	div := int64(1000)
-	unit := "b"
-
-	if diff >= div {
-		unit = "k"
-		diff /= div
-	}
-
-	if diff >= div {
-		unit = "m"
-		diff /= div
-	}
-
-	if diff >= div {
-		unit = "g"
-		diff /= div
-	}
-	return fmt.Sprintf("%v%v", diff, unit)
-
-}
-
 type LockStatus struct {
 	DBName     string
 	Percentage float64
@@ -413,13 +391,13 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		lineJson["delete"] = formatOpcount(line.Delete, line.DeleteR, false)
 		lineJson["getmore"] = fmt.Sprintf("%v", line.GetMore)
 		lineJson["command"] = formatOpcount(line.Command, line.CommandR, true)
-		lineJson["netIn"] = formatNet(line.NetIn)
-		lineJson["netOut"] = formatNet(line.NetOut)
+		lineJson["netIn"] = text.FormatBits(line.NetIn)
+		lineJson["netOut"] = text.FormatBits(line.NetOut)
 		lineJson["conn"] = fmt.Sprintf("%v", line.NumConnections)
 		lineJson["time"] = fmt.Sprintf("%v", line.Time.Format("15:04:05"))
 		lineJson["host"] = line.Host
-		lineJson["vsize"] = text.FormatByteAmount(int64(line.Virtual))
-		lineJson["res"] = text.FormatByteAmount(int64(line.Resident))
+		lineJson["vsize"] = text.FormatMegabyteAmount(int64(line.Virtual))
+		lineJson["res"] = text.FormatMegabyteAmount(int64(line.Resident))
 
 		// add mmapv1-specific fields
 		if lineFlags&MMAPOnly > 0 {
@@ -432,13 +410,13 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 
 			mappedVal := ""      // empty for mongos
 			if line.Mapped > 0 { // not mongos, update accordingly
-				mappedVal = text.FormatByteAmount(int64(line.Mapped))
+				mappedVal = text.FormatMegabyteAmount(int64(line.Mapped))
 			}
 			lineJson["mapped"] = mappedVal
 
 			nonMappedVal := ""       // empty for mongos
 			if line.NonMapped >= 0 { // not mongos, update accordingly
-				nonMappedVal = text.FormatByteAmount(int64(line.NonMapped))
+				nonMappedVal = text.FormatMegabyteAmount(int64(line.NonMapped))
 			}
 			lineJson["non-mapped"] = nonMappedVal
 
@@ -567,7 +545,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		if lineFlags&MMAPOnly > 0 {
 
 			if line.Mapped > 0 {
-				out.WriteCell(text.FormatByteAmount(int64(line.Mapped)))
+				out.WriteCell(text.FormatMegabyteAmount(int64(line.Mapped)))
 			} else {
 				//for mongos nodes, Mapped is empty, so write a blank cell.
 				out.WriteCell("")
@@ -575,14 +553,14 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		}
 
 		// Columns for Virtual and Resident are always active
-		out.WriteCell(text.FormatByteAmount(int64(line.Virtual)))
-		out.WriteCell(text.FormatByteAmount(int64(line.Resident)))
+		out.WriteCell(text.FormatMegabyteAmount(int64(line.Virtual)))
+		out.WriteCell(text.FormatMegabyteAmount(int64(line.Resident)))
 
 		if lineFlags&MMAPOnly > 0 {
 			if lineFlags&AllOnly > 0 {
 				nonMappedVal := ""
 				if line.NonMapped >= 0 { // not mongos, update accordingly
-					nonMappedVal = text.FormatByteAmount(int64(line.NonMapped))
+					nonMappedVal = text.FormatMegabyteAmount(int64(line.NonMapped))
 				}
 				out.WriteCell(nonMappedVal)
 			}
@@ -614,8 +592,8 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
 		out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
 
-		out.WriteCell(formatNet(line.NetIn))
-		out.WriteCell(formatNet(line.NetOut))
+		out.WriteCell(text.FormatBits(line.NetIn))
+		out.WriteCell(text.FormatBits(line.NetOut))
 
 		out.WriteCell(fmt.Sprintf("%v", line.NumConnections))
 		if discover || lineFlags&Repl > 0 { //only show these fields when in discover or repl mode.
