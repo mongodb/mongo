@@ -243,13 +243,13 @@ namespace {
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
                                        BSONObjBuilder* output) const {
-        IndexCursor cursor(*this, txn, true );
-        cursor.locate( minKey, RecordId::min() );
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
+        cursor->locate( minKey, RecordId::min() );
         long long count = 0;
         TRACE_INDEX << " fullValidate";
-        while ( !cursor.isEOF() ) {
-            TRACE_INDEX << "\t" << cursor.getKey();
-            cursor.advance();
+        while ( !cursor->isEOF() ) {
+            TRACE_INDEX << "\t" << cursor->getKey();
+            cursor->advance();
             count++;
         }
         if ( numKeysOut ) {
@@ -358,12 +358,6 @@ namespace {
                 return false;
         }
         return true;
-    }
-
-    SortedDataInterface::Cursor* WiredTigerIndex::newCursor(OperationContext* txn,
-                                                            int direction) const {
-        invariant((direction == 1) || (direction == -1));
-        return new IndexCursor(*this, txn, direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
@@ -542,236 +536,312 @@ namespace {
         KeyString _locs;
     };
 
-    SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder( OperationContext* txn,
-                                                                 bool dupsAllowed ) {
-        if ( !dupsAllowed ) {
-            // if we don't allow dups, we better be unique
-            invariant( unique() );
+namespace {
+
+    /**
+     * Implements the basic WT_CURSOR functionality used by both unique and standard indexes.
+     */
+    class WiredTigerIndexCursorBase : public SortedDataInterface::Cursor {
+    public:
+        WiredTigerIndexCursorBase(const WiredTigerIndex& idx, OperationContext *txn, bool forward)
+           : _txn(txn),
+             _cursor(idx.uri(), idx.instanceId(), false, txn),
+             _idx(idx),
+             _forward(forward),
+             _eof(true) {
         }
 
-        if (unique()) {
-            return new UniqueBulkBuilder(this, txn, dupsAllowed);
-        }
-        else {
-            return new StandardBulkBuilder(this, txn);
-        }
-    }
+        virtual int getDirection() const { return _forward ? 1 : -1; }
+        virtual bool isEOF() const { return _eof; }
 
+        virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor& genOther) const {
+            const WiredTigerIndexCursorBase& other =
+                dynamic_cast<const WiredTigerIndexCursorBase&>(genOther);
 
+            if ( _eof && other._eof )
+                return true;
+            else if ( _eof || other._eof )
+                return false;
 
-    // ----------------------
+            // TODO: make fast remaining parts fast
+            if ( getRecordId() != other.getRecordId() )
+                return false;
 
-    WiredTigerIndex::IndexCursor::IndexCursor(const WiredTigerIndex &idx,
-            OperationContext *txn,
-            bool forward)
-       : _txn(txn),
-         _cursor(idx.uri(), idx.instanceId(), false, txn ),
-         _idx(idx),
-         _forward(forward),
-         _eof(true),
-         _uniqueLen( -1 ) {
-    }
-
-    bool WiredTigerIndex::IndexCursor::pointsToSamePlaceAs( const SortedDataInterface::Cursor &genother) const {
-        const WiredTigerIndex::IndexCursor &other =
-            dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
-
-        if ( _eof && other._eof )
-            return true;
-        else if ( _eof || other._eof )
-            return false;
-
-        if ( getRecordId() != other.getRecordId() )
-            return false;
-
-        // TODO: make fast
-        return getKey() == other.getKey();
-    }
-
-    bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const RecordId& loc) {
-        _uniqueLen = -1;
-        WT_CURSOR *c = _cursor.get();
-
-        RecordId searchLoc = loc;
-        // Null cursors should start at the zero key to maintain search ordering in the
-        // collator.
-        // Reverse cursors should start on the last matching key.
-        if (loc.isNull())
-            searchLoc = _forward ? RecordId::min() : RecordId::max();
-
-        TRACE_CURSOR << " _locate " << key << " " << loc << (_forward ? " forward" : " backward");
-
-        KeyString data = _idx.unique() ?
-            KeyString::make( key, _idx._ordering ) :
-            KeyString::make( key, _idx._ordering, searchLoc );
-        WiredTigerItem myKey( data.getBuffer(), data.getSize() );
-
-        int cmp = -1;
-        c->set_key(c, myKey.Get() );
-
-        int ret = c->search_near(c, &cmp);
-        if ( ret == WT_NOTFOUND ) {
-            _eof = true;
-            TRACE_CURSOR << "\t not found";
-            return false;
-        }
-        invariantWTOK( ret );
-
-        TRACE_CURSOR << "\t cmp: " << cmp;
-
-        // Make sure we land on a matching key
-        if ( cmp < 0 ) {
-            if ( _forward ) {
-                ret = c->next(c);
-            }
-            else {
-                // do nothing
-            }
-        }
-        else if ( cmp > 0 ) {
-            if ( _forward ) {
-                // do nothing
-            }
-            else {
-                ret = c->prev(c);
-            }
+            return getKey() == other.getKey();
         }
 
-        _eof = ret == WT_NOTFOUND;
+        bool locate(const BSONObj &key, const RecordId& loc) {
+            const BSONObj finalKey = stripFieldNames(key);
+            bool result = _locate(finalKey, loc);
 
-        if ( _eof ) {
-            TRACE_CURSOR << "\t eof " << ret << " _forward: " << _forward;
-            return false;
-        }
-        else {
-            invariantWTOK( ret );
+            // An explicit search at the start of the range should always return false
+            if (loc == RecordId::min() || loc == RecordId::max() )
+                return false;
+            return result;
+       }
+
+        void advanceTo(const BSONObj &keyBegin,
+               int keyBeginLen,
+               bool afterKey,
+               const vector<const BSONElement*>& keyEnd,
+               const vector<bool>& keyEndInclusive) {
+            // TODO: don't go to a bson obj then to a KeyString, go straight
+            BSONObj key = IndexEntryComparison::makeQueryObject(
+                             keyBegin, keyBeginLen,
+                             afterKey, keyEnd, keyEndInclusive, getDirection() );
+
+            _locate(key, RecordId());
         }
 
-        {
+        void customLocate(const BSONObj& keyBegin,
+                      int keyBeginLen,
+                      bool afterKey,
+                      const vector<const BSONElement*>& keyEnd,
+                      const vector<bool>& keyEndInclusive) {
+            advanceTo(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
+        }
+
+
+        BSONObj getKey() const {
+            WT_CURSOR *c = _cursor.get();
             WT_ITEM keyItem;
             int ret = c->get_key(c, &keyItem);
             invariantWTOK(ret);
 
-            if ( data.getSize() != keyItem.size ||
-                 memcmp( data.getBuffer(), keyItem.data, keyItem.size ) ) {
+            BSONObj key = KeyString::toBson( static_cast<const char*>(keyItem.data),
+                                             keyItem.size,
+                                             _idx.ordering() );
+
+            TRACE_INDEX << " returning key: " << key;
+            return key;
+        }
+
+        void savePosition() {
+            _savedForCheck = _txn->recoveryUnit();
+
+            if ( !wt_keeptxnopen() && !_eof ) {
+                // TODO: use KeyString
+                _savedKey = getKey().getOwned();
+                _savedLoc = getRecordId();
+                _cursor.reset();
+            }
+
+            _txn = NULL;
+        }
+
+        void restorePosition( OperationContext *txn ) {
+            // Update the session handle with our new operation context.
+            _txn = txn;
+            invariant( _savedForCheck == txn->recoveryUnit() );
+
+            if ( !wt_keeptxnopen() && !_eof ) {
+                _locate(_savedKey, _savedLoc);
+            }
+        }
+
+    protected:
+        virtual bool _locate(const BSONObj &key, RecordId loc) = 0;
+
+        void advanceWTCursor() {
+            WT_CURSOR *c = _cursor.get();
+            int ret = _forward ? c->next(c) : c->prev(c);
+            if ( ret == WT_NOTFOUND ) {
+                _eof = true;
+                return;
+            }
+            invariantWTOK(ret);
+            _eof = false;
+        }
+
+        // Returns true on exact match
+        bool seekWTCursor(const KeyString& keyString) {
+            WT_CURSOR *c = _cursor.get();
+
+            int cmp = -1;
+            const WiredTigerItem key( keyString.getBuffer(), keyString.getSize() );
+            c->set_key(c, key.Get() );
+
+            int ret = c->search_near(c, &cmp);
+            if ( ret == WT_NOTFOUND ) {
+                _eof = true;
+                TRACE_CURSOR << "\t not found";
+                return false;
+            }
+            invariantWTOK( ret );
+
+            TRACE_CURSOR << "\t cmp: " << cmp;
+
+            // Make sure we land on a matching key
+            if ( cmp < 0 ) {
+                if ( _forward ) {
+                    ret = c->next(c);
+                }
+                else {
+                    // do nothing
+                }
+            }
+            else if ( cmp > 0 ) {
+                if ( _forward ) {
+                    // do nothing
+                }
+                else {
+                    ret = c->prev(c);
+                }
+            }
+
+            _eof = ret == WT_NOTFOUND;
+
+            if ( _eof ) {
+                TRACE_CURSOR << "\t eof " << ret << " _forward: " << _forward;
+                return false;
+            }
+
+            invariantWTOK(ret);
+
+            WT_ITEM currentKey;
+            invariantWTOK(c->get_key(c, &currentKey));
+
+            if ( keyString.getSize() != currentKey.size ||
+                 memcmp( keyString.getBuffer(), currentKey.data, currentKey.size ) ) {
                 TRACE_CURSOR << "\t key != " << getKey();
                 return false;
             }
-        }
 
-        if ( !_idx.unique() ) {
             return true;
         }
 
-        // now we need to check if we have an array situation
+        OperationContext *_txn;
+        WiredTigerCursor _cursor;
+        const WiredTigerIndex& _idx; // not owned
+        const bool _forward;
+        bool _eof;
 
-        if ( loc.isNull() ) {
-            // no loc specified means start and beginning or end of array as needed
-            // so nothing to do
+        // For save/restorePosition check
+        RecoveryUnit* _savedForCheck;
+        BSONObj _savedKey;
+        RecordId _savedLoc;
+    };
+
+    class WiredTigerIndexStandardCursor : public WiredTigerIndexCursorBase {
+    public:
+        WiredTigerIndexStandardCursor(const WiredTigerIndex& idx, OperationContext *txn,
+                                      bool forward)
+            : WiredTigerIndexCursorBase(idx, txn, forward) {
+        }
+
+        bool _locate(const BSONObj &key, RecordId loc) {
+            TRACE_CURSOR << " _locate " << key << " " << loc
+                         << (_forward ? " forward" : " backward");
+
+            // Null cursors should start at the zero key to maintain search ordering in the
+            // collator.
+            // Reverse cursors should start on the last matching key.
+            if (loc.isNull())
+                loc = _forward ? RecordId::min() : RecordId::max();
+
+            return seekWTCursor(KeyString::make(key, _idx.ordering(), loc));
+        }
+
+        RecordId getRecordId() const {
+            if ( _eof )
+                return RecordId();
+
+            WT_CURSOR *c = _cursor.get();
+            WT_ITEM item;
+            invariantWTOK( c->get_key(c, &item ) );
+            const char* base = static_cast<const char*>(item.data);
+            return KeyString::decodeRecordIdEndingAt(base + item.size - 1);
+        }
+
+        void advance() {
+            // Advance on a cursor at the end is a no-op
+            if (_eof) return;
+            advanceWTCursor();
+        }
+    };
+
+    class WiredTigerIndexUniqueCursor : public WiredTigerIndexCursorBase {
+    public:
+        WiredTigerIndexUniqueCursor(const WiredTigerIndex& idx, OperationContext *txn, bool forward)
+            : WiredTigerIndexCursorBase(idx, txn, forward), _uniquePos(0), _uniqueLen(-1) {
+        }
+
+        bool _locate(const BSONObj &key, RecordId loc) {
+            _uniqueLen = -1;
+
+            WT_CURSOR *c = _cursor.get();
+
+            TRACE_CURSOR << " _locate " << key << " " << loc
+                         << (_forward ? " forward" : " backward");
+
+            if (!seekWTCursor(KeyString::make(key, _idx.ordering())))
+                return false;
+
+            dassert(!_eof);
+
+            // now we need to check if we have an array situation
+
+            if ( loc.isNull() ) {
+                // Null loc means means start and beginning or end of array as needed.
+                // so nothing to do
+                return true;
+            }
+
+            TRACE_CURSOR << "\t in weird";
+
+            // we're looking for a specific RecordId, lets see if we can find
+
+            WT_ITEM item;
+            invariantWTOK( c->get_value(c, &item ) );
+            _uniqueLen = item.size;
+            invariant( _uniqueLen > 0 );
+
+            bool stopHere = false;
+            const char* base = static_cast<const char*>(item.data);
+            if ( _forward ) {
+                _uniquePos = 0;
+                while (_uniquePos < _uniqueLen) {
+                    const size_t bytes = KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
+                    invariant(int(_uniquePos + bytes) <= _uniqueLen);
+                    const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
+                    if ( temp >= loc ) {
+                        stopHere = true;
+                        break;
+                    }
+
+                    _uniquePos += bytes;
+                }
+            }
+            else {
+                _uniquePos = _uniqueLen;
+                while (_uniquePos > 0) {
+                    _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
+                    const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
+                    if ( temp <= loc ) {
+                        stopHere = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!stopHere) {
+                // we need to move to next slot
+                advanceWTCursor();
+            }
+
             return true;
         }
 
-        TRACE_CURSOR << "\t in weird";
+        RecordId getRecordId() const {
+            if ( _eof )
+                return RecordId();
 
-        // we're looking for a specific RecordId, lets see if we can find
-
-        WT_ITEM item;
-        invariantWTOK( c->get_value(c, &item ) );
-        _uniqueLen = item.size;
-        invariant( _uniqueLen > 0 );
-
-        bool stopHere = false;
-        const char* base = static_cast<const char*>(item.data);
-        if ( _forward ) {
-            _uniquePos = 0;
-            while (_uniquePos < _uniqueLen) {
-                const size_t bytes = KeyString::numBytesForRecordIdStartingAt(base + _uniquePos);
-                invariant(int(_uniquePos + bytes) <= _uniqueLen);
-                const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
-                if ( temp >= loc ) {
-                    stopHere = true;
-                    break;
-                }
-
-                _uniquePos += bytes;
-            }
-        }
-        else {
-            _uniquePos = _uniqueLen;
-            while (_uniquePos > 0) {
-                _uniquePos -= KeyString::numBytesForRecordIdEndingAt(base + _uniquePos - 1);
-                const RecordId temp = KeyString::decodeRecordIdStartingAt(base + _uniquePos);
-                if ( temp <= loc ) {
-                    stopHere = true;
-                    break;
-                }
-            }
-        }
-
-        if (!stopHere) {
-            // we need to move to next slot
-            advance();
-        }
-
-        return true;
-    }
-
-    bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const RecordId& loc) {
-        const BSONObj finalKey = stripFieldNames(key);
-        bool result = _locate(finalKey, loc);
-
-        // An explicit search at the start of the range should always return false
-        if (loc == RecordId::min() || loc == RecordId::max() )
-            return false;
-        return result;
-   }
-
-    void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
-           int keyBeginLen,
-           bool afterKey,
-           const vector<const BSONElement*>& keyEnd,
-           const vector<bool>& keyEndInclusive) {
-        // TODO: don't go to a bson obj then to a KeyString, go straight
-        BSONObj key = IndexEntryComparison::makeQueryObject(
-                         keyBegin, keyBeginLen,
-                         afterKey, keyEnd, keyEndInclusive, getDirection() );
-
-        _locate(key, RecordId());
-    }
-
-    void WiredTigerIndex::IndexCursor::customLocate(const BSONObj& keyBegin,
-                  int keyBeginLen,
-                  bool afterKey,
-                  const vector<const BSONElement*>& keyEnd,
-                  const vector<bool>& keyEndInclusive) {
-        advanceTo(keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive);
-    }
-
-    BSONObj WiredTigerIndex::IndexCursor::getKey() const {
-        WT_CURSOR *c = _cursor.get();
-        WT_ITEM keyItem;
-        int ret = c->get_key(c, &keyItem);
-        invariantWTOK(ret);
-
-        BSONObj key = KeyString::toBson( static_cast<const char*>(keyItem.data),
-                                         keyItem.size,
-                                         _idx._ordering );
-
-        TRACE_INDEX << " returning key: " << key;
-        return key;
-    }
-
-    RecordId WiredTigerIndex::IndexCursor::getRecordId() const {
-        if ( _eof )
-            return RecordId();
-
-        WT_CURSOR *c = _cursor.get();
-        WT_ITEM item;
-        if ( _idx.unique() ) {
+            WT_CURSOR *c = _cursor.get();
+            WT_ITEM item;
             invariantWTOK( c->get_value(c, &item ) );
             const char* base = static_cast<const char*>(item.data);
             if ( _uniqueLen == -1 ) {
-                // first time at this spot
+                // first time checking RecordId. Fetch and decode.
                 _uniqueLen = item.size;
                 invariant( _uniqueLen > 0 );
                 _uniquePos =
@@ -784,19 +854,13 @@ namespace {
             return KeyString::decodeRecordIdStartingAt(base + _uniquePos);
         }
 
-        invariantWTOK( c->get_key(c, &item ) );
-        const char* base = static_cast<const char*>(item.data);
-        return KeyString::decodeRecordIdEndingAt(base + item.size - 1);
-    }
+        void advance() {
+            // Advance on a cursor at the end is a no-op
+            if ( _eof )
+                return;
 
-    void WiredTigerIndex::IndexCursor::advance() {
-        // Advance on a cursor at the end is a no-op
-        if ( _eof )
-            return;
-
-        WT_CURSOR *c = _cursor.get();
-
-        if ( _idx.unique() ) {
+            // We may just be advancing withing the RecordIds for this key.
+            WT_CURSOR *c = _cursor.get();
             if ( _uniqueLen == -1 ) {
                 // we need to investigate
                 getRecordId();
@@ -820,48 +884,34 @@ namespace {
                     return;
                 }
             }
+
+            // done with this key, go to next.
+            _uniqueLen = -1;
+            advanceWTCursor();
         }
 
-        _uniqueLen = -1;
+    private:
+        mutable int _uniquePos; // byte offset of start of current RecordId
+        mutable int _uniqueLen;
+    };
 
-        int ret = _forward ? c->next(c) : c->prev(c);
-        if ( ret == WT_NOTFOUND ) {
-            _eof = true;
-            return;
-        }
-        invariantWTOK(ret);
-        _eof = false;
-    }
-
-    void WiredTigerIndex::IndexCursor::savePosition() {
-        _savedForCheck = _txn->recoveryUnit();
-
-        if ( !wt_keeptxnopen() && !_eof ) {
-            // TODO: use KeyString
-            _savedKey = getKey().getOwned();
-            _savedLoc = getRecordId();
-            _cursor.reset();
-        }
-
-        _txn = NULL;
-    }
-
-    void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
-        // Update the session handle with our new operation context.
-        _txn = txn;
-        invariant( _savedForCheck == txn->recoveryUnit() );
-
-        if ( !wt_keeptxnopen() && !_eof ) {
-            _locate(_savedKey, _savedLoc);
-        }
-    }
-
-    // ------------------------------
+} // namespace
 
     WiredTigerIndexUnique::WiredTigerIndexUnique( OperationContext* ctx,
                                                   const std::string& uri,
                                                   const IndexDescriptor* desc )
         : WiredTigerIndex( ctx, uri, desc ) {
+    }
+
+    SortedDataInterface::Cursor* WiredTigerIndexUnique::newCursor(OperationContext* txn,
+                                                                  int direction) const {
+        invariant((direction == 1) || (direction == -1));
+        return new WiredTigerIndexUniqueCursor(*this, txn, direction == 1);
+    }
+
+    SortedDataBuilderInterface* WiredTigerIndexUnique::getBulkBuilder(OperationContext* txn,
+                                                                      bool dupsAllowed) {
+        return new UniqueBulkBuilder(this, txn, dupsAllowed);
     }
 
     Status WiredTigerIndexUnique::_insert( WT_CURSOR* c,
@@ -992,6 +1042,19 @@ namespace {
                                                       const std::string& uri,
                                                       const IndexDescriptor* desc )
         : WiredTigerIndex( ctx, uri, desc ) {
+    }
+
+    SortedDataInterface::Cursor* WiredTigerIndexStandard::newCursor(OperationContext* txn,
+                                                                    int direction) const {
+        invariant((direction == 1) || (direction == -1));
+        return new WiredTigerIndexStandardCursor(*this, txn, direction == 1);
+    }
+
+    SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationContext* txn,
+                                                                        bool dupsAllowed) {
+        // We aren't unique so dups better be allowed.
+        invariant(dupsAllowed);
+        return new StandardBulkBuilder(this, txn);
     }
 
     Status WiredTigerIndexStandard::_insert( WT_CURSOR* c,

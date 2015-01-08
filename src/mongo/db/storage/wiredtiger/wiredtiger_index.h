@@ -82,8 +82,6 @@ namespace mongo {
                         const std::string& uri,
                         const IndexDescriptor* desc);
 
-        virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
-
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
                               const RecordId& loc,
@@ -106,14 +104,12 @@ namespace mongo {
 
         bool isDup(WT_CURSOR *c, const BSONObj& key, const RecordId& loc );
 
-        virtual SortedDataInterface::Cursor* newCursor(
-                                                       OperationContext* txn, int direction) const;
-
         virtual Status initAsEmpty(OperationContext* txn);
 
         const std::string& uri() const { return _uri; }
 
         uint64_t instanceId() const { return _instanceId; }
+        Ordering ordering() const { return _ordering; }
 
         virtual bool unique() const = 0;
 
@@ -133,62 +129,6 @@ namespace mongo {
         class StandardBulkBuilder;
         class UniqueBulkBuilder;
 
-        class IndexCursor : public SortedDataInterface::Cursor {
-        public:
-            IndexCursor(const WiredTigerIndex& idx,
-                        OperationContext *txn,
-                        bool forward);
-
-            virtual ~IndexCursor() { }
-
-            virtual int getDirection() const { return _forward ? 1 : -1; }
-
-            virtual bool isEOF() const { return _eof; }
-
-            virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor &genother) const;
-
-            virtual bool locate(const BSONObj &key, const RecordId& loc);
-
-            virtual void customLocate(const BSONObj& keyBegin,
-                                      int keyBeginLen,
-                                      bool afterKey,
-                                      const vector<const BSONElement*>& keyEnd,
-                                      const vector<bool>& keyEndInclusive);
-
-            void advanceTo(const BSONObj &keyBegin,
-                           int keyBeginLen,
-                           bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive);
-
-            virtual BSONObj getKey() const;
-
-            virtual RecordId getRecordId() const;
-
-            virtual void advance();
-
-            virtual void savePosition();
-
-            virtual void restorePosition( OperationContext *txn );
-
-        private:
-            bool _locate(const BSONObj &key, const RecordId& loc);
-
-            OperationContext *_txn;
-            WiredTigerCursor _cursor;
-            const WiredTigerIndex& _idx; // not owned
-            bool _forward;
-            bool _eof;
-
-            mutable int _uniquePos; // byte offset of start of current RecordId
-            mutable int _uniqueLen;
-
-            // For save/restorePosition check
-            RecoveryUnit* _savedForCheck;
-            BSONObj _savedKey;
-            RecordId _savedLoc;
-        };
-
         const Ordering _ordering;
         std::string _uri;
         uint64_t _instanceId;
@@ -200,6 +140,9 @@ namespace mongo {
         WiredTigerIndexUnique( OperationContext* ctx,
                                const std::string& uri,
                                const IndexDescriptor* desc );
+
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
         virtual bool unique() const { return true; }
 
@@ -219,6 +162,9 @@ namespace mongo {
         WiredTigerIndexStandard( OperationContext* ctx,
                                  const std::string& uri,
                                  const IndexDescriptor* desc );
+
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+        SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
         virtual bool unique() const { return false; }
 
