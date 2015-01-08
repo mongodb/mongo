@@ -203,6 +203,172 @@ namespace mongo {
         const BSONField<int> FsyncResponse::errCode( "code" );
         const BSONField<string> FsyncResponse::errMessage( "errmsg" );
 
+        /**
+         * A BSON serializable object representing a setShardVersion command request.
+         */
+        class SSVRequest: public BSONSerializable {
+        MONGO_DISALLOW_COPYING(SSVRequest);
+
+        public:
+
+            SSVRequest(const std::string& configDBString): _configDBString(configDBString) {
+            }
+
+            bool isValid(std::string* errMsg) const {
+                return true;
+            }
+
+            /** Returns the BSON representation of the entry. */
+            BSONObj toBSON() const {
+                BSONObjBuilder builder;
+                builder.append("setShardVersion", "");  // empty ns for init
+                builder.append("configdb", _configDBString);
+                builder.append("init", true);
+                builder.append("authoritative", true);
+                return builder.obj();
+            }
+
+            bool parseBSON(const BSONObj& source, std::string* errMsg) {
+                // Not implemented
+                dassert( false );
+                return false;
+            }
+
+            void clear() {
+                // Not implemented
+                dassert( false );
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
+        private:
+            std::string _configDBString;
+        };
+
+        /**
+         * A BSON serializable object representing a setShardVersion command response.
+         */
+        class SSVResponse: public BSONSerializable {
+        MONGO_DISALLOW_COPYING(SSVResponse);
+
+        public:
+
+            static const BSONField<int> ok;
+            static const BSONField<int> errCode;
+            static const BSONField<string> errMessage;
+
+            SSVResponse() {
+                clear();
+            }
+
+            bool isValid( std::string* errMsg ) const {
+                return _isOkSet;
+            }
+
+            BSONObj toBSON() const {
+                BSONObjBuilder builder;
+
+                if (_isOkSet) builder << ok(_ok);
+                if (_isErrCodeSet) builder << errCode(_errCode);
+                if (_isErrMessageSet) builder << errMessage(_errMessage);
+
+                return builder.obj();
+            }
+
+            bool parseBSON(const BSONObj& source, std::string* errMsg) {
+
+                FieldParser::FieldState result;
+
+                result = FieldParser::extractNumber(source, ok, &_ok, errMsg);
+                if (result == FieldParser::FIELD_INVALID)
+                    return false;
+                _isOkSet = result != FieldParser::FIELD_NONE;
+
+                result = FieldParser::extract(source, errCode, &_errCode, errMsg);
+                if (result == FieldParser::FIELD_INVALID)
+                    return false;
+                _isErrCodeSet = result != FieldParser::FIELD_NONE;
+
+                result = FieldParser::extract(source, errMessage, &_errMessage, errMsg);
+                if (result == FieldParser::FIELD_INVALID)
+                    return false;
+                _isErrMessageSet = result != FieldParser::FIELD_NONE;
+
+                return true;
+            }
+
+            void clear() {
+                _ok = false;
+                _isOkSet = false;
+
+                _errCode = 0;
+                _isErrCodeSet = false;
+
+                _errMessage = "";
+                _isErrMessageSet = false;
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
+            int getOk() {
+                dassert( _isOkSet );
+                return _ok;
+            }
+
+            void setOk(int ok) {
+                _ok = ok;
+                _isOkSet = true;
+            }
+
+            int getErrCode() {
+                if (_isErrCodeSet) {
+                    return _errCode;
+                }
+                else {
+                    return errCode.getDefault();
+                }
+            }
+
+            void setErrCode(int errCode) {
+                _errCode = errCode;
+                _isErrCodeSet = true;
+            }
+
+            bool isErrCodeSet() const {
+                return _isErrCodeSet;
+            }
+
+            const string& getErrMessage() {
+                dassert( _isErrMessageSet );
+                return _errMessage;
+            }
+
+            void setErrMessage(const StringData& errMsg) {
+                _errMessage = errMsg.toString();
+                _isErrMessageSet = true;
+            }
+
+        private:
+
+            int _ok;
+            bool _isOkSet;
+
+            int _errCode;
+            bool _isErrCodeSet;
+
+            string _errMessage;
+            bool _isErrMessageSet;
+
+        };
+
+        const BSONField<int> SSVResponse::ok("ok");
+        const BSONField<int> SSVResponse::errCode("code");
+        const BSONField<string> SSVResponse::errMessage("errmsg");
+
         //
         // Types to associate responses with particular config servers
         //
@@ -310,6 +476,67 @@ namespace mongo {
                                        "active and reachable before write" );
     }
 
+    bool ConfigCoordinator::_checkConfigString(BatchedCommandResponse* clientResponse) {
+        //
+        // Send side
+        //
+
+        string configStr;
+        {
+            vector<ConnectionString>::const_iterator it = _configHosts.begin();
+            configStr = it->toString();
+
+            for (++it; it != _configHosts.end(); ++it) {
+                configStr.append(",");
+                configStr.append(it->toString());
+            }
+        }
+
+        for (vector<ConnectionString>::const_iterator it = _configHosts.begin();
+                it != _configHosts.end(); ++it) {
+            SSVRequest ssvRequest(configStr);
+            _dispatcher->addCommand(*it, "admin", ssvRequest);
+        }
+
+        _dispatcher->sendAll();
+
+        //
+        // Recv side
+        //
+
+        bool ssvError = false;
+        while (_dispatcher->numPending() > 0) {
+            ConnectionString configHost;
+            SSVResponse response;
+
+            // We've got to recv everything, no matter what - even if some failed.
+            Status dispatchStatus = _dispatcher->recvAny(&configHost, &response);
+
+            if (ssvError) {
+                // record only the first failure.
+                continue;
+            }
+
+            if (!dispatchStatus.isOK()) {
+                ssvError = true;
+                clientResponse->setOk(false);
+                clientResponse->setErrCode(static_cast<int>(dispatchStatus.code()));
+                clientResponse->setErrMessage(dispatchStatus.reason());
+            }
+            else if (!response.getOk()) {
+                ssvError = true;
+                clientResponse->setOk(false);
+                clientResponse->setErrMessage(response.getErrMessage());
+
+                if (response.isErrCodeSet()) {
+                    clientResponse->setErrCode(response.getErrCode());
+                }
+            }
+        }
+
+        return !ssvError;
+    }
+
     /**
      * The core config write functionality.
      *
@@ -379,6 +606,10 @@ namespace mongo {
             else {
                 fsyncResponsesOwned.clear();
             }
+        }
+
+        if (!_checkConfigString(clientResponse)) {
+            return;
         }
 
         //

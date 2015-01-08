@@ -219,7 +219,7 @@ namespace mongo {
         LOG(3) << "initial sharding result : " << result << endl;
 
         connectionShardStatus.setSequence(conn, "", 0);
-        return true;
+        return ok;
     }
 
     /**
