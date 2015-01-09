@@ -14,7 +14,7 @@ Once you have `npm` installed, follow these steps:
 2. run `npm install` to install all missing dependencies. 
 3. run `npm run build` to build the template. 
 
-The build script packs everything into a single HTML file and copies it to its parent folder as `./tools/wtstats.html.template`. 
+The build script packs everything into a single HTML file and copies it to `./tools/template/wtstats.html.template`. 
 
 ### Usage
 

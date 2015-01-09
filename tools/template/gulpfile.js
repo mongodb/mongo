@@ -135,7 +135,7 @@ gulp.task('styles', function() {
 
 /**
  * 'gulp pack' will build all targets, then run packify to bundle everything into
- * a single .html file, and save this template in the tools directory.
+ * a single .html file, and save this template in the templates directory.
  */
 gulp.task('pack', ['default'], function() {
   process.chdir('./' + BUILD)
@@ -144,7 +144,7 @@ gulp.task('pack', ['default'], function() {
   }
   packify(opts, function (err, packed) {
     if (err) return console.error(err);
-    fs.writeFileSync('../../wtstats.html.template', packed);
+    fs.writeFileSync('../wtstats.html.template', packed);
   });
 });
 
