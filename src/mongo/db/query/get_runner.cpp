@@ -150,6 +150,7 @@ namespace mongo {
                                                         desc->getAccessMethodName(),
                                                         desc->isMultikey(),
                                                         desc->isSparse(),
+                                                        desc->unique(),
                                                         desc->indexName(),
                                                         desc->infoObj()));
         }
@@ -739,6 +740,7 @@ namespace mongo {
                                                            desc->getAccessMethodName(),
                                                            desc->isMultikey(),
                                                            desc->isSparse(),
+                                                           desc->unique(),
                                                            desc->indexName(),
                                                            desc->infoObj()));
             }
