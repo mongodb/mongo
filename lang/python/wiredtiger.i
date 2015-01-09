@@ -339,7 +339,9 @@ retry:
 	if (result != 0 && result != EBUSY)
 		SWIG_ERROR_IF_NOT_SET(result);
         else if (result == EBUSY) {
+		SWIG_PYTHON_THREAD_BEGIN_ALLOW;
                 __wt_sleep(0, 10000);
+		SWIG_PYTHON_THREAD_END_ALLOW;
                 goto retry;
         }
 }
