@@ -249,9 +249,6 @@ def main():
             print title
         sys.exit(0)
 
-    # Figure out the full set of x axis values
-    xdata = sorted(set(k for k in ydata.iterkeys() for ydata in results))
-
     output_series(results)
 
     # If the user wants the stats split up by prefix type do so.
