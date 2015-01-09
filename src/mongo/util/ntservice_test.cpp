@@ -116,4 +116,5 @@ TEST(NtService, RegressionSERVER_7252) {
 namespace mongo {
     void Client::initThread(const char* desc, AbstractMessagingPort* mp) {
     }
+    void removeControlCHandler() {}
 }  // namespace mongo
