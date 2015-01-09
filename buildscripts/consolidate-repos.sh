@@ -113,7 +113,7 @@ done
 # /var/www-org/repo.consolidated/apt/ubuntu/dists/precise/mongodb-org/unstable -> 2.5
 # /var/www-org/repo.consolidated/apt/debian/dists/wheezy/mongodb-org/unstable -> 2.5
 #
-for unstable_branch_dir in "$repodir"/yum/redhat/*/*/$unstable_branch "$repodir"/apt/debian/dists/*/*/$unstable_branch "$repodir"/apt/ubuntu/dists/*/*/$unstable_branch
+for unstable_branch_dir in "$repodir"/yum/redhat/*/*/$unstable_branch "$repodir"/yum/amazon/*/*/$unstable_branch "$repodir"/apt/debian/dists/*/*/$unstable_branch "$repodir"/apt/ubuntu/dists/*/*/$unstable_branch "$repodir"/zypper/suse/*/*/$unstable_branch
 do
   full_unstable_path=$(dirname "$unstable_branch_dir")/unstable
   if [ -e "$unstable_branch_dir" -a ! -e "$full_unstable_path" ]
@@ -123,7 +123,7 @@ do
   fi
 done
 
-for stable_branch_dir in "$repodir"/yum/redhat/*/*/$stable_branch "$repodir"/apt/debian/dists/*/*/$stable_branch "$repodir"/apt/ubuntu/dists/*/*/$stable_branch
+for stable_branch_dir in "$repodir"/yum/redhat/*/*/$stable_branch "$repodir"/yum/amazon/*/*/$stable_branch "$repodir"/apt/debian/dists/*/*/$stable_branch "$repodir"/apt/ubuntu/dists/*/*/$stable_branch "$repodir"/zypper/suse/*/*/$stable_branch
 do
   full_stable_path=$(dirname "$stable_branch_dir")/stable
   if [ -e "$stable_branch_dir" -a ! -e "$full_stable_path" ]
@@ -133,7 +133,7 @@ do
   fi
 done
 
-for rpm_dir in $(find "$repodir"/yum/redhat "$repodir"/zypper/suse -type d -name x86_64 -o -name i386)
+for rpm_dir in $(find "$repodir"/yum/redhat "$repodir"/yum/amazon "$repodir"/zypper/suse -type d -name x86_64 -o -name i386)
 do
   echo "Generating redhat repo metadata under $rpm_dir"
   cd "$rpm_dir"
