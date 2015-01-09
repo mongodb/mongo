@@ -38,6 +38,10 @@
 
 using namespace mongo;
 
+BSONObj toBson(const KeyString& ks, Ordering ord) {
+    return KeyString::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
+}
+
 Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
 Ordering ONE_DESCENDING = Ordering::make(BSON("a" << -1));
@@ -52,16 +56,17 @@ TEST(KeyStringTest, Simple1) {
                      KeyString::make(b, ALL_ASCENDING, RecordId()));
 }
 
-#define ROUNDTRIP_ORDER(x, order) do {                                  \
-        BSONObj _obj = x;                                               \
-        KeyString ks = KeyString::make(_obj, order);                    \
-        ASSERT_EQUALS(_obj, ks.toBson(order));                          \
+#define ROUNDTRIP_ORDER(x, order) do {                           \
+        const BSONObj _orig = x;                                 \
+        const KeyString _ks = KeyString::make(_orig, order);     \
+        const BSONObj _converted = toBson(_ks, order);           \
+        ASSERT_EQ(_converted, _orig);                            \
+        ASSERT(_converted.binaryEqual(_orig));                   \
     } while (0)
 
 #define ROUNDTRIP(x) do {                                            \
         ROUNDTRIP_ORDER(x, ALL_ASCENDING);                           \
-        ROUNDTRIP_ORDER(x, Ordering::make(BSON("a" << 1)));          \
-        ROUNDTRIP_ORDER(x, Ordering::make(BSON("a" << -1)));         \
+        ROUNDTRIP_ORDER(x, ONE_DESCENDING);                          \
     } while (0)
 
 #define COMPARES_SAME(_x,_y) do {                                \
@@ -422,14 +427,24 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << true));
     elements.push_back(BSON("" << false));
 
+    // Something that needs multiple bytes of typeBits
+    elements.push_back(BSON("" << BSON_ARRAY(""
+                                          << BSONSymbol("")
+                                          << 0
+                                          << 0ll
+                                          << 0.0
+                                          << -0.0
+                                          )));
+
     //
     // Interesting numeric cases
     //
 
+    elements.push_back(BSON("" << 0));
+    elements.push_back(BSON("" << 0ll));
     elements.push_back(BSON("" << 0.0));
     elements.push_back(BSON("" << -0.0));
     elements.push_back(BSON("" << std::numeric_limits<double>::quiet_NaN()));
-    elements.push_back(BSON("" << std::numeric_limits<double>::signaling_NaN())); // TODO hex float
     elements.push_back(BSON("" << std::numeric_limits<double>::infinity()));
     elements.push_back(BSON("" << -std::numeric_limits<double>::infinity()));
     elements.push_back(BSON("" << std::numeric_limits<double>::max()));
@@ -532,9 +547,9 @@ void testPermutation(const std::vector<BSONObj>& elementsOrig,
         for (size_t i = 0; i < elements.size(); i++) {
             const BSONObj& o1 = elements[i];
             if (debug) log() << "\to1: " << o1;
-            ROUNDTRIP(o1);
+            ROUNDTRIP_ORDER(o1, ordering);
+
             KeyString k1 = KeyString::make(o1, ordering);
-            ASSERT_EQUALS(o1, k1.toBson(ordering));
 
             KeyString l1 = KeyString::make(BSON("l" << o1.firstElement()), ordering); // kLess
             KeyString g1 = KeyString::make(BSON("g" << o1.firstElement()), ordering); // kGreater
@@ -599,6 +614,12 @@ TEST(KeyStringTest, AllPermCompare) {
 }
 
 TEST(KeyStringTest, AllPerm2Compare) {
+    // This test can take over a minute without optimizations. Re-enable if you need to debug it.
+#if !defined(MONGO_OPTIMIZED_BUILD)
+    log() << "\t\t\tskipping test on non-optimized build";
+    return;
+#endif
+
     const std::vector<BSONObj>& baseElements = getInterestingElements();
 
     std::vector<BSONObj> elements;
@@ -662,6 +683,27 @@ int compareNumbers(const BSONElement& lhs, const BSONElement& rhs ) {
     }
 }
 
+TEST(KeyStringTest, NaNs) {
+    // TODO use hex floats to force distinct NaNs
+    const double nan1 = std::numeric_limits<double>::quiet_NaN();
+    const double nan2 = std::numeric_limits<double>::signaling_NaN();
+
+    // Since only output a single NaN, we can't use the normal ROUNDTRIP testing here.
+
+    const KeyString ks1a = KeyString::make(BSON("" << nan1), ONE_ASCENDING);
+    const KeyString ks1d = KeyString::make(BSON("" << nan1), ONE_DESCENDING);
+
+    const KeyString ks2a = KeyString::make(BSON("" << nan2), ONE_ASCENDING);
+    const KeyString ks2d = KeyString::make(BSON("" << nan2), ONE_DESCENDING);
+
+    ASSERT_EQ(ks1a, ks2a);
+    ASSERT_EQ(ks1d, ks2d);
+
+    ASSERT(isNaN(toBson(ks1a, ONE_ASCENDING)[""].Double()));
+    ASSERT(isNaN(toBson(ks2a, ONE_ASCENDING)[""].Double()));
+    ASSERT(isNaN(toBson(ks1d, ONE_DESCENDING)[""].Double()));
+    ASSERT(isNaN(toBson(ks2d, ONE_DESCENDING)[""].Double()));
+}
 TEST(KeyStringTest, NumberOrderLots) {
     std::vector<BSONObj> numbers;
     {
@@ -744,12 +786,13 @@ TEST(KeyStringTest, RecordIds) {
             ASSERT_GTE(ks.getSize(), 2u);
             ASSERT_LTE(ks.getSize(), 10u);
 
-            ASSERT_EQ(KeyString::numBytesForRecordIdStartingAt(ks.getBuffer()), ks.getSize());
-            ASSERT_EQ(KeyString::numBytesForRecordIdEndingAt(ks.getBuffer() + ks.getSize() - 1),
-                      ks.getSize());
+            ASSERT_EQ(KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()), rid);
 
-            ASSERT_EQ(KeyString::decodeRecordIdStartingAt(ks.getBuffer()), rid);
-            ASSERT_EQ(KeyString::decodeRecordIdEndingAt(ks.getBuffer() + ks.getSize() - 1), rid);
+            {
+                BufReader reader(ks.getBuffer(), ks.getSize());
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
+                ASSERT(reader.atEof());
+            }
 
             if (rid.isNormal()) {
                 ASSERT_GT(ks, KeyString::make(RecordId()));
@@ -768,7 +811,8 @@ TEST(KeyStringTest, RecordIds) {
             if (rid < other) ASSERT_LT(KeyString::make(rid), KeyString::make(other));
             if (rid > other) ASSERT_GT(KeyString::make(rid), KeyString::make(other));
 
-            { // Test concatenating RecordIds like in a unique index
+            {
+                // Test concatenating RecordIds like in a unique index.
                 KeyString ks;
                 ks.appendRecordId(RecordId::max()); // uses all bytes
                 ks.appendRecordId(rid);
@@ -777,58 +821,19 @@ TEST(KeyStringTest, RecordIds) {
                 ks.appendRecordId(RecordId(1)); // uses no extra bytes
                 ks.appendRecordId(rid);
                 ks.appendRecordId(other);
-                ks.appendRecordId(rid);
-                ks.appendRecordId(RecordId(2));
 
-                {
-                    // forward scan
-                    const char* it = ks.getBuffer();
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId::max());
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(0xDEADBEEF));
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(1));
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), other);
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(2));
-                    it += KeyString::numBytesForRecordIdStartingAt(it);
+                ASSERT_EQ(KeyString::decodeRecordIdAtEnd(ks.getBuffer(), ks.getSize()), other);
 
-                    ASSERT_EQ(it, ks.getBuffer() + ks.getSize());
-                }
-
-                {
-                    // reverse scan
-                    const char* it = ks.getBuffer() + ks.getSize();
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(2));
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), other);
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(1));
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId(0xDEADBEEF));
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), rid);
-                    it -= KeyString::numBytesForRecordIdEndingAt(it - 1);
-                    ASSERT_EQ(KeyString::decodeRecordIdStartingAt(it), RecordId::max());
-
-                    ASSERT_EQ(it, ks.getBuffer());
-                }
+                // forward scan
+                BufReader reader(ks.getBuffer(), ks.getSize());
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId::max());
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId(0xDEADBEEF));
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), RecordId(1));
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), rid);
+                ASSERT_EQ(KeyString::decodeRecordId(&reader), other);
+                ASSERT(reader.atEof());
             }
         }
     }

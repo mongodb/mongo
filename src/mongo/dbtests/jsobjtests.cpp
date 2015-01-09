@@ -809,6 +809,9 @@ namespace JsobjTests {
 
                 b.append( "g" , -123.456 );
 
+                b.append( "h" , 0.0 );
+                b.append( "i" , -0.0 );
+
                 BSONObj x = b.obj();
                 keyTest(x);
 
@@ -822,6 +825,8 @@ namespace JsobjTests {
 
                 ASSERT_EQUALS( "-123.456" , x["g"].toString( false , true ) );
 
+                ASSERT_EQUALS( "0.0" , x["h"].toString( false , true ) );
+                ASSERT_EQUALS( "-0.0" , x["i"].toString( false , true ) );
             }
         };
 

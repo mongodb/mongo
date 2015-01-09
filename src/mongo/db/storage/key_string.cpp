@@ -32,10 +32,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/key_string.h"
+
 #include <boost/scoped_array.hpp>
+#include <cmath>
 
 #include "mongo/base/data_view.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/platform/bits.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -43,17 +45,19 @@
 namespace mongo {
 
     namespace {
+        typedef KeyString::TypeBits TypeBits;
+
         namespace CType {
             // canonical types namespace. (would be enum class CType: uint8_t in C++11)
             // Note 0-9 and 246-255 are disallowed and reserved for value encodings.
-            // For types that encode value information in the type byte, the value in this list is
-            // the "generic" one to be used to represent all values of that type, such as in the
+            // For types that encode value information in the ctype byte, the value in this list is
+            // the "generic" one to be used to represent all values of that ctype, such as in the
             // encoding of fields in Objects.
             const uint8_t kMinKey = 10;
             const uint8_t kUndefined = 15;
             const uint8_t kNullish = 20;
             const uint8_t kNumeric = 30;
-            const uint8_t kString = 60;
+            const uint8_t kStringLike = 60;
             const uint8_t kObject = 70;
             const uint8_t kArray = 80;
             const uint8_t kBinData = 90;
@@ -92,7 +96,7 @@ namespace mongo {
             const uint8_t kNumericPositive7ByteInt = kNumeric + 19;
             const uint8_t kNumericPositive8ByteInt = kNumeric + 20;
             const uint8_t kNumericPositiveLargeDouble = kNumeric + 21; // >= 2**63 including +Inf
-            BOOST_STATIC_ASSERT(kNumericPositiveLargeDouble < kString);
+            BOOST_STATIC_ASSERT(kNumericPositiveLargeDouble < kStringLike);
 
             const uint8_t kBoolFalse = kBool + 0;
             const uint8_t kBoolTrue = kBool + 1;
@@ -129,7 +133,7 @@ namespace mongo {
 
             case mongo::String:
             case Symbol:
-                return CType::kString;
+                return CType::kStringLike;
 
             case Object: return CType::kObject;
             case Array: return CType::kArray;
@@ -149,9 +153,6 @@ namespace mongo {
                 invariant(false);
             }
         }
-
-        // Where doubles go integer-only - i.e. no decimals.
-        const int64_t kMinLargeInt64 = 1ll << 52;
 
         // First double that isn't an int64.
         const double kMinLargeDouble = 9223372036854775808.0; // 1ULL<<63
@@ -341,6 +342,16 @@ namespace mongo {
         _append(lastByte, false);
     }
 
+    void KeyString::appendTypeBits(const TypeBits& typeBits) {
+        // As an optimization, encode AllZeros as a single 0 byte.
+        if (typeBits.isAllZeros()) {
+            _append(uint8_t(0), false);
+            return;
+        }
+
+        _appendBytes(typeBits.getBuffer(), typeBits.getSize(), false);
+    }
+
     void KeyString::_appendBool(bool val, bool invert) {
         _append(val ? CType::kBoolTrue : CType::kBoolFalse, invert);
     }
@@ -364,12 +375,14 @@ namespace mongo {
     }
 
     void KeyString::_appendString(StringData val, bool invert) {
-        _append(CType::kString, invert);
+        _typeBits.appendString();
+        _append(CType::kStringLike, invert);
         _appendStringLike(val, invert);
     }
 
     void KeyString::_appendSymbol(StringData val, bool invert) {
-        _append(CType::kString, invert); // Symbols and Strings compare equally
+        _typeBits.appendSymbol();
+        _append(CType::kStringLike, invert); // Symbols and Strings compare equally
         _appendStringLike(val, invert);
     }
 
@@ -418,7 +431,7 @@ namespace mongo {
     void KeyString::_appendArray(const BSONArray& val, bool invert) {
         _append(CType::kArray, invert);
         BSONForEach(elem, val) {
-            // No generic type byte needed here since no name is encoded.
+            // No generic ctype byte needed here since no name is encoded.
             _appendBsonValue(elem, invert, NULL);
         }
         _append(int8_t(0), invert);
@@ -429,7 +442,14 @@ namespace mongo {
         _appendBson(val, invert);
     }
 
-    void KeyString::_appendDouble(const double num, bool invert) {
+    void KeyString::_appendNumberDouble(const double num, bool invert) {
+        if (num == 0.0 && std::signbit(num)) {
+            _typeBits.appendNegativeZero();
+        }
+        else {
+            _typeBits.appendNumberDouble();
+        }
+
         // no special cases needed for Inf,
         // see http://en.wikipedia.org/wiki/IEEE_754-1985#Positive_and_negative_infinity
         if (isNaN(num)) {
@@ -485,28 +505,14 @@ namespace mongo {
         _appendLargeDouble(num, invert);
     }
 
-    void KeyString::_appendLongLong(const long long num, bool invert) {
-        if (num == std::numeric_limits<long long>::min()) {
-            // -2**63 is exactly representable as a double and not as a positive int64.
-            // Therefore we encode it as a double.
-            dassert(-double(num) == kMinLargeDouble);
-            _appendLargeDouble(double(num), invert);
-            return;
-        }
-
-        if (num == 0) {
-            _append(CType::kNumericZero, invert);
-            return;
-        }
-
-        const bool isNegative = num < 0;
-        const uint64_t magnitude = isNegative ? -num : num;
-        _appendPreshiftedIntegerPortion(magnitude << 1, isNegative, invert);
+    void KeyString::_appendNumberLong(const long long num, bool invert) {
+        _typeBits.appendNumberLong();
+        _appendInteger(num, invert);
     }
 
-    void KeyString::_appendInt(const int num, bool invert) {
-        // NumberInt encoding is the same as for NumberLong, without introducing new edge cases.
-        _appendLongLong(num, invert);
+    void KeyString::_appendNumberInt(const int num, bool invert) {
+        _typeBits.appendNumberInt();
+        _appendInteger(num, invert);
     }
 
     void KeyString::_appendBsonValue(const BSONElement& elem,
@@ -526,7 +532,7 @@ namespace mongo {
             _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
             break;
 
-        case NumberDouble: _appendDouble(elem._numberDouble(), invert); break;
+        case NumberDouble: _appendNumberDouble(elem._numberDouble(), invert); break;
         case String: _appendString(elem.valueStringData(), invert); break;
         case Object: _appendObject(elem.Obj(), invert); break;
         case Array: _appendArray(BSONArray(elem.Obj()), invert); break;
@@ -552,9 +558,9 @@ namespace mongo {
                                invert);
             break;
         }
-        case NumberInt: _appendInt(elem._numberInt(), invert); break;
+        case NumberInt: _appendNumberInt(elem._numberInt(), invert); break;
         case Timestamp: _appendTimestamp(elem._opTime(), invert); break;
-        case NumberLong: _appendLongLong(elem._numberLong(), invert); break;
+        case NumberLong: _appendNumberLong(elem._numberLong(), invert); break;
 
         default:
             invariant(false);
@@ -582,7 +588,7 @@ namespace mongo {
 
     void KeyString::_appendBson(const BSONObj& obj, bool invert) {
         BSONForEach(elem, obj) {
-            // Force the order to be based on (type, name, value).
+            // Force the order to be based on (ctype, name, value).
             _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
             StringData name = elem.fieldNameStringData();
             _appendBsonValue(elem, invert, &name);
@@ -623,6 +629,27 @@ namespace mongo {
             _append(endian::nativeToBig(data), !invert);
         }
     }
+
+    // Handles NumberLong and NumberInt which are encoded identically except for the TypeBits.
+    void KeyString::_appendInteger(const long long num, bool invert) {
+        if (num == std::numeric_limits<long long>::min()) {
+            // -2**63 is exactly representable as a double and not as a positive int64.
+            // Therefore we encode it as a double.
+            dassert(-double(num) == kMinLargeDouble);
+            _appendLargeDouble(double(num), invert);
+            return;
+        }
+
+        if (num == 0) {
+            _append(CType::kNumericZero, invert);
+            return;
+        }
+
+        const bool isNegative = num < 0;
+        const uint64_t magnitude = isNegative ? -num : num;
+        _appendPreshiftedIntegerPortion(magnitude << 1, isNegative, invert);
+    }
+
 
     void KeyString::_appendPreshiftedIntegerPortion(uint64_t value, bool isNegative, bool invert) {
         dassert(value != 0ull);
@@ -667,28 +694,33 @@ namespace mongo {
     // ----------------------------------------------------------------------
 
     namespace {
-        void toBsonValue(uint8_t type,
+        void toBsonValue(uint8_t ctype,
                          BufReader* reader,
+                         TypeBits::Reader* typeBits,
                          bool inverted,
                          BSONObjBuilderValueStream* stream);
 
-        void toBson(BufReader* reader, bool inverted, BSONObjBuilder* builder) {
+        void toBson(BufReader* reader, TypeBits::Reader* typeBits,
+                    bool inverted, BSONObjBuilder* builder) {
             while (readType<uint8_t>(reader, inverted) != 0) {
                 if (inverted) {
                     std::string name = readInvertedCString(reader);
                     BSONObjBuilderValueStream& stream = *builder << name;
-                    toBsonValue(readType<uint8_t>(reader, inverted), reader, inverted, &stream);
+                    toBsonValue(readType<uint8_t>(reader, inverted), reader, typeBits, inverted,
+                                                  &stream);
                 }
                 else {
                     StringData name = readCString(reader);
                     BSONObjBuilderValueStream& stream = *builder << name;
-                    toBsonValue(readType<uint8_t>(reader, inverted), reader, inverted, &stream);
+                    toBsonValue(readType<uint8_t>(reader, inverted), reader, typeBits, inverted,
+                                &stream);
                 }
             }
         }
 
-        void toBsonValue(uint8_t type,
+        void toBsonValue(uint8_t ctype,
                          BufReader* reader,
+                         TypeBits::Reader* typeBits,
                          bool inverted,
                          BSONObjBuilderValueStream* stream) {
 
@@ -696,7 +728,7 @@ namespace mongo {
             // since it is used across a fallthrough.
             bool isNegative = false;
 
-            switch (type) {
+            switch (ctype) {
             case CType::kMinKey: *stream << MINKEY; break;
             case CType::kMaxKey: *stream << MAXKEY; break;
             case CType::kNullish: *stream << BSONNULL; break;
@@ -725,15 +757,30 @@ namespace mongo {
                 }
                 break;
 
-            case CType::kString:
+            case CType::kStringLike: {
+                const uint8_t originalType = typeBits->readStringLike();
                 if (inverted) {
-                    *stream << readInvertedCStringWithNuls(reader);
+                    if (originalType == TypeBits::kString) {
+                        *stream << readInvertedCStringWithNuls(reader);
+                    }
+                    else {
+                        dassert(originalType == TypeBits::kSymbol);
+                        *stream << BSONSymbol(readInvertedCStringWithNuls(reader));
+                    }
+                    
                 }
                 else  {
                     std::string scratch;
-                    *stream << readCStringWithNuls(reader, &scratch);
+                    if (originalType == TypeBits::kString) {
+                        *stream << readCStringWithNuls(reader, &scratch);
+                    }
+                    else {
+                        dassert(originalType == TypeBits::kSymbol);
+                        *stream << BSONSymbol(readCStringWithNuls(reader, &scratch));
+                    }
                 }
                 break;
+            }
 
             case CType::kCode: {
                 if (inverted) {
@@ -758,7 +805,7 @@ namespace mongo {
                 }
                 // Not going to optimize CodeWScope.
                 BSONObjBuilder scope;
-                toBson(reader, inverted, &scope);
+                toBson(reader, typeBits, inverted, &scope);
                 *stream << BSONCodeWScope(code, scope.done());
                 break;
             }
@@ -816,7 +863,7 @@ namespace mongo {
 
             case CType::kObject: {
                 BSONObjBuilder subObj(stream->subobjStart());
-                toBson(reader, inverted, &subObj);
+                toBson(reader, typeBits, inverted, &subObj);
                 break;
             }
 
@@ -827,6 +874,7 @@ namespace mongo {
                 while ((elemType = readType<uint8_t>(reader, inverted)) != 0) {
                     toBsonValue(elemType,
                                 reader,
+                                typeBits,
                                 inverted,
                                 &(subArr << BSONObjBuilder::numStr(index++)));
                 }
@@ -835,11 +883,21 @@ namespace mongo {
 
             //
             // Numerics
-            // Using doubles for everything outside of the range +/- [2**52, 2**63)
             //
 
-            case CType::kNumericNaN: *stream << std::numeric_limits<double>::quiet_NaN(); break;
-            case CType::kNumericZero: *stream << 0.0; break;
+            case CType::kNumericNaN:
+                invariant(typeBits->readNumeric() == TypeBits::kDouble);
+                *stream << std::numeric_limits<double>::quiet_NaN();
+                break;
+
+            case CType::kNumericZero:
+                switch(typeBits->readNumeric()) {
+                case TypeBits::kDouble: *stream << 0.0; break;
+                case TypeBits::kInt: *stream << 0; break;
+                case TypeBits::kLong: *stream << 0ll; break;
+                case TypeBits::kNegativeZero: *stream << -0.0; break;
+                }
+                break;
 
             case CType::kNumericNegativeLargeDouble:
             case CType::kNumericNegativeSmallDouble:
@@ -848,12 +906,23 @@ namespace mongo {
 
             case CType::kNumericPositiveLargeDouble:
             case CType::kNumericPositiveSmallDouble: {
-                // for these, the original double was stored intact, including sign bit.
+                // for these, the raw double was stored intact, including sign bit.
+                const uint8_t originalType = typeBits->readNumeric();
                 uint64_t encoded = readType<uint64_t>(reader, inverted);
                 encoded = endian::bigToNative(encoded);
                 double d;
                 memcpy(&d, &encoded, sizeof(d));
-                *stream << d;
+
+                if (originalType == TypeBits::kDouble) {
+                    *stream << d;
+                }
+                else {
+                    // This can only happen for a single number.
+                    invariant(originalType == TypeBits::kLong);
+                    invariant(d == double(std::numeric_limits<long long>::min()));
+                    *stream << std::numeric_limits<long long>::min();
+                }
+
                 break;
             }
 
@@ -877,9 +946,11 @@ namespace mongo {
             case CType::kNumericPositive6ByteInt:
             case CType::kNumericPositive7ByteInt:
             case CType::kNumericPositive8ByteInt: {
+                const uint8_t originalType = typeBits->readNumeric();
+
                 uint64_t encodedIntegerPart = 0;
                 {
-                    size_t intBytesRemaining = CType::numBytesForInt(type);
+                    size_t intBytesRemaining = CType::numBytesForInt(ctype);
                     while (intBytesRemaining--) {
                         encodedIntegerPart = (encodedIntegerPart << 8)
                                            | readType<uint8_t>(reader, inverted);
@@ -890,14 +961,20 @@ namespace mongo {
                 long long integerPart = encodedIntegerPart >> 1;
 
                 if (!haveFractionalPart) {
-                    if (integerPart < kMinLargeInt64) {
-                        *stream << (isNegative ? -double(integerPart) : double(integerPart));
-                    }
-                    else {
-                        *stream << (isNegative ? -integerPart : integerPart);
+                    if (isNegative)
+                        integerPart = -integerPart;
+
+                    switch(originalType) {
+                    case TypeBits::kDouble: *stream << double(integerPart); break;
+                    case TypeBits::kInt: *stream << int(integerPart); break;
+                    case TypeBits::kLong: *stream << integerPart; break;
+                    case TypeBits::kNegativeZero: invariant(false);
                     }
                 }
                 else {
+                    // Nothing else can have a fractional part.
+                    invariant(originalType == TypeBits::kDouble);
+
                     const uint64_t exponent = (64 - countLeadingZeros64(integerPart)) - 1;
                     const size_t fractionalBits = (52 - exponent);
                     const size_t fractionalBytes = (fractionalBits + 7) / 8;
@@ -927,46 +1004,53 @@ namespace mongo {
         }
     } // namespace
 
-    BSONObj KeyString::toBson(const char* buffer, size_t len, Ordering ord) {
+    BSONObj KeyString::toBson(const char* buffer, size_t len, Ordering ord,
+                              const TypeBits& typeBits) {
         BSONObjBuilder builder;
         BufReader reader(buffer, len);
+        TypeBits::Reader typeBitsReader(typeBits);
         for (int i = 0; reader.remaining(); i++) {
             const bool invert = (ord.get(i) == -1);
-            uint8_t type = readType<uint8_t>(&reader, invert);
-            if (type == kLess || type == kGreater) {
+            uint8_t ctype = readType<uint8_t>(&reader, invert);
+            if (ctype == kLess || ctype == kGreater) {
                 // This was just a discriminator which is logically part of the previous field. This
                 // will only be encountered on queries, not in the keys stored in an index.
                 // Note: this should probably affect the BSON key name of the last field, but it
                 // must be read *after* the value so it isn't possible.
-                type = readType<uint8_t>(&reader, invert);
+                ctype = readType<uint8_t>(&reader, invert);
             }
 
-            if (type == kEnd)
+            if (ctype == kEnd)
                 break;
-            toBsonValue(type, &reader, invert, &(builder << ""));
+            toBsonValue(ctype, &reader, &typeBitsReader, invert, &(builder << ""));
         }
         return builder.obj();
     }
 
-    BSONObj KeyString::toBson(StringData data, Ordering ord) {
-        return toBson(data.rawData(), data.size(), ord);
+    BSONObj KeyString::toBson(StringData data, Ordering ord, const TypeBits& typeBits) {
+        return toBson(data.rawData(), data.size(), ord, typeBits);
     }
 
-    BSONObj KeyString::toBson(Ordering ord) const {
-        return toBson(_buffer, _size, ord);
+    RecordId KeyString::decodeRecordIdAtEnd(const void* bufferRaw, size_t bufSize) {
+        invariant(bufSize >= 2); // smallest possible encoding of a RecordId.
+        const unsigned char* buffer = static_cast<const unsigned char*>(bufferRaw);
+        const unsigned char lastByte = *(buffer + bufSize - 1);
+        const size_t ridSize = 2 + (lastByte & 0x7); // stored in low 3 bits.
+        invariant(bufSize >= ridSize);
+        const unsigned char* firstBytePtr = buffer + bufSize - ridSize;
+        BufReader reader(firstBytePtr, ridSize);
+        return decodeRecordId(&reader);
     }
 
-    RecordId KeyString::decodeRecordIdStartingAt(const void* ptr) {
-        BufReader buf(ptr, numBytesForRecordIdStartingAt(ptr));
-
-        const uint8_t firstByte = readType<uint8_t>(&buf, false);
+    RecordId KeyString::decodeRecordId(BufReader* reader) {
+        const uint8_t firstByte = readType<uint8_t>(reader, false);
         const uint8_t numExtraBytes = firstByte >> 5; // high 3 bits in firstByte
         uint64_t repr = firstByte & 0x1f; // low 5 bits in firstByte
         for (int i = 0; i < numExtraBytes; i++) {
-            repr = (repr << 8) | readType<uint8_t>(&buf, false);
+            repr = (repr << 8) | readType<uint8_t>(reader, false);
         }
 
-        const uint8_t lastByte = readType<uint8_t>(&buf, false);
+        const uint8_t lastByte = readType<uint8_t>(reader, false);
         invariant((lastByte & 0x7) == numExtraBytes);
         repr = (repr << 5) | (lastByte >> 3); // fold in high 5 bits of last byte
         return RecordId(repr);
@@ -1000,6 +1084,67 @@ namespace mongo {
             return 0;
 
         return a < b ? -1 : 1;
+    }
+    
+    void KeyString::TypeBits::resetFromBuffer(BufReader* reader) {
+        if (!reader->remaining()) {
+            // This means AllZeros state was encoded as an empty buffer.
+            reset();
+            return;
+        }
+
+        const uint8_t firstByte = readType<uint8_t>(reader, false);
+        if (firstByte & 0x80) {
+            // firstByte is the size byte.
+            _isAllZeros = false; // it wouldn't be encoded like this if it was.
+
+            _buf[0] = firstByte;
+            const uint8_t remainingBytes = getSizeByte();
+            memcpy(_buf + 1, reader->skip(remainingBytes), remainingBytes);
+            return;
+        }
+
+        // In remaining cases, firstByte is the only byte.
+
+        if (firstByte == 0) {
+            // This means AllZeros state was encoded as a single 0 byte.
+            reset();
+            return;
+        }
+
+        _isAllZeros = false;
+        setSizeByte(1);
+        _buf[1] = firstByte;
+    }
+
+    void KeyString::TypeBits::appendBit(uint8_t oneOrZero) {
+        dassert(oneOrZero == 0 || oneOrZero == 1);
+
+        if (oneOrZero == 1) _isAllZeros = false;
+
+        const uint8_t byte = (_curBit / 8) + 1;
+        const uint8_t offsetInByte = _curBit % 8;
+        if (offsetInByte == 0) {
+            setSizeByte(byte);
+            _buf[byte] = oneOrZero; // zeros bits 1-7
+        }
+        else {
+            _buf[byte] |= (oneOrZero << offsetInByte);
+        }
+        
+        _curBit++;
+    }
+
+    uint8_t KeyString::TypeBits::Reader::readBit() {
+        if (_typeBits._isAllZeros) return 0;
+
+        const uint8_t byte = (_curBit / 8) + 1;
+        const uint8_t offsetInByte = _curBit % 8;
+        _curBit++;
+
+        dassert(byte <= _typeBits.getSizeByte());
+
+        return (_typeBits._buf[byte] & (1 << offsetInByte)) ? 1 : 0;
     }
 
 } // namespace mongo
