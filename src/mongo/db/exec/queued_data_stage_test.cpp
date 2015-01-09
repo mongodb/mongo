@@ -27,10 +27,10 @@
  */
 
 //
-// This file contains tests for mongo/db/exec/mock_stage.cpp
+// This file contains tests for mongo/db/exec/queued_data_stage.cpp
 //
 
-#include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,9 +41,9 @@ namespace {
     //
     // Basic test that we get out valid stats objects.
     //
-    TEST(MockStageTest, getValidStats) {
+    TEST(QueuedDataStageTest, getValidStats) {
         WorkingSet ws;
-        auto_ptr<MockStage> mock(new MockStage(&ws));
+        auto_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
         const CommonStats* commonStats = mock->getCommonStats();
         ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
         const SpecificStats* specificStats = mock->getSpecificStats();
@@ -55,10 +55,10 @@ namespace {
     //
     // Test that our stats are updated as we perform operations.
     //
-    TEST(MockStageTest, validateStats) {
+    TEST(QueuedDataStageTest, validateStats) {
         WorkingSet ws;
         WorkingSetID wsID;
-        auto_ptr<MockStage> mock(new MockStage(&ws));
+        auto_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
 
         // make sure that we're at all zero
         const CommonStats* stats = mock->getCommonStats();

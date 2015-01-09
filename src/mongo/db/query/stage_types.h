@@ -74,7 +74,6 @@ namespace mongo {
         STAGE_IDHACK,
         STAGE_IXSCAN,
         STAGE_LIMIT,
-        STAGE_MOCK,
 
         // Implements parallelCollectionScan.
         STAGE_MULTI_ITERATOR,
@@ -87,6 +86,7 @@ namespace mongo {
         // Stage for running aggregation pipelines.
         STAGE_PIPELINE_PROXY,
 
+        STAGE_QUEUED_DATA,
         STAGE_SHARDING_FILTER,
         STAGE_SKIP,
         STAGE_SORT,

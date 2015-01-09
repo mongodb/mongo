@@ -37,7 +37,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
@@ -107,7 +107,7 @@ namespace QueryStageFetch {
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
-            auto_ptr<MockStage> mockStage(new MockStage(&ws));
+            auto_ptr<QueuedDataStage> mockStage(new QueuedDataStage(&ws));
 
             // Mock data.
             {
@@ -169,7 +169,7 @@ namespace QueryStageFetch {
             ASSERT_EQUALS(size_t(1), locs.size());
 
             // Create a mock stage that returns the WSM.
-            auto_ptr<MockStage> mockStage(new MockStage(&ws));
+            auto_ptr<QueuedDataStage> mockStage(new QueuedDataStage(&ws));
 
             // Mock data.
             {

@@ -40,7 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/query/find_constants.h"
@@ -101,7 +101,7 @@ namespace mongo {
             }
 
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
-            std::auto_ptr<MockStage> root(new MockStage(ws.get()));
+            std::auto_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
 
             for ( std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
                 string ns = *i;

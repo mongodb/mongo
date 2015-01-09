@@ -52,7 +52,6 @@ env.Library(
         "keep_mutations.cpp",
         "limit.cpp",
         "merge_sort.cpp",
-        "mock_stage.cpp",
         "multi_iterator.cpp",
         "multi_plan.cpp",
         "near.cpp",
@@ -61,6 +60,7 @@ env.Library(
         "pipeline_proxy.cpp",
         "projection.cpp",
         "projection_exec.cpp",
+        "queued_data_stage.cpp",
         "shard_filter.cpp",
         "skip.cpp",
         "sort.cpp",
@@ -77,9 +77,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target = "mock_stage_test",
+    target = "queued_data_stage_test",
     source = [
-        "mock_stage_test.cpp",
+        "queued_data_stage_test.cpp",
     ],
     LIBDEPS = [
         "exec",

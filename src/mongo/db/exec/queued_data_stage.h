@@ -38,18 +38,17 @@ namespace mongo {
     class RecordId;
 
     /**
-     * MockStage is a data-producing stage that is used for testing.  Unlike the other two leaf
-     * stages (CollectionScan and IndexScan) MockStage does not require any underlying storage
-     * layer.
+     * QueuedDataStage is a data-producing stage.  Unlike the other two leaf stages (CollectionScan
+     * and IndexScan) QueuedDataStage does not require any underlying storage layer.
      *
-     * A MockStage is "programmed" by pushing return values from work() onto its internal queue.
-     * Calls to MockStage::work() pop values off that queue and return them in FIFO order,
-     * annotating the working set with data when appropriate.
+     * A QueuedDataStage is "programmed" by pushing return values from work() onto its internal
+     * queue.  Calls to QueuedDataStage::work() pop values off that queue and return them in FIFO
+     * order, annotating the working set with data when appropriate.
      */
-    class MockStage : public PlanStage {
+    class QueuedDataStage : public PlanStage {
     public:
-        MockStage(WorkingSet* ws);
-        virtual ~MockStage() { }
+        QueuedDataStage(WorkingSet* ws);
+        virtual ~QueuedDataStage() { }
 
         virtual StageState work(WorkingSetID* out);
 
@@ -64,7 +63,7 @@ namespace mongo {
 
         virtual std::vector<PlanStage*> getChildren() const;
 
-        virtual StageType stageType() const { return STAGE_MOCK; }
+        virtual StageType stageType() const { return STAGE_QUEUED_DATA; }
 
         //
         // Exec stats

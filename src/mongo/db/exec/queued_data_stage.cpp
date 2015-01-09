@@ -26,20 +26,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
+
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {
 
-    const char* MockStage::kStageType = "MOCK";
+    const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
-    MockStage::MockStage(WorkingSet* ws)
+    QueuedDataStage::QueuedDataStage(WorkingSet* ws)
         : _ws(ws),
           _commonStats(kStageType)
     {}
 
-    PlanStage::StageState MockStage::work(WorkingSetID* out) {
+    PlanStage::StageState QueuedDataStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
         // Adds the amount of time taken by work() to executionTimeMillis.
@@ -62,37 +63,39 @@ namespace mongo {
         return state;
     }
 
-    bool MockStage::isEOF() { return _results.empty(); }
+    bool QueuedDataStage::isEOF() { return _results.empty(); }
 
-    void MockStage::saveState() {
+    void QueuedDataStage::saveState() {
         ++_commonStats.yields;
     }
 
-    void MockStage::restoreState(OperationContext* opCtx) {
+    void QueuedDataStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
     }
 
-    void MockStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
+    void QueuedDataStage::invalidate(OperationContext* txn,
+                                     const RecordId& dl,
+                                     InvalidationType type) {
         ++_commonStats.invalidates;
     }
 
-    PlanStageStats* MockStage::getStats() {
+    PlanStageStats* QueuedDataStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_MOCK));
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_QUEUED_DATA));
         ret->specific.reset(new MockStats(_specificStats));
         return ret.release();
     }
 
-    const CommonStats* MockStage::getCommonStats() { return &_commonStats; }
+    const CommonStats* QueuedDataStage::getCommonStats() { return &_commonStats; }
 
-    const SpecificStats* MockStage::getSpecificStats() { return &_specificStats; }
+    const SpecificStats* QueuedDataStage::getSpecificStats() { return &_specificStats; }
 
-    void MockStage::pushBack(const PlanStage::StageState state) {
+    void QueuedDataStage::pushBack(const PlanStage::StageState state) {
         invariant(PlanStage::ADVANCED != state);
         _results.push(state);
     }
 
-    void MockStage::pushBack(const WorkingSetMember& member) {
+    void QueuedDataStage::pushBack(const WorkingSetMember& member) {
         _results.push(PlanStage::ADVANCED);
 
         WorkingSetID id = _ws->allocate();
@@ -103,7 +106,7 @@ namespace mongo {
         _members.push(id);
     }
 
-    vector<PlanStage*> MockStage::getChildren() const {
+    vector<PlanStage*> QueuedDataStage::getChildren() const {
         vector<PlanStage*> empty;
         return empty;
     }
