@@ -177,10 +177,11 @@ public class ex_cursor {
                 while(br.ready())
                     System.out.println(br.readLine());
                 br.close();
+                proc.waitFor();
                 new File("WT_HOME").mkdir();
-            } catch (IOException ioe) {
-                System.err.println("IOException: WT_HOME: " + ioe);
-                return(1);
+            } catch (Exception ex) {
+                System.err.println("Exception: " + ex);
+                return (1);
             }
         } else
             home = null;
@@ -225,15 +226,16 @@ public class ex_cursor {
         return (ret);
     }
 
-    public static int
+    public static void
     main(String[] argv)
     {
         try {
-            return (cursorExample());
+            System.exit(cursorExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }

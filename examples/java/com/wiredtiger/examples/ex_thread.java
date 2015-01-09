@@ -139,6 +139,7 @@ public class ex_thread {
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
+            wte.printStackTrace();
             System.exit(1);
         }
     }

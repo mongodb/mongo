@@ -56,7 +56,7 @@ public class ex_log {
 
         conn = wiredtiger.open(home2, CONN_CONFIG);
         Session session = conn.open_session(null);
-        session.create(uri, "key_format=S,value_format=S");
+        session.create(uri, "key_format=U,value_format=U");
         return (session);
     }
 
@@ -71,16 +71,17 @@ public class ex_log {
 
         while ((ret = cursor.next()) == 0) {
             ret = curs_copy.next();
-            String key = cursor.getKeyString();
-            String value = cursor.getValueString();
-            String key_copy = curs_copy.getKeyString();
-            String value_copy = curs_copy.getValueString();
-            if (!key.equals(key_copy) || !value.equals(value_copy)) {
+            byte[] key = cursor.getKeyByteArray();
+            byte[] value = cursor.getValueByteArray();
+            byte[] key_copy = curs_copy.getKeyByteArray();
+            byte[] value_copy = curs_copy.getValueByteArray();
+            if (!Arrays.equals(key, key_copy) ||
+                !Arrays.equals(value, value_copy)) {
                 System.err.println(
-                    "Mismatched: key " + key +
-                    ", key_copy " + key_copy +
-                    " value " + value +
-                    " value_copy " + value_copy);
+                    "Mismatched: key " + new String(key) +
+                    ", key_copy " + new String(key_copy) +
+                    ", value " + new String(value) +
+                    ", value_copy " + new String(value_copy));
                 return (1);
             }
         }
@@ -109,7 +110,7 @@ public class ex_log {
             ": record type " + rectype + " optype " + optype +
             " txnid " + txnid + " fileid " + fileid);
         System.out.println(" key size " + key.length +
-            "value size " + value.length);
+            " value size " + value.length);
         if (rectype == wiredtiger.WT_LOGREC_MESSAGE)
             System.out.println("Application Record: " + new String(value));
     }
@@ -301,10 +302,11 @@ public class ex_log {
             while(br.ready())
                 System.out.println(br.readLine());
             br.close();
+            proc.waitFor();
             new File(home1).mkdir();
             new File(home2).mkdir();
-        } catch (IOException ioe) {
-            System.err.println("IOException: " + ioe);
+        } catch (Exception ex) {
+            System.err.println("Exception: " + ex);
             return (1);
         }
         if ((wt_conn = wiredtiger.open(home1, CONN_CONFIG)) == null) {
@@ -344,6 +346,7 @@ public class ex_log {
         ret = session.log_printf("Wrote " + record_count + " records");
         /*! [log cursor printf] */
 
+        session.close(null);
         /*
          * Close and reopen the connection so that the log ends up with
          * a variety of records such as file sync and checkpoint.  We
@@ -358,19 +361,21 @@ public class ex_log {
         session = wt_conn.open_session(null);
         ret = simple_walk_log(session);
         ret = walk_log(session);
+        ret = session.close(null);
         ret = wt_conn.close(null);
         return (ret);
     }
 
-    public static int
-    main()
+    public static void
+    main(String[] args)
     {
         try {
-            return (logExample());
+            System.exit(logExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }

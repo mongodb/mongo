@@ -200,16 +200,18 @@ public class ex_stat {
         if (System.getenv("WIREDTIGER_HOME") == null) {
             home = "WT_HOME";
             try {
-                Process proc = Runtime.getRuntime().exec("/bin/rm -rf WT_HOME");
+                Process proc = Runtime.getRuntime().exec("/bin/rm -rf " + home);
                 BufferedReader br = new BufferedReader(
                     new InputStreamReader(proc.getInputStream()));
                 while(br.ready())
                     System.out.println(br.readLine());
                 br.close();
-                new File("WT_HOME").mkdir();
-            } catch (IOException ioe) {
-                System.err.println("IOException: WT_HOME: " + ioe);
-                return(1);
+                proc.waitFor();
+                if (!(new File(home)).mkdir())
+                    System.err.println("mkdir: failed");
+            } catch (Exception ex) {
+                System.err.println("Exception: " + home + ": " + ex);
+                System.exit(1);
             }
         } else
             home = null;
@@ -238,15 +240,16 @@ public class ex_stat {
         return (conn.close(null) == 0 ? ret : -1);
     }
 
-    public static int
+    public static void
     main(String[] argv)
     {
         try {
-            return ((new ex_stat()).statExample());
+            System.exit((new ex_stat()).statExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }
