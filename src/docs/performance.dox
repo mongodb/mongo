@@ -24,4 +24,7 @@ investigate performance and tune their WiredTiger applications.
 <h2>Simulating workloads</h2>
 - @subpage wtperf
 
+<h2>Visualizing performance</h2>
+- @subpage wtstats
+
  */
