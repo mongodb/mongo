@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -10,7 +11,7 @@
 void
 util_copyright(void)
 {
-	printf("%s\n", "Copyright (c) 2008-2014 WiredTiger, Inc.");
+	printf("%s\n", "Copyright (c) 2008-2015 MongoDB, Inc.");
 	printf("%s\n\n", "All rights reserved.");
 
 	printf("%s\n\n",

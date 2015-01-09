@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Public Domain 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -146,7 +147,7 @@ class test_config02(wttest.WiredTigerTestCase):
         dir = 'nondir'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open(dir, 'create'),
-            '/No such file or directory/')
+            '/(No such file or directory|The system cannot find the path specified)/')
 
     def test_home_not_writeable(self):
         if os.name == "nt":

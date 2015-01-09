@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -341,8 +342,8 @@ err:	WT_TRET(bm->salvage_end(bm, session));
 	WT_TRET(__slvg_cleanup(session, ss));
 
 	/* Discard temporary buffers. */
-	__wt_scr_free(&ss->tmp1);
-	__wt_scr_free(&ss->tmp2);
+	__wt_scr_free(session, &ss->tmp1);
+	__wt_scr_free(session, &ss->tmp2);
 
 	/* Wrap up reporting. */
 	WT_TRET(__wt_progress(session, NULL, ss->fcnt));
@@ -471,8 +472,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 	}
 
-err:	__wt_scr_free(&as);
-	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &as);
+	__wt_scr_free(session, &buf);
 
 	return (ret);
 }
@@ -1785,8 +1786,8 @@ __slvg_row_trk_update_start(
 
 err:	if (page != NULL)
 		__wt_page_out(session, &page);
-	__wt_scr_free(&dsk);
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &dsk);
+	__wt_scr_free(session, &key);
 
 	return (ret);
 }
@@ -2023,7 +2024,7 @@ __slvg_row_build_leaf(
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
 	}
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 
 	return (ret);
 }

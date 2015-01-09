@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -32,13 +33,13 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	 */
 	if ((ret = GetFileAttributesA(to_path)) != INVALID_FILE_ATTRIBUTES) {
 		if ((ret = DeleteFileA(to_path)) == FALSE) {
-			lasterror = GetLastError();
+			lasterror = __wt_errno();
 			goto err;
 		}
 	}
 
 	if ((MoveFileA(from_path, to_path)) == FALSE)
-		lasterror = GetLastError();
+		lasterror = __wt_errno();
 
 err:
 	__wt_free(session, from_path);

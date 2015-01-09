@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -113,7 +114,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 	table->cg_complete = 1;
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	if (colgroup != NULL)
 		__wt_schema_destroy_colgroup(session, colgroup);
 	if (cgconfig != NULL)
@@ -241,8 +242,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	    table, table->colconf.str, table->colconf.len, 1, plan));
 	WT_ERR(__wt_strndup(session, plan->data, plan->size, &idx->value_plan));
 
-err:	__wt_scr_free(&buf);
-	__wt_scr_free(&plan);
+err:	__wt_scr_free(session, &buf);
+	__wt_scr_free(session, &plan);
 	return (ret);
 }
 
@@ -342,7 +343,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 		table->idx_complete = 1;
 	}
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	if (idx != NULL)
 		WT_TRET(__wt_schema_destroy_index(session, idx));
 	if (cursor != NULL)
@@ -462,7 +463,7 @@ err:		if (table != NULL)
 		WT_TRET(cursor->close(cursor));
 
 	__wt_free(session, tablename);
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }
 

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -164,7 +165,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		 */
 		if (++wait_cnt < 1000)
 			__wt_yield();
-		 else {
+		else {
 			sleep_cnt = WT_MIN(wait_cnt, 10000);
 			wait_cnt *= 2;
 			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
@@ -642,7 +643,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		}
 	}
 
-err:	__wt_scr_free(&current);
+err:	__wt_scr_free(session, &current);
 	return (ret);
 }
 

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -163,10 +164,10 @@ __rename_tree(WT_SESSION_IMPL *session,
 	/* Rename the file. */
 	WT_ERR(__wt_schema_rename(session, os->data, ns->data, cfg));
 
-err:	__wt_scr_free(&nn);
-	__wt_scr_free(&ns);
-	__wt_scr_free(&nv);
-	__wt_scr_free(&os);
+err:	__wt_scr_free(session, &nn);
+	__wt_scr_free(session, &ns);
+	__wt_scr_free(session, &nv);
+	__wt_scr_free(session, &os);
 	__wt_free(session, value);
 	table->name = olduri;
 	return (ret);

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -122,7 +123,7 @@ __create_file(WT_SESSION_IMPL *session,
 	else
 		WT_ERR(__wt_session_release_btree(session));
 
-err:	__wt_scr_free(&val);
+err:	__wt_scr_free(session, &val);
 	__wt_free(session, fileconf);
 	return (ret);
 }

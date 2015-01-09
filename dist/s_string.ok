@@ -181,6 +181,7 @@ KV
 KVS
 Kanowski's
 Kounavis
+LANGID
 LEX
 LF
 LIBBZ
@@ -225,6 +226,7 @@ Mellor
 Metadata
 Mewhort
 Mitzenmacher
+MongoDB
 MoveFile
 Multi
 Multithreaded
@@ -436,6 +438,7 @@ btmem
 btree
 btrees
 buf
+buflen
 bufs
 bufsz
 builtin

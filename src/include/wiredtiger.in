@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -2019,15 +2020,26 @@ int wiredtiger_open(const char *home,
     WT_CONNECTION **connectionp);
 
 /*!
- * Return information about an error as a string; wiredtiger_strerror is a
- * superset of the ISO C99/POSIX 1003.1-2001 function strerror.
+ * Return information about a WiredTiger error as a string, not thread-safe.
  *
  * @snippet ex_all.c Display an error
  *
- * @param err a return value from a WiredTiger, C library or POSIX function
+ * @param error a return value from a WiredTiger call
  * @returns a string representation of the error
  */
-const char *wiredtiger_strerror(int err);
+const char *wiredtiger_strerror(int error);
+
+/*!
+ * Return information about a WiredTiger error as a string, thread-safe version.
+ *
+ * @snippet ex_all.c Display an error thread safe
+ *
+ * @param error a return value from a WiredTiger call
+ * @param buf a buffer of at least \c buflen bytes
+ * @param buflen the length of the buffer
+ * @returns zero for success, non-zero to indicate an error.
+ */
+int wiredtiger_strerror_r(int error, char *buf, size_t buflen);
 
 #if !defined(SWIG)
 /*!

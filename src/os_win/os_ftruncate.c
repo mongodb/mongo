@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -16,7 +17,6 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 {
 	WT_DECL_RET;
 	LARGE_INTEGER largeint;
-	uint32_t lasterror;
 
 	largeint.QuadPart = len;
 
@@ -31,10 +31,8 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 		return (0);
 	}
 
-	lasterror = GetLastError();
-
-	if (lasterror = ERROR_USER_MAPPED_FILE)
+	if (GetLastError() == ERROR_USER_MAPPED_FILE)
 		return (EBUSY);
 
-	WT_RET_MSG(session, lasterror, "%s SetEndOfFile error", fh->name);
+	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
 }
