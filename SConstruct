@@ -458,6 +458,27 @@ v8suffix = '' if v8version == '3.12' else '-' + v8version
 
 usePCH = has_option( "usePCH" )
 
+# The Scons 'default' tool enables a lot of tools that we don't actually need to enable.
+# On platforms like Solaris, it actually does the wrong thing by enabling the sunstudio
+# toolchain first. As such it is simpler and more efficient to manually load the precise
+# set of tools we need for each platform.
+# If we aren't on a platform where we know the minimal set of tools, we fall back to loading
+# the 'default' tool.
+def decide_platform_tools():
+    if windows:
+        # we only support MS toolchain on windows
+        return ['msvc', 'mslink', 'mslib']
+    elif linux:
+        return ['gcc', 'g++', 'gnulink', 'ar']
+    elif solaris:
+        return ['gcc', 'g++', 'gnulink', 'ar']
+    elif darwin:
+        return ['gcc', 'g++', 'applelink', 'ar']
+    else:
+        return ["default"]
+
+tools = decide_platform_tools() + ["gch", "jsheader", "mergelib", "mongo_unittest", "textfile"]
+
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
 # to build it up via a dict, and then construct the Environment in one shot with kwargs.
@@ -476,7 +497,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                ARCHIVE_ADDITIONS=[],
                PYTHON=utils.find_python(),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-               tools=["default", "gch", "jsheader", "mergelib", "mongo_unittest", "textfile"],
+               tools=tools,
                UNITTEST_ALIAS='unittests',
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
@@ -532,20 +553,6 @@ if has_option("cache"):
         print("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
         Exit(1)
     env.CacheDir(str(env.Dir(cacheDir)))
-
-# This could be 'if solaris', but unfortuantely that variable hasn't been set yet.
-if "sunos5" == os.sys.platform:
-    # SERVER-9890: On Solaris, SCons preferentially loads the sun linker tool 'sunlink' when
-    # using the 'default' tools as we do above. The sunlink tool sets -G as the flag for
-    # creating a shared library. But we don't want that, since we always drive our link step
-    # through CC or CXX. Instead, we want to let the compiler map GCC's '-shared' flag to the
-    # appropriate linker specs that it has compiled in. We could (and should in the future)
-    # select an empty set of tools above and then enable them as appropriate on a per platform
-    # basis. Until then the simplest solution, as discussed on the scons-users mailing list,
-    # appears to be to simply explicitly run the 'gnulink' tool to overwrite the Environment
-    # changes made by 'sunlink'. See the following thread for more detail:
-    #  http://four.pairlist.net/pipermail/scons-users/2013-June/001486.html
-    env.Tool('gnulink')
 
 if optBuild:
     env.Append( CPPDEFINES=["MONGO_OPTIMIZED_BUILD"] )
