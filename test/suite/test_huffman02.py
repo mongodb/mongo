@@ -40,12 +40,12 @@ class test_huffman02(wttest.WiredTigerTestCase, suite_subprocess):
     table_name = 'table:test_huff'
 
     huffkey = [
-        ('none', dict(huffkey='huffman_key=none',kfile=None)),
-        ('english', dict(huffkey='huffman_key=english',kfile=None)),
-        ('bad', dict(huffkey='huffman_key=bad',kfile=None)),
+        ('none', dict(huffkey='huffman_key=none')),
+        ('english', dict(huffkey='huffman_key=english')),
+        ('bad', dict(huffkey='huffman_key=bad')),
     ]
     huffval = [
-        ('bad', dict(huffval=',huffman_value=bad',kfile=None)),
+        ('bad', dict(huffval=',huffman_value=bad')),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', huffkey, huffval))
 
