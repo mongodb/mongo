@@ -135,3 +135,90 @@ db.getCollection( "test_db" ).find();
 
 db.getCollection( "test_db" ).drop();
 assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);  
+
+/*
+ * stats()
+ */
+
+ (function() {
+    var t = db.apttest_dbcollection;
+
+    // Non-existent collection.
+    t.drop();
+    assert.commandFailed(t.stats(),
+                         'db.collection.stats() should fail on non-existent collection');
+
+    // scale - passed to stats() as sole numerical argument or part of an options object.
+    t.drop();
+    assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 10*1024*1024}));
+    var collectionStats = assert.commandWorked(t.stats(1024*1024));
+    assert.eq(10, collectionStats.maxSize,
+              'db.collection.stats(scale) - capped collection size scaled incorrectly: ' +
+              tojson(collectionStats));
+    var collectionStats = assert.commandWorked(t.stats({scale: 1024*1024}));
+    assert.eq(10, collectionStats.maxSize,
+              'db.collection.stats({scale: N}) - capped collection size scaled incorrectly: ' +
+              tojson(collectionStats));
+
+    // indexDetails - If true, includes 'indexDetails' field in results. Default: false.
+    t.drop();
+    t.save({a: 1});
+    t.ensureIndex({a: 1});
+    collectionStats = assert.commandWorked(t.stats());
+    assert(!collectionStats.hasOwnProperty('indexDetails'),
+           'unexpected indexDetails found in db.collection.stats() result: ' +
+           tojson(collectionStats));
+    collectionStats = assert.commandWorked(t.stats({indexDetails: false}));
+    assert(!collectionStats.hasOwnProperty('indexDetails'),
+           'unexpected indexDetails found in db.collection.stats({indexDetails: true}) result: ' +
+           tojson(collectionStats));
+    collectionStats = assert.commandWorked(t.stats({indexDetails: true}));
+    assert(collectionStats.hasOwnProperty('indexDetails'),
+           'indexDetails missing from db.collection.stats({indexDetails: true}) result: ' +
+           tojson(collectionStats));
+
+    // Returns index name.
+    function getIndexName(indexKey) {
+        var indexes = t.getIndexes().filter(function(doc) {
+            return friendlyEqual(doc.key, indexKey);
+        });
+        assert.eq(1, indexes.length, tojson(indexKey) + ' not found in getIndexes() result: ' +
+                  tojson(t.getIndexes()));
+        return indexes[0].name;
+    }
+
+    function checkIndexDetails(options, indexName) {
+        var collectionStats = assert.commandWorked(t.stats(options));
+        assert(collectionStats.hasOwnProperty('indexDetails'),
+               'indexDetails missing from ' + 'db.collection.stats(' + tojson(options) +
+               ') result: ' + tojson(collectionStats));
+        // Currently, indexDetails is only supported with WiredTiger.
+        if (jsTest.options().storageEngine == undefined) { return; }
+        if (jsTest.options().storageEngine.toLowerCase() != "wiredtiger") { return; }
+        assert.eq(1, Object.keys(collectionStats.indexDetails).length,
+                  'indexDetails must have exactly one entry');
+        assert(collectionStats.indexDetails[indexName],
+               indexName + ' missing from indexDetails: ' + tojson(collectionStats.indexDetails));
+        assert.neq(0, Object.keys(collectionStats.indexDetails[indexName]).length,
+                   indexName + ' exists in indexDetails but contains no information: ' +
+                   tojson(collectionStats));
+    }
+
+    // indexDetailsKey - show indexDetails results for this index key only.
+    var indexKey = {a: 1};
+    var indexName = getIndexName(indexKey);
+    checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
+
+    // indexDetailsName - show indexDetails results for this index name only.
+    checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
+
+    // Cannot specify both indexDetailsKey and indexDetailsName.
+    var error = assert.throws(function() {
+        t.stats({indexDetails: true, indexDetailsKey: indexKey, indexDetailsName: indexName});
+    }, null, 'indexDetailsKey and indexDetailsName cannot be used at the same time');
+    assert.eq(Error, error.constructor,
+              'db.collection.stats() failed when both indexDetailsKey and indexDetailsName ' +
+              'are used but with incorrect error type');
+
+    t.drop();
+ }());
