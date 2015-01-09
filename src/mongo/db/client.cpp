@@ -513,7 +513,7 @@ namespace {
                 s << " code:" << exceptionInfo.code;
         }
 
-        s << " numYields:" << curop.numYields() << " ";
+        s << " numYields:" << curop.numYields();
         
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
