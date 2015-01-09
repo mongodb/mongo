@@ -74,7 +74,7 @@ namespace audit {
      */
     void logCommandAuthzCheck(
             ClientBasic* client,
-            const NamespaceString& ns,
+            const std::string& dbname,
             const BSONObj& cmdObj,
             Command* command,
             ErrorCodes::Error result);

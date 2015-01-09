@@ -344,7 +344,7 @@ namespace mongo {
             log(LogComponent::kAccessControl) << status << std::endl;
         }
         audit::logCommandAuthzCheck(client,
-                                    NamespaceString(c->parseNs(dbname, cmdObj)),
+                                    dbname,
                                     cmdObj,
                                     c,
                                     status.code());
