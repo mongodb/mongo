@@ -30,12 +30,6 @@ assert(db.getCollection( "test_db" ).count() == 101,6);
 db.getCollection( "test_db" ).drop();
 assert(db.getCollection( "test_db" ).count() == 0,7);
  
-/*
- *  test clean (not sure... just be sure it doen't blow up, I guess
- */ 
- 
- db.getCollection( "test_db" ).clean();
- 
  /*
   * test validate
   */
@@ -46,16 +40,44 @@ assert(db.getCollection( "test_db" ).count() == 0,8);
 for (i = 0; i < 100; i++) {
     db.getCollection( "test_db" ).save({a:1});
 }
-  
-var v = db.getCollection( "test_db" ).validate();
-if( v.ns != "test.test_db" ) { 
-    print("Error: wrong ns name");
-    print(tojson(v));
-}
-assert (v.ns == "test.test_db",9);
-assert (v.ok == 1,10);
 
-assert.eq(100,v.nrecords,11)
+(function() {
+    var validateResult = assert.commandWorked(db.getCollection( "test_db" ).validate());
+    // Extract validation results from mongos output if running in a sharded context.
+    if (jsTest.isMongos(db.getMongo())) {
+        // Sample mongos format:
+        // {
+        //   raw: {
+        //     "localhost:30000": {
+        //       "ns" : "test.test_db",
+        //       ...
+        //       "valid": true,
+        //       ...
+        //       "ok": 1
+        //     }
+        //   },
+        //   "valid": true,
+        //   ...
+        //   "ok": 1
+        // }
+
+        var numFields = 0;
+        var result = null;
+        for (var field in validateResult.raw) {
+            result = validateResult.raw[field];
+            numFields++;
+        }
+
+        assert.eq(1, numFields);
+        assert.neq(null, result);
+        validateResult = result;
+    }
+
+    assert.eq('test.test_db', validateResult.ns,
+              'incorrect namespace in db.collection.validate() result: ' + tojson(validateResult));
+    assert(validateResult.valid, 'collection validation failed');
+    assert.eq(100, validateResult.nrecords, 11);
+}());
 
 /*
  * test deleteIndex, deleteIndexes

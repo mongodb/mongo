@@ -1041,14 +1041,6 @@ DBCollection.prototype.count = function( x ){
     return this.find( x ).count();
 }
 
-/**
- *  Drop free lists. Normally not used.
- *  Note this only does the collection itself, not the namespaces of its indexes (see cleanAll).
- */
-DBCollection.prototype.clean = function() {
-    return this._dbCommand( { clean: this.getName() } );
-}
-
 DBCollection.prototype.hashAllDocs = function() {
     var cmd = { dbhash : 1,
                 collections : [ this._shortName ] };
