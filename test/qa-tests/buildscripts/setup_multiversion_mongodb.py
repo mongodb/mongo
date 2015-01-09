@@ -12,6 +12,7 @@ import shutil
 import errno
 # To ensure it exists on the system
 import gzip
+import argparse
 
 #
 # Useful script for installing multiple versions of MongoDB on a machine
@@ -40,44 +41,7 @@ def version_tuple(version):
 
     return tuple(map(int, version_parts))
 
-class MultiVersionDownloader :
-
-    def __init__(self, install_dir, link_dir, platform):
-        self.install_dir = install_dir
-        self.link_dir = link_dir
-        match = re.compile("(.*)\/(.*)").match(platform)
-        self.platform = match.group(1)
-        self.arch = match.group(2)
-        self._links = None
-
-    @property
-    def links(self):
-        if self._links is None:
-            self._links = self.download_links()
-        return self._links
-
-
-    def download_links(self):
-        href = "http://dl.mongodb.org/dl/%s/%s" \
-               % (self.platform.lower(), self.arch)
-
-        html = urllib2.urlopen(href).read()
-        links = {}
-        for line in html.split():
-            match = None
-            for ext in ["tgz", "zip"]:
-                match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.%s" \
-                    % (self.platform.lower(), self.platform.lower(), self.arch, ext)).search(line)
-                if match != None:
-                    break
-
-            if match == None:
-                continue
-            link = match.group(0)
-            version = match.group(1)
-            links[version] = link
-
-        return links
+class MultiVersionDownloaderBase : 
 
     def download_version(self, version):
 
@@ -88,24 +52,11 @@ class MultiVersionDownloader :
                 pass
             else: raise
 
-        urls = []
-        for link_version, link_url in self.links.iteritems():
-            if link_version.startswith(version):
-                # If we have a "-" in our version, exact match only
-                if version.find("-") >= 0:
-                    if link_version != version: continue
-                elif link_version.find("-") >= 0:
-                    continue
+        url, full_version = self.gen_url(version)
 
-                urls.append((link_version, link_url))
-
-        if len(urls) == 0:
-            raise Exception("Cannot find a link for version %s, versions %s found." \
-                % (version, self.links))
-
-        urls.sort(key=version_tuple)
-        full_version = urls[-1][0]
-        url = urls[-1][1]
+        # this extracts the filename portion of the URL, without the extension.
+        # for example: ttp://downloads.mongodb.org/osx/mongodb-osx-x86_64-2.4.12.tgz
+        # extract_dir will become mongodb-osx-x86_64-2.4.12
         extract_dir = url.split("/")[-1][:-4]
 
         # only download if we don't already have the directory
@@ -116,11 +67,11 @@ class MultiVersionDownloader :
         else:
             temp_dir = tempfile.mkdtemp()
             temp_file = tempfile.mktemp(suffix=".tgz")
-    
+
             data = urllib2.urlopen(url)
-    
-            print "Downloading data for version %s (%s)..." % (version, full_version)
-    
+
+            print "Downloading data for version %s (%s) from %s..." % (version, full_version, url)
+
             with open(temp_file, 'wb') as f:
                 f.write(data.read())
                 print "Uncompressing data for version %s (%s)..." % (version, full_version)
@@ -144,6 +95,12 @@ class MultiVersionDownloader :
                     raise
                 zfile.close()
             temp_install_dir = os.path.join(temp_dir, extract_dir)
+            try:
+                os.stat(temp_install_dir)
+            except:
+                dir = os.listdir(temp_dir)
+                # TODO confirm that there is one and only one directory entry
+                os.rename(os.path.join(temp_dir,dir[0]),temp_install_dir)
             shutil.move(temp_install_dir, self.install_dir)
             shutil.rmtree(temp_dir)
             try:
@@ -152,7 +109,6 @@ class MultiVersionDownloader :
                 print e
                 pass
         self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
-
 
     def symlink_version(self, version, installed_dir):
 
@@ -180,8 +136,93 @@ class MultiVersionDownloader :
                 except:
                     if exc.errno == errno.EEXIST:
                         pass
-                    else: raise
+                    else:
+                        raise
 
+class MultiVersionDownloader(MultiVersionDownloaderBase) :
+
+    def __init__(self, install_dir, link_dir, platform):
+        self.install_dir = install_dir
+        self.link_dir = link_dir
+        match = re.compile("(.*)\/(.*)").match(platform)
+        self.platform = match.group(1)
+        self.arch = match.group(2)
+        self._links = None
+
+    @property
+    def links(self):
+        if self._links is None:
+            self._links = self.download_links()
+        return self._links
+
+    def gen_url(self, version):
+        urls = []
+        for link_version, link_url in self.links.iteritems():
+            if link_version.startswith(version):
+                # If we have a "-" in our version, exact match only
+                if version.find("-") >= 0:
+                    if link_version != version: continue
+                elif link_version.find("-") >= 0:
+                    continue
+
+                urls.append((link_version, link_url))
+
+        if len(urls) == 0:
+            raise Exception("Cannot find a link for version %s, versions %s found." \
+                % (version, self.links))
+
+        urls.sort(key=version_tuple)
+        full_version = urls[-1][0]
+        url = urls[-1][1]
+        return url, full_version
+
+    def download_links(self):
+        href = "http://dl.mongodb.org/dl/%s/%s" \
+               % (self.platform, self.arch)
+
+        html = urllib2.urlopen(href).read()
+        links = {}
+        for line in html.split():
+            match = None
+            for ext in ["tgz", "zip"]:
+                match = re.compile("http:\/\/downloads\.mongodb\.org\/%s/mongodb-%s-%s-([^\"]*)\.%s" \
+                    % (self.platform, self.platform, self.arch, ext)).search(line)
+                if match != None:
+                    break
+
+            if match == None:
+                continue
+            link = match.group(0)
+            version = match.group(1)
+            links[version] = link
+
+        return links
+
+
+class LatestMultiVersionDownloader(MultiVersionDownloaderBase) :
+
+    def __init__(self, install_dir, link_dir, platform, use_ssl, os):
+        self.install_dir = install_dir
+        self.link_dir = link_dir
+        match = re.compile("(.*)\/(.*)").match(platform)
+        self.platform = match.group(1)
+        self.arch = match.group(2)
+        self._links = None
+        self.use_ssl = use_ssl
+        self.os = os
+
+    def gen_url(self, version):
+        if self.use_ssl:
+            if version == "2.4":
+                enterprise_string = "subscription"
+            else:
+                enterprise_string = "enterprise"
+            full_version = self.os + "-v" + version + "-latest"
+            url = "http://downloads.10gen.com/%s/mongodb-%s-%s-%s-%s.tgz" % ( self.platform, self.platform, self.arch, enterprise_string, full_version )
+        else:
+            full_version = "v" + version + "-latest"
+            url = "http://downloads.mongodb.org/%s/mongodb-%s-%s-%s.tgz" % ( self.platform, self.platform, self.arch, full_version )
+        return url, full_version
 
 CL_HELP_MESSAGE = \
 """
@@ -205,33 +246,33 @@ version compatible with the version specified.
 
 def parse_cl_args(args):
 
+    parser = argparse.ArgumentParser(description=CL_HELP_MESSAGE)
+
     def raise_exception(msg):
         print CL_HELP_MESSAGE
         raise Exception(msg)
 
-    if len(args) == 0: raise_exception("Missing INSTALL_DIR")
+    parser.add_argument('install_dir', action="store" )
+    parser.add_argument('link_dir', action="store" )
+    parser.add_argument('platform_and_arch', action="store" )
+    parser.add_argument('--latest', action="store_true" )
+    parser.add_argument('--use-ssl', action="store_true" )
+    parser.add_argument('--os', action="store" )
+    parser.add_argument('version', action="store", nargs="+" )
 
-    install_dir = args[0]
+    args = parser.parse_args()
 
-    args = args[1:]
-    if len(args) == 0: raise_exception("Missing LINK_DIR")
-
-    link_dir = args[0]
-
-    args = args[1:]
-    if len(args) == 0: raise_exception("Missing PLATFORM_AND_ARCH")
-
-    platform = args[0]
-
-    args = args[1:]
-    if re.compile(".*\/.*").match(platform) == None:
+    if re.compile(".*\/.*").match(args.platform_and_arch) == None:
         raise_exception("PLATFORM_AND_ARCH isn't of the correct format")
 
-    if len(args) == 0: raise_exception("Missing VERSION1")
-
-    versions = args
-
-    return (MultiVersionDownloader(install_dir, link_dir, platform), versions)
+    if args.latest:
+        if not args.os:
+            raise_exception("using --use-ssl requires an --os parameter")
+        return (LatestMultiVersionDownloader(args.install_dir, args.link_dir, args.platform_and_arch, args.use_ssl, args.os), args.version)
+    else:
+        if args.use_ssl:
+            raise_exception("you can only use --use-ssl when using --latest")
+        return (MultiVersionDownloader(args.install_dir, args.link_dir, args.platform_and_arch), args.version)
 
 def main():
 
