@@ -48,7 +48,7 @@ namespace mongo {
         static MetricTree* theMetricTree;
     private:
 
-        void _add( const string& path, ServerStatusMetric* metric );
+        void _add( const std::string& path, ServerStatusMetric* metric );
 
         std::map<std::string, MetricTree*> _subtrees;
         std::map<std::string, ServerStatusMetric*> _metrics;

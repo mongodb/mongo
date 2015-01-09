@@ -121,7 +121,7 @@ namespace mongo {
          *
          * Returns !OK with message if replacement could not be targeted
          */
-        Status targetDoc(const BSONObj& doc, vector<ShardEndpoint*>* endpoints) const;
+        Status targetDoc(const BSONObj& doc, std::vector<ShardEndpoint*>* endpoints) const;
 
         /**
          * Returns a vector of ShardEndpoints for a potentially multi-shard query.

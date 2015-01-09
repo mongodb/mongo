@@ -263,7 +263,7 @@ namespace mongo {
         std::atomic<long long> _dataSize;
         std::atomic<long long> _numRecords;
 
-        const string _dataSizeKey;
-        const string _numRecordsKey;
+        const std::string _dataSizeKey;
+        const std::string _numRecordsKey;
     };
 }

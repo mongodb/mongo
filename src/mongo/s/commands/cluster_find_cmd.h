@@ -52,7 +52,7 @@ namespace mongo {
 
         virtual bool adminOnly() const { return false; }
 
-        virtual void help(stringstream& help) const {
+        virtual void help(std::stringstream& help) const {
             help << "query for documents";
         }
 
@@ -71,9 +71,9 @@ namespace mongo {
                                BSONObjBuilder* out) const;
 
         virtual bool run(OperationContext* txn,
-                         const string& dbname,
+                         const std::string& dbname,
                          BSONObj& cmdObj, int options,
-                         string& errmsg,
+                         std::string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl);
 

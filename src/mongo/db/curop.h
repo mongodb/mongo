@@ -201,7 +201,7 @@ namespace mongo {
         void reset( const HostAndPort& remote, int op );
         void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
-        string getNS() const { return _ns.toString(); }
+        std::string getNS() const { return _ns.toString(); }
 
         bool shouldDBProfile( int ms ) const {
             if ( _dbprofile <= 0 )

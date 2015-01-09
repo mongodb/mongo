@@ -92,7 +92,7 @@ namespace mongo {
 
             // insert or update the deadline
             std::pair<typename TaskDeadlineMap::iterator, bool> inserted =
-                    _tasks.insert(make_pair(task, now + timeoutMs));
+                _tasks.insert(std::make_pair(task, now + timeoutMs));
 
             if (!inserted.second)
                 inserted.first->second = now + timeoutMs;

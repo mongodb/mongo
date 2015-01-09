@@ -137,7 +137,7 @@ namespace mongo {
         OperatorMap _operatorFunctions;
 
         // map that holds variable name and value pairs
-        typedef std::map<string, BSONObj> VarMap;
+        typedef std::map<std::string, BSONObj> VarMap;
         VarMap _varMap;
 
         // evaluates a BSON element. This is internally called by the top level evaluate method.

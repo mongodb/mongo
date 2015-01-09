@@ -159,7 +159,7 @@
         if ( myString.find(CONTAINS) == std::string::npos ) {           \
             std::string err( "Expected " #BIG_STRING " (" );            \
             err += myString;                                            \
-            err += string(") to contain " #CONTAINS );                  \
+            err += std::string(") to contain " #CONTAINS );             \
             ::mongo::unittest::TestAssertionFailure(__FILE__,           \
                                                     __LINE__,           \
                                                     err).stream();      \

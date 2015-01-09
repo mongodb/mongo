@@ -99,8 +99,8 @@ namespace mongo {
             return false;
         }
 
-        virtual string getNS() const {
-            return string();
+        virtual std::string getNS() const {
+            return std::string();
         };
 
         virtual unsigned int getOpID() const {

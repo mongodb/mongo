@@ -104,7 +104,7 @@ namespace mongo {
      * If the provided solution could be mutated successfully, returns true, otherwise returns
      * false.
      */
-    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const string& field);
+    bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field);
 
     /*
      * Get an executor for a query executing as part of a distinct command.

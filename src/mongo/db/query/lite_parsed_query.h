@@ -183,7 +183,7 @@ namespace mongo {
         int getSkip() const { return _skip; }
         int getLimit() const { return _limit; }
         int getBatchSize() const { return _batchSize; }
-        int getNumToReturn() const { return min(_limit, _batchSize); }
+        int getNumToReturn() const { return std::min(_limit, _batchSize); }
         bool wantMore() const { return _wantMore; }
         bool hasReadPref() const { return _options.hasReadPref; }
 

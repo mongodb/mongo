@@ -56,7 +56,7 @@ namespace mongo {
 
         virtual bool isGod() const;
 
-        virtual string getNS() const;
+        virtual std::string getNS() const;
 
         virtual Client* getClient() const;
 

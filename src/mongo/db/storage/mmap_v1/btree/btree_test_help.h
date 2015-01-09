@@ -145,7 +145,7 @@ namespace mongo {
 
         bool isPresent(const BSONObj& key, int direction) const;
 
-        static string expectedKey(const char* spec);
+        static std::string expectedKey(const char* spec);
 
         OperationContext* _txn;
         BtreeLogicTestHelper<OnDiskFormat>* _helper;

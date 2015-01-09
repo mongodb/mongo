@@ -70,7 +70,7 @@ namespace mongo {
     bool circleInteriorContainsBox(const Circle& circle, const Box& box);
     bool circleIntersectsWithBox(const Circle& circle, const Box& box);
     bool circleInteriorIntersectsWithBox(const Circle& circle, const Box& box);
-    bool edgesIntersectsWithBox(const vector<Point>& vertices, const Box& box);
+    bool edgesIntersectsWithBox(const std::vector<Point>& vertices, const Box& box);
     bool polygonContainsBox(const Polygon& polygon, const Box& box);
     bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box);
 

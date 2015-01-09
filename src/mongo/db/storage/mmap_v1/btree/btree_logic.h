@@ -79,7 +79,7 @@ namespace mongo {
                    RecordStore* store,
                    SavedCursorRegistry* cursors,
                    const Ordering& ordering,
-                   const string& indexName)
+                   const std::string& indexName)
             : _headManager(head),
               _recordStore(store),
               _cursorRegistry(cursors),
@@ -120,7 +120,7 @@ namespace mongo {
 
             DiskLoc _rightLeafLoc; // DiskLoc of right-most (highest) leaf bucket.
             bool _dupsAllowed;
-            auto_ptr<KeyDataOwnedType> _keyLast;
+            std::auto_ptr<KeyDataOwnedType> _keyLast;
 
             // Not owned.
             OperationContext* _txn;
@@ -199,8 +199,8 @@ namespace mongo {
                           const BSONObj& keyBegin,
                           int keyBeginLen,
                           bool afterKey,
-                          const vector<const BSONElement*>& keyEnd,
-                          const vector<bool>& keyEndInclusive,
+                          const std::vector<const BSONElement*>& keyEnd,
+                          const std::vector<bool>& keyEndInclusive,
                           int direction) const;
 
         void advanceTo(OperationContext*,
@@ -209,8 +209,8 @@ namespace mongo {
                        const BSONObj &keyBegin,
                        int keyBeginLen,
                        bool afterKey,
-                       const vector<const BSONElement*>& keyEnd,
-                       const vector<bool>& keyEndInclusive,
+                       const std::vector<const BSONElement*>& keyEnd,
+                       const std::vector<bool>& keyEndInclusive,
                        int direction) const;
 
         void restorePosition(OperationContext* txn,
@@ -351,10 +351,10 @@ namespace mongo {
                           const BSONObj& keyBegin,
                           int keyBeginLen,
                           bool afterKey,
-                          const vector<const BSONElement*>& keyEnd,
-                          const vector<bool>& keyEndInclusive,
+                          const std::vector<const BSONElement*>& keyEnd,
+                          const std::vector<bool>& keyEndInclusive,
                           int direction,
-                          pair<DiskLoc, int>& bestParent) const;
+                          std::pair<DiskLoc, int>& bestParent) const;
 
         Status _find(OperationContext* txn,
                      BucketType* bucket,
@@ -370,13 +370,13 @@ namespace mongo {
                         const BSONObj& keyBegin,
                         int keyBeginLen,
                         bool afterKey,
-                        const vector<const BSONElement*>& keyEnd,
-                        const vector<bool>& keyEndInclusive,
+                        const std::vector<const BSONElement*>& keyEnd,
+                        const std::vector<bool>& keyEndInclusive,
                         const Ordering& order,
                         int direction,
                         DiskLoc* thisLocInOut,
                         int* keyOfsInOut,
-                        pair<DiskLoc, int>& bestParent) const;
+                        std::pair<DiskLoc, int>& bestParent) const;
 
         void advanceToImpl(OperationContext* txn,
                            DiskLoc* thisLocInOut,
@@ -384,8 +384,8 @@ namespace mongo {
                            const BSONObj &keyBegin,
                            int keyBeginLen,
                            bool afterKey,
-                           const vector<const BSONElement*>& keyEnd,
-                           const vector<bool>& keyEndInclusive,
+                           const std::vector<const BSONElement*>& keyEnd,
+                           const std::vector<bool>& keyEndInclusive,
                            int direction) const;
 
         bool wouldCreateDup(OperationContext* txn,
@@ -597,7 +597,7 @@ namespace mongo {
 
         Ordering _ordering;
 
-        string _indexName;
+        std::string _indexName;
     };
 
 }  // namespace mongo

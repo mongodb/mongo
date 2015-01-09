@@ -233,8 +233,8 @@ namespace mongo {
             virtual void advanceTo(const BSONObj &keyPrefix,
                                    int prefixLen,
                                    bool prefixExclusive,
-                                   const vector<const BSONElement*>& keySuffix,
-                                   const vector<bool>& suffixInclusive) = 0;
+                                   const std::vector<const BSONElement*>& keySuffix,
+                                   const std::vector<bool>& suffixInclusive) = 0;
 
             /**
              * Position 'this' forward (reverse) cursor either at the first
@@ -286,8 +286,8 @@ namespace mongo {
             virtual void customLocate(const BSONObj& keyPrefix,
                                       int prefixLen,
                                       bool prefixExclusive,
-                                      const vector<const BSONElement*>& keySuffix,
-                                      const vector<bool>& suffixInclusive) = 0;
+                                      const std::vector<const BSONElement*>& keySuffix,
+                                      const std::vector<bool>& suffixInclusive) = 0;
 
             /**
              * Return the key associated with the current position of 'this' cursor.

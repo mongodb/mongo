@@ -88,7 +88,7 @@ namespace mongo {
         virtual void restoreState(OperationContext* opCtx);
         virtual void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-        virtual vector<PlanStage*> getChildren() const;
+        virtual std::vector<PlanStage*> getChildren() const;
 
         virtual StageType stageType() const;
         virtual PlanStageStats* getStats();

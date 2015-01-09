@@ -577,14 +577,14 @@ namespace mongo {
 
         long long totalResultsFound() {
             long long totalResultsFound = 0;
-            for (vector<IntervalStats>::iterator it = intervalStats.begin();
+            for (std::vector<IntervalStats>::iterator it = intervalStats.begin();
                 it != intervalStats.end(); ++it) {
                 totalResultsFound += it->numResultsFound;
             }
             return totalResultsFound;
         }
 
-        vector<IntervalStats> intervalStats;
+        std::vector<IntervalStats> intervalStats;
         std::string indexName;
         BSONObj keyPattern;
     };

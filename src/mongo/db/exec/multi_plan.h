@@ -123,7 +123,7 @@ namespace mongo {
          * Gathers execution stats for all losing plans. Caller takes ownership of
          * all pointers in the returned vector.
          */
-        vector<PlanStageStats*> generateCandidateStats();
+        std::vector<PlanStageStats*> generateCandidateStats();
 
         static const char* kStageType;
 

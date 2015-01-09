@@ -65,7 +65,7 @@ namespace {
     private:
         OperationContext *_txn;
         RecordId _loc;
-        string _data;
+        std::string _data;
 
         int nCalls; // to verify that recordStoreGoingToMove() gets called once
     };

@@ -393,7 +393,7 @@ namespace mongo {
         void enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                                      const IndexToPredMap& idxToNotFirst,
                                      MatchExpression* mandatoryPred,
-                                     const set<IndexID>& mandatoryIndices,
+                                     const std::set<IndexID>& mandatoryIndices,
                                      AndAssignment* andAssignment);
 
         /**

@@ -81,7 +81,7 @@ namespace mongo {
                   Query q);
 
         void copyIndexes(OperationContext* txn,
-                         const string& toDBName,
+                         const std::string& toDBName,
                          const NamespaceString& from_ns,
                          const NamespaceString& to_ns,
                          bool logForRepl,

@@ -71,7 +71,7 @@ namespace mongo {
 
         BSONObj dump() const;
 
-        void dump(iostream& s) const;
+        void dump(std::iostream& s) const;
 
         bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }

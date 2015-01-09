@@ -107,7 +107,7 @@ namespace mongo {
          *
          * TODO: We return a string because of hopefully transient CurOp thread-unsafe insanity.
          */
-        virtual string getNS() const = 0;
+        virtual std::string getNS() const = 0;
 
         /**
          * Returns true if this operation is under a GodScope.  Only used by DBDirectClient.

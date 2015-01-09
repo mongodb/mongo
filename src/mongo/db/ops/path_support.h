@@ -47,7 +47,7 @@ namespace mongo {
         static const size_t kMaxPaddingAllowed = 1500000;
 
         // Convenience type to hold equality matches at particular paths from a MatchExpression
-        typedef map<StringData, const EqualityMatchExpression*> EqualityMatches;
+        typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;
 
         /**
          * Finds the longest portion of 'prefix' that exists in document rooted at 'root' and is

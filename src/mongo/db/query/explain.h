@@ -167,7 +167,7 @@ namespace mongo {
          */
         static void generatePlannerInfo(PlanExecutor* exec,
                                         PlanStageStats* winnerStats,
-                                        const vector<PlanStageStats*>& rejectedStats,
+                                        const std::vector<PlanStageStats*>& rejectedStats,
                                         BSONObjBuilder* out);
 
         /**

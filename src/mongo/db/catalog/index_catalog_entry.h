@@ -55,7 +55,7 @@ namespace mongo {
 
         ~IndexCatalogEntry();
 
-        const string& ns() const { return _ns; }
+        const std::string& ns() const { return _ns; }
 
         void init( OperationContext* txn,
                    IndexAccessMethod* accessMethod );
@@ -98,7 +98,7 @@ namespace mongo {
 
         // -----
 
-        string _ns;
+        std::string _ns;
 
         CollectionCatalogEntry* _collection; // not owned here
 

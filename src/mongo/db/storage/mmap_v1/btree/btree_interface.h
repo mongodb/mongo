@@ -45,6 +45,6 @@ namespace mongo {
                                             RecordStore* recordStore,
                                             SavedCursorRegistry* cursorRegistry,
                                             const Ordering& ordering,
-                                            const string& indexName,
+                                            const std::string& indexName,
                                             int version);
 }  // namespace mongo

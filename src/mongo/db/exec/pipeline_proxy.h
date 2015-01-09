@@ -93,7 +93,7 @@ namespace mongo {
 
         // Things in the _stash sould be returned before pulling items from _pipeline.
         const boost::intrusive_ptr<Pipeline> _pipeline;
-        vector<BSONObj> _stash;
+        std::vector<BSONObj> _stash;
         const bool _includeMetaData;
         boost::weak_ptr<PlanExecutor> _childExec;
 

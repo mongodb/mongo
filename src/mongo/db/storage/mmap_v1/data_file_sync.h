@@ -41,7 +41,7 @@ namespace mongo {
         DataFileSync();
 
         virtual bool includeByDefault() const { return true; }
-        virtual string name() const { return "DataFileSync"; }
+        virtual std::string name() const { return "DataFileSync"; }
 
         void run();
 

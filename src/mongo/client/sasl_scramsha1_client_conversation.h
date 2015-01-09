@@ -69,12 +69,12 @@ namespace mongo {
         /**
          * Parses server-first-message and generate client-final-message.
          **/
-        StatusWith<bool> _secondStep(const std::vector<string>& input, std::string* outputData);
+        StatusWith<bool> _secondStep(const std::vector<std::string>& input, std::string* outputData);
 
         /**
          * Generates client-first-message.
          **/
-        StatusWith<bool> _thirdStep(const std::vector<string>& input, std::string* outputData);
+        StatusWith<bool> _thirdStep(const std::vector<std::string>& input, std::string* outputData);
 
         int _step;
         std::string _authMessage;

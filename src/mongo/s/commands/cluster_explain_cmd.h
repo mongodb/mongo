@@ -61,7 +61,7 @@ namespace mongo {
 
         virtual bool adminOnly() const { return false; }
 
-        virtual void help( stringstream& help ) const {
+        virtual void help( std::stringstream& help ) const {
             help << "explain database reads and writes";
         }
 
@@ -74,10 +74,10 @@ namespace mongo {
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
 
-        virtual bool run(OperationContext* txn, const string& dbName,
+        virtual bool run(OperationContext* txn, const std::string& dbName,
                          BSONObj& cmdObj,
                          int options,
-                         string& errmsg,
+                         std::string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl);
 

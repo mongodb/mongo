@@ -58,9 +58,9 @@ namespace mongo {
         BSONSizeTracker _sizeTracker;
     private:
         // We have V0 and V1.  Sigh.
-        virtual void getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                  const BSONObj &obj, BSONObjSet *keys) const = 0;
-        vector<BSONElement> _fixed;
+        std::vector<BSONElement> _fixed;
     };
 
     class BtreeKeyGeneratorV0 : public BtreeKeyGenerator {
@@ -70,7 +70,7 @@ namespace mongo {
         virtual ~BtreeKeyGeneratorV0() { }
 
     private:
-        virtual void getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                  const BSONObj &obj, BSONObjSet *keys) const;
     };
 
@@ -90,11 +90,11 @@ namespace mongo {
          * @param array - array from which keys should be extracted, based on names in fieldNames
          *        If obj and array are both nonempty, obj will be one of the elements of array.
          */        
-        virtual void getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        virtual void getKeysImpl(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                  const BSONObj &obj, BSONObjSet *keys) const;
 
         // These guys are called by getKeysImpl.
-        void getKeysImplWithArray(vector<const char*> fieldNames, vector<BSONElement> fixed,
+        void getKeysImplWithArray(std::vector<const char*> fieldNames, std::vector<BSONElement> fixed,
                                   const BSONObj &obj, BSONObjSet *keys, unsigned numNotFound,
                                   const BSONObj &array) const;
         /**
@@ -103,10 +103,10 @@ namespace mongo {
          */
         BSONElement extractNextElement(const BSONObj &obj, const BSONObj &arr, const char *&field,
                                        bool &arrayNestedArray ) const;
-        void _getKeysArrEltFixed(vector<const char*> &fieldNames, vector<BSONElement> &fixed,
+        void _getKeysArrEltFixed(std::vector<const char*> &fieldNames, std::vector<BSONElement> &fixed,
                                  const BSONElement &arrEntry, BSONObjSet *keys,
                                  unsigned numNotFound, const BSONElement &arrObjElt,
-                                 const set<unsigned> &arrIdxs, bool mayExpandArrayUnembedded) const;
+                                 const std::set<unsigned> &arrIdxs, bool mayExpandArrayUnembedded) const;
 
         BSONObj _undefinedObj;
         BSONElement _undefinedElt;

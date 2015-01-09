@@ -161,7 +161,7 @@ namespace mongo {
         boost::scoped_ptr<QueryHandler> _customQueryHandler;
 
         mongo::mutex _mutex;
-        map<string,int> _lockTypes;
+        std::map<std::string,int> _lockTypes;
         // End mutex
 
         double _socketTimeout;
@@ -179,20 +179,20 @@ namespace mongo {
         /**
          * Returns true if the query can be processed using this handler.
          */
-        virtual bool canHandleQuery( const string& ns, Query query ) = 0;
+        virtual bool canHandleQuery( const std::string& ns, Query query ) = 0;
 
         /**
          * Returns a cursor on one of the hosts with the desired results for the query.
          * May throw or return an empty auto_ptr on failure.
          */
-        virtual auto_ptr<DBClientCursor> handleQuery( const vector<string>& hosts,
-                                                      const string &ns,
-                                                      Query query,
-                                                      int nToReturn,
-                                                      int nToSkip,
-                                                      const BSONObj *fieldsToReturn,
-                                                      int queryOptions,
-                                                      int batchSize ) = 0;
+        virtual std::auto_ptr<DBClientCursor> handleQuery( const std::vector<std::string>& hosts,
+                                                           const std::string &ns,
+                                                           Query query,
+                                                           int nToReturn,
+                                                           int nToSkip,
+                                                           const BSONObj *fieldsToReturn,
+                                                           int queryOptions,
+                                                           int batchSize ) = 0;
     };
 
     class MONGO_CLIENT_API UpdateNotTheSame : public UserException {

@@ -58,7 +58,7 @@ namespace mongo {
          * the results from the shards, assuming that the command being explained is a read
          * operation such as find or count.
          */
-        static const char* getStageNameForReadOp(const vector<Strategy::CommandResult>& shardResults,
+        static const char* getStageNameForReadOp(const std::vector<Strategy::CommandResult>& shardResults,
                                                  const BSONObj& explainObj);
 
         /**
@@ -67,7 +67,7 @@ namespace mongo {
          *
          * On success, the output is added to the BSONObj builder 'out'.
          */
-        static Status buildExplainResult(const vector<Strategy::CommandResult>& shardResults,
+        static Status buildExplainResult(const std::vector<Strategy::CommandResult>& shardResults,
                                          const char* mongosStageName,
                                          long long millisElapsed,
                                          BSONObjBuilder* out);
@@ -86,7 +86,7 @@ namespace mongo {
          * Returns an OK status if all shards support the explain command and returned sensible
          * results. Otherwise, returns a non-OK status and the entire explain should fail.
          */
-        static Status validateShardResults(const vector<Strategy::CommandResult>& shardResults);
+        static Status validateShardResults(const std::vector<Strategy::CommandResult>& shardResults);
 
         /**
          * Populates the BSONObj builder 'out' with query planner explain information, based on
@@ -95,7 +95,7 @@ namespace mongo {
          * The planner info will display 'mongosStageName' as the name of the execution stage
          * performed by mongos after gathering results from the shards.
          */
-        static void buildPlannerInfo(const vector<Strategy::CommandResult>& shardResults,
+        static void buildPlannerInfo(const std::vector<Strategy::CommandResult>& shardResults,
                                      const char* mongosStageName,
                                      BSONObjBuilder* out);
 
@@ -106,7 +106,7 @@ namespace mongo {
          * Will display 'mongosStageName' as the name of the execution stage performed by mongos,
          * and 'millisElapsed' as the execution time of the mongos stage.
          */
-        static void buildExecStats(const vector<Strategy::CommandResult>& shardResults,
+        static void buildExecStats(const std::vector<Strategy::CommandResult>& shardResults,
                                    const char* mongosStageName,
                                    long long millisElapsed,
                                    BSONObjBuilder* out);

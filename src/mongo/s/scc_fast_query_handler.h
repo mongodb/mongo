@@ -54,16 +54,16 @@ namespace mongo {
         virtual ~SCCFastQueryHandler() {
         }
 
-        virtual bool canHandleQuery(const string& ns, Query query);
+        virtual bool canHandleQuery(const std::string& ns, Query query);
 
-        virtual auto_ptr<DBClientCursor> handleQuery(const vector<string>& hostStrings,
-                                                     const string &ns,
-                                                     Query query,
-                                                     int nToReturn,
-                                                     int nToSkip,
-                                                     const BSONObj *fieldsToReturn,
-                                                     int queryOptions,
-                                                     int batchSize);
+        virtual std::auto_ptr<DBClientCursor> handleQuery(const std::vector<std::string>& hostStrings,
+                                                          const std::string &ns,
+                                                          Query query,
+                                                          int nToReturn,
+                                                          int nToSkip,
+                                                          const BSONObj *fieldsToReturn,
+                                                          int queryOptions,
+                                                          int batchSize);
 
     private:
 

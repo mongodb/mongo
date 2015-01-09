@@ -198,7 +198,7 @@ namespace mongo {
 
         virtual void installBSONTypes();
 
-        virtual string getError() { return _error; }
+        virtual std::string getError() { return _error; }
 
         virtual bool hasOutOfMemoryException();
 
@@ -216,7 +216,7 @@ namespace mongo {
         virtual double getNumber(const char* field);
         virtual int getNumberInt(const char* field);
         virtual long long getNumberLongLong(const char* field);
-        virtual string getString(const char* field);
+        virtual std::string getString(const char* field);
         virtual bool getBoolean(const char* field);
         virtual BSONObj getObject(const char* field);
 
@@ -235,7 +235,7 @@ namespace mongo {
                            int timeoutMs = 0, bool ignoreReturn = false,
                            bool readOnlyArgs = false, bool readOnlyRecv = false);
 
-        virtual bool exec(const StringData& code, const string& name, bool printResult,
+        virtual bool exec(const StringData& code, const std::string& name, bool printResult,
                           bool reportError, bool assertOnError, int timeoutMs);
 
         // functions to create v8 object and function templates
@@ -457,7 +457,7 @@ namespace mongo {
 
         v8::Eternal<v8::Context> _context;
         v8::Eternal<v8::Object> _global;
-        string _error;
+        std::string _error;
         std::vector<v8::Eternal<v8::Value> > _funcs;
 
         enum ConnectState { NOT, LOCAL, EXTERNAL };
@@ -562,7 +562,7 @@ namespace mongo {
          */
         DeadlineMonitor<V8Scope>* getDeadlineMonitor() { return &_deadlineMonitor; }
 
-        typedef map<unsigned, V8Scope*> OpIdToScopeMap;
+        typedef std::map<unsigned, V8Scope*> OpIdToScopeMap;
         mongo::mutex _globalInterruptLock;  // protects map of all operation ids -> scope
         OpIdToScopeMap _opToScopeMap;       // map of mongo op ids to scopes (protected by
                                             // _globalInterruptLock).

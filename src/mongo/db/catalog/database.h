@@ -109,8 +109,8 @@ namespace mongo {
          * 'duplicates' is specified, it is filled with all duplicate names.
          // TODO move???
          */
-        static string duplicateUncasedName( const std::string &name,
-                                            std::set< std::string > *duplicates = 0 );
+        static std::string duplicateUncasedName( const std::string &name,
+                                                 std::set< std::string > *duplicates = 0 );
 
         static Status validateDBName( const StringData& dbname );
 

@@ -64,7 +64,7 @@ namespace mongo {
         void setMaxCells(int maxCells);
         int maxCells() const { return _maxCells; }
 
-        void getCovering(const R2Region& region, vector<GeoHash>* cover);
+        void getCovering(const R2Region& region, std::vector<GeoHash>* cover);
 
     private:
         struct Candidate {
@@ -106,27 +106,27 @@ namespace mongo {
 
         // We keep the candidates that may intersect with this region in a priority queue.
         struct CompareQueueEntries;
-        typedef pair<int, Candidate*> QueueEntry;
-        typedef priority_queue<QueueEntry, vector<QueueEntry>,
-                               CompareQueueEntries> CandidateQueue;
+        typedef std::pair<int, Candidate*> QueueEntry;
+        typedef std::priority_queue<QueueEntry, std::vector<QueueEntry>,
+                                    CompareQueueEntries> CandidateQueue;
         boost::scoped_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
-        boost::scoped_ptr<vector<GeoHash> > _results;
+        boost::scoped_ptr<std::vector<GeoHash> > _results;
     };
 
 
     // An R2CellUnion is a region consisting of cells of various sizes.
     class R2CellUnion : boost::noncopyable {
     public:
-        void init(const vector<GeoHash>& cellIds);
+        void init(const std::vector<GeoHash>& cellIds);
         bool contains(const GeoHash cellId) const;
-        string toString() const;
+        std::string toString() const;
     private:
         // Normalizes the cell union by discarding cells that are contained by other
         // cells, replacing groups of 4 child cells by their parent cell whenever
         // possible, and sorting all the cell ids in increasing order.  Returns true
         // if the number of cells was reduced.
         bool normalize();
-        vector<GeoHash> _cellIds;
+        std::vector<GeoHash> _cellIds;
     };
 
 } /* namespace mongo */
