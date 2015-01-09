@@ -495,8 +495,9 @@ namespace {
 
     TEST(IndexBoundsBuilderTest, ExistsTrueSparse) {
         IndexEntry testIndex = IndexEntry(BSONObj(),
-                                          false,
-                                          true,
+                                          false, // multikey
+                                          true, // sparse
+                                          false, // unique
                                           "exists_true_sparse",
                                           BSONObj());
         BSONObj obj = fromjson("{a: {$exists: true}}");

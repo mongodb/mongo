@@ -689,6 +689,20 @@ namespace mongo {
         QueryPlannerIXSelect::rateIndices(query.root(), "", relevantIndices);
         QueryPlannerIXSelect::stripInvalidAssignments(query.root(), relevantIndices);
 
+        // Unless we have GEO_NEAR, TEXT, or a projection, we may be able to apply an optimization
+        // in which we strip unnecessary index assignments.
+        //
+        // Disallowed with projection because assignment to a non-unique index can allow the plan
+        // to be covered.
+        //
+        // TEXT and GEO_NEAR are special because they require the use of a text/geo index in order
+        // to be evaluated correctly. Stripping these "mandatory assignments" is therefore invalid.
+        if (query.getParsed().getProj().isEmpty()
+            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
+            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
+            QueryPlannerIXSelect::stripUnneededAssignments(query.root(), relevantIndices);
+        }
+
         // query.root() is now annotated with RelevantTag(s).
         QLOG() << "Rated tree:" << endl << query.root()->toString();
 

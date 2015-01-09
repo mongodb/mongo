@@ -47,11 +47,13 @@ namespace mongo {
                    const std::string& accessMethod,
                    bool mk,
                    bool sp,
+                   bool unq,
                    const std::string& n,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
               sparse(sp),
+              unique(unq),
               name(n),
               infoObj(io) {
 
@@ -64,16 +66,18 @@ namespace mongo {
         IndexEntry(const BSONObj& kp,
                    bool mk,
                    bool sp,
+                   bool unq,
                    const std::string& n,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
               sparse(sp),
+              unique(unq),
               name(n),
               infoObj(io) {
 
             type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-        }     
+        }
 
         /**
          * For testing purposes only.
@@ -82,17 +86,20 @@ namespace mongo {
             : keyPattern(kp),
               multikey(false),
               sparse(false),
+              unique(false),
               name("test_foo"),
               infoObj(BSONObj()) {
 
             type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
-        }     
+        }
 
         BSONObj keyPattern;
 
         bool multikey;
 
         bool sparse;
+
+        bool unique;
 
         std::string name;
 
