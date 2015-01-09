@@ -228,12 +228,18 @@ type ExtraOptions interface {
 	Name() string
 }
 
+func (auth *Auth) RequiresExternalDB() bool {
+	return auth.Mechanism == "GSSAPI" || auth.Mechanism == "PLAIN" || auth.Mechanism == "MONGODB-X509"
+}
+
 // Get the authentication database to use. Should be the value of
 // --authenticationDatabase if it's provided, otherwise, the database that's
 // specified in the tool's --db arg.
 func (self *ToolOptions) GetAuthenticationDatabase() string {
 	if self.Auth.Source != "" {
 		return self.Auth.Source
+	} else if self.Auth.RequiresExternalDB() {
+		return "$external"
 	} else if self.Namespace != nil && self.Namespace.DB != "" {
 		return self.Namespace.DB
 	}

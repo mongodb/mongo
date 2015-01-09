@@ -60,8 +60,8 @@ func main() {
 		os.Exit(util.ExitBadOptions)
 	}
 
-	if opts.Auth.Username != "" && opts.Auth.Source == "" {
-		log.Logf(log.Always, "--authenticationDatabase is required")
+	if opts.Auth.Username != "" && opts.Auth.Source == "" && !opts.Auth.RequiresExternalDB() {
+		log.Logf(log.Always, "--authenticationDatabase is required when authenticating against a non $external database")
 		os.Exit(util.ExitBadOptions)
 	}
 
