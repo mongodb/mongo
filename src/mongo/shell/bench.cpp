@@ -76,6 +76,11 @@ namespace {
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::map;
+
     BenchRunEventCounter::BenchRunEventCounter() {
         reset();
     }

@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     /**
      * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
      */

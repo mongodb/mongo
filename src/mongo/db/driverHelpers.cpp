@@ -53,6 +53,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     class BasicDriverHelper : public Command {
     public:
         BasicDriverHelper( const char * name ) : Command( name ) {}

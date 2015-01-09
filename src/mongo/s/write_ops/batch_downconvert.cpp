@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     Status extractGLEErrors( const BSONObj& gleResponse, GLEErrors* errors ) {
 
         // DRAGONS

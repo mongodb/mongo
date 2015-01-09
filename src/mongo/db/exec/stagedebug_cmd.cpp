@@ -51,6 +51,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     /**
      * A command for manually constructing a query tree and running it.
      *

@@ -40,6 +40,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::endl;
+
     OpCounters::OpCounters() {}
 
     void OpCounters::incInsertInWriteLock(int n) {

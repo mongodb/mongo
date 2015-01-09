@@ -52,6 +52,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
 
 namespace {
     void _appendUserInfo(const CurOp& c,

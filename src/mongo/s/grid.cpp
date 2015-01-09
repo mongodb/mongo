@@ -57,6 +57,16 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::istringstream;
+    using std::map;
+    using std::ostringstream;
+    using std::set;
+    using std::setfill;
+    using std::setw;
+    using std::stringstream;
+    using std::vector;
+
     MONGO_FP_DECLARE(neverBalance);
 
     DBConfigPtr Grid::getDBConfig( const StringData& ns , bool create , const string& shardNameHint ) {

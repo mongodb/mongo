@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     // Does not take ownership.
     OplogStart::OplogStart(OperationContext* txn,
                            const Collection* collection,

@@ -38,6 +38,10 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     class AppendOplogNoteCmd : public Command {
     public:
         AppendOplogNoteCmd() : Command( "appendOplogNote" ) {}

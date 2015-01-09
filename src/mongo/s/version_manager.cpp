@@ -44,6 +44,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::map;
+    using std::string;
+
     // Global version manager
     VersionManager versionManager;
 

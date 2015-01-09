@@ -50,6 +50,14 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    using std::cout;
+    using std::endl;
+    using std::numeric_limits;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     typedef std::map<std::string, BSONElement> BSONMap;
     BSONMap bson2map(const BSONObj& obj) {
         BSONMap m;

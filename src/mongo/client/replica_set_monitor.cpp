@@ -56,6 +56,10 @@
 
 namespace mongo {
 
+    using std::numeric_limits;
+    using std::set;
+    using std::string;
+
 namespace {
     // Pull nested types to top-level scope
     typedef ReplicaSetMonitor::IsMasterReply IsMasterReply;

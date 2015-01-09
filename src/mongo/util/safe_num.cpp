@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::ostringstream;
+
     SafeNum::SafeNum(const BSONElement& element) {
         switch (element.type()) {
         case NumberInt:

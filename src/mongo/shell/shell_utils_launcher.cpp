@@ -64,6 +64,14 @@
 namespace mongo {
 
     using boost::scoped_array;
+    using std::cout;
+    using std::endl;
+    using std::make_pair;
+    using std::map;
+    using std::pair;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     extern bool dbexitCalled;
 

@@ -43,6 +43,9 @@
 
 
 namespace mongo {
+
+    using std::string;
+
 namespace unittest {
     namespace str = mongoutils::str;
     namespace moe = mongo::optionenvironment;

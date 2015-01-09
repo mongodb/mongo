@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+    using std::numeric_limits;
+
     DummyRecordStoreV1MetaData::DummyRecordStoreV1MetaData( bool capped, int userFlags ) {
         _dataSize = 0;
         _numRecords = 0;

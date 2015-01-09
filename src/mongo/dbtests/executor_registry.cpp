@@ -47,6 +47,8 @@
 
 namespace ExecutorRegistry {
 
+    using std::auto_ptr;
+
     class ExecutorRegistryBase {
     public:
         ExecutorRegistryBase()

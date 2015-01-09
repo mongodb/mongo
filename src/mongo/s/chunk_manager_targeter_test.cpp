@@ -40,6 +40,8 @@ namespace {
 
     using namespace mongo;
 
+    using std::auto_ptr;
+    using std::make_pair;
     /**
      * ChunkManager targeting test
      *

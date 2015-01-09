@@ -49,6 +49,9 @@ namespace mongo {
     namespace mb = mongo::mutablebson;
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
+
     using pathsupport::EqualityMatches;
 
     UpdateDriver::UpdateDriver(const Options& opts)

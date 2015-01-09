@@ -53,6 +53,11 @@
 
 namespace ThreadedTests {
 
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::string;
+
     template <int nthreads_param=10>
     class ThreadedTest {
     public:

@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     MatchDetails::MatchDetails() :
         _elemMatchKeyRequested() {
         resetOutput();

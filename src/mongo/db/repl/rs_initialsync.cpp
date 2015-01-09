@@ -55,6 +55,9 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using std::list;
+    using std::string;
+
     /**
      * Truncates the oplog (removes any documents) and resets internal variables that were
      * originally initialized or affected by using values from the oplog at startup time.  These 

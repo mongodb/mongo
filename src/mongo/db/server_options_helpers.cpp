@@ -55,6 +55,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 
+using std::endl;
 using std::string;
 
 namespace mongo {

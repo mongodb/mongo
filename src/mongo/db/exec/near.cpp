@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     NearStage::NearStage(OperationContext* txn,
                          WorkingSet* workingSet,
                          Collection* collection,
@@ -234,7 +236,7 @@ namespace mongo {
 
         // Store the member's RecordId, if available, for quick invalidation
         if (nextMember->hasLoc()) {
-            _nextIntervalSeen.insert(make_pair(nextMember->loc, nextMemberID));
+            _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
         }
 
         if (!distanceStatus.isOK()) {

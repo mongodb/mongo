@@ -33,6 +33,7 @@
 
 namespace mongo {
 
+    using std::string;
     using std::vector;
 
     namespace {

@@ -40,6 +40,8 @@ namespace repl {
 
 namespace {
 
+    using std::string;
+
     TEST(IsSelf, DetectsSameHostIPv4) {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
         bool wasEnabled = IPv6Enabled();

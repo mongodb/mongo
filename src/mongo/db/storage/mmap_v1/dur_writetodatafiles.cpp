@@ -40,6 +40,8 @@ namespace mongo {
 
     namespace dur {
 
+        using std::endl;
+
         static void WRITETODATAFILES_Impl1(const JSectHeader& h,
                                            const AlignedBuilder& uncompressed) {
             LOG(3) << "journal WRITETODATAFILES 1" << endl;

@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST(DConcurrency, GlobalRead) {
         MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);

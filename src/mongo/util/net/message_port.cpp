@@ -58,6 +58,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::string;
 
 // if you want trace output:
 #define mmm(x)

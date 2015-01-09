@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     class MyHarnessHelper : public HarnessHelper {
     public:
         MyHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {

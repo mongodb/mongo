@@ -41,6 +41,12 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::vector;
+
     template < class ValType, class ShardType >
     bool ConfigDiffTracker<ValType,ShardType>::
         isOverlapping( const BSONObj& min, const BSONObj& max )

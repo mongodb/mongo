@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
     using std::string;
     using mongoutils::str::stream;
 

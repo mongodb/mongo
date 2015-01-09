@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::vector;
+
     class TestableChunkManager : public ChunkManager {
     public:
 

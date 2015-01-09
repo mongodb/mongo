@@ -37,6 +37,10 @@
 #include "mongo/db/commands.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     class CmdConnectionStatus : public Command {
     public:
         CmdConnectionStatus() : Command("connectionStatus") {}

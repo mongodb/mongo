@@ -37,6 +37,10 @@
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::vector;
+
     class KVDatabaseCatalogEntry::AddCollectionChange : public RecoveryUnit::Change {
     public:
         AddCollectionChange(OperationContext* opCtx, KVDatabaseCatalogEntry* dce,

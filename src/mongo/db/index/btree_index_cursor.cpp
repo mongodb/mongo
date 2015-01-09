@@ -39,6 +39,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     BtreeIndexCursor::BtreeIndexCursor(SortedDataInterface::Cursor* cursor) : _cursor(cursor) { }
 
     bool BtreeIndexCursor::isEOF() const { return _cursor->isEOF(); }

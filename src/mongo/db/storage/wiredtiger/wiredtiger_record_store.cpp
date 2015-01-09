@@ -59,6 +59,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
 
 namespace {
     static const int kMinimumRecordStoreVersion = 1;

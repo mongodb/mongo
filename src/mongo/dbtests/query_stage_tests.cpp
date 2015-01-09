@@ -44,6 +44,8 @@
 
 namespace QueryStageTests {
 
+    using std::auto_ptr;
+
     class IndexScanBase {
     public:
         IndexScanBase() : _client(&_txn) {

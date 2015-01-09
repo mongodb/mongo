@@ -34,6 +34,10 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
 namespace repl {
 
     // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}

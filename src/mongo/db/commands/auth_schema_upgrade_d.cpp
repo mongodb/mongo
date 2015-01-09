@@ -44,6 +44,8 @@
 namespace mongo {
 namespace {
 
+    using std::string;
+
     Status checkReplicaMemberVersions() {
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();

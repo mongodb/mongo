@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string BatchedInsertRequest::BATCHED_INSERT_REQUEST = "insert";

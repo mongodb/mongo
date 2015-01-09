@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     Status TextMatchExpression::init( const string& query, const string& language ) {
         _query = query;
         _language = language;

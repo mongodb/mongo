@@ -37,6 +37,12 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::vector;
+
     using mongoutils::str::stream;
 
     /**

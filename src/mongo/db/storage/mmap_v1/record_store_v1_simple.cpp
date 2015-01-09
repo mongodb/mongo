@@ -51,6 +51,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::vector;
+
     static Counter64 freelistAllocs;
     static Counter64 freelistBucketExhausted;
     static Counter64 freelistIterations;
@@ -229,7 +232,7 @@ namespace mongo {
     void SimpleRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {
         DeletedRecord* d = drec( dloc );
 
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
+        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << std::hex << d->extentOfs() << endl;
 
         int b = bucket(d->lengthWithHeaders());
         *txn->recoveryUnit()->writing(&d->nextDeleted()) = _details->deletedListEntry(b);

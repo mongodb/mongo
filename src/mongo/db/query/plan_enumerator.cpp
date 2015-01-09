@@ -40,6 +40,11 @@
 namespace {
 
     using namespace mongo;
+    using std::auto_ptr;
+    using std::endl;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     std::string getPathPrefix(std::string path) {
         if (mongoutils::str::contains(path, '.')) {

@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     namespace {
         int MAGIC = 123123;
     }

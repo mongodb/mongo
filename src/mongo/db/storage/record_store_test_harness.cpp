@@ -38,6 +38,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
 
     TEST( RecordStoreTestHarness, Simple1 ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );

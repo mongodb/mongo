@@ -46,6 +46,11 @@
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     FrameworkGlobalParams frameworkGlobalParams;
 
     Status addTestFrameworkOptions(moe::OptionSection* options) {

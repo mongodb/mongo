@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongo::str::stream;
 
     const std::string ActionLogType::ConfigNS = "config.actionlog";

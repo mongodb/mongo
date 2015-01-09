@@ -40,6 +40,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    using std::stringstream;
+
     std::ostream& operator<<(std::ostream &s, const GeoHash &h) {
         return s << h.toString();
     }
@@ -242,7 +244,7 @@ namespace mongo {
 
     string GeoHash::toStringHex1() const {
         stringstream ss;
-        ss << hex << _hash;
+        ss << std::hex << _hash;
         return ss.str();
     }
 

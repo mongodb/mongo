@@ -46,6 +46,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
 
     const std::string openSSLVersion(const std::string &prefix, const std::string &suffix) {

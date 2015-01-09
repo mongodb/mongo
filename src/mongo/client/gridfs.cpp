@@ -53,6 +53,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::ios;
+    using std::ofstream;
+    using std::ostream;
+    using std::string;
+
     const unsigned DEFAULT_CHUNK_SIZE = 255 * 1024;
 
     GridFSChunk::GridFSChunk( BSONObj o ) {

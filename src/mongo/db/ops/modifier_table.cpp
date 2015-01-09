@@ -48,6 +48,10 @@
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
+
+    using std::make_pair;
+    using std::string;
+
 namespace modifiertable {
 
     namespace {

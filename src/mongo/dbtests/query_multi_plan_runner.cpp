@@ -57,6 +57,8 @@ namespace mongo {
 namespace QueryMultiPlanRunner {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
 
     /**
      * Create query solution.

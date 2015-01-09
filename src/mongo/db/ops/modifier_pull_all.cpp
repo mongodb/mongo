@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     namespace mb = mutablebson;
     namespace str = mongoutils::str;
 

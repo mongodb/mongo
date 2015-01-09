@@ -58,6 +58,9 @@ namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     namespace dbtests {
 
         mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");

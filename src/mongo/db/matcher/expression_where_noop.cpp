@@ -38,6 +38,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     /**
      * Bogus no-op $where match expression to parse $where in mongos,
      * since mongos doesn't have script engine to compile JS functions.
@@ -116,6 +119,7 @@ namespace mongo {
     }
 
     StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
+
 
         auto_ptr<WhereNoOpMatchExpression> exp( new WhereNoOpMatchExpression() );
         if ( where.type() == String || where.type() == Code ) {

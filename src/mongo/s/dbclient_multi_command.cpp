@@ -43,6 +43,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::deque;
+    using std::string;
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
                                                           const StringData& dbName,

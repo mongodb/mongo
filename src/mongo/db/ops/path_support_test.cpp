@@ -53,6 +53,7 @@ namespace {
     using namespace mutablebson;
     using namespace pathsupport;
     using mongoutils::str::stream;
+    using std::auto_ptr;
     using std::string;
 
     class EmptyDoc : public mongo::unittest::Test {

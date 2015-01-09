@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 

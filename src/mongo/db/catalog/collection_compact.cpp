@@ -47,6 +47,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::vector;
+
     namespace {
         BSONObj _compactAdjustIndexSpec( const BSONObj& oldSpec ) {
             BSONObjBuilder b;

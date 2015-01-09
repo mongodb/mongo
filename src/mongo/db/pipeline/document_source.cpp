@@ -38,6 +38,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::vector;
 
     DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext> &pCtx)
         : pSource(NULL)

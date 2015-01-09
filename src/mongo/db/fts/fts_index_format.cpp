@@ -44,6 +44,9 @@ namespace mongo {
 
     namespace fts {
 
+        using std::string;
+        using std::vector;
+
         namespace {
             BSONObj nullObj;
             BSONElement nullElt;

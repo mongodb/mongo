@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string ChunkType::ConfigNS = "config.chunks";

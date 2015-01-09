@@ -55,6 +55,10 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+    using std::endl;
+
     using logger::LogComponent;
 
     Command::CommandMap* Command::_commandsByBestName;

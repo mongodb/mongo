@@ -52,7 +52,13 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::map;
     using std::pair;
+    using std::string;
 
     void DurableMappedFile::remapThePrivateView() {
         verify(storageGlobalParams.dur);

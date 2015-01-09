@@ -53,6 +53,8 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::endl;
+    using std::string;
 
 namespace repl {
 

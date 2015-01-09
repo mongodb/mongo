@@ -46,6 +46,11 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     Top::UsageData::UsageData( const UsageData& older, const UsageData& newer ) {
         // this won't be 100% accurate on rollovers and drop(), but at least it won't be negative
         time  = (newer.time  >= older.time)  ? (newer.time  - older.time)  : newer.time;

@@ -54,6 +54,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::stringstream;
 
     class Geo2dFindNearCmd : public Command {
     public:

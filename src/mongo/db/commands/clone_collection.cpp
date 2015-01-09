@@ -59,6 +59,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::stringstream;
+    using std::endl;
+
     class CmdCloneCollection : public Command {
     public:
         CmdCloneCollection() : Command("cloneCollection") { }

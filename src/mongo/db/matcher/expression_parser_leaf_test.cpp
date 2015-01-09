@@ -42,6 +42,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     TEST( MatchExpressionParserLeafTest, SimpleEQ2 ) {
         BSONObj query = BSON( "x" << BSON( "$eq" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );

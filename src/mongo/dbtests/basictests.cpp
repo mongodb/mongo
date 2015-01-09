@@ -51,6 +51,13 @@ namespace BasicTests {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::cout;
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     class Rarely {
     public:

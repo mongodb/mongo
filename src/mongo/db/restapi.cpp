@@ -57,6 +57,12 @@ namespace mongo {
 
     bool getInitialSyncCompleted();
 
+    using std::auto_ptr;
+    using std::string;
+    using std::stringstream;
+    using std::endl;
+    using std::vector;
+
     using namespace html;
 
     class RESTHandler : public DbWebHandler {

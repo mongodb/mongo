@@ -35,6 +35,9 @@ using namespace mongo;
 
 namespace {
 
+    using std::auto_ptr;
+    using std::string;
+
     static const char* ns = "somebogusns";
 
     /**

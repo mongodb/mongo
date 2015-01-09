@@ -40,6 +40,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     class ValidateCmd : public Command {
     public:
         ValidateCmd() : Command( "validate" ) {}

@@ -46,6 +46,9 @@
 
 namespace DirectClientTests {
 
+    using std::auto_ptr;
+    using std::vector;
+
     class ClientBase {
     public:
         ClientBase() {

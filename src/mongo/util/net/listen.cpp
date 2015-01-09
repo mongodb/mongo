@@ -76,6 +76,9 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
 
     // ----- Listener -------
 
@@ -286,7 +289,7 @@ namespace mongo {
             }
 
 #if defined(__linux__)
-            _elapsedTime += max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
+            _elapsedTime += std::max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
 #else
             _elapsedTime += ret; // assume 1ms to grab connection. very rough
 #endif

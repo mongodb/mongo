@@ -39,6 +39,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     namespace {
         const std::string catalogInfo = "_mdb_catalog";
     }

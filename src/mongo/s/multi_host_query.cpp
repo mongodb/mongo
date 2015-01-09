@@ -37,6 +37,10 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::make_pair;
+    using std::string;
+    using std::vector;
+
     typedef boost::unique_lock<boost::mutex> boost_unique_lock;
 
     HostThreadPool::HostThreadPool(int poolSize, bool scopeAllWork) :

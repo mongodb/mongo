@@ -42,6 +42,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     class WhereMatchExpression : public MatchExpression {
     public:
         WhereMatchExpression(OperationContext* txn)

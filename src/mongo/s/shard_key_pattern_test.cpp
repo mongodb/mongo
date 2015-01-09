@@ -33,6 +33,8 @@
 
 namespace {
 
+    using std::string;
+
     using namespace mongo;
 
     TEST(ShardKeyPattern, ValidShardKeyPatternSingle) {

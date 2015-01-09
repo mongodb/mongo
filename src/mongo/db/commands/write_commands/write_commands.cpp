@@ -51,6 +51,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     namespace {
 
         MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {

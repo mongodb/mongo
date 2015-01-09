@@ -35,8 +35,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-
 namespace mongo {
 namespace {
 

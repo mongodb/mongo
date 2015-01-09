@@ -44,6 +44,9 @@
 
 namespace mongo {
 
+    using std::abs;
+    using std::numeric_limits;
+
     namespace mb = mutablebson;
     namespace str = mongoutils::str;
 

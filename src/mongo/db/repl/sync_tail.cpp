@@ -59,6 +59,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
 namespace repl {
 #if defined(MONGO_PLATFORM_64)
     const int replWriterThreadCount = 16;
@@ -143,7 +145,7 @@ namespace repl {
                 // equal numbers and is still likely to be different for different numbers.
                 const double dbl = elem.numberDouble();
                 if (isNaN(dbl)) {
-                    boost::hash_combine(hash, numeric_limits<double>::quiet_NaN());
+                    boost::hash_combine(hash, std::numeric_limits<double>::quiet_NaN());
                 }
                 else {
                     boost::hash_combine(hash, dbl);

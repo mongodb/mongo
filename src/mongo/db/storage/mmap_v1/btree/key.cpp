@@ -38,6 +38,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::numeric_limits;
+    using std::min;
+
     extern const Ordering nullOrdering = Ordering::make(BSONObj());
 
     // KeyBson is for V0 (version #0) indexes

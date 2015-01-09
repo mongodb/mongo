@@ -63,6 +63,17 @@
 
 namespace mongo {
 
+    using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::hex;
+    using std::map;
+    using std::pair;
+    using std::setw;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     /**
      * Thrown when a journal section is corrupt. This is considered OK as long as it occurs while
      * processing the last file. Processing stops at the first corrupt section.

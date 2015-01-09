@@ -62,6 +62,12 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::pair;
+    using std::set;
+    using std::stringstream;
+    using std::vector;
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;

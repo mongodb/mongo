@@ -45,6 +45,9 @@
 
 namespace QueryStageSortTests {
 
+    using std::auto_ptr;
+    using std::set;
+
     class QueryStageSortTestBase {
     public:
         QueryStageSortTestBase() : _client(&_txn) {

@@ -43,6 +43,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::set;
 
     //
     // Comparison for external sorter interface

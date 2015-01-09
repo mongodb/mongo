@@ -38,6 +38,10 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using std::set;
+    using std::string;
+
     namespace fts {
 
         /**

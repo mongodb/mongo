@@ -44,6 +44,8 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using mongoutils::str::stream;
+    using std::auto_ptr;
+    using std::string;
     using std::vector;
 
     void msgToBatchRequests( const Message& msg, vector<BatchedCommandRequest*>* requests ) {

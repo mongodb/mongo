@@ -36,6 +36,10 @@
 
 namespace mongo {
 
+    using std::iostream;
+    using std::string;
+    using std::vector;
+
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
 
     BSONObj Extent::dump() const {

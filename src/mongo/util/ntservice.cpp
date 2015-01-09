@@ -48,6 +48,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
+using std::string;
 using std::wstring;
 
 namespace mongo {

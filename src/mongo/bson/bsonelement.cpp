@@ -38,8 +38,12 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
-namespace mongo {  
+namespace mongo {
     namespace str = mongoutils::str;
+
+    using std::dec;
+    using std::hex;
+    using std::string;
 
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         int sign;

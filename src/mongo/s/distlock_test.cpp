@@ -77,6 +77,10 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     class TestDistLockWithSync: public Command {
     public:

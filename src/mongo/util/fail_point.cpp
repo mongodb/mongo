@@ -34,6 +34,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
+using std::endl;
+
 using mongoutils::str::stream;
 
 namespace mongo {

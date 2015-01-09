@@ -61,6 +61,9 @@ namespace {
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     using mongoutils::str::stream;
 
     enum CleanupResult {

@@ -38,6 +38,7 @@
 namespace mongo {
 namespace pathsupport {
 
+    using std::string;
     using mongoutils::str::stream;
 
     namespace {
@@ -414,7 +415,7 @@ namespace pathsupport {
             if (!status.isOK())
                 return status;
 
-            equalities->insert(make_pair(eqChild.path(), &eqChild));
+            equalities->insert(std::make_pair(eqChild.path(), &eqChild));
         }
         else if (root.matchType() == MatchExpression::AND) {
 

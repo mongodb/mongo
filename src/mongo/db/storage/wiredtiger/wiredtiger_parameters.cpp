@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+using std::string;
+
 WiredTigerEngineRuntimeConfigParameter::WiredTigerEngineRuntimeConfigParameter(
     WiredTigerKVEngine* engine)
     : ServerParameter(ServerParameterSet::getGlobal(),

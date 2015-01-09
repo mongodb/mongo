@@ -35,6 +35,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::list;
+    using std::string;
+    using std::vector;
+
     // static
     const char* MergeSortStage::kStageType = "SORT_MERGE";
 

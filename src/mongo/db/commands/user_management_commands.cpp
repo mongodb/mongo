@@ -68,6 +68,11 @@ namespace mongo {
 
     namespace str = mongoutils::str;
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     static void redactPasswordData(mutablebson::Element parent) {
         namespace mmb = mutablebson;
         const StringData pwdFieldName("pwd", StringData::LiteralTag());

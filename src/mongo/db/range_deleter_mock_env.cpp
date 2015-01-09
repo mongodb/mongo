@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+
     bool DeletedRangeCmp::operator()(const DeletedRange& lhs,
                                      const DeletedRange& rhs) const {
         const int nsComp = lhs.ns.compare(rhs.ns);

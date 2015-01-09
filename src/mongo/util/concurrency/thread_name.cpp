@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
 namespace {
     boost::thread_specific_ptr<std::string> _threadName;
 

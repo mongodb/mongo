@@ -63,6 +63,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
 
 namespace {
 

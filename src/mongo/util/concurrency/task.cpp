@@ -47,6 +47,9 @@
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+
     namespace task {
 
         /*void foo() {

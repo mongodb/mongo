@@ -57,6 +57,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
 
 namespace {
 

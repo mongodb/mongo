@@ -45,6 +45,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::string;
 
     static FindCmd findCmd;
 

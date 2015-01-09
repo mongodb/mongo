@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
     DataFileSync dataFileSync;
 
     DataFileSync::DataFileSync()

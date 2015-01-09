@@ -56,6 +56,10 @@
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+    using std::string;
+
     MongodGlobalParams mongodGlobalParams;
 
     extern DiagLog _diaglog;

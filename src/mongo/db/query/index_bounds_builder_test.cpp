@@ -43,6 +43,9 @@ using namespace mongo;
 namespace {
 
     using std::auto_ptr;
+    using std::numeric_limits;
+    using std::string;
+    using std::vector;
 
     double numberMin = -numeric_limits<double>::max();
     double numberMax = numeric_limits<double>::max();

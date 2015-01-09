@@ -40,6 +40,10 @@
 namespace ExpressionTests {
 
     using boost::intrusive_ptr;
+    using std::numeric_limits;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     /** Convert BSONObj to a BSONObj with our $const wrappings. */
     static BSONObj constify(const BSONObj& obj, bool parentIsArray=false) {

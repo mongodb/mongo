@@ -64,8 +64,11 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    class AlignedBuilder;
+    using std::endl;
+    using std::hex;
+    using std::string;
 
+    class AlignedBuilder;
 
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file

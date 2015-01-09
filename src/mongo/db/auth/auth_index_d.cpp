@@ -45,6 +45,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::endl;
+
 namespace authindex {
 
 namespace {

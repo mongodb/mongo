@@ -49,6 +49,10 @@
 
 namespace mongo {
 
+    using std::min;
+    using std::string;
+    using std::stringstream;
+
     class CmdRenameCollection : public Command {
     public:
         CmdRenameCollection() : Command( "renameCollection" ) {}

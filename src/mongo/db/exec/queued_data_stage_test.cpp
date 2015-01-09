@@ -38,6 +38,8 @@ using namespace mongo;
 
 namespace {
 
+    using std::auto_ptr;
+
     //
     // Basic test that we get out valid stats objects.
     //

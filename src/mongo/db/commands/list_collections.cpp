@@ -49,6 +49,9 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::list;
+    using std::string;
+    using std::stringstream;
 
     class CmdListCollections : public Command {
     public:

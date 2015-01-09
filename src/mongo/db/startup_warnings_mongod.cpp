@@ -46,6 +46,9 @@
 
 namespace mongo {
 
+    using std::ios_base;
+    using std::string;
+
     void logMongodStartupWarnings() {
         logCommonStartupWarnings();
 

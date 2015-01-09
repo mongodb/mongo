@@ -37,6 +37,11 @@
 
 namespace mongo {
 
+    using std::ostream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     using namespace mongoutils;
 
     const char FieldPath::prefix[] = "$";

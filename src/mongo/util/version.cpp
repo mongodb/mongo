@@ -37,6 +37,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     /* Approved formats for versionString:
      *      1.2.3
      *      1.2.3-pre-

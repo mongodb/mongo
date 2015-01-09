@@ -57,6 +57,8 @@
 
 namespace NamespaceTests {
 
+    using std::string;
+
     const int MinExtentSize = 4096;
 
     namespace MissingFieldTests {

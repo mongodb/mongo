@@ -70,7 +70,7 @@ namespace mongo {
     template<> std::string integerToHex<unsigned long long>(unsigned long long val) { return integerToHexDef(val); }
 
 
-    string hexdump(const char *data, unsigned len) {
+    std::string hexdump(const char *data, unsigned len) {
         verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;
         std::stringstream ss;

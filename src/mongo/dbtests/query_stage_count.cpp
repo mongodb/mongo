@@ -43,6 +43,8 @@
 namespace QueryStageCount {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
 
     const int kDocuments = 100;
     const int kInterjections = kDocuments;

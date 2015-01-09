@@ -49,6 +49,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
     using std::string;
     using std::vector;
     using mongoutils::str::stream;

@@ -51,6 +51,9 @@
  */
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     class GeoHaystackSearchCommand : public Command {
     public:
         GeoHaystackSearchCommand() : Command("geoSearch") {}

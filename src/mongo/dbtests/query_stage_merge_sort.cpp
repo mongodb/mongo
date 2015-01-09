@@ -45,6 +45,10 @@
 
 namespace QueryStageMergeSortTests {
 
+    using std::auto_ptr;
+    using std::set;
+    using std::string;
+
     class QueryStageMergeSortTestBase {
     public:
         QueryStageMergeSortTestBase() : _client(&_txn) {

@@ -37,6 +37,11 @@
 
 namespace mongo {
 
+    using std::cerr;
+    using std::endl;
+    using std::map;
+    using std::string;
+
     using namespace mongoutils;
 
     MetricTree* MetricTree::theMetricTree = NULL;

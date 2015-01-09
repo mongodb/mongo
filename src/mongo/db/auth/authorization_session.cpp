@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
 namespace {
     const std::string ADMIN_DBNAME = "admin";
 }  // namespace

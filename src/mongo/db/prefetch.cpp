@@ -47,6 +47,10 @@
 #include "mongo/util/mmap.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+
 namespace repl {
 namespace {
     // todo / idea: the prefetcher, when it fetches _id, on an upsert, will see if the record exists. if it does not, 

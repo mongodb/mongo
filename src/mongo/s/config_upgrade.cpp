@@ -49,6 +49,12 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
+    using std::make_pair;
+    using std::map;
+    using std::string;
+    using std::vector;
+
     using mongoutils::str::stream;
 
     //

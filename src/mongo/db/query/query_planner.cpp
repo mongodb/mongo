@@ -50,6 +50,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::numeric_limits;
+
     // Copied verbatim from db/index.h
     static bool isIdIndex( const BSONObj &pattern ) {
         BSONObjIterator i(pattern);

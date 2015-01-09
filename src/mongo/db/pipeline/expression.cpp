@@ -48,7 +48,11 @@
 
 namespace mongo {
     using namespace mongoutils;
+
     using boost::intrusive_ptr;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     /// Helper function to easily wrap constants with $const.
     static Value serializeConstant(Value val) {

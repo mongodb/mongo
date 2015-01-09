@@ -40,6 +40,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     using mongo::str::stream;
 
     /**

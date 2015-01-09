@@ -71,6 +71,11 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    using std::endl;
+    using std::list;
+    using std::string;
+    using std::stringstream;
+
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;
     static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );

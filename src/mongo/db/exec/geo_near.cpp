@@ -1,3 +1,4 @@
+
 /**
  *    Copyright (C) 2014 10gen Inc.
  *
@@ -52,6 +53,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::abs;
+    using std::auto_ptr;
 
     //
     // Shared GeoNear search functionality

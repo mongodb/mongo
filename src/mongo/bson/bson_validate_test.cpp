@@ -40,6 +40,7 @@ namespace {
 
     using namespace mongo;
     using boost::scoped_array;
+    using std::endl;
 
     void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
         // like a BSONObj string, but without a NUL terminator.

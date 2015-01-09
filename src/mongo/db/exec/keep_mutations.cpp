@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     // static
     const char* KeepMutationsStage::kStageType = "KEEP_MUTATIONS";
 

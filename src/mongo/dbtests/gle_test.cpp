@@ -37,6 +37,9 @@ using mongo::MsgAssertionException;
  * Test getLastError client handling
  */
 namespace {
+
+    using std::string;
+
     static const char* const _ns = "unittests.gle";
 
     /**

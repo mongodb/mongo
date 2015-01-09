@@ -46,6 +46,12 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::vector;
 
 namespace {
 

@@ -36,6 +36,12 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::make_pair;
+    using std::string;
+    using std::vector;
+
     using mongoutils::str::stream;
 
     CollectionMetadata::CollectionMetadata() { }

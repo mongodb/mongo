@@ -52,6 +52,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::string;
 
     namespace unittest {
 

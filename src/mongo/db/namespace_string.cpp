@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     bool legalClientSystemNS( const StringData& ns , bool write ) {
         if( ns == "local.system.replset" ) return true;
 

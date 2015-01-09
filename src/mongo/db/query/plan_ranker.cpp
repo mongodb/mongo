@@ -63,6 +63,7 @@ namespace {
 
 namespace mongo {
 
+    using std::endl;
     using std::vector;
 
     // static 

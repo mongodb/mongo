@@ -76,6 +76,15 @@ namespace mongo {
     using boost::intrusive_ptr;
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::endl;
+    using std::list;
+    using std::make_pair;
+    using std::map;
+    using std::multimap;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     namespace dbgrid_pub_cmds {
 

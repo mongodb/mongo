@@ -38,6 +38,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::set;
+
     /**
      * Unit tests related to DBHelpers
      */

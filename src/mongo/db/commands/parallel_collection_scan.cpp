@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
 
     class ParallelCollectionScanCmd : public Command {
     public:

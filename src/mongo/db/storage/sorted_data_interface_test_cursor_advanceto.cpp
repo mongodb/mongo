@@ -38,6 +38,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::vector;
 
     // Insert multiple single-field keys and advance to each of them
     // using a forward cursor by specifying their exact key. When

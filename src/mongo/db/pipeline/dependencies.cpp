@@ -37,6 +37,11 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using std::set;
+    using std::string;
+    using std::vector;
+
     namespace str = mongoutils::str;
 
     BSONObj DepsTracker::toProjection() const {

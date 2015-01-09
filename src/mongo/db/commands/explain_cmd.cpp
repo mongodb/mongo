@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     static CmdExplain cmdExplain;
 
     Status CmdExplain::checkAuthForCommand(ClientBasic* client,

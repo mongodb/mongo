@@ -45,6 +45,11 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+
     static DatabaseHolder _dbHolder;
 
 namespace {

@@ -47,6 +47,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::set;
+    using std::vector;
+
     MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
     BtreeBasedAccessMethod::BtreeBasedAccessMethod(IndexCatalogEntry* btreeState,

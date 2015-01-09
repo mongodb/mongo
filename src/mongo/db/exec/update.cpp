@@ -44,6 +44,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     namespace mb = mutablebson;
 
     namespace {

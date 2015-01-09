@@ -45,6 +45,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     /* For testing only, not for general use. Enabled via command-line */
     class GodInsert : public Command {
     public:

@@ -45,6 +45,7 @@
 namespace mongo {
     using namespace mongo::sorter;
     using boost::make_shared;
+    using std::pair;
 
     // Stub to avoid including the server_options library
     // TODO: This should go away once we can do these checks at compile time

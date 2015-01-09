@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     void splitStringDelim( const string& str , vector<string>* res , char delim ) {
         if ( str.empty() )
             return;

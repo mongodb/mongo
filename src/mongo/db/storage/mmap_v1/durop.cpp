@@ -50,6 +50,8 @@ namespace mongo {
 
     using boost::scoped_array;
     using boost::shared_ptr;
+    using std::endl;
+    using std::string;
 
     namespace dur {
 

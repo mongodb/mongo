@@ -45,6 +45,11 @@ namespace mongo {
 
         using namespace mongoutils;
 
+        using std::set;
+        using std::string;
+        using std::stringstream;
+        using std::vector;
+
         Status FTSQuery::parse(const string& query, const StringData& language,
                                TextIndexVersion textIndexVersion) {
             _search = query;

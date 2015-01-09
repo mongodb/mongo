@@ -38,6 +38,10 @@
 
 namespace ClientTests {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     class Base {
     public:
 

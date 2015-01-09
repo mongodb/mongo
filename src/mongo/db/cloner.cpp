@@ -63,6 +63,12 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::list;
+    using std::set;
+    using std::endl;
+    using std::string;
+    using std::vector;
 
     MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
 

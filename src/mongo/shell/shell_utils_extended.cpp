@@ -50,6 +50,10 @@
 
 namespace mongo {
 
+    using std::ifstream;
+    using std::string;
+    using std::stringstream;
+
     /**
      * These utilities are thread safe but do not provide mutually exclusive access to resources
      * identified by the caller.  Dependent filesystem paths should not be accessed by different
@@ -158,7 +162,7 @@ namespace mongo {
             ifstream f(e.valuestrsafe());
             uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open() );
 
-            streamsize sz = 0;
+            std::streamsize sz = 0;
             while( 1 ) {
                 char ch = 0;
                 // slow...maybe change one day

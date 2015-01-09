@@ -37,6 +37,10 @@
 using namespace mongo::repl;
 
 namespace mongo {
+
+    using std::string;
+    using std::vector;
+
     MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes):
             _setName(setName) {
         BSONObjBuilder configBuilder;

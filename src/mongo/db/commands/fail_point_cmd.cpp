@@ -36,6 +36,10 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     /**
      * Command for modifying installed fail points.
      *

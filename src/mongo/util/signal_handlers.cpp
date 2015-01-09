@@ -65,6 +65,8 @@ namespace {
 
 namespace mongo {
 
+    using std::endl;
+
     /*
      * WARNING: PLEASE READ BEFORE CHANGING THIS MODULE
      *

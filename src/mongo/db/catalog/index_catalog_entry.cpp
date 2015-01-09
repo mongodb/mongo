@@ -47,6 +47,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     class HeadManagerImpl : public HeadManager {
     public:
         HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }

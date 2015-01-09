@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
                                            WorkingSet* ws,
                                            Collection* collection)

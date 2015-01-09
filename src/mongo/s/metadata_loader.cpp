@@ -45,6 +45,11 @@
 
 namespace mongo {
 
+    using std::make_pair;
+    using std::map;
+    using std::pair;
+    using std::string;
+
     /**
      * This is an adapter so we can use config diffs - mongos and mongod do them slightly
      * differently.

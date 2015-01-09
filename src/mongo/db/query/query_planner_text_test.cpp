@@ -44,6 +44,10 @@
 #include "mongo/util/assert_util.h"
 
 using namespace mongo;
+using std::cout;
+using std::endl;
+using std::string;
+using std::vector;
 
 namespace {
 

@@ -57,6 +57,8 @@
 namespace mongo {
 namespace {
 
+    using std::stringstream;
+
     const bool autoAuthorizeDefault = true;
 
     class CmdSaslStart : public Command {

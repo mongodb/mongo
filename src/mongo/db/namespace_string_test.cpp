@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( NamespaceStringTest, Normal ) {
         ASSERT( NamespaceString::normal( "a" ) );
         ASSERT( NamespaceString::normal( "a.b" ) );

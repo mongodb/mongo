@@ -52,6 +52,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     static Counter64 cursorStatsOpen; // gauge
     static Counter64 cursorStatsOpenPinned; // gauge
     static Counter64 cursorStatsOpenNoTimeout; // gauge

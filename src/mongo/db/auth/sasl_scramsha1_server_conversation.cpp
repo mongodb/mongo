@@ -50,6 +50,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
 
     SaslSCRAMSHA1ServerConversation::SaslSCRAMSHA1ServerConversation(
                                                     SaslAuthenticationSession* saslAuthSession) :

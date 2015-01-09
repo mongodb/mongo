@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     static const char* minMongoProcessVersion = "2.6";
 
     static const char* cannotCleanupMessage =

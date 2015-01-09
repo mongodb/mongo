@@ -68,6 +68,11 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
 #if 0
     namespace cloud {
         SimpleMutex mtx("cloud");

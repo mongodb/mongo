@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST(Comparison, Basic) {
 
         //

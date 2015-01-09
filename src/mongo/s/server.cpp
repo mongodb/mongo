@@ -95,6 +95,11 @@
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     using logger::LogComponent;
 
 #if defined(_WIN32)

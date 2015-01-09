@@ -55,6 +55,12 @@ namespace mongo {
 
 namespace QueryTests {
 
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     class Base {
     public:
         Base() : _scopedXact(&_txn, MODE_X),

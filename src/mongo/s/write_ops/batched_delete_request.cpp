@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     using mongoutils::str::stream;
 
     const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";

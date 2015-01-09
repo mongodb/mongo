@@ -44,6 +44,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
+    using std::stringstream;
 
 namespace {
 

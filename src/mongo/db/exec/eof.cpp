@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     // static
     const char* EOFStage::kStageType = "EOF";
 

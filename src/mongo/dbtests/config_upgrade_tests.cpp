@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     /**
      * Specialization of the config server fixture with helpers for the tests below.
      */

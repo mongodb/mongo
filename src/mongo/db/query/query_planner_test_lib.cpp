@@ -46,6 +46,8 @@ namespace {
 
     using namespace mongo;
 
+    using std::string;
+
     bool filterMatches(const BSONObj& testFilter,
                        const QuerySolutionNode* trueFilterNode) {
         if (NULL == trueFilterNode->filter) { return false; }

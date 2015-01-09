@@ -47,6 +47,8 @@
 namespace QueryStageFetch {
 
     using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::set;
 
     class QueryStageFetchBase {
     public:

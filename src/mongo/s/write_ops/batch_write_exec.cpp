@@ -43,6 +43,11 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::make_pair;
+    using std::stringstream;
+    using std::vector;
+
     BatchWriteExec::BatchWriteExec( NSTargeter* targeter,
                                     ShardResolver* resolver,
                                     MultiCommandDispatch* dispatcher ) :

@@ -52,6 +52,7 @@
 namespace QueryStageKeep {
 
     using boost::shared_ptr;
+    using std::set;
 
     class QueryStageKeepBase {
     public:

@@ -55,6 +55,9 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+
     namespace {
         int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
                              int errorCode, const char *message) {

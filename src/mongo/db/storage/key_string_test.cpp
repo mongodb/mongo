@@ -36,6 +36,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
+using std::string;
 using namespace mongo;
 
 BSONObj toBson(const KeyString& ks, Ordering ord) {

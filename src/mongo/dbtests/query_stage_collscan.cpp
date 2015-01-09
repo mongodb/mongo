@@ -49,6 +49,8 @@
 namespace QueryStageCollectionScan {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
 
     //
     // Stage-specific tests.

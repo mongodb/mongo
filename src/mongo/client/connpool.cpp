@@ -43,6 +43,13 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::vector;
+
     // ------ PoolForHost ------
 
     PoolForHost::~PoolForHost() {

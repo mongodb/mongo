@@ -63,6 +63,10 @@
 
 namespace mongo {
 
+    using std::hex;
+    using std::string;
+    using std::stringstream;
+
     static bool _isCRAuthDisabled;
     static bool _isX509AuthDisabled;
     static const char _nonceAuthenticationDisabledMessage[] = 

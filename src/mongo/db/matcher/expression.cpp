@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     MatchExpression::MatchExpression( MatchType type )
         : _matchType( type ) { }
 

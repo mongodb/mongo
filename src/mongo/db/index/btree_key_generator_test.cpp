@@ -36,6 +36,9 @@
 
 using namespace mongo;
 using boost::scoped_ptr;
+using std::cout;
+using std::endl;
+using std::vector;
 
 namespace {
 

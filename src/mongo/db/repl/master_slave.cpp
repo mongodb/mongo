@@ -69,6 +69,14 @@
 #include "mongo/util/log.h"
 
 using boost::scoped_ptr;
+using std::auto_ptr;
+using std::cout;
+using std::endl;
+using std::max;
+using std::min;
+using std::set;
+using std::stringstream;
+using std::vector;
 
 namespace mongo {
 namespace repl {

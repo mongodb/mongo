@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     class MyHarnessHelper : public HarnessHelper {
     public:
         MyHarnessHelper()

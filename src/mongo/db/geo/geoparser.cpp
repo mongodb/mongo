@@ -43,6 +43,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::stringstream;
+
     // This field must be present, and...
     static const string GEOJSON_TYPE = "type";
     // Have one of these values:

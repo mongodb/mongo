@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
 
     ConfigCoordinator::ConfigCoordinator( MultiCommandDispatch* dispatcher,
                                           const vector<ConnectionString>& configHosts ) :

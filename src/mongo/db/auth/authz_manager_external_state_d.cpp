@@ -52,6 +52,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 

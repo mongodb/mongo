@@ -44,6 +44,8 @@ namespace mongo {
 
     namespace fts {
 
+        using std::map;
+        using std::string;
         using namespace mongoutils;
 
         const double DEFAULT_WEIGHT = 1;

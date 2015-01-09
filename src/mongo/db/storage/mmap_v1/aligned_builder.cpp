@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
     AlignedBuilder::AlignedBuilder(unsigned initSize) {
         _len = 0;
         _malloc(initSize);

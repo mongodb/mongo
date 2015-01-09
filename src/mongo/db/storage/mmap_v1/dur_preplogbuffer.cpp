@@ -54,6 +54,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::min;
+    using std::stringstream;
+
     namespace dur {
 
         extern Journal j;
@@ -66,7 +70,7 @@ namespace mongo {
                 error() << "findMMF_inlock failed " << privateViews.numberOfViews_inlock() << endl;
                 printStackTrace(); // we want a stack trace and the assert below didn't print a trace once in the real world - not sure why
                 stringstream ss;
-                ss << "view pointer cannot be resolved " << hex << (size_t) ptr;
+                ss << "view pointer cannot be resolved " << std::hex << (size_t) ptr;
                 journalingFailure(ss.str().c_str()); // asserts, which then abends
             }
             return f;

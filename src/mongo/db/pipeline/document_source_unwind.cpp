@@ -40,6 +40,8 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::string;
+    using std::vector;
 
     /** Helper class to unwind array from a single document. */
     class DocumentSourceUnwind::Unwinder {

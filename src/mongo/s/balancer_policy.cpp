@@ -44,6 +44,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::map;
+    using std::numeric_limits;
+    using std::set;
+    using std::string;
+    using std::vector;
+
     string TagRange::toString() const {
         return str::stream() << min << " -->> " << max << "  on  " << tag;
     }

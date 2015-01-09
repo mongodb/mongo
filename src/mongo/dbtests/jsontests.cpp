@@ -45,6 +45,14 @@
 
 
 namespace JsonTests {
+
+    using std::cout;
+    using std::endl;
+    using std::numeric_limits;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     namespace JsonStringTests {
 
         class Empty {

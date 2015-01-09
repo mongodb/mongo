@@ -51,6 +51,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     bool setUpSecurityKey(const string& filename) {
         struct stat stats;
 

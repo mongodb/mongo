@@ -48,6 +48,8 @@
 namespace mongo {
 namespace auth {
 
+    using std::vector;
+
     /**
      * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
      * the write confirmation.

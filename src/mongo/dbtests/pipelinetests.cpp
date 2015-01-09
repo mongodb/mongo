@@ -43,6 +43,8 @@
 namespace PipelineTests {
 
     using boost::intrusive_ptr;
+    using std::string;
+    using std::vector;
 
     namespace FieldPath {
 

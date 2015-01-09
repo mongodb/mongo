@@ -51,6 +51,8 @@ namespace QueryPlanExecutor {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::string;
 
     class PlanExecutorBase {
     public:

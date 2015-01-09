@@ -62,6 +62,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::ostringstream;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     class CmdMedianKey : public Command {
     public:
         CmdMedianKey() : Command( "medianKey" ) {}

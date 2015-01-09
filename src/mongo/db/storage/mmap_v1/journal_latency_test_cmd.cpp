@@ -54,6 +54,11 @@
 
 namespace mongo {
 
+    using std::max;
+    using std::min;
+    using std::string;
+    using std::stringstream;
+
     namespace dur {
         boost::filesystem::path getJournalDir();
     }

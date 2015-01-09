@@ -56,6 +56,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     ClientInfo::ClientInfo(AbstractMessagingPort* messagingPort) : ClientBasic(messagingPort) {
         _cur = &_a;
         _prev = &_b;

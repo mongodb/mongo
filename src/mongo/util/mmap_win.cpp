@@ -45,6 +45,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     namespace {
         mongo::AtomicUInt64 mmfNextId(0);
     }

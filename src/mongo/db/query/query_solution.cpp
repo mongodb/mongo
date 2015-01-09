@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    using std::set;
+
     string QuerySolutionNode::toString() const {
         mongoutils::str::stream ss;
         appendToString(&ss, 0);

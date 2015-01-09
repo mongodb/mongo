@@ -70,6 +70,10 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::stringstream;
+
 namespace repl {
 
 namespace {

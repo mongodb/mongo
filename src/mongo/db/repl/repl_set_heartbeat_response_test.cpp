@@ -39,6 +39,7 @@ namespace repl {
 namespace {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;

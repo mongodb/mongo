@@ -51,6 +51,8 @@
 namespace mongo {
 namespace repl {
 
+    using std::vector;
+
     const Seconds TopologyCoordinatorImpl::LastVote::leaseTime = Seconds(30);
 
 namespace {

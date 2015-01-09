@@ -61,6 +61,11 @@
 
 namespace mongo {
 
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::vector;
+
     CappedRecordStoreV1::CappedRecordStoreV1( OperationContext* txn,
                                               CappedDocumentDeleteCallback* collection,
                                               const StringData& ns,

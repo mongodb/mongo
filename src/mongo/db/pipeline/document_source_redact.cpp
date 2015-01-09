@@ -43,6 +43,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::vector;
 
     const char DocumentSourceRedact::redactName[] = "$redact";
 

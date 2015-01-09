@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     class RepairCursorCmd : public Command {
     public:
         RepairCursorCmd() : Command("repairCursor") {}

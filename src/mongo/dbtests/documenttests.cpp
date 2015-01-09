@@ -41,6 +41,11 @@
 
 namespace DocumentTests {
 
+    using std::endl;
+    using std::numeric_limits;
+    using std::string;
+    using std::vector;
+
     mongo::Document::FieldPair getNthField(mongo::Document doc, size_t index) {
         mongo::FieldIterator it (doc);
         while (index--) // advance index times

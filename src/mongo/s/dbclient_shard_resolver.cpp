@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     Status DBClientShardResolver::chooseWriteHost( const string& shardName,
                                                    ConnectionString* shardHost ) const {
 

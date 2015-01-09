@@ -45,6 +45,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
 namespace repl {
 
     void Sync::setHostname(const string& hostname) {

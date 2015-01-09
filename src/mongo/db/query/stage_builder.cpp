@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     PlanStage* buildStages(OperationContext* txn,
                            Collection* collection,
                            const QuerySolution& qsol,

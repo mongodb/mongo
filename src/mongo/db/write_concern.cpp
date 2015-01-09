@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     static TimerStats gleWtimeStats;
     static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime",
                                                                  &gleWtimeStats );

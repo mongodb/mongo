@@ -39,6 +39,10 @@
 
 namespace MatcherTests {
 
+    using std::cout;
+    using std::endl;
+    using std::string;
+
     class CollectionBase {
     public:
         CollectionBase() { }

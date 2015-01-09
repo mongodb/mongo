@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
     MongosGlobalParams mongosGlobalParams;
 
     Status addMongosOptions(moe::OptionSection* options) {

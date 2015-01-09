@@ -35,6 +35,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     TEST( ServerParameters, Simple1 ) {
         int f = 5;
         ExportedServerParameter<int> ff( NULL, "ff", &f, true, true );

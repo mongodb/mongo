@@ -45,6 +45,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     void RangeDeleterDBEnv::initThread() {
         if ( currentClient.get() == NULL )
             Client::initThread( "RangeDeleter" );

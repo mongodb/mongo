@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     void BsonTemplateEvaluator::initializeEvaluator() {
         addOperator("RAND_INT", &BsonTemplateEvaluator::evalRandInt);
         addOperator("RAND_INT_PLUS_THREAD", &BsonTemplateEvaluator::evalRandPlusThread);

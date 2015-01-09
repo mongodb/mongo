@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     TEST( NotMatchExpression, MatchesScalar ) {
         BSONObj baseOperand = BSON( "$lt" << 5 );
         auto_ptr<ComparisonMatchExpression> lt( new LTMatchExpression() );

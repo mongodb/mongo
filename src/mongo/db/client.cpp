@@ -72,6 +72,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     using logger::LogComponent;
 
     boost::mutex Client::clientsMutex;

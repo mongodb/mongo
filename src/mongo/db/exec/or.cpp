@@ -35,6 +35,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     // static
     const char* OrStage::kStageType = "OR";
 

@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( NamespaceTest, Basics ) {
         Namespace foo( "foo.bar" );
         Namespace bar( "bar.foo" );

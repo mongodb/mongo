@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     /**
      * This class is made friend of BtreeLogic so we can add whatever private method accesses we
      * need to it, to be used by the tests.

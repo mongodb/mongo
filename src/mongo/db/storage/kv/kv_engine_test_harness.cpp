@@ -43,6 +43,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
 
     namespace {
         class MyOperationContext : public OperationContextNoop {

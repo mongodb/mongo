@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
     const BSONField<int> WCErrorDetail::errCode("code");
     const BSONField<BSONObj> WCErrorDetail::errInfo("errInfo");

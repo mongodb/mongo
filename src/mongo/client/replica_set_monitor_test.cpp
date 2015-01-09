@@ -36,6 +36,7 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/unittest/unittest.h"
 
+using std::set;
 using namespace mongo;
 
 // Pull nested types to top-level scope

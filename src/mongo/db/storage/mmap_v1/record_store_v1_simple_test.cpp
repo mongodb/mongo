@@ -39,6 +39,9 @@
 using namespace mongo;
 
 namespace {
+
+    using std::string;
+
     TEST(SimpleRecordStoreV1, ChangeNoPaddingSetting) {
         OperationContextNoop txn;
         DummyExtentManager em;

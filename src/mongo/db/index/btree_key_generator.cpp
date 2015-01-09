@@ -31,6 +31,11 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     // Used in scanandorder.cpp to inforatively error when we try to sort keys with parallel arrays.
     const int BtreeKeyGenerator::ParallelArraysCode = 10088;
 

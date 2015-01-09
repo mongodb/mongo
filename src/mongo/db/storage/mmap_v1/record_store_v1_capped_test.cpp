@@ -42,6 +42,9 @@ using namespace mongo;
 
 namespace {
 
+    using std::string;
+    using std::vector;
+
     // Provides data to be inserted. Must be large enough for largest possible record.
     // Should be in BSS so unused portions should be free.
     char zeros[20*1024*1024] = {};

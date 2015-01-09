@@ -43,6 +43,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     //#define HD(x) cout << x << endl;
 #define HD(x)
 

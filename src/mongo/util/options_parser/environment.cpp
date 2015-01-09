@@ -39,6 +39,8 @@ namespace mongo {
 namespace optionenvironment {
 
     using boost::shared_ptr;
+    using std::string;
+    using std::type_info;
 
     // Environment implementation
 

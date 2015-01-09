@@ -75,6 +75,17 @@
 namespace PerfTests {
 
     using boost::shared_ptr;
+    using std::cout;
+    using std::endl;
+    using std::fixed;
+    using std::ifstream;
+    using std::left;
+    using std::min;
+    using std::right;
+    using std::setprecision;
+    using std::setw;
+    using std::string;
+    using std::vector;
 
     const bool profiling = false;
 

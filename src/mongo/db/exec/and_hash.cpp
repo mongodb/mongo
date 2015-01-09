@@ -46,6 +46,7 @@ namespace {
 namespace mongo {
 
     using std::auto_ptr;
+    using std::vector;
 
     const size_t AndHashStage::kLookAheadWorks = 10;
 

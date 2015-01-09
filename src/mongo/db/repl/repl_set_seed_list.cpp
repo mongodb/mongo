@@ -40,6 +40,8 @@ namespace mongo {
 
 namespace repl {
 
+    using std::string;
+
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
     void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
                               const std::string& cfgString,

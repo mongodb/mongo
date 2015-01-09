@@ -63,6 +63,8 @@ namespace {
 
 namespace mongo {
 
+    using std::string;
+
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
                                                                        const BSONElement& e ) {

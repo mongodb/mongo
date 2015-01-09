@@ -56,6 +56,12 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::endl;
+    using std::list;
+    using std::string;
+    using std::vector;
+
     Counter64 ttlPasses;
     Counter64 ttlDeletedDocuments;
 

@@ -49,6 +49,9 @@ namespace {
 
     using namespace mongo;
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
 
     /**
      * Traverse the tree rooted at 'root', and add all tree nodes into the list 'flattened'.

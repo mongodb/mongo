@@ -37,6 +37,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     static ClusterFindCmd cmdFindCluster;
 
     Status ClusterFindCmd::checkAuthForCommand(ClientBasic* client,

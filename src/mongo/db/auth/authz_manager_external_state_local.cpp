@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     AuthzManagerExternalStateLocal::AuthzManagerExternalStateLocal() :
         _roleGraphState(roleGraphStateInitial) {}
     AuthzManagerExternalStateLocal::~AuthzManagerExternalStateLocal() {}

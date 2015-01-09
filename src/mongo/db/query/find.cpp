@@ -63,6 +63,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 using boost::scoped_ptr;
+using std::auto_ptr;
+using std::endl;
 
 namespace mongo {
     // The .h for this in find_constants.h.

@@ -47,6 +47,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     //
     // Cache-related functions for CanonicalQuery
     //

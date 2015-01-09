@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    using std::less;
+
     // Definition
     int const R2RegionCoverer::kDefaultMaxCells = 8;
 

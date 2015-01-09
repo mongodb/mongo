@@ -50,6 +50,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     class CompactCmd : public Command {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }

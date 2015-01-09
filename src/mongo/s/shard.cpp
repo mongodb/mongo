@@ -60,6 +60,15 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::ostream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     static bool initWireVersion( DBClientBase* conn, std::string* errMsg ) {
         BSONObj response;
         if ( !conn->runCommand( "admin", BSON("isMaster" << 1), response )) {

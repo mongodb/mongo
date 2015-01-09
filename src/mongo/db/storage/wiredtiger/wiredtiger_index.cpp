@@ -59,6 +59,10 @@
 
 namespace mongo {
 namespace {
+
+    using std::string;
+    using std::vector;
+
     static const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
 
     static const WiredTigerItem emptyItem(NULL, 0);

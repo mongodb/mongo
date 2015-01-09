@@ -38,6 +38,12 @@ namespace {
 
     using namespace html;
 
+    using std::auto_ptr;
+    using std::fixed;
+    using std::setprecision;
+    using std::string;
+    using std::stringstream;
+
     class WriteLockStatus : public WebStatusPlugin {
     public:
         WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods" ) {}

@@ -43,6 +43,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     /**
      * This parameter turns on fastest config reads for auth data only - *.system.users collections
      * and the "usersInfo" command.  This should be enough to prevent a non-responsive config from

@@ -41,6 +41,9 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using std::string;
+
 namespace {
 
     /**

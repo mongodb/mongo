@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     string Message::toString() const {
         stringstream ss;
         ss << "op: " << opToString( operation() ) << " len: " << size();

@@ -38,6 +38,7 @@
 
 namespace {
 
+    using std::auto_ptr;
     using namespace mongo;
     using mongo::Polygon; // "windows.h" has another Polygon for Windows GDI.
 

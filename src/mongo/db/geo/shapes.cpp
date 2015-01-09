@@ -30,6 +30,8 @@
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/mongoutils/str.h"
 
+using std::abs;
+
 // So we can get at the str namespace.
 using namespace mongoutils;
 

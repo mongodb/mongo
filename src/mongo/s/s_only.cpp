@@ -54,6 +54,10 @@
  */
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     void* remapPrivateView(void *oldPrivateAddr) {
         log() << "remapPrivateView called in mongos, aborting" << endl;
         fassertFailed(16462);

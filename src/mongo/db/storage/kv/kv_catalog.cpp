@@ -54,6 +54,7 @@ namespace {
 }
 
     using boost::scoped_ptr;
+    using std::string;
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
     public:

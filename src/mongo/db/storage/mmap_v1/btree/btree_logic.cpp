@@ -42,6 +42,16 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::dec;
+    using std::endl;
+    using std::hex;
+    using std::make_pair;
+    using std::pair;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     // BtreeLogic::Builder algorithm
     //
     // Phase 1:

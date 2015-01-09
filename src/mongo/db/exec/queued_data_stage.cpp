@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
     QueuedDataStage::QueuedDataStage(WorkingSet* ws)

@@ -38,6 +38,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     namespace {
 
         // Helper function that extracts the group key from a BSONObj.

@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     TEST( ElemMatchObjectMatchExpression, MatchesElementSingle ) {
         BSONObj baseOperand = BSON( "b" << 5 );
         BSONObj match = BSON( "a" << BSON_ARRAY( BSON( "b" << 5.0 ) ) );

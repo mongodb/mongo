@@ -97,6 +97,14 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using logger::LogComponent;
+    using std::auto_ptr;
+    using std::endl;
+    using std::hex;
+    using std::ios;
+    using std::ofstream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     // for diaglog
     inline void opread(Message& m) {

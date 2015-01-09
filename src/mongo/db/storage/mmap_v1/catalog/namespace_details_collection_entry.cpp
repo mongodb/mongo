@@ -37,6 +37,9 @@
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    using std::string;
+
     NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry( const StringData& ns,
                                                                                     NamespaceDetails* details,
                                                                                     RecordStore* indexRecordStore,

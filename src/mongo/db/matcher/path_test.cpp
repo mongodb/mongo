@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( Path, Root1 ) {
         ElementPath p;
         ASSERT( p.init( "a" ).isOK() );

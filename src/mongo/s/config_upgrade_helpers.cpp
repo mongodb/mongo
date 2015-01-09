@@ -45,6 +45,10 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+
     using mongoutils::str::stream;
 
     // Custom field used in upgrade state to determine if/where we failed on last upgrade

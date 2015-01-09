@@ -56,6 +56,11 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+
     class CmdServerStatus : public Command {
     public:
 

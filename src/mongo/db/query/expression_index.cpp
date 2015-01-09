@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    using std::set;
+
     BSONObj ExpressionMapping::hash(const BSONElement& value) {
         BSONObjBuilder bob;
         bob.append("", BSONElementHasher::hash64(value, BSONElementHasher::DEFAULT_HASH_SEED));

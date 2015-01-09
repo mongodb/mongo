@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     // Standard Btree implementation below.
     BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree )
         : BtreeBasedAccessMethod(btreeState, btree) {

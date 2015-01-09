@@ -41,6 +41,8 @@
 namespace AccumulatorTests {
 
     using boost::intrusive_ptr;
+    using std::numeric_limits;
+    using std::string;
 
     class Base {
     protected:

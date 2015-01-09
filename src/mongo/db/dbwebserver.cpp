@@ -65,6 +65,10 @@
 
 namespace mongo {
 
+    using std::map;
+    using std::stringstream;
+    using std::vector;
+
     using namespace html;
 
     struct Timing {

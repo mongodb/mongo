@@ -58,6 +58,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     /* Usage:
      * admindb.$cmd.findOne( { copydb: 1, fromhost: <connection string>, fromdb: <db>,
      *                         todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );

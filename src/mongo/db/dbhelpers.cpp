@@ -66,6 +66,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::ios_base;
+    using std::ofstream;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+
     using logger::LogComponent;
 
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );

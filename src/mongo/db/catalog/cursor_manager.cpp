@@ -47,6 +47,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     namespace {
         unsigned idFromCursorId( CursorId id ) {
             uint64_t x = static_cast<uint64_t>(id);

@@ -39,6 +39,8 @@ namespace mongo {
 
     namespace fts {
 
+        using std::string;
+
         extern const double DEFAULT_WEIGHT;
         extern const double MAX_WEIGHT;
 

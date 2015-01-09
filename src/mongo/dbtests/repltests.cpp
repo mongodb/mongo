@@ -54,6 +54,12 @@ using namespace mongo::repl;
 
 namespace ReplTests {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     BSONObj f( const char *s ) {
         return fromjson( s );
     }

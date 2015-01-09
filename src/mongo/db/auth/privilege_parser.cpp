@@ -37,6 +37,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::vector;
+
     using mongoutils::str::stream;
 
     const BSONField<bool> ParsedResource::anyResource("anyResource");

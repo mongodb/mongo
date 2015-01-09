@@ -55,6 +55,9 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
+    using std::stringstream;
 
     const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 

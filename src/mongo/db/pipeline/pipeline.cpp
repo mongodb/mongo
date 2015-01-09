@@ -49,6 +49,10 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::endl;
+    using std::ostringstream;
+    using std::string;
+    using std::vector;
 
     const char Pipeline::commandName[] = "aggregate";
     const char Pipeline::pipelineName[] = "pipeline";

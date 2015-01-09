@@ -48,6 +48,12 @@
 
 namespace UpdateTests {
 
+    using std::auto_ptr;
+    using std::numeric_limits;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     class ClientBase {
     public:
         ClientBase() : _client(&_txn) {

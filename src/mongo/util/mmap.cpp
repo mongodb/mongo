@@ -49,6 +49,13 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::map;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     void minOSPageSizeBytesTest(size_t minOSPageSizeBytes) {
         fassert( 16325, minOSPageSizeBytes > 0 );
         fassert( 16326, minOSPageSizeBytes < 1000000 );

@@ -34,6 +34,9 @@
 using mongoutils::str::stream;
 
 namespace mongo {
+
+    using std::string;
+
     FailPointRegistry::FailPointRegistry(): _frozen(false) {
     }
 

@@ -39,6 +39,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
+    using std::vector;
 
     template <class OnDiskFormat>
     class BtreeBuilderInterfaceImpl : public SortedDataBuilderInterface {

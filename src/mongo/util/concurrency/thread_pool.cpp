@@ -47,6 +47,8 @@
 namespace mongo {
     namespace threadpool {
 
+        using std::endl;
+        
         // Worker thread
         class Worker : boost::noncopyable {
         public:

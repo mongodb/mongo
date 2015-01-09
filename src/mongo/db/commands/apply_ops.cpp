@@ -45,6 +45,10 @@
 #include "mongo/db/repl/oplog.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }

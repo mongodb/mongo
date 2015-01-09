@@ -42,10 +42,6 @@ namespace mongo {
 
     namespace fts {
 
-        using std::string;
-        using std::vector;
-        using std::set;
-
         class FTSQuery {
 
         public:

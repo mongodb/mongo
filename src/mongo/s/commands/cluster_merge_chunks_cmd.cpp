@@ -40,6 +40,10 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     /**
      * Mongos-side command for merging chunks, passes command to appropriate shard.
      */

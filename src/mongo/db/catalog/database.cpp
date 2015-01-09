@@ -62,6 +62,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     void massertNamespaceNotIndex( const StringData& ns, const StringData& caller ) {
         massert( 17320,
                  str::stream() << "cannot do " << caller

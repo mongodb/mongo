@@ -64,6 +64,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     static const int INDEX_CATALOG_INIT = 283711;
     static const int INDEX_CATALOG_UNINIT = 654321;
 

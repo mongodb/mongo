@@ -51,6 +51,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::vector;
+
     // static
     const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 

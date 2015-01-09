@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     static ClusterExplainCmd cmdExplainCluster;
 
     Status ClusterExplainCmd::checkAuthForCommand(ClientBasic* client,

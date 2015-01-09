@@ -44,6 +44,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::ostringstream;
+    using std::string;
 
 #if 0
 #define MONGO_JSON_DEBUG(message) log() << "JSON DEBUG @ " << __FILE__\

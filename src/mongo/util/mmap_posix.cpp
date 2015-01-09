@@ -49,6 +49,10 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"
 
+using std::endl;
+using std::numeric_limits;
+using std::vector;
+
 using namespace mongoutils;
 
 namespace {

@@ -44,6 +44,8 @@
 namespace mongo {
 
     using std::string;
+    using std::stringstream;
+
     using mongoutils::str::stream;
 
     /**

@@ -43,6 +43,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to

@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     Status addSSLServerOptions(moe::OptionSection* options) {
         options->addOptionChaining("net.ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
                 "use ssl on configured ports")

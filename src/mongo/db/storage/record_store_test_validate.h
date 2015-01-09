@@ -37,10 +37,6 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
-using std::set;
-using std::string;
-using std::stringstream;
-
 namespace mongo {
 namespace {
 

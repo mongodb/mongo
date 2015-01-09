@@ -47,6 +47,10 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::map;
+    using std::string;
+
     namespace JSFiles {
         extern const JSFile servers;
         extern const JSFile mongodtest;

@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     WorkingSet::MemberHolder::MemberHolder() : member(NULL) { }
     WorkingSet::MemberHolder::~MemberHolder() {}
 

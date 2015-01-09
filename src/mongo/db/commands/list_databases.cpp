@@ -38,6 +38,11 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     // XXX: remove and put into storage api
     intmax_t dbSize( const string& database );
 

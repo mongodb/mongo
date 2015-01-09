@@ -39,6 +39,8 @@
 namespace mongo {
     namespace fts {
 
+        using std::string;
+
         TEST( FTSElementIterator, Test1 ) {
 
             BSONObj obj = fromjson(

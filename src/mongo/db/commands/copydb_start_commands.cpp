@@ -60,6 +60,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     // SERVER-4328 todo review for concurrency
     // :(
     thread_specific_ptr<DBClientBase> authConn_;

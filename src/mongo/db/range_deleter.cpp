@@ -46,6 +46,7 @@
 #include "mongo/util/timer.h"
 
 using std::auto_ptr;
+using std::endl;
 using std::set;
 using std::pair;
 using std::string;
@@ -413,7 +414,7 @@ namespace {
         stats->reserve(kDeleteJobsHistory);
 
         scoped_lock sl(_statsHistoryMutex);
-        for (deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
+        for (std::deque<DeleteJobStats*>::const_iterator it = _statsHistory.begin();
                 it != _statsHistory.end(); ++it) {
             stats->push_back(new DeleteJobStats(**it));
         }

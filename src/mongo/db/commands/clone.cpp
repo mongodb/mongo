@@ -54,6 +54,10 @@
 
 namespace mongo {
 
+    using std::set;
+    using std::string;
+    using std::stringstream;
+
     /* Usage:
        mydb.$cmd.findOne( { clone: "fromhost" } );
        Note: doesn't work with authentication enabled, except as internal operation or for

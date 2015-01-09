@@ -51,6 +51,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::vector;
+
 namespace {
     void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
         bool firstTime = true;

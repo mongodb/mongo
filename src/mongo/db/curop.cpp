@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a valid
     // non-zero max time to fail immediately.  Any getmore operation on a cursor already created
     // with a valid non-zero max time will also fail immediately.

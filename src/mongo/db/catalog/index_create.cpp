@@ -55,6 +55,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
+    using std::endl;
 
     /**
      * On rollback sets MultiIndexBlock::_needToCleanup to true.

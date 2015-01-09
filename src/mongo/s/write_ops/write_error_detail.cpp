@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
         const BSONField<int> WriteErrorDetail::index("index");
         const BSONField<int> WriteErrorDetail::errCode("code");

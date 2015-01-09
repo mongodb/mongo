@@ -47,6 +47,9 @@
 
 namespace MMapTests {
 
+    using std::endl;
+    using std::string;
+
     class LeakTest  {
         const string fn;
         const int optOld;

@@ -73,6 +73,18 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::cout;
+    using std::endl;
+    using std::pair;
+    using std::make_pair;
+    using std::map;
+    using std::max;
+    using std::ostringstream;
+    using std::set;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     inline bool allOfType(BSONType type, const BSONObj& o) {
         BSONObjIterator it(o);

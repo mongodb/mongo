@@ -61,6 +61,12 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::pair;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     MONGO_FP_DECLARE(throwSockExcep);
 
     static bool ipv6 = false;

@@ -36,6 +36,9 @@
 using namespace mongo;
 
 namespace CommandTests {
+
+    using std::string;
+
     // one namespace per command
     namespace FileMD5 {
         struct Base {

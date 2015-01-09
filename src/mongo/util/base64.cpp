@@ -36,6 +36,10 @@
 #include "mongo/util/base64.h"
 
 namespace mongo {
+
+    using std::string;
+    using std::stringstream;
+
     namespace base64 {
 
         Alphabet alphabet;

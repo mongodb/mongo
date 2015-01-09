@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
     RecordStoreV1RepairIterator::RecordStoreV1RepairIterator(OperationContext* txn,
                                                              const RecordStoreV1Base* recordStore)
         : _txn(txn), _recordStore(recordStore), _stage(FORWARD_SCAN) {

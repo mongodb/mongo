@@ -48,6 +48,12 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
+
+    using std::auto_ptr;
+    using std::list;
+    using std::string;
+    using std::stringstream;
+
 namespace repl {
 
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {

@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    using std::endl;
+
     LastError LastError::noError;
     LastErrorHolder lastError;
 

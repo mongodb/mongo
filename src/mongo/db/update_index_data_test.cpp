@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( UpdateIndexDataTest, Simple1 ) {
         UpdateIndexData a;
         a.addPath( "a.b" );

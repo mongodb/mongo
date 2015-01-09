@@ -33,6 +33,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     const size_t BatchedCommandRequest::kMaxWriteBatchSize = 1000;
 
     BatchedCommandRequest::BatchedCommandRequest( BatchType batchType ) :

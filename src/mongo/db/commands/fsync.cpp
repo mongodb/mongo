@@ -50,7 +50,11 @@
 
 
 namespace mongo {
-    
+
+    using std::endl;
+    using std::string;
+    using std::stringstream;
+
     class FSyncLockThread : public BackgroundJob {
         void doRealWork();
     public:

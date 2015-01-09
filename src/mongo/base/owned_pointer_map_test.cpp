@@ -38,6 +38,7 @@ namespace mongo {
 namespace {
 
     using std::make_pair;
+    using std::string;
 
     /** Helper class that logs its constructor argument to a static vector on destruction. */
     class DestructionLogger {

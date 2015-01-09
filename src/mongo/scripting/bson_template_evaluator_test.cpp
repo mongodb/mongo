@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     namespace {
 
         void common_rand_tests(string op, BsonTemplateEvaluator *t) {

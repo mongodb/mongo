@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     using mongoutils::str::stream;
         const BSONField<BSONObj> BatchedDeleteDocument::query("q");
         const BSONField<int> BatchedDeleteDocument::limit("limit");

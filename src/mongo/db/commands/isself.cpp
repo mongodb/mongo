@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     class IsSelfCommand : public Command {
     public:
         IsSelfCommand() : Command("_isSelf") {}

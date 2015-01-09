@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     // static
     const char* TextStage::kStageType = "TEXT";
 

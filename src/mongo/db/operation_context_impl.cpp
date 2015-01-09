@@ -45,6 +45,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     OperationContextImpl::OperationContextImpl()
         : _client(currentClient.get()),
           _locker(_client->getLocker()) {

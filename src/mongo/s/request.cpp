@@ -50,6 +50,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {
 

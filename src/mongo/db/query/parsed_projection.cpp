@@ -32,6 +32,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     /**
      * Parses the projection 'spec' and checks its validity with respect to the query 'query'.
      * Puts covering information into 'out'.

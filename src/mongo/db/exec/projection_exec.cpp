@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::max;
+    using std::string;
+
     ProjectionExec::ProjectionExec()
         : _include(true),
           _special(false),

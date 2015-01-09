@@ -60,6 +60,10 @@
 namespace mongo {
 namespace repl {
 
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     unsigned replSetForceInitialSyncFailure = 0;
 
     // Testing only, enabled via command-line.

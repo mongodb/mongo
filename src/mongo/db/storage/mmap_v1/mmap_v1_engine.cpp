@@ -53,6 +53,12 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::ifstream;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
 namespace {
 
 #if !defined(__sunos__)

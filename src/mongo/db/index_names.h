@@ -32,8 +32,6 @@
 
 namespace mongo {
 
-    using std::string;
-
     class BSONObj;
 
     /**

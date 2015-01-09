@@ -45,6 +45,9 @@
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+
     bool is32bit() {
         return ( sizeof(int*) == 4 );
     }

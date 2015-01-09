@@ -48,7 +48,9 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
     using std::list;
+    using std::string;
 
     ConfigServerFixture::ConfigServerFixture()
         : _client(&_txn),

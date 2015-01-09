@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     // static
     const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 

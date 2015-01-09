@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( MatchExpressionParserArrayTest, Size1 ) {
         BSONObj query = BSON( "x" << BSON( "$size" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );

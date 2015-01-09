@@ -38,6 +38,9 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::make_pair;
+    using std::string;
+    using std::vector;
 
     const char DocumentSourceMergeCursors::name[] = "$mergeCursors";
 

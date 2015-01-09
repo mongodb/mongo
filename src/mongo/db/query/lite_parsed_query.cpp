@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
     const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
 

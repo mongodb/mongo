@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     TEST( ExpressionGeoTest, Geo1 ) {
         BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 

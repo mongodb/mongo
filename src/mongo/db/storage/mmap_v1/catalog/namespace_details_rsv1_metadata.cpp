@@ -38,6 +38,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::numeric_limits;
 
     BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets
                         == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);

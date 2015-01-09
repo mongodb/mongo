@@ -35,6 +35,9 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
+
+    using std::string;
+
     class KVCollectionCatalogEntry::AddIndexChange : public RecoveryUnit::Change {
     public:
         AddIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce,

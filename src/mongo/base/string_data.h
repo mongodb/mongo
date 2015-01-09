@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    using std::string;
-
     /**
      * A StringData object wraps a 'const std::string&' or a 'const char*' without copying its
      * contents. The most common usage is as a function argument that takes any of the two

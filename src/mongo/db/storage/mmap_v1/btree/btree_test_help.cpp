@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     string bigNumString(long long n, int len) {
         char sub[17];
         sprintf(sub, "%.16llx", n);

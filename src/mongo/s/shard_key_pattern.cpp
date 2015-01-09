@@ -48,6 +48,8 @@ namespace mongo {
     using std::pair;
     using std::make_pair;
     using std::vector;
+    using std::string;
+
     using pathsupport::EqualityMatches;
     using mongoutils::str::stream;
 

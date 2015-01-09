@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+    using std::string;
+
 namespace repl {
 
 namespace {

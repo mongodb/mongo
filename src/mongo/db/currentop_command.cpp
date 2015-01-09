@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+    using std::stringstream;
+
     void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
         DbMessage d(message);
         QueryMessage q(d);

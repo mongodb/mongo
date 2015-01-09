@@ -43,6 +43,8 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
+    using std::string;
+    using std::vector;
 
     const char DocumentSourceMatch::matchName[] = "$match";
 

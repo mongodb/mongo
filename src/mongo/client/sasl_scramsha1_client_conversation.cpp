@@ -44,6 +44,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
 
     SaslSCRAMSHA1ClientConversation::SaslSCRAMSHA1ClientConversation(
                                                     SaslClientSession* saslClientSession) :

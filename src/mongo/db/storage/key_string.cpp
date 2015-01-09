@@ -44,6 +44,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     namespace {
         typedef KeyString::TypeBits TypeBits;
 

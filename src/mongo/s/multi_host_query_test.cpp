@@ -39,7 +39,10 @@ namespace {
     using namespace mongo;
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::make_pair;
     using std::map;
+    using std::string;
+    using std::vector;
 
     class CallbackCheck {
     public:

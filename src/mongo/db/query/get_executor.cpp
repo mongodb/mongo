@@ -74,6 +74,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     // static
     void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
                                    std::vector<IndexEntry>* indexEntries) {

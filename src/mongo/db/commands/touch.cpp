@@ -51,6 +51,9 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     class TouchCmd : public Command {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }

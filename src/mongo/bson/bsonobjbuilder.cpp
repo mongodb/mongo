@@ -37,6 +37,9 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::string;
+
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {
                 

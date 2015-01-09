@@ -51,6 +51,14 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::list;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
+
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
     const char* const saslCommandUserSourceFieldName = "userSource";

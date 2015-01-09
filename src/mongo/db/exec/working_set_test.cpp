@@ -42,6 +42,8 @@ using namespace mongo;
 
 namespace {
 
+    using std::string;
+
     class WorkingSetFixture : public mongo::unittest::Test {
     protected:
         void setUp() {

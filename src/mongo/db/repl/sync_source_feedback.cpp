@@ -50,6 +50,9 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+
 namespace repl {
 
     // used in replAuthenticate

@@ -35,6 +35,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+    using std::string;
+
 namespace {
 
     /** Helper class that logs its constructor argument to a static vector on destruction. */

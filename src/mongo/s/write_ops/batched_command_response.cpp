@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::string;
+
     using mongoutils::str::stream;
 
     const BSONField<int> BatchedCommandResponse::ok("ok");

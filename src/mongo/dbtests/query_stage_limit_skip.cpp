@@ -46,6 +46,9 @@ using namespace mongo;
 namespace {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::max;
+    using std::min;
 
     static const int N = 50;
 

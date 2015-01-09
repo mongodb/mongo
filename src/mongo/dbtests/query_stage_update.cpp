@@ -51,6 +51,8 @@
 namespace QueryStageUpdate {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::vector;
 
     class QueryStageUpdateBase {
     public:

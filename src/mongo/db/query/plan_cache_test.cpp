@@ -54,6 +54,8 @@ namespace {
 
     using boost::scoped_ptr;
     using std::auto_ptr;
+    using std::string;
+    using std::vector;
 
     static const char* ns = "somebogusns";
 

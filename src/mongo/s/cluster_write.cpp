@@ -50,8 +50,12 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
     using std::vector;
+    using std::endl;
+    using std::map;
     using std::string;
+    using std::stringstream;
 
     const int ConfigOpTimeoutMillis = 30 * 1000;
 

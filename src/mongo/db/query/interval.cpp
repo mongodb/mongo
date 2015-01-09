@@ -30,6 +30,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     Interval::Interval()
         : _intervalData(BSONObj()), start(BSONElement()), startInclusive(false), end(BSONElement()),
           endInclusive(false) { }

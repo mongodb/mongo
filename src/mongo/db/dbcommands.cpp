@@ -88,7 +88,11 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::ostringstream;
     using std::string;
+    using std::stringstream;
 
     CmdShutdown cmdShutdown;
 

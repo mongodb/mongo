@@ -38,6 +38,7 @@
 namespace OplogStartTests {
 
     using boost::scoped_ptr;
+    using std::string;
 
     class Base {
     public:

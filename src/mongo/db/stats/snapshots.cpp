@@ -47,6 +47,9 @@
  */
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+
     void SnapshotData::takeSnapshot() {
         _created = curTimeMicros64();
         Top::global.cloneMap(_usage);

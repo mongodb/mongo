@@ -41,6 +41,10 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::vector;
+
     static const char* kIdField = "_id";
 
     // static

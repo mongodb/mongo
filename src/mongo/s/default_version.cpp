@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     // Global version manager
     VersionManager versionManager;
 

@@ -37,6 +37,11 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     //
     // Helpers for bounds explosion AKA quick-and-dirty SERVER-1205.
     //

@@ -47,6 +47,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::string;
+    using std::stringstream;
 
     /* select count(*) */
     class CmdCount : public Command {

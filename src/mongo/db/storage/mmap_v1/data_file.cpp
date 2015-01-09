@@ -45,6 +45,9 @@
 
 
 namespace mongo {
+
+    using std::endl;
+
 namespace {
 
     void data_file_check(void *_mb) {

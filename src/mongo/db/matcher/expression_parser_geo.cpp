@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+
     StatusWithMatchExpression expressionParserGeoCallbackReal( const char* name,
                                                                int type,
                                                                const BSONObj& section ) {

@@ -54,6 +54,12 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::endl;
+    using std::max;
+    using std::string;
+    using std::stringstream;
+
     // Turn on this failpoint to force the system to yield for a fetch. Setting to "alwaysOn"
     // will cause yields for fetching to occur on every 'kNeedsFetchFailFreq'th call to
     // recordNeedsFetch().

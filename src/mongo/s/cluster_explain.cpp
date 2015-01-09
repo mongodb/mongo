@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    using std::vector;
+
     const char* ClusterExplain::kSingleShard = "SINGLE_SHARD";
     const char* ClusterExplain::kMergeFromShards = "SHARD_MERGE";
     const char* ClusterExplain::kMergeSortFromShards = "SHARD_MERGE_SORT";

@@ -51,6 +51,10 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::auto_ptr;
+    using std::endl;
+    using std::set;
+    using std::string;
 
     long long Scope::_lastVersion = 1;
 
@@ -356,7 +360,7 @@ namespace {
         static const unsigned kMaxPoolSize = 10;
         static const int kMaxScopeReuse = 10;
 
-        typedef deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
+        typedef std::deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
         Pools _pools;    // protected by _mutex
         mongo::mutex _mutex;
     };

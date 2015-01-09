@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    using std::string;
+
     TEST( EqOp, MatchesElement ) {
         BSONObj operand = BSON( "a" << 5 );
         BSONObj match = BSON( "a" << 5.0 );

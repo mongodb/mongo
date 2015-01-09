@@ -56,6 +56,10 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     using logger::LogComponent;
 
     std::string CompactOptions::toString() const {

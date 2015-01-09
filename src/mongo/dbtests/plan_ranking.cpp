@@ -62,6 +62,7 @@ namespace mongo {
 namespace PlanRankingTests {
 
     using boost::scoped_ptr;
+    using std::vector;
 
     static const char* ns = "unittests.PlanRankingTests";
 

@@ -49,6 +49,12 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    using std::cout;
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::stringstream;
+
 #ifndef _MSC_EXTENSIONS
     const int V8Scope::objectDepthLimit;
 #endif

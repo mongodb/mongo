@@ -96,6 +96,16 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::fixed;
+    using std::hex;
+    using std::set;
+    using std::setprecision;
+    using std::setw;
+    using std::string;
+    using std::stringstream;
+
 namespace dur {
 
 namespace {

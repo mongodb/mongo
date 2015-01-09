@@ -34,6 +34,9 @@
 
 namespace mongo {
 
+    using std::auto_ptr;
+    using std::vector;
+
     // static
     const char* CountScan::kStageType = "COUNT_SCAN";
 

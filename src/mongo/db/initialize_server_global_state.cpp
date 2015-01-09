@@ -73,6 +73,10 @@ namespace fs = boost::filesystem;
 
 namespace mongo {
 
+    using std::cerr;
+    using std::cout;
+    using std::endl;
+
 #ifndef _WIN32
     // support for exit value propagation with fork
     void launchSignal( int sig ) {

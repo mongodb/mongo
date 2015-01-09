@@ -48,6 +48,8 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::set;
+    using std::string;
 
     /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
        contains records up to that size (meaning a record with a size exactly equal to

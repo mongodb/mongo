@@ -49,6 +49,10 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    using std::endl;
+    using std::string;
+
 namespace {
 
     /**

@@ -46,6 +46,12 @@
 namespace mongo {
 
     using boost::scoped_ptr;
+    using std::auto_ptr;
+    using std::list;
+    using std::endl;
+    using std::set;
+    using std::string;
+    using std::vector;
 
     DBHashCmd dbhashCmd;
 

@@ -37,6 +37,10 @@
 
 namespace {
 
+    using std::auto_ptr;
+    using std::string;
+    using std::vector;
+
     using namespace mongo;
 
     static void initTargeterFullRange( const NamespaceString& nss,

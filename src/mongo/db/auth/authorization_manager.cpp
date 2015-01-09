@@ -65,6 +65,10 @@
 
 namespace mongo {
 
+    using std::endl;
+    using std::string;
+    using std::vector;
+
     AuthInfo internalSecurity;
 
     MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, MONGO_NO_PREREQUISITES)(
@@ -617,7 +621,7 @@ namespace mongo {
         user->incrementRefCount();
         // NOTE: It is not safe to throw an exception from here to the end of the method.
         if (guard.isSameCacheGeneration()) {
-            _userCache.insert(make_pair(userName, user.get()));
+            _userCache.insert(std::make_pair(userName, user.get()));
             if (_version == schemaVersionInvalid)
                 _version = authzVersion;
         }

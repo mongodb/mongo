@@ -51,6 +51,7 @@ namespace mongo {
 namespace {
 
     using boost::scoped_ptr;
+    using std::vector;
 
     TEST(RoleParsingTest, BuildRoleBSON) {
         RoleGraph graph;
