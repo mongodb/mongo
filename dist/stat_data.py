@@ -166,6 +166,8 @@ connection_stats = [
         'failed eviction of pages that exceeded the in-memory maximum'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
+    CacheStat('cache_eviction_maximum_page_size',
+        'maximum page size at eviction', 'max_aggregate,no_scale'),
     CacheStat('cache_eviction_queue_empty',
         'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty',

@@ -367,6 +367,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
+	stats->cache_eviction_maximum_page_size.desc =
+	    "cache: maximum page size at eviction";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_deepen.desc =
 	    "cache: page split during eviction deepened the tree";
@@ -548,6 +550,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
+	stats->cache_eviction_maximum_page_size.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_force.v = 0;
