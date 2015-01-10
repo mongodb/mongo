@@ -35,8 +35,9 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
 
     types = [
-        ('file', dict(type='file:')),
-        ('table', dict(type='table:'))
+        ('file', dict(type='file:', config='')),
+        ('lsm', dict(type='table:', config=',type=lsm')),
+        ('table', dict(type='table:', config=''))
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),
@@ -47,32 +48,128 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
 
     def test_cursor_comparison(self):
         uri = self.type + 'compare'
+        uriX = self.type + 'compareX'
 
         # Build the object.
         if self.type == 'file:':
-            simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+            simple_populate(self, uri,
+                            'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(self, uriX,
+                            'key_format=' + self.keyfmt + self.config, 100)
         else:
-            complex_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+            complex_populate(self, uri,
+                             'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(self, uriX,
+                             'key_format=' + self.keyfmt + self.config, 100)
 
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
 
-        # Confirm the method fails unless the keys are set.
+        # Confirm failure unless the keys are set.
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: c1.compare(c2), msg)
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: c2.compare(c1), msg)
 
-        # Test cursors in all three orders.
+        # Test cursors before they're positioned.
         c1.set_key(key_populate(c1, 10))
-        self.assertEquals(c1.search(), 0)
         c2.set_key(key_populate(c2, 20))
-        self.assertEquals(c2.search(), 0)
         self.assertGreater(c2.compare(c1), 0)
         self.assertLess(c1.compare(c2), 0)
         c2.set_key(key_populate(c2, 10))
-        self.assertEquals(c1.compare(c2), 0)
+        self.assertEqual(c1.compare(c2), 0)
+        self.assertEqual(c2.compare(c1), 0)
+
+        # Confirm failure for different objects.
+        cX = self.session.open_cursor(uriX, None)
+        cX.set_key(key_populate(cX, 10))
+        msg = '/must reference the same object/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+
+        # Test cursors after they're positioned (shouldn't matter for compare).
+        c1.set_key(key_populate(c1, 10))
+        self.assertEqual(c1.search(), 0)
+        c2.set_key(key_populate(c2, 20))
+        self.assertEqual(c2.search(), 0)
+        self.assertGreater(c2.compare(c1), 0)
+        self.assertLess(c1.compare(c2), 0)
+        c2.set_key(key_populate(c2, 10))
+        self.assertEqual(c2.search(), 0)
+        self.assertEqual(c1.compare(c2), 0)
+        self.assertEqual(c2.compare(c1), 0)
+
+        # Confirm failure for different objects.
+        cX = self.session.open_cursor(uriX, None)
+        cX.set_key(key_populate(cX, 10))
+        self.assertEqual(cX.search(), 0)
+        msg = '/must reference the same object/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+
+    def test_cursor_equality(self):
+        uri = self.type + 'equality'
+        uriX = self.type + 'compareX'
+
+        # Build the object.
+        if self.type == 'file:':
+            simple_populate(self, uri,
+                            'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(self, uriX,
+                            'key_format=' + self.keyfmt + self.config, 100)
+        else:
+            complex_populate(self, uri,
+                             'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(self, uriX,
+                             'key_format=' + self.keyfmt + self.config, 100)
+
+        c1 = self.session.open_cursor(uri, None)
+        c2 = self.session.open_cursor(uri, None)
+
+        # Confirm failure unless the keys are set.
+        msg = '/requires key be set/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: c1.compare_equal(c2), msg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: c2.compare_equal(c1), msg)
+
+        # Test cursors before they're positioned.
+        c1.set_key(key_populate(c1, 10))
+        c2.set_key(key_populate(c2, 20))
+        self.assertNotEqual(c1.compare_equal(c2), 0)
+        self.assertNotEqual(c2.compare_equal(c1), 0)
+        c2.set_key(key_populate(c2, 10))
+        self.assertEqual(c1.compare_equal(c2), 0)
+        self.assertEqual(c2.compare_equal(c1), 0)
+
+        # Confirm failure for different objects.
+        cX = self.session.open_cursor(uriX, None)
+        cX.set_key(key_populate(cX, 10))
+        msg = '/must reference the same object/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+
+        # Test cursors after they're positioned (internally, it's a different
+        # search path if keys are positioned in the tree).
+        c1.set_key(key_populate(c1, 10))
+        self.assertEqual(c1.search(), 0)
+        c2.set_key(key_populate(c2, 20))
+        self.assertEqual(c2.search(), 0)
+        self.assertNotEqual(c1.compare_equal(c2), 0)
+        self.assertNotEqual(c2.compare_equal(c1), 0)
+        c2.set_key(key_populate(c2, 10))
+        self.assertEqual(c2.search(), 0)
+        self.assertEqual(c1.compare_equal(c2), 0)
+        self.assertEqual(c2.compare_equal(c1), 0)
+
+        # Confirm failure for different objects.
+        cX = self.session.open_cursor(uriX, None)
+        cX.set_key(key_populate(cX, 10))
+        self.assertEqual(cX.search(), 0)
+        msg = '/must reference the same object/'
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
 
 
 if __name__ == '__main__':

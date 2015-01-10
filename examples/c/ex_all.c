@@ -242,6 +242,19 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	WT_CURSOR *other = NULL;
+	/*! [Cursor equality] */
+	int equal;
+	ret = cursor->compare_equal(cursor, other, &equal);
+	if (equal == 0) {
+		/* Cursors reference the same key */
+	} else {
+		/* Cursors don't reference the same key */
+	}
+	/*! [Cursor equality] */
+	}
+
+	{
 	/*! [Search for an exact match] */
 	const char *key = "some key";
 	cursor->set_key(cursor, key);

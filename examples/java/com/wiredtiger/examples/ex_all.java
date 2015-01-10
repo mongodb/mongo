@@ -215,6 +215,19 @@ public static int cursor_ops(Session session)
     }
 
     {
+    Cursor other = null;
+    /*! [Cursor equality] */
+    int equal;
+    equal = cursor.compare_equal(other);
+    if (equal == 0) {
+        /* Cursors reference the same key */
+    } else {
+	/* Cursors don't reference the same key */
+    }
+    /*! [Cursor equality] */
+    }
+
+    {
     /*! [Search for an exact match] */
     String key = "some key";
     cursor.putKeyString(key);

@@ -381,6 +381,7 @@ NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
 
 COMPARE_OK(__wt_cursor::compare)
+COMPARE_OK(__wt_cursor::compare_equal)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
@@ -415,6 +416,7 @@ COMPARE_OK(__wt_cursor::search_near)
 
 /* Next, override methods that return integers via arguments. */
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
+%ignore __wt_cursor::compare_equal(WT_CURSOR *, WT_CURSOR *, int *);
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 
 /* SWIG magic to turn Python byte strings into data / size. */
@@ -673,7 +675,7 @@ typedef int int_void;
 		return (ret);
 	}
 
-	/* compare and search_near need special handling. */
+	/* compare: special handling. */
 	int compare(WT_CURSOR *other) {
 		int cmp = 0;
 		int ret = 0;
@@ -691,12 +693,37 @@ typedef int int_void;
 			 * Map less-than-zero to -1 and greater-than-zero to 1
 			 * to avoid colliding with other errors.
 			 */
-			ret = ((ret != 0) ? ret :
-			    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
+			ret = (ret != 0) ? ret :
+			    ((cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 		}
 		return (ret);
 	}
 
+	/* compare_equal: special handling. */
+	int compare_equal(WT_CURSOR *other) {
+		int cmp = 0;
+		int ret = 0;
+		if (other == NULL) {
+			SWIG_Error(SWIG_NullReferenceError,
+			    "in method 'Cursor_compare_equal', "
+			    "argument 1 of type 'struct __wt_cursor *' "
+			    "is None");
+			ret = EINVAL;  /* any non-zero value will do. */
+		}
+		else {
+			ret = $self->compare_equal($self, other, &cmp);
+
+			/*
+			 * Compare-equal is documented to return 0 and !0, map
+			 * less-than-zero and greater-than-zero to 1 to avoid
+			 * colliding with other errors.
+			 */
+			ret = (ret != 0) ? ret : (cmp == 0 ? 0 : 1);
+		}
+		return (ret);
+	}
+
+	/* search_near: special handling. */
 	int search_near() {
 		int cmp = 0;
 		int ret = $self->search_near($self, &cmp);
@@ -704,8 +731,7 @@ typedef int int_void;
 		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
 		 * colliding with WT_NOTFOUND.
 		 */
-		return ((ret != 0) ? ret :
-		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
+		return ((ret != 0) ? ret : (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 	}
 
 	int _freecb() {

@@ -485,6 +485,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	    __curstat_set_key,		/* set-key */
 	    __curstat_set_value,	/* set-value */
 	    __wt_cursor_notsup,		/* compare */
+	    __wt_cursor_notsup,		/* compare_equal */
 	    __curstat_next,		/* next */
 	    __curstat_prev,		/* prev */
 	    __curstat_reset,		/* reset */

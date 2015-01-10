@@ -96,6 +96,7 @@ extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp);
+extern int __wt_btcur_compare_equal( WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp);
 extern int __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
 extern int __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v);
