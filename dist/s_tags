@@ -35,10 +35,19 @@ ctags $flags ../src/include/*.in ../src/*/*.[chi] 2>/dev/null)
 rm -f tags
 ctags $flags ../include/*.in ../*/*.[chi] 2>/dev/null)
 
+# Link the tags file into place if we're at the right level.
+link_tag()
+{
+	if test -e ../include/tags; then
+		rm -f tags && ln -s ../include/tags .
+	fi
+}
+
 # Link to the tags file from standard build and source directories.
 dirs="`python -c 'import dist; dist.print_source_dirs()'` ../src/os_win"
 for i in $dirs; do
-	if ! expr "$i" : ".*/include" > /dev/null; then
-		(cd $i && rm -f tags && ln -s ../include/tags .)
+	if expr "$i" : ".*/include" > /dev/null; then
+		continue
 	fi
+	(cd $i && link_tag)
 done
