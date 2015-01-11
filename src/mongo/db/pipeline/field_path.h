@@ -28,10 +28,7 @@
 
 #pragma once
 
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

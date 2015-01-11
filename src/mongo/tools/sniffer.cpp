@@ -36,10 +36,7 @@
     killcursors
 
  */
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 
 #ifdef _WIN32
 #undef min

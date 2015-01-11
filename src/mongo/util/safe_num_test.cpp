@@ -27,9 +27,7 @@
 
 #include <limits>
 
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
 #undef MONGO_PCH_WHITELISTED // for malloc/realloc pulled from bson
 
 #include "mongo/bson/bsontypes.h"

@@ -28,7 +28,6 @@
 // *    then also delete it in the license file.
 // */
 //
-// #include "mongo/pch.h"
 
 #pragma once
 

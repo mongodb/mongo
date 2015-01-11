@@ -29,10 +29,7 @@
 
 #pragma once
 
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 #include "mongo/client/connpool.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/client/syncclusterconnection.h"

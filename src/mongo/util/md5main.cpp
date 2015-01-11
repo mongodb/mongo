@@ -40,10 +40,7 @@
   2002-04-13 lpd Splits off main program into a separate file, md5main.c.
  */
 
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 
 #include <math.h>
 #include <stdio.h>

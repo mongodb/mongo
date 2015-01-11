@@ -29,10 +29,7 @@
 */
 
 #pragma once
-#define MONGO_PCH_WHITELISTED
 #include "mongo/platform/basic.h"
-#include "mongo/pch.h"
-#undef MONGO_PCH_WHITELISTED
 #include "mongo/db/jsobj.h"
 #include "top.h"
 #include "mongo/util/background.h"
