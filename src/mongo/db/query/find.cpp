@@ -540,11 +540,11 @@ namespace mongo {
     std::string runQuery(OperationContext* txn,
                          Message& m,
                          QueryMessage& q,
+                         const NamespaceString& nss,
                          CurOp& curop,
                          Message &result,
                          bool fromDBDirectClient) {
         // Validate the namespace.
-        const NamespaceString nss(q.ns);
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
 
         // Set curop information.

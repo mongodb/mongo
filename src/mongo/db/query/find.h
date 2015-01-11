@@ -74,6 +74,7 @@ namespace mongo {
     std::string runQuery(OperationContext* txn,
                          Message& m,
                          QueryMessage& q,
+                         const NamespaceString& ns,
                          CurOp& curop,
                          Message &result,
                          bool fromDBDirectClient);
