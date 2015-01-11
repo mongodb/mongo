@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/client/export_macros.h"
 
 namespace mongo {

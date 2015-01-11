@@ -33,6 +33,9 @@
 #ifndef MONGO_PCH_H
 #define MONGO_PCH_H
 
+// NOTE: New uses of pch.h are prohibited, if the following error triggers for you, do *not*
+// work around it by defining MONGO_PCH_WHITELISTED. Instead, include-what-you-use for standard
+// library headers, and namespace qualify things from the standard library in headers.
 #ifndef MONGO_PCH_WHITELISTED
 #error New uses of mongo/pch.h are prohibited
 #endif
@@ -41,23 +44,9 @@
 // system headers and boost headers
 #include "mongo/client/undef_macros.h"
 
-#include <cstring>
-#include <ctime>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
 #define BOOST_FILESYSTEM_VERSION 3
 
 #include "mongo/client/redef_macros.h"
-
-namespace mongo {
-
-    using namespace std;
-}
-
 #include "mongo/util/debug_util.h"
 
 #endif // MONGO_PCH_H

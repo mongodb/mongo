@@ -36,6 +36,8 @@
 #undef MONGO_PCH_WHITELISTED
 
 #include <boost/noncopyable.hpp>
+#include <map>
+#include <string>
 
 namespace mongo {
 

@@ -48,6 +48,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stringutils.h"
 
+using namespace std;
+
 namespace mongo {
 
     /**

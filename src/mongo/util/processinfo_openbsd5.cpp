@@ -44,6 +44,8 @@
 #include "mongo/util/log.h"
 #include "processinfo.h"
 
+using namespace std;
+
 namespace mongo {
 
     ProcessInfo::ProcessInfo(ProcessId pid) : _pid( pid ) {
