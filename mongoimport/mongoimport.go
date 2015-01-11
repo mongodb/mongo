@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/text"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -29,8 +30,7 @@ const (
 	maxBSONSize         = 16 * (1024 * 1024)
 	maxMessageSizeBytes = 2 * maxBSONSize
 	workerBufferSize    = 16
-
-	ProgressBarLength = 24
+	ProgressBarLength   = 24
 )
 
 // Wrapper for MongoImport functionality
@@ -450,6 +450,10 @@ readLoop:
 			}
 			if documentBytes, err = bson.Marshal(document); err != nil {
 				return err
+			}
+			if len(documentBytes) > maxBSONSize {
+				log.Logf(log.Always, "warning: attempting to insert document with size %v (exceeds %v limit)",
+					text.FormatByteAmount(int64(len(documentBytes))), text.FormatByteAmount(maxBSONSize))
 			}
 			numMessageBytes += len(documentBytes)
 			documents = append(documents, bson.Raw{3, documentBytes})
