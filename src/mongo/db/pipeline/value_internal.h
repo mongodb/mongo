@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/bson/optime.h"
 

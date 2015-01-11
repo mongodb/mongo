@@ -47,6 +47,5 @@
 #define BOOST_FILESYSTEM_VERSION 3
 
 #include "mongo/client/redef_macros.h"
-#include "mongo/util/debug_util.h"
 
 #endif // MONGO_PCH_H

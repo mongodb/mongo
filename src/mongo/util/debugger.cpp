@@ -34,6 +34,7 @@
 #include <iostream>
 
 #include "mongo/db/server_options.h"
+#include "mongo/util/debug_util.h"
 
 #ifndef _WIN32
 #include <signal.h>

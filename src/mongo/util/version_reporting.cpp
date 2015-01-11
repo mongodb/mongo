@@ -39,6 +39,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/version.h"

@@ -37,6 +37,7 @@
 #include "mongo/bson/optime.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace oploghack {

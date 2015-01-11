@@ -37,6 +37,7 @@
 #include "mongo/db/stats/counters.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
