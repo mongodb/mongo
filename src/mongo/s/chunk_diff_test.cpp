@@ -26,11 +26,12 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/s/chunk_diff.h"
+
 #include <string>
 #include <utility>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/chunk_diff.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

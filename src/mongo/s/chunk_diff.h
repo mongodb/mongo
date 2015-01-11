@@ -171,5 +171,5 @@ namespace mongo {
 } // namespace mongo
 
 // Include template definition
-#include "chunk_diff-inl.cpp"
+#include "chunk_diff-inl.h"
 

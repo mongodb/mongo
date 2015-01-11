@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include "mongo/s/chunk_diff.h"
-
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
@@ -40,12 +38,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
-
-    using std::auto_ptr;
-    using std::endl;
-    using std::map;
-    using std::string;
-    using std::vector;
 
     template < class ValType, class ShardType >
     bool ConfigDiffTracker<ValType,ShardType>::
@@ -97,7 +89,7 @@ namespace mongo {
     }
 
     template<class ValType, class ShardType>
-    int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(const string& config) {
+    int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(const std::string& config) {
         verifyAttached();
 
         // Get the diff query required
@@ -108,7 +100,7 @@ namespace mongo {
         try {
 
             // Open a cursor for the diff chunks
-            auto_ptr<DBClientCursor> cursor = conn->query(
+            std::auto_ptr<DBClientCursor> cursor = conn->query(
                     ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
             verify( cursor.get() );
 
@@ -141,7 +133,7 @@ namespace mongo {
         //    shard for mongod) add them to the ranges
         //
 
-        vector<BSONObj> newTracked;
+        std::vector<BSONObj> newTracked;
         // Store epoch now so it doesn't change when we change max
         OID currEpoch = _maxVersion->epoch();
 
@@ -160,7 +152,7 @@ namespace mongo {
                 LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Warning(),
                                  LogComponent::kSharding)
                           << "got invalid chunk document " << diffChunkDoc
-                          << " when trying to load differing chunks" << endl;
+                          << " when trying to load differing chunks" << std::endl;
                 continue;
             }
 
@@ -173,7 +165,7 @@ namespace mongo {
                           << " when trying to load differing chunks at version "
                           << ChunkVersion( _maxVersion->majorVersion(),
                                            _maxVersion->minorVersion(),
-                                           currEpoch ) << endl;
+                                           currEpoch ) << std::endl;
 
                 // Don't keep loading, since we know we'll be broken here
                 return -1;
@@ -186,7 +178,7 @@ namespace mongo {
 
             // Chunk version changes
             ShardType shard = shardFor( diffChunkDoc[ChunkType::shard()].String() );
-            typename map<ShardType, ChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
+            typename std::map<ShardType, ChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
             if( shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion ){
                 (*_maxShardVersions)[ shard ] = chunkVersion;
             }
@@ -208,10 +200,10 @@ namespace mongo {
                 << " new chunks for collection " << _ns
                 << " (tracking " << newTracked.size()
                 << "), new version is " << *_maxVersion
-                << endl;
+                << std::endl;
         }
 
-        for( vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
+        for( std::vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
 
             BSONObj chunkDoc = *it;
 
@@ -265,7 +257,7 @@ namespace mongo {
             LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Debug(2),
                              LogComponent::kSharding)
                 << "major version query from " << *_maxVersion << " and over "
-                << _maxShardVersions->size() << " shards is " << queryObj << endl;
+                << _maxShardVersions->size() << " shards is " << queryObj << std::endl;
         }
 
         return queryObj;
