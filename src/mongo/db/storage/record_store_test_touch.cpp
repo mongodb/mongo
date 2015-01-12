@@ -120,7 +120,8 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_OK( rs->touch( opCtx.get(), NULL /* stats output */ ) );
+            Status status = rs->touch( opCtx.get(), NULL /* stats output */ );
+            ASSERT( status.isOK() || status.code() == ErrorCodes::CommandNotSupported );
         }
     }
 
