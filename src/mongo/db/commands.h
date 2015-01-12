@@ -289,6 +289,21 @@ namespace mutablebson {
         static Status getStatusFromCommandResult(const BSONObj& result);
 
         /**
+         * Parses cursor options from the command request object "cmdObj".  Used by commands that
+         * take cursor options.  The only cursor option currently supported is "cursor.batchSize".
+         *
+         * If a valid batch size was specified, returns Status::OK() and fills in "batchSize" with
+         * the specified value.  If no batch size was specified, returns Status::OK() and fills in
+         * "batchSize" with the provided default value.
+         *
+         * If an error occurred while parsing, returns an error Status.  If this is the case, the
+         * value pointed to by "batchSize" is unspecified.
+         */
+        static Status parseCommandCursorOptions(const BSONObj& cmdObj,
+                                                long long defaultBatchSize,
+                                                long long* batchSize);
+
+        /**
          * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
          * and appends the response object to the provided builder under the field name "cursor".
          *

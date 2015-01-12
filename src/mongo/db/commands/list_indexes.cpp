@@ -100,6 +100,15 @@ namespace mongo {
                               << "not the empty string",
                 !ns.coll().empty());
 
+            const long long defaultBatchSize = std::numeric_limits<long long>::max();
+            long long batchSize;
+            Status parseCursorStatus = parseCommandCursorOptions(cmdObj,
+                                                                 defaultBatchSize,
+                                                                 &batchSize);
+            if (!parseCursorStatus.isOK()) {
+                return appendCommandStatus(result, parseCursorStatus);
+            }
+
             AutoGetCollectionForRead autoColl(txn, ns);
             if (!autoColl.getDb()) {
                 return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
@@ -151,16 +160,11 @@ namespace mongo {
                 return appendCommandStatus( result, makeStatus );
             }
 
-            BSONElement batchSizeElem = cmdObj.getFieldDotted("cursor.batchSize");
-            const long long batchSize = batchSizeElem.isNumber()
-                                        ? batchSizeElem.numberLong()
-                                        : -1;
-
             BSONArrayBuilder firstBatch;
 
             const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            for (int objCount = 0;
-                 firstBatch.len() < byteLimit && (batchSize == -1 || objCount < batchSize);
+            for (long long objCount = 0;
+                 objCount < batchSize && firstBatch.len() < byteLimit;
                  objCount++) {
                 BSONObj next;
                 PlanExecutor::ExecState state = exec->getNext(&next, NULL);

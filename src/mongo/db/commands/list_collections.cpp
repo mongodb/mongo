@@ -76,6 +76,29 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
+            boost::scoped_ptr<MatchExpression> matcher;
+            BSONElement filterElt = jsobj["filter"];
+            if (!filterElt.eoo()) {
+                if (filterElt.type() != mongo::Object) {
+                    return appendCommandStatus(result, Status(ErrorCodes::BadValue,
+                                                              "\"filter\" must be an object"));
+                }
+                StatusWithMatchExpression statusWithMatcher =
+                    MatchExpressionParser::parse(filterElt.Obj());
+                if (!statusWithMatcher.isOK()) {
+                    return appendCommandStatus(result, statusWithMatcher.getStatus());
+                }
+                matcher.reset(statusWithMatcher.getValue());
+            }
+
+            const long long defaultBatchSize = std::numeric_limits<long long>::max();
+            long long batchSize;
+            Status parseCursorStatus = parseCommandCursorOptions(jsobj,
+                                                                 defaultBatchSize,
+                                                                 &batchSize);
+            if (!parseCursorStatus.isOK()) {
+                return appendCommandStatus(result, parseCursorStatus);
+            }
 
             ScopedTransaction scopedXact(txn, MODE_IS);
             AutoGetDb autoDb(txn, dbname, MODE_S);
@@ -90,21 +113,13 @@ namespace mongo {
                 names.sort();
             }
 
-            scoped_ptr<MatchExpression> matcher;
-            if ( jsobj["filter"].isABSONObj() ) {
-                StatusWithMatchExpression parsed =
-                    MatchExpressionParser::parse( jsobj["filter"].Obj() );
-                if ( !parsed.isOK() ) {
-                    return appendCommandStatus( result, parsed.getStatus() );
-                }
-                matcher.reset( parsed.getValue() );
-            }
-
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
             std::auto_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
 
-            for ( std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i ) {
-                string ns = *i;
+            for (std::list<std::string>::const_iterator i = names.begin();
+                 i != names.end();
+                 ++i) {
+                const std::string& ns = *i;
 
                 StringData collection = nsToCollectionSubstring( ns );
                 if ( collection == "system.namespaces" ) {
@@ -148,16 +163,11 @@ namespace mongo {
                 return appendCommandStatus( result, makeStatus );
             }
 
-            BSONElement batchSizeElem = jsobj.getFieldDotted("cursor.batchSize");
-            const long long batchSize = batchSizeElem.isNumber()
-                                        ? batchSizeElem.numberLong()
-                                        : -1;
-
             BSONArrayBuilder firstBatch;
 
             const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            for (int objCount = 0;
-                 firstBatch.len() < byteLimit && (batchSize == -1 || objCount < batchSize);
+            for (long long objCount = 0;
+                 objCount < batchSize && firstBatch.len() < byteLimit;
                  objCount++) {
                 BSONObj next;
                 PlanExecutor::ExecState state = exec->getNext(&next, NULL);

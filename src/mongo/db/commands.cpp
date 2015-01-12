@@ -261,6 +261,46 @@ namespace mongo {
         return mongo::getStatusFromCommandResult(result);
     }
 
+    Status Command::parseCommandCursorOptions(const BSONObj& cmdObj,
+                                              long long defaultBatchSize,
+                                              long long* batchSize) {
+        invariant(batchSize);
+        *batchSize = defaultBatchSize;
+
+        BSONElement cursorElem = cmdObj["cursor"];
+        if (cursorElem.eoo()) {
+            return Status::OK();
+        }
+
+        if (cursorElem.type() != mongo::Object) {
+            return Status(ErrorCodes::TypeMismatch, "cursor field must be missing or an object");
+        }
+
+        BSONObj cursor = cursorElem.embeddedObject();
+        BSONElement batchSizeElem = cursor["batchSize"];
+        if (batchSizeElem.eoo()) {
+            if (!cursor.isEmpty()) {
+                return Status(ErrorCodes::BadValue,
+                              "cursor object can't contain fields other than batchSize");
+            }
+
+            return Status::OK();
+        }
+
+        if (!batchSizeElem.isNumber()) {
+            return Status(ErrorCodes::TypeMismatch, "cursor.batchSize must be a number");
+        }
+
+        // This can change in the future, but for now all negatives are reserved.
+        if (batchSizeElem.numberLong() < 0) {
+            return Status(ErrorCodes::BadValue, "cursor.batchSize must not be negative");
+        }
+
+        *batchSize = batchSizeElem.numberLong();
+
+        return Status::OK();
+    }
+
     void Command::appendCursorResponseObject(long long cursorId,
                                              StringData cursorNamespace,
                                              BSONArray firstBatch,

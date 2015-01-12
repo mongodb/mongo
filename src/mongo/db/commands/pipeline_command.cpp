@@ -58,32 +58,6 @@ namespace mongo {
     using boost::scoped_ptr;
     using boost::shared_ptr;
 
-    static bool isCursorCommand(BSONObj cmdObj) {
-        BSONElement cursorElem = cmdObj["cursor"];
-        if (cursorElem.eoo())
-            return false;
-
-        uassert(16954, "cursor field must be missing or an object",
-                cursorElem.type() == Object);
-
-        BSONObj cursor = cursorElem.embeddedObject();
-        BSONElement batchSizeElem = cursor["batchSize"];
-        if (batchSizeElem.eoo()) {
-            uassert(16955, "cursor object can't contain fields other than batchSize",
-                cursor.isEmpty());
-        }
-        else {
-            uassert(16956, "cursor.batchSize must be a number",
-                    batchSizeElem.isNumber());
-
-            // This can change in the future, but for now all negatives are reserved.
-            uassert(16957, "Cursor batchSize must not be negative",
-                    batchSizeElem.numberLong() >= 0);
-        }
-
-        return true;
-    }
-
     static void handleCursorCommand(OperationContext* txn,
                                     const string& ns,
                                     ClientCursorPin* pin,
@@ -98,10 +72,9 @@ namespace mongo {
             invariant(cursor->isAggCursor());
         }
 
-        BSONElement batchSizeElem = cmdObj.getFieldDotted("cursor.batchSize");
-        const long long batchSize = batchSizeElem.isNumber()
-                                    ? batchSizeElem.numberLong()
-                                    : 101; // same as query
+        const long long defaultBatchSize = 101; // Same as query.
+        long long batchSize;
+        uassertStatusOK(Command::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
 
         // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
         BSONArrayBuilder resultsArray;
@@ -296,11 +269,13 @@ namespace mongo {
                 // Unless set to true, the ClientCursor created above will be deleted on block exit.
                 bool keepCursor = false;
 
+                const bool isCursorCommand = !cmdObj["cursor"].eoo();
+
                 // If both explain and cursor are specified, explain wins.
                 if (pPipeline->isExplain()) {
                     result << "stages" << Value(pPipeline->writeExplainOps());
                 }
-                else if (isCursorCommand(cmdObj)) {
+                else if (isCursorCommand) {
                     handleCursorCommand(txn, nss.ns(), pin.get(), exec, cmdObj, result);
                     keepCursor = true;
                 }
