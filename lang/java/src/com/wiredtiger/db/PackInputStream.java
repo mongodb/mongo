@@ -225,6 +225,7 @@ public class PackInputStream {
     public String getString()
     throws WiredTigerPackingException {
         int stringLength = 0;
+        int skipnull = 0;
         format.checkType('S', false);
         // Get the length for a fixed length string
         if (format.getType() != 'S') {
@@ -235,10 +236,11 @@ public class PackInputStream {
             // string length.
             for (; valueOff + stringLength < value.length &&
                     value[valueOff + stringLength] != 0; stringLength++) {}
+            skipnull = 1;
         }
         format.consume();
         String result = new String(value, valueOff, stringLength);
-        valueOff += stringLength + 1;
+        valueOff += stringLength + skipnull;
         return result;
     }
 
@@ -250,7 +252,7 @@ public class PackInputStream {
     private short unpackShort(boolean signed)
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
-        if ((signed && (ret > Short.MAX_VALUE || ret > Short.MIN_VALUE)) ||
+        if ((signed && (ret > Short.MAX_VALUE || ret < Short.MIN_VALUE)) ||
                 (!signed && (short)ret < 0)) {
             throw new WiredTigerPackingException("Overflow unpacking short.");
         }
@@ -265,7 +267,7 @@ public class PackInputStream {
     private int unpackInt(boolean signed)
     throws WiredTigerPackingException {
         long ret = unpackLong(true);
-        if ((signed && (ret > Integer.MAX_VALUE || ret > Integer.MIN_VALUE)) ||
+        if ((signed && (ret > Integer.MAX_VALUE || ret < Integer.MIN_VALUE)) ||
                 (!signed && (int)ret < 0)) {
             throw new WiredTigerPackingException("Overflow unpacking integer.");
         }
