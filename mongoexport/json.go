@@ -1,12 +1,12 @@
 package mongoexport
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"bytes"
 )
 
 // JSONExportOutput is an implementation of ExportOutput that writes documents
@@ -17,9 +17,9 @@ type JSONExportOutput struct {
 	ArrayOutput bool
 	// Pretty when set to true indicates that the output will be written in pretty() mode
 	PrettyOutput bool
-	Encoder     *json.Encoder
-	Out         io.Writer
-	NumExported int64
+	Encoder      *json.Encoder
+	Out          io.Writer
+	NumExported  int64
 }
 
 // NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
@@ -87,14 +87,12 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 		if err != nil {
 			return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
 		}
-		if jsonExporter.PrettyOutput{
+		if jsonExporter.PrettyOutput {
 			var jsonFormatted bytes.Buffer
 			json.Indent(&jsonFormatted, jsonOut, "", "\t")
-			jsonExporter.Out.Write(jsonFormatted.Bytes())
+			jsonOut = jsonFormatted.Bytes()
 		}
-		if jsonExporter.ArrayOutput {
-			jsonExporter.Out.Write(jsonOut)
-		}
+		jsonExporter.Out.Write(jsonOut)
 	} else {
 		extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
 		if err != nil {
