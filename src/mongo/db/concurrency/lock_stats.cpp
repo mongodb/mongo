@@ -52,6 +52,11 @@ namespace mongo {
         stat.stats[mode].combinedWaitTimeMicros.addAndFetch(waitMicros);
     }
 
+    void LockStats::recordDeadlock(ResourceId resId, LockMode mode) {
+        PerModeAtomicLockStats& stat = get(resId);
+        stat.stats[mode].numDeadlocks.addAndFetch(1);
+    }
+
     void LockStats::append(const LockStats& other) {
         // Append all lock stats
         for (int i = 0; i < ResourceTypesCount; i++) {
@@ -125,6 +130,16 @@ namespace mongo {
             }
             timeAcquiring.done();
         }
+
+        // Deadlocks
+        {
+            BSONObjBuilder deadlockCount(builder->subobjStart("deadlockCount"));
+            for (int mode = 1; mode < LockModesCount; mode++) {
+                deadlockCount.append(legacyModeName(static_cast<LockMode>(mode)),
+                                     stat.stats[mode].numDeadlocks.load());
+            }
+            deadlockCount.done();
+        }
     }
 
     void LockStats::reset() {
@@ -157,12 +172,14 @@ namespace mongo {
         numAcquisitions.addAndFetch(other.numAcquisitions.load());
         numWaits.addAndFetch(other.numWaits.load());
         combinedWaitTimeMicros.addAndFetch(other.combinedWaitTimeMicros.load());
+        numDeadlocks.addAndFetch(other.numDeadlocks.load());
     }
 
     void LockStats::AtomicLockStats::reset() {
         numAcquisitions.store(0);
         numWaits.store(0);
         combinedWaitTimeMicros.store(0);
+        numDeadlocks.store(0);
     }
 
 } // namespace mongo

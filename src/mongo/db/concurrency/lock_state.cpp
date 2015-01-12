@@ -32,7 +32,6 @@
 
 #include "mongo/db/concurrency/lock_state.h"
 
-#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
@@ -64,6 +63,11 @@ namespace {
         void recordWaitTime(LockerId id, ResourceId resId, LockMode mode, uint64_t waitMicros) {
             LockStats& stats = _get(id);
             stats.recordWaitTime(resId, mode, waitMicros);
+        }
+
+        void recordDeadlock(ResourceId resId, LockMode mode) {
+            LockStats& stats = _get(resId);
+            stats.recordDeadlock(resId, mode);
         }
 
         void report(LockStats* outStats) const {
@@ -508,6 +512,7 @@ namespace {
         // Zero-out the contents
         lockerInfo->locks.clear();
         lockerInfo->waitingResource = ResourceId();
+        lockerInfo->stats.reset();
 
         if (!isLocked()) return;
 
@@ -526,6 +531,7 @@ namespace {
         std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end(), SortByGranularity());
 
         lockerInfo->waitingResource = getWaitingResource();
+        lockerInfo->stats.append(_stats);
     }
 
     template<bool IsForMMAPV1>
@@ -624,6 +630,7 @@ namespace {
 
         // Making this call here will record lock re-acquisitions and conversions as well.
         globalStats.recordAcquisition(_id, resId, mode);
+        _stats.recordAcquisition(resId, mode);
 
         // Give priority to the full modes for global and flush lock so we don't stall global
         // operations such as shutdown or flush.
@@ -649,6 +656,7 @@ namespace {
             // Start counting the wait time so that lockComplete can update that metric
             _requestStartTime = curTimeMicros64();
             globalStats.recordWait(_id, resId, mode);
+            _stats.recordWait(resId, mode);
         }
 
         return result;
@@ -682,6 +690,7 @@ namespace {
             // Account for the time spent waiting on the notification object
             const uint64_t elapsedTimeMicros = curTimeMicros64() - _requestStartTime;
             globalStats.recordWaitTime(_id, resId, mode, elapsedTimeMicros);
+            _stats.recordWaitTime(resId, mode, elapsedTimeMicros);
 
             if (result == LOCK_OK) break;
 
@@ -689,6 +698,9 @@ namespace {
                 DeadlockDetector wfg(globalLockManager, this);
                 if (wfg.check().hasCycle()) {
                     warning() << "Deadlock found: " << wfg.toString();
+
+                    globalStats.recordDeadlock(resId, mode);
+                    _stats.recordDeadlock(resId, mode);
 
                     result = LOCK_DEADLOCK;
                     break;

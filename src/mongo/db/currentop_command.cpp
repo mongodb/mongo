@@ -45,13 +45,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-
-    // Until we are able to resolve resource ids to db/collection names, report local db specially
-    const ResourceId resourceIdLocalDb = ResourceId(RESOURCE_DATABASE, std::string("local"));
-
-} // namespace
-
 
     void inProgCmd(OperationContext* txn, Message &message, DbResponse &dbresponse) {
         DbMessage d(message);
@@ -163,7 +156,7 @@ namespace {
         for (size_t i = 0; i < lockerInfo.locks.size(); i++) {
             const Locker::OneLock& lock = lockerInfo.locks[i];
 
-            if (resourceIdLocalDb == lock.resourceId) {
+            if (resourceIdLocalDB == lock.resourceId) {
                 locks.append("local", legacyModeName(lock.mode));
             }
             else {
@@ -177,9 +170,11 @@ namespace {
         infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
 
         // "lockStats" section
-        BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
-        // TODO: When we implement lock stats tracking
-        lockStats.done();
+        {
+            BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
+            lockerInfo.stats.report(&lockStats);
+            lockStats.done();
+        }
     }
 
 } // namespace mongo

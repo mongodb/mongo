@@ -52,6 +52,7 @@ namespace mongo {
             AtomicInt64 numAcquisitions;
             AtomicInt64 numWaits;
             AtomicInt64 combinedWaitTimeMicros;
+            AtomicInt64 numDeadlocks;
         };
 
         // Keep the per-mode lock stats next to each other in case we want to do fancy operations
@@ -66,6 +67,7 @@ namespace mongo {
         void recordAcquisition(ResourceId resId, LockMode mode);
         void recordWait(ResourceId resId, LockMode mode);
         void recordWaitTime(ResourceId resId, LockMode mode, uint64_t waitMicros);
+        void recordDeadlock(ResourceId resId, LockMode mode);
 
         PerModeAtomicLockStats& get(ResourceId resId);
 

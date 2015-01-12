@@ -33,6 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/lock_stats.h"
 
 namespace mongo {
     
@@ -205,6 +206,9 @@ namespace mongo {
 
             // If isValid(), then what lock this particular locker is sleeping on
             ResourceId waitingResource;
+
+            // Lock timing statistics
+            LockStats stats;
         };
 
         virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;

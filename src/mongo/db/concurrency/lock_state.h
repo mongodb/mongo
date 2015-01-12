@@ -207,6 +207,10 @@ namespace mongo {
         // about to wait and is sampled at grant time.
         uint64_t _requestStartTime;
 
+        // Per-locker locking statistics. Reported in the slow-query log message and through
+        // db.currentOp. Complementary to the per-instance locking statistics.
+        LockStats _stats;
+
         // Delays release of exclusive/intent-exclusive locked resources until the write unit of
         // work completes. Value of 0 means we are not inside a write unit of work.
         int _wuowNestingLevel;

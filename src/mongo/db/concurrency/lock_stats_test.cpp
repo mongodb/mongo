@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
-#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
