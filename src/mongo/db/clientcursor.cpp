@@ -216,8 +216,6 @@ namespace mongo {
 
     //
     // Pin methods
-    // TODO: Simplify when we kill Cursor.  In particular, once we've pinned a CC, it won't be
-    // deleted from underneath us, so we can save the pointer and ignore the ID.
     //
 
     ClientCursorPin::ClientCursorPin( CursorManager* cursorManager, long long cursorid )

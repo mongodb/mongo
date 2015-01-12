@@ -286,17 +286,49 @@ namespace mongo {
     };
 
     /**
-     * use this to assure we don't in the background time out cursor while it is under use.  if you
-     * are using noTimeout() already, there is no risk anyway.  Further, this mechanism guards
-     * against two getMore requests on the same cursor executing at the same time - which might be
-     * bad.  That should never happen, but if a client driver had a bug, it could (or perhaps some
-     * sort of attack situation).
-     * Must have a read lock on the collection already
-    */
-    class ClientCursorPin : boost::noncopyable {
+     * ClientCursorPin is an RAII class that manages the pinned state of a ClientCursor.
+     * ClientCursorPin objects pin the given cursor upon construction, and release the pin upon
+     * destruction.
+     *
+     * A pin extends the lifetime of a ClientCursor object until the pin's release.  Pinned
+     * ClientCursor objects cannot not be killed due to inactivity, and cannot be killed by user
+     * kill requests.  When a CursorManager is destroyed (e.g. by a collection drop), ownership of
+     * any still-pinned ClientCursor objects is transferred to their managing ClientCursorPin
+     * objects.
+     *
+     * Example usage:
+     * {
+     *     ClientCursorPin pin(cursorManager, cursorid);
+     *     ClientCursor* cursor = pin.c();
+     *     if (cursor) {
+     *         // Use cursor.
+     *     }
+     *     // Pin automatically released on block exit.
+     * }
+     *
+     * Clients that wish to access ClientCursor objects owned by collection cursor managers must
+     * hold the collection lock during pin acquisition and pin release.  This guards from a
+     * collection drop (which requires an exclusive lock on the collection) occurring concurrently
+     * with the pin request or unpin request.
+     *
+     * Clients that wish to access ClientCursor objects owned by the global cursor manager need not
+     * hold any locks; the global cursor manager can only be destroyed by a process exit.
+     */
+    class ClientCursorPin {
+        MONGO_DISALLOW_COPYING(ClientCursorPin);
     public:
+        /**
+         * Asks "cursorManager" to set a pin on the ClientCursor associated with "cursorid".  If no
+         * such cursor exists, does nothing.  If the cursor is already pinned, throws a
+         * UserException.
+         */
         ClientCursorPin( CursorManager* cursorManager, long long cursorid );
+
+        /**
+         * Calls release().
+         */
         ~ClientCursorPin();
+
         // This just releases the pin, does not delete the underlying
         // unless ownership has passed to us after kill
         void release();

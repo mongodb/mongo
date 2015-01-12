@@ -285,8 +285,8 @@ namespace mongo {
     }
 
     std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* txn,
-        int millisSinceLastCall) {;
-    return globalCursorIdCache->timeoutCursors(txn, millisSinceLastCall);
+                                                    int millisSinceLastCall) {
+        return globalCursorIdCache->timeoutCursors(txn, millisSinceLastCall);
     }
 
     int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n,
@@ -477,11 +477,11 @@ namespace mongo {
         cursor->unsetPinned();
     }
 
-    bool CursorManager::ownsCursorId( CursorId cursorId ) {
+    bool CursorManager::ownsCursorId( CursorId cursorId ) const {
         return _collectionCacheRuntimeId == idFromCursorId( cursorId );
     }
 
-    void CursorManager::getCursorIds( std::set<CursorId>* openCursors ) {
+    void CursorManager::getCursorIds( std::set<CursorId>* openCursors ) const {
         SimpleMutex::scoped_lock lk( _mutex );
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
@@ -490,7 +490,7 @@ namespace mongo {
         }
     }
 
-    size_t CursorManager::numCursors(){
+    size_t CursorManager::numCursors() const {
         SimpleMutex::scoped_lock lk( _mutex );
         return _cursors.size();
     }
