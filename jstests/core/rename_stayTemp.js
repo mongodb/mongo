@@ -7,7 +7,7 @@ db[dest].drop()
 function ns(coll){ return db[coll].getFullName() }
 
 function istemp( name ) {
-    var result = db.runCommand( "listCollections", { filter : { name : name }, cursor: {} } );
+    var result = db.runCommand( "listCollections", { filter : { name : name } } );
     assert( result.ok );
     var collections = new DBCommandCursor( db.getMongo(), result ).toArray();
     assert.eq( 1, collections.length );

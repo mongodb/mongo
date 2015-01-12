@@ -1436,7 +1436,7 @@ var authCommandsLib = {
         },
         {
             testname: "listCollections",
-            command: {listCollections: 1, cursor: {}},
+            command: {listCollections: 1},
             setup: function (db) {
                 db.x.insert({_id: 5});
                 db.y.insert({_id: 6});
@@ -1475,7 +1475,7 @@ var authCommandsLib = {
         },
         {
             testname: "listIndexes",
-            command: {listIndexes: "x", cursor: {}},
+            command: {listIndexes: "x"},
             setup: function (db) {
                 db.x.insert({_id: 5});
                 db.x.insert({_id: 6});

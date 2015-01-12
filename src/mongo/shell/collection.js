@@ -993,7 +993,7 @@ DBCollection.prototype._getIndexesSystemIndexes = function(){
 }
 
 DBCollection.prototype._getIndexesCommand = function(){
-    var res = this.runCommand( "listIndexes", { cursor: {} } );
+    var res = this.runCommand( "listIndexes" );
 
     if ( !res.ok ) {
 
@@ -1150,7 +1150,7 @@ DBCollection.prototype.convertToCapped = function( bytes ){
 
 DBCollection.prototype.exists = function(){
     var res = this._db.runCommand( "listCollections",
-                                  { filter : { name : this._shortName } , cursor : {} } );
+                                  { filter : { name : this._shortName } } );
     if ( res.ok ) {
         var cursor = new DBCommandCursor( this._mongo, res );
         if ( !cursor.hasNext() )

@@ -34,15 +34,13 @@ assert.writeOK(masterDB.keep4.insert({}, { writeConcern: { w: 2 }}));
 
 // make sure they exist on primary and secondary
 function countCollection( mydb, nameFilter ) {
-    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter },
-                                                       cursor : {} } );
+    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter } } );
     assert.commandWorked( result );
     return new DBCommandCursor( mydb.getMongo(), result ).itcount();
 }
 
 function countIndexesFor( mydb, nameFilter ) {
-    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter },
-                                                       cursor : {} } );
+    var result = mydb.runCommand( "listCollections", { filter : { name : nameFilter } } );
     assert.commandWorked( result );
     var arr = new DBCommandCursor( mydb.getMongo(), result ).toArray();
     var total = 0;

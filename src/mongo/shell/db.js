@@ -629,7 +629,7 @@ DB.prototype._getCollectionInfosSystemNamespaces = function(){
 
 
 DB.prototype._getCollectionInfosCommand = function() {
-    var res = this.runCommand( "listCollections", { cursor: {} } );
+    var res = this.runCommand( "listCollections" );
     if ( res.code == 59 ) {
         // command doesn't exist, old mongod
         return null;
