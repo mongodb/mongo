@@ -10,7 +10,7 @@ func (self *InputOptions) Name() string {
 }
 
 type OutputOptions struct {
-	Out                        string   `long:"out" short:"o" description:"Output directory or - for stdout" default:"dump"`
+	Out                        string   `long:"out" short:"o" description:"Output directory or '-' for stdout" default:"dump"`
 	Repair                     bool     `long:"repair" description:"Try to recover docs from damaged data files (not supported by all storage engines)"`
 	Oplog                      bool     `long:"oplog" description:"Use oplog for point-in-time snapshotting"`
 	DumpDBUsersAndRoles        bool     `long:"dumpDbUsersAndRoles" description:"Dump user and role definitions for the given database"`
