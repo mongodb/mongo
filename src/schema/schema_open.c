@@ -327,6 +327,13 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 			table->indices[i] = idx;
 			idx = NULL;
+
+			/*
+			 * If the slot is bigger than anything else we've seen,
+			 * bump the number of indices.
+			 */
+			if (i >= table->nindices)
+				table->nindices = i + 1;
 		}
 
 		/* If we were looking for a single index, we're done. */
