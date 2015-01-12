@@ -39,7 +39,7 @@
             }
         );
         var authInfo ={user:'admin', pwd:'password'}
-        if(sourceDBVersion == "2.6"){
+        if (sourceDBVersion == "2.6") {
           authInfo.mechanism = "MONGODB-CR"
         }
         assert.eq(1, adminDB.auth(authInfo));
@@ -53,13 +53,13 @@
         assert.eq(10, testDB.data.count());
 
         // dump all the data
-        args = ['dump' + (dumpVersion ? ('-'+dumpVersion) : ''),
+        args = ['mongodump' + (dumpVersion ? ('-'+dumpVersion) : ''),
                 '--out', dumpTarget, '--username', 'admin',
-                '--password', 'password']
-        if(sourceDBVersion == "2.6") {
-          args.push("--authenticationMechanism=MONGODB-CR")
+                '--password', 'password', '--port', toolTest.port];
+        if (sourceDBVersion == "2.6") {
+          args.push("--authenticationMechanism=MONGODB-CR");
         }
-        var ret = toolTest.runTool.apply(toolTest, args)
+        var ret = runMongoProgram.apply(this, args);
         assert.eq(0, ret);
 
         // restart the mongod, with a clean db path
@@ -88,16 +88,19 @@
         );
 
         var authInfoDest ={user:'admin28', pwd:'password'}
-        if(destDBVersion == "2.6"){
+        if (destDBVersion == "2.6") {
           authInfoDest.mechanism = "MONGODB-CR"
         }
         assert.eq(1, adminDB.auth(authInfoDest));
 
         // do a full restore
-        ret = toolTest.runTool('restore' + (restoreVersion ? ('-'+restoreVersion) : ''), 
+        args = ['mongorestore' + (restoreVersion ? ('-'+restoreVersion) : ''),
             '--username', 'admin28', '--password', 
-            'password', '--stopOnError', dumpTarget);
-        if(shouldSucceed){
+            'password', '--port', toolTest.port, '--stopOnError', dumpTarget];
+
+        ret = runMongoProgram.apply(this, args);
+
+        if (shouldSucceed) {
           assert.eq(0, ret);
           // make sure the data and users are all there
           assert.eq(10, testDB.data.count());
@@ -108,21 +111,17 @@
           assert.eq(2, users.length);
           assert(users[0].user === 'admin' || users[1].user === 'admin');
           assert(users[0].user === 'admin28' || users[1].user === 'admin28');
-        }else{
+        } else {
           assert.neq(0, ret);
         }
-
         // success
         toolTest.stop();
-
     };
 
     // 'undefined' triggers latest
     runTest('2.6', '2.6', undefined, '2.6', true);
     runTest('2.6', '2.6', undefined, undefined, true);
     runTest('2.6', undefined, undefined, undefined, true);
-    //runTest(undefined, '2.6', undefined, '2.6');
     runTest(undefined, undefined, undefined, '2.6', false);
     runTest(undefined, undefined, undefined, undefined, true);
-
 }());
