@@ -88,8 +88,9 @@
         assert.eq(10, testDB.data.count());
 
         // dump the data
-        var ret = toolTest.runTool('dump' + (dumpVersion ? ('-'+dumpVersion) : ''),
-                '--out', dumpTarget);
+        var args = ['mongodump' + (dumpVersion ? ('-'+dumpVersion) : ''),
+                '--out', dumpTarget, '--port', toolTest.port];
+        var ret = runMongoProgram.apply(this, args);
         assert.eq(0, ret);
 
         // restart the mongod, with a clean db path
@@ -105,8 +106,9 @@
         testDB = toolTest.db.getSiblingDB('test');
 
         // do a full restore
-        ret = toolTest.runTool('restore' + (restoreVersion ? ('-'+restoreVersion) : ''), 
-            dumpTarget);
+        args = ['mongorestore' + (restoreVersion ? ('-'+restoreVersion) : ''),
+            dumpTarget, '--port', toolTest.port];
+        ret = runMongoProgram.apply(this, args);
         assert.eq(0, ret);
 
         // make sure the data was restored
@@ -143,5 +145,4 @@
     runTest('2.6', undefined, undefined, undefined);
     runTest('2.6', undefined, undefined, '2.6');
     runTest(undefined, undefined, undefined, undefined);
-
 }());
