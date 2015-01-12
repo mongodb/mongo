@@ -128,10 +128,9 @@ static const struct __wt_huffman_table __wt_huffman_nytenglish[] = {
 static int __wt_huffman_read(WT_SESSION_IMPL *,
     WT_CONFIG_ITEM *, struct __wt_huffman_table **, u_int *, u_int *);
 
-#define	HUFF_CONFIG_VALID(str, len)					\
+#define	WT_HUFFMAN_CONFIG_VALID(str, len)				\
 	(WT_STRING_CASE_MATCH("english", (str), (len)) ||		\
-	    WT_PREFIX_MATCH((str), "utf8") ||				\
-	    WT_PREFIX_MATCH((str), "utf16"))
+	    WT_PREFIX_MATCH((str), "utf8") || WT_PREFIX_MATCH((str), "utf16"))
 
 /*
  * __btree_huffman_config --
@@ -142,13 +141,13 @@ __btree_huffman_config(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *key_conf, WT_CONFIG_ITEM *value_conf)
 {
 	if (key_conf->len != 0 &&
-	    !HUFF_CONFIG_VALID(key_conf->str, key_conf->len))
-		WT_RET_MSG(session, EINVAL,
-		    "illegal Huffman key setting");
+	    !WT_HUFFMAN_CONFIG_VALID(key_conf->str, key_conf->len))
+		WT_RET_MSG(
+		    session, EINVAL, "illegal Huffman key configuration");
 	if (value_conf->len != 0 &&
-	    !HUFF_CONFIG_VALID(value_conf->str, value_conf->len))
-		WT_RET_MSG(session, EINVAL,
-		    "illegal Huffman value setting");
+	    !WT_HUFFMAN_CONFIG_VALID(value_conf->str, value_conf->len))
+		WT_RET_MSG(
+		    session, EINVAL, "illegal Huffman value configuration");
 	return (0);
 
 }
