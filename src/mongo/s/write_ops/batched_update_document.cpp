@@ -88,21 +88,33 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, query, &_query, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isQuerySet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, updateExpr, &_updateExpr, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpdateExprSet = fieldState == FieldParser::FIELD_SET;
+        BSONObjIterator it(source);
+        while ( it.more() ) {
+            BSONElement elem = it.next();
+            StringData fieldName = elem.fieldNameStringData();
 
-        fieldState = FieldParser::extract(source, multi, &_multi, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMultiSet = fieldState == FieldParser::FIELD_SET;
-
-        fieldState = FieldParser::extract(source, upsert, &_upsert, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpsertSet = fieldState == FieldParser::FIELD_SET;
+            if ( fieldName == query.name() ) {
+                fieldState = FieldParser::extract(elem, query, &_query, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isQuerySet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == updateExpr.name() ) {
+                fieldState = FieldParser::extract(elem, updateExpr, &_updateExpr, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isUpdateExprSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == multi.name() ) {
+                fieldState = FieldParser::extract(elem, multi, &_multi, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isMultiSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == upsert.name() ) {
+                fieldState = FieldParser::extract(elem, upsert, &_upsert, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isUpsertSet = fieldState == FieldParser::FIELD_SET;
+            }
+        }
 
         return true;
     }

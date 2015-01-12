@@ -102,35 +102,47 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        std::string collNameTemp;
-        fieldState = FieldParser::extract(source, collName, &collNameTemp, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _collName = NamespaceString(collNameTemp);
-        _isCollNameSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, updates, &_updates, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpdatesSet = fieldState == FieldParser::FIELD_SET;
+        BSONObjIterator it( source );
+        while ( it.more() ) {
+            const BSONElement& elem = it.next();
+            StringData fieldName = elem.fieldNameStringData();
 
-        fieldState = FieldParser::extract(source, writeConcern, &_writeConcern, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            if ( fieldName == collName.name() ) {
+                std::string collNameTemp;
+                fieldState = FieldParser::extract(elem, collName, &collNameTemp, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _collName = NamespaceString(collNameTemp);
+                _isCollNameSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == updates.name() ) {
+                fieldState = FieldParser::extract(elem, updates, &_updates, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isUpdatesSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == writeConcern.name() ) {
+                fieldState = FieldParser::extract(elem, writeConcern, &_writeConcern, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == ordered.name() ) {
+                fieldState = FieldParser::extract(elem, ordered, &_ordered, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
+                _isOrderedSet = fieldState == FieldParser::FIELD_SET;
+            }
+            else if ( fieldName == metadata.name() ) {
+                BSONObj metadataObj;
+                fieldState = FieldParser::extract(elem, metadata, &metadataObj, errMsg);
+                if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isOrderedSet = fieldState == FieldParser::FIELD_SET;
-
-        BSONObj metadataObj;
-        fieldState = FieldParser::extract(source, metadata, &metadataObj, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-
-        if (!metadataObj.isEmpty()) {
-            _metadata.reset(new BatchedRequestMetadata());
-            if (!_metadata->parseBSON(metadataObj, errMsg)) {
-                return false;
+                if (!metadataObj.isEmpty()) {
+                    _metadata.reset(new BatchedRequestMetadata());
+                    if (!_metadata->parseBSON(metadataObj, errMsg)) {
+                        return false;
+                    }
+                }
             }
         }
-
         return true;
     }
 
