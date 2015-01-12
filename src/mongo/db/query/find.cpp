@@ -842,7 +842,9 @@ namespace mongo {
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(collection->cursorManager(), exec.get(),
+            ClientCursor* cc = new ClientCursor(collection->cursorManager(),
+                                                exec.release(),
+                                                nss.ns(),
                                                 pq.getOptions().toInt(),
                                                 pq.getFilter());
             ccId = cc->cursorid();
@@ -864,9 +866,6 @@ namespace mongo {
 
             QLOG() << "caching executor with cursorid " << ccId
                    << " after returning " << numResults << " results" << endl;
-
-            // ClientCursor takes ownership of executor.  Release to make sure it's not deleted.
-            exec.release();
 
             // TODO document
             if (pq.getOptions().oplogReplay && !slaveReadTill.isNull()) {

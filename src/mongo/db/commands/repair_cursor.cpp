@@ -102,7 +102,9 @@ namespace mongo {
 
             // ClientCursors' constructor inserts them into a global map that manages their
             // lifetimes. That is why the next line isn't leaky.
-            ClientCursor* cc = new ClientCursor(collection->cursorManager(), exec.release());
+            ClientCursor* cc = new ClientCursor(collection->cursorManager(),
+                                                exec.release(),
+                                                ns.ns());
 
             BSONObjBuilder cursorObj(result.subobjStart("cursor"));
             cursorObj.append("id", cc->cursorid());

@@ -62,10 +62,14 @@ namespace mongo {
     class ClientCursor : private boost::noncopyable {
     public:
         /**
-         * This ClientCursor constructor creates a cursorid that can be getMore'd
+         * This ClientCursor constructor creates a cursorid that can be used with getMore and
+         * killCursors.  "cursorManager" is the object that will manage the lifetime of this
+         * cursor, and "ns" is the namespace string that should be associated with this cursor (e.g.
+         * "test.foo", "test.$cmd.listCollections", etc).
          */
         ClientCursor(CursorManager* cursorManager,
                      PlanExecutor* exec,
+                     const std::string& ns,
                      int qopts = 0,
                      const BSONObj query = BSONObj(),
                      bool isAggCursor = false);

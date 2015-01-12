@@ -72,16 +72,17 @@ namespace mongo {
 
     ClientCursor::ClientCursor(CursorManager* cursorManager,
                                PlanExecutor* exec,
+                               const std::string& ns,
                                int qopts,
                                const BSONObj query,
                                bool isAggCursor)
-        : _cursorManager(cursorManager),
+        : _ns(ns),
+          _cursorManager(cursorManager),
           _countedYet(false),
           _isAggCursor(isAggCursor),
           _unownedRU(NULL) {
 
         _exec.reset(exec);
-        _ns = exec->ns();
         _query = query;
         _queryOptions = qopts;
         if (exec->collection()) {

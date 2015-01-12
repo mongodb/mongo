@@ -171,7 +171,8 @@ namespace mongo {
             if ( !exec->isEOF() ) {
                 exec->saveState();
                 ClientCursor* cursor = new ClientCursor(CursorManager::getGlobalCursorManager(),
-                                                        exec.release());
+                                                        exec.release(),
+                                                        cursorNamespace);
                 cursorId = cursor->cursorid();
 
                 cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
