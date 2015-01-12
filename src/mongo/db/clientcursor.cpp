@@ -86,14 +86,14 @@ namespace mongo {
         _query = query;
         _queryOptions = qopts;
         if (exec->collection()) {
-            invariant(cursorManager == exec->collection()->cursorManager());
+            invariant(cursorManager == exec->collection()->getCursorManager());
         }
         init();
     }
 
     ClientCursor::ClientCursor(const Collection* collection)
         : _ns(collection->ns().ns()),
-          _cursorManager(collection->cursorManager()),
+          _cursorManager(collection->getCursorManager()),
           _countedYet(false),
           _queryOptions(QueryOption_NoCursorTimeout),
           _isAggCursor(false),

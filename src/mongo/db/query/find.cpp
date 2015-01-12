@@ -207,7 +207,7 @@ namespace mongo {
             ctx.reset(new AutoGetCollectionForRead(txn, nss));
             Collection* collection = ctx->getCollection();
             uassert( 17356, "collection dropped between getMore calls", collection );
-            cursorManager = collection->cursorManager();
+            cursorManager = collection->getCursorManager();
         }
 
         QLOG() << "Running getMore, cursorid: " << cursorid << endl;
@@ -840,7 +840,7 @@ namespace mongo {
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(collection->cursorManager(),
+            ClientCursor* cc = new ClientCursor(collection->getCursorManager(),
                                                 exec.release(),
                                                 nss.ns(),
                                                 pq.getOptions().toInt(),

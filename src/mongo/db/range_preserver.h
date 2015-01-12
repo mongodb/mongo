@@ -55,7 +55,7 @@ namespace mongo {
                 ClientCursor* cc = new ClientCursor(collection);
 
                 // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-                _pin.reset(new ClientCursorPin(collection->cursorManager(), cc->cursorid()));
+                _pin.reset(new ClientCursorPin(collection->getCursorManager(), cc->cursorid()));
             }
         }
 

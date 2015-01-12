@@ -702,7 +702,7 @@ namespace {
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        _collection->cursorManager()->invalidateAll( false );
+        _collection->getCursorManager()->invalidateAll( false );
 
         // make sure nothing in progress
         massert( 17348,
@@ -802,7 +802,7 @@ namespace {
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        _collection->cursorManager()->invalidateAll( false );
+        _collection->getCursorManager()->invalidateAll( false );
 
         // wipe out stats
         _collection->infoCache()->reset(txn);
@@ -1046,7 +1046,7 @@ namespace {
 
         // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.
         const bool collectionGoingAway = false;
-        _collection->cursorManager()->invalidateAll( collectionGoingAway );
+        _collection->getCursorManager()->invalidateAll( collectionGoingAway );
 
         // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
         // invalid and should not be dereferenced.

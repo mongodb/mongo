@@ -102,7 +102,7 @@ namespace mongo {
 
             // ClientCursors' constructor inserts them into a global map that manages their
             // lifetimes. That is why the next line isn't leaky.
-            ClientCursor* cc = new ClientCursor(collection->cursorManager(),
+            ClientCursor* cc = new ClientCursor(collection->getCursorManager(),
                                                 exec.release(),
                                                 ns.ns());
 

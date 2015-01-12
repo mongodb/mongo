@@ -125,7 +125,7 @@ namespace mongo {
         const RecordStore* getRecordStore() const { return _recordStore; }
         RecordStore* getRecordStore() { return _recordStore; }
 
-        CursorManager* cursorManager() const { return &_cursorManager; }
+        CursorManager* getCursorManager() const { return &_cursorManager; }
 
         bool requiresIdIndex() const;
 

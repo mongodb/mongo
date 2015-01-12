@@ -234,7 +234,7 @@ namespace mongo {
                                                 ErrorCodes::CursorNotFound);
             return false;
         }
-        return collection->cursorManager()->eraseCursor(txn, id, checkAuth);
+        return collection->getCursorManager()->eraseCursor(txn, id, checkAuth);
     }
 
     std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
@@ -272,7 +272,7 @@ namespace mongo {
                 continue;
             }
 
-            totalTimedOut += collection->cursorManager()->timeoutCursors( millisSinceLastCall );
+            totalTimedOut += collection->getCursorManager()->timeoutCursors( millisSinceLastCall );
         }
 
         return totalTimedOut;

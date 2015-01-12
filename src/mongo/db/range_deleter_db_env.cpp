@@ -159,6 +159,6 @@ namespace mongo {
             return;
         }
 
-        collection->cursorManager()->getCursorIds( openCursors );
+        collection->getCursorManager()->getCursorIds( openCursors );
     }
 }

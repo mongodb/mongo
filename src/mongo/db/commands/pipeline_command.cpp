@@ -280,13 +280,14 @@ namespace mongo {
                 if (collection) {
                     // XXX
                     const bool isAggCursor = true; // enable special locking behavior
-                    ClientCursor* cursor = new ClientCursor(collection->cursorManager(),
+                    ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
                                                             execHolder.release(),
                                                             nss.ns(),
                                                             0,
                                                             BSONObj(),
                                                             isAggCursor);
-                    pin.reset(new ClientCursorPin(collection->cursorManager(), cursor->cursorid()));
+                    pin.reset(new ClientCursorPin(collection->getCursorManager(),
+                                                  cursor->cursorid()));
                     // Don't add any code between here and the start of the try block.
                 }
             }
