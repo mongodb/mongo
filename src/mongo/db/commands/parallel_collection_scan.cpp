@@ -141,16 +141,11 @@ namespace mongo {
                                                          execs.releaseAt(i),
                                                          ns.ns() );
 
-                    // we are mimicking the aggregation cursor output here
-                    // that is why there are ns, ok and empty firstBatch
                     BSONObjBuilder threadResult;
-                    {
-                        BSONObjBuilder cursor;
-                        cursor.appendArray( "firstBatch", BSONObj() );
-                        cursor.append( "ns", ns );
-                        cursor.append( "id", cc->cursorid() );
-                        threadResult.append( "cursor", cursor.obj() );
-                    }
+                    appendCursorResponseObject( cc->cursorid(),
+                                                ns.ns(),
+                                                BSONArray(),
+                                                &threadResult );
                     threadResult.appendBool( "ok", 1 );
 
                     bucketsBuilder.append( threadResult.obj() );
