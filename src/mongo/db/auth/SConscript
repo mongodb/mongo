@@ -34,6 +34,7 @@ env.Library('authcore', ['action_set.cpp',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
                      '$BUILD_DIR/mongo/md5',
+                     '$BUILD_DIR/mongo/namespace_string',
                      '$BUILD_DIR/mongo/signal_handlers_synchronous',
                      '$BUILD_DIR/mongo/stringutils'])
 

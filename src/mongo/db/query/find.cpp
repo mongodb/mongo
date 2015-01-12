@@ -256,12 +256,10 @@ namespace mongo {
         else {
             // Check for spoofing of the ns such that it does not match the one originally
             // there for the cursor.
-            if (globalCursorManager->ownsCursorId(cursorid)) {
-                // TODO Implement auth check for global cursors.  SERVER-16657.
-            }
-            else {
-                uassert(17011, "auth error", str::equals(ns, cc->ns().c_str()));
-            }
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Requested getMore on namespace " << ns << ", but cursor "
+                                  << cursorid << " belongs to namespace " << cc->ns(),
+                    ns == cc->ns());
             *isCursorAuthorized = true;
 
             // Restore the RecoveryUnit if we need to.

@@ -176,21 +176,46 @@ namespace {
     Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
                                                    const BSONObj& query) {
         if (MONGO_unlikely(ns.isCommand())) {
-            return Status(ErrorCodes::InternalError, mongoutils::str::stream() <<
+            return Status(ErrorCodes::InternalError, str::stream() <<
                           "Checking query auth on command namespace " << ns.ns());
         }
         if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for query on " << ns.ns());
+                          str::stream() << "not authorized for query on " << ns.ns());
         }
         return Status::OK();
     }
 
     Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
                                                      long long cursorID) {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
-            return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for getmore on " << ns.ns());
+        // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
+        // normal format.
+        if (ns.isListCollectionsGetMore()) {
+            // "ns" is of the form "<db>.$cmd.listCollections".  Check if we can perform the
+            // listCollections action on the database resource for "<db>".
+            if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                                  ActionType::listCollections)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized for listCollections getMore on "
+                                            << ns.ns());
+            }
+        }
+        else if (ns.isListIndexesGetMore()) {
+            // "ns" is of the form "<db>.$cmd.listIndexes.<coll>".  Check if we can perform the
+            // listIndexes action on the "<db>.<coll>" namespace.
+            NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+            if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized for listIndexes getMore on "
+                                            << ns.ns());
+            }
+        }
+        else {
+            // "ns" is a regular namespace string.  Check if we can perform the find action on it.
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized for getMore on " << ns.ns());
+            }
         }
         return Status::OK();
     }
@@ -206,14 +231,13 @@ namespace {
             NamespaceString indexNS(nsElement.str());
             if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized to create index on " <<
+                              str::stream() << "not authorized to create index on " <<
                               indexNS.ns());
             }
         } else {
             if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for insert on " <<
-                              ns.ns());
+                              str::stream() << "not authorized for insert on " << ns.ns());
             }
         }
 
@@ -227,8 +251,7 @@ namespace {
         if (!upsert) {
             if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for update on " <<
-                              ns.ns());
+                              str::stream() << "not authorized for update on " << ns.ns());
             }
         }
         else {
@@ -237,8 +260,7 @@ namespace {
             required.addAction(ActionType::insert);
             if (!isAuthorizedForActionsOnNamespace(ns, required)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for upsert on " <<
-                              ns.ns());
+                              str::stream() << "not authorized for upsert on " << ns.ns());
             }
         }
         return Status::OK();
@@ -248,7 +270,35 @@ namespace {
                                                     const BSONObj& query) {
         if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
             return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized to remove from " << ns.ns());
+                          str::stream() << "not authorized to remove from " << ns.ns());
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
+                                                         long long cursorID) {
+        // See implementation comments in checkAuthForGetMore().  This method looks very similar.
+        if (ns.isListCollectionsGetMore()) {
+            if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                                  ActionType::killCursors)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized to kill listCollections cursor on "
+                                            << ns.ns());
+            }
+        }
+        else if (ns.isListIndexesGetMore()) {
+            NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
+            if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized to kill listIndexes cursor on "
+                                            << ns.ns());
+            }
+        }
+        else {
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "not authorized to kill cursor on " << ns.ns());
+            }
         }
         return Status::OK();
     }

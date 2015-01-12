@@ -374,14 +374,14 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                            NamespaceString(i->second->getNS()), ActionType::killCursors);
+                    Status authorizationStatus = authSession->checkAuthForKillCursors(
+                            NamespaceString(i->second->getNS()), id);
                     audit::logKillCursorsAuthzCheck(
                             client,
                             NamespaceString(i->second->getNS()),
                             id,
-                            isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-                    if (isAuthorized) {
+                            authorizationStatus.isOK() ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                    if (authorizationStatus.isOK()) {
                         _cursorsMaxTimeMS.erase( i->second->getId() );
                         _cursors.erase( i );
                     }
@@ -395,14 +395,14 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
-                        NamespaceString(refsNSIt->second), ActionType::killCursors);
+                Status authorizationStatus = authSession->checkAuthForKillCursors(
+                        NamespaceString(refsNSIt->second), id);
                 audit::logKillCursorsAuthzCheck(
                         client,
                         NamespaceString(refsNSIt->second),
                         id,
-                        isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
-                if (!isAuthorized) {
+                        authorizationStatus.isOK() ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                if (!authorizationStatus.isOK()) {
                     continue;
                 }
                 server = refsIt->second;

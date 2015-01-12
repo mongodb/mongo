@@ -48,4 +48,22 @@ namespace mongo {
         return false;
     }
 
+    bool NamespaceString::isListCollectionsGetMore() const {
+        return coll() == StringData("$cmd.listCollections", StringData::LiteralTag());
+    }
+
+    namespace {
+        const StringData listIndexesGetMoreNSPrefix("$cmd.listIndexes.", StringData::LiteralTag());
+    }  // namespace
+
+    bool NamespaceString::isListIndexesGetMore() const {
+        return coll().size() > listIndexesGetMoreNSPrefix.size() &&
+               coll().startsWith(listIndexesGetMoreNSPrefix);
+    }
+
+    NamespaceString NamespaceString::getTargetNSForListIndexesGetMore() const {
+        dassert(isListIndexesGetMore());
+        return NamespaceString(db(), coll().substr(listIndexesGetMoreNSPrefix.size()));
+    }
+
 }

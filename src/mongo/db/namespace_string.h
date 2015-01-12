@@ -97,6 +97,10 @@ namespace mongo {
 
         size_t size() const { return _ns.size(); }
 
+        //
+        // The following methods assume isValid() is true for this NamespaceString.
+        //
+
         bool isSystem() const { return coll().startsWith( "system." ); }
         bool isSystemDotIndexes() const { return coll() == "system.indexes"; }
         bool isConfigDB() const { return db() == "config"; }
@@ -105,6 +109,14 @@ namespace mongo {
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
         bool isSpecial() const { return special( _ns ); }
         bool isNormal() const { return normal( _ns ); }
+        bool isListCollectionsGetMore() const;
+        bool isListIndexesGetMore() const;
+
+        /**
+         * Given a NamespaceString for which isListIndexesGetMore() returns true, returns the
+         * NamespaceString for the collection that the "listIndexesGetMore" targets.
+         */
+        NamespaceString getTargetNSForListIndexesGetMore() const;
 
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.

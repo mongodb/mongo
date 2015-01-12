@@ -133,6 +133,8 @@ namespace mongo {
             }
 
             std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;
+            dassert(NamespaceString(cursorNamespace).isValid());
+            dassert(NamespaceString(cursorNamespace).isListCollectionsGetMore());
 
             PlanExecutor* rawExec;
             Status makeStatus = PlanExecutor::make(txn,

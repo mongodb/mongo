@@ -179,28 +179,40 @@ namespace mongo {
     }
 
     bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
-        string ns;
-        {
-            SimpleMutex::scoped_lock lk( _mutex );
-            unsigned nsid = idFromCursorId( id );
-            Map::const_iterator it = _idToNS.find( nsid );
-            if ( it == _idToNS.end() ) {
+        // Figure out what the namespace of this cursor is.
+        std::string ns;
+        if (globalCursorManager->ownsCursorId(id)) {
+            ClientCursorPin pin(globalCursorManager.get(), id);
+            if (!pin.c()) {
+                // No such cursor.  TODO: Consider writing to audit log here (even though we don't
+                // have a namespace).
+                return false;
+            }
+            ns = pin.c()->ns();
+        }
+        else {
+            SimpleMutex::scoped_lock lk(_mutex);
+            unsigned nsid = idFromCursorId(id);
+            Map::const_iterator it = _idToNS.find(nsid);
+            if (it == _idToNS.end()) {
+                // No namespace corresponding to this cursor id prefix.  TODO: Consider writing to
+                // audit log here (even though we don't have a namespace).
                 return false;
             }
             ns = it->second;
         }
+        const NamespaceString nss(ns);
+        invariant(nss.isValid());
 
-        const NamespaceString nss( ns );
-
-        if ( checkAuth ) {
+        // Check if we are authorized to erase this cursor.
+        if (checkAuth) {
             AuthorizationSession* as = txn->getClient()->getAuthorizationSession();
-            bool isAuthorized = as->isAuthorizedForActionsOnNamespace(
-                                                nss, ActionType::killCursors);
-            if ( !isAuthorized ) {
-                audit::logKillCursorsAuthzCheck( txn->getClient(),
-                                                 nss,
-                                                 id,
-                                                 ErrorCodes::Unauthorized );
+            Status authorizationStatus = as->checkAuthForKillCursors(nss, id);
+            if (!authorizationStatus.isOK()) {
+                audit::logKillCursorsAuthzCheck(txn->getClient(),
+                                                nss,
+                                                id,
+                                                ErrorCodes::Unauthorized);
                 return false;
             }
         }
@@ -213,17 +225,13 @@ namespace mongo {
         // If not, then the cursor must be owned by a collection.  Erase the cursor under the
         // collection lock (to prevent the collection from going away during the erase).
         AutoGetCollectionForRead ctx(txn, nss);
-        if (!ctx.getDb()) {
-            return false;
-        }
-
         Collection* collection = ctx.getCollection();
-        if ( !collection ) {
-            if ( checkAuth )
-                audit::logKillCursorsAuthzCheck( txn->getClient(),
-                                                 nss,
-                                                 id,
-                                                 ErrorCodes::CursorNotFound );
+        if (!collection) {
+            if (checkAuth)
+                audit::logKillCursorsAuthzCheck(txn->getClient(),
+                                                nss,
+                                                id,
+                                                ErrorCodes::CursorNotFound);
             return false;
         }
         return collection->cursorManager()->eraseCursor(txn, id, checkAuth);
