@@ -124,7 +124,7 @@ namespace mongo {
                     return false;
                 }
                 
-                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
+                log() << "db is now locked, no writes allowed. db.fsyncUnlock() to unlock" << endl;
                 log() << "    For more info see " << FSyncCommand::url() << endl;
                 result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
                 result.append("seeAlso", FSyncCommand::url());
