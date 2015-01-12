@@ -852,9 +852,8 @@ namespace mongo {
         result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 2.8. It "
                                              "remains hard coded to 1.0 for compatibility only." );
         result->append( "userFlags", _details->userFlags() );
-
+        result->appendBool( "capped", isCapped() );
         if ( isCapped() ) {
-            result->appendBool( "capped", true );
             result->appendNumber( "max", _details->maxCappedDocs() );
             result->appendNumber( "maxSize", static_cast<long long>(storageSize(txn, NULL, 0) /
                                       scale) );
