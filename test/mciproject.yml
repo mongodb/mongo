@@ -1,3 +1,7 @@
+#
+# This file defines the tasks and platforms for WiredTiger in the
+# MongoDB continuous integration system (see https://mci.mongodb.com).
+#
 
 functions:
   "fetch source" :
