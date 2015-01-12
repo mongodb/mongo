@@ -717,10 +717,11 @@ __split_multi_inmem(
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = orig->modify->first_dirty_txn;
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
@@ -1137,10 +1138,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
+	right->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
