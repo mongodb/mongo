@@ -194,9 +194,27 @@ namespace mongo {
 
         exhaust = false;
 
-        // This is a read lock.
         const NamespaceString nss(ns);
+
+        // Depending on the type of cursor being operated on, we hold locks for the whole getMore,
+        // or none of the getMore, or part of the getMore.  The three cases in detail:
+        //
+        // 1) Normal cursor: we lock with "ctx" and hold it for the whole getMore.
+        // 2) Cursor owned by global cursor manager: we don't lock anything.  These cursors don't
+        //    own any collection state.
+        // 3) Agg cursor: we lock with "ctx", then release, then relock with "unpinDBLock" and
+        //    "unpinCollLock".  This is because agg cursors handle locking internally (hence the
+        //    release), but the pin and unpin of the cursor must occur under the collection lock.
+        //    We don't use our AutoGetCollectionForRead "ctx" to relock, because
+        //    AutoGetCollectionForRead checks the sharding version (and we want the relock for the
+        //    unpin to succeed even if the sharding version has changed).
+        //
+        // Note that we declare our locks before our ClientCursorPin, in order to ensure that the
+        // pin's destructor is called before the lock destructors (so that the unpin occurs under
+        // the lock).
         boost::scoped_ptr<AutoGetCollectionForRead> ctx;
+        boost::scoped_ptr<Lock::DBLock> unpinDBLock;
+        boost::scoped_ptr<Lock::CollectionLock> unpinCollLock;
 
         CursorManager* cursorManager;
         CursorManager* globalCursorManager = CursorManager::getGlobalCursorManager();
@@ -378,6 +396,23 @@ namespace mongo {
                 saveClientCursor = true;
             }
 
+            // If we are operating on an aggregation cursor, then we dropped our collection lock
+            // earlier and need to reacquire it in order to clean up our ClientCursorPin.
+            //
+            // TODO: We need to ensure that this relock happens if we release the pin above in
+            // response to PlanExecutor::getNext() throwing an exception.
+            if (cc->isAggCursor()) {
+                invariant(NULL == ctx.get());
+                unpinDBLock.reset(new Lock::DBLock(txn->lockState(), nss.db(), MODE_IS));
+                unpinCollLock.reset(new Lock::CollectionLock(txn->lockState(), nss.ns(), MODE_IS));
+            }
+
+            // Our two possible ClientCursorPin cleanup paths are:
+            // 1) If the cursor is not going to be saved, we call deleteUnderlying() on the pin.
+            // 2) If the cursor is going to be saved, we simply let the pin go out of scope.  In
+            //    this case, the pin's destructor will be invoked, which will call release() on the
+            //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
+            //    will happen under the lock.
             if (!saveClientCursor) {
                 ruSwapper.reset();
                 ccPin.deleteUnderlying();

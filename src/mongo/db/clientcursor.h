@@ -329,12 +329,21 @@ namespace mongo {
          */
         ~ClientCursorPin();
 
-        // This just releases the pin, does not delete the underlying
-        // unless ownership has passed to us after kill
+        /**
+         * Releases the pin.  It does not delete the underlying cursor unless ownership has passed
+         * to us after kill.  Turns into a no-op if release() or deleteUnderlying() have already
+         * been called on this pin.
+         */
         void release();
-        // Call this to delete the underlying ClientCursor.
+
+        /**
+         * Deletes the underlying cursor.  Cannot be called if release() or deleteUnderlying() have
+         * already been called on this pin.
+         */
         void deleteUnderlying();
+
         ClientCursor *c() const;
+
     private:
         ClientCursor* _cursor;
     };

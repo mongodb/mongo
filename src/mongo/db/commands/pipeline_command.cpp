@@ -58,7 +58,11 @@ namespace mongo {
     using boost::scoped_ptr;
     using boost::shared_ptr;
 
-    static void handleCursorCommand(OperationContext* txn,
+    /**
+     * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore
+     * requests).  Otherwise, returns false.
+     */
+    static bool handleCursorCommand(OperationContext* txn,
                                     const string& ns,
                                     ClientCursorPin* pin,
                                     PlanExecutor* exec,
@@ -84,7 +88,6 @@ namespace mongo {
             // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
             // do it when batchSize is 0 since that indicates a desire for a fast return.
             if (exec->getNext(&next, NULL) != PlanExecutor::ADVANCED) {
-                if (pin) pin->deleteUnderlying();
                 // make it an obvious error to use cursor or executor after this point
                 cursor = NULL;
                 exec = NULL;
@@ -135,6 +138,8 @@ namespace mongo {
 
         const long long cursorId = cursor ? cursor->cursorid() : 0LL;
         Command::appendCursorResponseObject(cursorId, ns, resultsArray.arr(), &result);
+
+        return static_cast<bool>(cursor);
     }
 
 
@@ -263,6 +268,13 @@ namespace mongo {
                                                   cursor->cursorid()));
                     // Don't add any code between here and the start of the try block.
                 }
+
+                // At this point, it is safe to release the collection lock.
+                // - In the case where we have a collection: we will need to reacquire the
+                //   collection lock later when cleaning up our ClientCursorPin.
+                // - In the case where we don't have a collection: our PlanExecutor won't be
+                //   registered, so it will be safe to clean it up outside the lock.
+                invariant(NULL == execHolder.get() || NULL == execHolder->collection());
             }
 
             try {
@@ -276,18 +288,41 @@ namespace mongo {
                     result << "stages" << Value(pPipeline->writeExplainOps());
                 }
                 else if (isCursorCommand) {
-                    handleCursorCommand(txn, nss.ns(), pin.get(), exec, cmdObj, result);
-                    keepCursor = true;
+                    keepCursor = handleCursorCommand(txn,
+                                                     nss.ns(),
+                                                     pin.get(),
+                                                     exec,
+                                                     cmdObj,
+                                                     result);
                 }
                 else {
                     pPipeline->run(result);
                 }
 
-                if (!keepCursor && pin) pin->deleteUnderlying();
+                // Clean up our ClientCursorPin, if needed.  We must reacquire the collection lock
+                // in order to do so.
+                if (pin) {
+                    // We acquire locks here with DBLock and CollectionLock instead of using
+                    // AutoGetCollectionForRead.  AutoGetCollectionForRead will throw if the
+                    // sharding version is out of date, and we don't care if the sharding version
+                    // has changed.
+                    Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IS);
+                    Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
+                    if (keepCursor) {
+                        pin->release();
+                    }
+                    else {
+                        pin->deleteUnderlying();
+                    }
+                }
             }
             catch (...) {
-                // Clean up cursor on way out of scope.
-                if (pin) pin->deleteUnderlying();
+                // On our way out of scope, we clean up our ClientCursorPin if needed.
+                if (pin) {
+                    Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IS);
+                    Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IS);
+                    pin->deleteUnderlying();
+                }
                 throw;
             }
             // Any code that needs the cursor pinned must be inside the try block, above.
