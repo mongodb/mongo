@@ -881,7 +881,7 @@ namespace mongo {
             // If a stage fails, it may create a status WSM to indicate why it failed, in which case
             // 'id' is valid.  If ID is invalid, we create our own error message.
             if (WorkingSet::INVALID_ID == id) {
-                const std::string errmsg = "delete stage failed to read in results from child";
+                const std::string errmsg = "update stage failed to read in results from child";
                 *out = WorkingSetCommon::allocateStatusMember(_ws, Status(ErrorCodes::InternalError,
                                                                           errmsg));
                 return PlanStage::FAILURE;
