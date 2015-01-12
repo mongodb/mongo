@@ -212,16 +212,19 @@ class LatestMultiVersionDownloader(MultiVersionDownloaderBase) :
         self.os = os
 
     def gen_url(self, version):
+        ext = "tgz"
+        if "win" in self.platform:
+            ext = "zip"
         if self.use_ssl:
             if version == "2.4":
                 enterprise_string = "subscription"
             else:
                 enterprise_string = "enterprise"
             full_version = self.os + "-v" + version + "-latest"
-            url = "http://downloads.10gen.com/%s/mongodb-%s-%s-%s-%s.tgz" % ( self.platform, self.platform, self.arch, enterprise_string, full_version )
+            url = "http://downloads.10gen.com/%s/mongodb-%s-%s-%s-%s.%s" % ( self.platform, self.platform, self.arch, enterprise_string, full_version, ext )
         else:
             full_version = "v" + version + "-latest"
-            url = "http://downloads.mongodb.org/%s/mongodb-%s-%s-%s.tgz" % ( self.platform, self.platform, self.arch, full_version )
+            url = "http://downloads.mongodb.org/%s/mongodb-%s-%s-%s.%s" % ( self.platform, self.platform, self.arch, full_version, ext )
         return url, full_version
 
 CL_HELP_MESSAGE = \
