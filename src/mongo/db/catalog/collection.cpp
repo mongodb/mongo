@@ -625,9 +625,9 @@ namespace mongo {
         if ( touchData ) {
             BSONObjBuilder b;
             Status status = _recordStore->touch( txn, &b );
-            output->append( "data", b.obj() );
             if ( !status.isOK() )
                 return status;
+            output->append( "data", b.obj() );
         }
 
         if ( touchIndexes ) {

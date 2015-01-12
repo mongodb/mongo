@@ -769,14 +769,6 @@ namespace {
 
     }
 
-    Status WiredTigerRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {
-        if (output) {
-            output->append("numRanges", 1);
-            output->append("millis", 0);
-        }
-        return Status::OK();
-    }
-
     Status WiredTigerRecordStore::setCustomOption( OperationContext* txn,
                                                    const BSONElement& option,
                                                    BSONObjBuilder* info ) {
