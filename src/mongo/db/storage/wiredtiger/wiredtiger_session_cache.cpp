@@ -235,10 +235,10 @@ namespace mongo {
         // Do all cleanup outside of the cache partition spinlock.
         if (!returnedToCache) {
             delete session;
+        }
 
-            if (_engine && _engine->haveDropsQueued()) {
-                _engine->dropAllQueued();
-            }
+        if (_engine && _engine->haveDropsQueued()) {
+            _engine->dropAllQueued();
         }
     }
 }
