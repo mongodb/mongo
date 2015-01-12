@@ -68,7 +68,7 @@ assert(statOutputPortCheck([ rs.liveNodes.slaves[0].port ]), "discovered host is
 
 rs.stop(rs.liveNodes.slaves[0]);
 
-sleep(2000);
+sleep(15000);
 
 clearRawMongoProgramOutput();
 
@@ -94,7 +94,7 @@ rs.stop(rs.liveNodes.slaves[1]);
 
 clearRawMongoProgramOutput();
 
-sleep(9000)
+sleep(15000)
 
 
 assert(!statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "after specified host is stopped, specified host is not seen");
