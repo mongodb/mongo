@@ -18,29 +18,33 @@ if (typeof getToolTest === 'undefined') {
     '--sslPEMKeyFile', 'jstests/libs/client.pem'
   ];
 
-  if (toolTest.usesSSL) {
+  if (toolTest.useSSL) {
     var port = 26999;
+
+    // this mongod is actually started with SSL flags because of `useSSL`
     var mongod = startMongod('--auth', '--port', port,
       '--dbpath', MongoRunner.dataPath + 'oplogAsymmetricSSLTest2');
 
-    /** Overwrite so toolTest.runTool doesn't append --host */
-    toolTest.runTool = function() {
-      arguments[0] = 'mongo' + arguments[0];
-      return runMongoProgram.apply(null , arguments);
-    };
+    var args = ['mongooplog'].concat(commonToolArgs).concat(
+      '--from', '127.0.0.1:' + toolTest.port, '--host', '127.0.0.1', '--port', port);
 
-    var args = ['oplog'].concat(commonToolArgs).concat('--host', '127.0.0.1',
-      '--port', port, '--from', '127.0.0.1:' + toolTest.port);
-    assert(toolTest.runTool.apply(toolTest, args) !== 0,
-      'mongooplog should fail when --host does not support SSL but --ssl ' +
-      'is specified');
+    // mongooplog run without SSL against a destination server started with SSL should fail
+    jsTest.log("Running mongooplog without SSL against mongod with SSL");
+    assert.neq(runProgram.apply(this, args), 0,
+      'mongooplog should fail when run without SSL flags against destination host (--host) ' +
+      'started with SSL');
   } else {
-    var args = ['oplog', '--from', '127.0.0.1:' + toolTest.port].
-      concat(commonToolArgs).concat(sslOpts);
-    assert(toolTest.runTool.apply(toolTest, args) !== 0,
-      'mongooplog should fail when --from doesnt support SSL but --ssl is ' +
-      'specified');
+    // toolTest.runTool will add the underlying --host argument for the mongod started without SSL
+    var args = ['oplog'].concat(commonToolArgs).concat(sslOpts).concat(
+      '--from', '127.0.0.1:' + toolTest.port);
+
+    // mongooplog run with SSL against a destination server not started with SSL should fail
+    jsTest.log("Running mongooplog with SSL against mongod without SSL");
+    assert.neq(toolTest.runTool.apply(toolTest, args), 0,
+      'mongooplog should fail when run with SSL flags against destination host (--host) ' +
+      'not started with SSL');
   }
 
   toolTest.stop();
 })();
+
