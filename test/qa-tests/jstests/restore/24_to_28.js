@@ -4,6 +4,11 @@
     if (TestData && TestData.storageEngine === 'wiredTiger')
         return
 
+    // Skip this test if running with SSL turned on, because the common tool args are not
+    // compatible with 2.4 servers.
+    if (TestData && TestData.useSSL) {
+        return
+    }
     // Tests using mongorestore to restore a dump from a 2.4 mongod to a 2.8 mongod.
 
     jsTest.log('Testing running mongorestore restoring data from a 2.4 mongod to'+
