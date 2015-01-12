@@ -136,6 +136,14 @@ function CollectionDataValidator() {
         delete collectionStats["indexDetails"];
         delete newCollectionStats["indexDetails"];
 
+        // Delete capped:false added in 2.8.0-rc5
+        if (newCollectionStats["capped"] == false) {
+            delete newCollectionStats["capped"];
+        }
+        if (collectionStats["capped"] == false) {
+            delete collectionStats["capped"];
+        }
+
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 
         // Get the indexes for this collection
