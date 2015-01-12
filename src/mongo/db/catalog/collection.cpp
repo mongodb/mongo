@@ -317,10 +317,6 @@ namespace mongo {
                                          "in Collection::updateDocument _id mismatch",
                                          13596 );
 
-        /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
-           below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
-        */
-
         // At the end of this step, we will have a map of UpdateTickets, one per index, which
         // represent the index updates needed to be done, based on the changes between objOld and
         // objNew.
