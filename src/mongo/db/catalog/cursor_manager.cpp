@@ -205,10 +205,13 @@ namespace mongo {
             }
         }
 
-        if (ns == globalCursorManager->ns()) {
+        // If this cursor is owned by the global cursor manager, ask it to erase the cursor for us.
+        if (globalCursorManager->ownsCursorId(id)) {
             return globalCursorManager->eraseCursor(txn, id, checkAuth);
         }
 
+        // If not, then the cursor must be owned by a collection.  Erase the cursor under the
+        // collection lock (to prevent the collection from going away during the erase).
         AutoGetCollectionForRead ctx(txn, nss);
         if (!ctx.getDb()) {
             return false;
@@ -227,21 +230,29 @@ namespace mongo {
     }
 
     std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
+        size_t totalTimedOut = 0;
+
+        // Time out the cursors from the global cursor manager.
+        totalTimedOut += globalCursorManager->timeoutCursors( millisSinceLastCall );
+
+        // Compute the set of collection names that we have to time out cursors for.
         vector<string> todo;
         {
             SimpleMutex::scoped_lock lk( _mutex );
-            for ( Map::const_iterator i = _idToNS.begin(); i != _idToNS.end(); ++i )
+            for ( Map::const_iterator i = _idToNS.begin(); i != _idToNS.end(); ++i ) {
+                if (globalCursorManager->ownsCursorId(cursorIdFromParts(i->first, 0))) {
+                    // Skip the global cursor manager, since we handle it above (and it's not
+                    // associated with a collection).
+                    continue;
+                }
                 todo.push_back( i->second );
+            }
         }
 
-        size_t totalTimedOut = 0;
-
+        // For each collection, time out its cursors under the collection lock (to prevent the
+        // collection from going away during the erase).
         for ( unsigned i = 0; i < todo.size(); i++ ) {
             const std::string& ns = todo[i];
-            if ( ns == globalCursorManager->ns() ) {
-                totalTimedOut += globalCursorManager->timeoutCursors( millisSinceLastCall );
-                continue;
-            }
 
             AutoGetCollectionForRead ctx(txn, ns);
             if (!ctx.getDb()) {

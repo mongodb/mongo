@@ -90,9 +90,9 @@ namespace mongo {
         init();
     }
 
-    ClientCursor::ClientCursor(CursorManager* cursorManager)
-        : _ns(cursorManager->ns()),
-          _cursorManager(cursorManager),
+    ClientCursor::ClientCursor(const Collection* collection)
+        : _ns(collection->ns().ns()),
+          _cursorManager(collection->cursorManager()),
           _countedYet(false),
           _queryOptions(QueryOption_NoCursorTimeout),
           _isAggCursor(false),

@@ -71,9 +71,9 @@ namespace mongo {
                      bool isAggCursor = false);
 
         /**
-         * This ClientCursor is used to track sharding state.
+         * This ClientCursor is used to track sharding state for the given collection.
          */
-        ClientCursor(CursorManager* cursorManager);
+        explicit ClientCursor(const Collection* collection);
 
         //
         // Basic accessors

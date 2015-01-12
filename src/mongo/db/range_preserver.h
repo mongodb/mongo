@@ -52,7 +52,7 @@ namespace mongo {
             // Empty collections don't have any data we need to preserve
             if (collection) {
                 // Not a memory leak.  Cached in a static structure by CC's ctor.
-                ClientCursor* cc = new ClientCursor(collection->cursorManager());
+                ClientCursor* cc = new ClientCursor(collection);
 
                 // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
                 _pin.reset(new ClientCursorPin(collection->cursorManager(), cc->cursorid()));
