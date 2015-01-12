@@ -233,7 +233,7 @@ namespace {
         }
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (ns && ns[0] && !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
+        if (ns[0] && !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
             severe() << "replSet error : logOp() but can't accept write to collection " << ns;
             fassertFailed(17405);
         }
