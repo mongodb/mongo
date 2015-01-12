@@ -4,10 +4,22 @@
         load('jstests/configs/plain_28.config.js');
     }
 
+    // Using the collection options command is the way to get full
+    // collection options as of 2.8, so we use this helper to
+    // pull the options from a listCollections cursor.
+    var extractCollectionOptions = function(db, name) {
+        var res = db.runCommand("listCollections");
+        for (var i = 0; i < res.cursor.firstBatch.length; i++) {
+            if (res.cursor.firstBatch[i].name == name) {
+              return res.cursor.firstBatch[i].options;
+            }
+        }
+        return {};
+    }
+
     // Tests that running mongorestore with --noOptionsRestore does 
     // not restore collection options, and that running it without
     // --noOptionsRestore does restore collection options.
-    
     jsTest.log('Testing restoration with --noOptionsRestore');
 
     var toolTest = getToolTest('no_options_restore');
@@ -46,6 +58,11 @@
     // add options to the appropriate collection
     cmdRet = testDB.runCommand({ 'collMod': 'withOptions', usePowerOf2Sizes: true });
     assert.eq(1, cmdRet.ok);
+
+    // store the default options, because they change based on storage engine
+    var baseCappedOptionsFromDB = extractCollectionOptions(testDB, 'capped');
+    var baseWithOptionsFromDB = extractCollectionOptions(testDB, 'withOptions');
+    var baseWithoutOptionsFromDB = extractCollectionOptions(testDB, 'withoutOptions');
     
     // dump the data
     var ret = toolTest.runTool.apply(
@@ -72,12 +89,12 @@
     });
 
     // make sure the options were restored correctly
-    var cappedOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.capped' });
-    assert.eq(cappedOptions, cappedOptionsFromDB.options);
-    var withOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withOptions' });
-    assert.eq({ flags: 3 }, withOptionsFromDB.options);
-    var withoutOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withoutOptions' });
-    assert.eq({ flags: 1 }, withoutOptionsFromDB.options);
+    var cappedOptionsFromDB = extractCollectionOptions(testDB, 'capped');
+    assert.eq(baseCappedOptionsFromDB, cappedOptionsFromDB);
+    var withOptionsFromDB = extractCollectionOptions(testDB, 'withOptions');
+    assert.eq(baseWithOptionsFromDB, withOptionsFromDB);
+    var withoutOptionsFromDB = extractCollectionOptions(testDB, 'withoutOptions');
+    assert.eq(baseWithoutOptionsFromDB, withoutOptionsFromDB);
 
     // drop the data
     testDB.dropDatabase();
@@ -96,12 +113,12 @@
     });
 
     // make sure the options were not restored
-    cappedOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.capped' });
-    assert.eq({ flags : 1 }, cappedOptionsFromDB.options);
-    withOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withOptions' });
-    assert.eq({ flags : 1 }, withOptionsFromDB.options);
-    withoutOptionsFromDB = testDB['system.namespaces'].findOne({ name: 'test.withoutOptions' });
-    assert.eq({ flags : 1 }, withoutOptionsFromDB.options);
+    cappedOptionsFromDB = extractCollectionOptions(testDB, 'capped');
+    assert.eq(baseWithoutOptionsFromDB, cappedOptionsFromDB);
+    withOptionsFromDB = extractCollectionOptions(testDB, 'withOptions');
+    assert.eq(baseWithoutOptionsFromDB, withOptionsFromDB);
+    withoutOptionsFromDB = extractCollectionOptions(testDB, 'withoutOptions');
+    assert.eq(baseWithoutOptionsFromDB, withoutOptionsFromDB);
 
     // additional check that the capped collection is no longer capped
     var cappedStats = testDB.capped.stats();
