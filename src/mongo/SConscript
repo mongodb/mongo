@@ -448,9 +448,14 @@ env.CppUnitTest(
     ]
 )
 
-tcmallocServerStatus = []
 if get_option('allocator') == 'tcmalloc':
-    tcmallocServerStatus.append("util/tcmalloc_server_status_section.cpp")
+    env.Library('tcmalloc_set_parameter',
+                [
+                    'util/tcmalloc_server_status_section.cpp',
+                    'util/tcmalloc_set_parameter.cpp',
+                ],
+                LIBDEPS=['server_parameters'],
+                LIBDEPS_DEPENDENTS=['mongod', 'mongos'])
 
 coredbEnv = env.Clone()
 coredbEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
@@ -505,9 +510,7 @@ coredbEnv.Library("coredb", [
         "db/stats/timer_stats.cpp",
         "db/startup_warnings_common.cpp",
         "s/shardconnection.cpp",
-        ]
-        + tcmallocServerStatus
-        ,
+        ],
                   LIBDEPS=['db/auth/serverauth',
                            'db/commands/server_status_core',
                            'db/common',

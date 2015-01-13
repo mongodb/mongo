@@ -38,7 +38,7 @@ namespace {
 
         TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
         virtual bool includeByDefault() const { return false; }
-        
+
         virtual BSONObj generateSection(OperationContext* txn,
                                         const BSONElement& configElement) const {
 
@@ -66,13 +66,14 @@ namespace {
                                                  "tcmalloc.current_total_thread_cache_bytes");
                 // Not including tcmalloc.slack_bytes since it is deprecated.
 
-                // These are not available in our version but are available with use-system-tcmalloc
                 appendNumericPropertyIfAvailable(sub,     "central_cache_free_bytes",
                                                  "tcmalloc.central_cache_free_bytes");
                 appendNumericPropertyIfAvailable(sub,     "transfer_cache_free_bytes",
                                                  "tcmalloc.transfer_cache_free_bytes");
                 appendNumericPropertyIfAvailable(sub,     "thread_cache_free_bytes",
                                                  "tcmalloc.thread_cache_free_bytes");
+                appendNumericPropertyIfAvailable(sub,     "aggressive_memory_decommit",
+                                                 "tcmalloc.aggressive_memory_decommit");
             }
 
             char buffer[4096];
