@@ -7,16 +7,16 @@ statistics_log).
 After running an application with statistics logging configured, the
 statistics output files will be in the database home directory.  By default,
 these are named \c WiredTigerStat.* .  In the database home directory, run
-this command, replacing \c ... with the path to the WiredTiger installation
-directory:
+this command, replacing \c \<wiredtiger\> with the path to the
+WiredTiger installation directory:
 \code{.sh}
-python .../tools/wtstats.py WiredTigerStat.*
+python <wiredtiger>/tools/wtstats.py WiredTigerStat.*
 \endcode
 
-Another way to collect all the stats files in a directory is:
+Another way to process all the stats files in a directory is:
 
 \code{.sh}
-python .../tools/wtstats.py <directory>
+python <wiredtiger>/tools/wtstats.py <directory>
 \endcode
 In either case, a \c wtstats.html file will be generated in the \e current
 directory that you can open in your browser to examine statistics.
