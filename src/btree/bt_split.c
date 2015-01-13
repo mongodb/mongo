@@ -189,7 +189,7 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Deepen the tree if the page's memory footprint is larger than the
 	 * maximum size for a page in memory (presuambly putting eviction
 	 * pressure on the cache). Additionally, ensure the page has enough
-	 * entries to make it worth splkitting, in the case of a set of large
+	 * entries to make it worth splitting, in the case of a set of large
 	 * keys, splitting won't help.
 	 */
 	return (
