@@ -890,7 +890,7 @@ __wt_btcur_equals(
 		    session, EINVAL, "Cursors must reference the same object");
 
 	/*
-	 * The reason for a compare-equal method is because we can avoid doing
+	 * The reason for an equals method is because we can avoid doing
 	 * a full key comparison in some cases. If both cursors point into the
 	 * tree, take the fast path, otherwise fall back to the slower compare
 	 * method; in both cases, return 0 if the cursors are equal, 1 if they
