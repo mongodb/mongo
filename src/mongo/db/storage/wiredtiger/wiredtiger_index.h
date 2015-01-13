@@ -113,6 +113,14 @@ namespace mongo {
 
         virtual bool unique() const = 0;
 
+        /**
+         * Call this during engine initialization to disable index version checking.
+         *
+         * WARNING: this should only be called when started with --repair. It is safe then because
+         * we drop existing indexes before attempting to use them.
+         */
+        static void disableVersionCheckForRepair();
+
     protected:
 
         virtual Status _insert( WT_CURSOR* c,

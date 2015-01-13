@@ -105,6 +105,11 @@ namespace mongo {
           _durable( durable ),
           _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
 
+        if (repair) {
+            // This should be done once before we try to access any data.
+            WiredTigerIndex::disableVersionCheckForRepair();
+        }
+
         _eventHandler.handle_error = mdb_handle_error;
         _eventHandler.handle_message = mdb_handle_message;
         _eventHandler.handle_progress = mdb_handle_progress;
