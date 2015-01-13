@@ -893,7 +893,8 @@ __wt_btcur_equals(
 	 * The reason for a compare-equal method is because we can avoid doing
 	 * a full key comparison in some cases. If both cursors point into the
 	 * tree, take the fast path, otherwise fall back to the slower compare
-	 * method.
+	 * method; in both cases, return 0 if the cursors are equal, 1 if they
+	 * are not.
 	 */
 	if (F_ISSET(a, WT_CURSTD_KEY_INT) && F_ISSET(b, WT_CURSTD_KEY_INT))
 		*cmpp = !__cursor_equals(a_arg, b_arg);
