@@ -308,7 +308,8 @@ namespace {
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
-        ASSERT_EQUALS("foo_1", lpq->getHint().firstElement().str());
+        BSONObj hintObj = lpq->getHint();
+        ASSERT_EQUALS(BSON("$hint" << "foo_1"), hintObj);
     }
 
     TEST(LiteParsedQueryTest, ParseFromCommandValidSortProj) {

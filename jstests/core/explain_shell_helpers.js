@@ -122,7 +122,13 @@ assert(planHasStage(explain.queryPlanner.winningPlan, "SORT"));
 explain = t.explain().find().hint({a: 1}).finish();
 assert.commandWorked(explain);
 assert(isIxscan(explain.queryPlanner.winningPlan));
+explain = t.explain().find().hint("a_1").finish();
+assert.commandWorked(explain);
+assert(isIxscan(explain.queryPlanner.winningPlan));
 explain = t.find().hint({a: 1}).explain();
+assert.commandWorked(explain);
+assert(isIxscan(explain.queryPlanner.winningPlan));
+explain = t.find().hint("a_1").explain();
 assert.commandWorked(explain);
 assert(isIxscan(explain.queryPlanner.winningPlan));
 
