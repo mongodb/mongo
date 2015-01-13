@@ -194,6 +194,7 @@ namespace {
         try {
             DBClientConnection conn;
             std::string errmsg;
+            conn.setSoTimeout(30); // 30 second timeout
             if (!conn.connect(hostAndPort, errmsg)) {
                 return false;
             }
