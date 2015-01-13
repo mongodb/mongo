@@ -260,15 +260,15 @@ namespace mongo {
                 res->setIndexOnly(false);
             }
             else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
-                // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
+                S2NearStats* s2stats = static_cast<S2NearStats*>(leaf->specific.get());
                 res->setCursor("S2NearCursor");
-                // The first work() is an init.  Every subsequent work examines a document.
-                res->setNScanned(leaf->common.works);
-                res->setNScannedObjects(leaf->common.works);
+
+                res->setNScanned(s2stats->nscanned);
+                res->setNScannedObjects(s2stats->nscannedObjects);
+
                 // TODO: only adding empty index bounds for backwards compatibility.
                 res->setIndexBounds(BSONObj());
-                // TODO: Could be multikey.
-                res->setIsMultiKey(false);
+                res->setIsMultiKey(s2stats->isMultiKey);
                 res->setIndexOnly(false);
             }
             else if (leaf->stageType == STAGE_GEO_NEAR_2D) {

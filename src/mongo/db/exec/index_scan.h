@@ -112,6 +112,16 @@ namespace mongo {
 
         virtual PlanStageStats* getStats();
 
+        /**
+         * Get an unowned pointer to this stage's common stats.
+         */
+        CommonStats* getCommonStats();
+
+        /**
+         * Get an unowned pointer to this stage's specific stats.
+         */
+        IndexScanStats* getSpecificStats();
+
     private:
         /**
          * Initialize the underlying IndexCursor, grab information from the catalog for stats.

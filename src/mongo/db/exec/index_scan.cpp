@@ -338,6 +338,14 @@ namespace mongo {
         }
     }
 
+    CommonStats* IndexScan::getCommonStats() {
+        return &_commonStats;
+    }
+
+    IndexScanStats* IndexScan::getSpecificStats() {
+        return &_specificStats;
+    }
+
     PlanStageStats* IndexScan::getStats() {
         // WARNING: this could be called even if the collection was dropped.  Do not access any
         // catalog information here.

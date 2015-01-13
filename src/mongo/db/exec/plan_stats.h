@@ -349,6 +349,19 @@ namespace mongo {
         size_t forcedFetches;
     };
 
+    struct S2NearStats : public SpecificStats {
+        S2NearStats() : nscanned(0), nscannedObjects(0), isMultiKey(false) { }
+
+        virtual SpecificStats* clone() const {
+            S2NearStats* specific = new S2NearStats(*this);
+            return specific;
+        }
+
+        size_t nscanned;
+        size_t nscannedObjects;
+        bool isMultiKey;
+    };
+
     struct ShardingFilterStats : public SpecificStats {
         ShardingFilterStats() : chunkSkips(0) { }
 

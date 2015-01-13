@@ -30,6 +30,8 @@
 
 #include <queue>
 
+#include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
@@ -94,7 +96,11 @@ namespace mongo {
         // Geo filter in index scan (which is owned by fetch stage in _child).
         scoped_ptr<MatchExpression> _keyGeoFilter;
 
-        scoped_ptr<PlanStage> _child;
+        // The child fetch stage for the current annulus.
+        scoped_ptr<FetchStage> _child;
+
+        // The child of '_child'. Not owned here.
+        IndexScan* _indexScan;
 
         // The S2 machinery that represents the search annulus.  We keep this around after bounds
         // generation to check for intersection.
@@ -153,6 +159,7 @@ namespace mongo {
         IndexDescriptor* _descriptor;
 
         CommonStats _commonStats;
+        S2NearStats _specificStats;
     };
 
 }  // namespace mongo

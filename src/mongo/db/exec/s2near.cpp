@@ -30,7 +30,6 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -40,12 +39,13 @@
 
 namespace mongo {
 
-    S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws) {
-        _initted = false;
-        _params = params;
-        _ws = ws;
-        _worked = false;
-        _failed = false;
+    S2NearStage::S2NearStage(const S2NearParams& params, WorkingSet* ws)
+        : _worked(false),
+          _params(params),
+          _ws(ws),
+          _indexScan(NULL),
+          _failed(false),
+          _initted(false) {
     }
 
     void S2NearStage::init() {
@@ -278,10 +278,10 @@ namespace mongo {
         // Owns geo filter.
         _keyGeoFilter.reset(new GeoS2KeyMatchExpression(
             &_annulus, _params.baseBounds.fields[_nearFieldIndex].name));
-        IndexScan* scan = new IndexScan(params, _ws, _keyGeoFilter.get());
+        _indexScan = new IndexScan(params, _ws, _keyGeoFilter.get());
 
-        // Owns 'scan'.
-        _child.reset(new FetchStage(_ws, scan, _params.filter));
+        // Owns '_indexScan'.
+        _child.reset(new FetchStage(_ws, _indexScan, _params.filter));
         _seenInScan.clear();
     }
 
@@ -290,6 +290,15 @@ namespace mongo {
 
         // All done reading from _child.
         if (PlanStage::IS_EOF == state) {
+            // Aggregate stats from index scan used to get results for the annulus.
+            invariant(_indexScan);
+            _specificStats.nscanned += _indexScan->getSpecificStats()->keysExamined;
+            _specificStats.nscannedObjects += _indexScan->getCommonStats()->advanced;
+            if (_indexScan->getSpecificStats()->isMultiKey) {
+                _specificStats.isMultiKey = true;
+            }
+            _indexScan = NULL;
+
             _child.reset();
             _keyGeoFilter.reset();
 
@@ -426,10 +435,10 @@ namespace mongo {
     }
 
     PlanStageStats* S2NearStage::getStats() {
-        // TODO: must agg stats across child ixscan/fetches.
-        // TODO: we can do better than this, need own common stats.
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2DSPHERE);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2DSPHERE));
+        ret->specific.reset(new S2NearStats(_specificStats));
+        return ret.release();
     }
 
 }  // namespace mongo
