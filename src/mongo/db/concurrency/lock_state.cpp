@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -67,26 +68,34 @@ namespace {
 
         void report(LockStats* outStats) const {
             for (int i = 0; i < NumPartitions; i++) {
-                outStats->append(_partitions[i]);
+                outStats->append(_partitions[i].stats);
             }
         }
 
         void reset() {
             for (int i = 0; i < NumPartitions; i++) {
-                _partitions[i].reset();
+                _partitions[i].stats.reset();
             }
         }
 
     private:
 
+        // This alignment is a best effort approach to ensure that each partition falls on a
+        // separate page/cache line in order to avoid false sharing. The 4096-byte alignment is
+        // in an effort to play nicely with NUMA.
+        struct MONGO_COMPILER_ALIGN_TYPE(4096) AlignedLockStats {
+            LockStats stats;
+        };
+
         enum { NumPartitions = 8 };
 
+
         LockStats& _get(LockerId id) {
-            return _partitions[id % NumPartitions];
+            return _partitions[id % NumPartitions].stats;
         }
 
 
-        LockStats _partitions[NumPartitions];
+        AlignedLockStats _partitions[NumPartitions];
     };
 
 
