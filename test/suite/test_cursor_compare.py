@@ -130,18 +130,18 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         # Confirm failure unless the keys are set.
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(
-            wiredtiger.WiredTigerError, lambda: c1.compare_equal(c2), msg)
+            wiredtiger.WiredTigerError, lambda: c1.equals(c2), msg)
         self.assertRaisesWithMessage(
-            wiredtiger.WiredTigerError, lambda: c2.compare_equal(c1), msg)
+            wiredtiger.WiredTigerError, lambda: c2.equals(c1), msg)
 
         # Test cursors before they're positioned.
         c1.set_key(key_populate(c1, 10))
         c2.set_key(key_populate(c2, 20))
-        self.assertNotEqual(c1.compare_equal(c2), 0)
-        self.assertNotEqual(c2.compare_equal(c1), 0)
+        self.assertNotEqual(c1.equals(c2), 0)
+        self.assertNotEqual(c2.equals(c1), 0)
         c2.set_key(key_populate(c2, 10))
-        self.assertEqual(c1.compare_equal(c2), 0)
-        self.assertEqual(c2.compare_equal(c1), 0)
+        self.assertEqual(c1.equals(c2), 0)
+        self.assertEqual(c2.equals(c1), 0)
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
@@ -156,12 +156,12 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         self.assertEqual(c1.search(), 0)
         c2.set_key(key_populate(c2, 20))
         self.assertEqual(c2.search(), 0)
-        self.assertNotEqual(c1.compare_equal(c2), 0)
-        self.assertNotEqual(c2.compare_equal(c1), 0)
+        self.assertNotEqual(c1.equals(c2), 0)
+        self.assertNotEqual(c2.equals(c1), 0)
         c2.set_key(key_populate(c2, 10))
         self.assertEqual(c2.search(), 0)
-        self.assertEqual(c1.compare_equal(c2), 0)
-        self.assertEqual(c2.compare_equal(c1), 0)
+        self.assertEqual(c1.equals(c2), 0)
+        self.assertEqual(c2.equals(c1), 0)
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
