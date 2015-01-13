@@ -5020,6 +5020,109 @@ namespace {
                                    "{ixscan: {pattern: {b: 1}}}}}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, CannotTrimIxisectParam) {
+        params.options = QueryPlannerParams::CANNOT_TRIM_IXISECT;
+        params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+
+        runQuery(fromjson("{a: 1, b: 1, c: 1}"));
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{fetch: {filter: {b: 1, c: 1}, node: "
+                                "{ixscan: {filter: null, pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a: 1, c: 1}, node: "
+                                "{ixscan: {filter: null, pattern: {b: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: {a:1,b:1,c:1}, node: {andSorted: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {a:1}}},"
+                                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CannotTrimIxisectParamBeneathOr) {
+        params.options = QueryPlannerParams::CANNOT_TRIM_IXISECT;
+        params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+
+        runQuery(fromjson("{d: 1, $or: [{a: 1}, {b: 1, c: 1}]}"));
+
+        assertNumSolutions(3U);
+
+        assertSolutionExists("{fetch: {filter: {d: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {c: 1}, node: {ixscan: {filter: null,"
+                                    "pattern: {b: 1}, bounds: {b: [[1,1,true,true]]}}}}},"
+                                "{ixscan: {filter: null, pattern: {a: 1},"
+                                    "bounds: {a: [[1,1,true,true]]}}}]}}}}");
+
+        assertSolutionExists("{fetch: {filter: {d: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {b: 1}, node: {ixscan: {filter: null,"
+                                    "pattern: {c: 1}, bounds: {c: [[1,1,true,true]]}}}}},"
+                                "{ixscan: {filter: null, pattern: {a: 1},"
+                                    "bounds: {a: [[1,1,true,true]]}}}]}}}}");
+
+        assertSolutionExists("{fetch: {filter: {d: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {b: 1, c: 1}, node: {andSorted: {nodes: ["
+                                    "{ixscan: {filter: null, pattern: {b: 1}}},"
+                                    "{ixscan: {filter: null, pattern: {c: 1}}}]}}}},"
+                                "{ixscan: {filter: null, pattern: {a: 1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CannotTrimIxisectAndHashWithOrChild) {
+        params.options = QueryPlannerParams::CANNOT_TRIM_IXISECT;
+        params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+        params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+
+        runQuery(fromjson("{c: 1, $or: [{a: 1}, {b: 1, d: 1}]}"));
+
+        assertNumSolutions(3U);
+
+        assertSolutionExists("{fetch: {filter: {c: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {d: 1}, node: {ixscan: {filter: null,"
+                                    "pattern: {b: 1}, bounds: {b: [[1,1,true,true]]}}}}},"
+                                "{ixscan: {filter: null, pattern: {a: 1},"
+                                    "bounds: {a: [[1,1,true,true]]}}}]}}}}");
+
+        assertSolutionExists("{fetch: {filter: {$or:[{b:1,d:1},{a:1}]}, node:"
+                                "{ixscan: {filter: null, pattern: {c: 1}}}}}");
+
+        assertSolutionExists("{fetch: {filter: {c:1,$or:[{a:1},{b:1,d:1}]}, node:{andHash:{nodes:["
+                                "{or: {nodes: ["
+                                    "{fetch: {filter: {d:1}, node: {ixscan: {pattern: {b: 1}}}}},"
+                                    "{ixscan: {filter: null, pattern: {a: 1}}}]}},"
+                                "{ixscan: {filter: null, pattern: {c: 1}}}]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CannotTrimIxisectParamSelfIntersection) {
+        params.options = QueryPlannerParams::CANNOT_TRIM_IXISECT;
+        params.options = QueryPlannerParams::INDEX_INTERSECTION;
+        params.options |= QueryPlannerParams::NO_TABLE_SCAN;
+
+        // true means multikey
+        addIndex(BSON("a" << 1), true);
+
+        runQuery(fromjson("{a: {$all: [1, 2, 3]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{fetch: {filter: {$and: [{a:2}, {a:3}]}, node: "
+                                "{ixscan: {filter: null, pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {filter: null, node: {andSorted: {nodes: ["
+                                "{ixscan: {filter: null, pattern: {a:1},"
+                                    "bounds: {a: [[1,1,true,true]]}}},"
+                                "{ixscan: {filter: null, pattern: {a:1},"
+                                    "bounds: {a: [[2,2,true,true]]}}},"
+                                "{ixscan: {filter: null, pattern: {a:1},"
+                                    "bounds: {a: [[3,3,true,true]]}}}]}}}}");
+    }
+
     //
     // Test bad input to query planner helpers.
     //

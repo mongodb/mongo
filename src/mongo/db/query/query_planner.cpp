@@ -402,7 +402,7 @@ namespace mongo {
 
         // Use the cached index assignments to build solnRoot.  Takes ownership of clone.
         QuerySolutionNode* solnRoot =
-            QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices);
+            QueryPlannerAccess::buildIndexedDataAccess(query, clone, false, params.indices, params);
 
         if (NULL != solnRoot) {
             // Takes ownership of 'solnRoot'.
@@ -774,7 +774,8 @@ namespace mongo {
 
                 // This can fail if enumeration makes a mistake.
                 QuerySolutionNode* solnRoot =
-                    QueryPlannerAccess::buildIndexedDataAccess(query, rawTree, false, relevantIndices);
+                    QueryPlannerAccess::buildIndexedDataAccess(query, rawTree, false,
+                                                               relevantIndices, params);
 
                 if (NULL == solnRoot) { continue; }
 

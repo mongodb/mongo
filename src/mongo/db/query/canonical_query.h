@@ -174,9 +174,6 @@ namespace mongo {
         std::string toString() const;
         std::string toStringShort() const;
 
-        bool isForWrite() const { return _isForWrite; }
-        void setIsForWrite( bool w ) { _isForWrite = w; }
-
         /**
          * Validates match expression, checking for certain
          * combinations of operators in match expression and

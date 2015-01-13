@@ -214,7 +214,7 @@ namespace PlanRankingTests {
             // Takes ownership of cq.
             soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                             "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                             "{fetch: {node: {andSorted: {nodes: ["
                                      "{ixscan: {filter: null, pattern: {a:1}}},"
                                      "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
                              soln->root.get()));
@@ -250,7 +250,7 @@ namespace PlanRankingTests {
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                             "{fetch: {filter: null, node: {andHash: {nodes: ["
+                             "{fetch: {node: {andHash: {nodes: ["
                                      "{ixscan: {filter: null, pattern: {a:1}}},"
                                      "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
                              soln->root.get()));
@@ -624,7 +624,7 @@ namespace PlanRankingTests {
 
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                "{fetch: {node: {andSorted: {nodes: ["
                     "{ixscan: {filter: null, pattern: {a:1}}},"
                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
                 soln->root.get()));
@@ -666,7 +666,7 @@ namespace PlanRankingTests {
             // Choose the index intersection plan.
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                "{fetch: {filter: null, node: {andSorted: {nodes: ["
+                "{fetch: {node: {andSorted: {nodes: ["
                     "{ixscan: {filter: null, pattern: {a:1}}},"
                     "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
                 soln->root.get()));
@@ -710,7 +710,7 @@ namespace PlanRankingTests {
             // other plans are busy fetching documents.
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
-                "{fetch: {filter: {a:1}, node: {andSorted: {nodes: ["
+                "{fetch: {node: {andSorted: {nodes: ["
                     "{ixscan: {filter: null, pattern: {b:1}}},"
                     "{ixscan: {filter: null, pattern: {c:1}}}]}}}}",
                 soln->root.get()));

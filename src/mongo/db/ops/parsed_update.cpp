@@ -77,7 +77,6 @@ namespace mongo {
                                                      &cqRaw,
                                                      whereCallback);
         if (status.isOK()) {
-            cqRaw->setIsForWrite(true);
             _canonicalQuery.reset(cqRaw);
         }
 

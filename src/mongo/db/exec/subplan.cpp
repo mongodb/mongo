@@ -341,7 +341,7 @@ namespace mongo {
 
         // Use the cached index assignments to build solnRoot.  Takes ownership of 'orExpr'.
         QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
-            *_query, orExpr.release(), false, _plannerParams.indices);
+            *_query, orExpr.release(), false, _plannerParams.indices, _plannerParams);
 
         if (NULL == solnRoot) {
             mongoutils::str::stream ss;
