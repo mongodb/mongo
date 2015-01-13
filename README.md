@@ -1,4 +1,5 @@
-# MongoDB Tools
+MongoDB Tools
+===================================
 
 This is the 2.7.x **unstable** branch. This project is a work in progress.
  
@@ -11,10 +12,10 @@ This is the 2.7.x **unstable** branch. This project is a work in progress.
  - **mongooplog** - _Replay oplog entries between MongoDB servers_
  - **mongotop** - _Monitor read/write activity on a mongo server_
 
-Report any bugs, improvements, or new feature requests at https://jira.mongodb.org/browse/tools
+Report any bugs, improvements, or new feature requests at https://jira.mongodb.org/browse/TOOLS
 
- 
-####Setup
+Setup
+---------------
 Clone the repo and run `. ./set_gopath.sh` (`set_gopath.bat` on Windows) to setup your GOPATH:
 
 ```
@@ -23,7 +24,8 @@ cd mongo-tools
 . ./set_gopath.sh
 ```
 
-#### Building Tools
+Building Tools
+---------------
 To build the tools, you need to have Go version 1.3 and up.
 
 An additional flag, `-tags`, can be passed to the `go build` command in order to build the tools with support for SSL and/or SASL. For example:
@@ -34,3 +36,12 @@ go build -o bin/mongoimport mongoimport/main/mongoimport.go # build mongoimport
 go build -o bin/mongoimport -tags ssl mongoimport/main/mongoimport.go # build mongoimport with SSL support enabled
 go build -o bin/mongoimport -tags "ssl sasl" mongoimport/main/mongoimport.go # build mongoimport with SSL and SASL support enabled
 ```
+
+Contributing
+---------------
+See our [Contributor's Guide](CONTRIBUTING.md).
+
+Documentation
+---------------
+See the MongoDB packages [documentation](http://docs.mongodb.org/master/reference/program/).
+
