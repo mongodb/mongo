@@ -820,9 +820,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
-	alloc_index = NULL;
+	alloc_index = pindex = NULL;
 	parent_ref = NULL;
 	complete = hazard = locked = 0;
+	parent_entries = 0;
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
