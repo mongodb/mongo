@@ -171,8 +171,6 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		    lsm_tree->nchunks != 0)
 			goto open;
 
-		WT_RET(__wt_cache_full_check(session));
-
 		if (clsm->dsk_gen != lsm_tree->dsk_gen &&
 		    lsm_tree->nchunks != 0)
 			goto open;

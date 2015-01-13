@@ -736,13 +736,6 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
-	/*
-	 * There is no transaction active in this thread; check if the cache is
-	 * full, if we have to block for eviction, this is the best time to do
-	 * it.
-	 */
-	WT_ERR(__wt_cache_full_check(session));
-
 	ret = __wt_txn_begin(session, cfg);
 
 err:	API_END_RET(session, ret);
