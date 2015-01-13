@@ -12,9 +12,7 @@ require('bootstrap/js/button');
 // do not change this line, wtstats.py requires this placeholder
 var data = "### INSERT DATA HERE ###";
 
-// un-comment below line to use fixture data for development/testing
-// other fixtures are available in the ../fixtures/ folder
-
+// un-comment line below to use fixture data for development/testing
 // var data = require('../fixtures/strdates.fixture.json');
 
 // create main app model and view and render
