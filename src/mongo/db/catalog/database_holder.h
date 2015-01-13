@@ -28,12 +28,16 @@
 
 #pragma once
 
+#include <set>
+
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+    class Database;
 
     /**
      * Registry of opened databases.

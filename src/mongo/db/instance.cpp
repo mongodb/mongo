@@ -497,24 +497,24 @@ namespace mongo {
                     << debug.report( currentOp ) << endl;
         }
 
-        if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
-            // performance profiling is on
+        if (currentOp.shouldDBProfile(debug.executionTime)) {
+            // Performance profiling is on
             if (txn->lockState()->isReadLocked()) {
                 MONGO_LOG_COMPONENT(1, responseComponent)
-                        << "note: not profiling because recursive read lock" << endl;
+                        << "note: not profiling because recursive read lock";
             }
-            else if ( lockedForWriting() ) {
+            else if (lockedForWriting()) {
                 MONGO_LOG_COMPONENT(1, responseComponent)
-                        << "note: not profiling because doing fsync+lock" << endl;
+                        << "note: not profiling because doing fsync+lock";
             }
             else {
-                profile(txn, c, op, currentOp);
+                profile(txn, op);
             }
         }
 
         debug.recordStats();
         debug.reset();
-    } /* assembleResponse() */
+    }
 
     void receivedKillCursors(OperationContext* txn, Message& m) {
         DbMessage dbmessage(m);

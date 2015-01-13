@@ -32,17 +32,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <time.h>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
 
@@ -54,16 +53,20 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
+namespace {
+
     const int edebug=0;
 
-    static bool dbEval(OperationContext* txn,
-                       const string& dbName,
-                       const BSONObj& cmd,
-                       BSONObjBuilder& result,
-                       string& errmsg) {
+    bool dbEval(OperationContext* txn,
+                const string& dbName,
+                const BSONObj& cmd,
+                BSONObjBuilder& result,
+                string& errmsg) {
 
-        BSONElement e = cmd.firstElement();
-        uassert( 10046 ,  "eval needs Code" , e.type() == Code || e.type() == CodeWScope || e.type() == String );
+        const BSONElement e = cmd.firstElement();
+        uassert(10046,
+                "eval needs Code",
+                e.type() == Code || e.type() == CodeWScope || e.type() == String);
 
         const char *code = 0;
         switch ( e.type() ) {
@@ -77,9 +80,10 @@ namespace mongo {
         default:
             verify(0);
         }
-        verify( code );
 
-        if ( ! globalScriptEngine ) {
+        verify(code);
+
+        if (!globalScriptEngine) {
             errmsg = "db side execution is disabled";
             return false;
         }
@@ -88,15 +92,16 @@ namespace mongo {
         s->registerOperation(txn);
 
         ScriptingFunction f = s->createFunction(code);
-        if ( f == 0 ) {
-            errmsg = (string)"compile failed: " + s->getError();
+        if (f == NULL) {
+            errmsg = string("compile failed: ") + s->getError();
             return false;
         }
 
         s->localConnectForDbEval(txn, dbName.c_str());
 
-        if ( e.type() == CodeWScope )
-            s->init( e.codeWScopeScopeDataUnsafe() );
+        if (e.type() == CodeWScope) {
+            s->init(e.codeWScopeScopeDataUnsafe());
+        }
 
         BSONObj args;
         {
@@ -121,6 +126,7 @@ namespace mongo {
                 else OCCASIONALLY log() << code << endl;
             }
         }
+
         if (res || s->isLastRetNativeCode()) {
             result.append("errno", (double) res);
             errmsg = "invoke failed: ";
@@ -128,22 +134,25 @@ namespace mongo {
                 errmsg += "cannot return native function";
             else
                 errmsg += s->getError();
+
             return false;
         }
 
-        s->append( result , "retval" , "__returnValue" );
+        s->append(result, "retval", "__returnValue");
 
         return true;
     }
 
-    // SERVER-4328 todo review for concurrency
+
     class CmdEval : public Command {
     public:
         virtual bool slaveOk() const {
             return false;
         }
-        virtual void help( stringstream &help ) const {
-            help << "Evaluate javascript at the server.\n" "http://dochub.mongodb.org/core/serversidecodeexecution";
+
+        virtual void help(stringstream &help) const {
+            help << "Evaluate javascript at the server.\n"
+                 << "http://dochub.mongodb.org/core/serversidecodeexecution";
         }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -152,19 +161,30 @@ namespace mongo {
 
             RoleGraph::generateUniversalPrivileges(out);
         }
+
         CmdEval() : Command("eval", false, "$eval") { }
-        bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if ( cmdObj["nolock"].trueValue() ) {
+
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+
+            if (cmdObj["nolock"].trueValue()) {
                 return dbEval(txn, dbname, cmdObj, result, errmsg);
             }
 
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-            // No WriteUnitOfWork necessary, as dbEval will create its own, see "nolock" case above
-            Client::Context ctx(txn,  dbname );
+
+            Client::Context ctx(txn, dbname);
 
             return dbEval(txn, dbname, cmdObj, result, errmsg);
         }
+
     } cmdeval;
 
+} // namespace
 } // namespace mongo

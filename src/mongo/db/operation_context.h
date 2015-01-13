@@ -30,7 +30,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -40,6 +39,7 @@ namespace mongo {
     class Client;
     class CurOp;
     class ProgressMeter;
+    class StringData;
 
     /**
      * This class encompasses the state required by an operation.

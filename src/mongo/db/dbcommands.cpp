@@ -351,10 +351,16 @@ namespace mongo {
 
         }
 
-        bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        bool run(OperationContext* txn,
+                 const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
-            //
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, dbname);
@@ -364,21 +370,26 @@ namespace mongo {
             result.append("slowms", serverGlobalParams.slowMS);
 
             int p = (int) e.number();
-            bool ok = false;
+            Status status = Status::OK();
 
-            if ( p == -1 )
-                ok = true;
+            if (p == -1)
+                status = Status::OK();
             else if ( p >= 0 && p <= 2 ) {
-                ok = ctx.db()->setProfilingLevel( txn, p , errmsg );
+                status = ctx.db()->setProfilingLevel(txn, p);
             }
 
-            BSONElement slow = cmdObj["slowms"];
+            const BSONElement slow = cmdObj["slowms"];
             if (slow.isNumber()) {
                 serverGlobalParams.slowMS = slow.numberInt();
             }
 
-            return ok;
+            if (!status.isOK()) {
+                errmsg = status.reason();
+            }
+
+            return status.isOK();
         }
+
     } cmdProfile;
 
     class CmdDiagLogging : public Command {
