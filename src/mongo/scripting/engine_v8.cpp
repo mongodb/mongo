@@ -335,7 +335,7 @@ namespace mongo {
 
     template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
-        if (!logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)))
+        if (!shouldLog(logger::LogSeverity::Debug(1)))
              // don't collect stats unless verbose
              return;
 
@@ -477,7 +477,7 @@ namespace mongo {
      */
     std::string V8ScriptEngine::printKnownOps_inlock() {
         stringstream out;
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             out << "  known ops: " << endl;
             for(OpIdToScopeMap::iterator iSc = _opToScopeMap.begin();
                 iSc != _opToScopeMap.end(); ++iSc) {

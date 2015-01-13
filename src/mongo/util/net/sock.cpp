@@ -78,7 +78,7 @@ namespace mongo {
         struct timeval tv;
         tv.tv_sec = (int)secs;
         tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
-        bool report = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(4));
+        bool report = shouldLog(logger::LogSeverity::Debug(4));
         DEV report = true;
 #if defined(_WIN32)
         tv.tv_sec *= 1000; // Windows timeout is a DWORD, in milliseconds.

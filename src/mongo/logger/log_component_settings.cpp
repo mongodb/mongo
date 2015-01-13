@@ -90,10 +90,6 @@ namespace logger {
         _hasMinimumLoggedSeverity[component] = false;
     }
 
-    bool LogComponentSettings::shouldLog(LogSeverity severity) const {
-        return severity >= LogSeverity::cast(_minimumLoggedSeverity[LogComponent::kDefault]);
-    }
-
     bool LogComponentSettings::shouldLog(LogComponent component, LogSeverity severity) const {
         dassert(int(component) >= 0 && int(component) < LogComponent::kNumLogComponents);
 

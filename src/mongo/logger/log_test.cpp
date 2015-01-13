@@ -216,10 +216,10 @@ namespace {
         LogComponentSettings settings;
 
         // Initial log severity for LogComponent::kDefault is Log().
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Info()));
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Log()));
-        ASSERT_FALSE(settings.shouldLog(LogSeverity::Debug(1)));
-        ASSERT_FALSE(settings.shouldLog(LogSeverity::Debug(2)));
+        ASSERT_TRUE(shouldLog(LogSeverity::Info()));
+        ASSERT_TRUE(shouldLog(LogSeverity::Log()));
+        ASSERT_FALSE(shouldLog(LogSeverity::Debug(1)));
+        ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
 
         // If any components are provided to shouldLog(), we should get the same outcome
         // because we have not configured any non-LogComponent::kDefault components.
@@ -228,10 +228,17 @@ namespace {
 
         // Set minimum logged severity so that Debug(1) messages are written to log domain.
         settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Info()));
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Log()));
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Debug(1)));
-        ASSERT_FALSE(settings.shouldLog(LogSeverity::Debug(2)));
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Debug(1));
+
+        ASSERT_TRUE(shouldLog(LogSeverity::Info()));
+        ASSERT_TRUE(shouldLog(LogSeverity::Log()));
+        ASSERT_TRUE(shouldLog(LogSeverity::Debug(1)));
+        ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
+
+        // Revert back.
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Log());
 
         // Same results when components are supplied to shouldLog().
         ASSERT_TRUE(settings.shouldLog(componentA, LogSeverity::Debug(1)));
@@ -250,10 +257,6 @@ namespace {
         settings.setMinimumLoggedSeverity(LogComponent::kDefault, LogSeverity::Debug(1));
         settings.setMinimumLoggedSeverity(componentA, LogSeverity::Debug(2));
 
-        // Components for log message: LogComponent::kDefault only.
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Debug(1)));
-        ASSERT_FALSE(settings.shouldLog(LogSeverity::Debug(2)));
-
         // Components for log message: componentA only.
         ASSERT_TRUE(settings.shouldLog(componentA, LogSeverity::Debug(2)));
         ASSERT_FALSE(settings.shouldLog(componentA, LogSeverity::Debug(3)));
@@ -262,6 +265,17 @@ namespace {
         settings.clearMinimumLoggedSeverity(componentA);
         ASSERT_TRUE(settings.shouldLog(componentA, LogSeverity::Debug(1)));
         ASSERT_FALSE(settings.shouldLog(componentA, LogSeverity::Debug(2)));
+
+        // Test shouldLog() with global settings.
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Debug(1));
+
+        // Components for log message: LogComponent::kDefault only.
+        ASSERT_TRUE(shouldLog(LogSeverity::Debug(1)));
+        ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
+
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Log());
     }
 
     // Test for shouldLog() when we have configured multiple components.
@@ -276,10 +290,6 @@ namespace {
         settings.setMinimumLoggedSeverity(componentA, LogSeverity::Debug(2));
         settings.setMinimumLoggedSeverity(componentB, LogSeverity::Log());
 
-        // Components for log message: LogComponent::kDefault only.
-        ASSERT_TRUE(settings.shouldLog(LogSeverity::Debug(1)));
-        ASSERT_FALSE(settings.shouldLog(LogSeverity::Debug(2)));
-
         // Components for log message: componentA only.
         ASSERT_TRUE(settings.shouldLog(componentA, LogSeverity::Debug(2)));
         ASSERT_FALSE(settings.shouldLog(componentA, LogSeverity::Debug(3)));
@@ -293,6 +303,19 @@ namespace {
         // shouldLog() falls back on LogComponent::kDefault.
         ASSERT_TRUE(settings.shouldLog(componentC, LogSeverity::Debug(1)));
         ASSERT_FALSE(settings.shouldLog(componentC, LogSeverity::Debug(2)));
+
+        // Test shouldLog() with global settings.
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Debug(1));
+
+
+        // Components for log message: LogComponent::kDefault only.
+        ASSERT_TRUE(shouldLog(LogSeverity::Debug(1)));
+        ASSERT_FALSE(shouldLog(LogSeverity::Debug(2)));
+
+        logger::globalLogDomain()->setMinimumLoggedSeverity(LogComponent::kDefault,
+                                                            LogSeverity::Log());
+
     }
 
     // Log component hierarchy.

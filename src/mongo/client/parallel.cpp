@@ -636,7 +636,7 @@ namespace mongo {
         ShardPtr primary;
 
         string prefix;
-        if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
+        if (MONGO_unlikely(shouldLog(pc))) {
             if( _totalTries > 0 ) {
                 prefix = str::stream() << "retrying (" << _totalTries << " tries)";
             }
@@ -656,7 +656,7 @@ namespace mongo {
         // Try to get either the chunk manager or the primary shard
         config->getChunkManagerOrPrimary( ns, manager, primary );
 
-        if (MONGO_unlikely(logger::globalLogDomain()->shouldLog(pc))) {
+        if (MONGO_unlikely(shouldLog(pc))) {
             if (manager) {
                 vinfo = str::stream() << "[" << manager->getns() << " @ "
                     << manager->getVersion().toString() << "]";

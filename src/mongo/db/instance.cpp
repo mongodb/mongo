@@ -533,7 +533,7 @@ namespace mongo {
 
         int found = CursorManager::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
-        if ( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
+        if ( shouldLog(logger::LogSeverity::Debug(1)) || found != n ) {
             LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
         }
 

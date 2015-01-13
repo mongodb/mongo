@@ -141,7 +141,7 @@ namespace {
 
         }
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             StringBuilder builder;
             builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
@@ -340,7 +340,7 @@ namespace {
 
 #endif  // defined(_WIN32)
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             StringBuilder builder;
             builder << "getBoundAddrs():";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
