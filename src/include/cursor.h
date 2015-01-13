@@ -15,7 +15,7 @@
 	set_key,							\
 	set_value,							\
 	compare,							\
-	equals,							\
+	equals,								\
 	next,								\
 	prev,								\
 	reset,								\
@@ -35,7 +35,7 @@
 	(void (*)(WT_CURSOR *, ...))(set_key),				\
 	(void (*)(WT_CURSOR *, ...))(set_value),			\
 	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(compare),		\
-	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(equals),	\
+	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(equals),		\
 	next,								\
 	prev,								\
 	reset,								\
