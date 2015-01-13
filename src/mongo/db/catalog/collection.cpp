@@ -140,11 +140,15 @@ namespace mongo {
     RecordIterator* Collection::getIterator( OperationContext* txn,
                                              const RecordId& start,
                                              const CollectionScanParams::Direction& dir) const {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
         invariant( ok() );
+
         return _recordStore->getIterator( txn, start, dir );
     }
 
     vector<RecordIterator*> Collection::getManyIterators( OperationContext* txn ) const {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
+
         return _recordStore->getManyIterators(txn);
     }
 
@@ -168,6 +172,8 @@ namespace mongo {
     }
 
     bool Collection::findDoc(OperationContext* txn, const RecordId& loc, BSONObj* out) const {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
+
         RecordData rd;
         if ( !_recordStore->findRecord( txn, loc, &rd ) )
             return false;
@@ -178,6 +184,7 @@ namespace mongo {
     StatusWith<RecordId> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( !_indexCatalog.haveAnyIndexes() ); // eventually can implement, just not done
 
         StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
@@ -212,6 +219,8 @@ namespace mongo {
                                                     const BSONObj& doc,
                                                     MultiIndexBlock* indexBlock,
                                                     bool enforceQuota ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
+
         StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
                                                               doc.objdata(),
                                                               doc.objsize(),
@@ -236,6 +245,7 @@ namespace mongo {
     StatusWith<RecordId> Collection::_insertDocument( OperationContext* txn,
                                                      const BSONObj& docToInsert,
                                                      bool enforceQuota ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
@@ -312,6 +322,7 @@ namespace mongo {
                                                      bool enforceQuota,
                                                      bool indexesAffected,
                                                      OpDebug* debug ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
         uint64_t txnId = txn->recoveryUnit()->getMyTransactionCount();
 
@@ -424,6 +435,7 @@ namespace mongo {
                                                   const RecordData& oldRec,
                                                   const char* damageSource,
                                                   const mutablebson::DamageVector& damages ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
         // Broadcast the mutation so that query results stay correct.
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_MUTATION);
@@ -492,6 +504,7 @@ namespace mongo {
      * 4) re-write indexes
      */
     Status Collection::truncate(OperationContext* txn) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
         massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress( txn ) == 0 );
 
         // 1) store index specs
@@ -529,7 +542,9 @@ namespace mongo {
     void Collection::temp_cappedTruncateAfter(OperationContext* txn,
                                               RecordId end,
                                               bool inclusive) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( isCapped() );
+
         _recordStore->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 
@@ -552,6 +567,7 @@ namespace mongo {
     Status Collection::validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateResults* results, BSONObjBuilder* output ){
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
 
         MyValidateAdaptor adaptor;
         Status status = _recordStore->validate( txn, full, scanData, &adaptor, results, output );
