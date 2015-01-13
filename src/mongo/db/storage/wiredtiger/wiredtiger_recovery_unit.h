@@ -133,7 +133,7 @@ namespace mongo {
 
 
         WT_CURSOR* get() const {
-            dassert(_session == _ru->getSession());
+            // TODO(SERVER-16816): assertInActiveTxn();
             return _cursor;
         }
 

@@ -664,6 +664,9 @@ namespace {
             invariant( _savedForCheck == txn->recoveryUnit() );
 
             if ( !wt_keeptxnopen() && !_eof ) {
+                // Ensure an active session exists, so any restored cursors will bind to it
+                WiredTigerRecoveryUnit::get(txn)->getSession();
+
                 _locate(_savedLoc);
             }
         }

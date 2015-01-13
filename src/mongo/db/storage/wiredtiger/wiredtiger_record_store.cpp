@@ -1117,6 +1117,9 @@ namespace {
 
         invariant( _savedRecoveryUnit == txn->recoveryUnit() );
         if ( needRestore || !wt_keeptxnopen() ) {
+            // This will ensure an active session exists, so any restored cursors will bind to it
+            invariant(WiredTigerRecoveryUnit::get(txn)->getSession() == _cursor->getSession());
+
             RecordId saved = _lastLoc;
             _locate(_lastLoc, false);
             RS_ITERATOR_TRACE( "isEOF check " << _eof );
