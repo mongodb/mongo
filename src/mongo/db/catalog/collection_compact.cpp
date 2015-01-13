@@ -100,6 +100,8 @@ namespace mongo {
 
     StatusWith<CompactStats> Collection::compact( OperationContext* txn,
                                                   const CompactOptions* compactOptions ) {
+        dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
         if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              str::stream() <<
