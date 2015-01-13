@@ -105,7 +105,7 @@ namespace {
     static const char* ResourceTypeNames[] = {
         "Invalid",
         "Global",
-        "MMAPV1Flush",
+        "MMAPV1Journal",
         "Database",
         "Collection",
         "Metadata",
