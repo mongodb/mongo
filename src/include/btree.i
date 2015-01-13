@@ -917,11 +917,11 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_page_release --
- *	Release a reference to a page.
+ * __wt_page_release_busy --
+ *	Release a reference to a page, fail if busy during forced eviction.
  */
 static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+__wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -974,12 +974,21 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 	else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
-		if (ret == EBUSY)
-			ret = 0;
 	}
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
 	return (ret);
+}
+
+/*
+ * __wt_page_release --
+ *	Release a reference to a page.
+ */
+static inline int
+__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+{
+	WT_RET_BUSY_OK(__wt_page_release_busy(session, ref, flags));
+	return (0);
 }
 
 /*

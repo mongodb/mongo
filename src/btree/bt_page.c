@@ -131,7 +131,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    force_attempts < 10 &&
 			    __evict_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_page_release(session, ref, flags));
+				if ((ret = __wt_page_release_busy(
+				    session, ref, flags)) == EBUSY) {
+					/* If forced eviction fails, stall. */
+					ret = 0;
+					wait_cnt += 1000;
+				} else
+					WT_RET(ret);
 				WT_STAT_FAST_CONN_INCR(
 				    session, page_forcible_evict_blocked);
 				break;
