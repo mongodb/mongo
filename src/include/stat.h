@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -166,6 +167,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_force_fail;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
+	WT_STATS cache_eviction_maximum_page_size;
 	WT_STATS cache_eviction_queue_empty;
 	WT_STATS cache_eviction_queue_not_empty;
 	WT_STATS cache_eviction_server_evicting;
@@ -236,6 +238,11 @@ struct __wt_connection_stats {
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;
 	WT_STATS memory_grow;
+	WT_STATS page_busy_blocked;
+	WT_STATS page_forcible_evict_blocked;
+	WT_STATS page_locked_blocked;
+	WT_STATS page_read_blocked;
+	WT_STATS page_sleep;
 	WT_STATS read_io;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;

@@ -1,4 +1,5 @@
 /*-
+ * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -125,10 +126,11 @@ public class ex_call_center {
                 while(br.ready())
                     System.out.println(br.readLine());
                 br.close();
+                proc.waitFor();
                 new File("WT_HOME").mkdir();
-            } catch (IOException ioe) {
-                System.err.println("IOException: WT_HOME: " + ioe);
-                return(1);
+            } catch (Exception ex) {
+                System.err.println("Exception: " + ex);
+                return (1);
             }
 	} else
             home = null;
@@ -196,8 +198,8 @@ public class ex_call_center {
 	cursor = session.open_cursor("table:calls", null, "append");
 	for (Call call : callSample) {
             cursor.putValueLong(call.call_date);
-            cursor.putValueLong(call.cust_id);
-            cursor.putValueLong(call.emp_id);
+            cursor.putValueRecord(call.cust_id);
+            cursor.putValueRecord(call.emp_id);
             cursor.putValueString(call.call_type);
             cursor.putValueString(call.notes);
             ret = cursor.insert();
@@ -223,7 +225,7 @@ public class ex_call_center {
 	ret = cursor.search();
 	if (ret == 0) {
             Customer cust = new Customer();
-            cust.id = cursor.getValueLong();
+            cust.id = cursor.getValueRecord();
             cust.name = cursor.getValueString();
             System.out.println("Read customer record for " + cust.name +
                 " (ID " + cust.id + ")");
@@ -253,7 +255,7 @@ public class ex_call_center {
 	 * backwards.
 	 */
         long custid = 1;
-	cursor.putKeyLong(custid + 1);
+	cursor.putKeyRecord(custid + 1);
 	cursor.putKeyLong(0);
 	nearstatus = cursor.search_near();
 
@@ -268,7 +270,7 @@ public class ex_call_center {
             ret = cursor.prev();
 	for (count = 0; ret == 0 && count < 3; ++count) {
             Call call = new Call();
-            call.cust_id = cursor.getValueLong();
+            call.cust_id = cursor.getValueRecord();
             call.call_type = cursor.getValueString();
             call.notes = cursor.getValueString();
             if (call.cust_id != custid)
@@ -285,15 +287,16 @@ public class ex_call_center {
 	return (ret);
     }
 
-    public static int
+    public static void
     main(String[] argv)
     {
         try {
-            return (callCenterExample());
+            System.exit(callCenterExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }

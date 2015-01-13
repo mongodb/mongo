@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -96,7 +97,7 @@ err:
 	if (findhandle != INVALID_HANDLE_VALUE)
 		(void)FindClose(findhandle);
 	__wt_free(session, path);
-	__wt_scr_free(&pathbuf);
+	__wt_scr_free(session, &pathbuf);
 
 	if (ret == 0)
 		return (0);

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -268,6 +269,8 @@ struct __wt_cursor_log {
 	WT_ITEM		*logrec;	/* Copy of record for cursor */
 	WT_ITEM		*opkey, *opvalue;	/* Op key/value copy */
 	const uint8_t	*stepp, *stepp_end;	/* Pointer within record */
+	uint8_t		*packed_key;	/* Packed key for 'raw' interface */
+	uint8_t		*packed_value;	/* Packed value for 'raw' interface */
 	uint32_t	step_count;	/* Intra-record count */
 	uint32_t	rectype;	/* Record type */
 	uint64_t	txnid;		/* Record txnid */

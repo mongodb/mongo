@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -59,6 +60,8 @@ struct __wt_cache {
 	uint64_t pages_evict;
 	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
 	uint64_t pages_dirty;
+
+	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
 
 	/*
 	 * Read information.

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -96,6 +97,7 @@ struct __wt_session_impl {
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
+	size_t scratch_cached;		/* Scratch bytes cached */
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * It's hard to figure out from where a buffer was allocated after it's

@@ -26,26 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn04.py
-#   Transactions: hot backup and recovery
+# test_txn02.py
+#   Transactions: commits and rollbacks
 #
 
-import shutil, os
+import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import wiredtiger_open
-from wtscenario import multiply_scenarios, number_scenarios
+from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
-class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
-    logmax = "100K"
-    tablename = 'test_txn04'
+class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_txn09'
     uri = 'table:' + tablename
-    sync_list = [
-        '(method=dsync,enabled)',
-        '(method=fsync,enabled)',
-        '(method=none,enabled)',
-        '(enabled=false)'
-    ]
+    log_enabled = True
 
     types = [
         ('row', dict(tabletype='row',
@@ -56,28 +50,47 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
                     create_params = 'key_format=r,value_format=8t')),
     ]
     op1s = [
-        ('insert', dict(op1=('insert', 6))),
-        ('update', dict(op1=('update', 2))),
-        ('remove', dict(op1=('remove', 2))),
-        ('trunc-stop', dict(op1=('stop', 2))),
+        ('i4', dict(op1=('insert', 4))),
+        ('r1', dict(op1=('remove', 1))),
+        ('u10', dict(op1=('update', 10))),
+    ]
+    op2s = [
+        ('i6', dict(op2=('insert', 6))),
+        ('r4', dict(op2=('remove', 4))),
+        ('u4', dict(op2=('update', 4))),
+    ]
+    op3s = [
+        ('i12', dict(op3=('insert', 12))),
+        ('r4', dict(op3=('remove', 4))),
+        ('u4', dict(op3=('update', 4))),
+    ]
+    op4s = [
+        ('i14', dict(op4=('insert', 14))),
+        ('r12', dict(op4=('remove', 12))),
+        ('u12', dict(op4=('update', 12))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
+    txn2s = [('t2c', dict(txn2='commit')), ('t2r', dict(txn2='rollback'))]
+    txn3s = [('t3c', dict(txn3='commit')), ('t3r', dict(txn3='rollback'))]
+    txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, op1s, txn1s))
+    all_scenarios = multiply_scenarios('.', types,
+        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)
+
+    # This test generates thousands of potential scenarios.
+    # For default runs, we'll use a small subset of them, for
+    # long runs (when --long is set) we'll set a much larger limit.
+    scenarios = number_scenarios(prune_scenarios(all_scenarios, 20, 5000))
+
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir
-        # Cycle through the different transaction_sync values in a
-        # deterministic manner.
-        self.txn_sync = self.sync_list[
-            self.scenario_number % len(self.sync_list)]
-        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        # Set archive false on the home directory.  
         conn_params = \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
                 'create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
+                'log=(archive=false,enabled=%s),' % int(self.log_enabled) + \
+                'transaction_sync=(enabled=false),'
+
+        # print "Opening conn at '%s' with config '%s'" % (dir, conn_params)
         conn = wiredtiger_open(dir, conn_params)
         self.pr(`conn`)
         self.session2 = conn.open_session()
@@ -109,79 +122,60 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.check(self.session2, "isolation=read-committed", committed)
         self.check(self.session2, "isolation=read-uncommitted", current)
 
-    def hot_backup(self, backup_uri, committed):
-        # If we are backing up a target, assume the directory exists.
-        # We just use the wt backup command.
-        # A future test extension could also use a cursor.
-        cmd = '-h ' + self.home + ' backup '
-        if backup_uri != None:
-            cmd += '-t ' + backup_uri + ' '
-        else:
-            shutil.rmtree(self.backup_dir, ignore_errors=True)
-            os.mkdir(self.backup_dir)
-
-        cmd += self.backup_dir
-        self.runWt(cmd.split())
-        self.exception='false'
-        backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
-        backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
-        try:
-            self.check(backup_conn.open_session(), None, committed)
-        except:
-            self.exception='true'
-        finally:
-            backup_conn.close()
-
     def test_ops(self):
+        # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         self.session.create(self.uri, self.create_params)
-        c = self.session.open_cursor(self.uri, None, 'overwrite')
-        # Set up the table with entries for 1-5.
-        # We then truncate starting or ending in various places.
+        # Set up the table with entries for 1, 2, 10 and 11.
         # We use the overwrite config so insert can update as needed.
-        current = {1:1, 2:1, 3:1, 4:1, 5:1}
+        c = self.session.open_cursor(self.uri, None, 'overwrite')
         c.set_value(1)
-        for k in current:
-            c.set_key(k)
-            c.insert()
+        c.set_key(1)
+        c.insert()
+        c.set_key(2)
+        c.insert()
+        c.set_key(10)
+        c.insert()
+        c.set_key(11)
+        c.insert()
+        current = {1:1, 2:1, 10:1, 11:1}
         committed = current.copy()
 
-        ops = (self.op1, )
-        txns = (self.txn1, )
+        ops = (self.op1, self.op2, self.op3, self.op4)
+        txns = (self.txn1, self.txn2, self.txn3, self.txn4)
+        # for ok, txn in zip(ops, txns):
+        # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
         for i, ot in enumerate(zip(ops, txns)):
-            # Perform a full hot backup of the original tables.
-            # The runWt command closes our connection and sessions so
-            # we need to reopen them here.
-            self.hot_backup(None, committed)
-            self.assertEqual(True, self.exception == 'false')
-            c = self.session.open_cursor(self.uri, None, 'overwrite')
-            c.set_value(1)
-            # Then do the given modification.
-            # Perform a targeted hot backup.
-            self.session.begin_transaction()
             ok, txn = ot
             op, k = ok
             
+            # Close and reopen the connection and cursor, toggling the log
+            self.log_enabled = not self.log_enabled
+            self.reopen_conn()
+            c = self.session.open_cursor(self.uri, None, 'overwrite')
+
+            self.session.begin_transaction(
+                (self.scenario_number % 2) and 'sync' or None)
+            # Test multiple operations per transaction by always
+            # doing the same operation on key k + 1.
+            k1 = k + 1
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             if op == 'insert' or op == 'update':
                 c.set_value(i + 2)
                 c.set_key(k)
                 c.insert()
+                c.set_key(k1)
+                c.insert()
                 current[k] = i + 2
+                current[k1] = i + 2
             elif op == 'remove':
                 c.set_key(k)
                 c.remove()
+                c.set_key(k1)
+                c.remove()
                 if k in current:
                     del current[k]
-            elif op == 'stop':
-                # For both, the key given is the start key.  Add 2
-                # for the stop key.
-                c.set_key(k)
-                kstart = 1
-                kstop = k
-                self.session.truncate(None, None, c, None)
-                while (kstart <= kstop):
-                    del current[kstart]
-                    kstart += 1
+                if k1 in current:
+                    del current[k1]
 
             # print current
             # Check the state after each operation.
@@ -196,15 +190,6 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
 
             # Check the state after each commit/rollback.
             self.check_all(current, committed)
-
-        # Backup the target we modified.  We expect that running
-        # recovery now will generate an exception if we committed.
-        # print 'Call hot_backup with ' + self.uri
-        self.hot_backup(self.uri, committed)
-        if txn == 'commit':
-            self.assertEqual(True, self.exception == 'true')
-        else: 
-            self.assertEqual(True, self.exception == 'false')
 
 if __name__ == '__main__':
     wttest.run()

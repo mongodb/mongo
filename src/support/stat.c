@@ -367,6 +367,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
+	stats->cache_eviction_maximum_page_size.desc =
+	    "cache: maximum page size at eviction";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_deepen.desc =
 	    "cache: page split during eviction deepened the tree";
@@ -480,6 +482,16 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "reconciliation: split objects currently awaiting free";
 	stats->session_cursor_open.desc = "session: open cursor count";
 	stats->session_open.desc = "session: open session count";
+	stats->page_busy_blocked.desc =
+	    "thread-yield: page acquire busy blocked";
+	stats->page_forcible_evict_blocked.desc =
+	    "thread-yield: page acquire eviction blocked";
+	stats->page_locked_blocked.desc =
+	    "thread-yield: page acquire locked blocked";
+	stats->page_read_blocked.desc =
+	    "thread-yield: page acquire read blocked";
+	stats->page_sleep.desc =
+	    "thread-yield: page acquire time sleeping (usecs)";
 	stats->txn_begin.desc = "transaction: transaction begins";
 	stats->txn_checkpoint_running.desc =
 	    "transaction: transaction checkpoint currently running";
@@ -538,6 +550,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_inmem_split.v = 0;
 	stats->cache_eviction_internal.v = 0;
+	stats->cache_eviction_maximum_page_size.v = 0;
 	stats->cache_eviction_dirty.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_eviction_force.v = 0;
@@ -608,6 +621,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->lsm_work_queue_max.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
+	stats->page_busy_blocked.v = 0;
+	stats->page_forcible_evict_blocked.v = 0;
+	stats->page_locked_blocked.v = 0;
+	stats->page_read_blocked.v = 0;
+	stats->page_sleep.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_fail_cache.v = 0;

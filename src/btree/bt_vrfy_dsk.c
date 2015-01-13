@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -453,9 +454,9 @@ eof:		ret = __err_eof(session, cell_num, addr);
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
-	__wt_scr_free(&current);
-	__wt_scr_free(&last_pfx);
-	__wt_scr_free(&last_ovfl);
+	__wt_scr_free(session, &current);
+	__wt_scr_free(session, &last_pfx);
+	__wt_scr_free(session, &last_ovfl);
 	return (ret);
 }
 

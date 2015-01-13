@@ -1,4 +1,5 @@
 /*-
+ * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -84,7 +85,6 @@ public class PackFormatInputStream {
     protected char getType()
     throws WiredTigerPackingException {
         if (formatOff >= format.length()) {
-            System.err.println("Raw format is: " + format);
             throw new WiredTigerPackingException(
                 "No more fields in format.");
         }

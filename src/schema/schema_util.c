@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -79,6 +80,6 @@ __wt_name_check(WT_SESSION_IMPL *session, const char *str, size_t len)
 
 	ret = __wt_str_name_check(session, tmp->data);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(session, &tmp);
 	return (ret);
 }

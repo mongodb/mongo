@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -254,7 +255,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
 
 	ret = __wt_write(session, fh, (wt_off_t)0, (size_t)allocsize, desc);
 
-	__wt_scr_free(&buf);
+	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -312,7 +313,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
 		    desc->majorv, desc->minorv);
 
-err:	__wt_scr_free(&buf);
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 

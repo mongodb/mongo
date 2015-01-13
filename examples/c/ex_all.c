@@ -1,4 +1,5 @@
 /*-
+ * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -338,6 +339,22 @@ cursor_ops(WT_SESSION *session)
 	/*! [Display an error] */
 	}
 
+	{
+	/*! [Display an error thread safe] */
+	const char *key = "non-existent key";
+	cursor->set_key(cursor, key);
+	if ((ret = cursor->remove(cursor)) != 0) {
+		char buf[128];
+
+		if (wiredtiger_strerror_r(ret, buf, sizeof(buf)) != 0)
+			(void)snprintf(
+			    buf, sizeof(buf), "error value: %d\n", ret);
+		fprintf(stderr, "cursor.remove: %s\n", buf);
+		return (ret);
+	}
+	/*! [Display an error thread safe] */
+	}
+
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor);
 	/*! [Close the cursor] */
@@ -526,14 +543,14 @@ session_ops(WT_SESSION *session)
 
 	/*! [Create a table and configure the page size] */
 	ret = session->create(session,
-	    "table:mytable", "key_format=S,value_format=S"
+	    "table:mytable", "key_format=S,value_format=S,"
 	    "internal_page_max=16KB,leaf_page_max=1MB,leaf_value_max=64KB");
 	/*! [Create a table and configure the page size] */
 	ret = session->drop(session, "table:mytable", NULL);
 
 	/*! [Create a table and configure a large leaf value max] */
 	ret = session->create(session,
-	    "table:mytable", "key_format=S,value_format=S"
+	    "table:mytable", "key_format=S,value_format=S,"
 	    "leaf_page_max=16KB,leaf_value_max=256KB");
 	/*! [Create a table and configure a large leaf value max] */
 	ret = session->drop(session, "table:mytable", NULL);

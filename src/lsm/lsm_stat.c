@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -139,7 +140,7 @@ __curstat_lsm_init(
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
-	__wt_scr_free(&uribuf);
+	__wt_scr_free(session, &uribuf);
 
 	return (ret);
 }

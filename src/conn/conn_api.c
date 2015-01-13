@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -263,8 +264,8 @@ __conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	__wt_scr_free(&expath);
-	__wt_scr_free(&exconfig);
+err:	__wt_scr_free(session, &expath);
+	__wt_scr_free(session, &exconfig);
 
 	return (ret);
 }
@@ -1575,6 +1576,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+
+	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
+	conn->session_scratch_max = (size_t)cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -716,15 +717,16 @@ __split_multi_inmem(
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = orig->modify->first_dirty_txn;
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
 
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 	return (ret);
 }
 
@@ -1107,7 +1109,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	WT_ERR(__wt_row_ikey(
 	    session, 0, key->data, key->size, &child->key.ikey));
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 
 	/*
 	 * The second page in the split is a new WT_REF/page pair.
@@ -1136,10 +1138,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
+	right->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip
@@ -1317,7 +1320,7 @@ err:	if (split_ref[0] != NULL) {
 	}
 	if (right != NULL)
 		__wt_page_out(session, &right);
-	__wt_scr_free(&key);
+	__wt_scr_free(session, &key);
 	return (ret);
 }
 

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2014-2015 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -530,9 +531,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	txn_global = &conn->txn_global;
-	txn_global->current = 1;
-	txn_global->oldest_id = 1;
-	txn_global->last_running = 1;
+	txn_global->current = txn_global->last_running =
+	    txn_global->oldest_id = WT_TXN_FIRST;
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
