@@ -296,11 +296,10 @@ struct __wt_cursor {
 	 * @param cursor the cursor handle
 	 * @param other another cursor handle
 	 * @param equalityp the status of the comparison: 0 if the cursors
-	 * refer to the same key, otherwise not 0.
+	 * refer to the same key, otherwise 1.
 	 * @errors
 	 */
-	int __F(equals)
-	    (WT_CURSOR *cursor, WT_CURSOR *other, int *equalityp);
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other, int *equalityp);
 
 	/*!
 	 * Return the next record.
