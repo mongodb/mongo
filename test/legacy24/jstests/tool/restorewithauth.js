@@ -16,7 +16,7 @@
 
 var port = allocatePorts(1)[0];
 baseName = "jstests_restorewithauth";
-var conn = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface",
+var conn = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
                         "--nojournal", "--bind_ip", "127.0.0.1" );
 
 // write to ns foo.bar
@@ -36,7 +36,7 @@ foo.bar.createIndex({x:1});
 assert.eq(foo.system.indexes.count(), 3);
 
 // get data dump
-var dumpdir = "/data/db/restorewithauth-dump1/";
+var dumpdir = MongoRunner.dataDir + "/restorewithauth-dump1/";
 resetDbpath( dumpdir );
 x = runMongoProgram("mongodump", "--db", "foo", "-h", "127.0.0.1:"+port, "--out", dumpdir);
 
@@ -47,7 +47,7 @@ foo.dropDatabase();
 stopMongod( port );
 
 // start mongod with --auth
-conn = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface",
+conn = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
                     "--nojournal", "--bind_ip", "127.0.0.1" );
 
 // admin user

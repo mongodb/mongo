@@ -33,7 +33,7 @@ var replSetConnString = "tool_replset/127.0.0.1:" + replTest.ports[0] +
 
 // Test with mongodump/mongorestore
 print("dump the db");
-var data = "/data/db/tool_replset-dump1/";
+var data = MongoRunner.dataDir + "/tool_replset-dump1/";
 runMongoProgram("mongodump", "--host", replSetConnString, "--out", data);
 
 print("db successfully dumped, dropping now");
@@ -51,7 +51,7 @@ replTest.awaitReplication();
 
 // Test with mongoexport/mongoimport
 print("export the collection");
-var extFile = "/data/db/tool_replset/export";
+var extFile = MongoRunner.dataDir + "/tool_replset/export";
 runMongoProgram("mongoexport", "--host", replSetConnString, "--out", extFile,
                 "-d", "foo", "-c", "bar");
 

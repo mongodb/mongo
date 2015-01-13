@@ -242,6 +242,20 @@ functions:
         chmod +x ./mongodb-*/bin/*
         mv ./mongodb-*/bin/* .
 
+  "download & copy shell":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        rm -rf temp
+        mkdir temp
+        cd temp
+        curl -s ${mongo_url} --output mongodb.tgz
+        ${decompress} mongodb.tgz
+        chmod +x ./mongodb-*/bin/*
+        mv ./mongodb-*/bin/mongo${extension} ../mongodb/
+
   "fetch tool" :
     command: s3.get
     params:
@@ -878,6 +892,9 @@ tasks:
     - func: "download mongod"
       vars:
         mongo_url: "${mongo24_url}"
+    - func: "download & copy shell"
+      vars:
+        mongo_url: "${mongo26_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport

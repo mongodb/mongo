@@ -31,7 +31,7 @@ var total = 1000;
 
 step("mongodump from replset");
 
-var data = "/data/db/dumprestore10-dump1/";
+var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
 
 runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--out", data );
 
