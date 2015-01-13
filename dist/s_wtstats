@@ -15,6 +15,12 @@ type npm > /dev/null 2>&1 || {
 
 cd ../tools/template || exit 1
 rm -f ./$out
+# Note: we don't do the npm install here, it downloads files
+test -d ./node_modules || {
+        echo 's_wtstats: missing node_modules directory, install by:' >&2
+        echo '    cd ../tools/template; npm install' >&2
+        exit 1
+}
 npm run build >$t 2>&1 || {
         echo "s_wtstats: npm failed" >&2
         cat $t
