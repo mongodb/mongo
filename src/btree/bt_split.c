@@ -172,7 +172,7 @@ __split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
  * any real understanding of what might be useful to surface to applications.
  */
 static u_int __split_deepen_min_child = 10000;
-static u_int __split_deepen_per_child =   100;
+static u_int __split_deepen_per_child = 100;
 
 /*
  * __split_should_deepen --
@@ -192,7 +192,7 @@ __split_should_deepen(
 
 	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
-	 * maximum size for a page in memory (presuambly putting eviction
+	 * maximum size for a page in memory (presumably putting eviction
 	 * pressure on the cache).
 	 */
 	if (page->memory_footprint < S2BT(session)->maxmempage)

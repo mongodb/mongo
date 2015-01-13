@@ -917,13 +917,13 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
-                        /*
-                         * If the page isn't too big, we are evicting it
-                         * because it had a chain of deleted entries that make
-                         * traversal expensive.
-                         */
+			/*
+			 * If the page isn't too big, we are evicting it because
+			 * it had a chain of deleted entries that make traversal
+			 * expensive.
+			 */
 			WT_STAT_FAST_CONN_INCR(
-                            session, cache_eviction_force_delete);
+			    session, cache_eviction_force_delete);
 	} else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
 	}
