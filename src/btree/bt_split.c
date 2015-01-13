@@ -812,9 +812,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_REF **alloc_refp, *parent_ref;
+	WT_REF **alloc_refp, *next_ref, *parent_ref;
 	size_t size;
-	uint32_t children, i, j, parent_entries, result_entries;
+	uint32_t children, i, j;
+	uint32_t deleted_entries, parent_entries, result_entries;
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
@@ -861,7 +862,22 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
-	result_entries = (parent_entries - 1) + new_entries;
+
+	/*
+	 * Remove any refs to deleted pages while we are splitting, we have
+	 * the internal page locked down, and are copying the refs into a new
+	 * array anyway.
+	 */
+	for (i = 0, deleted_entries = 0; i < parent_entries; ++i)
+		if (pindex->index[i]->state == WT_REF_DELETED)
+			deleted_entries++;
+
+	/*
+	 * The final entry count consists of: The original count, plus any
+	 * new pages, less any refs we are removing because they only
+	 * contained deleted items, less 1 for the page being replaced.
+	 */
+	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -873,8 +889,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_MEMSIZE_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
-	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
-		if (pindex->index[i] == ref)
+	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
@@ -886,8 +903,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				 */
 				ref_new[j] = NULL;
 			}
-		else
-			*alloc_refp++ = pindex->index[i];
+		else if (next_ref->state != WT_REF_DELETED)
+			*alloc_refp++ = next_ref;
+	}
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
