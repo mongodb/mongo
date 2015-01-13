@@ -867,7 +867,7 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked;
+	int locked, too_big;
 
 	btree = S2BT(session);
 
@@ -878,6 +878,8 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (ref == NULL || __wt_ref_is_root(ref))
 		return (0);
 	page = ref->page;
+
+	too_big = (page->memory_footprint < btree->maxmempage) ? 0 : 1;
 
 	/*
 	 * Attempt to evict pages with the special "oldest" read generation.
@@ -911,9 +913,18 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		return (ret);
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
-	if ((ret = __wt_evict_page(session, ref)) == 0)
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-	else {
+	if ((ret = __wt_evict_page(session, ref)) == 0) {
+		if (too_big)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else
+                        /*
+                         * If the page isn't too big, we are evicting it
+                         * because it had a chain of deleted entries that make
+                         * traversal expensive.
+                         */
+			WT_STAT_FAST_CONN_INCR(
+                            session, cache_eviction_force_delete);
+	} else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
 	}
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
