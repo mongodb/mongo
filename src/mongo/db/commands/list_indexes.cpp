@@ -182,10 +182,6 @@ namespace mongo {
                                                         exec.release(),
                                                         cursorNamespace);
                 cursorId = cursor->cursorid();
-
-                cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-                txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
             }
 
             Command::appendCursorResponseObject( cursorId, cursorNamespace, firstBatch.arr(),
