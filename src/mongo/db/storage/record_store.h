@@ -331,6 +331,12 @@ namespace mongo {
             return Status::OK();
         }
 
+        /**
+         * Called after a repair operation is run with the recomputed numRecords and dataSize.
+         */
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) = 0;
 
     protected:
         std::string _ns;

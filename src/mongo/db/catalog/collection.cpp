@@ -42,7 +42,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
@@ -87,11 +87,11 @@ namespace mongo {
                             const StringData& fullNS,
                             CollectionCatalogEntry* details,
                             RecordStore* recordStore,
-                            Database* database )
+                            DatabaseCatalogEntry* dbce )
         : _ns( fullNS ),
           _details( details ),
           _recordStore( recordStore ),
-          _database( database ),
+          _dbce( dbce ),
           _infoCache( this ),
           _indexCatalog( this ),
           _cursorManager( fullNS ) {

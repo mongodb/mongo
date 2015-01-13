@@ -262,6 +262,12 @@ namespace mongo {
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );
+
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            invariant(false); // MMAPv1 has its own repair which doesn't call this.
+        }
     protected:
 
         virtual Record* recordFor( const DiskLoc& loc ) const;

@@ -170,6 +170,11 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+        }
+
     private:
         CollectionOptions _options;
         long long _numInserts;

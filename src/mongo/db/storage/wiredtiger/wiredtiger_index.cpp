@@ -67,8 +67,6 @@ namespace {
 
     static const WiredTigerItem emptyItem(NULL, 0);
 
-    bool shouldCheckIndexVersions = true;
-
     static const int kMinimumIndexVersion = 6;
     static const int kCurrentIndexVersion = 6; // New indexes use this by default.
     static const int kMaximumIndexVersion = 6;
@@ -113,11 +111,6 @@ namespace {
     }
 
 } // namespace
-
-    // static
-    void WiredTigerIndex::disableVersionCheckForRepair() {
-        shouldCheckIndexVersions = false;
-    }
 
     // static
     StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& options) {
@@ -209,17 +202,14 @@ namespace {
           _uri( uri ),
           _instanceId( WiredTigerSession::genCursorId() ) {
 
-        if (shouldCheckIndexVersions) {
-            Status versionStatus =
-                WiredTigerUtil::checkApplicationMetadataFormatVersion(ctx,
-                                                                      uri,
-                                                                      kMinimumIndexVersion,
-                                                                      kMaximumIndexVersion);
-            if (!versionStatus.isOK()) {
-                fassertFailedWithStatusNoTrace(28579, versionStatus);
-            }
+        Status versionStatus =
+            WiredTigerUtil::checkApplicationMetadataFormatVersion(ctx,
+                                                                  uri,
+                                                                  kMinimumIndexVersion,
+                                                                  kMaximumIndexVersion);
+        if (!versionStatus.isOK()) {
+            fassertFailedWithStatusNoTrace(28579, versionStatus);
         }
-
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,

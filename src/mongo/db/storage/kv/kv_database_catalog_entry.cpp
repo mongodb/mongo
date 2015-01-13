@@ -233,14 +233,23 @@ namespace mongo {
     }
 
     void KVDatabaseCatalogEntry::initCollection( OperationContext* opCtx,
-                                                 const std::string& ns ) {
-        string ident = _engine->getCatalog()->getCollectionIdent( ns );
-        BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData( opCtx, ns );
-
-        RecordStore* rs = _engine->getEngine()->getRecordStore( opCtx, ns, ident, md.options );
-        invariant( rs );
-
+                                                 const std::string& ns,
+                                                 bool forRepair ) {
         invariant(!_collections.count(ns));
+
+        const std::string ident = _engine->getCatalog()->getCollectionIdent( ns );
+
+        RecordStore* rs;
+        if (forRepair) {
+            // Using a NULL rs since we don't want to open this record store before it has been
+            // repaired. This also ensures that if we try to use it, it will blow up.
+            rs = NULL;
+        }
+        else {
+            BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
+            rs = _engine->getEngine()->getRecordStore( opCtx, ns, ident, md.options );
+            invariant( rs );
+        }
 
         // No change registration since this is only for committed collections
         _collections[ns] = new KVCollectionCatalogEntry( _engine->getEngine(),
@@ -248,6 +257,18 @@ namespace mongo {
                                                          ns,
                                                          ident,
                                                          rs );
+    }
+
+    void KVDatabaseCatalogEntry::reinitCollectionAfterRepair(OperationContext* opCtx,
+                                                             const std::string& ns) {
+        // Get rid of the old entry.
+        CollectionMap::iterator it = _collections.find(ns);
+        invariant(it != _collections.end());
+        delete it->second;
+        _collections.erase(it);
+
+        // Now reopen fully initialized.
+        initCollection(opCtx, ns, false);
     }
 
     Status KVDatabaseCatalogEntry::renameCollection( OperationContext* txn,

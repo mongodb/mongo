@@ -119,7 +119,8 @@ namespace mongo {
                 if ( !db ) {
                     db = new KVDatabaseCatalogEntry( dbName, this );
                 }
-                db->initCollection( &opCtx, coll );
+
+                db->initCollection( &opCtx, coll, options.forRepair );
             }
 
             uow.commit();
@@ -262,6 +263,11 @@ namespace mongo {
     }
 
     Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::string& ns) {
-        return _engine->repairIdent(txn, _catalog->getCollectionIdent(ns));
+        Status status = _engine->repairIdent(txn, _catalog->getCollectionIdent(ns));
+        if (!status.isOK())
+            return status;
+
+        _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(txn, ns);
+        return Status::OK();
     }
 }

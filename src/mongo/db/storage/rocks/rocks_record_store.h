@@ -172,6 +172,12 @@ namespace mongo {
 
         virtual Status oplogDiskLocRegister(OperationContext* txn, const OpTime& opTime);
 
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            // TODO
+        }
+
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
           _cappedDeleteCallback = cb;
         }

@@ -173,6 +173,10 @@ namespace mongo {
         virtual Status oplogDiskLocRegister( OperationContext* txn,
                                              const OpTime& opTime );
 
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize);
+
         bool isOplog() const { return _isOplog; }
         bool usingOplogHack() const { return _useOplogHack; }
 

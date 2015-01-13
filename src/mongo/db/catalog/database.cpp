@@ -185,7 +185,7 @@ namespace mongo {
         invariant( rs.get() ); // if cce exists, so should this
 
         // Not registering AddCollectionChange since this is for collections that already exist.
-        Collection* c = new Collection( txn, fullns, cce.release(), rs.release(), this );
+        Collection* c = new Collection( txn, fullns, cce.release(), rs.release(), _dbEntry );
         return c;
     }
 

@@ -161,6 +161,12 @@ namespace mongo {
         virtual bool isCapped() const { invariant(false); }
 
         virtual const char* name() const { invariant(false); }
+
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            invariant(false);
+        }
         // more things that we actually care about below
 
     private:

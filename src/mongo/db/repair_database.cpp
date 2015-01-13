@@ -84,8 +84,7 @@ namespace {
         // Skip the rest if there are no indexes to rebuild.
         if (indexSpecs.empty()) return Status::OK();
 
-        boost::scoped_ptr<Database> db;
-        Collection* collection;
+        boost::scoped_ptr<Collection> collection;
         boost::scoped_ptr<MultiIndexBlock> indexer;
         {
             // These steps are combined into a single WUOW to ensure there are no commits without
@@ -106,11 +105,10 @@ namespace {
             // Indexes must be dropped before we open the Collection otherwise we could attempt to
             // open a bad index and fail.
             // TODO see if MultiIndexBlock can be made to work without a Collection.
-            db.reset(new Database(txn, dbce->name(), dbce));
-            collection = db->getCollection(collectionName);
-            invariant(collection);
+            const StringData ns = cce->ns().ns();
+            collection.reset(new Collection(txn, ns, cce, dbce->getRecordStore(ns), dbce));
 
-            indexer.reset(new MultiIndexBlock(txn, collection));
+            indexer.reset(new MultiIndexBlock(txn, collection.get()));
             Status status = indexer->init(indexSpecs);
             if (!status.isOK()) {
                 // The WUOW will handle cleanup, so the indexer shouldn't do its own.
@@ -123,6 +121,9 @@ namespace {
 
         // Iterate all records in the collection. Delete them if they aren't valid BSON. Index them
         // if they are.
+
+        long long numRecords = 0;
+        long long dataSize = 0;
 
         RecordStore* rs = collection->getRecordStore();
         boost::scoped_ptr<RecordIterator> it(rs->getIterator(txn));
@@ -144,6 +145,9 @@ namespace {
                 continue;
             }
 
+            numRecords++;
+            dataSize += data.size();
+
             // Now index the record.
             // TODO SERVER-14812 add a mode that drops duplicates rather than failing
             WriteUnitOfWork wunit(txn);
@@ -158,6 +162,7 @@ namespace {
         {
             WriteUnitOfWork wunit(txn);
             indexer->commit();
+            rs->updateStatsAfterRepair(txn, numRecords, dataSize);
             wunit.commit();
         }
 
@@ -232,6 +237,9 @@ namespace {
 
             status = rebuildIndexesOnCollection(txn, dbce, *it);
             if (!status.isOK()) return status;
+
+            // TODO: uncomment once SERVER-16869
+            // engine->flushAllFiles(true);
         }
 
         return Status::OK();

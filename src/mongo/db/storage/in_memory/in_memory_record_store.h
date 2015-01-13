@@ -136,6 +136,13 @@ namespace mongo {
         virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
                                                          const RecordId& startingPosition) const;
 
+        virtual void updateStatsAfterRepair(OperationContext* txn,
+                                            long long numRecords,
+                                            long long dataSize) {
+            invariant(_data->records.size() == size_t(numRecords));
+            _data->dataSize = dataSize;
+        }
+
     protected:
         struct InMemoryRecord {
             InMemoryRecord() :size(0) {}

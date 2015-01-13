@@ -856,6 +856,14 @@ namespace {
         return _fromKey(key);
     }
 
+    void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* txn,
+                                                       long long numRecords,
+                                                       long long dataSize) {
+        _numRecords.store(numRecords);
+        _dataSize.store(dataSize);
+        _sizeStorer->store(_uri, numRecords, dataSize);
+    }
+
     RecordId WiredTigerRecordStore::_nextId() {
         invariant(!_useOplogHack);
         RecordId out = RecordId(_nextIdNum.fetchAndAdd(1));
