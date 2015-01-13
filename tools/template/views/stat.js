@@ -17,8 +17,14 @@ var StatView = module.exports = AmpersandView.extend({
       no: 'fa-circle-o'
     }
   },
-  clicked: function () {
-    this.model.toggle('selected');
-    this.parent.parent.statChanged(this);
+  clicked: function (event) {
+    // ignore shift+click, app handles those
+    if (event.shiftKey) {
+      this.model.app.toggleAllExcept(this.model);
+    } else {
+      this.model.app.clearSelectionState();
+      this.model.toggle('selected');
+    }
+    this.parent.parent.statChanged(this, {all: event.shiftKey, propagate: true});
   }
 });

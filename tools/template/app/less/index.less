@@ -10,6 +10,15 @@
   .transition(height .2s ease);
 }
 
+.noselect {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 #navbar {
   margin-bottom: 0px;
 
@@ -117,6 +126,7 @@ ul.stats {
 }
 
 li.stat {
+  .noselect;
   cursor: pointer;
   font-size: 12px;
   i {
@@ -125,6 +135,8 @@ li.stat {
 }
 
 .panel-title {
+  .noselect;
+  
   i.fa {
     margin-right: 10px;
   }
@@ -191,13 +203,11 @@ svg.multiline {
   }
 
   dl dt {
-    -moz-user-select: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+    .noselect;
   }
 
   dl dd {
+    .noselect;
     font-weight: bold;
     padding-top: 15px;
     font-size: 26px;

@@ -18,6 +18,9 @@ var Stat = module.exports = AmpersandState.extend({
     }, 
     data: {
       type: 'object'
+    },
+    app: {
+      type: 'object'
     }
   },
   derived: {

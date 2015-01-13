@@ -38,8 +38,14 @@ var SidebarView = module.exports = AmpersandView.extend({
       view.filterStats(search);
     });
   },
-  statChanged: function(stat) {
-    this.parent.statChanged(stat);
+  statChanged: function(stat, options) {
+    this.parent.statChanged(stat, options);
+    if (options.all) {
+      // inform all other panels that they need to update their indicators
+      _.each(this.panelViews.views, function (pv) { 
+        pv.statChanged(stat, {all: false, propagate: false});
+      });
+    }
   },
   inputChanged: _.debounce(function () {
     var content = this.queryByHook('input').value;

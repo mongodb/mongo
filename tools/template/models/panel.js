@@ -15,6 +15,9 @@ var Panel = module.exports = AmpersandState.extend({
       type: 'boolean',
       default: false
     },
+    app: {
+      type: 'object'
+    }
   },
   derived: {
     selected: {

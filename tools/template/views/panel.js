@@ -61,13 +61,16 @@ var PanelView = module.exports = AmpersandView.extend({
       case 'some': this.collapsibleOpen(); break;
       case 'none': this.collapsibleClose(); break;
     }
-
-    this.statChanged();
+    this.model.app.clearSelectionState();
+    this.statChanged(null, {propagate: true});
   },
-  statChanged: function (stat) {
+  statChanged: function (stat, options) {
+    options = options || {};
     // mirroring model.selected here to use for bindings
     this.indicator = this.model.selected;
-    this.parent.parent.statChanged(stat);
+    if (options.propagate) {
+      this.parent.parent.statChanged(stat, options);
+    }
   },
   collapsibleToggle: function (event) {
     if (this.model.open) {

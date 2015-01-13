@@ -51,7 +51,7 @@ var AppView = module.exports = AmpersandView.extend({
       }
     }
   },
-  statChanged: function (stat) {
+  statChanged: function (stat, options) {
     this.model.chart.recalcXDomain = true;
     this.chartView.render();
   },

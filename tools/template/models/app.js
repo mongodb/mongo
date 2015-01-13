@@ -14,6 +14,12 @@ var App = module.exports = AmpersandState.extend({
   collections: {
     stats: StatCollection
   },
+  props: {
+    selectionState: {
+      type: 'array',
+      default: function () { return []; }
+    }
+  },
   parse: function (attrs, options) {
     var year = new Date().getFullYear();
     var groups = {};
@@ -58,11 +64,50 @@ var App = module.exports = AmpersandState.extend({
     return ret;
   },
   initialize: function (attrs, options) {
-    // tell the panels what stats they're managing
+    // tell the panels about app and what stats they're managing
     var panels = this.sidebar.panels;
+    panels.each(function (panel) {
+      panel.app = this;
+    }.bind(this));
+    
     this.stats.each(function (stat) {
+      stat.app = this;
       panels.get(stat.group).stats.add(stat);
-    });
+    }.bind(this));
+  },
+  clearSelectionState: function () {
+    this.selectionState = [];
+    debug('clear');
+  },
+  toggleAllExcept: function (stat) {
+    // shift-click on stat has the following behavior:
+    // if any other stat is selected, then 
+    //     1. store current selection state
+    //     2. enable current stat
+    //     3. disable all other stats
+    // else
+    //     restore previous selection state
+
+    var deselectAll = this.stats
+      .filter(function (s) { return s !== stat })
+      .some(function (s) { return s.selected; });
+
+    if (this.selectionState.length === 0 || !stat.selected) {
+      // store old selected state
+      this.selectionState = this.stats.map(function (s) { return s.selected; });
+
+      // now deselect all but stat
+      this.stats.each(function (s) {
+        s.selected = (s === stat);
+      });
+
+    } else {
+      // need to restore previous selection state
+      this.stats.each(function (s, i) {
+        s.selected = this.selectionState.length ? this.selectionState[i] : true;
+      }.bind(this));
+      this.clearSelectionState();
+    }
   }
 });
 
