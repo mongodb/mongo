@@ -109,7 +109,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* set-key */
 	    __wt_cursor_notsup,		/* set-value */
 	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* compare_equal */
+	    __wt_cursor_notsup,		/* equals */
 	    __curbackup_next,		/* next */
 	    __wt_cursor_notsup,		/* prev */
 	    __curbackup_reset,		/* reset */

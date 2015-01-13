@@ -381,7 +381,7 @@ NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
 
 COMPARE_OK(__wt_cursor::compare)
-COMPARE_OK(__wt_cursor::compare_equal)
+COMPARE_OK(__wt_cursor::equals)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
@@ -416,7 +416,7 @@ COMPARE_OK(__wt_cursor::search_near)
 
 /* Next, override methods that return integers via arguments. */
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
-%ignore __wt_cursor::compare_equal(WT_CURSOR *, WT_CURSOR *, int *);
+%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 
 /* SWIG magic to turn Python byte strings into data / size. */
@@ -699,19 +699,19 @@ typedef int int_void;
 		return (ret);
 	}
 
-	/* compare_equal: special handling. */
-	int compare_equal(WT_CURSOR *other) {
+	/* equals: special handling. */
+	int equals(WT_CURSOR *other) {
 		int cmp = 0;
 		int ret = 0;
 		if (other == NULL) {
 			SWIG_Error(SWIG_NullReferenceError,
-			    "in method 'Cursor_compare_equal', "
+			    "in method 'Cursor_equals', "
 			    "argument 1 of type 'struct __wt_cursor *' "
 			    "is None");
 			ret = EINVAL;  /* any non-zero value will do. */
 		}
 		else {
-			ret = $self->compare_equal($self, other, &cmp);
+			ret = $self->equals($self, other, &cmp);
 
 			/*
 			 * Compare-equal is documented to return 0 and !0, map

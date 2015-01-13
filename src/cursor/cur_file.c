@@ -64,18 +64,18 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __curfile_compare_equal --
- *	WT_CURSOR->compare_equal method for the btree cursor type.
+ * __curfile_equals --
+ *	WT_CURSOR->equals method for the btree cursor type.
  */
 static int
-__curfile_compare_equal(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+__curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)a;
-	CURSOR_API_CALL(a, session, compare_equal, cbt->btree);
+	CURSOR_API_CALL(a, session, equals, cbt->btree);
 
 	/*
 	 * Check both cursors are a "file:" type then call the underlying
@@ -89,7 +89,7 @@ __curfile_compare_equal(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_CHECKKEY(a);
 	WT_CURSOR_CHECKKEY(b);
 
-	ret = __wt_btcur_compare_equal(
+	ret = __wt_btcur_equals(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
 
 err:	API_END_RET(session, ret);
@@ -389,7 +389,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curfile_compare,		/* compare */
-	    __curfile_compare_equal,	/* compare_equal */
+	    __curfile_equals,		/* equals */
 	    __curfile_next,		/* next */
 	    __curfile_prev,		/* prev */
 	    __curfile_reset,		/* reset */

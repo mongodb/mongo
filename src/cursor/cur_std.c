@@ -502,6 +502,28 @@ __wt_cursor_close(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_equals --
+ *	WT_CURSOR->equals default implementation.
+ */
+int
+__wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalityp)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	int cmp;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	CURSOR_API_CALL(cursor, session, equals, NULL);
+
+	WT_ERR(cursor->compare(cursor, other, &cmp));
+
+	*equalityp = (cmp == 0) ? 0 : 1;
+
+err:	API_END(session, ret);
+	return (ret);
+}
+
+/*
  * __cursor_runtime_config --
  *	Set runtime-configurable settings.
  */

@@ -218,7 +218,7 @@ public static int cursor_ops(Session session)
     Cursor other = null;
     /*! [Cursor equality] */
     int equal;
-    equal = cursor.compare_equal(other);
+    equal = cursor.equals(other);
     if (equal == 0) {
         /* Cursors reference the same key */
     } else {

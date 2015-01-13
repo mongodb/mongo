@@ -343,7 +343,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __curindex_set_value,	/* set-value */
 	    __wt_cursor_notsup,		/* compare */
-	    __wt_cursor_notsup,		/* compare_equal */
+	    __wt_cursor_notsup,		/* equals */
 	    __curindex_next,		/* next */
 	    __curindex_prev,		/* prev */
 	    __curindex_reset,		/* reset */

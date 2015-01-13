@@ -870,11 +870,11 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 }
 
 /*
- * __wt_btcur_compare_equal --
+ * __wt_btcur_equals --
  *	Return an equality comparison between two cursors.
  */
 int
-__wt_btcur_compare_equal(
+__wt_btcur_equals(
     WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 {
 	WT_CURSOR *a, *b;
