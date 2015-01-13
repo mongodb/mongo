@@ -7,6 +7,7 @@
  */
 
 #define	WT_TXN_NONE	0		/* No txn running in a session. */
+#define	WT_TXN_FIRST	1		/* First transaction to run. */
 #define	WT_TXN_ABORTED	UINT64_MAX	/* Update rolled back, ignore. */
 
 /*

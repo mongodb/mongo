@@ -957,10 +957,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
 	/*
-	 * If we have a file to close, close it now.
+	 * If we have a file to close, close it now.  First fsync so
+	 * that a later sync will be assured all earlier transactions
+	 * in earlier log files are also on disk.
 	 */
-	if (close_fh)
+	if (close_fh) {
+		WT_ERR(__wt_fsync(session, close_fh));
 		WT_ERR(__wt_close(session, close_fh));
+	}
 
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);

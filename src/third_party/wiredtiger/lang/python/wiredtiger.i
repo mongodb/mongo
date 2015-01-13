@@ -339,7 +339,9 @@ retry:
 	if (result != 0 && result != EBUSY)
 		SWIG_ERROR_IF_NOT_SET(result);
         else if (result == EBUSY) {
+		SWIG_PYTHON_THREAD_BEGIN_ALLOW;
                 __wt_sleep(0, 10000);
+		SWIG_PYTHON_THREAD_END_ALLOW;
                 goto retry;
         }
 }
@@ -361,8 +363,17 @@ retry:
 }
 %enddef
 
-/* Cursor compare can return any of -1, 0, 1 or WT_NOTFOUND. */
+/* Cursor compare can return any of -1, 0, 1. */
 %define COMPARE_OK(m)
+%exception m {
+	$action
+	if (result < -1 || result > 1)
+		SWIG_ERROR_IF_NOT_SET(result);
+}
+%enddef
+
+/* Cursor compare can return any of -1, 0, 1 or WT_NOTFOUND. */
+%define COMPARE_NOTFOUND_OK(m)
 %exception m {
 	$action
 	if ((result < -1 || result > 1) && result != WT_NOTFOUND)
@@ -379,7 +390,7 @@ NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
 
 COMPARE_OK(__wt_cursor::compare)
-COMPARE_OK(__wt_cursor::search_near)
+COMPARE_NOTFOUND_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
 %exception __wt_connection::get_home;

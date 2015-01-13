@@ -227,6 +227,16 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+
+	/*
+	 * If there is no transaction active in this thread and we haven't
+	 * checked if the cache is full, do it now.  If we have to block for
+	 * eviction, this is the best time to do it.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING) &&
+	    !F_ISSET(txn, TXN_HAS_ID) && !F_ISSET(txn, TXN_HAS_SNAPSHOT))
+		WT_RET(__wt_cache_full_check(session));
+
 	if (!F_ISSET(txn, TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;

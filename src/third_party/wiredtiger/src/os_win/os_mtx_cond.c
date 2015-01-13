@@ -45,7 +45,6 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 {
 	WT_DECL_RET;
 	int locked;
-	int lasterror;
 	int milliseconds;
 	locked = 0;
 	WT_ASSERT(session, usecs >= 0);
@@ -82,8 +81,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 		    &cond->cond, &cond->mtx, INFINITE);
 
 	if (ret == 0) {
-		lasterror = GetLastError();
-		if (lasterror == ERROR_TIMEOUT) {
+		if (GetLastError() == ERROR_TIMEOUT) {
 			ret = 1;
 		}
 	}

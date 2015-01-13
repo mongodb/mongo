@@ -78,7 +78,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 tfile.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
-# Output the wiredtiger_strerror code.
+# Output the wiredtiger_strerror and wiredtiger_sterror_r code.
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
@@ -86,18 +86,22 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 #include "wt_internal.h"
 
 /*
- * wiredtiger_strerror --
- *\tReturn a string for any error value.
+ * Historically, there was only the wiredtiger_strerror call because the POSIX
+ * port didn't need anything more complex; Windows requires memory allocation
+ * of error strings, so we added the wiredtiger_strerror_r call. Because we
+ * want wiredtiger_strerror to continue to be as thread-safe as possible, errors
+ * are split into three categories: WiredTiger constant strings, system constant
+ * strings and Everything Else, and we check constant strings before Everything
+ * Else.
  */
-const char *
-wiredtiger_strerror(int error)
+
+/*
+ * __wiredtiger_error --
+ *\tReturn a constant string for the WiredTiger errors.
+ */
+static const char *
+__wiredtiger_error(int error)
 {
-\tstatic char errbuf[64];
-\tchar *p;
-
-\tif (error == 0)
-\t\treturn ("Successful return: 0");
-
 \tswitch (error) {
 ''')
 
@@ -105,19 +109,51 @@ for err in errors:
     tfile.write('\tcase ' + err.name + ':\n')
     tfile.write('\t\treturn ("' + err.name + ': ' + err.desc + '");\n')
 
-tfile.write('''\
-\tdefault:
-\t\tif (error > 0 && (p = strerror(error)) != NULL)
-\t\t\treturn (p);
-\t\tbreak;
-\t}
+tfile.write('''\t}
+\treturn (NULL);
+}
 
-\t/*
-\t * !!!
-\t * Not thread-safe, but this is never supposed to happen.
-\t */
-\t(void)snprintf(errbuf, sizeof(errbuf), "Unknown error: %d", error);
-\treturn (errbuf);
+/*
+ * wiredtiger_strerror --
+ *\tReturn a string for any error value, non-thread-safe version.
+ */
+const char *
+wiredtiger_strerror(int error)
+{
+\tstatic char buf[128];
+\tconst char *p;
+
+\t/* Check for a constant string. */
+\tif ((p = __wiredtiger_error(error)) != NULL ||
+\t    (p = __wt_strerror(error)) != NULL)
+\t\treturn (p);
+
+\t/* Else, fill in the non-thread-safe static buffer. */
+\tif (wiredtiger_strerror_r(error, buf, sizeof(buf)) != 0)
+\t\t(void)snprintf(buf, sizeof(buf), "error return: %d", error);
+
+\treturn (buf);
+}
+
+/*
+ * wiredtiger_strerror_r --
+ *\tReturn a string for any error value, thread-safe version.
+ */
+int
+wiredtiger_strerror_r(int error, char *buf, size_t buflen)
+{
+\tconst char *p;
+
+\t/* Require at least 2 bytes, printable character and trailing nul. */
+\tif (buflen < 2)
+\t\treturn (ENOMEM);
+
+\t/* Check for a constant string. */
+\tif ((p = __wiredtiger_error(error)) != NULL ||
+\t    (p = __wt_strerror(error)) != NULL)
+\t\treturn (snprintf(buf, buflen, "%s", p) > 0 ? 0 : ENOMEM);
+
+\treturn (__wt_strerror_r(error, buf, buflen));
 }
 ''')
 tfile.close()

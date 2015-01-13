@@ -437,7 +437,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 	WT_EVICT_WORKER *worker;
 	int loop;
 	uint32_t flags;
-	uint64_t bytes_inuse, pages_evicted;
+	uint64_t bytes_inuse, dirty_target_size, pages_evicted, target_size;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -465,9 +465,16 @@ __evict_pass(WT_SESSION_IMPL *session)
 		if (loop > 10)
 			LF_SET(WT_EVICT_PASS_AGGRESSIVE);
 
-		/* Start a worker if we have capacity and the cache is full. */
+		/*
+		 * Start a worker if we have capacity and we haven't reached
+		 * the eviction targets.
+		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		if (bytes_inuse > conn->cache_size &&
+		target_size = (conn->cache_size * cache->eviction_target) / 100;
+		dirty_target_size =
+		    (conn->cache_size * cache->eviction_dirty_target) / 100;
+		if ((bytes_inuse > target_size ||
+		    cache->bytes_dirty > dirty_target_size) &&
 		    conn->evict_workers < conn->evict_workers_max) {
 			WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "Starting evict worker: %"PRIu32"\n",
