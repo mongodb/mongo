@@ -9,15 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * Tuning; global variables to allow the binary to be patched, we don't yet have
- * any real understanding of what might be useful to surface to applications.
- */
-static u_int __split_deepen_max_internal_image = 100;
-static u_int __split_deepen_min_child = 10;
-static u_int __split_deepen_per_child = 100;
-static u_int __split_deepen_split_child = 100;
-
-/*
  * Track allocation increments, matching the cache calculations, which add an
  * estimate of allocation overhead to every object.
  */
@@ -177,45 +168,57 @@ __split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
 }
 
 /*
+ * Tuning; global variables to allow the binary to be patched, we don't yet have
+ * any real understanding of what might be useful to surface to applications.
+ */
+static u_int __split_deepen_min_child = 10000;
+static u_int __split_deepen_per_child = 100;
+
+/*
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
 static int
-__split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
+__split_should_deepen(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *childrenp)
 {
 	WT_PAGE_INDEX *pindex;
+	WT_PAGE *page;
 
-	/*
-	 * Splits are based on either the number of child pages that will be
-	 * created by the split (splitting an internal page that will be slow
-	 * to search), or by the memory footprint of the parent page (avoiding
-	 * an internal page that will eat up all of the cache and put eviction
-	 * pressure on the system).
-	 */
+	*childrenp = 0;
+
+	page = ref->page;
 	pindex = WT_INTL_INDEX_COPY(page);
 
 	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
-	 * maximum size for a page in memory.  We need an absolute minimum
-	 * number of entries in order to split the page: if there is a single
-	 * huge key, splitting won't help.
+	 * maximum size for a page in memory (presumably putting eviction
+	 * pressure on the cache).
 	 */
-	if (page->memory_footprint > S2BT(session)->maxmempage &&
-	    pindex->entries >= __split_deepen_min_child)
-		return (1);
+	if (page->memory_footprint < S2BT(session)->maxmempage)
+		return (0);
 
 	/*
-	 * Deepen the tree if the page's memory footprint is at least N
-	 * times the maximum internal page size chunk in the backing file and
-	 * the split will result in at least N children in the newly created
-	 * intermediate layer.
+	 * Ensure the page has enough entries to make it worth splitting and
+	 * we get a significant payback (in the case of a set of large keys,
+	 * splitting won't help).
 	 */
-	if (page->memory_footprint >
-	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage &&
-	    pindex->entries >=
-	    (__split_deepen_per_child * __split_deepen_split_child))
+	if (pindex->entries > __split_deepen_min_child) {
+		*childrenp = pindex->entries / __split_deepen_per_child;
 		return (1);
+	}
 
+	/*
+	 * The root is a special-case: if it's putting cache pressure on the
+	 * system, split it even if there are only a few entries, we can't
+	 * push it out of memory.  Sanity check: if the root page is too big
+	 * with less than 100 keys, there are huge keys and/or a too-small
+	 * cache, there's not much to do.
+	 */
+	if (__wt_ref_is_root(ref) && pindex->entries > 100) {
+		*childrenp = pindex->entries / 10;
+		return (1);
+	}
 	return (0);
 }
 
@@ -383,7 +386,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Split an internal page in-memory, deepening the tree.
  */
 static int
-__split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
+__split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 {
 	WT_DECL_RET;
 	WT_PAGE *child;
@@ -391,7 +394,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_REF **alloc_refp;
 	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
-	uint32_t children, chunk, i, j, remain, slots;
+	uint32_t chunk, i, j, remain, slots;
 	int panic;
 	void *p;
 
@@ -400,13 +403,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	panic = 0;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
-
-	/*
-	 * Create N children, unless we are dealing with a large page without
-	 * many entries, in which case split into the minimum number of pages.
-	 */
-	children = WT_MAX(pindex->entries / __split_deepen_per_child,
-	    __split_deepen_min_child);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
@@ -717,10 +713,11 @@ __split_multi_inmem(
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = orig->modify->first_dirty_txn;
+	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
@@ -813,17 +810,20 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     int exclusive, int ref_discard)
 {
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_REF **alloc_refp, *parent_ref;
+	WT_REF **alloc_refp, *next_ref, *parent_ref;
 	size_t size;
-	uint32_t i, j, parent_entries, result_entries;
+	uint32_t children, i, j;
+	uint32_t deleted_entries, parent_entries, result_entries;
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
-	alloc_index = NULL;
+	alloc_index = pindex = NULL;
 	parent_ref = NULL;
 	complete = hazard = locked = 0;
+	parent_entries = 0;
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -864,7 +864,29 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
-	result_entries = (parent_entries - 1) + new_entries;
+
+	/*
+	 * Remove any refs to deleted pages while we are splitting, we have
+	 * the internal page locked down, and are copying the refs into a new
+	 * array anyway.  Switch them to the special split state, so that any
+	 * reading thread will restart.
+	 */
+	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+		if (next_ref->state == WT_REF_DELETED &&
+		    next_ref->page_del == NULL &&
+		    WT_ATOMIC_CAS4(next_ref->state,
+		    WT_REF_DELETED, WT_REF_SPLIT))
+			deleted_entries++;
+	}
+
+	/*
+	 * The final entry count consists of: The original count, plus any
+	 * new pages, less any refs we are removing because they only
+	 * contained deleted items, less 1 for the page being replaced.
+	 */
+	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -876,8 +898,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_MEMSIZE_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
-	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
-		if (pindex->index[i] == ref)
+	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
@@ -889,8 +912,26 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				 */
 				ref_new[j] = NULL;
 			}
-		else
-			*alloc_refp++ = pindex->index[i];
+		else if (next_ref->state == WT_REF_SPLIT) {
+			/*
+			 * We're discarding a deleted reference.
+			 * Free any resources it holds.
+			 */
+			if (parent->type == WT_PAGE_ROW_INT) {
+				WT_TRET(__split_ovfl_key_cleanup(
+				    session, parent, next_ref));
+				ikey = __wt_ref_key_instantiated(next_ref);
+				if (ikey != NULL)
+					WT_TRET(__split_safe_free(session, 0,
+					    ikey,
+					    sizeof(WT_IKEY) + ikey->size));
+			}
+
+			WT_TRET(__split_safe_free(
+			    session, 0, next_ref, sizeof(WT_REF)));
+		} else
+			*alloc_refp++ = next_ref;
+	}
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -977,11 +1018,30 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !exclusive && __split_should_deepen(session, parent))
+	if (ret == 0 && !exclusive &&
+	    !F_ISSET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN) &&
+	    __split_should_deepen(session, parent_ref, &children)) {
+		/*
+		 * XXX
+		 * Temporary hack to avoid a bug where the root page is split
+		 * even when it's no longer doing any good.
+		 */
+		uint64_t __a, __b;
+		__a = parent->memory_footprint;
 		WT_WITH_PAGE_INDEX(session,
-		    ret = __split_deepen(session, parent));
+		    ret = __split_deepen(session, parent, children));
+		__b = parent->memory_footprint;
+		if (__b * 2 >= __a)
+			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
+	}
 
-err:	if (locked)
+err:	if (!complete)
+		for (i = 0; i < parent_entries; ++i) {
+			next_ref = pindex->index[i];
+			if (next_ref->state == WT_REF_SPLIT)
+				next_ref->state = WT_REF_DELETED;
+		}
+	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
@@ -1137,10 +1197,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	/*
 	 * We modified the page above, which will have set the first dirty
 	 * transaction to the last transaction current running.  However, the
-	 * updates we installed may be older than that.  Inherit the first
-	 * dirty transaction from the original page.
+	 * updates we installed may be older than that.  Set the first dirty
+	 * transaction to an impossibly old value so this page is never skipped
+	 * in a checkpoint.
 	 */
-	right->modify->first_dirty_txn = page->modify->first_dirty_txn;
+	right->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
 	 * Calculate how much memory we're moving: figure out how deep the skip

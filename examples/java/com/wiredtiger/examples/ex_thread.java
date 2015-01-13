@@ -60,6 +60,8 @@ class ScanThread extends Thread {
             if (ret != wiredtiger.WT_NOTFOUND)
                 System.err.println("Cursor.next: " +
                                    wiredtiger.wiredtiger_strerror(ret));
+            cursor.close();
+            session.close(null);
         } catch (WiredTigerException wte) {
             System.err.println("Exception " + wte);
         }
@@ -74,7 +76,7 @@ public class ex_thread {
     public static final int NUM_THREADS = 10;
 
     /*! [thread main] */
-    static int main(String[] argv)
+    public static void main(String[] argv)
     {
         try {
             Thread[] threads = new Thread[NUM_THREADS];
@@ -86,7 +88,7 @@ public class ex_thread {
              * environment variable isn't already set (as is done by make check).
              */
             if (System.getenv("WIREDTIGER_HOME") == null) {
-		home = "WT_HOME";
+                home = "WT_HOME";
                 try {
                     Process proc = Runtime.getRuntime().exec("/bin/rm -rf " + home);
                     BufferedReader br = new BufferedReader(
@@ -94,17 +96,19 @@ public class ex_thread {
                     while(br.ready())
                         System.out.println(br.readLine());
                     br.close();
-                    new File(home).mkdir();
-                } catch (IOException ioe) {
-                    System.err.println("IOException: " + home + ": " + ioe);
-                    return(1);
+                    proc.waitFor();
+                    if (!(new File(home)).mkdir())
+                        System.err.println("mkdir: failed");
+                } catch (Exception ex) {
+                    System.err.println("Exception: " + home + ": " + ex);
+                    System.exit(1);
                 }
             } else
 		home = null;
 
             if ((conn = wiredtiger.open(home, "create")) == null) {
                 System.err.println("Error connecting to " + home);
-                return(1);
+                System.exit(1);
             }
 
             /* Note: further error checking omitted for clarity. */
@@ -115,6 +119,7 @@ public class ex_thread {
             cursor.putKeyString("key1");
             cursor.putValueString("value1");
             ret = cursor.insert();
+            cursor.close();
             ret = session.close(null);
 
             for (i = 0; i < NUM_THREADS; i++) {
@@ -131,11 +136,12 @@ public class ex_thread {
                 }
 
             ret = conn.close(null);
-            return (ret);
+            System.exit(ret);
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
     /*! [thread main] */

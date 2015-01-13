@@ -270,6 +270,7 @@ __wt_txn_checkpoint_log(
 {
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;
+	WT_ITEM *ckpt_snapshot, empty;
 	WT_LSN *ckpt_lsn;
 	WT_TXN *txn;
 	uint8_t *end, *p;
@@ -319,19 +320,22 @@ __wt_txn_checkpoint_log(
 		 */
 		if (!txn->full_ckpt) {
 			txn->ckpt_nsnapshot = 0;
+			WT_CLEAR(empty);
+			ckpt_snapshot = &empty;
 			*ckpt_lsn = S2C(session)->log->alloc_lsn;
-		}
+		} else
+			ckpt_snapshot = txn->ckpt_snapshot;
 
 		/* Write the checkpoint log record. */
 		WT_ERR(__wt_struct_size(session, &recsize, fmt,
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
-		    txn->ckpt_nsnapshot, &txn->ckpt_snapshot));
+		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
 
 		WT_ERR(__wt_struct_pack(session,
 		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
-		    txn->ckpt_nsnapshot, &txn->ckpt_snapshot));
+		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 

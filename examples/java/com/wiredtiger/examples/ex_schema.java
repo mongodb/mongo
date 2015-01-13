@@ -92,10 +92,11 @@ public class ex_schema {
                 while(br.ready())
                     System.out.println(br.readLine());
                 br.close();
+                proc.waitFor();
                 new File("WT_HOME").mkdir();
-            } catch (IOException ioe) {
-                System.err.println("IOException: WT_HOME: " + ioe);
-                return(1);
+            } catch (Exception ex) {
+                System.err.println("Exception: " + ex);
+                return (1);
             }
         } else
             home = null;
@@ -159,10 +160,23 @@ public class ex_schema {
         }
         ret = cursor.close();
 
+	/* Update records in the table. */
+	cursor = session.open_cursor("table:poptable", null, null);
+        while ((ret = cursor.next()) == 0) {
+            recno = cursor.getKeyRecord();
+            country = cursor.getValueString();
+            year = cursor.getValueShort();
+            population = cursor.getValueLong();
+            cursor.putValueString(country);
+            cursor.putValueShort(year);
+            cursor.putValueLong(population + 1);
+        }
+        ret = cursor.close();
+
         /* List the records in the table. */
         cursor = session.open_cursor("table:poptable", null, null);
         while ((ret = cursor.next()) == 0) {
-            recno = cursor.getKeyLong();
+            recno = cursor.getKeyRecord();
             country = cursor.getValueString();
             year = cursor.getValueShort();
             population = cursor.getValueLong();
@@ -282,7 +296,7 @@ public class ex_schema {
         while ((ret = cursor.next()) == 0) {
             country = cursor.getKeyString();
             year = cursor.getKeyShort();
-            recno = cursor.getValueLong();
+            recno = cursor.getValueRecord();
             System.out.println("row ID " + recno + ": country " + country +
                 ", year " + year);
         }
@@ -326,15 +340,16 @@ public class ex_schema {
         return (ret);
     }
 
-    public static int
+    public static void
     main(String[] argv)
     {
         try {
-            return (schemaExample());
+            System.exit(schemaExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }

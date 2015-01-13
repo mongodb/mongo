@@ -361,8 +361,15 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	/* If we are logging, write a commit log record. */
 	if (ret == 0 && txn->mod_count > 0 &&
 	    FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
-	    !F_ISSET(session, WT_SESSION_NO_LOGGING))
+	    !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
+		/*
+		 * We are about to block on I/O writing the log.
+		 * Release our snapshot in case it is keeping data pinned.
+		 * This is particularly important for checkpoints.
+		 */
+		__wt_txn_release_snapshot(session);
 		ret = __wt_txn_log_commit(session, cfg);
+	}
 
 	/*
 	 * If anything went wrong, roll back.
@@ -531,9 +538,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	txn_global = &conn->txn_global;
-	txn_global->current = 1;
-	txn_global->oldest_id = 1;
-	txn_global->last_running = 1;
+	txn_global->current = txn_global->last_running =
+	    txn_global->oldest_id = WT_TXN_FIRST;
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));

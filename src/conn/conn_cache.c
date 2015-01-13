@@ -144,6 +144,8 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
 	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
 	WT_STAT_SET(stats, cache_bytes_dirty, cache->bytes_dirty);
+	WT_STAT_SET(stats,
+	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
 	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
 }
 

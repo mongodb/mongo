@@ -164,9 +164,11 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_dirty;
 	WT_STATS cache_eviction_fail;
 	WT_STATS cache_eviction_force;
+	WT_STATS cache_eviction_force_delete;
 	WT_STATS cache_eviction_force_fail;
 	WT_STATS cache_eviction_hazard;
 	WT_STATS cache_eviction_internal;
+	WT_STATS cache_eviction_maximum_page_size;
 	WT_STATS cache_eviction_queue_empty;
 	WT_STATS cache_eviction_queue_not_empty;
 	WT_STATS cache_eviction_server_evicting;
