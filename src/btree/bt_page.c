@@ -37,8 +37,11 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    page->type != WT_PAGE_ROW_LEAF)
 		return (0);
 
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	/*
+	 * Eviction may be turned off (although that's rare), or we may be in
+	 * the middle of a checkpoint.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
 		return (0);
 
 	/*
