@@ -454,7 +454,7 @@ namespace mongo {
         }
 
         DEV log(LogComponent::kControl) << "_DEBUG build (which is slower)" << endl;
-        logMongodStartupWarnings();
+        logMongodStartupWarnings(storageGlobalParams);
 
 #if defined(_WIN32)
         printTargetMinOS();

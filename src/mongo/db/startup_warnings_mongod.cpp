@@ -40,16 +40,95 @@
 
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
+namespace {
+
+    const std::string kTransparentHugePagesDirectory("/sys/kernel/mm/transparent_hugepage");
+
+}  // namespace
 
     using std::ios_base;
     using std::string;
 
-    void logMongodStartupWarnings() {
+    // static
+    StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
+        const std::string& parameter) {
+
+        return readTransparentHugePagesParameter(parameter, kTransparentHugePagesDirectory);
+    }
+
+    // static
+    StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter(
+        const std::string& parameter,
+        const std::string& directory) {
+
+        std::string opMode;
+        try {
+            boost::filesystem::path directoryPath(directory);
+            if (!boost::filesystem::exists(directoryPath)) {
+                return StatusWith<std::string>(ErrorCodes::NonExistentPath, str::stream()
+                    << "Unable to read non-existent transparent Huge Pages directory: "
+                    << directory);
+            }
+
+            boost::filesystem::path parameterPath(directoryPath / parameter);
+            if (!boost::filesystem::exists(parameterPath)) {
+                return StatusWith<std::string>(ErrorCodes::NonExistentPath, str::stream()
+                    << "Unable to read non-existent transparent Huge Pages file: "
+                    << parameterPath.string());
+            }
+
+            std::string filename(parameterPath.string());
+            std::ifstream ifs(filename.c_str());
+            if (!ifs) {
+                return StatusWith<std::string>(ErrorCodes::FileNotOpen, str::stream()
+                    << "Unable to open transparent Huge Pages file " << filename);
+            }
+
+            std::string line;
+            if (!std::getline(ifs, line)) {
+                int errorcode = errno;
+                return StatusWith<std::string>(ErrorCodes::FileStreamFailed, str::stream()
+                    << "failed to read from " << filename << ": "
+                    << ((ifs.eof()) ? "EOF" : errnoWithDescription(errorcode)));
+            }
+
+            std::string::size_type posBegin = line.find("[");
+            std::string::size_type posEnd = line.find("]");
+            if (posBegin == string::npos || posEnd == string::npos ||
+                posBegin >= posEnd) {
+                return StatusWith<std::string>(ErrorCodes::FailedToParse, str::stream()
+                    << "cannot parse line: '" << line << "'");
+            }
+
+            opMode = line.substr(posBegin + 1, posEnd - posBegin - 1);
+            if (opMode.empty()) {
+                return StatusWith<std::string>(ErrorCodes::BadValue, str::stream()
+                    << "invalid mode in " << filename << ": '" << line << "'");
+            }
+
+            // Check against acceptable values of opMode.
+            if (opMode != "always" && opMode != "madvise" && opMode != "never") {
+                return StatusWith<std::string>(ErrorCodes::BadValue, str::stream()
+                    << "** WARNING: unrecognized transparent Huge Pages mode of operation in "
+                    << filename << ": '" << opMode << "''");
+            }
+        }
+        catch (const boost::filesystem::filesystem_error& err) {
+            return StatusWith<std::string>(ErrorCodes::UnknownError, str::stream()
+                << "Failed to probe \"" << err.path1().string() << "\": "
+                << err.code().message());
+        }
+
+        return StatusWith<std::string>(opMode);
+    }
+
+    void logMongodStartupWarnings(const StorageGlobalParams& params) {
         logCommonStartupWarnings();
 
         bool warned = false;
@@ -59,7 +138,7 @@ namespace mongo {
             log() << "** NOTE: This is a 32 bit MongoDB binary." << startupWarningsLog;
             log() << "**       32 bit builds are limited to less than 2GB of data "
                   << "(or less with --journal)." << startupWarningsLog;
-            if (!storageGlobalParams.dur) {
+            if (!params.dur) {
                 log() << "**       Note that journaling defaults to off for 32 bit "
                       << "and is currently off." << startupWarningsLog;
             }
@@ -140,7 +219,7 @@ namespace mongo {
             }
         }
 
-        if (storageGlobalParams.dur) {
+        if (params.dur) {
             std::fstream f("/proc/sys/vm/overcommit_memory", ios_base::in);
             unsigned val;
             f >> val;
@@ -170,57 +249,50 @@ namespace mongo {
         }
 
         // Transparent Hugepages checks
-        bool hasHugePages = false;
-        try {
-            hasHugePages = boost::filesystem::exists("/sys/kernel/mm/transparent_hugepage/enabled");
+        StatusWith<std::string> transparentHugePagesEnabledResult =
+            StartupWarningsMongod::readTransparentHugePagesParameter("enabled");
+        if (transparentHugePagesEnabledResult.isOK()) {
+            if (transparentHugePagesEnabledResult.getValue() == "always") {
+                log() << startupWarningsLog;
+                log() << "** WARNING: " << kTransparentHugePagesDirectory
+                      << "/enabled is 'always'."
+                      << startupWarningsLog;
+                log() << "**        We suggest setting it to 'never'"
+                      << startupWarningsLog;
 
-            if (hasHugePages) {
-                std::ifstream f1("/sys/kernel/mm/transparent_hugepage/enabled");
-                std::string line;
-                if (!std::getline(f1, line)) {
-                    warning() << "failed to read from /sys/kernel/mm/transparent_hugepage/enabled: "
-                              << ((f1.eof()) ? "EOF" : errnoWithDescription())
-                              << startupWarningsLog;
-                    warned = true;
-                }
-                else {
-                    std::string::size_type pos_begin = line.find("[");
-                    std::string::size_type pos_end = line.find("]");
-                    if (pos_begin == string::npos || pos_end == string::npos ||
-                        pos_begin >= pos_end) {
-                        warning() << "cannot parse line: '" << line << "'"
-                              << startupWarningsLog;
-                        warned = true;
-                    }
-
-                    std::string op_mode = line.substr(pos_begin + 1, pos_end - pos_begin - 1);
-                    if (op_mode == "always") {
-                        log() << startupWarningsLog;
-                        log() <<
-                            "** WARNING: /sys/kernel/mm/transparent_hugepage/enabled is 'always'."
-                            << startupWarningsLog;
-                        log() << "**        We suggest setting it to 'never'"
-                              << startupWarningsLog;
-                        warned = true;
-                    }
-                    else if (op_mode != "madvise" && op_mode != "never") {
-                        log() << startupWarningsLog;
-                        log() << "** WARNING: unrecognized transparent HugePages mode of operation '"
-                              << op_mode << "'"
-                              << startupWarningsLog;
-                    }
-                }
             }
+            warned = true;
         }
-        catch (const boost::filesystem::filesystem_error& err) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: Cannot detect if transparent HugePages feature is enabled. "
-                    << "Failed to probe \"" << err.path1().string() << "\": "
-                    << err.code().message()
-                    << startupWarningsLog;
+        else if (transparentHugePagesEnabledResult.getStatus().code() !=
+                 ErrorCodes::NonExistentPath) {
+            warning() << startupWarningsLog;
+            warning() << transparentHugePagesEnabledResult.getStatus().reason()
+                      << startupWarningsLog;
+            warned = true;
         }
 
-#endif
+        StatusWith<std::string> transparentHugePagesDefragResult =
+            StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
+        if (transparentHugePagesDefragResult.isOK()) {
+            if (transparentHugePagesDefragResult.getValue() == "always") {
+                log() << startupWarningsLog;
+                log() << "** WARNING: " << kTransparentHugePagesDirectory
+                      << "/defrag is 'always'."
+                      << startupWarningsLog;
+                log() << "**        We suggest setting it to 'never'"
+                      << startupWarningsLog;
+
+            }
+            warned = true;
+        }
+        else if (transparentHugePagesDefragResult.getStatus().code() !=
+                 ErrorCodes::NonExistentPath) {
+            warning() << startupWarningsLog;
+            warning() << transparentHugePagesDefragResult.getStatus().reason()
+                      << startupWarningsLog;
+            warned = true;
+        }
+#endif  // __linux__
 
 #if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
         //Check that # of files rlmit > 1000 , and # of processes > # of files/2
