@@ -17,14 +17,8 @@ import (
 )
 
 const (
-	JSON_ARRAY_START = "["
-	JSON_ARRAY_END   = "]"
-)
-
-// compile-time interface sanity check
-var (
-	_ ExportOutput = (*CSVExportOutput)(nil)
-	_ ExportOutput = (*JSONExportOutput)(nil)
+	CSV  = "csv"
+	JSON = "json"
 )
 
 // Wrapper for mongoexport functionality
@@ -79,6 +73,19 @@ func (exp *MongoExport) ValidateSettings() error {
 	}
 	if err := util.ValidateCollectionName(exp.ToolOptions.Namespace.Collection); err != nil {
 		return err
+	}
+
+	if exp.ToolOptions.HiddenOptions.CSVOutputType {
+		log.Log(log.Always, "csv flag is deprecated; please use --type=csv instead")
+		exp.OutputOpts.Type = CSV
+	}
+
+	if exp.OutputOpts.Type == "" {
+		// special error for an empty type value
+		return fmt.Errorf("--type cannot be empty")
+	}
+	if exp.OutputOpts.Type != CSV && exp.OutputOpts.Type != JSON {
+		return fmt.Errorf("invalid output type '%v', choose 'json' or 'csv'", exp.OutputOpts.Type)
 	}
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
@@ -264,7 +271,7 @@ func (exp *MongoExport) Export(out io.Writer) (int64, error) {
 // transforming BSON documents into the appropriate output format and writing
 // them to an output stream.
 func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
-	if exp.OutputOpts.CSV {
+	if exp.OutputOpts.Type == CSV {
 		// TODO what if user specifies *both* --fields and --fieldFile?
 		var fields []string
 		var err error

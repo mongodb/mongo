@@ -2,13 +2,13 @@ package mongoexport
 
 type OutputFormatOptions struct {
 	//Fields is an option to directly specify comma-separated fields to export to CSV
-	Fields string `long:"fields" short:"f" description:"comma separated list of field names\ne.g. -f name,age"`
+	Fields string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
 
 	//FieldFile is a filename that refers to a list of fields to export, 1 per line
 	FieldFile string `long:"fieldFile" description:"file with field names - 1 per line"`
 
-	//CSV switches the export mode from JSON (the default) to CSV
-	CSV bool `long:"csv" description:"export to csv instead of json"`
+	//Type selects the type of output to export as (json or csv)
+	Type string `long:"type" default:"json" description:"the output format, either json or csv"`
 
 	//OutputFile specifies an output file path.
 	OutputFile string `long:"out" short:"o" description:"output file; if not specified, stdout is used"`

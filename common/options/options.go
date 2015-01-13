@@ -65,6 +65,9 @@ type HiddenOptions struct {
 	// Specifies the number of threads to use in sending processed data over to the server
 	NumInsertionWorkers int
 
+	// Deprecated flag for csv writing in mongoexport
+	CSVOutputType bool
+
 	TempUsersColl *string
 	TempRolesColl *string
 }
@@ -268,6 +271,10 @@ func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgume
 See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`)
 	}
 
+	if option == "csv" {
+		opts.CSVOutputType = true
+		return args, nil
+	}
 	if option == "tempUsersColl" {
 		opts.TempUsersColl = new(string)
 		value, consumeVal, err := getStringArg(arg, args)
@@ -318,7 +325,7 @@ See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`
 	return args, nil
 }
 
-//getInt returns 3 args: the parsed int value, a bool set to true if a value
+//getIntArg returns 3 args: the parsed int value, a bool set to true if a value
 //was consumed from the incoming args array during parsing, and an error
 //value if parsing failed
 func getIntArg(arg flags.SplitArgument, args []string) (int, bool, error) {

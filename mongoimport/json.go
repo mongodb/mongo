@@ -55,12 +55,6 @@ type JSONConverter struct {
 	index uint64
 }
 
-const (
-	JSON_ARRAY_START = '['
-	JSON_ARRAY_SEP   = ','
-	JSON_ARRAY_END   = ']'
-)
-
 var (
 	// ErrNoOpeningBracket means that the input source did not contain any
 	// opening brace - returned only if --jsonArray is passed in.
@@ -171,9 +165,9 @@ func (j JSONConverter) Convert() (bson.D, error) {
 // input source until it hits an error (including EOF) to ensure the entire
 // input source content is a valid JSON array
 func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
-	jsonInputReader.expectedByte = JSON_ARRAY_SEP
+	jsonInputReader.expectedByte = json.ArraySep
 	if jsonInputReader.numProcessed == 0 {
-		jsonInputReader.expectedByte = JSON_ARRAY_START
+		jsonInputReader.expectedByte = json.ArrayStart
 	}
 
 	var readByte byte
@@ -194,7 +188,7 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 		}
 		readByte = jsonInputReader.bytesFromReader[0]
 
-		if readByte == JSON_ARRAY_END {
+		if readByte == json.ArrayEnd {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
@@ -210,18 +204,18 @@ func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
 				if strings.TrimSpace(readString) != "" {
 					return fmt.Errorf("bad JSON array format - found '%v' "+
 						"after '%v' in input source", readString,
-						string(JSON_ARRAY_END))
+						string(json.ArrayEnd))
 				}
 			}
 		}
 
 		// this will catch any invalid inter JSON object byte that occurs in the
 		// input source
-		if !(readByte == JSON_ARRAY_SEP ||
+		if !(readByte == json.ArraySep ||
 			strings.TrimSpace(string(readByte)) == "" ||
-			readByte == JSON_ARRAY_START ||
-			readByte == JSON_ARRAY_END) {
-			if jsonInputReader.expectedByte == JSON_ARRAY_START {
+			readByte == json.ArrayStart ||
+			readByte == json.ArrayEnd) {
+			if jsonInputReader.expectedByte == json.ArrayStart {
 				return ErrNoOpeningBracket
 			}
 			return fmt.Errorf("bad JSON array format - found '%v' outside "+
