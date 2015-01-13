@@ -810,6 +810,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     int exclusive, int ref_discard)
 {
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc_refp, *next_ref, *parent_ref;
@@ -866,11 +867,18 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	/*
 	 * Remove any refs to deleted pages while we are splitting, we have
 	 * the internal page locked down, and are copying the refs into a new
-	 * array anyway.
+	 * array anyway.  Switch them to the special split state, so that any
+	 * reading thread will restart.
 	 */
-	for (i = 0, deleted_entries = 0; i < parent_entries; ++i)
-		if (pindex->index[i]->state == WT_REF_DELETED)
+	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+		if (next_ref->state == WT_REF_DELETED &&
+		    next_ref->page_del == NULL &&
+		    WT_ATOMIC_CAS4(next_ref->state,
+		    WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
+	}
 
 	/*
 	 * The final entry count consists of: The original count, plus any
@@ -903,7 +911,24 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				 */
 				ref_new[j] = NULL;
 			}
-		else if (next_ref->state != WT_REF_DELETED)
+		else if (next_ref->state == WT_REF_SPLIT) {
+			/*
+			 * We're discarding a deleted reference.
+			 * Free any resources it holds.
+			 */
+			if (parent->type == WT_PAGE_ROW_INT) {
+				WT_TRET(__split_ovfl_key_cleanup(
+				    session, parent, next_ref));
+				ikey = __wt_ref_key_instantiated(next_ref);
+				if (ikey != NULL)
+					WT_TRET(__split_safe_free(session, 0,
+					    ikey,
+					    sizeof(WT_IKEY) + ikey->size));
+			}
+
+			WT_TRET(__split_safe_free(
+			    session, 0, next_ref, sizeof(WT_REF)));
+		} else
 			*alloc_refp++ = next_ref;
 	}
 
@@ -997,7 +1022,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		WT_WITH_PAGE_INDEX(session,
 		    ret = __split_deepen(session, parent, children));
 
-err:	if (locked)
+err:	if (!complete)
+		for (i = 0; i < parent_entries; ++i) {
+			next_ref = pindex->index[i];
+			if (next_ref->state == WT_REF_SPLIT)
+				next_ref->state = WT_REF_DELETED;
+		}
+	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
