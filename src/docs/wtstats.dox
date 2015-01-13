@@ -1,14 +1,28 @@
 /*! @page wtstats Visualizing performance with wtstats
 
-The WiredTiger distribution includes the \b wtstats tool that can be used to examine
-information generated using statistics logging (see @ref statistics_log).
+The WiredTiger distribution includes the \b wtstats tool that can be used to
+examine information generated using statistics logging (see @ref
+statistics_log).
 
-After running an application with statistics logging configured, the statistics output files will be in the database home directory.  By default, these are named \c WiredTigerStat.* .  In the database home directory, run this command, replacing \c ... with the path to the WiredTiger installation directory:
+After running an application with statistics logging configured, the
+statistics output files will be in the database home directory.  By default,
+these are named \c WiredTigerStat.* .  In the database home directory, run
+this command, replacing \c ... with the path to the WiredTiger installation
+directory:
 \code{.sh}
 python .../tools/wtstats.py WiredTigerStat.*
 \endcode
 
-This will generate a \c wtstats.html file that you can open in your browser to examine statistics.
+Another way to collect all the stats files in a directory is:
+
+\code{.sh}
+python .../tools/wtstats.py <directory>
+\endcode
+In either case, a \c wtstats.html file will be generated in the \e current
+directory that you can open in your browser to examine statistics.
+
+Additional options are available, use <tt>wtstats.py --help</tt>
+to display them.
 
 Here is a sample of what is displayed using \c wtstats.html:
 
