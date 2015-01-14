@@ -719,6 +719,14 @@ __split_multi_inmem(
 	 */
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
+	/*
+	 * XXX Don't allow this page to be evicted immediately.
+	 *
+	 * In some cases involving forced eviction during truncates, a reader
+	 * ends up looking at an evicted page.  This is a temporary workaround.
+	 */
+	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
 
