@@ -337,7 +337,9 @@ __wt_txn_checkpoint_log(
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
 		    txn->ckpt_nsnapshot, ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
-		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
+		WT_ERR(__wt_log_write(session, logrec, lsnp,
+		    F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) ?
+		    WT_LOG_FSYNC : 0));
 
 		/*
 		 * If this full checkpoint completed successfully and there is
