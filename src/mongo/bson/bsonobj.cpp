@@ -31,6 +31,8 @@
 
 #include "mongo/db/jsobj.h"
 
+#include <boost/functional/hash.hpp>
+
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/json.h"
 #include "mongo/util/allocator.h"
@@ -232,6 +234,14 @@ namespace mongo {
                 return x;
         }
         return -1;
+    }
+
+    size_t BSONObj::Hasher::operator()(const BSONObj& obj) const {
+        size_t hash = 0;
+        BSONForEach(elem, obj) {
+            boost::hash_combine(hash, BSONElement::Hasher()(elem));
+        }
+        return hash;
     }
 
     bool BSONObj::isPrefixOf( const BSONObj& otherObj ) const {
