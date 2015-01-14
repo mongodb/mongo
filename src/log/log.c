@@ -873,6 +873,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * of the file handle structure.
 	 */
 	close_fh = NULL;
+	WT_INIT_LSN(&close_lsn);
+	WT_INIT_LSN(&close_end_lsn);
 	if (F_ISSET(slot, SLOT_CLOSEFH)) {
 		close_fh = log->log_close_fh;
 		/*
