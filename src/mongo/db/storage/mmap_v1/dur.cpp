@@ -248,7 +248,7 @@ namespace {
                               "writeToJournal" << (unsigned) (_writeToJournalMicros / 1000) <<
                               "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros / 1000) <<
                               "remapPrivateView" << (unsigned) (_remapPrivateViewMicros / 1000) <<
-                              "commitsInWriteLockMicros"
+                              "commitsInWriteLock"
                                     << (unsigned)(_commitsInWriteLockMicros / 1000));
 
         if (mmapv1GlobalOptions.journalCommitInterval != 0) {
