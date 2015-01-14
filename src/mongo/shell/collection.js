@@ -1169,16 +1169,10 @@ DBCollection.prototype.totalIndexSize = function( verbose ){
 
 DBCollection.prototype.totalSize = function(){
     var total = this.storageSize();
-    var mydb = this._db;
-    var shortName = this._shortName;
-    this.getIndexes().forEach(
-        function( spec ){
-            var coll = mydb.getCollection( shortName + ".$" + spec.name );
-            var mysize = coll.storageSize();
-            //print( coll + "\t" + mysize + "\t" + tojson( coll.validate() ) );
-            total += coll.dataSize();
-        }
-    );
+    var totalIndexSize = this.totalIndexSize();
+    if (totalIndexSize) {
+        total += totalIndexSize;
+    }
     return total;
 }
 

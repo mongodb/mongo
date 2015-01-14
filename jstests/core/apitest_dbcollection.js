@@ -222,3 +222,36 @@ assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);
 
     t.drop();
  }());
+
+/*
+ * test db.collection.totalSize()
+ */
+(function() {
+    'use strict';
+
+    var t = db.apitest_dbcollection;
+
+    t.drop();
+    var failedStats = assert.commandFailed(t.stats());
+    assert.eq(failedStats.storageSize, t.storageSize());
+    assert.eq(undefined, t.storageSize(),
+              'db.collection.storageSize() on empty collection should return undefined');
+    assert.eq(failedStats.totalIndexSize, t.totalIndexSize());
+    assert.eq(undefined, t.totalIndexSize(),
+              'db.collection.totalIndexSize() on empty collection should return undefined');
+    assert.eq(undefined, t.totalSize(),
+              'db.collection.totalSize() on empty collection should return undefined');
+
+    t.save({a: 1});
+    var stats = assert.commandWorked(t.stats());
+    assert.eq(stats.storageSize, t.storageSize());
+    assert.neq(undefined, t.storageSize(),
+               'db.collection.storageSize() cannot be undefined on a non-empty collection');
+    assert.eq(stats.totalIndexSize, t.totalIndexSize());
+    assert.neq(undefined, t.totalIndexSize(),
+               'db.collection.totalIndexSize() cannot be undefined on a non-empty collection');
+    assert.eq(t.storageSize() + t.totalIndexSize(), t.totalSize(),
+              'incorrect db.collection.totalSize() on a non-empty collection');
+
+    t.drop();
+}());
