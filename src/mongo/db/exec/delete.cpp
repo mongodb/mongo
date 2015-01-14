@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -86,11 +87,14 @@ namespace mongo {
         if (PlanStage::ADVANCED == status) {
             WorkingSetMember* member = _ws->get(id);
             if (!member->hasLoc()) {
+                // We expect to be here because of an invalidation causing a force-fetch, and
+                // doc-locking storage engines do not issue invalidations.
+                dassert(!supportsDocLocking());
+
                 _ws->free(id);
-                const std::string errmsg = "delete stage failed to read member w/ loc from child";
-                *out = WorkingSetCommon::allocateStatusMember(_ws, Status(ErrorCodes::InternalError,
-                                                                          errmsg));
-                return PlanStage::FAILURE;
+                ++_specificStats.nInvalidateSkips;
+                ++_commonStats.needTime;
+                return PlanStage::NEED_TIME;
             }
             RecordId rloc = member->loc;
 
