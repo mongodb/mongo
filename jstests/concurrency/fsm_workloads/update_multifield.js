@@ -6,6 +6,9 @@
  * Does updates that affect multiple fields on a single document.
  * The collection has an index for each field, and a compound index for all fields.
  */
+
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     function makeQuery(options) {
@@ -81,9 +84,24 @@ var $config = (function() {
         data: {
             assertResult: function(res, db, collName, query) {
                 assertAlways.eq(0, res.nUpserted, tojson(res));
-                assertWhenOwnColl.eq(1, res.nMatched,  tojson(res));
-                if (db.getMongo().writeMode() === 'commands') {
-                    assertWhenOwnColl.eq(1, res.nModified, tojson(res));
+
+                var status = db.serverStatus();
+                if (isMongod(status) && !isMMAPv1(status)) {
+                    // For non-mmap storage engines we can have a strong assertion that exactly one
+                    // doc will be modified.
+                    assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
+                    if (db.getMongo().writeMode() === 'commands') {
+                        assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
+                    }
+                }
+                else {
+                    // Zero matches are possible for MMAP v1 because the update will skip a document
+                    // that was invalidated during a yield.
+                    assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
+                    if (db.getMongo().writeMode() === 'commands') {
+                        assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                        assertAlways.eq(res.nModified, res.nMatched, tojson(res));
+                    }
                 }
             },
             multi: false,

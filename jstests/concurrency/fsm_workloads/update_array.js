@@ -9,6 +9,8 @@
  * though other threads in the workload may be modifying the array between the
  * update and the find, because thread ids are unique.
  */
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     var states = (function() {
@@ -18,9 +20,21 @@ var $config = (function() {
         // nModifiedPossibilities: array of allowed values for res.nModified
         function assertUpdateSuccess(db, res, nModifiedPossibilities) {
             assertAlways.eq(0, res.nUpserted, tojson(res));
-            assertWhenOwnColl.eq(1, res.nMatched, tojson(res));
-            if (db.getMongo().writeMode() === 'commands') {
-                assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
+
+            var status = db.serverStatus();
+            if (isMongod(status) && !isMMAPv1(status)) {
+                assertWhenOwnColl.contains(1, nModifiedPossibilities, tojson(res));
+                if (db.getMongo().writeMode() === 'commands') {
+                    assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
+                }
+            }
+            else {
+                // Zero matches are possible for MMAP v1 because the update will skip a document
+                // that was invalidated during a yield.
+                assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
+                if (db.getMongo().writeMode() === 'commands') {
+                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                }
             }
         }
 
