@@ -859,7 +859,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	WT_LSN close_lsn, sync_lsn;
+	WT_LSN close_end_lsn, close_lsn, sync_lsn;
 	size_t write_size;
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
@@ -875,14 +875,18 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	close_fh = NULL;
 	if (F_ISSET(slot, SLOT_CLOSEFH)) {
 		close_fh = log->log_close_fh;
+		/*
+		 * Set the close_end_lsn to the LSN immediately after ours.
+		 * That is, the beginning of the next log file.  We need to
+		 * know the LSN file number of our own close in case earlier
+		 * calls are still in progress and the next one to move the
+		 * sync_lsn into the next file for later syncs.
+		 */
 		WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
 		    &close_lsn.file));
-		/*
-		 * Set the close_lsn to the LSN immediately after ours.
-		 * That is, the beginning of the next log file.
-		 */
-		close_lsn.file++;
 		close_lsn.offset = 0;
+		close_end_lsn = close_lsn;
+		close_end_lsn.file++;
 		log->log_close_fh = NULL;
 		F_CLR(slot, SLOT_CLOSEFH);
 	}
@@ -910,16 +914,21 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * before potentially syncing our own operation.
 	 */
 	if (close_fh) {
-		__wt_spin_lock(session, &log->log_sync_lock);
-		locked = 1;
 		WT_ERR(__wt_fsync(session, close_fh));
 		/*
-		 * We may be racing with the close of an
-		 * earlier log file.  Only update if we need to.
+		 * This loop guarantees sync_lsn is updated in file order
+		 * so that when sync_lsn is updated, we know all earlier files
+		 * have already been fully processed.
 		 */
+		while (log->sync_lsn.file < close_lsn.file ||
+		    __wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
+			WT_ERR(__wt_cond_wait(
+			    session, log->log_sync_cond, 10000));
+			continue;
+		}
+		locked = 1;
 		WT_ERR(__wt_close(session, close_fh));
-		if (LOG_CMP(&log->sync_lsn, &close_lsn) < 0)
-			log->sync_lsn = close_lsn;
+		log->sync_lsn = close_end_lsn;
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
 	}
