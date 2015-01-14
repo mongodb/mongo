@@ -112,6 +112,7 @@ namespace mongo {
             scoped_lock l(_lock);
             _queue = std::queue<T>();
             _currentSize = 0;
+            _cvNoLongerFull.notify_one();
         }
 
         bool tryPop( T & t ) {

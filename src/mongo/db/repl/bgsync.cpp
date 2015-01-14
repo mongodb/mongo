@@ -122,6 +122,9 @@ namespace {
     void BackgroundSync::shutdown() {
         boost::lock_guard<boost::mutex> lock(_mutex);
 
+        // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
+        _buffer.clear();
+
         // Wake up producerThread so it notices that we're in shutdown
         _condvar.notify_all();
     }
