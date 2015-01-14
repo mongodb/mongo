@@ -109,6 +109,9 @@ namespace repl {
         _localRsConfigDocument = localConfigDocument;
     }
 
+    void ReplicationCoordinatorExternalStateMock::setGlobalOpTime(const OpTime& newTime) {
+    }
+
     StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
         OperationContext* txn) {
         return _lastOpTime;

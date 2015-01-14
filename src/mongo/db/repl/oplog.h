@@ -117,5 +117,10 @@ namespace repl {
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
      */
     void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS);
+
+    /**
+     * Sets the global OpTime to be 'newTime'.
+     */
+    void setNewOptime(const OpTime& newTime);
 } // namespace repl
 } // namespace mongo

@@ -182,6 +182,10 @@ namespace {
         }
     }
 
+    void ReplicationCoordinatorExternalStateImpl::setGlobalOpTime(const OpTime& newTime) {
+        setNewOptime(newTime);
+    }
+
     StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             OperationContext* txn) {
 

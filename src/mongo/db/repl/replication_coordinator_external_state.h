@@ -119,6 +119,11 @@ namespace repl {
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config) = 0;
 
         /**
+         * Sets the global opTime to be 'newTime'.
+         */
+        virtual void setGlobalOpTime(const OpTime& newTime) = 0;
+
+        /**
          * Gets the last optime of an operation performed on this host, from stable
          * storage.
          */
