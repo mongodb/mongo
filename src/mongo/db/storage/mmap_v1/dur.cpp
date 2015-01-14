@@ -149,7 +149,7 @@ namespace {
         virtual BSONObj generateSection(OperationContext* txn,
                                         const BSONElement& configElement) const {
 
-            if (!storageGlobalParams.dur) {
+            if (!getDur().isDurable()) {
                 return BSONObj();
             }
 

@@ -98,6 +98,10 @@ namespace mongo {
 
     BSONObj DataFileSync::generateSection(OperationContext* txn,
                                           const BSONElement& configElement) const {
+        if (!running()) {
+            return BSONObj();
+        }
+
         BSONObjBuilder b;
         b.appendNumber( "flushes" , _flushes );
         b.appendNumber( "total_ms" , _total_time );
