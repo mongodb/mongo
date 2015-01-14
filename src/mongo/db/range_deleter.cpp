@@ -282,18 +282,18 @@ namespace {
         repl::ReplicationCoordinator::Milliseconds elapsedTime = replStatus.duration;
         if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
             *errMsg = str::stream() << "rangeDeleter timed out after "
-                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << elapsedTime.total_seconds() << " seconds while waiting"
                                     << " for deletions to be replicated to majority nodes";
             log() << *errMsg;
         }
         else if (replStatus.status.code() == ErrorCodes::NotMaster) {
             *errMsg = str::stream() << "rangeDeleter no longer PRIMARY after "
-                                    << elapsedTime.seconds() << " seconds while waiting"
+                                    << elapsedTime.total_seconds() << " seconds while waiting"
                                     << " for deletions to be replicated to majority nodes";
         }
         else {
-            LOG(elapsedTime.seconds() < 30 ? 1 : 0)
-                << "rangeDeleter took " << elapsedTime.seconds() << " seconds "
+            LOG(elapsedTime.total_seconds() < 30 ? 1 : 0)
+                << "rangeDeleter took " << elapsedTime.total_seconds() << " seconds "
                 << " waiting for deletes to be replicated to majority nodes";
 
             fassert(18512, replStatus.status);
