@@ -57,12 +57,6 @@ namespace mongo {
                 return false;
             }
 
-            int cfgver = cmdObj["cfgver"].Int();
-            if (theReplSet->config().version < cfgver) {
-                // Our config is stale; do not veto.
-                return false;
-            }
-
             unsigned id = cmdObj["id"].Int();
             const Member* primary = theReplSet->box.getPrimary();
             const Member* hopeful = theReplSet->findById(id);
