@@ -80,14 +80,14 @@ type Namespace struct {
 
 // Struct holding generic options
 type General struct {
-	Help    bool `long:"help" description:"Print usage"`
-	Version bool `long:"version" description:"Print the version"`
+	Help    bool `long:"help" description:"print usage"`
+	Version bool `long:"version" description:"print the tool version and exit"`
 }
 
 // Struct holding verbosity-related options
 type Verbosity struct {
-	Verbose []bool `short:"v" long:"verbose" description:"Set verbosity level"`
-	Quiet   bool   `long:"quiet" description:"Run in quiet mode, attempting to limit the amount of output"`
+	Verbose []bool `short:"v" long:"verbose" description:"more detailed log output (include multiple times for more verbosity, e.g. -vvvvv)"`
+	Quiet   bool   `long:"quiet" description:"hide all log output"`
 }
 
 func (v Verbosity) Level() int {
@@ -100,34 +100,34 @@ func (v Verbosity) IsQuiet() bool {
 
 // Struct holding connection-related options
 type Connection struct {
-	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect"`
-	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening"`
+	Host string `short:"h" long:"host" description:"mongodb host to connect to (setname/host1,host2 for replica sets)"`
+	Port string `long:"port" description:"server port (can also use --host hostname:port)"`
 }
 
 // Struct holding ssl-related options
 type SSL struct {
-	UseSSL              bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
-	SSLCAFile           string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
-	SSLPEMKeyFile       string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
-	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
-	SSLCRLFile          string `long:"sslCRLFile" description:"Specify the .pem file containing the certificate revocation list"`
-	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"Bypass the validation for server certificates"`
-	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" description:"Bypass the validation for server name"`
-	SSLFipsMode         bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
+	UseSSL              bool   `long:"ssl" description:"connect to a mongod or mongos that has ssl enabled"`
+	SSLCAFile           string `long:"sslCAFile" description:"the .pem file containing the root certificate chain from the certificate authority"`
+	SSLPEMKeyFile       string `long:"sslPEMKeyFile" description:"the .pem file containing the certificate and key"`
+	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" description:"the password to decrypt the sslPEMKeyFile, if necessary"`
+	SSLCRLFile          string `long:"sslCRLFile" description:"the .pem file containing the certificate revocation list"`
+	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"bypass the validation for server certificates"`
+	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" description:"bypass the validation for server name"`
+	SSLFipsMode         bool   `long:"sslFIPSMode" description:"use FIPS mode of the installed openssl library"`
 }
 
 // Struct holding auth-related options
 type Auth struct {
-	Username  string `short:"u" long:"username" description:"Specify a user name for authentication"`
-	Password  string `short:"p" long:"password" description:"Specify a password for authentication"`
-	Source    string `long:"authenticationDatabase" description:"Specify the database that holds the user's credentials"`
-	Mechanism string `long:"authenticationMechanism" description:"Specify the authentication mechanism to be used"`
+	Username  string `short:"u" long:"username" description:"username for authentication"`
+	Password  string `short:"p" long:"password" description:"password for authentication"`
+	Source    string `long:"authenticationDatabase" description:"database that holds the user's credentials"`
+	Mechanism string `long:"authenticationMechanism" description:"authentication mechanism to use"`
 }
 
 // Struct for Kerberos/GSSAPI-specific options
 type Kerberos struct {
-	Service     string `long:"gssapiServiceName" description:"Service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
-	ServiceHost string `long:"gssapiHostName" description:"Hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
+	Service     string `long:"gssapiServiceName" description:"service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
+	ServiceHost string `long:"gssapiHostName" description:"hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
 }
 
 type OptionRegistrationFunction func(self *ToolOptions) error
