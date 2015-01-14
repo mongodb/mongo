@@ -538,21 +538,26 @@ namespace {
             return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );
         }
 
-        StringData specNamespace = spec.getStringField("ns");
-        if ( specNamespace.size() == 0 )
+        const BSONElement specNamespace = spec["ns"];
+        if ( specNamespace.type() != String )
             return Status( ErrorCodes::CannotCreateIndex,
-                           "the index spec needs a 'ns' field'" );
+                           "the index spec needs a 'ns' string field" );
 
-        if ( nss.ns() != specNamespace )
+        if ( nss.ns() != specNamespace.valueStringData())
             return Status( ErrorCodes::CannotCreateIndex,
                            "the index spec ns does not match" );
 
         // logical name of the index
-        const char *name = spec.getStringField("name");
-        if ( !name[0] )
-            return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
+        const BSONElement nameElem = spec["name"];
+        if (nameElem.type() != String)
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "index name must be specified as a string");
 
-        string indexNamespace = IndexDescriptor::makeIndexNamespace( specNamespace, name );
+        const StringData name = nameElem.valueStringData();
+        if (name.find('\0') != std::string::npos)
+            return Status(ErrorCodes::CannotCreateIndex, "index names cannot contain NUL bytes");
+
+        const std::string indexNamespace = IndexDescriptor::makeIndexNamespace( nss.ns(), name );
         if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<
