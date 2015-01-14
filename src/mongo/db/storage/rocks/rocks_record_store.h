@@ -161,8 +161,6 @@ namespace mongo {
                                         BSONObjBuilder* result,
                                         double scale ) const;
 
-        virtual Status touch( OperationContext* txn, BSONObjBuilder* output ) const;
-
         virtual Status setCustomOption( OperationContext* txn,
                                         const BSONElement& option,
                                         BSONObjBuilder* info = NULL );

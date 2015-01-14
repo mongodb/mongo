@@ -561,24 +561,6 @@ namespace mongo {
         result->append( "stats", statsString );
     }
 
-    Status RocksRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
-        Timer t;
-        // no need to use snapshot here, since we're just loading records into memory
-        boost::scoped_ptr<rocksdb::Iterator> itr(
-            _db->NewIterator(_readOptions(), _columnFamily.get()));
-        itr->SeekToFirst();
-        for (; itr->Valid(); itr->Next()) {
-            invariant(itr->status().ok());
-        }
-        invariant(itr->status().ok());
-
-        if (output) {
-            output->append("numRanges", 1);
-            output->append("millis", t.millis());
-        }
-        return Status::OK();
-    }
-
     Status RocksRecordStore::setCustomOption( OperationContext* txn,
                                               const BSONElement& option,
                                               BSONObjBuilder* info ) {
