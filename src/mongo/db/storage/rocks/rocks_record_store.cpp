@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/platform/endian.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -214,7 +215,9 @@ namespace mongo {
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
         uint64_t storageSize;
-        rocksdb::Range wholeRange( _makeKey( RecordId::min() ), _makeKey( RecordId::max() ) );
+        int64_t minLocStorage, maxLocStorage;
+        rocksdb::Range wholeRange(_makeKey(RecordId(), &minLocStorage),
+                                  _makeKey(RecordId::max(), &maxLocStorage));
         _db->GetApproximateSizes(_columnFamily.get(), &wholeRange, 1, &storageSize);
         return static_cast<int64_t>( storageSize );
     }
@@ -230,10 +233,12 @@ namespace mongo {
         }
 
         std::string oldValue;
-        ru->Get(_columnFamily.get(), _makeKey(dl), &oldValue);
+        int64_t locStorage;
+        rocksdb::Slice key = _makeKey(dl, &locStorage);
+        ru->Get(_columnFamily.get(), key, &oldValue);
         int oldLength = oldValue.size();
 
-        ru->writeBatch()->Delete(_columnFamily.get(), _makeKey(dl));
+        ru->writeBatch()->Delete(_columnFamily.get(), key);
 
         _changeNumRecords(txn, false);
         _increaseDataSize(txn, -oldLength);
@@ -373,7 +378,9 @@ namespace mongo {
         if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
             throw WriteConflictException();
         }
-        ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
+        int64_t locStorage;
+        ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc, &locStorage),
+                              rocksdb::Slice(data, len));
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -405,7 +412,9 @@ namespace mongo {
         }
 
         std::string old_value;
-        auto status = ru->Get(_columnFamily.get(), _makeKey(loc), &old_value);
+        int64_t locStorage;
+        rocksdb::Slice key = _makeKey(loc, &locStorage);
+        auto status = ru->Get(_columnFamily.get(), key, &old_value);
 
         if ( !status.ok() ) {
             return StatusWith<RecordId>( ErrorCodes::InternalError, status.ToString() );
@@ -413,7 +422,7 @@ namespace mongo {
 
         int old_length = old_value.size();
 
-        ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
+        ru->writeBatch()->Put(_columnFamily.get(), key, rocksdb::Slice(data, len));
 
         _increaseDataSize(txn, len - old_length);
 
@@ -436,7 +445,8 @@ namespace mongo {
             throw WriteConflictException();
         }
 
-        rocksdb::Slice key = _makeKey( loc );
+        int64_t locStorage;
+        rocksdb::Slice key = _makeKey(loc, &locStorage);
 
         // get original value
         std::string value;
@@ -597,7 +607,8 @@ namespace mongo {
         ru->setOplogReadTill(_cappedVisibilityManager->oplogStartHack());
 
         boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_columnFamily.get()));
-        iter->Seek(_makeKey(startingPosition));
+        int64_t locStorage;
+        iter->Seek(_makeKey(startingPosition, &locStorage));
         if (!iter->Valid()) {
             iter->SeekToLast();
             if (iter->Valid()) {
@@ -612,7 +623,7 @@ namespace mongo {
         // We're at or past target:
         // 1) if we're at -- return
         // 2) if we're past -- do a prev()
-        RecordId foundKey = reinterpret_cast<const RecordId*>(iter->key().data())[0];
+        RecordId foundKey = _makeRecordId(iter->key());
         int cmp = startingPosition.compare(foundKey);
         if (cmp != 0) {
             // RocksDB invariant -- iterator needs to land at or past target when Seek-ing
@@ -627,41 +638,6 @@ namespace mongo {
         }
 
         return _makeRecordId(iter->key());
-    }
-
-    namespace {
-        class RocksCollectionComparator : public rocksdb::Comparator {
-            public:
-                RocksCollectionComparator() { }
-                virtual ~RocksCollectionComparator() { }
-
-                virtual int Compare( const rocksdb::Slice& a, const rocksdb::Slice& b ) const {
-                    RecordId lhs = reinterpret_cast<const RecordId*>( a.data() )[0];
-                    RecordId rhs = reinterpret_cast<const RecordId*>( b.data() )[0];
-                    return lhs.compare( rhs );
-                }
-
-                virtual const char* Name() const {
-                    return "mongodb.RocksCollectionComparator";
-                }
-
-                /**
-                 * From the RocksDB comments: "an implementation of this method that does nothing is
-                 * correct"
-                 */
-                virtual void FindShortestSeparator( std::string* start,
-                        const rocksdb::Slice& limit) const { }
-
-                /**
-                 * From the RocksDB comments: "an implementation of this method that does nothing is
-                 * correct.
-                 */
-                virtual void FindShortSuccessor(std::string* key) const { }
-        };
-    }
-
-    rocksdb::Comparator* RocksRecordStore::newRocksCollectionComparator() {
-        return new RocksCollectionComparator();
     }
 
     void RocksRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
@@ -692,12 +668,17 @@ namespace mongo {
         return RecordId(_nextIdNum.fetchAndAdd(1));
     }
 
-    rocksdb::Slice RocksRecordStore::_makeKey(const RecordId& loc) {
-        return rocksdb::Slice(reinterpret_cast<const char*>(&loc), sizeof(loc));
+    rocksdb::Slice RocksRecordStore::_makeKey(const RecordId& loc, int64_t* storage) {
+        *storage = endian::nativeToBig(loc.repr());
+        RecordId a = loc;
+        return rocksdb::Slice(reinterpret_cast<const char*>(storage), sizeof(*storage));
     }
 
-    RecordId RocksRecordStore::_makeRecordId( const rocksdb::Slice& slice ) {
-        return reinterpret_cast<const RecordId*>( slice.data() )[0];
+    RecordId RocksRecordStore::_makeRecordId(const rocksdb::Slice& slice) {
+        invariant(slice.size() == sizeof(int64_t));
+        int64_t repr = endian::bigToNative(*reinterpret_cast<const int64_t*>(slice.data()));
+        RecordId a(repr);
+        return RecordId(repr);
     }
 
     bool RocksRecordStore::findRecord( OperationContext* txn,
@@ -713,8 +694,9 @@ namespace mongo {
                                              OperationContext* txn, const RecordId& loc) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
 
-        std::string value_storage;
-        auto status = ru->Get(cf, _makeKey(loc), &value_storage);
+        std::string valueStorage;
+        int64_t locStorage;
+        auto status = ru->Get(cf, _makeKey(loc, &locStorage), &valueStorage);
         if (!status.ok()) {
             if (status.IsNotFound()) {
                 return RecordData(nullptr, 0);
@@ -724,9 +706,9 @@ namespace mongo {
             }
         }
 
-        SharedBuffer data = SharedBuffer::allocate(value_storage.size());
-        memcpy(data.get(), value_storage.data(), value_storage.size());
-        return RecordData(data.moveFrom(), value_storage.size());
+        SharedBuffer data = SharedBuffer::allocate(valueStorage.size());
+        memcpy(data.get(), valueStorage.data(), valueStorage.size());
+        return RecordData(data.moveFrom(), valueStorage.size());
     }
 
     // XXX make sure these work with rollbacks (I don't think they will)
@@ -859,7 +841,8 @@ namespace mongo {
             if (loc.isNull()) {
                 _iterator->SeekToFirst();
             } else {
-                _iterator->Seek(RocksRecordStore::_makeKey(loc));
+                int64_t locStorage;
+                _iterator->Seek(RocksRecordStore::_makeKey(loc, &locStorage));
             }
             _checkStatus();
         } else {  // backward iterator
@@ -867,7 +850,8 @@ namespace mongo {
                 _iterator->SeekToLast();
             } else {
                 // lower bound on reverse iterator
-                _iterator->Seek(RocksRecordStore::_makeKey(loc));
+                int64_t locStorage;
+                _iterator->Seek(RocksRecordStore::_makeKey(loc, &locStorage));
                 _checkStatus();
                 if (!_iterator->Valid()) {
                     _iterator->SeekToLast();

@@ -39,13 +39,13 @@
 #include <string>
 #include <vector>
 
-#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/iterator.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
@@ -64,9 +64,6 @@ namespace mongo {
 
         const int kTempKeyMaxSize = 1024; // Do the same as the heap implementation
 
-        rocksdb::Slice emptyByteSlice( "" );
-        rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
-
         // functions for converting between BSONObj-RecordId pairs and strings/rocksdb::Slices
 
         /**
@@ -80,26 +77,6 @@ namespace mongo {
                 b.appendAs( e, "" );
             }
             return b.obj();
-        }
-
-        /**
-         * Constructs a string containing the bytes of key followed by the bytes of loc.
-         */
-        string makeString(const BSONObj& key, const RecordId loc) {
-            string s(key.objdata(), key.objsize());
-            s.append( reinterpret_cast<const char*>( &loc ), sizeof( RecordId ) );
-
-            return s;
-        }
-
-        /**
-         * Constructs an IndexKeyEntry from a slice containing the bytes of a BSONObject followed
-         * by the bytes of a RecordId
-         */
-        IndexKeyEntry makeIndexKeyEntry( const rocksdb::Slice& slice ) {
-            BSONObj key(slice.data());
-            RecordId loc = *reinterpret_cast<const RecordId*>( slice.data() + key.objsize() );
-            return IndexKeyEntry( key, loc );
         }
 
         string dupKeyError(const BSONObj& key) {
@@ -117,12 +94,12 @@ namespace mongo {
         public:
             RocksCursor(OperationContext* txn, rocksdb::DB* db,
                         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool forward,
-                        Ordering o)
+                        Ordering order)
                 : _db(db),
                   _columnFamily(columnFamily),
                   _forward(forward),
-                  _isCached(false),
-                  _comparator(o) {
+                  _order(order),
+                  _isCached(false) {
                 _resetIterator(txn);
                 _checkStatus();
             }
@@ -259,12 +236,11 @@ namespace mongo {
             bool _reverseLocate( const BSONObj& key, const RecordId loc ) {
                 invariant( !_forward );
 
-                const IndexKeyEntry keyEntry( key, loc );
 
                 _isCached = false;
                 // assumes fieldNames already stripped if necessary
-                const string keyData = makeString(key, loc);
-                _iterator->Seek( keyData );
+                KeyString encodedKey(key, _order, loc);
+                _iterator->Seek(rocksdb::Slice(encodedKey.getBuffer(), encodedKey.getSize()));
                 _checkStatus();
 
                 if ( !_iterator->Valid() ) { // seeking outside the range of the index
@@ -296,10 +272,11 @@ namespace mongo {
             bool _locate( const BSONObj& key, const RecordId loc ) {
                 invariant(_forward);
 
+
                 _isCached = false;
                 // assumes fieldNames already stripped if necessary
-                const string keyData = makeString(key, loc);
-                _iterator->Seek( keyData );
+                KeyString encodedKey(key, _order, loc);
+                _iterator->Seek(rocksdb::Slice(encodedKey.getBuffer(), encodedKey.getSize()));
                 _checkStatus();
                 if ( !_iterator->Valid() )
                     return false;
@@ -327,16 +304,20 @@ namespace mongo {
                 }
 
                 _isCached = true;
-                rocksdb::Slice slice = _iterator->key();
-                _cachedKey = BSONObj( slice.data() ).getOwned();
-                _cachedLoc = *reinterpret_cast<const RecordId*>( slice.data() +
-                                                                _cachedKey.objsize() );
+                rocksdb::Slice iterKey = _iterator->key();
+                rocksdb::Slice iterValue = _iterator->value();
+                KeyString::TypeBits typeBits;
+                BufReader br(iterValue.data(), iterValue.size());
+                typeBits.resetFromBuffer(&br);
+                _cachedKey = KeyString::toBson(iterKey.data(), iterKey.size(), _order, typeBits);
+                _cachedLoc = KeyString::decodeRecordIdAtEnd(iterKey.data(), iterKey.size());
             }
 
             rocksdb::DB* _db;                                       // not owned
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
             scoped_ptr<rocksdb::Iterator> _iterator;
             const bool _forward;
+            Ordering _order;
 
             mutable bool _isCached;
             mutable BSONObj _cachedKey;
@@ -346,43 +327,6 @@ namespace mongo {
             bool _savedAtEnd;
             BSONObj _savePositionObj;
             RecordId _savePositionLoc;
-
-            // Used for comparing elements in reverse iterators. Because the rocksdb::Iterator is
-            // only a forward iterator, it is sometimes necessary to compare index keys manually
-            // when implementing a reverse iterator.
-            IndexEntryComparison _comparator;
-        };
-
-        /**
-         * Custom comparator for rocksdb used to compare Index Entries by BSONObj and RecordId
-         */
-        class RocksIndexEntryComparator : public rocksdb::Comparator {
-            public:
-                RocksIndexEntryComparator( const Ordering& order ): _indexComparator( order ) { }
-
-                virtual int Compare(const rocksdb::Slice& a, const rocksdb::Slice& b) const {
-                    if (a.size() == 0 || b.size() == 0) {
-                        return a.size() == b.size() ? 0 : ((a.size() == 0) ? -1 : 1);
-                    }
-                    const IndexKeyEntry lhs = makeIndexKeyEntry( a );
-                    const IndexKeyEntry rhs = makeIndexKeyEntry( b );
-                    return _indexComparator.compare( lhs, rhs );
-                }
-
-                virtual const char* Name() const {
-                    // changing this means that any existing mongod instances using rocks storage
-                    // engine will not be able to start up again, because the comparator's name
-                    // will not match
-                    return "mongodb.RocksIndexEntryComparator";
-                }
-
-                virtual void FindShortestSeparator( std::string* start,
-                        const rocksdb::Slice& limit ) const { }
-
-                virtual void FindShortSuccessor( std::string* key ) const { }
-
-            private:
-                const IndexEntryComparison _indexComparator;
         };
 
         class RocksBulkSortedBuilderImpl : public SortedDataBuilderInterface {
@@ -451,19 +395,29 @@ namespace mongo {
                 return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        auto strippedKey = stripFieldNames(key);
-
         if ( !dupsAllowed ) {
-            Status status = dupKeyCheck(txn, strippedKey, loc);
+            // TODO this will encode KeyString twice (in dupKeyCheck and below in this function).
+            // However, once we change unique index format, this will be optimized
+            Status status = dupKeyCheck(txn, stripFieldNames(key), loc);
             if ( !status.isOK() ) {
                 return status;
             }
         }
 
+        KeyString encodedKey(key, _order, loc);
+
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         ru->incrementCounter(_numEntriesKey, &_numEntries, 1);
 
-        ru->writeBatch()->Put(_columnFamily.get(), makeString(strippedKey, loc), emptyByteSlice);
+        rocksdb::Slice value;
+        if (!encodedKey.getTypeBits().isAllZeros()) {
+            value =
+                rocksdb::Slice(reinterpret_cast<const char*>(encodedKey.getTypeBits().getBuffer()),
+                               encodedKey.getTypeBits().getSize());
+        }
+
+        ru->writeBatch()->Put(_columnFamily.get(),
+                              rocksdb::Slice(encodedKey.getBuffer(), encodedKey.getSize()), value);
 
         return Status::OK();
     }
@@ -475,18 +429,18 @@ namespace mongo {
         // If we're unindexing an index element, this means we already "locked" the RecordId of the
         // document. No need to register write here
 
-        const string keyData = makeString(stripFieldNames(key), loc);
+        KeyString encodedKey(key, _order, loc);
+        rocksdb::Slice keyItem(encodedKey.getBuffer(), encodedKey.getSize());
 
         string dummy;
-
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        if (ru->Get(_columnFamily.get(), keyData, &dummy).IsNotFound()) {
+        if (ru->Get(_columnFamily.get(), keyItem, &dummy).IsNotFound()) {
             return;
         }
 
         ru->incrementCounter(_numEntriesKey, &_numEntries,  -1);
 
-        ru->writeBatch()->Delete(_columnFamily.get(), keyData);
+        ru->writeBatch()->Delete(_columnFamily.get(), keyItem);
     }
 
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn, const BSONObj& key,
@@ -497,9 +451,10 @@ namespace mongo {
         // Note that this doesn't catch the situation where the key is present in the snapshot, but
         // deleted after the snapshot. This should be fine
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        // This will check if there is any write to the key  after our snapshot (committed or
+        // This will check if there is any write to the key after our snapshot (committed or
         // uncommitted). If the answer is yes, we will return dupkey.
-        if (!ru->transaction()->registerWrite(_getTransactionID(key))) {
+        KeyString encodedKey(key, _order);
+        if (!ru->transaction()->registerWrite(_getTransactionID(encodedKey))) {
             return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
         }
 
@@ -568,13 +523,8 @@ namespace mongo {
         return spaceUsedBytes + walSpaceUsed;
     }
 
-    // ownership passes to caller
-    rocksdb::Comparator* RocksSortedDataImpl::newRocksComparator( const Ordering& order ) {
-        return new RocksIndexEntryComparator( order );
-    }
-
-    std::string RocksSortedDataImpl::_getTransactionID(const BSONObj& key) const {
+    std::string RocksSortedDataImpl::_getTransactionID(const KeyString& key) const {
         // TODO optimize in the future
-        return _ident + std::string(key.objdata(), key.objsize());
+        return _ident + std::string(key.getBuffer(), key.getSize());
     }
 }

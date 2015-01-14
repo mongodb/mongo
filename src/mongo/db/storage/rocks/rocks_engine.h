@@ -146,7 +146,6 @@ namespace mongo {
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
-        boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
         const bool _durable;
 
