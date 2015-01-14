@@ -717,9 +717,6 @@ namespace mongo {
         statsOut->nReturned = common->advanced;
         statsOut->executionTimeMillis = common->executionTimeMillis;
 
-        // Generate the plan summary string.
-        statsOut->summaryStr = getPlanSummary(root);
-
         // The other fields are aggregations over the stages in the plan tree. We flatten
         // the tree into a list and then compute these aggregations.
         vector<PlanStage*> stages;

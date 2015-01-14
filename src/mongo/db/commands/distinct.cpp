@@ -167,7 +167,7 @@ namespace mongo {
                 b.appendNumber( "nscanned" , stats.totalKeysExamined );
                 b.appendNumber( "nscannedObjects" , stats.totalDocsExamined );
                 b.appendNumber( "timems" , t.millis() );
-                b.append( "planSummary" , stats.summaryStr );
+                b.append( "planSummary" , Explain::getPlanSummary(exec.get()) );
                 result.append( "stats" , b.obj() );
             }
 
