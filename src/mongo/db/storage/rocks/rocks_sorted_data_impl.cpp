@@ -530,18 +530,6 @@ namespace mongo {
         return !it->Valid();
     }
 
-    Status RocksSortedDataImpl::touch(OperationContext* txn) const {
-        boost::scoped_ptr<rocksdb::Iterator> itr;
-        // no need to use snapshot to load into memory
-        itr.reset(_db->NewIterator(rocksdb::ReadOptions(), _columnFamily.get()));
-        itr->SeekToFirst();
-        for (; itr->Valid(); itr->Next()) {
-            invariant(itr->status().ok());
-        }
-
-        return Status::OK();
-    }
-
     long long RocksSortedDataImpl::numEntries(OperationContext* txn) const {
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         return _numEntries.load(std::memory_order::memory_order_relaxed) +

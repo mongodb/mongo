@@ -91,8 +91,6 @@ namespace mongo {
 
         virtual bool isEmpty(OperationContext* txn);
 
-        virtual Status touch(OperationContext* txn) const;
-
         virtual long long numEntries(OperationContext* txn) const;
 
         virtual Cursor* newCursor(OperationContext* txn, int direction) const;
