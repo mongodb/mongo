@@ -84,7 +84,7 @@ func main() {
 	// fail fast if connecting to a mongos
 	isMongos, err := sessionProvider.IsMongos()
 	if err != nil {
-		log.Logf(log.Always, "error determining if connected to mongos: %v", err)
+		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 	if isMongos {

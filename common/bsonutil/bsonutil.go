@@ -86,7 +86,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 					}
 					return time.Unix(n/1e3, n%1e3*1e6), err
 				}
-				return nil, errors.New("Expected $numberLong field in $date")
+				return nil, errors.New("expected $numberLong field in $date")
 
 			case json.Number:
 				n, err := v.Int64()
@@ -102,7 +102,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				return v, nil
 
 			default:
-				return nil, errors.New("Invalid type for $date field")
+				return nil, errors.New("invalid type for $date field")
 			}
 		}
 
@@ -111,7 +111,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			case string:
 				return bson.JavaScript{Code: v}, nil
 			default:
-				return nil, errors.New("Expected $code field to have string value")
+				return nil, errors.New("expected $code field to have string value")
 			}
 		}
 
@@ -119,12 +119,12 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			switch v := jsonValue.(type) {
 			case string:
 				if !bson.IsObjectIdHex(v) {
-					return nil, errors.New("Expected $oid field to contain 24 hexadecimal character")
+					return nil, errors.New("expected $oid field to contain 24 hexadecimal character")
 				}
 				return bson.ObjectIdHex(v), nil
 
 			default:
-				return nil, errors.New("Expected $oid field to have string value")
+				return nil, errors.New("expected $oid field to have string value")
 			}
 		}
 
@@ -140,7 +140,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				return int32(n), err
 
 			default:
-				return nil, errors.New("Expected $numberInt field to have string value")
+				return nil, errors.New("expected $numberInt field to have string value")
 			}
 		}
 
@@ -193,7 +193,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			case string:
 				code.Code = v
 			default:
-				return nil, errors.New("Expected $code field to have string value")
+				return nil, errors.New("expected $code field to have string value")
 			}
 
 			if jsonValue, ok = doc["$scope"]; ok {
@@ -206,10 +206,10 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 					code.Scope = x
 					return code, nil
 				default:
-					return nil, errors.New("Expected $scope field to contain map")
+					return nil, errors.New("expected $scope field to contain map")
 				}
 			} else {
-				return nil, errors.New("Expected $scope field with $code field")
+				return nil, errors.New("expected $scope field with $code field")
 			}
 		}
 
@@ -221,10 +221,10 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				regex.Pattern = pattern
 
 			default:
-				return nil, errors.New("Expected $regex field to have string value")
+				return nil, errors.New("expected $regex field to have string value")
 			}
 			if jsonValue, ok = doc["$options"]; !ok {
-				return nil, errors.New("Expected $options field with $regex field")
+				return nil, errors.New("expected $options field with $regex field")
 			}
 
 			switch options := jsonValue.(type) {
@@ -232,14 +232,14 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				regex.Options = options
 
 			default:
-				return nil, errors.New("Expected $options field to have string value")
+				return nil, errors.New("expected $options field to have string value")
 			}
 
 			// Validate regular expression options
 			for i := range regex.Options {
 				switch o := regex.Options[i]; o {
 				default:
-					return nil, fmt.Errorf("Invalid regular expression option '%v'", o)
+					return nil, fmt.Errorf("invalid regular expression option '%v'", o)
 
 				case 'g', 'i', 'm', 's': // allowed
 				}
@@ -259,10 +259,10 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				binary.Data = bytes
 
 			default:
-				return nil, errors.New("Expected $binary field to have string value")
+				return nil, errors.New("expected $binary field to have string value")
 			}
 			if jsonValue, ok = doc["$type"]; !ok {
-				return nil, errors.New("Expected $type field with $binary field")
+				return nil, errors.New("expected $type field with $binary field")
 			}
 
 			switch typ := jsonValue.(type) {
@@ -271,12 +271,12 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 				if err != nil {
 					return nil, err
 				} else if len(kind) != 1 {
-					return nil, errors.New("Expected single byte (as hexadecimal string) for $type field")
+					return nil, errors.New("expected single byte (as hexadecimal string) for $type field")
 				}
 				binary.Kind = kind[0]
 
 			default:
-				return nil, errors.New("Expected $type field to have string value")
+				return nil, errors.New("expected $type field to have string value")
 			}
 			return binary, nil
 		}
@@ -306,6 +306,6 @@ func parseNumberLongField(jsonValue interface{}) (int64, error) {
 		return strconv.ParseInt(v, 0, 64)
 
 	default:
-		return 0, errors.New("Expected $numberLong field to have string value")
+		return 0, errors.New("expected $numberLong field to have string value")
 	}
 }

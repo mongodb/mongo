@@ -25,7 +25,7 @@ type BSONDump struct {
 func (bd *BSONDump) Open() error {
 	file, err := os.Open(bd.FileName)
 	if err != nil {
-		return fmt.Errorf("Couldn't open BSON file: %v", err)
+		return fmt.Errorf("couldn't open BSON file: %v", err)
 	}
 	bd.bsonSource = db.NewBSONSource(file)
 	return nil
@@ -40,7 +40,7 @@ func dumpDoc(doc *bson.Raw, out io.Writer, pretty bool) error {
 
 	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(decodedDoc)
 	if err != nil {
-		return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
+		return fmt.Errorf("error converting BSON to extended JSON: %v", err)
 	}
 	jsonBytes, err := json.Marshal(extendedDoc)
 	if pretty {
@@ -49,7 +49,7 @@ func dumpDoc(doc *bson.Raw, out io.Writer, pretty bool) error {
 		jsonBytes = jsonFormatted.Bytes()
 	}
 	if err != nil {
-		return fmt.Errorf("Error converting doc to JSON: %v", err)
+		return fmt.Errorf("error converting doc to JSON: %v", err)
 	}
 	_, err = out.Write(jsonBytes)
 	return err
@@ -120,12 +120,12 @@ func (bd *BSONDump) Debug() (int, error) {
 			err := bson.Unmarshal(result.Data, &validated)
 			if err != nil {
 				// ObjCheck is turned on and we hit an error, so short-circuit now.
-				return numFound, fmt.Errorf("Failed to validate bson during objcheck: %v", err)
+				return numFound, fmt.Errorf("failed to validate bson during objcheck: %v", err)
 			}
 		}
 		err := debugBSON(result, 0, bd.Out)
 		if err != nil {
-			log.Logf(log.Always, "Encountered error debugging BSON data: %v", err)
+			log.Logf(log.Always, "encountered error debugging BSON data: %v", err)
 		}
 		numFound++
 	}

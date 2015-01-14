@@ -302,7 +302,7 @@ func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) 
 		} else {
 			key := "field" + strconv.Itoa(index)
 			if util.StringSliceContains(fields, key) {
-				return nil, fmt.Errorf("Duplicate field name - on %v - for token #%v ('%v') in document #%v",
+				return nil, fmt.Errorf("duplicate field name - on %v - for token #%v ('%v') in document #%v",
 					key, index+1, parsedValue, numProcessed)
 			}
 			document = append(document, bson.DocElem{key, parsedValue})
@@ -320,16 +320,16 @@ func validateFields(fields []string) error {
 
 	for index, field := range fieldsCopy {
 		if strings.HasSuffix(field, ".") {
-			return fmt.Errorf("field '%v' can not end with a '.'", field)
+			return fmt.Errorf("field '%v' cannot end with a '.'", field)
 		}
 		if strings.HasPrefix(field, ".") {
-			return fmt.Errorf("field '%v' can not start with a '.'", field)
+			return fmt.Errorf("field '%v' cannot start with a '.'", field)
 		}
 		if strings.HasPrefix(field, "$") {
-			return fmt.Errorf("field '%v' can not start with a '$'", field)
+			return fmt.Errorf("field '%v' cannot start with a '$'", field)
 		}
 		if strings.Contains(field, "..") {
-			return fmt.Errorf("field '%v' can not contain consecutive '.' characters", field)
+			return fmt.Errorf("field '%v' cannot contain consecutive '.' characters", field)
 		}
 		// NOTE: since fields is sorted, this check ensures that no field
 		// is incompatible with another one that occurs further down the list.
@@ -338,12 +338,12 @@ func validateFields(fields []string) error {
 			// NOTE: this means we will not support imports that have fields that
 			// include e.g. a, a.b
 			if strings.HasPrefix(latterField, field+".") {
-				return fmt.Errorf("incompatible fields found: '%v' and '%v'", field, latterField)
+				return fmt.Errorf("fields '%v' and '%v' are incompatible", field, latterField)
 			}
 			// NOTE: this means we will not support imports that have fields like
 			// a, a - since this is invalid in MongoDB
 			if field == latterField {
-				return fmt.Errorf("fields can not be identical: '%v' and '%v'", field, latterField)
+				return fmt.Errorf("fields cannot be identical: '%v' and '%v'", field, latterField)
 			}
 		}
 	}

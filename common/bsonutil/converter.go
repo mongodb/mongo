@@ -46,7 +46,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	case json.ObjectId: // ObjectId
 		s := string(v)
 		if !bson.IsObjectIdHex(s) {
-			return nil, errors.New("Expected ObjectId to contain 24 hexadecimal characters")
+			return nil, errors.New("expected ObjectId to contain 24 hexadecimal characters")
 		}
 		return bson.ObjectIdHex(s), nil
 
@@ -216,5 +216,5 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Conversion of BSON type '%v' not supported %v", reflect.TypeOf(x), x)
+	return nil, fmt.Errorf("conversion of BSON type '%v' not supported %v", reflect.TypeOf(x), x)
 }

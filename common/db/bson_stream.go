@@ -106,7 +106,7 @@ func (bsonSource *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 	//actually fit into the buffer that was provided. If not, either the BSON is
 	//invalid, or the buffer passed in is too small.
 	if bsonSize > int32(len(into)) {
-		bsonSource.err = fmt.Errorf("Invalid BSONSize: %v bytes", bsonSize)
+		bsonSource.err = fmt.Errorf("invalid BSONSize: %v bytes", bsonSize)
 		return false, 0
 	}
 	_, err = io.ReadAtLeast(bsonSource.Stream, into[4:int(bsonSize)], int(bsonSize-4))
@@ -117,7 +117,7 @@ func (bsonSource *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 		}
 		//This case means we hit EOF but read a partial document,
 		//so there's a broken doc in the stream. Treat this as error.
-		bsonSource.err = fmt.Errorf("Invalid bson: %v", err)
+		bsonSource.err = fmt.Errorf("invalid bson: %v", err)
 		return false, 0
 	}
 

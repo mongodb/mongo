@@ -85,7 +85,7 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 		}
 		jsonOut, err := json.Marshal(extendedDoc)
 		if err != nil {
-			return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
+			return fmt.Errorf("error converting BSON to extended JSON: %v", err)
 		}
 		if jsonExporter.PrettyOutput {
 			var jsonFormatted bytes.Buffer

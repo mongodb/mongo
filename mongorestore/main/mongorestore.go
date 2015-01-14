@@ -97,7 +97,7 @@ func getTargetDirFromArgs(extraArgs []string, dirFlag string) (string, error) {
 		return dirFlag, nil
 
 	default:
-		log.Log(log.Info, "using default 'dump' directory")
+		log.Log(log.Always, "using default 'dump' directory")
 		return "dump", nil
 	}
 }
