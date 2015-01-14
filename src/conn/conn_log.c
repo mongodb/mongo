@@ -126,11 +126,13 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	/*
 	 * If we're coming from a backup cursor we want the smaller of
 	 * the last full log file copied in backup or the checkpoint LSN.
+	 * Otherwise we want the minimum of the last log file written to
+	 * disk and the checkpoint LSN.
 	 */
 	if (backup_file != 0)
 		min_lognum = WT_MIN(log->ckpt_lsn.file, backup_file);
 	else
-		min_lognum = log->ckpt_lsn.file;
+		min_lognum = WT_MIN(log->ckpt_lsn.file, log->sync_lsn.file);
 	WT_RET(__wt_verbose(session, WT_VERB_LOG,
 	    "log_archive: archive to log number %" PRIu32, min_lognum));
 
