@@ -514,6 +514,7 @@ coredbEnv.Library("coredb", [
                   LIBDEPS=['db/auth/serverauth',
                            'db/commands/server_status_core',
                            'db/common',
+                           'scripting_common',
                            'server_parameters',
                            'expressions',
                            'expressions_geo',
@@ -537,9 +538,13 @@ if windows:
                     LIBDEPS=['ntservice'],
                     LIBS=['shell32', env['LIBS']])
 
-scripting_common_files = [ "scripting/engine.cpp",
-                           "scripting/utils.cpp",
-                           ]
+env.Library(
+    target='scripting_common',
+    source=[
+        'scripting/engine.cpp',
+        'scripting/utils.cpp',
+    ],
+)
 
 env.Library('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
             LIBDEPS=['bson'])
@@ -549,15 +554,31 @@ env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evalua
 if usev8:
     scriptingEnv = env.Clone()
     scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
-    scriptingEnv.Library('scripting',
-                         scripting_common_files + ['scripting/engine_v8' + v8suffix + '.cpp',
-                                                   'scripting/v8' + v8suffix + '_db.cpp',
-                                                   'scripting/v8' + v8suffix + '_utils.cpp',
-                                                   'scripting/v8' + v8suffix + '_profiler.cpp'],
-                 LIBDEPS=['bson_template_evaluator', '$BUILD_DIR/third_party/shim_v8'])
+    scriptingEnv.Library(
+        target='scripting',
+        source=[
+            'scripting/engine_v8' + v8suffix + '.cpp',
+            'scripting/v8' + v8suffix + '_db.cpp',
+            'scripting/v8' + v8suffix + '_utils.cpp',
+            'scripting/v8' + v8suffix + '_profiler.cpp',
+        ],
+        LIBDEPS=[
+            'bson_template_evaluator',
+            'scripting_common',
+            '$BUILD_DIR/third_party/shim_v8',
+        ],
+    )
 else:
-    env.Library('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
-                LIBDEPS=['bson_template_evaluator'])
+    env.Library(
+        target='scripting',
+        source=[
+            'scripting/engine_none.cpp',
+        ],
+        LIBDEPS=[
+            'bson_template_evaluator',
+            'scripting_common',
+        ],
+    )
 
 env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/common' ])
 
@@ -923,6 +944,7 @@ serveronlyLibdeps = ["coreshard",
                      "global_optime",
                      "index_key_validate",
                      'range_deleter',
+                     'scripting',
                      "update_index_data",
                      's/metadata',
                      's/batch_write_types',
@@ -994,14 +1016,19 @@ mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 
 env.Library("gridfs", "client/gridfs.cpp")
 
-env.Library("coreserver",
-            ["db/client_basic.cpp",
-             "util/net/miniwebserver.cpp",
-             "db/stats/counters.cpp",
-             "db/log_process_details.cpp",
-             "db/conn_pool_options.cpp"
-            ],
-            LIBDEPS=["mongocommon", "scripting"])
+env.Library(
+    target='coreserver',
+    source=[
+        'db/client_basic.cpp',
+        'db/conn_pool_options.cpp',
+        'db/log_process_details.cpp',
+        'db/stats/counters.cpp',
+        'util/net/miniwebserver.cpp',
+    ],
+    LIBDEPS=[
+        'mongocommon',
+    ],
+)
 
 # mongod options
 env.Library("mongod_options", ["db/mongod_options.cpp"],
