@@ -33,6 +33,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/scoped_array.hpp>
 
+#include "mongo/base/compare_numbers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/util/hex.h"
@@ -549,19 +550,6 @@ namespace mongo {
         }
     }
 
-    // Special case for double since it needs special NaN handling
-    inline static int cmp(double left, double right) {
-        // The following is lifted directly from compareElementValues
-        // to ensure identical handling of NaN
-        if (left < right) 
-            return -1;
-        if (left == right)
-            return 0;
-        if (isNaN(left))
-            return isNaN(right) ? 0 : -1;
-        return 1;
-    }
-
     int Value::compare(const Value& rL, const Value& rR) {
         // Note, this function needs to behave identically to BSON's compareElementValues().
         // Additionally, any changes here must be replicated in hash_combine().
@@ -590,23 +578,45 @@ namespace mongo {
         case Bool:
             return rL.getBool() - rR.getBool();
 
-        // WARNING: Timestamp and Date have same canonical type, but compare differently.
-        // Maintaining behavior from normal BSON.
         case Timestamp: // unsigned
             return cmp(rL._storage.timestampValue, rR._storage.timestampValue);
+
         case Date: // signed
             return cmp(rL._storage.dateValue, rR._storage.dateValue);
 
         // Numbers should compare by equivalence even if different types
-        case NumberLong:
-        case NumberInt:
-        case NumberDouble:
-            switch (getWidestNumeric(lType, rType)) {
-            case NumberDouble: return cmp(rL.getDouble(), rR.getDouble());
-            case NumberLong:   return cmp(rL.getLong(),   rR.getLong());
-            case NumberInt:    return cmp(rL.getInt(),    rR.getInt());
-            default: verify(false);
+        case NumberInt: {
+            // All types can precisely represent all NumberInts, so it is safe to simply convert to
+            // whatever rhs's type is.
+            switch (rType) {
+            case NumberInt: return compareInts(rL._storage.intValue, rR._storage.intValue);
+            case NumberLong: return compareLongs(rL._storage.intValue, rR._storage.longValue);
+            case NumberDouble: return compareDoubles(rL._storage.intValue, rR._storage.doubleValue);
+            default: invariant(false);
             }
+        }
+
+        case NumberLong: {
+            switch (rType) {
+            case NumberLong: return compareLongs(rL._storage.longValue, rR._storage.longValue);
+            case NumberInt: return compareLongs(rL._storage.longValue, rR._storage.intValue);
+            case NumberDouble: return compareLongToDouble(rL._storage.longValue,
+                                                          rR._storage.doubleValue);
+            default: invariant(false);
+            }
+        }
+
+        case NumberDouble: {
+            switch (rType) {
+            case NumberDouble: return compareDoubles(rL._storage.doubleValue,
+                                                     rR._storage.doubleValue);
+            case NumberInt: return compareDoubles(rL._storage.doubleValue,
+                                                  rR._storage.intValue);
+            case NumberLong: return compareDoubleToLong(rL._storage.doubleValue,
+                                                        rR._storage.longValue);
+            default: invariant(false);
+            }
+        }
 
         case jstOID:
             return memcmp(rL._storage.oid, rR._storage.oid, OID::kOIDSize);
@@ -662,23 +672,14 @@ namespace mongo {
             return rL.getStringData().compare(rR.getStringData());
 
         case CodeWScope: {
-            // This case crazy, but identical to how they are compared in BSON (SERVER-7804)
-
             intrusive_ptr<const RCCodeWScope> l = rL._storage.getCodeWScope();
             intrusive_ptr<const RCCodeWScope> r = rR._storage.getCodeWScope();
-
-            // This triggers two bugs in codeWScope.
-            // Since this is a very rare case I'm not handling it here.
-            uassert(16557, "can't compare CodeWScope values containing a NUL byte in the code.",
-                    strlen(l->code.c_str()) == l->code.size()
-                 && strlen(r->code.c_str()) == r->code.size());
 
             ret = l->code.compare(r->code);
             if (ret)
                 return ret;
 
-            // SERVER-7804
-            return strcmp(l->scope.objdata(), r->scope.objdata());
+            return l->scope.woCompare(r->scope);
         }
         }
         verify(false);
@@ -710,16 +711,10 @@ namespace mongo {
             boost::hash_combine(seed, _storage.dateValue);
             break;
 
-            /*
-              Numbers whose values are equal need to hash to the same thing
-              as well.  Note that Value::compare() promotes numeric values to
-              their largest common form in order for comparisons to work.
-              We must hash all numeric values as if they are doubles so that
-              things like grouping work.  We don't know what values will come
-              down the pipe later, but if we start out with int representations
-              of a value, and later see double representations of it, they need
-              to end up in the same buckets.
-             */
+        // This converts all numbers to doubles, which ignores the low-order bits of
+        // NumberLongs > 2**53, but that is ok since the hash will still be the same for
+        // equal numbers and is still likely to be different for different numbers.
+        // SERVER-16851
         case NumberDouble:
         case NumberLong:
         case NumberInt: {
@@ -776,11 +771,9 @@ namespace mongo {
         }
 
         case CodeWScope: {
-            // SERVER-7804
-            const char * code = _storage.getCodeWScope()->code.c_str();
-            boost::hash_range(seed, code, (code + strlen(code)));
-            // Not going to bother hashing scope. Too many edge cases. Will fall back to
-            // Value::compare when code is same, so this is ok.
+            intrusive_ptr<const RCCodeWScope> cws = _storage.getCodeWScope();
+            boost::hash_combine(seed, StringData::Hasher()(cws->code));
+            boost::hash_combine(seed, BSONObj::Hasher()(cws->scope));
             break;
         }
         }

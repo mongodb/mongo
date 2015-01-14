@@ -391,6 +391,13 @@ namespace mongo {
             const ValueElement& rField = rIt.get();
             const ValueElement& lField = lIt.get();
 
+            // For compatibility with BSONObj::woCompare() consider the canonical type of values
+            // before considerting their names.
+            const int rCType = canonicalizeBSONType(rField.val.getType());
+            const int lCType = canonicalizeBSONType(lField.val.getType());
+            if (lCType != rCType)
+                return lCType < rCType ? -1 : 1;
+
             const int nameCmp = lField.nameSD().compare(rField.nameSD());
             if (nameCmp)
                 return nameCmp; // field names are unequal
