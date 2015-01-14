@@ -396,17 +396,6 @@ namespace mongo {
         }
     }
 
-    bool InMemoryRecordStore::compactSupported() const {
-        return false;
-    }
-    Status InMemoryRecordStore::compact(OperationContext* txn,
-                                        RecordStoreCompactAdaptor* adaptor,
-                                        const CompactOptions* options,
-                                        CompactStats* stats) {
-        // TODO might be possible to do something here
-        invariant(!"compact not yet implemented");
-    }
-
     Status InMemoryRecordStore::validate(OperationContext* txn,
                                          bool full,
                                          bool scanData,

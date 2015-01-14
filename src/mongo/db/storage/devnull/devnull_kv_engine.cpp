@@ -141,12 +141,6 @@ namespace mongo {
                                               RecordId end,
                                               bool inclusive) { }
 
-        virtual bool compactSupported() const { return false; }
-        virtual Status compact( OperationContext* txn,
-                                RecordStoreCompactAdaptor* adaptor,
-                                const CompactOptions* options,
-                                CompactStats* stats ) { return Status::OK(); }
-
         virtual Status validate( OperationContext* txn,
                                  bool full, bool scanData,
                                  ValidateAdaptor* adaptor,

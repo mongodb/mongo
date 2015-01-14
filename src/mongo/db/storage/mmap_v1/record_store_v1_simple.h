@@ -62,6 +62,7 @@ namespace mongo {
         }
 
         virtual bool compactSupported() const { return true; }
+        virtual bool compactsInPlace() const { return false; }
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,

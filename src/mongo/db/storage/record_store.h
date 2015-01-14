@@ -259,12 +259,32 @@ namespace mongo {
                                               RecordId end,
                                               bool inclusive) = 0;
 
-        // does this RecordStore support the compact operation
-        virtual bool compactSupported() const = 0;
+        /**
+         * does this RecordStore support the compact operation?
+         *
+         * If you return true, you must provide implementations of all compact methods.
+         */
+        virtual bool compactSupported() const { return false; }
+
+        /**
+         * Does compact() leave RecordIds alone or can they change.
+         *
+         * Only called if compactSupported() returns true.
+         */
+        virtual bool compactsInPlace() const { invariant(false); }
+
+        /**
+         * Attempt to reduce the storage space used by this RecordStore.
+         *
+         * Only called if compactSupported() returns true.
+         * No RecordStoreCompactAdaptor will be passed if compactsInPlace() returns true.
+         */
         virtual Status compact( OperationContext* txn,
                                 RecordStoreCompactAdaptor* adaptor,
                                 const CompactOptions* options,
-                                CompactStats* stats ) = 0;
+                                CompactStats* stats ) {
+            invariant(false);
+        }
 
         /**
          * @param full - does more checks

@@ -99,12 +99,6 @@ namespace mongo {
 
         virtual void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
 
-        virtual bool compactSupported() const;
-        virtual Status compact( OperationContext* txn,
-                                RecordStoreCompactAdaptor* adaptor,
-                                const CompactOptions* options,
-                                CompactStats* stats );
-
         virtual Status validate( OperationContext* txn,
                                  bool full,
                                  bool scanData,

@@ -117,13 +117,6 @@ namespace mongo {
 
         virtual bool compactSupported() const { invariant(false); }
 
-        virtual Status compact(OperationContext* txn,
-                               RecordStoreCompactAdaptor* adaptor,
-                               const CompactOptions* options,
-                               CompactStats* stats) {
-            invariant(false);
-        }
-
         virtual Status validate(OperationContext* txn,
                                 bool full,
                                 bool scanData,

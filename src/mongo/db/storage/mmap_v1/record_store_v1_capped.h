@@ -68,13 +68,6 @@ namespace mongo {
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
 
-        virtual bool compactSupported() const { return false; }
-
-        virtual Status compact( OperationContext* txn,
-                                RecordStoreCompactAdaptor* adaptor,
-                                const CompactOptions* options,
-                                CompactStats* stats );
-
         // Start from firstExtent by default.
         DiskLoc firstRecord( OperationContext* txn,
                              const DiskLoc &startExtent = DiskLoc() ) const;
@@ -99,7 +92,7 @@ namespace mongo {
 
     private:
         // -- start copy from cap.cpp --
-        void compact(OperationContext* txn);
+        void _compact(OperationContext* txn);
         DiskLoc cappedFirstDeletedInCurExtent() const;
         void setFirstDeletedInCurExtent( OperationContext* txn, const DiskLoc& loc );
         void cappedCheckMigrate(OperationContext* txn);
