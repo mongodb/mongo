@@ -172,12 +172,9 @@ namespace mongo {
         // Btree-specific navigation state.
         //
 
-        // When _params.bounds.isSimpleRange is false, we assume that we are traversing a btree
-        // index and make use of the BtreeIndexCursor methods for navigation.  We do this because
-        // using the btree-specific navigation methods will yield better index scan performance.
-        //
-        // This assumption will need to change when we introduce new index types not based on the
-        // btree index.  This is being tracked in SERVER-12397.
+        // Either NULL or points to the same object as '_indexCursor'. The index scan stage should
+        // not need to use both IndexCursor and BtreeIndexCursor. This is being tracked in
+        // SERVER-12397.
         BtreeIndexCursor* _btreeCursor;
 
         //

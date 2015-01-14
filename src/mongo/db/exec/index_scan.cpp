@@ -143,8 +143,7 @@ namespace mongo {
                 invariant(_iam->newCursor(_txn, cursorOptions, &endCursor).isOK());
                 invariant(endCursor);
 
-                // TODO: Is it a valid assumption that we can always make this cast safely?
-                // See SERVER-12397.
+                // TODO: Get rid of this cast. See SERVER-12397.
                 _endCursor.reset(static_cast<BtreeIndexCursor*>(endCursor));
 
                 // If the end key is inclusive, we want to point *past* it since that's the end.
@@ -318,9 +317,28 @@ namespace mongo {
             //
             // As an example, say we're counting from 5 to 10 and the index only has keys for 6, 7,
             // 8, and 9. '_btreeCursor' will point at key 6 at the start and '_endCursor' will be
-            // EOF. If we insert documents with keys 11 during a yield, we need to relocate
-            // '_endCursor' to point at them as the end key of our scan.
+            // EOF. If we insert a document with key 11 during a yield, we need to relocate
+            // '_endCursor' to point at the new key as the end key of our scan.
             _endCursor->seek(_endKey, _endKeyInclusive);
+
+            // It is possible that the re-positioning of the end cursor above will move the end
+            // cursor so that it is on the other side of the scanning cursor. If this happens, the
+            // scan is over, so we transition to HIT_END state.
+            //
+            // Example:
+            //   Suppose we're counting from 5 to 10 and the index has keys 6 and 15. The end
+            //   cursor will initially point at 15. Say that the scanning cursor advances, returning
+            //   key 6 and now points at 15. Then the index scan state is saved. While saved,
+            //   key 11 is inserted. The end cursor will seek to point at key 11. If we didn't have
+            //   the check below, then the scan could erroneously return key 15, which is not in the
+            //   desired range of [5, 10].
+            int cmp = _endKey.woCompare(_indexCursor->getKey(), _keyPattern);
+            const bool cursorPastEndKey = (_params.direction == 1 ? cmp < 0 : cmp > 0);
+            const bool cursorAtExclusiveEndKey = (cmp == 0 && !_endKeyInclusive);
+            if (cursorPastEndKey || cursorAtExclusiveEndKey) {
+                _scanState = HIT_END;
+                return;
+            }
         }
 
         if (!_savedKey.binaryEqual(_indexCursor->getKey())
