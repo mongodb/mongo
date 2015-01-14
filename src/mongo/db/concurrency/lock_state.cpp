@@ -701,6 +701,8 @@ namespace {
         // deadlock detection.
         unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
         while (true) {
+            // It is OK if this call wakes up spuriously, because we re-evaluate the remaining
+            // wait time anyways.
             result = _notify.wait(waitTimeMs);
 
             // Account for the time spent waiting on the notification object
@@ -722,6 +724,9 @@ namespace {
                     break;
                 }
             }
+
+            // If infinite timeout was requested, just keep waiting
+            if (timeoutMs == UINT_MAX) continue;
 
             const unsigned elapsedTimeMs = elapsedTimeMicros / 1000;
             waitTimeMs = (elapsedTimeMs < timeoutMs) ?
