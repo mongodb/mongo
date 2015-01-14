@@ -929,6 +929,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		locked = 1;
 		WT_ERR(__wt_close(session, close_fh));
 		log->sync_lsn = close_end_lsn;
+		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
 	}
