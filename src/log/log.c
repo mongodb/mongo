@@ -917,11 +917,11 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 * We may be racing with the close of an
 		 * earlier log file.  Only update if we need to.
 		 */
+		WT_ERR(__wt_close(session, close_fh));
 		if (LOG_CMP(&log->sync_lsn, &close_lsn) < 0)
 			log->sync_lsn = close_lsn;
 		locked = 0;
 		__wt_spin_unlock(session, &log->log_sync_lock);
-		WT_ERR(__wt_close(session, close_fh));
 	}
 
 	/*
