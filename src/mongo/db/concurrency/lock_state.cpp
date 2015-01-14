@@ -35,6 +35,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -333,6 +334,8 @@ namespace {
         if (globalLockRequest->recursiveCount == 1) {
             invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         }
+
+        dassert(getLockMode(resourceIdMMAPV1Flush) == _getModeForMMAPV1FlushLock());
     }
 
     template<bool IsForMMAPV1>
@@ -368,6 +371,10 @@ namespace {
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::beginWriteUnitOfWork() {
+        // Sanity check that write transactions under MMAP V1 have acquired the flush lock, so we
+        // don't allow partial changes to be written.
+        dassert(!IsForMMAPV1 || isLockHeldForMode(resourceIdMMAPV1Flush, MODE_IX));
+
         _wuowNestingLevel++;
     }
 
@@ -641,8 +648,17 @@ namespace {
             }
         }
         else {
-            // The global lock must always be acquired first
-            invariant(getLockMode(resourceIdGlobal) != MODE_NONE);
+            // This is all sanity checks that the global and flush locks are always be acquired
+            // before any other lock has been acquired and they must be in sync with the nesting.
+            DEV {
+                const LockRequestsMap::Iterator itGlobal = _requests.find(resourceIdGlobal);
+                invariant(itGlobal->recursiveCount > 0);
+                invariant(itGlobal->mode != MODE_NONE);
+
+                // Check the MMAP V1 flush lock is held in the appropriate mode
+                invariant(!IsForMMAPV1 || isLockHeldForMode(resourceIdMMAPV1Flush,
+                                                            _getModeForMMAPV1FlushLock()));
+            };
         }
 
         // The notification object must be cleared before we invoke the lock manager, because

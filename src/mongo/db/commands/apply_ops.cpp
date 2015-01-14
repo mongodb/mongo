@@ -86,10 +86,8 @@ namespace mongo {
 
             // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple 
             // ns used so locking individually requires more analysis
-            ScopedTransaction transaction(txn, MODE_X);
+            ScopedTransaction scopedXact(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-
-            DBDirectClient db(txn);
 
             // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {
@@ -129,7 +127,7 @@ namespace mongo {
                 const char *opType = temp["op"].valuestrsafe();
                 if (*opType == 'n') continue;
 
-                string ns = temp["ns"].String();
+                const string ns = temp["ns"].String();
 
                 // Run operations under a nested lock as a hack to prevent yielding.
                 //
@@ -142,8 +140,7 @@ namespace mongo {
                 // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
                 // commit to happen with a subset of ops applied.
                 // TODO figure out what to do about this.
-                ScopedTransaction transaction(txn, MODE_IX);
-                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                Lock::GlobalWrite globalWriteLockDisallowTempRelease(txn->lockState());
 
                 // Ensures that yielding will not happen (see the comment above).
                 DEV {
