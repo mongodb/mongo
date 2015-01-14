@@ -912,24 +912,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				 */
 				ref_new[j] = NULL;
 			}
-		else if (next_ref->state == WT_REF_SPLIT) {
-			/*
-			 * We're discarding a deleted reference.
-			 * Free any resources it holds.
-			 */
-			if (parent->type == WT_PAGE_ROW_INT) {
-				WT_TRET(__split_ovfl_key_cleanup(
-				    session, parent, next_ref));
-				ikey = __wt_ref_key_instantiated(next_ref);
-				if (ikey != NULL)
-					WT_TRET(__split_safe_free(session, 0,
-					    ikey,
-					    sizeof(WT_IKEY) + ikey->size));
-			}
-
-			WT_TRET(__split_safe_free(
-			    session, 0, next_ref, sizeof(WT_REF)));
-		} else
+		else if (next_ref->state != WT_REF_SPLIT)
+			/* Skip refs we have marked for deletion. */
 			*alloc_refp++ = next_ref;
 	}
 
@@ -964,6 +948,33 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * this point unless there's a panic.
 	 */
 	complete = 1;
+
+	/*
+	 * Now that the new page is in place it's OK to free any deleted
+	 * refs we encountered modulo the regular safe free semantics.
+	 */
+	for (i = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		/* If we set the ref to split to mark it for delete */
+		if (next_ref != ref && next_ref->state == WT_REF_SPLIT) {
+			/*
+			 * We're discarding a deleted reference.
+			 * Free any resources it holds.
+			 */
+			if (parent->type == WT_PAGE_ROW_INT) {
+				WT_TRET(__split_ovfl_key_cleanup(
+				    session, parent, next_ref));
+				ikey = __wt_ref_key_instantiated(next_ref);
+				if (ikey != NULL)
+					WT_TRET(__split_safe_free(session, 0,
+					    ikey,
+					    sizeof(WT_IKEY) + ikey->size));
+			}
+
+			WT_TRET(__split_safe_free(
+			    session, 0, next_ref, sizeof(WT_REF)));
+		}
+	}
 
 	/*
 	 * We can't free the previous page index, there may be threads using it.
