@@ -1178,6 +1178,20 @@ namespace mongo {
                             if ( ! result.hasField( e.fieldName() ) )
                                 result.append( e );
                         }
+                        else if ( str::equals( e.fieldName() , "capped" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        else if ( str::equals( e.fieldName() , "paddingFactorNote" ) ) {
+                            if ( ! result.hasField( e.fieldName() ) )
+                                result.append( e );
+                        }
+                        else if ( str::equals( e.fieldName() , "indexDetails" ) ) {
+                            //skip this field in the rollup
+                        }
+                        else if ( str::equals( e.fieldName() , "wiredTiger" ) ) {
+                            //skip this field in the rollup
+                        }
                         else if ( str::equals( e.fieldName() , "nindexes" ) ) {
                             int myIndexes = e.numberInt();
                             
