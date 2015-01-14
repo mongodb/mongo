@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-const storageEngineWarning = `Warning: not all columns will apply to mongods running storage engines other than mmapv1.`
 
 //MongoStat is a container for the user-specified options and
 //internal cluster state used for running mongostat.
@@ -112,10 +111,6 @@ type AsyncClusterMonitor struct {
 
 	//Used to format the StatLines for printing
 	Formatter LineFormatter
-
-	//Whether or not the last group included any nodes running non-mmap
-	//storage engines
-	lastHadNonMmap bool
 }
 
 //Update() refreshes the internal state of the cluster monitor with the data
@@ -129,7 +124,6 @@ func (cluster *SyncClusterMonitor) Update(statLine StatLine) {
 func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep time.Duration) {
 	go func() {
 		rowCount := 0
-		warned := false
 		hasData := false
 		for {
 			newStat := <-cluster.ReportChan
@@ -139,13 +133,6 @@ func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep t
 			}
 			hasData = true
 
-			//If this mongod is running a storage engine other than mmapv1,
-			//print a warning about the non-applicable fields.
-			//Only display the warning once.
-			if newStat.Error == nil && newStat.StorageEngine != "mmapv1" && !warned {
-				log.Log(log.Always, storageEngineWarning)
-				warned = true
-			}
 
 			out := cluster.Formatter.FormatLines([]StatLine{newStat}, rowCount, false)
 			fmt.Print(out)
@@ -182,19 +169,6 @@ func (cluster *AsyncClusterMonitor) printSnapshot(lineCount int, discover bool) 
 	//Mark all the host lines that we encountered as having been printed
 	for _, stat := range cluster.LastStatLines {
 		stat.LastPrinted = stat.Time
-	}
-
-	//If appropriate, print a warning message about how the columns relate
-	//to the wired tiger storage engine
-	if !cluster.lastHadNonMmap {
-		cluster.lastHadNonMmap = false
-		for _, stat := range cluster.LastStatLines {
-			if stat.Error == nil && stat.StorageEngine != "mmapv1" {
-				log.Log(log.Always, storageEngineWarning)
-				cluster.lastHadNonMmap = true
-				break
-			}
-		}
 	}
 
 	fmt.Print(out)
