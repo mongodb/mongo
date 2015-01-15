@@ -186,6 +186,20 @@ namespace mongo {
     PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
                                                       WorkingSetID* out) {
+        // We consider "examining a document" to be every time that we pass a document through
+        // a filter by calling Filter::passes(...) below. Therefore, the 'docsExamined' metric
+        // is not always equal to the number of documents that were fetched from the collection.
+        // In particular, we can sometimes generate plans which have two fetch stages. The first
+        // one actually grabs the document from the collection, and the second passes the
+        // document through a second filter.
+        //
+        // One common example of this is geoNear. Suppose that a geoNear plan is searching an
+        // annulus to find 2dsphere-indexed documents near some point (x, y) on the globe.
+        // After fetching documents within geo hashes that intersect this annulus, the docs are
+        // fetched and filtered to make sure that they really do fall into this annulus. However,
+        // the user might also want to find only those documents for which accommodationType==
+        // "restaurant". The planner will add a second fetch stage to filter by this non-geo
+        // predicate.
         ++_specificStats.docsExamined;
 
         if (Filter::passes(member, _filter)) {
