@@ -346,7 +346,8 @@ var runner = (function() {
                 var cleanup = [];
                 var errors = [];
                 var teardownFailed = false;
-                var startTime, endTime, totalTime;
+                var startTime = new Date(); // Initialize in case setupWorkload fails below
+                var endTime, totalTime;
 
                 jsTest.log(workloads.join('\n'));
 
@@ -376,7 +377,6 @@ var runner = (function() {
                     });
 
                     totalTime = endTime.getTime() - startTime.getTime();
-                    assert.gte(totalTime, 0);
                     if (!executionMode.parallel && !executionMode.composed) {
                         jsTest.log(workloads[0] + ': Workload completed in ' + totalTime + ' ms');
                     }
