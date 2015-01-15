@@ -131,6 +131,7 @@ namespace mongo {
 
             // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
             // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+            txn->recoveryUnit()->commitAndRestart();
             cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
             txn->setRecoveryUnit(storageEngine->newRecoveryUnit());

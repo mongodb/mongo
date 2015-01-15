@@ -155,6 +155,7 @@ namespace mongo {
             : _cc(cc), _txn(txn) {
 
             // Save this for later.  We restore it upon destruction.
+            _txn->recoveryUnit()->commitAndRestart();
             _txnPreviousRecoveryUnit = txn->releaseRecoveryUnit();
 
             // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
@@ -163,6 +164,7 @@ namespace mongo {
         }
 
         ~ScopedRecoveryUnitSwapper() {
+            _txn->recoveryUnit()->commitAndRestart();
             _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
             _txn->setRecoveryUnit(_txnPreviousRecoveryUnit);
         }
@@ -894,6 +896,7 @@ namespace mongo {
             else {
                 // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+                txn->recoveryUnit()->commitAndRestart();
                 cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());
