@@ -49,82 +49,79 @@ namespace mongo {
     using std::max;
     using std::min;
 
-    namespace dur {
+namespace dur {
 
-        void WriteIntent::absorb(const WriteIntent& other) {
-            dassert(overlaps(other));
+    void WriteIntent::absorb(const WriteIntent& other) {
+        dassert(overlaps(other));
 
-            void* newStart = min(start(), other.start());
-            p = max(p, other.p);
-            len = (char*)p - (char*)newStart;
+        void* newStart = min(start(), other.start());
+        p = max(p, other.p);
+        len = (char*)p - (char*)newStart;
 
-            dassert(contains(other));
-        }
+        dassert(contains(other));
+    }
 
 
-        CommitJob::CommitJob() :
-            groupCommitMutex("groupCommit"),
-            _hasWritten(false),
-            _lastNotedPos(0),
-            _bytes(0) {
+    CommitJob::CommitJob() :
+        groupCommitMutex("groupCommit"),
+        _hasWritten(false),
+        _lastNotedPos(0),
+        _bytes(0) {
 
-        }
+    }
 
-        CommitJob::~CommitJob() {
+    CommitJob::~CommitJob() {
 
-        }
+    }
 
-        void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            SimpleMutex::scoped_lock lk(groupCommitMutex);
-            _hasWritten = true;
-            _durOps.push_back(p);
-        }
+    void CommitJob::noteOp(shared_ptr<DurOp> p) {
+        SimpleMutex::scoped_lock lk(groupCommitMutex);
+        _hasWritten = true;
+        _durOps.push_back(p);
+    }
 
-        void CommitJob::note(void* p, int len) {
-            _hasWritten = true;
+    void CommitJob::note(void* p, int len) {
+        _hasWritten = true;
 
-            // from the point of view of the dur module, it would be fine (i think) to only
-            // be read locked here.  but must be at least read locked to avoid race with
-            // remapprivateview
+        if (!_alreadyNoted.checkAndSet(p, len)) {
+            // Remember intent. We will journal it in a bit.
+            _insertWriteIntent(p, len);
 
-            if (!_alreadyNoted.checkAndSet(p, len)) {
-                // Remember intent. We will journal it in a bit.
-                _insertWriteIntent(p, len);
+            // Round off to page address (4KB).
+            const size_t x = ((size_t)p) & ~0xfff;
 
-                // Round off to page address (4KB)
-                const size_t x = ((size_t)p) & ~0xfff;
+            if (x != _lastNotedPos) {
+                _lastNotedPos = x;
 
-                if (x != _lastNotedPos) {
-                    _lastNotedPos = x;
-                    unsigned b = (len + 4095) & ~0xfff;
-                    _bytes += b;
+                // Add the full page amount
+                _bytes += (len + 4095) & ~0xfff;
 
-                    if (_bytes > UncommittedBytesLimit * 3) {
-                        static time_t lastComplain;
-                        static unsigned nComplains;
-                        // throttle logging
-                        if (++nComplains < 100 || time(0) - lastComplain >= 60) {
-                            lastComplain = time(0);
-                            warning() << "DR102 too much data written uncommitted ("
-                                      << _bytes / 1000000.0 << "MB)";
+                if (_bytes > UncommittedBytesLimit * 3) {
+                    _complains++;
 
-                            if (nComplains < 10 || nComplains % 10 == 0) {
-                                // wassert makes getLastError show an error, so we just print stack trace
-                                printStackTrace();
-                            }
+                    // Throttle logging
+                    if (_complains < 100 || (curTimeMillis64() - _lastComplainMs >= 60000)) {
+                        _lastComplainMs = curTimeMillis64();
+
+                        warning() << "DR102 too much data written uncommitted ("
+                                  << _bytes / 1000000.0 << "MB)";
+
+                        if (_complains < 10 || _complains % 10 == 0) {
+                            printStackTrace();
                         }
                     }
                 }
             }
         }
-
-        void CommitJob::committingReset() {
-            _hasWritten = false;
-            _alreadyNoted.clear();
-            _intents.clear();
-            _durOps.clear();
-            _bytes = 0;
-        }
-
     }
-}
+
+    void CommitJob::committingReset() {
+        _hasWritten = false;
+        _alreadyNoted.clear();
+        _intents.clear();
+        _durOps.clear();
+        _bytes = 0;
+    }
+
+} // namespace "dur"
+} // namespace "mongo"
