@@ -36,6 +36,7 @@
     killcursors
 
  */
+
 #include "mongo/platform/basic.h"
 
 #ifdef _WIN32
@@ -78,6 +79,7 @@ using mongo::BSONObj;
 using mongo::BufBuilder;
 using mongo::DBClientConnection;
 using mongo::MemoryMappedFile;
+using std::string;
 
 #define SNAP_LEN 65535
 
@@ -256,9 +258,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
     DbMessage d( m );
 
-    out() << inet_ntoa(ip->ip_src) << ":" << ntohs( tcp->th_sport )
+    // inet_ntoa uses statically allocated buffer.
+    string sourceAddress = inet_ntoa(ip->ip_src);
+    string destinationAddress = inet_ntoa(ip->ip_dst);
+    out() << sourceAddress << ":" << ntohs( tcp->th_sport )
           << ( serverPorts.count( ntohs( tcp->th_dport ) ) ? "  -->> " : "  <<--  " )
-          << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
+          << destinationAddress << ":" << ntohs( tcp->th_dport )
           << " " << (d.messageShouldHaveNs() ? d.getns() : "")
           << "  " << m.header().getLen() << " bytes "
           << " id:" << hex << m.header().getId() << dec << "\t" << m.header().getId();
