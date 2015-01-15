@@ -759,11 +759,11 @@ struct __wt_col {
  * with RLE counts greater than 1 when reading the page.  We can do a binary
  * search in this array, then an offset calculation to find the cell.
  */
-struct __wt_col_rle {
+WT_PACKED_STRUCT_BEGIN(__wt_col_rle)
 	uint64_t recno;			/* Record number of first repeat. */
 	uint64_t rle;			/* Repeat count. */
 	uint32_t indx;			/* Slot of entry in col_var.d */
-} WT_GCC_ATTRIBUTE((packed));
+WT_PACKED_STRUCT_END
 
 /*
  * WT_COL_PTR, WT_COL_PTR_SET --
@@ -827,7 +827,7 @@ struct __wt_ikey {
  * is done for an entry, WT_UPDATE structures are formed into a forward-linked
  * list.
  */
-struct __wt_update {
+WT_PACKED_STRUCT_BEGIN(__wt_update)
 	uint64_t txnid;			/* update transaction */
 
 	WT_UPDATE *next;		/* forward-linked list */
@@ -844,7 +844,7 @@ struct __wt_update {
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\
 	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
-} WT_GCC_ATTRIBUTE((packed));
+};
 
 /*
  * WT_INSERT --

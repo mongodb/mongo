@@ -31,7 +31,7 @@ for i in `sed -e '/^[a-z]/!d' filelist`; do
 	    -e 's/\* /\*/g' \
 	    -e 's/  */ /g' \
 	    -e 's/^/extern /' \
-	    -e 's/WT_GCC_FUNC_/WT_GCC_/' \
+	    -e 's/WT_GCC_FUNC_/WT_GCC_FUNC_DECL_/' \
 	    -e 's/$/;/p' \
 	    < ../$i
 done) > $t

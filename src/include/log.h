@@ -70,7 +70,7 @@
 #define	WT_LOG_SLOT_FREE	1
 #define	WT_LOG_SLOT_PENDING	2
 #define	WT_LOG_SLOT_READY	3
-typedef struct {
+typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	int64_t	 slot_state;		/* Slot state */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
@@ -90,7 +90,7 @@ typedef struct {
 #define	SLOT_SYNC	0x08			/* Needs sync on release */
 #define	SLOT_SYNC_DIR	0x10			/* Directory sync on release */
 	uint32_t flags;			/* Flags */
-} WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
+} WT_LOGSLOT;
 
 typedef struct {
 	WT_LOGSLOT	*slot;
