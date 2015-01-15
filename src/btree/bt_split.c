@@ -1468,7 +1468,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **ref_new;
-	size_t ikey_size, parent_decr, parent_incr;
+	size_t parent_decr, parent_incr;
 	uint32_t i, new_entries;
 
 	page = ref->page;
@@ -1476,7 +1476,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	new_entries = mod->mod_multi_entries;
 
 	ikey = NULL;
-	ikey_size = parent_decr = parent_incr = 0;
+	parent_decr = parent_incr = 0;
 
 	/*
 	 * Convert the split page's multiblock reconciliation information into
@@ -1492,12 +1492,11 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * change in memory footprint.  Row store pages have keys that may be
 	 * instantiated, check for that.
 	 */
-	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
-	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
-		ikey_size = sizeof(WT_IKEY) + ikey->size;
-		WT_MEMSIZE_ADD(parent_decr, ikey_size);
-	}
 	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
+			WT_MEMSIZE_ADD(
+			    parent_decr, sizeof(WT_IKEY) + ikey->size);
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session,
@@ -1524,7 +1523,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * safe.
 	 */
 	if (ikey != NULL)
-		WT_TRET(__split_safe_free(session, exclusive, ikey, ikey_size));
+		WT_TRET(__split_safe_free(
+		    session, exclusive, ikey, sizeof(WT_IKEY) + ikey->size));
 	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
 
 	/*
