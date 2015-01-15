@@ -2,7 +2,7 @@
 import re
 import textwrap
 
-Import("env windows darwin solaris linux freebsd")
+Import("env windows darwin solaris linux freebsd openbsd")
 
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
@@ -19,6 +19,8 @@ elif solaris:
     env.Append(CPPPATH=["build_solaris"])
 elif freebsd:
     env.Append(CPPPATH=["build_freebsd"])
+elif openbsd:
+    env.Append(CPPPATH=["build_openbsd"])
 elif linux:
     env.Append(CPPPATH=["build_linux"])
     env.Append(CPPDEFINES=["_GNU_SOURCE"])

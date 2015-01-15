@@ -47,7 +47,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__) || defined(__openbsd__)
 #define FASTPATH_UNIX 1
 #endif
 
