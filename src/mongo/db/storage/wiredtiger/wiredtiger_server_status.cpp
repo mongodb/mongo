@@ -35,6 +35,7 @@
 
 #include "boost/scoped_ptr.hpp"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -61,7 +62,7 @@ namespace mongo {
                 const BSONElement& configElement) const {
 
         WiredTigerSession* session =
-            dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession();
+            checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession();
         invariant(session);
 
         WT_SESSION* s = session->getSession();

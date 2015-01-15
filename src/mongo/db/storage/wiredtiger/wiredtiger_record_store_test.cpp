@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
@@ -273,10 +274,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        string uri = dynamic_cast<WiredTigerRecordStore*>( rs.get() )->getURI();
+        string uri = checked_cast<WiredTigerRecordStore*>( rs.get() )->getURI();
 
         WiredTigerSizeStorer ss;
-        dynamic_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
+        checked_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
 
         int N = 12;
 
@@ -321,7 +322,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             WiredTigerRecoveryUnit* ru =
-                dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() );
+                checked_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
@@ -374,7 +375,7 @@ namespace {
             harnessHelper.reset(new WiredTigerHarnessHelper());
             sizeStorer.reset(new WiredTigerSizeStorer());
             rs.reset(harnessHelper->newNonCappedRecordStore());
-            WiredTigerRecordStore* wtrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());
+            WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
             wtrs->setSizeStorer(sizeStorer.get());
             uri = wtrs->getURI();
 
@@ -497,7 +498,7 @@ namespace {
                                    const OpTime& opTime) {
         BSONObj obj = BSON( "ts" << opTime );
         WriteUnitOfWork wuow(opCtx.get());
-        WiredTigerRecordStore* wrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());
+        WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         invariant( wrs );
         Status status = wrs->oplogDiskLocRegister( opCtx.get(), opTime );
         if (!status.isOK())
@@ -687,7 +688,7 @@ namespace {
                                     scoped_ptr<RecordStore>& rs,
                                     int inc ) {
         OpTime opTime = OpTime(5,inc);
-        WiredTigerRecordStore* wrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());
+        WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         Status status = wrs->oplogDiskLocRegister( txn, opTime );
         ASSERT_OK( status );
         BSONObj obj = BSON( "ts" << opTime );
@@ -703,7 +704,7 @@ namespace {
                                                                        -1));
 
         {
-            const WiredTigerRecordStore* wrs = dynamic_cast<WiredTigerRecordStore*>(rs.get());
+            const WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
             ASSERT( wrs->isOplog() );
             ASSERT( wrs->usingOplogHack() );
         }

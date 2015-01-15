@@ -33,6 +33,7 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -168,7 +169,7 @@ namespace mongo {
 
     WiredTigerRecoveryUnit* WiredTigerRecoveryUnit::get(OperationContext *txn) {
         invariant( txn );
-        return dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+        return checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
     }
 
     void WiredTigerRecoveryUnit::assertInActiveTxn() const {

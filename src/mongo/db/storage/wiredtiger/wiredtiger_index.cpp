@@ -36,6 +36,7 @@
 
 #include <set>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -576,7 +577,7 @@ namespace {
 
         virtual bool pointsToSamePlaceAs(const SortedDataInterface::Cursor& genOther) const {
             const WiredTigerIndexCursorBase& other =
-                dynamic_cast<const WiredTigerIndexCursorBase&>(genOther);
+                checked_cast<const WiredTigerIndexCursorBase&>(genOther);
 
             if ( _eof && other._eof )
                 return true;
