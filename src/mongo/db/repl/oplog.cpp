@@ -446,7 +446,8 @@ namespace {
             OpTime myLastOptime = replCoord->getMyLastOptime();
             if (!(myLastOptime < ts)) {
                 severe() << "replication oplog stream went back in time. previous timestamp: "
-                         << myLastOptime << " newest timestamp: " << ts;
+                         << myLastOptime << " newest timestamp: " << ts << ". Op being applied: "
+                         << op;
                 fassertFailedNoTrace(18905);
             }
             wunit.commit();

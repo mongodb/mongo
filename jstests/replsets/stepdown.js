@@ -112,8 +112,16 @@ config.version++;
 config.members.push({_id: 2,
                      host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
                      arbiterOnly:true});
+try {
+    reconfig(replTest, config);
+} catch (x) {
+    // SERVER-16878 Print the last few oplog entries of the secondary to aid debugging
+    var oplog1 = replTest.nodes[1].getDB('local').oplog.rs.find().sort({'$natural':-1}).limit(3);
+    print("Node 1 oplog: " + tojson(oplog1.toArray()));
 
-reconfig(replTest, config);
+    throw x;
+}
+
 
 print("\ncheck shutdown command");
 
