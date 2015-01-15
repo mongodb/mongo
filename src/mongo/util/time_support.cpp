@@ -914,7 +914,7 @@ namespace {
         SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
         baseFiletime = ftNew;
         basePerfCounter = newPerfCounter;
-        resyncInterval = 60 * Timer::_countsPerSecond;
+        resyncInterval = 60 * Timer::getCountsPerSecond();
         return newPerfCounter;
     }
 
@@ -952,7 +952,7 @@ namespace {
         // truncation while using only integer instructions.
         //
         unsigned long long computedTime = baseFiletime +
-                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::_countsPerSecond;
+                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::getCountsPerSecond();
 
         // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
         //
