@@ -79,7 +79,6 @@ mongo_tools_variables:
       - name: legacy28
       - name: legacy26
       - name: legacy24
-      - name: unit
     ubuntu1204_task_list: &ubuntu1204_tasks
       - name: bsonutil
       - name: db
@@ -98,6 +97,7 @@ mongo_tools_variables:
       - name: qa-tests
       - name: qa-tests-wt
       - name: text
+      - name: unit
       - name: util
       - name: vet
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
