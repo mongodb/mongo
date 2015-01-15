@@ -20,7 +20,7 @@ build() {
 
 	l=`ls ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
-	egrep -h '^[	 ]*((struct|union)[	 ]*(WT_COMPILER_TYPE_ALIGN\(.*\)[	 ]*)?__.*[	 ]*{)|(WT_PACKED_STRUCT_BEGIN.*))' $l | \
+	egrep -h '^[	 ]*(((struct|union)[	 ]*(WT_COMPILER_TYPE_ALIGN\(.*\)[	 ]*)?__.*[	 ]*{)|(WT_PACKED_STRUCT_BEGIN.*))' $l | \
 	    egrep -v '(#define|__attribute)' |
 	    sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' |
 	    sed -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' |
