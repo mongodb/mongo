@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <string>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -48,6 +51,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::string;
 
     class RocksSortedDataImplHarness : public HarnessHelper {
     public:

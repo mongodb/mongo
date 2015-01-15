@@ -1,5 +1,3 @@
-// rocks_sorted_data_impl.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *

@@ -1,5 +1,3 @@
-// rocks_init.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,6 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/rocks/rocks_engine.h"
 

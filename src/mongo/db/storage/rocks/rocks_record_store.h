@@ -1,5 +1,3 @@
-// rocks_record_store.h
-
 /**
 *    Copyright (C) 2014 MongoDB Inc.
 *

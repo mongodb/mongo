@@ -1,5 +1,3 @@
-// rocks_record_store.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -31,13 +29,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/rocks/rocks_record_store.h"
+#include "mongo/platform/basic.h"
 
-#include <memory>
-#include <algorithm>
+#include "mongo/db/storage/rocks/rocks_record_store.h"
 
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
+#include <memory>
+#include <algorithm>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -57,6 +56,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::string;
 
     namespace {
 
