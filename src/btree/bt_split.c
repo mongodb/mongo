@@ -1334,8 +1334,21 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 #endif
 
 	/*
-	 * Split into the parent.
+	 * Save the transaction ID when the split happened.  Application
+	 * threads will not try to forcibly evict the page again until
+	 * all concurrent transactions commit.
 	 */
+	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+
+	/* Update the page accounting. */
+	__wt_cache_page_inmem_decr(session, page, page_decr);
+	__wt_cache_page_inmem_incr(session, right, right_incr);
+
+	/*
+	 * Split into the parent.  After this, the original page is no
+	 * longer locked, so we cannot safely look at it.
+	 */
+	page = NULL;
 	if ((ret = __split_parent(
 	    session, ref, split_ref, 2, parent_decr, parent_incr, 0, 0)) != 0) {
 		/*
@@ -1359,17 +1372,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 		WT_ERR(ret);
 	}
-
-	/* Update the page accounting. */
-	__wt_cache_page_inmem_decr(session, page, page_decr);
-	__wt_cache_page_inmem_incr(session, right, right_incr);
-
-	/*
-	 * Save the transaction ID when the split happened.  Application
-	 * threads will not try to forcibly evict the page again until
-	 * all concurrent transactions commit.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_new_id(session);
 
 	/* Let our caller know that we split. */
 	*splitp = 1;
