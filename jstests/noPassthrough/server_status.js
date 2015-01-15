@@ -1,7 +1,7 @@
 // Checks storage-engine specific sections of db.severStatus() output.
 
 (function() {
-    'use string';
+    'use strict';
 
     var baseName = "jstests_server_status";
     var port = allocatePorts(1)[0] ;
