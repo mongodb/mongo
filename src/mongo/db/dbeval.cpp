@@ -92,7 +92,7 @@ namespace {
         s->registerOperation(txn);
 
         ScriptingFunction f = s->createFunction(code);
-        if (f == NULL) {
+        if (f == 0) {
             errmsg = string("compile failed: ") + s->getError();
             return false;
         }
