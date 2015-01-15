@@ -91,6 +91,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -134,6 +135,10 @@ namespace {
     // How frequently to reset the durability statistics
     enum { DurStatsResetIntervalMillis = 3 * 1000 };
 
+    // Size sanity checks
+    BOOST_STATIC_ASSERT(UncommittedBytesLimit > BSONObjMaxInternalSize * 3);
+    BOOST_STATIC_ASSERT(sizeof(void*) == 4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6);
+
 
     /**
      * MMAP V1 durability server status section.
@@ -174,7 +179,7 @@ namespace {
     Stats stats;
 
     // Reference to the write intents tracking object
-    CommitJob& commitJob = *(new CommitJob()); // don't destroy
+    CommitJob commitJob;
 
     // The durability interface to use
     DurableInterface* DurableInterface::_impl = &nonDurableImpl;
@@ -324,6 +329,21 @@ namespace {
     void* DurableImpl::writingPtr(void* x, unsigned len) {
         declareWriteIntent(x, len);
         return x;
+    }
+
+    void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+        privateViews.makeWritable(p, len);
+        SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+        commitJob.note(p, len);
+    }
+
+    void DurableImpl::declareWriteIntents(
+        const std::vector<std::pair<void*, unsigned> >& intents) {
+        typedef std::vector<std::pair<void*, unsigned> > Intents;
+        SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+        for (Intents::const_iterator it(intents.begin()), end(intents.end()); it != end; ++it) {
+            commitJob.note(it->first, it->second);
+        }
     }
 
     bool DurableImpl::commitIfNeeded() {

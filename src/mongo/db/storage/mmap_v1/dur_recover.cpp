@@ -34,16 +34,12 @@
 
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>
 #include <sys/stat.h>
 
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
@@ -51,7 +47,6 @@
 #include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
@@ -85,6 +80,14 @@ namespace mongo {
 
     namespace dur {
 
+        // The singleton recovery job object
+        RecoveryJob& RecoveryJob::_instance = *(new RecoveryJob());
+
+
+        void removeJournalFiles();
+        boost::filesystem::path getJournalDir();
+
+
         struct ParsedJournalEntry { /*copyable*/
             ParsedJournalEntry() : e(0) { }
 
@@ -99,10 +102,10 @@ namespace mongo {
             boost::shared_ptr<DurOp> op;
         };
 
-        void removeJournalFiles();
-        boost::filesystem::path getJournalDir();
 
-        /** get journal filenames, in order. throws if unexpected content found */
+        /**
+         * Get journal filenames, in order. Throws if unexpected content found.
+         */
         static void getFiles(boost::filesystem::path dir, vector<boost::filesystem::path>& files) {
             map<unsigned,boost::filesystem::path> m;
             for ( boost::filesystem::directory_iterator i( dir );
@@ -131,39 +134,40 @@ namespace mongo {
         /** read through the memory mapped data of a journal file (journal/j._<n> file)
             throws
         */
-        class JournalSectionIterator : boost::noncopyable {
-            auto_ptr<BufReader> _entries;
-            const JSectHeader _h;
-            const char *_lastDbName; // pointer into mmaped journal file
-            const bool _doDurOps;
-            string _uncompressed;
+        class JournalSectionIterator {
+            MONGO_DISALLOW_COPYING(JournalSectionIterator);
         public:
-            JournalSectionIterator(const JSectHeader& h, const void *compressed, unsigned compressedLen, bool doDurOpsRecovering) :
-                _h(h),
-                _lastDbName(0)
-                , _doDurOps(doDurOpsRecovering)
-            {
-                verify( doDurOpsRecovering );
-                bool ok = uncompress((const char *)compressed, compressedLen, &_uncompressed);
-                if( !ok ) { 
+            JournalSectionIterator(const JSectHeader& h,
+                                   const void *compressed,
+                                   unsigned compressedLen,
+                                   bool doDurOpsRecovering)
+                : _h(h),
+                  _lastDbName(0),
+                  _doDurOps(doDurOpsRecovering) {
+
+                verify(doDurOpsRecovering);
+
+                if (!uncompress((const char *)compressed, compressedLen, &_uncompressed)) {
                     // We check the checksum before we uncompress, but this may still fail as the
                     // checksum isn't foolproof.
                     log() << "couldn't uncompress journal section" << endl;
                     throw JournalSectionCorruptException();
                 }
+
                 const char *p = _uncompressed.c_str();
-                verify( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
-                _entries = auto_ptr<BufReader>( new BufReader(p, _uncompressed.size()) );
+                verify(compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader));
+
+                _entries = auto_ptr<BufReader>(new BufReader(p, _uncompressed.size()));
             }
 
-            // we work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
-            JournalSectionIterator(const JSectHeader &h, const void *p, unsigned len) :
-                _entries( new BufReader((const char *) p, len) ),
-                _h(h),
-                _lastDbName(0)
-                , _doDurOps(false)
+            // We work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
+            JournalSectionIterator(const JSectHeader &h, const void *p, unsigned len)
+                : _entries(new BufReader((const char *)p, len)),
+                  _h(h),
+                  _lastDbName(0),
+                  _doDurOps(false) {
 
-                { }
+            }
 
             bool atEof() const { return _entries->atEof(); }
 
@@ -222,7 +226,15 @@ namespace mongo {
                 _entries->skip(e.e->len);
             }
 
+
+        private:
+            auto_ptr<BufReader> _entries;
+            const JSectHeader _h;
+            const char *_lastDbName; // pointer into mmaped journal file
+            const bool _doDurOps;
+            string _uncompressed;
         };
+
 
         static string fileName(const char* dbName, int fileNo) {
             stringstream ss;
@@ -239,9 +251,18 @@ namespace mongo {
             return full.string();
         }
 
+
+        RecoveryJob::RecoveryJob()
+            : _mx("recovery"),
+              _recovering(false),
+              _lastDataSyncedFromLastRun(0),
+              _lastSeqMentionedInConsoleLog(1) {
+
+        }
+
         RecoveryJob::~RecoveryJob() {
             DESTRUCTOR_GUARD(
-                if( !_mmfs.empty() )
+                if (!_mmfs.empty()) {}
                     close();
             )
         }
@@ -257,7 +278,7 @@ namespace mongo {
         }
 
         RecoveryJob::Last::Last() : mmf(NULL), fileNo(-1) { 
-            // we are keeping invariants so we need to be sure things aren't disappearing out from under us:
+            // Make sure the files list does not change from underneath
             LockMongoFilesShared::assertAtLeastReadLocked();
         }
 
@@ -345,50 +366,24 @@ namespace mongo {
             }
         }
 
-        DurableMappedFile* RecoveryJob::getDurableMappedFile(const ParsedJournalEntry& entry) {
-            verify(entry.dbName);
-
-            const string fn = fileName(entry.dbName, entry.e->getFileNo());
-            MongoFile* file;
-            {
-                MongoFileFinder finder; // must release lock before creating new DurableMappedFile
-                file = finder.findByPath(fn);
-            }
-
-            DurableMappedFile* mmf;
-            if (file) {
-                verify(file->isDurableMappedFile());
-                mmf = (DurableMappedFile*)file;
-            }
-            else {
-                if( !_recovering ) {
-                    log() << "journal error applying writes, file " << fn << " is not open" << endl;
-                    verify(false);
-                }
-                boost::shared_ptr<DurableMappedFile> sp (new DurableMappedFile);
-                verify(sp->open(fn, false));
-                _mmfs.push_back(sp);
-                mmf = sp.get();
-            }
-
-            return mmf;
-        }
-
         void RecoveryJob::applyEntries(const vector<ParsedJournalEntry> &entries) {
-            bool apply = (mmapv1GlobalOptions.journalOptions &
-                          MMAPV1Options::JournalScanOnly) == 0;
-            bool dump = mmapv1GlobalOptions.journalOptions &
-                        MMAPV1Options::JournalDumpJournal;
-            if( dump )
+            const bool apply =
+                (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalScanOnly) == 0;
+            const bool dump =
+                (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal);
+
+            if (dump) {
                 log() << "BEGIN section" << endl;
+            }
 
             Last last;
-            for( vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i ) {
+            for (vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
                 applyEntry(last, *i, apply, dump);
             }
 
-            if( dump )
+            if (dump) {
                 log() << "END section" << endl;
+            }
         }
 
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
@@ -629,10 +624,6 @@ namespace mongo {
             }
         } brunittest;
 
-        // can't free at termination because order of destruction of global vars is arbitrary
-        RecoveryJob &RecoveryJob::_instance = *(new RecoveryJob());
-
     } // namespace dur
-
 } // namespace mongo
 
