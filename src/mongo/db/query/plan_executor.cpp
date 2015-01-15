@@ -263,6 +263,12 @@ namespace mongo {
 
         _opCtx = opCtx;
 
+        // We're restoring after a yield or getMore now. If we're a yielding plan executor, reset
+        // the yield timer in order to prevent from yielding again right away.
+        if (_yieldPolicy.get()) {
+            _yieldPolicy->resetTimer();
+        }
+
         if (!_killed) {
             _root->restoreState(opCtx);
         }

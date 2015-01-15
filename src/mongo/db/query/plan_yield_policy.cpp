@@ -45,6 +45,10 @@ namespace mongo {
         return _elapsedTracker.intervalHasElapsed();
     }
 
+    void PlanYieldPolicy::resetTimer() {
+        _elapsedTracker.resetLastTime();
+    }
+
     bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
         invariant(_planYielding);
 
@@ -65,8 +69,6 @@ namespace mongo {
 
         // Release and reacquire locks.
         QueryYield::yieldAllLocks(opCtx, fetcher);
-
-        _elapsedTracker.resetLastTime();
 
         return _planYielding->restoreState(opCtx);
     }

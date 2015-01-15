@@ -48,6 +48,11 @@ namespace mongo {
         bool shouldYield();
 
         /**
+         * Resets the yield timer so that we wait for a while before yielding again.
+         */
+        void resetTimer();
+
+        /**
          * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
          * must *not* be in saved state. Handles calls to save/restore state internally.
          *
