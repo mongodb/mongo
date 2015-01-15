@@ -956,10 +956,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		locked = 1;
 
 		/*
-		 * Record the current end of log after we grabbed the lock.
+		 * Record the current end of our update after the lock.
 		 * That is how far our calls can guarantee.
 		 */
-		sync_lsn = log->write_lsn;
+		sync_lsn = slot->slot_end_lsn;
 		/*
 		 * Check if we have to sync the parent directory.  Some
 		 * combinations of sync flags may result in the log file
