@@ -973,14 +973,17 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				WT_TRET(__split_ovfl_key_cleanup(
 				    session, parent, next_ref));
 				ikey = __wt_ref_key_instantiated(next_ref);
-				if (ikey != NULL)
-					WT_TRET(__split_safe_free(session, 0,
-					    ikey,
-					    sizeof(WT_IKEY) + ikey->size));
+				if (ikey != NULL) {
+					size = sizeof(WT_IKEY) + ikey->size;
+					WT_TRET(__split_safe_free(
+					    session, 0, ikey, size));
+					WT_MEMSIZE_ADD(parent_decr, size);
+				}
 			}
 
 			WT_TRET(__split_safe_free(
 			    session, 0, next_ref, sizeof(WT_REF)));
+			WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
 		}
 	}
 
@@ -1206,8 +1209,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
 	    &child->key.ikey));
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
-	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
-	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(moved_ins));
+	WT_MEMSIZE_ADD(
+	    parent_incr, sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins));
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
