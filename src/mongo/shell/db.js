@@ -44,7 +44,7 @@ DB.prototype.commandHelp = function( name ){
     return res.help;
 }
 
-DB.prototype.runCommand = function( obj, extra ){
+DB.prototype.runCommand = function( obj, extra, options ){
     if ( typeof( obj ) == "string" ){
         var n = {};
         n[obj] = 1;
@@ -55,7 +55,7 @@ DB.prototype.runCommand = function( obj, extra ){
             }
         }
     }
-    return this.getCollection( "$cmd" ).findOne( obj );
+    return this.getCollection( "$cmd" ).findOne( obj, undefined, options );
 }
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
