@@ -122,10 +122,6 @@ namespace {
     // When set, the flush thread will exit
     AtomicUInt32 shutdownRequested(0);
 
-    // One instance of each durability interface
-    DurableImpl durableImpl;
-    NonDurableImpl nonDurableImpl;
-
     // How many commit cycles to do before considering doing a remap
     enum { NumCommitsBeforeRemap = 10 };
 
@@ -163,6 +159,59 @@ namespace {
 
     } durSSS;
 
+
+    /**
+     * A no-op durability interface. Used for the case when journaling is not enabled.
+     */
+    class NonDurableImpl : public DurableInterface {
+    public:
+        NonDurableImpl() { }
+
+        // DurableInterface virtual methods
+        virtual void* writingPtr(void *x, unsigned len) { return x; }
+        virtual void declareWriteIntent(void*, unsigned) { }
+        virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents) {
+
+        }
+        virtual void createdFile(const std::string& filename, unsigned long long len) { }
+        virtual bool awaitCommit() { return false; }
+        virtual bool commitNow(OperationContext* txn) { return false; }
+        virtual bool commitIfNeeded() { return false; }
+        virtual void syncDataAndTruncateJournal(OperationContext* txn) {}
+        virtual bool isDurable() const { return false; }
+        virtual void commitAndStopDurThread() { }
+    };
+
+
+    /**
+     * The actual durability interface, when journaling is enabled.
+     */
+    class DurableImpl : public DurableInterface {
+    public:
+        DurableImpl() { }
+
+        // DurableInterface virtual methods
+        virtual void* writingPtr(void *x, unsigned len);
+        virtual void declareWriteIntent(void *, unsigned);
+        virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents);
+        virtual void createdFile(const std::string& filename, unsigned long long len);
+        virtual bool awaitCommit();
+        virtual bool commitNow(OperationContext* txn);
+        virtual bool commitIfNeeded();
+        virtual void syncDataAndTruncateJournal(OperationContext* txn);
+        virtual bool isDurable() const { return true; }
+        virtual void commitAndStopDurThread();
+
+        void start();
+
+    private:
+        boost::thread _durThreadHandle;
+    };
+
+    // One instance of each durability interface
+    DurableImpl durableImpl;
+    NonDurableImpl nonDurableImpl;
+
 } // namespace
 
 
@@ -175,14 +224,17 @@ namespace {
     boost::filesystem::path getJournalDir();
     void preallocateFiles();
 
+    // Forward declaration
+    static void durThread();
+
     // Durability activity statistics
     Stats stats;
 
     // Reference to the write intents tracking object
     CommitJob commitJob;
 
-    // The durability interface to use
-    DurableInterface* DurableInterface::_impl = &nonDurableImpl;
+    // Reference to the active durability interface
+    DurableInterface* DurableInterface::_impl(&nonDurableImpl);
 
 
     //
@@ -274,31 +326,6 @@ namespace {
 
     }
 
-    void DurableInterface::enableDurability() {
-        _impl = &durableImpl;
-    }
-
-
-    //
-    // NonDurableImpl
-    //
-
-    void* NonDurableImpl::writingPtr(void *x, unsigned len) {
-        return x;
-    }
-
-    void NonDurableImpl::declareWriteIntent(void *, unsigned) {
-
-    }
-
-    bool NonDurableImpl::commitNow(OperationContext* txn) {
-        return false;
-    }
-
-    bool NonDurableImpl::commitIfNeeded() {
-        return false;
-    }
-
 
     //
     // DurableImpl
@@ -375,6 +402,17 @@ namespace {
         commitNotify.waitFor(when);
 
         shutdownRequested.store(1);
+
+        // Wait for the durability thread to terminate
+        log() << "Terminating durability thread ...";
+
+        _durThreadHandle.join();
+    }
+
+    void DurableImpl::start() {
+        // Start the durability thread
+        boost::thread t(durThread);
+        _durThreadHandle.swap(t);
     }
 
 
@@ -532,7 +570,7 @@ namespace {
         }
 
         LOG(3) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo
-                << ' ' << t.millis() << "ms";
+               << ' ' << t.millis() << "ms";
     }
 
 
@@ -799,8 +837,8 @@ namespace {
 
         preallocateFiles();
 
-        DurableInterface::enableDurability();
-        boost::thread t(durThread);
+        durableImpl.start();
+        DurableInterface::_impl = &durableImpl;
     }
 
 } // namespace dur
