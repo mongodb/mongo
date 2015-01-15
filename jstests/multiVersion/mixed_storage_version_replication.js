@@ -515,7 +515,7 @@ function doMultiThreadedWork(primary, numThreads) {
     var oldVersion = "2.6";
     var newVersion = "latest";
     var setups = [{binVersion: newVersion, storageEngine: 'mmapv1'},
-                  {binVersion: newVersion, storageEngine: 'wiredtiger'},
+                  {binVersion: newVersion, storageEngine: 'wiredTiger'},
                   {binVersion: oldVersion}
     ];
     var nodes = {};

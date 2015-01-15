@@ -60,7 +60,7 @@ function isMMAPv1(dbOrServerStatus) {
 
 /**
  * Returns true if the current storage engine is wiredTiger
- * (or wiredtiger), and false otherwise.
+ * and false otherwise.
  *
  * 'dbOrServerStatus' must refer to a mongod connection
  * (and not a mongos connection), or the result of the
@@ -79,5 +79,5 @@ function isWiredTiger(dbOrServerStatus) {
     assert.neq('undefined', typeof status.storageEngine,
                'missing storage engine info in server status');
 
-    return Array.contains(['wiredTiger', 'wiredtiger'], status.storageEngine.name);
+    return Array.contains(['wiredTiger'], status.storageEngine.name);
 }
