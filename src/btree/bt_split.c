@@ -1244,7 +1244,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
 		;
 	WT_MEMSIZE_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
-	    i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
+	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
 	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
 		WT_MEMSIZE_TRANSFER(
 		    page_decr, right_incr, sizeof(WT_UPDATE) + upd->size);
