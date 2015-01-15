@@ -192,7 +192,6 @@ namespace mongo {
             const char* end = static_cast<const char*>(memchr(start, 0x0, reader->remaining()));
             invariant(end);
             size_t actualBytes = end - start;
-            invariant(actualBytes < KeyString::kMaxBufferSize);
             reader->skip(1 + actualBytes);
             return StringData(start, actualBytes);
         }
@@ -225,7 +224,6 @@ namespace mongo {
             const char* end = static_cast<const char*>(memchr(start, 0xFF, reader->remaining()));
             invariant(end);
             size_t actualBytes = end - start;
-            invariant(actualBytes < KeyString::kMaxBufferSize);
             string s(start, actualBytes);
             for (size_t i = 0; i < s.size(); i++) {
                 s[i] = ~s[i];
@@ -249,7 +247,6 @@ namespace mongo {
                                     memchr(start, 0xFF, reader->remaining()));
                 invariant(end);
                 size_t actualBytes = end - start;
-                invariant(out.size() + actualBytes < KeyString::kMaxBufferSize);
 
                 out.append(start, actualBytes);
                 reader->skip(1 + actualBytes);
@@ -679,9 +676,7 @@ namespace mongo {
     }
 
     void KeyString::_appendBytes(const void* source, size_t bytes, bool invert) {
-        invariant(_size + bytes < kMaxBufferSize);
-        char* const base = _buffer + _size;
-        _size += bytes;
+        char* const base = _buffer.skip(bytes);
 
         if (invert) {
             memcpy_flipBits(base, source, bytes);
@@ -1072,7 +1067,7 @@ namespace mongo {
 
         int min = std::min(a, b);
 
-        int cmp = memcmp(_buffer, other._buffer, min);
+        int cmp = memcmp(getBuffer(), other.getBuffer(), min);
 
         if (cmp) {
             if (cmp < 0)

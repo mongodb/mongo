@@ -345,7 +345,7 @@ namespace {
     bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const RecordId& loc ) {
         invariant( unique() );
         // First check whether the key exists.
-        KeyString data = KeyString::make( key, _ordering );
+        KeyString data( key, _ordering );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key( c, item.Get() );
         int ret = c->search(c);
@@ -435,7 +435,7 @@ namespace {
                     return s;
             }
 
-            KeyString data = KeyString::make( key, _idx->_ordering, loc );
+            KeyString data( key, _idx->_ordering, loc );
 
             // Can't use WiredTigerCursor since we aren't using the cache.
             WiredTigerItem item(data.getBuffer(), data.getSize());
@@ -993,10 +993,10 @@ namespace {
                                            const RecordId& loc,
                                            bool dupsAllowed ) {
 
-        const KeyString data = KeyString::make( key, _ordering );
+        const KeyString data( key, _ordering );
         WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
 
-        KeyString value = KeyString::make(loc);
+        KeyString value(loc);
         if (!data.getTypeBits().isAllZeros())
             value.appendTypeBits(data.getTypeBits());
 
@@ -1063,7 +1063,7 @@ namespace {
                                           const BSONObj& key,
                                           const RecordId& loc,
                                           bool dupsAllowed ) {
-        KeyString data = KeyString::make( key, _ordering );
+        KeyString data( key, _ordering );
         WiredTigerItem keyItem( data.getBuffer(), data.getSize() );
         c->set_key( c, keyItem.Get() );
 
@@ -1161,7 +1161,7 @@ namespace {
 
         TRACE_INDEX << " key: " << keyBson << " loc: " << loc;
 
-        KeyString key = KeyString::make( keyBson, _ordering, loc );
+        KeyString key( keyBson, _ordering, loc );
         WiredTigerItem keyItem( key.getBuffer(), key.getSize() );
 
         WiredTigerItem valueItem = 
@@ -1186,7 +1186,7 @@ namespace {
                                             const RecordId& loc,
                                             bool dupsAllowed ) {
         invariant( dupsAllowed );
-        KeyString data = KeyString::make( key, _ordering, loc );
+        KeyString data( key, _ordering, loc );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key(c, item.Get() );
         int ret = c->remove(c);
