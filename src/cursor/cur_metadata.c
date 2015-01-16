@@ -443,9 +443,9 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_config_gets_def(session, cfg, "readonly", 1, &cval));
 	if (cval.val != 0) {
-		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
-		cursor->update = cursor->update_orig = __wt_cursor_notsup;
-		cursor->remove = cursor->remove_orig = __wt_cursor_notsup;
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
 	}
 
 	if (0) {

@@ -43,8 +43,8 @@
 	insert,								\
 	update,								\
 	remove,								\
-	(int (*)(WT_CURSOR *, const char *))(reconfigure),		\
 	close,								\
+	(int (*)(WT_CURSOR *, const char *))(reconfigure),		\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\
@@ -54,9 +54,6 @@
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
 	NULL,				/* internal_uri */		\
-	insert,				/* original insert */		\
-	update,				/* original update */		\
-	remove,				/* original remove */		\
 	0				/* uint32_t flags */		\
 }
 
