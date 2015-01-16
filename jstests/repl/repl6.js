@@ -50,6 +50,10 @@ doTest = function( signal ) {
 
     ms1.stop( true, signal );
 
+    // Need to pause here on Windows, since killing processes does not synchronously close their
+    // open file handles.
+    sleep(1000);
+
     m = ms1.start( true, null, true );
     am = m.getDB( baseName ).a
     
