@@ -174,13 +174,16 @@ public class PackOutputStream {
         char fieldFormat = format.getType();
         int stringLen = 0;
         int padBytes = 0;
+        int valLen = 0;
         // Strings have two possible encodings. A lower case 's' is not null
         // terminated, and has a length define in the format (default 1). An
         // upper case 'S' is variable length and has a null terminator.
         if (fieldFormat == 's') {
             stringLen = format.getLengthFromFormat(true);
-            if (stringLen > value.length()) {
-                padBytes = stringLen - value.length();
+            valLen = value.length();
+            if (stringLen > valLen) {
+                padBytes = stringLen - valLen;
+                stringLen = valLen;
             }
         } else {
             stringLen = value.length();

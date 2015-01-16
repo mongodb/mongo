@@ -150,6 +150,7 @@ static int
 __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
+	WT_ITEM item;
 	uint32_t fileid, key_count, opsize, optype;
 
 	cl = (WT_CURSOR_LOG *)cursor;
@@ -180,11 +181,37 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	 * The log cursor sets the LSN and step count as the cursor key and
 	 * and log record related data in the value.  The data in the value
 	 * contains any operation key/value that was in the log record.
+	 * For the special case that the caller needs the result in raw form,
+	 * we create packed versions of the key/value.
 	 */
-	__wt_cursor_set_key(cursor, cl->cur_lsn->file, cl->cur_lsn->offset,
-	    key_count);
-	__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
-	    fileid, cl->opkey, cl->opvalue);
+	if (FLD_ISSET(cursor->flags, WT_CURSTD_RAW)) {
+		memset(&item, 0, sizeof(item));
+		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
+		    &item.size, LOGC_KEY_FORMAT, cl->cur_lsn->file,
+		    cl->cur_lsn->offset, key_count));
+		WT_RET(__wt_realloc(session, NULL, item.size, &cl->packed_key));
+		item.data = cl->packed_key;
+		WT_RET(wiredtiger_struct_pack((WT_SESSION *)session,
+		    cl->packed_key, item.size, LOGC_KEY_FORMAT,
+		    cl->cur_lsn->file, cl->cur_lsn->offset, key_count));
+		__wt_cursor_set_key(cursor, &item);
+
+		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
+		    &item.size, LOGC_VALUE_FORMAT, cl->txnid, cl->rectype,
+		    optype, fileid, cl->opkey, cl->opvalue));
+		WT_RET(__wt_realloc(session, NULL, item.size,
+		    &cl->packed_value));
+		item.data = cl->packed_value;
+		WT_RET(wiredtiger_struct_pack((WT_SESSION *)session,
+		    cl->packed_value, item.size, LOGC_VALUE_FORMAT, cl->txnid,
+		    cl->rectype, optype, fileid, cl->opkey, cl->opvalue));
+		__wt_cursor_set_value(cursor, &item);
+	} else {
+		__wt_cursor_set_key(cursor, cl->cur_lsn->file,
+		    cl->cur_lsn->offset, key_count);
+		__wt_cursor_set_value(cursor, cl->txnid, cl->rectype, optype,
+		    fileid, cl->opkey, cl->opvalue);
+	}
 	return (0);
 }
 
@@ -295,6 +322,8 @@ __curlog_close(WT_CURSOR *cursor)
 	__wt_scr_free(session, &cl->logrec);
 	__wt_scr_free(session, &cl->opkey);
 	__wt_scr_free(session, &cl->opvalue);
+	__wt_free(session, cl->packed_key);
+	__wt_free(session, cl->packed_value);
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);

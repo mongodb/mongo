@@ -165,65 +165,6 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_cache_read_gen --
- *      Get the current read generation number.
- */
-static inline uint64_t
-__wt_cache_read_gen(WT_SESSION_IMPL *session)
-{
-	return (S2C(session)->cache->read_gen);
-}
-
-/*
- * __wt_cache_read_gen_incr --
- *      Increment the current read generation number.
- */
-static inline void
-__wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
-{
-	++S2C(session)->cache->read_gen;
-}
-
-/*
- * __wt_cache_read_gen_set --
- *      Get the read generation to store in a page.
- */
-static inline uint64_t
-__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
-{
-	/*
-	 * We return read-generations from the future (where "the future" is
-	 * measured by increments of the global read generation).  The reason
-	 * is because when acquiring a new hazard pointer for a page, we can
-	 * check its read generation, and if the read generation isn't less
-	 * than the current global generation, we don't bother updating the
-	 * page.  In other words, the goal is to avoid some number of updates
-	 * immediately after each update we have to make.
-	 */
-	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
-}
-
-/*
- * __wt_cache_pages_inuse --
- *	Return the number of pages in use.
- */
-static inline uint64_t
-__wt_cache_pages_inuse(WT_CACHE *cache)
-{
-	return (cache->pages_inmem - cache->pages_evict);
-}
-
-/*
- * __wt_cache_bytes_inuse --
- *	Return the number of bytes in use.
- */
-static inline uint64_t
-__wt_cache_bytes_inuse(WT_CACHE *cache)
-{
-	return (cache->bytes_inmem - cache->bytes_evict);
-}
-
-/*
  * __wt_page_evict_soon --
  *      Set a page to be evicted as soon as possible.
  */
@@ -917,16 +858,16 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_page_release --
- *	Release a reference to a page.
+ * __wt_page_release_busy --
+ *	Release a reference to a page, fail if busy during forced eviction.
  */
 static inline int
-__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+__wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked;
+	int locked, too_big;
 
 	btree = S2BT(session);
 
@@ -937,6 +878,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (ref == NULL || __wt_ref_is_root(ref))
 		return (0);
 	page = ref->page;
+
+	too_big = (page->memory_footprint < btree->maxmempage) ? 0 : 1;
 
 	/*
 	 * Attempt to evict pages with the special "oldest" read generation.
@@ -970,16 +913,34 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		return (ret);
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
-	if ((ret = __wt_evict_page(session, ref)) == 0)
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
-	else {
+	if ((ret = __wt_evict_page(session, ref)) == 0) {
+		if (too_big)
+			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
+		else
+			/*
+			 * If the page isn't too big, we are evicting it because
+			 * it had a chain of deleted entries that make traversal
+			 * expensive.
+			 */
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_force_delete);
+	} else {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
-		if (ret == EBUSY)
-			ret = 0;
 	}
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
 	return (ret);
+}
+
+/*
+ * __wt_page_release --
+ *	Release a reference to a page.
+ */
+static inline int
+__wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+{
+	WT_RET_BUSY_OK(__wt_page_release_busy(session, ref, flags));
+	return (0);
 }
 
 /*

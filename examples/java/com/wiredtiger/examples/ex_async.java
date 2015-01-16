@@ -60,6 +60,7 @@ class AsyncKeys implements AsyncCallback {
             long id = op.getId();
             /*! [async get identifier] */
 
+            /* If doing a search, retrieve the key/value pair. */
             if (optype == AsyncOpType.WT_AOP_SEARCH) {
                 /*! [async get the operation's string key] */
                 String key = op.getKeyString();
@@ -72,10 +73,6 @@ class AsyncKeys implements AsyncCallback {
                 }
                 System.out.println("Id " + id + " got record: " + key +
                                    " : " + value);
-            }
-            else {
-                notifyError("unexpected optype");
-                ret = 1;
             }
         }
         catch (Exception e) {
@@ -209,15 +206,16 @@ public class ex_async {
         return (ret);
     }
     
-    public static int
+    public static void
     main(String[] argv)
     {
         try {
-            return (asyncExample());
+            System.exit(asyncExample());
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);
-            return (-1);
+            wte.printStackTrace();
+            System.exit(1);
         }
     }
 }

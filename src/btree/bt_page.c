@@ -37,8 +37,11 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    page->type != WT_PAGE_ROW_LEAF)
 		return (0);
 
-	/* Eviction may be turned off, although that's rare. */
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	/*
+	 * Eviction may be turned off (although that's rare), or we may be in
+	 * the middle of a checkpoint.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->checkpointing)
 		return (0);
 
 	/*
@@ -128,7 +131,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    force_attempts < 10 &&
 			    __evict_force_check(session, page)) {
 				++force_attempts;
-				WT_RET(__wt_page_release(session, ref, flags));
+				if ((ret = __wt_page_release_busy(
+				    session, ref, flags)) == EBUSY) {
+					/* If forced eviction fails, stall. */
+					ret = 0;
+					wait_cnt += 1000;
+				} else
+					WT_RET(ret);
 				WT_STAT_FAST_CONN_INCR(
 				    session, page_forcible_evict_blocked);
 				break;

@@ -363,8 +363,17 @@ retry:
 }
 %enddef
 
-/* Cursor compare can return any of -1, 0, 1 or WT_NOTFOUND. */
+/* Cursor compare can return any of -1, 0, 1. */
 %define COMPARE_OK(m)
+%exception m {
+	$action
+	if (result < -1 || result > 1)
+		SWIG_ERROR_IF_NOT_SET(result);
+}
+%enddef
+
+/* Cursor compare can return any of -1, 0, 1 or WT_NOTFOUND. */
+%define COMPARE_NOTFOUND_OK(m)
 %exception m {
 	$action
 	if ((result < -1 || result > 1) && result != WT_NOTFOUND)
@@ -382,7 +391,7 @@ NOTFOUND_OK(__wt_cursor::update)
 
 COMPARE_OK(__wt_cursor::compare)
 COMPARE_OK(__wt_cursor::equals)
-COMPARE_OK(__wt_cursor::search_near)
+COMPARE_NOTFOUND_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
 %exception __wt_connection::get_home;
@@ -724,7 +733,7 @@ typedef int int_void;
 		int ret = $self->search_near($self, &cmp);
 		/*
 		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
-		 * colliding with WT_NOTFOUND.
+		 * colliding with other errors.
 		 */
 		return ((ret != 0) ? ret : (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 	}

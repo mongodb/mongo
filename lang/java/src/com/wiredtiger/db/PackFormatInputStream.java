@@ -85,7 +85,6 @@ public class PackFormatInputStream {
     protected char getType()
     throws WiredTigerPackingException {
         if (formatOff >= format.length()) {
-            System.err.println("Raw format is: " + format);
             throw new WiredTigerPackingException(
                 "No more fields in format.");
         }
