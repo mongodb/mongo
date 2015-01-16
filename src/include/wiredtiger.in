@@ -482,19 +482,6 @@ struct __wt_cursor {
 	/*! @} */
 
 	/*!
-	 * Reconfigure the cursor.
-	 *
-	 * The cursor is reset.
-	 *
-	 * @snippet ex_all.c Reconfigure a cursor
-	 *
-	 * @param cursor the cursor handle
-	 * @param config the configuration string
-	 * @errors
-	 */
-	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
-
-	/*!
 	 * Close the cursor.
 	 *
 	 * This releases the resources associated with the cursor handle.
@@ -507,6 +494,19 @@ struct __wt_cursor {
 	 * @errors
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_CURSOR) *cursor);
+
+	/*!
+	 * Reconfigure the cursor.
+	 *
+	 * The cursor is reset.
+	 *
+	 * @snippet ex_all.c Reconfigure a cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @param config the configuration string
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
 
 	/*
 	 * Protected fields, only to be used by cursor implementations.
