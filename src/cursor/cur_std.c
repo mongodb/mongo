@@ -522,31 +522,6 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 	} else
 		WT_RET_NOTFOUND_OK(ret);
 
-	/*
-	 * readonly
-	 */
-	if ((ret = __wt_config_getones(
-	    session, config, "readonly", &cval)) == 0) {
-		if (cval.val == 0) {
-			/*
-			 * Fail if the user is turning readonly off and the
-			 * cursor never supported writing in the first place.
-			 */
-			if (cursor->insert_orig ==
-			    (int (*)(WT_CURSOR *))__wt_cursor_set_notsup)
-				WT_RET_MSG(session, EINVAL,
-				    "cursor cannot be used for data update");
-			cursor->insert = cursor->insert_orig;
-			cursor->remove = cursor->remove_orig;
-			cursor->update = cursor->update_orig;
-		} else {
-			cursor->insert = __wt_cursor_notsup;
-			cursor->remove = __wt_cursor_notsup;
-			cursor->update = __wt_cursor_notsup;
-		}
-	} else
-		WT_RET_NOTFOUND_OK(ret);
-
 	return (0);
 }
 
@@ -625,9 +600,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0) {
-		cursor->insert = cursor->insert_orig = __wt_cursor_notsup;
-		cursor->update = cursor->update_orig = __wt_cursor_notsup;
-		cursor->remove = cursor->remove_orig = __wt_cursor_notsup;
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
 	} else {
 		WT_RET(
 		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));

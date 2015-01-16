@@ -113,7 +113,6 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 static const WT_CONFIG_CHECK confchk_cursor_reconfigure[] = {
 	{ "append", "boolean", NULL, NULL },
 	{ "overwrite", "boolean", NULL, NULL },
-	{ "readonly", "boolean", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -569,7 +568,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "cursor.reconfigure",
-	  "append=0,overwrite=,readonly=0",
+	  "append=0,overwrite=",
 	  confchk_cursor_reconfigure
 	},
 	{ "file.meta",

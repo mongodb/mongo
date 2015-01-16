@@ -559,7 +559,7 @@ common_wiredtiger_open = [
         ]),
 ]
 
-cursor_config = [
+cursor_runtime_config = [
     Config('append', 'false', r'''
         append the value as a new record, creating a new record
         number key; valid only for cursors with record number keys''',
@@ -570,12 +570,6 @@ cursor_config = [
         is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
         if the record exists, WT_CURSOR::update and WT_CURSOR::remove
         fail with ::WT_NOTFOUND if the record does not exist''',
-        type='boolean'),
-    Config('readonly', 'false', r'''
-        only query operations are supported by this cursor. An error is
-        returned if a modification is attempted using the cursor.  The
-        default is false for all cursor types except for log and metadata
-        cursors''',
         type='boolean'),
 ]
 
@@ -590,7 +584,7 @@ methods = {
 
 'cursor.close' : Method([]),
 
-'cursor.reconfigure' : Method(cursor_config),
+'cursor.reconfigure' : Method(cursor_runtime_config),
 
 'session.close' : Method([]),
 
@@ -622,7 +616,7 @@ methods = {
 
 'session.log_printf' : Method([]),
 
-'session.open_cursor' : Method(cursor_config + [
+'session.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
         configure the cursor for bulk-loading, a fast, initial load
         path (see @ref tune_bulk_load for more information).  Bulk-load
@@ -662,6 +656,12 @@ methods = {
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
         the formats were \c "u".  See @ref cursor_raw for details''',
+        type='boolean'),
+    Config('readonly', 'false', r'''
+        only query operations are supported by this cursor. An error is
+        returned if a modification is attempted using the cursor.  The
+        default is false for all cursor types except for log and metadata
+        cursors''',
         type='boolean'),
     Config('skip_sort_check', 'false', r'''
         skip the check of the sort order of each bulk-loaded key''',
