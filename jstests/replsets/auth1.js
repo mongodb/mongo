@@ -60,8 +60,8 @@ var master = rs.getMaster();
 rs.awaitSecondaryNodes();
 var mId = rs.getNodeId(master);
 var slave = rs.liveNodes.slaves[0];
-
-master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }});
+assert.eq(1, master.getDB("admin").auth("foo", "bar"));
+assert.writeOK(master.getDB("test").foo.insert({ x: 1 }, { writeConcern: { w:3, wtimeout:60000 }}));
 
 print("try some legal and illegal reads");
 var r = master.getDB("test").foo.findOne();
