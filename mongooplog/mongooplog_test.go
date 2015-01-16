@@ -19,7 +19,7 @@ func TestBasicOps(t *testing.T) {
 		ssl := testutil.GetSSLOptions()
 		auth := testutil.GetAuthOptions()
 
-		// specify localhost:27017 as the destination host
+		// specify localhost:33333 as the destination host
 		opts = &options.ToolOptions{
 			Namespace: &options.Namespace{},
 			SSL:       &ssl,
@@ -27,11 +27,11 @@ func TestBasicOps(t *testing.T) {
 			Kerberos:  &options.Kerberos{},
 			Connection: &options.Connection{
 				Host: "localhost",
-				Port: "27017",
+				Port: db.DefaultTestPort,
 			},
 		}
 
-		// specify localhost:27017 as the source host
+		// specify localhost:33333 as the source host
 		sourceOpts = &SourceOptions{
 			Seconds: 84600,            // the default
 			OplogNS: "local.oplog.rs", // the default

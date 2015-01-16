@@ -19,7 +19,7 @@ import (
 var (
 	testDB     = "mongofiles_test_db"
 	testServer = "localhost"
-	testPort   = "27017"
+	testPort   = db.DefaultTestPort
 
 	ssl        = testutil.GetSSLOptions()
 	auth       = testutil.GetAuthOptions()

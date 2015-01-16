@@ -43,7 +43,7 @@ func TestVanillaDBConnector(t *testing.T) {
 			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: DefaultTestPort,
 				},
 				Auth: &options.Auth{},
 			}
@@ -61,10 +61,8 @@ func TestVanillaDBConnector(t *testing.T) {
 }
 
 func TestVanillaDBConnectorWithAuth(t *testing.T) {
-
 	testutil.VerifyTestType(t, "auth")
-
-	session, err := mgo.Dial("localhost:27017")
+	session, err := mgo.Dial("localhost:33333")
 	if err != nil {
 		t.Fatalf("error dialing server: %v", err)
 	}
@@ -89,7 +87,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: DefaultTestPort,
 				},
 				Auth: &options.Auth{},
 			}
@@ -112,7 +110,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
-					Port: "27017",
+					Port: DefaultTestPort,
 				},
 				Auth: &options.Auth{
 					Username: "cAdmin",

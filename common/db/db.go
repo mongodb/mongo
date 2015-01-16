@@ -18,6 +18,8 @@ type sessionFlag uint32
 const (
 	None      sessionFlag = 0
 	Monotonic sessionFlag = 1 << iota
+
+	DefaultTestPort = "33333"
 )
 
 var (

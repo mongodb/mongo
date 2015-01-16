@@ -364,9 +364,9 @@ functions:
           export AUTH_PASSWORD=${auth_password}
           if [ "${ssl_bv}" != "" ]
           then
-            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates admin
+            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} --port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates admin
           else
-            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin
+            echo "${create_mongod_users_command}" | ./mongodb/mongo${extension} admin --port 33333
           fi
         fi;
 
@@ -450,7 +450,7 @@ functions:
         rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
-        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &
+        ./mongodb/mongod${extension} ${mongodb_args} --dbpath mongodb/db_files --port 33333 --setParameter=enableTestCommands=1 &
 
   "upload tool":
     command: s3.put

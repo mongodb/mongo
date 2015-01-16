@@ -17,9 +17,11 @@ func TestNewSessionProvider(t *testing.T) {
 		Convey("with the standard options, a provider with a standard"+
 			" connector should be returned", func() {
 			opts := options.ToolOptions{
-				Connection: &options.Connection{},
-				SSL:        &options.SSL{},
-				Auth:       &options.Auth{},
+				Connection: &options.Connection{
+					Port: DefaultTestPort,
+				},
+				SSL:  &options.SSL{},
+				Auth: &options.Auth{},
 			}
 			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)
@@ -31,9 +33,11 @@ func TestNewSessionProvider(t *testing.T) {
 		Convey("the master session should be successfully "+
 			" initialized", func() {
 			opts := options.ToolOptions{
-				Connection: &options.Connection{},
-				SSL:        &options.SSL{},
-				Auth:       &options.Auth{},
+				Connection: &options.Connection{
+					Port: DefaultTestPort,
+				},
+				SSL:  &options.SSL{},
+				Auth: &options.Auth{},
 			}
 			provider, err := NewSessionProvider(opts)
 			So(err, ShouldBeNil)

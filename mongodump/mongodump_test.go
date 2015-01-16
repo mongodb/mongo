@@ -26,9 +26,8 @@ var (
 	// temp database used for restoring a DB
 	testRestoreDB       = "temp_mongodump_restore_test_db"
 	testCollectionNames = []string{"coll1", "coll2", "coll3"}
-
-	testServer = "localhost"
-	testPort   = "27017"
+	testServer          = "localhost"
+	testPort            = db.DefaultTestPort
 )
 
 func simpleMongoDumpInstance() *MongoDump {

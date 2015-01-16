@@ -58,7 +58,7 @@ func getBasicToolOptions() *options.ToolOptions {
 	}
 	connection := &options.Connection{
 		Host: "localhost",
-		Port: "27017",
+		Port: db.DefaultTestPort,
 	}
 	return &options.ToolOptions{
 		SSL:           &ssl,
