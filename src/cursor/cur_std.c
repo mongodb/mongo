@@ -506,7 +506,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
  *	WT_CURSOR->equals default implementation.
  */
 int
-__wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalityp)
+__wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -516,8 +516,7 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalityp)
 	CURSOR_API_CALL(cursor, session, equals, NULL);
 
 	WT_ERR(cursor->compare(cursor, other, &cmp));
-
-	*equalityp = (cmp == 0) ? 0 : 1;
+	*equalp = (cmp == 0) ? 1 : 0;
 
 err:	API_END(session, ret);
 	return (ret);

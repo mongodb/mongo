@@ -68,7 +68,7 @@ err:	API_END_RET(session, ret);
  *	WT_CURSOR->equals method for the btree cursor type.
  */
 static int
-__curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+__curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *equalp)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
@@ -90,7 +90,7 @@ __curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_CURSOR_CHECKKEY(b);
 
 	ret = __wt_btcur_equals(
-	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
+	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, equalp);
 
 err:	API_END_RET(session, ret);
 }

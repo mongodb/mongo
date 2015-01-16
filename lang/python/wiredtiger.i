@@ -712,13 +712,8 @@ typedef int int_void;
 		}
 		else {
 			ret = $self->equals($self, other, &cmp);
-
-			/*
-			 * Compare-equal is documented to return 0 and !0, map
-			 * less-than-zero and greater-than-zero to 1 to avoid
-			 * colliding with other errors.
-			 */
-			ret = (ret != 0) ? ret : (cmp == 0 ? 0 : 1);
+                        if (ret == 0)
+                                ret = cmp;
 		}
 		return (ret);
 	}

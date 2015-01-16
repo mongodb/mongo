@@ -246,7 +246,7 @@ cursor_ops(WT_SESSION *session)
 	/*! [Cursor equality] */
 	int equal;
 	ret = cursor->equals(cursor, other, &equal);
-	if (equal == 0) {
+	if (equal) {
 		/* Cursors reference the same key */
 	} else {
 		/* Cursors don't reference the same key */

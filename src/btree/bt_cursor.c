@@ -875,10 +875,11 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
  */
 int
 __wt_btcur_equals(
-    WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
+    WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
 {
 	WT_CURSOR *a, *b;
 	WT_SESSION_IMPL *session;
+	int cmp;
 
 	a = (WT_CURSOR *)a_arg;
 	b = (WT_CURSOR *)b_arg;
@@ -893,15 +894,14 @@ __wt_btcur_equals(
 	 * The reason for an equals method is because we can avoid doing
 	 * a full key comparison in some cases. If both cursors point into the
 	 * tree, take the fast path, otherwise fall back to the slower compare
-	 * method; in both cases, return 0 if the cursors are equal, 1 if they
+	 * method; in both cases, return 1 if the cursors are equal, 0 if they
 	 * are not.
 	 */
 	if (F_ISSET(a, WT_CURSTD_KEY_INT) && F_ISSET(b, WT_CURSTD_KEY_INT))
-		*cmpp = !__cursor_equals(a_arg, b_arg);
+		*equalp = __cursor_equals(a_arg, b_arg);
 	else {
-		WT_RET(__wt_btcur_compare(a_arg, b_arg, cmpp));
-		if (*cmpp != 0)
-			*cmpp = 1;
+		WT_RET(__wt_btcur_compare(a_arg, b_arg, &cmp));
+		*equalp = (cmp == 0) ? 1 : 0;
 	}
 	return (0);
 }

@@ -581,7 +581,7 @@ enum's
 env
 eof
 eop
-equalityp
+equalp
 errhandler
 errno
 errv
