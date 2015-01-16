@@ -859,7 +859,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LSN close_lsn, sync_lsn;
+	WT_LSN sync_lsn;
 	size_t write_size;
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
@@ -867,12 +867,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
-
-	/*
-	 * If we're going to have to close our log file, make a local copy
-	 * of the file handle structure.
-	 */
-	WT_INIT_LSN(&close_lsn);
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
