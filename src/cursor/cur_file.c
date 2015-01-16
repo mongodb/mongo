@@ -364,6 +364,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	    __curfile_insert,		/* insert */
 	    __curfile_update,		/* update */
 	    __curfile_remove,		/* remove */
+	    __wt_cursor_reconfigure,	/* reconfigure */
 	    __curfile_close);		/* close */
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;

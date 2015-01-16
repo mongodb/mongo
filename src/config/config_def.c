@@ -110,6 +110,12 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_cursor_reconfigure[] = {
+	{ "append", "boolean", NULL, NULL },
+	{ "overwrite", "boolean", NULL, NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "allocation_size", "int", "min=512B,max=128MB", NULL },
 	{ "app_metadata", "string", NULL, NULL },
@@ -560,6 +566,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "cursor.close",
 	  "",
 	  NULL
+	},
+	{ "cursor.reconfigure",
+	  "append=0,overwrite=",
+	  confchk_cursor_reconfigure
 	},
 	{ "file.meta",
 	  "allocation_size=4KB,app_metadata=,block_allocation=best,"
