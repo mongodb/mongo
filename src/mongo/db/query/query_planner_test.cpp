@@ -4726,6 +4726,37 @@ namespace {
         ASSERT_EQUALS(getNumSolutions(), 1U);
     }
 
+    TEST_F(QueryPlannerTest, TwoDSphereSparseV2BelowOr) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+        addIndex(BSON("geo1" << "2dsphere" << "a" << 1 << "b" << 1),
+                 BSON("2dsphereIndexVersion" << 2));
+        addIndex(BSON("geo2" << "2dsphere" << "a" << 1 << "b" << 1),
+                 BSON("2dsphereIndexVersion" << 2));
+
+        runQuery(fromjson("{a: 4, b: 5, $or: ["
+                            "{geo1: {$geoWithin: {$centerSphere: [[10, 20], 0.01]}}},"
+                            "{geo2: {$geoWithin: {$centerSphere: [[10, 20], 0.01]}}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {filter: {a: 4, b: 5}, node: {or: {nodes: ["
+                                "{fetch: {node: {ixscan: {pattern: {geo1:'2dsphere',a:1,b:1}}}}},"
+                                "{fetch: {node: {ixscan: {pattern: {geo2:'2dsphere',a:1,b:1}}}}}"
+                             "]}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, TwoDSphereSparseV2BelowElemMatch) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a.b" << "2dsphere" << "a.c" << 1),
+                 BSON("2dsphereIndexVersion" << 2));
+
+        runQuery(fromjson("{a: {$elemMatch: {b: {$geoWithin: {$centerSphere: [[10,20], 0.01]}},"
+                            "c: {$gt: 3}}}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {'a.b': '2dsphere', 'a.c': 1}}}}}");
+    }
+
     //
     // Test that we add a KeepMutations when we should and and we don't add one when we shouldn't.
     //
