@@ -503,7 +503,17 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Reconfigure a cursor
 	 *
 	 * @param cursor the cursor handle
-	 * @param config the configuration string
+	 * @configstart{cursor.reconfigure, see dist/api_data.py}
+	 * @config{append, append the value as a new record\, creating a new
+	 * record number key; valid only for cursors with record number keys., a
+	 * boolean flag; default \c false.}
+	 * @config{overwrite, configures whether the cursor's insert\, update
+	 * and remove methods check the existing state of the record.  If \c
+	 * overwrite is \c false\, WT_CURSOR::insert fails with
+	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update and
+	 * WT_CURSOR::remove fail with ::WT_NOTFOUND if the record does not
+	 * exist., a boolean flag; default \c true.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
