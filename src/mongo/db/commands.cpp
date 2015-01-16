@@ -282,12 +282,14 @@ namespace mongo {
 
         BSONObj cursor = cursorElem.embeddedObject();
         BSONElement batchSizeElem = cursor["batchSize"];
-        if (batchSizeElem.eoo()) {
-            if (!cursor.isEmpty()) {
-                return Status(ErrorCodes::BadValue,
-                              "cursor object can't contain fields other than batchSize");
-            }
 
+        const int expectedNumberOfCursorFields = batchSizeElem.eoo() ? 0 : 1;
+        if (cursor.nFields() != expectedNumberOfCursorFields) {
+            return Status(ErrorCodes::BadValue,
+                          "cursor object can't contain fields other than batchSize");
+        }
+
+        if (batchSizeElem.eoo()) {
             return Status::OK();
         }
 
