@@ -87,6 +87,7 @@
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
+#include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
@@ -122,8 +123,15 @@ namespace {
     // When set, the flush thread will exit
     AtomicUInt32 shutdownRequested(0);
 
-    // How many commit cycles to do before considering doing a remap
-    enum { NumCommitsBeforeRemap = 10 };
+    enum {
+        // How many commit cycles to do before considering doing a remap
+        NumCommitsBeforeRemap = 10,
+
+        // How many outstanding journal flushes should be allowed before applying writer back
+        // pressure. Size of 1 allows two journal blocks to be in the process of being written -
+        // one on the journal writer's buffer and one blocked waiting to be picked up.
+        NumAsyncJournalWrites = 1,
+    };
 
     // Remap loop state
     unsigned remapFileToStartAt;
@@ -179,6 +187,7 @@ namespace {
         virtual bool commitIfNeeded() { return false; }
         virtual void syncDataAndTruncateJournal(OperationContext* txn) {}
         virtual bool isDurable() const { return false; }
+        virtual void closingFileNotification() { }
         virtual void commitAndStopDurThread() { }
     };
 
@@ -200,6 +209,7 @@ namespace {
         virtual bool commitIfNeeded();
         virtual void syncDataAndTruncateJournal(OperationContext* txn);
         virtual bool isDurable() const { return true; }
+        virtual void closingFileNotification();
         virtual void commitAndStopDurThread();
 
         void start();
@@ -207,6 +217,165 @@ namespace {
     private:
         boost::thread _durThreadHandle;
     };
+
+
+    /**
+     * Diagnostic to check that the private view and the non-private view are in sync after
+     * applying the journal changes. This function is very slow and only runs when paranoid checks
+     * are enabled.
+     *
+     * Must be called under at least S flush lock to ensure that there are no concurrent writes
+     * happening.
+     */
+    void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
+        const unsigned char *p = (const unsigned char *)mmf->getView();
+        const unsigned char *w = (const unsigned char *)mmf->view_write();
+
+        // Ignore pre-allocated files that are not fully created yet
+        if (!p || !w) {
+            return;
+        }
+
+        if (memcmp(p, w, (unsigned)mmf->length()) == 0) {
+            return;
+        }
+
+        unsigned low = 0xffffffff;
+        unsigned high = 0;
+
+        log() << "DurParanoid mismatch in " << mmf->filename();
+
+        int logged = 0;
+        unsigned lastMismatch = 0xffffffff;
+
+        for (unsigned i = 0; i < mmf->length(); i++) {
+            if (p[i] != w[i]) {
+
+                if (lastMismatch != 0xffffffff && lastMismatch + 1 != i) {
+                    // Separate blocks of mismatches
+                    log() << std::endl;
+                }
+
+                lastMismatch = i;
+
+                if (++logged < 60) {
+                    if (logged == 1) {
+                        // For .ns files to find offset in record
+                        log() << "ofs % 628 = 0x" << hex << (i % 628) << endl;
+                    }
+
+                    stringstream ss;
+                    ss << "mismatch ofs:" << hex << i
+                        << "\tfilemap:" << setw(2) << (unsigned)w[i]
+                        << "\tprivmap:" << setw(2) << (unsigned)p[i];
+
+                    if (p[i] > 32 && p[i] <= 126) {
+                        ss << '\t' << p[i];
+                    }
+
+                    log() << ss.str() << endl;
+                }
+
+                if (logged == 60) {
+                    log() << "..." << endl;
+                }
+
+                if (i < low) low = i;
+                if (i > high) high = i;
+            }
+        }
+
+        if (low != 0xffffffff) {
+            std::stringstream ss;
+            ss << "journal error warning views mismatch " << mmf->filename() << ' '
+                << hex << low << ".." << high
+                << " len:" << high - low + 1;
+
+            log() << ss.str() << endl;
+            log() << "priv loc: " << (void*)(p + low) << ' ' << endl;
+
+            severe() << "Written data does not match in-memory view. Missing WriteIntent?";
+            invariant(false);
+        }
+    }
+
+
+    /**
+     * Main code of the remap private view function.
+     */
+    void remapPrivateViewImpl(double fraction) {
+        LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
+
+        // There is no way that the set of files can change while we are in this method, because
+        // we hold the flush lock in X mode. For files to go away, a database needs to be dropped,
+        // which means acquiring the flush lock in at least IX mode.
+        //
+        // However, the record fetcher logic unfortunately operates without any locks and on
+        // Windows and Solaris remap is not atomic and there is a window where the record fetcher
+        // might get an access violation. That's why we acquire the mongo files mutex here in X
+        // mode and the record fetcher takes in in S-mode (see MmapV1RecordFetcher for more
+        // detail).
+        //
+        // See SERVER-5723 for performance improvement.
+        // See SERVER-5680 to see why this code is necessary on Windows.
+        // See SERVER-8795 to see why this code is necessary on Solaris.
+#if defined(_WIN32) || defined(__sunos__)
+        LockMongoFilesExclusive lk;
+#else
+        LockMongoFilesShared lk;
+#endif
+
+        std::set<MongoFile*>& files = MongoFile::getAllFiles();
+
+        const unsigned sz = files.size();
+        if (sz == 0) {
+            return;
+        }
+
+        unsigned ntodo = (unsigned) (sz * fraction);
+        if( ntodo < 1 ) ntodo = 1;
+        if( ntodo > sz ) ntodo = sz;
+
+        const set<MongoFile*>::iterator b = files.begin();
+        const set<MongoFile*>::iterator e = files.end();
+        set<MongoFile*>::iterator i = b;
+
+        // Skip to our starting position as remembered from the last remap cycle
+        for (unsigned x = 0; x < remapFileToStartAt; x++) {
+            i++;
+            if (i == e) i = b;
+        }
+
+        // Mark where to start on the next cycle
+        const unsigned startedAt = remapFileToStartAt;
+        remapFileToStartAt = (remapFileToStartAt + ntodo) % sz;
+
+        Timer t;
+
+        for (unsigned x = 0; x < ntodo; x++) {
+            if ((*i)->isDurableMappedFile()) {
+                DurableMappedFile* const mmf = (DurableMappedFile*) *i;
+
+                // Sanity check that the contents of the shared and the private view match so we
+                // don't end up overwriting data.
+                if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid) {
+                    debugValidateFileMapsMatch(mmf);
+                }
+
+                if (mmf->willNeedRemap()) {
+                    mmf->remapThePrivateView();
+                }
+
+                i++;
+
+                if (i == e) i = b;
+            }
+        }
+
+        LOG(3) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo
+               << ' ' << t.millis() << "ms";
+    }
+
 
     // One instance of each durability interface
     DurableImpl durableImpl;
@@ -217,8 +386,6 @@ namespace {
 
     // Declared in dur_preplogbuffer.cpp
     void PREPLOGBUFFER(JSectHeader& outHeader, AlignedBuilder& outBuffer);
-    void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed);
-    void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed);
 
     // Declared in dur_journal.cpp
     boost::filesystem::path getJournalDir();
@@ -287,6 +454,7 @@ namespace {
            << (unsigned) (_writeToJournalMicros / 1000) << '\t'
            << (unsigned) (_writeToDataFilesMicros / 1000) << '\t'
            << (unsigned) (_remapPrivateViewMicros / 1000) << '\t'
+           << (unsigned) (_commitsMicros / 1000) << '\t'
            << (unsigned) (_commitsInWriteLockMicros / 1000) << '\t';
 
         return ss.str();
@@ -305,6 +473,7 @@ namespace {
                               "writeToJournal" << (unsigned) (_writeToJournalMicros / 1000) <<
                               "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros / 1000) <<
                               "remapPrivateView" << (unsigned) (_remapPrivateViewMicros / 1000) <<
+                              "commits" << (unsigned)(_commitsMicros / 1000) <<
                               "commitsInWriteLock"
                                     << (unsigned)(_commitsInWriteLockMicros / 1000));
 
@@ -394,6 +563,15 @@ namespace {
         invariant(!haveJournalFiles());
     }
 
+    void DurableImpl::closingFileNotification() {
+        if (commitJob.hasWritten()) {
+            severe() << "journal warning files are closing outside locks with writes pending";
+
+            // File is closing while there are unwritten changes
+            invariant(false);
+        }
+    }
+
     void DurableImpl::commitAndStopDurThread() {
         NotifyAll::When when = commitNotify.now();
 
@@ -417,164 +595,6 @@ namespace {
 
 
     /**
-     * Diagnostic to check that the private view and the non-private view are in sync after
-     * applying the journal changes. This function is very slow and only runs when paranoid checks
-     * are enabled.
-     *
-     * Must be called under at least S flush lock to ensure that there are no concurrent writes
-     * happening.
-     */
-    static void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
-        const unsigned char *p = (const unsigned char *)mmf->getView();
-        const unsigned char *w = (const unsigned char *)mmf->view_write();
-
-        // Ignore pre-allocated files that are not fully created yet
-        if (!p || !w) {
-            return;
-        }
-
-        if (memcmp(p, w, (unsigned)mmf->length()) == 0) {
-            return;
-        }
-
-        unsigned low = 0xffffffff;
-        unsigned high = 0;
-
-        log() << "DurParanoid mismatch in " << mmf->filename();
-
-        int logged = 0;
-        unsigned lastMismatch = 0xffffffff;
-
-        for (unsigned i = 0; i < mmf->length(); i++) {
-            if (p[i] != w[i]) {
-
-                if (lastMismatch != 0xffffffff && lastMismatch + 1 != i) {
-                    // Separate blocks of mismatches
-                    log() << std::endl;
-                }
-
-                lastMismatch = i;
-
-                if (++logged < 60) {
-                    if (logged == 1) {
-                        // For .ns files to find offset in record
-                        log() << "ofs % 628 = 0x" << hex << (i % 628) << endl;
-                    }
-
-                    stringstream ss;
-                    ss << "mismatch ofs:" << hex << i
-                        << "\tfilemap:" << setw(2) << (unsigned)w[i]
-                        << "\tprivmap:" << setw(2) << (unsigned)p[i];
-
-                    if (p[i] > 32 && p[i] <= 126) {
-                        ss << '\t' << p[i];
-                    }
-
-                    log() << ss.str() << endl;
-                }
-
-                if (logged == 60) {
-                    log() << "..." << endl;
-                }
-
-                if (i < low) low = i;
-                if (i > high) high = i;
-            }
-        }
-
-        if (low != 0xffffffff) {
-            std::stringstream ss;
-            ss << "journal error warning views mismatch " << mmf->filename() << ' '
-                << hex << low << ".." << high
-                << " len:" << high - low + 1;
-
-            log() << ss.str() << endl;
-            log() << "priv loc: " << (void*)(p + low) << ' ' << endl;
-
-            severe() << "Written data does not match in-memory view. Missing WriteIntent?";
-            invariant(false);
-        }
-    }
-
-
-    /**
-     * Main code of the remap private view function.
-     */
-    static void _remapPrivateView(double fraction) {
-        LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
-
-        // There is no way that the set of files can change while we are in this method, because
-        // we hold the flush lock in X mode. For files to go away, a database needs to be dropped,
-        // which means acquiring the flush lock in at least IX mode.
-        //
-        // However, the record fetcher logic unfortunately operates without any locks and on
-        // Windows and Solaris remap is not atomic and there is a window where the record fetcher
-        // might get an access violation. That's why we acquire the mongo files mutex here in X
-        // mode and the record fetcher takes in in S-mode (see MmapV1RecordFetcher for more
-        // detail).
-        //
-        // See SERVER-5723 for performance improvement.
-        // See SERVER-5680 to see why this code is necessary on Windows.
-        // See SERVER-8795 to see why this code is necessary on Solaris.
-#if defined(_WIN32) || defined(__sunos__)
-        LockMongoFilesExclusive lk;
-#else
-        LockMongoFilesShared lk;
-#endif
-
-        std::set<MongoFile*>& files = MongoFile::getAllFiles();
-
-        const unsigned sz = files.size();
-        if (sz == 0) {
-            return;
-        }
-
-        unsigned ntodo = (unsigned) (sz * fraction);
-        if( ntodo < 1 ) ntodo = 1;
-        if( ntodo > sz ) ntodo = sz;
-
-        const set<MongoFile*>::iterator b = files.begin();
-        const set<MongoFile*>::iterator e = files.end();
-        set<MongoFile*>::iterator i = b;
-
-        // Skip to our starting position as remembered from the last remap cycle
-        for (unsigned x = 0; x < remapFileToStartAt; x++) {
-            i++;
-            if( i == e ) i = b;
-        }
-
-        // Mark where to start on the next cycle
-        const unsigned startedAt = remapFileToStartAt;
-        remapFileToStartAt = (remapFileToStartAt + ntodo) % sz;
-
-        Timer t;
-
-        for (unsigned x = 0; x < ntodo; x++) {
-            if ((*i)->isDurableMappedFile()) {
-                DurableMappedFile* const mmf = (DurableMappedFile*) *i;
-
-                // Sanity check that the contents of the shared and the private view match so we
-                // don't end up overwriting data.
-                if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalParanoid) {
-                    debugValidateFileMapsMatch(mmf);
-                }
-
-                if (mmf->willNeedRemap()) {
-                    mmf->remapThePrivateView();
-                }
-
-                i++;
-
-                if( i == e ) i = b;
-            }
-        }
-
-        LOG(3) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo
-               << ' ' << t.millis() << "ms";
-    }
-
-
-    /**
      * Remaps the private view from the shared view so that it does not consume too much
      * copy-on-write/swap space. Must only be called after the in-memory journal has been flushed
      * to disk and applied on top of the shared view.
@@ -589,7 +609,7 @@ namespace {
 
         try {
             Timer t;
-            _remapPrivateView(fraction);
+            remapPrivateViewImpl(fraction);
             stats.curr()->_remapPrivateViewMicros += t.micros();
 
             LOG(4) << "remapPrivateView end";
@@ -623,7 +643,9 @@ namespace {
      * The main durability thread loop. There is a single instance of this function running.
      */
     static void durThread() {
-        Client::initThread("journal");
+        Client::initThread("durability");
+
+        log() << "Durability thread started";
 
         bool samePartition = true;
         try {
@@ -635,10 +657,12 @@ namespace {
 
         }
 
-        // Pre-allocated buffer for building the journal
-        AlignedBuilder journalBuilder(4 * 1024 * 1024);
+        // Spawn the journal writer thread
+        JournalWriter journalWriter(&commitNotify, NumAsyncJournalWrites);
+        journalWriter.start();
 
-        // Used as an estimate of how much to remap
+        // Used as an estimate of how much / how fast to remap
+        uint64_t commitCounter(0);
         uint64_t estimatedPrivateMapSize(0);
         uint64_t remapLastTimestamp(0);
 
@@ -684,82 +708,112 @@ namespace {
                 OperationContextImpl txn;
                 AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(txn.lockState());
 
+                // We need to snapshot the commitNumber after the flush lock has been obtained,
+                // because at this point we know that we have a stable snapshot of the data.
                 commitNumber = commitNotify.now();
 
+                LOG(4) << "Processing commit number " << commitNumber;
+
                 if (!commitJob.hasWritten()) {
+                    // We do not need the journal lock anymore. Free it here, for the really
+                    // unlikely possibility that the writeBuffer command below blocks.
+                    autoFlushLock.release();
+
                     // getlasterror request could have came after the data was already committed.
                     // No need to call committingReset though, because we have not done any
                     // writes (hasWritten == false).
-                    commitNotify.notifyAll(commitNumber);
+                    JournalWriter::Buffer* const buffer = journalWriter.newBuffer();
+                    buffer->setNoop();
+
+                    journalWriter.writeBuffer(buffer, commitNumber);
                 }
                 else {
-                    JSectHeader h;
-                    PREPLOGBUFFER(h, journalBuilder);
+                    // This copies all the in-memory changes into the journal writer's buffer.
+                    JournalWriter::Buffer* const buffer = journalWriter.newBuffer();
+                    PREPLOGBUFFER(buffer->getHeader(), buffer->getBuilder());
 
                     estimatedPrivateMapSize += commitJob.bytes();
+                    commitCounter++;
 
-                    // Need to reset the commit job's contents while under the S flush lock,
-                    // because otherwise someone might have done a write and this would wipe out
-                    // their changes without ever being committed.
+                    // Now that the write intents have been copied to the buffer, the commit job is
+                    // free to be reused. We need to reset the commit job's contents while under
+                    // the S flush lock, because otherwise someone might have done a write and this
+                    // would wipe out their changes without ever being committed.
                     commitJob.committingReset();
 
-                    // We want to remap all private views about every 2 seconds. There could be
-                    // ~1000 views so we do a little each pass. There will be copy on write faults
-                    // after remapping, so doing a little bit at a time will avoid big load spikes
-                    // when the pages are touched.
-                    //
-                    // TODO: Instead of the time-based logic above, consider using ProcessInfo and
-                    //       watching for getResidentSize to drop, which is more precise.
-                    double remapFraction = (curTimeMicros64() - remapLastTimestamp) / 2000000.0;
+                    // Now that the in-memory modifications have been collected, we can potentially
+                    // release the flush lock if remap is not necessary.
+                    const bool shouldRemap =
+                        (estimatedPrivateMapSize >= UncommittedBytesLimit) ||
+                        (commitCounter % NumCommitsBeforeRemap == 0) ||
+                        (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalAlwaysRemap);
 
-                    if (mmapv1GlobalOptions.journalOptions &
-                                MMAPV1Options::JournalAlwaysRemap) {
-                        remapFraction = 1;
-                    }
-                    else {
-                        // We don't want to get close to the UncommittedBytesLimit
-                        const double f =
-                            estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
-                        if (f > remapFraction) {
-                            remapFraction = f;
+                    double remapFraction = 0.0;
+
+                    if (shouldRemap) {
+                        // We want to remap all private views about every 2 seconds. There could be
+                        // ~1000 views so we do a little each pass. There will be copy on write
+                        // faults after remapping, so doing a little bit at a time will avoid big
+                        // load spikes when the pages are touched.
+                        //
+                        // TODO: Instead of the time-based logic above, consider using ProcessInfo
+                        //       and watching for getResidentSize to drop, which is more precise.
+                        remapFraction = (curTimeMicros64() - remapLastTimestamp) / 2000000.0;
+
+                        if (mmapv1GlobalOptions.journalOptions &
+                                    MMAPV1Options::JournalAlwaysRemap) {
+                            remapFraction = 1;
+                        }
+                        else {
+                            // We don't want to get close to the UncommittedBytesLimit
+                            const double f =
+                                estimatedPrivateMapSize / ((double)UncommittedBytesLimit);
+                            if (f > remapFraction) {
+                                remapFraction = f;
+                            }
                         }
                     }
+                    else {
+                        LOG(4) << "Early release flush lock";
 
-                    // This performs an I/O to the journal file
-                    WRITETOJOURNAL(h, journalBuilder);
+                        // We will not be doing a remap so drop the flush lock. That way we will be
+                        // doing the journal I/O outside of lock, so other threads can proceed.
+                        invariant(!shouldRemap);
+                        autoFlushLock.release();
+                    }
 
-                    // Data is now in the journal, which is sufficient for acknowledging
-                    // getLastError. Note that we are doing this outside of the flush lock, which
-                    // is alright because we will acknowledge the previous commit. If any writes
-                    // happened after we released the flush lock, those will not be in the
-                    // journalBuilder and hence will not be persisted, but in this case
-                    // commitJob.commitingBegin() bumps the commit number, so those writers will
-                    // wait for the next run of this loop.
-                    commitNotify.notifyAll(commitNumber);
+                    // Request async I/O to the journal. This may block.
+                    journalWriter.writeBuffer(buffer, commitNumber);
 
-                    // Apply the journal entries on top of the shared view so that when flush
-                    // is requested it would write the latest.
-                    WRITETODATAFILES(h, journalBuilder);
+                    // Data has now been written to the shared view. If remap was requested, we
+                    // would still be holding the S flush lock here, so just upgrade it and
+                    // perform the remap.
+                    if (shouldRemap) {
+                        // Need to wait for the previously scheduled journal writes to complete
+                        // before any remap is attempted.
+                        journalWriter.flush();
+                        journalWriter.assertIdle();
 
-                    // Data has now been written to the shared view. Upgrade the flush lock to X so
-                    // no writes can happen and remap the private view.
-                    autoFlushLock.upgradeFlushLockToExclusive();
-                    remapPrivateView(remapFraction);
+                        // Upgrading the journal lock to flush stops all activity on the system,
+                        // because we will be remapping memory and we don't want readers to be
+                        // accessing it. Technically this step could be avoided on systems, which
+                        // support atomic remap.
+                        autoFlushLock.upgradeFlushLockToExclusive();
+                        remapPrivateView(remapFraction);
 
-                    autoFlushLock.release();
+                        autoFlushLock.release();
 
-                    // Reset the private map estimate outside of the lock
-                    estimatedPrivateMapSize = 0;
-                    remapLastTimestamp = curTimeMicros64();
+                        // Reset the private map estimate outside of the lock
+                        estimatedPrivateMapSize = 0;
+                        remapLastTimestamp = curTimeMicros64();
 
-                    // Do this reset after all locks have been released in order to not do
-                    // unnecessary work under lock.
-                    journalBuilder.reset();
+                        stats.curr()->_commitsInWriteLock++;
+                        stats.curr()->_commitsInWriteLockMicros += t.micros();
+                    }
                 }
 
                 stats.curr()->_commits++;
-                stats.curr()->_commitsInWriteLock++;
-                stats.curr()->_commitsInWriteLockMicros += t.micros();
+                stats.curr()->_commitsMicros += t.micros();
 
                 LOG(4) << "groupCommit end";
             }
@@ -789,22 +843,15 @@ namespace {
             }
         }
 
+        // Stops the journal thread and ensures everything was written
+        invariant(!commitJob.hasWritten());
+
+        journalWriter.flush();
+        journalWriter.shutdown();
+
+        log() << "Durability thread stopped";
+
         cc().shutdown();
-    }
-
-
-    /**
-     * Called when a DurableMappedFile is closing. Asserts that there are no unwritten changes,
-     * because that would mean journal replay on recovery would try to write to non-existent files
-     * and fail.
-     */
-    void closingFileNotification() {
-        if (commitJob.hasWritten()) {
-            severe() << "journal warning files are closing outside locks with writes pending";
-
-            // File is closing while there are unwritten changes
-            invariant(false);
-        }
     }
 
 

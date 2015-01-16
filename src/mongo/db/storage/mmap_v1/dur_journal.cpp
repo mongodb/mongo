@@ -731,6 +731,7 @@ namespace mongo {
             j.journal(h, uncompressed);
             stats.curr()->_writeToJournalMicros += t.micros();
         }
+
         void Journal::journal(const JSectHeader& h, const AlignedBuilder& uncompressed) {
             static AlignedBuilder b(32*1024*1024);
             /* buffer to journal will be

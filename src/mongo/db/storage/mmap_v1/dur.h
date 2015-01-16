@@ -114,6 +114,14 @@ namespace dur {
             */
         virtual bool commitIfNeeded() = 0;
 
+
+        /**
+         * Called when a DurableMappedFile is closing. Asserts that there are no unwritten changes,
+         * because that would mean journal replay on recovery would try to write to non-existent
+         * files and fail.
+         */
+        virtual void closingFileNotification() = 0;
+
         /**
             * Invoked at clean shutdown time. Performs one last commit/flush and terminates the
             * flush thread.

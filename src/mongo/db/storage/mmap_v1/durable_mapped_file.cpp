@@ -283,16 +283,12 @@ namespace mongo {
         _view_write = _view_private = 0;
     }
 
-    namespace dur {
-        void closingFileNotification();
-    }
-
     DurableMappedFile::~DurableMappedFile() {
         try { 
             LOG(3) << "mmf close " << filename();
 
             // Notify the durability system that we are closing a file.
-            dur::closingFileNotification();
+            getDur().closingFileNotification();
 
             LockMongoFilesExclusive lk;
             privateViews.remove(_view_private, length());
