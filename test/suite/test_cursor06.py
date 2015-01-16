@@ -84,15 +84,11 @@ class test_cursor06(wttest.WiredTigerTestCase):
             self.session.drop(uri, "force")
             self.pop(uri)
             cursor = self.session.open_cursor(uri, None, open_config)
-            if open_config != "readonly=1":
-                self.set_kv(cursor)
-                cursor.update()
-            for i in range(0, 10):
-                cursor.reconfigure("readonly=1")
+            if open_config == "readonly=1":
                 self.set_kv(cursor)
                 self.assertRaises(wiredtiger.WiredTigerError,
                                   lambda: cursor.update())
-                cursor.reconfigure("readonly=0")
+            else:
                 self.set_kv(cursor)
                 cursor.update()
             cursor.close()
