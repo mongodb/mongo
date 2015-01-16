@@ -2408,6 +2408,8 @@ no_slots:
 			break;
 		}
 		write_ref = dst;
+		if (r->space_avail < next_len)
+			goto split_grow;
 	} else if (no_more_rows) {
 		/*
 		 * Compression failed and there are no more rows to accumulate,
