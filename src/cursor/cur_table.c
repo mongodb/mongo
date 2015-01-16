@@ -82,6 +82,7 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __wt_cursor_notsup,		/* compare */
+	    __wt_cursor_notsup,		/* equals */
 	    __wt_cursor_notsup,		/* next */
 	    __wt_cursor_notsup,		/* prev */
 	    __wt_cursor_notsup,		/* reset */
@@ -89,8 +90,8 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
 	    __wt_cursor_notsup,		/* search-near */
 	    __curextract_insert,	/* insert */
 	    __wt_cursor_notsup,		/* update */
-	    __wt_cursor_notsup,		/* remove */
 	    __wt_cursor_notsup,		/* reconfigure */
+	    __wt_cursor_notsup,		/* remove */
 	    __wt_cursor_notsup);	/* close */
 	WT_CURSOR **cp;
 	WT_CURSOR_EXTRACTOR extract_cursor;
@@ -838,6 +839,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	    __wt_curtable_set_key,	/* set-key */
 	    __wt_curtable_set_value,	/* set-value */
 	    __curtable_compare,		/* compare */
+	    __wt_cursor_equals,		/* equals */
 	    __curtable_next,		/* next */
 	    __curtable_prev,		/* prev */
 	    __curtable_reset,		/* reset */

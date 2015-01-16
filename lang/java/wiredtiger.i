@@ -293,6 +293,8 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
+%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
+%rename (equals_wrap) __wt_cursor::equals;
 %rename (AsyncOpType) WT_ASYNC_OPTYPE;
 %rename (getKeyFormat) __wt_async_op::getKey_format;
 %rename (getValueFormat) __wt_async_op::getValue_format;
@@ -1134,6 +1136,13 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return cmp;
 	}
 
+	int equals_wrap(JNIEnv *jenv, WT_CURSOR *other) {
+		int cmp, ret = $self->equals($self, other, &cmp);
+		if (ret != 0)
+			throwWiredTigerException(jenv, ret);
+		return cmp;
+	}
+
 	%javamethodmodifiers java_init "protected";
 	int java_init(jobject jcursor) {
 		JAVA_CALLBACK *jcb = (JAVA_CALLBACK *)$self->lang_private;
@@ -1619,6 +1628,16 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	public int compare(Cursor other)
 	throws WiredTigerException {
 		return compare_wrap(other);
+	}
+
+	/**
+	 * Compare this cursor's position to another Cursor.
+	 *
+	 * \return The result of the comparison.
+	 */
+	public int equals(Cursor other)
+	throws WiredTigerException {
+		return equals_wrap(other);
 	}
 
 	/**
