@@ -859,7 +859,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LSN close_end_lsn, close_lsn, sync_lsn;
+	WT_LSN close_lsn, sync_lsn;
 	size_t write_size;
 	int locked;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
@@ -873,7 +873,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * of the file handle structure.
 	 */
 	WT_INIT_LSN(&close_lsn);
-	WT_INIT_LSN(&close_end_lsn);
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
