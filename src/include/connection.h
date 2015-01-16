@@ -279,10 +279,14 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_EXISTED	0x04	/* Log files found */
 #define	WT_CONN_LOG_PREALLOC	0x08	/* Pre-allocation is enabled */
 	uint32_t	 log_flags;	/* Global logging configuration */
-	WT_CONDVAR	*log_cond;	/* Log archive wait mutex */
-	WT_SESSION_IMPL *log_session;	/* Log archive session */
-	wt_thread_t	 log_tid;	/* Log archive thread */
-	int		 log_tid_set;	/* Log archive thread set */
+	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
+	WT_SESSION_IMPL *log_session;	/* Log server session */
+	wt_thread_t	 log_tid;	/* Log server thread */
+	int		 log_tid_set;	/* Log server thread set */
+	WT_CONDVAR	*log_close_cond;/* Log close thread wait mutex */
+	WT_SESSION_IMPL *log_close_session;/* Log close thread session */
+	wt_thread_t	 log_close_tid;	/* Log close thread thread */
+	int		 log_close_tid_set;/* Log close thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	wt_off_t	 log_file_max;	/* Log file max size */

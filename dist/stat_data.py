@@ -162,6 +162,8 @@ connection_stats = [
         'pages selected for eviction unable to be evicted'),
     CacheStat('cache_eviction_force',
         'pages evicted because they exceeded the in-memory maximum'),
+    CacheStat('cache_eviction_force_delete',
+        'pages evicted because they had chains of deleted items'),
     CacheStat('cache_eviction_force_fail',
         'failed eviction of pages that exceeded the in-memory maximum'),
     CacheStat('cache_eviction_hazard', 'hazard pointer blocked page eviction'),

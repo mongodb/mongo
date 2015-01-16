@@ -76,6 +76,7 @@ WiredTigerException
 WiredTigerLog
 WiredTigerPanicException
 WiredTigerRollbackException
+WiredTigerStat
 WiredTigerTestCase
 Za
 aR
@@ -442,6 +443,7 @@ writelock
 writelocks
 wrlock
 wtperf
+wtstats
 xa
 yieldcpu
 zlib

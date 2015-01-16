@@ -9,15 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * Tuning; global variables to allow the binary to be patched, we don't yet have
- * any real understanding of what might be useful to surface to applications.
- */
-static u_int __split_deepen_max_internal_image = 100;
-static u_int __split_deepen_min_child = 10;
-static u_int __split_deepen_per_child = 100;
-static u_int __split_deepen_split_child = 100;
-
-/*
  * Track allocation increments, matching the cache calculations, which add an
  * estimate of allocation overhead to every object.
  */
@@ -177,45 +168,57 @@ __split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
 }
 
 /*
+ * Tuning; global variables to allow the binary to be patched, we don't yet have
+ * any real understanding of what might be useful to surface to applications.
+ */
+static u_int __split_deepen_min_child = 10000;
+static u_int __split_deepen_per_child = 100;
+
+/*
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
 static int
-__split_should_deepen(WT_SESSION_IMPL *session, WT_PAGE *page)
+__split_should_deepen(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *childrenp)
 {
 	WT_PAGE_INDEX *pindex;
+	WT_PAGE *page;
 
-	/*
-	 * Splits are based on either the number of child pages that will be
-	 * created by the split (splitting an internal page that will be slow
-	 * to search), or by the memory footprint of the parent page (avoiding
-	 * an internal page that will eat up all of the cache and put eviction
-	 * pressure on the system).
-	 */
+	*childrenp = 0;
+
+	page = ref->page;
 	pindex = WT_INTL_INDEX_COPY(page);
 
 	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
-	 * maximum size for a page in memory.  We need an absolute minimum
-	 * number of entries in order to split the page: if there is a single
-	 * huge key, splitting won't help.
+	 * maximum size for a page in memory (presumably putting eviction
+	 * pressure on the cache).
 	 */
-	if (page->memory_footprint > S2BT(session)->maxmempage &&
-	    pindex->entries >= __split_deepen_min_child)
-		return (1);
+	if (page->memory_footprint < S2BT(session)->maxmempage)
+		return (0);
 
 	/*
-	 * Deepen the tree if the page's memory footprint is at least N
-	 * times the maximum internal page size chunk in the backing file and
-	 * the split will result in at least N children in the newly created
-	 * intermediate layer.
+	 * Ensure the page has enough entries to make it worth splitting and
+	 * we get a significant payback (in the case of a set of large keys,
+	 * splitting won't help).
 	 */
-	if (page->memory_footprint >
-	    __split_deepen_max_internal_image * S2BT(session)->maxintlpage &&
-	    pindex->entries >=
-	    (__split_deepen_per_child * __split_deepen_split_child))
+	if (pindex->entries > __split_deepen_min_child) {
+		*childrenp = pindex->entries / __split_deepen_per_child;
 		return (1);
+	}
 
+	/*
+	 * The root is a special-case: if it's putting cache pressure on the
+	 * system, split it even if there are only a few entries, we can't
+	 * push it out of memory.  Sanity check: if the root page is too big
+	 * with less than 100 keys, there are huge keys and/or a too-small
+	 * cache, there's not much to do.
+	 */
+	if (__wt_ref_is_root(ref) && pindex->entries > 100) {
+		*childrenp = pindex->entries / 10;
+		return (1);
+	}
 	return (0);
 }
 
@@ -254,12 +257,13 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 }
 
 /*
- * __split_ref_instantiate --
- *	Instantiate key/address pairs in memory in service of a split.
+ * __split_ref_deepen_move --
+ *	Move a WT_REF from a parent to a child in service of a split to deepen
+ * the tree, including updating the accounting information.
  */
 static int
-__split_ref_instantiate(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_REF *ref, size_t *parent_decrp, size_t *child_incrp)
+__split_ref_deepen_move(WT_SESSION_IMPL *session,
+    WT_PAGE *parent, WT_REF *ref, size_t *parent_decrp, size_t *child_incrp)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK unpack;
@@ -276,8 +280,6 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 * of child pages, and so we can no longer reference the block image
 	 * that remains with the page being split.
 	 *
-	 * Track how much memory the parent is losing and the child gaining.
-	 *
 	 * No locking is required to update the WT_REF structure because we're
 	 * the only thread splitting the parent page, and there's no way for
 	 * readers to race with our updates of single pointers.  The changes
@@ -286,13 +288,13 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 *
 	 * Row-store keys, first.
 	 */
-	if (page->type == WT_PAGE_ROW_INT) {
+	if (parent->type == WT_PAGE_ROW_INT) {
 		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
-			__wt_ref_key(page, ref, &key, &size);
+			__wt_ref_key(parent, ref, &key, &size);
 			WT_RET(__wt_row_ikey(session, 0, key, size, &ikey));
 			ref->key.ikey = ikey;
 		} else {
-			WT_RET(__split_ovfl_key_cleanup(session, page, ref));
+			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
 			WT_MEMSIZE_ADD(*parent_decrp,
 			    sizeof(WT_IKEY) + ikey->size);
 		}
@@ -304,12 +306,8 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 	 * address has been instantiated, there's no work to do.  Otherwise,
 	 * get the address from the on-page cell.
 	 */
-	if ((addr = ref->addr) == NULL)
-		return (0);
-	if (__wt_off_page(page, addr))
-		WT_MEMSIZE_TRANSFER(*parent_decrp, *child_incrp,
-		    sizeof(WT_ADDR) + addr->size);
-	else {
+	addr = ref->addr;
+	if (addr != NULL && !__wt_off_page(parent, addr)) {
 		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		if ((ret = __wt_strndup(
@@ -321,8 +319,11 @@ __split_ref_instantiate(WT_SESSION_IMPL *session,
 		addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
 		ref->addr = addr;
-		WT_MEMSIZE_ADD(*child_incrp, sizeof(WT_ADDR) + addr->size);
 	}
+
+	/* And finally, the WT_REF itself. */
+	WT_MEMSIZE_TRANSFER(*parent_decrp, *child_incrp, sizeof(WT_REF));
+
 	return (0);
 }
 
@@ -383,7 +384,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Split an internal page in-memory, deepening the tree.
  */
 static int
-__split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
+__split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 {
 	WT_DECL_RET;
 	WT_PAGE *child;
@@ -391,7 +392,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_REF **alloc_refp;
 	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
-	uint32_t children, chunk, i, j, remain, slots;
+	uint32_t chunk, i, j, remain, slots;
 	int panic;
 	void *p;
 
@@ -400,13 +401,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	panic = 0;
 
 	pindex = WT_INTL_INDEX_COPY(parent);
-
-	/*
-	 * Create N children, unless we are dealing with a large page without
-	 * many entries, in which case split into the minimum number of pages.
-	 */
-	children = WT_MAX(pindex->entries / __split_deepen_per_child,
-	    __split_deepen_min_child);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
@@ -506,12 +500,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		child_incr = 0;
 		child_pindex = WT_INTL_INDEX_COPY(child);
 		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
-			WT_ERR(__split_ref_instantiate(session,
+			WT_ERR(__split_ref_deepen_move(session,
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
-
-			WT_MEMSIZE_TRANSFER(
-			    parent_decr, child_incr, sizeof(WT_REF));
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
@@ -604,9 +595,10 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * be using the new index.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_MEMSIZE_ADD(parent_decr, size);
 	WT_ERR(__split_safe_free(session, 0, pindex, size));
+	WT_MEMSIZE_ADD(parent_decr, size);
 
+#if 0
 	/*
 	 * Adjust the parent's memory footprint.  This may look odd, but we
 	 * have already taken the allocation overhead into account, and an
@@ -615,6 +607,19 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
+#else
+	/*
+	 * XXX
+	 * The code to track page sizes is fundamentally flawed in the face of
+	 * splits: for example, we don't add in an overhead allocation constant
+	 * when allocating WT_REF structures as pages are created, but the
+	 * calculations during split assume that correction. For now, ignore
+	 * our carefully calculated values and force the internal page size to
+	 * 5% of its current value.
+	 */
+	size = parent->memory_footprint - (parent->memory_footprint / 20);
+	__wt_cache_page_inmem_decr(session, parent, size);
+#endif
 
 	if (0) {
 err:		__wt_free_ref_index(session, parent, alloc_index, 1);
@@ -770,13 +775,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		 * the confusion.
 		 */
 		WT_RET(__wt_calloc_one(session, &addr));
-		WT_MEMSIZE_ADD(incr, sizeof(WT_ADDR));
 		ref->addr = addr;
 		addr->size = multi->addr.size;
 		addr->type = multi->addr.type;
 		WT_RET(__wt_strndup(session,
 		    multi->addr.addr, addr->size, &addr->addr));
-		WT_MEMSIZE_ADD(incr, addr->size);
 	} else
 		WT_RET(__split_multi_inmem(session, page, ref, multi));
 
@@ -814,17 +817,20 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     int exclusive, int ref_discard)
 {
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_REF **alloc_refp, *parent_ref;
+	WT_REF **alloc_refp, *next_ref, *parent_ref;
 	size_t size;
-	uint32_t i, j, parent_entries, result_entries;
+	uint32_t children, i, j;
+	uint32_t deleted_entries, parent_entries, result_entries;
 	int complete, hazard, locked;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
-	alloc_index = NULL;
+	alloc_index = pindex = NULL;
 	parent_ref = NULL;
 	complete = hazard = locked = 0;
+	parent_entries = 0;
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -865,7 +871,29 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	pindex = WT_INTL_INDEX_COPY(parent);
 	parent_entries = pindex->entries;
-	result_entries = (parent_entries - 1) + new_entries;
+
+	/*
+	 * Remove any refs to deleted pages while we are splitting, we have
+	 * the internal page locked down, and are copying the refs into a new
+	 * array anyway.  Switch them to the special split state, so that any
+	 * reading thread will restart.
+	 */
+	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
+		if (next_ref->state == WT_REF_DELETED &&
+		    next_ref->page_del == NULL &&
+		    WT_ATOMIC_CAS4(next_ref->state,
+		    WT_REF_DELETED, WT_REF_SPLIT))
+			deleted_entries++;
+	}
+
+	/*
+	 * The final entry count consists of: The original count, plus any
+	 * new pages, less any refs we are removing because they only
+	 * contained deleted items, less 1 for the page being replaced.
+	 */
+	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -877,8 +905,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_MEMSIZE_ADD(parent_incr, size);
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
-	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i)
-		if (pindex->index[i] == ref)
+	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		if (next_ref == ref)
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
@@ -890,8 +919,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				 */
 				ref_new[j] = NULL;
 			}
-		else
-			*alloc_refp++ = pindex->index[i];
+		else if (next_ref->state != WT_REF_SPLIT)
+			/* Skip refs we have marked for deletion. */
+			*alloc_refp++ = next_ref;
+	}
 
 	/*
 	 * Update the parent page's index: this update makes the split visible
@@ -924,6 +955,36 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * this point unless there's a panic.
 	 */
 	complete = 1;
+
+	/*
+	 * Now that the new page is in place it's OK to free any deleted
+	 * refs we encountered modulo the regular safe free semantics.
+	 */
+	for (i = 0; i < parent_entries; ++i) {
+		next_ref = pindex->index[i];
+		/* If we set the ref to split to mark it for delete */
+		if (next_ref != ref && next_ref->state == WT_REF_SPLIT) {
+			/*
+			 * We're discarding a deleted reference.
+			 * Free any resources it holds.
+			 */
+			if (parent->type == WT_PAGE_ROW_INT) {
+				WT_TRET(__split_ovfl_key_cleanup(
+				    session, parent, next_ref));
+				ikey = __wt_ref_key_instantiated(next_ref);
+				if (ikey != NULL) {
+					size = sizeof(WT_IKEY) + ikey->size;
+					WT_TRET(__split_safe_free(
+					    session, 0, ikey, size));
+					WT_MEMSIZE_ADD(parent_decr, size);
+				}
+			}
+
+			WT_TRET(__split_safe_free(
+			    session, 0, next_ref, sizeof(WT_REF)));
+			WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+		}
+	}
 
 	/*
 	 * We can't free the previous page index, there may be threads using it.
@@ -978,11 +1039,30 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !exclusive && __split_should_deepen(session, parent))
+	if (ret == 0 && !exclusive &&
+	    !F_ISSET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN) &&
+	    __split_should_deepen(session, parent_ref, &children)) {
+		/*
+		 * XXX
+		 * Temporary hack to avoid a bug where the root page is split
+		 * even when it's no longer doing any good.
+		 */
+		uint64_t __a, __b;
+		__a = parent->memory_footprint;
 		WT_WITH_PAGE_INDEX(session,
-		    ret = __split_deepen(session, parent));
+		    ret = __split_deepen(session, parent, children));
+		__b = parent->memory_footprint;
+		if (__b * 2 >= __a)
+			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
+	}
 
-err:	if (locked)
+err:	if (!complete)
+		for (i = 0; i < parent_entries; ++i) {
+			next_ref = pindex->index[i];
+			if (next_ref->state == WT_REF_SPLIT)
+				next_ref->state = WT_REF_DELETED;
+		}
+	if (locked)
 		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
@@ -1018,15 +1098,16 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	WT_UPDATE *upd;
-	size_t page_decr, parent_incr, right_incr, size;
+	size_t page_decr, parent_decr, parent_incr, right_incr;
 	int i;
 
 	*splitp = 0;
 
 	btree = S2BT(session);
 	page = ref->page;
+	ikey = NULL;
 	right = NULL;
-	page_decr = parent_incr = right_incr = 0;
+	page_decr = parent_decr = parent_incr = right_incr = 0;
 
 	/*
 	 * Check for pages with append-only workloads. A common application
@@ -1127,9 +1208,19 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_ERR(__wt_row_ikey(session, 0,
 	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
 	    &child->key.ikey));
+
+	/*
+	 * We're swapping WT_REFs in the parent, adjust the accounting, and
+	 * row store pages may have instantiated keys.
+	 */
 	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
-	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY));
-	WT_MEMSIZE_ADD(parent_incr, WT_INSERT_KEY_SIZE(moved_ins));
+	WT_MEMSIZE_ADD(
+	    parent_incr, sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins));
+	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
+			WT_MEMSIZE_ADD(
+			    parent_decr, sizeof(WT_IKEY) + ikey->size);
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
@@ -1151,14 +1242,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
 		;
-	size = ((size_t)i - 1) * sizeof(WT_INSERT *);
-	size += sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(moved_ins);
+	WT_MEMSIZE_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
+	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
 	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
-		size += sizeof(WT_UPDATE) + upd->size;
-	WT_MEMSIZE_ADD(right_incr, size);
-	WT_MEMSIZE_ADD(page_decr, size);
-	__wt_cache_page_inmem_decr(session, page, page_decr);
-	__wt_cache_page_inmem_incr(session, right, right_incr);
+		WT_MEMSIZE_TRANSFER(
+		    page_decr, right_incr, sizeof(WT_UPDATE) + upd->size);
 
 	/*
 	 * Allocation operations completed, move the last insert list item from
@@ -1245,10 +1333,23 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 #endif
 
 	/*
-	 * Split into the parent.
+	 * Save the transaction ID when the split happened.  Application
+	 * threads will not try to forcibly evict the page again until
+	 * all concurrent transactions commit.
 	 */
+	page->modify->inmem_split_txn = __wt_txn_new_id(session);
+
+	/* Update the page accounting. */
+	__wt_cache_page_inmem_decr(session, page, page_decr);
+	__wt_cache_page_inmem_incr(session, right, right_incr);
+
+	/*
+	 * Split into the parent.  After this, the original page is no
+	 * longer locked, so we cannot safely look at it.
+	 */
+	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, 0, parent_incr, 0, 0)) != 0) {
+	    session, ref, split_ref, 2, parent_decr, parent_incr, 0, 0)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1271,13 +1372,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 		WT_ERR(ret);
 	}
 
-	/*
-	 * Save the transaction ID when the split happened.  Application
-	 * threads will not try to forcibly evict the page again until
-	 * all concurrent transactions commit.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_new_id(session);
-
 	/* Let our caller know that we split. */
 	*splitp = 1;
 
@@ -1289,13 +1383,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * structure and instantiated key, there may be threads using them.
 	 * Add them to the session discard list, to be freed once we know it's
 	 * safe.
-	 *
-	 * After the split, we're going to discard the WT_REF, account for the
-	 * change in memory footprint.  Row store pages have keys that may be
-	 * instantiated, check for that.
 	 */
-	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
-	    (ikey = __wt_ref_key_instantiated(ref)) != NULL)
+	 if (ikey != NULL)
 		WT_TRET(__split_safe_free(
 		    session, 0, ikey, sizeof(WT_IKEY) + ikey->size));
 	WT_TRET(__split_safe_free(session, 0, ref, sizeof(WT_REF)));
@@ -1380,7 +1469,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **ref_new;
-	size_t ikey_size, parent_decr, parent_incr;
+	size_t parent_decr, parent_incr;
 	uint32_t i, new_entries;
 
 	page = ref->page;
@@ -1388,7 +1477,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	new_entries = mod->mod_multi_entries;
 
 	ikey = NULL;
-	ikey_size = parent_decr = parent_incr = 0;
+	parent_decr = parent_incr = 0;
 
 	/*
 	 * Convert the split page's multiblock reconciliation information into
@@ -1404,12 +1493,11 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * change in memory footprint.  Row store pages have keys that may be
 	 * instantiated, check for that.
 	 */
-	if ((page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT) &&
-	    (ikey = __wt_ref_key_instantiated(ref)) != NULL) {
-		ikey_size = sizeof(WT_IKEY) + ikey->size;
-		WT_MEMSIZE_ADD(parent_decr, ikey_size);
-	}
 	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
+			WT_MEMSIZE_ADD(
+			    parent_decr, sizeof(WT_IKEY) + ikey->size);
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session,
@@ -1436,7 +1524,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * safe.
 	 */
 	if (ikey != NULL)
-		WT_TRET(__split_safe_free(session, exclusive, ikey, ikey_size));
+		WT_TRET(__split_safe_free(
+		    session, exclusive, ikey, sizeof(WT_IKEY) + ikey->size));
 	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
 
 	/*

@@ -7,6 +7,65 @@
  */
 
 /*
+ * __wt_cache_read_gen --
+ *      Get the current read generation number.
+ */
+static inline uint64_t
+__wt_cache_read_gen(WT_SESSION_IMPL *session)
+{
+	return (S2C(session)->cache->read_gen);
+}
+
+/*
+ * __wt_cache_read_gen_incr --
+ *      Increment the current read generation number.
+ */
+static inline void
+__wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
+{
+	++S2C(session)->cache->read_gen;
+}
+
+/*
+ * __wt_cache_read_gen_set --
+ *      Get the read generation to store in a page.
+ */
+static inline uint64_t
+__wt_cache_read_gen_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * We return read-generations from the future (where "the future" is
+	 * measured by increments of the global read generation).  The reason
+	 * is because when acquiring a new hazard pointer for a page, we can
+	 * check its read generation, and if the read generation isn't less
+	 * than the current global generation, we don't bother updating the
+	 * page.  In other words, the goal is to avoid some number of updates
+	 * immediately after each update we have to make.
+	 */
+	return (__wt_cache_read_gen(session) + WT_READGEN_STEP);
+}
+
+/*
+ * __wt_cache_pages_inuse --
+ *	Return the number of pages in use.
+ */
+static inline uint64_t
+__wt_cache_pages_inuse(WT_CACHE *cache)
+{
+	return (cache->pages_inmem - cache->pages_evict);
+}
+
+/*
+ * __wt_cache_bytes_inuse --
+ *	Return the number of bytes in use.
+ */
+static inline uint64_t
+__wt_cache_bytes_inuse(WT_CACHE *cache)
+{
+	return (cache->bytes_inmem - cache->bytes_evict);
+}
+
+/*
  * __wt_eviction_check --
  *	Wake the eviction server if necessary.
  */
