@@ -1151,6 +1151,12 @@ DBCollection.prototype.stats = function(args) {
 
     updateStats(res, options.indexDetails, filterIndexName);
 
+    if (res.sharded) {
+        for (var shardName in res.shards) {
+            updateStats(res.shards[shardName], options.indexDetails, filterIndexName);
+        }
+    }
+
     return res;
 }
 
