@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Copyright (c) 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2015 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
