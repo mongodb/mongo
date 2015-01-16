@@ -208,6 +208,7 @@ namespace mongo {
 
         virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
                                                    const RecordId& oldLocation,
+                                                   const RecordData& oldRec,
                                                    const char* data,
                                                    int len,
                                                    bool enforceQuota,

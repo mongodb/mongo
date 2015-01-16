@@ -292,6 +292,7 @@ namespace mongo {
 
     StatusWith<RecordId> InMemoryRecordStore::updateRecord(OperationContext* txn,
                                                           const RecordId& loc,
+                                                          const RecordData& oldRec,
                                                           const char* data,
                                                           int len,
                                                           bool enforceQuota,

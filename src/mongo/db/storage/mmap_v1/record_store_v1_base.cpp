@@ -366,6 +366,7 @@ namespace mongo {
 
     StatusWith<RecordId> RecordStoreV1Base::updateRecord( OperationContext* txn,
                                                          const RecordId& oldLocation,
+                                                         const RecordData& oldRec,
                                                          const char* data,
                                                          int dataSize,
                                                          bool enforceQuota,
