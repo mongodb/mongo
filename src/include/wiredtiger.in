@@ -270,7 +270,8 @@ struct __wt_cursor {
 	 */
 	/*!
 	 * Return the ordering relationship between two cursors: both cursors
-	 * must have the same data source and have valid keys.
+	 * must have the same data source and have valid keys. (When testing
+	 * only for equality, WT_CURSOR::equals may be faster.)
 	 *
 	 * @snippet ex_all.c Cursor comparison
 	 *
@@ -284,6 +285,21 @@ struct __wt_cursor {
 	 * @errors
 	 */
 	int __F(compare)(WT_CURSOR *cursor, WT_CURSOR *other, int *comparep);
+
+	/*!
+	 * Return the ordering relationship between two cursors, testing only
+	 * for equality: both cursors must have the same data source and have
+	 * valid keys.
+	 *
+	 * @snippet ex_all.c Cursor equality
+	 *
+	 * @param cursor the cursor handle
+	 * @param other another cursor handle
+	 * @param[out] equalp the status of the comparison: 1 if the cursors
+	 * refer to the same key, otherwise 0.
+	 * @errors
+	 */
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
 
 	/*!
 	 * Return the next record.
