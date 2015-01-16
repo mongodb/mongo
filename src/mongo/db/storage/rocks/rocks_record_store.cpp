@@ -395,6 +395,7 @@ namespace mongo {
 
     StatusWith<RecordId> RocksRecordStore::updateRecord( OperationContext* txn,
                                                         const RecordId& loc,
+                                                        const RecordData& oldRec,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota,
