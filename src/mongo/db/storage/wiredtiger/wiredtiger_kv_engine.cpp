@@ -450,6 +450,10 @@ namespace mongo {
         return true;
     }
 
+    bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
+        return true;
+    }
+
     bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, const StringData& ident) const {
         return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession(), _uri(ident));
     }

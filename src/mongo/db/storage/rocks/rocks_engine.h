@@ -97,6 +97,10 @@ namespace mongo {
             return true;
         }
 
+        virtual bool supportsDirectoryPerDB() const override {
+            return false;
+        }
+
         virtual bool isDurable() const override { return _durable; }
 
         virtual int64_t getIdentSize(OperationContext* opCtx,

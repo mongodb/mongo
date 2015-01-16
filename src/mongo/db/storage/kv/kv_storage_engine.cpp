@@ -35,7 +35,9 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -73,6 +75,9 @@ namespace mongo {
         : _options( options )
         , _engine( engine )
         , _supportsDocLocking(_engine->supportsDocLocking()) {
+
+        uassert(28601, "Storage engine does not support --directoryperdb",
+                !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
 
         OperationContextNoop opCtx( _engine->newRecoveryUnit() );
 

@@ -102,6 +102,13 @@ namespace mongo {
          */
         virtual bool supportsDocLocking() const = 0;
 
+        /**
+         * Returns true if storage engine supports --directoryperdb.
+         * See:
+         *     http://docs.mongodb.org/manual/reference/program/mongod/#cmdoption--directoryperdb
+         */
+        virtual bool supportsDirectoryPerDB() const = 0;
+
         virtual Status okToRename( OperationContext* opCtx,
                                    const StringData& fromNS,
                                    const StringData& toNS,

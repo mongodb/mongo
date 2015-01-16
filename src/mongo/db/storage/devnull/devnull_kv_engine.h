@@ -76,6 +76,10 @@ namespace mongo {
             return true;
         }
 
+        virtual bool supportsDirectoryPerDB() const {
+            return false;
+        }
+
         virtual bool isDurable() const {
             return true;
         }
