@@ -193,6 +193,11 @@ type ReadWriteLockTimes struct {
 type LockStats struct {
 	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
+
+	// AcquireCount is a new field of the lock stats only populated on 2.8 or newer.
+	// Typed as a pointer so that if it is nil, mongostat can assume the field is not populated
+	// with real namespace data.
+	AcquireCount *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
 }
 
 type ExtraInfo struct {
@@ -715,45 +720,50 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 		returnVal.Faults = diff(*(newStat.ExtraInfo.PageFaults), *(oldStat.ExtraInfo.PageFaults), sampleSecs)
 	}
 	if !returnVal.IsMongos && oldStat.Locks != nil && oldStat.Locks != nil {
-		prevLocks := parseLocks(oldStat)
-		curLocks := parseLocks(newStat)
-		lockdiffs := computeLockDiffs(prevLocks, curLocks)
-		if len(lockdiffs) == 0 {
-			if newStat.GlobalLock != nil {
-				returnVal.HighestLocked = &LockStatus{
-					DBName:     "",
-					Percentage: percentageInt64(newStat.GlobalLock.LockTime, newStat.GlobalLock.TotalTime),
-					Global:     true,
-				}
-			}
-		}
-
-		if len(lockdiffs) > 0 {
-			//Get the entry with the highest lock
-			highestLocked := lockdiffs[len(lockdiffs)-1]
-
-			var timeDiffMillis int64
-			timeDiffMillis = newStat.UptimeMillis - oldStat.UptimeMillis
-
-			lockToReport := highestLocked.Writes
-
-			//if the highest locked namespace is not '.'
-			if highestLocked.Namespace != "." {
-				for _, namespaceLockInfo := range lockdiffs {
-					if namespaceLockInfo.Namespace == "." {
-						lockToReport += namespaceLockInfo.Writes
+		globalCheck, hasGlobal := oldStat.Locks["Global"]
+		if hasGlobal && globalCheck.AcquireCount != nil {
+			// This appears to be a 2.8+ server so the data in these fields do *not* refer to
+			// actual namespaces and thus we can't compute lock %.
+			returnVal.HighestLocked = nil
+		} else {
+			prevLocks := parseLocks(oldStat)
+			curLocks := parseLocks(newStat)
+			lockdiffs := computeLockDiffs(prevLocks, curLocks)
+			if len(lockdiffs) == 0 {
+				if newStat.GlobalLock != nil {
+					returnVal.HighestLocked = &LockStatus{
+						DBName:     "",
+						Percentage: percentageInt64(newStat.GlobalLock.LockTime, newStat.GlobalLock.TotalTime),
+						Global:     true,
 					}
 				}
-			}
+			} else {
+				//Get the entry with the highest lock
+				highestLocked := lockdiffs[len(lockdiffs)-1]
 
-			//lock data is in microseconds and uptime is in milliseconds - so
-			//divide by 1000 so that they units match
-			lockToReport /= 1000
+				var timeDiffMillis int64
+				timeDiffMillis = newStat.UptimeMillis - oldStat.UptimeMillis
 
-			returnVal.HighestLocked = &LockStatus{
-				DBName:     highestLocked.Namespace,
-				Percentage: percentageInt64(lockToReport, timeDiffMillis),
-				Global:     false,
+				lockToReport := highestLocked.Writes
+
+				//if the highest locked namespace is not '.'
+				if highestLocked.Namespace != "." {
+					for _, namespaceLockInfo := range lockdiffs {
+						if namespaceLockInfo.Namespace == "." {
+							lockToReport += namespaceLockInfo.Writes
+						}
+					}
+				}
+
+				//lock data is in microseconds and uptime is in milliseconds - so
+				//divide by 1000 so that they units match
+				lockToReport /= 1000
+
+				returnVal.HighestLocked = &LockStatus{
+					DBName:     highestLocked.Namespace,
+					Percentage: percentageInt64(lockToReport, timeDiffMillis),
+					Global:     false,
+				}
 			}
 		}
 	} else {

@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-
 //MongoStat is a container for the user-specified options and
 //internal cluster state used for running mongostat.
 type MongoStat struct {
@@ -132,7 +131,6 @@ func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep t
 				return
 			}
 			hasData = true
-
 
 			out := cluster.Formatter.FormatLines([]StatLine{newStat}, rowCount, false)
 			fmt.Print(out)
@@ -256,6 +254,10 @@ func (node *NodeMonitor) Poll(discover chan string, all bool, checkShards bool, 
 	//the driver with 'direct' connections, which disables the built-in
 	//replset discovery mechanism since we do our own node discovery here.
 	s.SetMode(mgo.Eventual, true)
+
+	// Disable the socket timeout - otherwise if db.serverStatus() takes a long time on the server
+	// side, the client will close the connection early and report an error.
+	s.SetSocketTimeout(0)
 	defer s.Close()
 
 	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
