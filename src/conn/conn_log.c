@@ -546,6 +546,11 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		conn->log_close_tid_set = 0;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->log_close_cond));
+	if (conn->log_close_session != NULL) {
+		wt_session = &conn->log_close_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		conn->log_close_session = NULL;
+	}
 
 	WT_TRET(__wt_log_close(session));
 
