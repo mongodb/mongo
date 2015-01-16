@@ -1022,6 +1022,7 @@ namespace mongo {
             }
 
             if (localCheckOnly) {
+                conn.done();
                 return true;
             }
 
