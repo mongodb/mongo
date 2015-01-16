@@ -134,6 +134,20 @@ namespace mongo {
         _lockState->unlockAll();
     }
 
+    Lock::GlobalLock::GlobalLock(Locker* lockState, LockMode lockMode)
+        : ScopedLock(lockState) {
+
+        LockResult result = _lockState->lockGlobalBegin(lockMode);
+        if (result == LOCK_WAITING) {
+            result = _lockState->lockGlobalComplete(UINT_MAX);
+        }
+
+        invariant(result == LOCK_OK);
+    }
+
+    Lock::GlobalLock::~GlobalLock() {
+        _lockState->unlockAll();
+    }
 
     Lock::DBLock::DBLock(Locker* lockState, const StringData& db, LockMode mode)
         : ScopedLock(lockState),

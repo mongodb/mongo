@@ -128,6 +128,18 @@ namespace mongo {
             ~GlobalRead();
         };
 
+        /**
+         * Global lock.
+         *
+         * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
+         * in any mode, see LockMode.
+         * NOTE: Does not acquire flush lock.
+         */
+        class GlobalLock : public ScopedLock {
+        public:
+            GlobalLock(Locker* lockState, LockMode lockMode);
+            ~GlobalLock();
+        };
 
         /**
          * Database lock with support for collection- and document-level locking

@@ -144,6 +144,9 @@ namespace mongo {
 
                     //  No WriteUnitOfWork needed, as this does no writes of its own.
                 }
+
+                // Take a global IS lock to ensure the storage engine is not shutdown
+                Lock::GlobalLock global(txn->lockState(), MODE_IS);
                 StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
                 result.append( "numFiles" , storageEngine->flushAllFiles( sync ) );
             }
