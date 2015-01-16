@@ -1122,28 +1122,34 @@ DBCollection.prototype.stats = function(args) {
         return res;
     }
 
-    var newIndexDetails = {};
-    if (res.indexDetails) {
-        if (!options.indexDetails) {
-            delete res.indexDetails;
-        }
-        else if (isObject(options.indexDetailsKey)) {
-            this.getIndexes().forEach(function(spec) {
-                if (friendlyEqual(spec.key, options.indexDetailsKey) &&
-                    res.indexDetails[spec.name]) {
-                    newIndexDetails[spec.name] = res.indexDetails[spec.name];
-                }
-            });
-            res.indexDetails = newIndexDetails;
-        }
-        else if (options.indexDetailsName) {
-            if (res.indexDetails[options.indexDetailsName]) {
-                newIndexDetails[options.indexDetailsName] =
-                    res.indexDetails[options.indexDetailsName];
+    var getIndexName = function(collection, indexKey) {
+        if (!isObject(indexKey)) return undefined;
+        var indexName;
+        collection.getIndexes().forEach(function(spec) {
+            if (friendlyEqual(spec.key, options.indexDetailsKey)) {
+                indexName = spec.name;
             }
-            res.indexDetails = newIndexDetails;
+        });
+        return indexName;
+    };
+
+    var filterIndexName =
+        options.indexDetailsName || getIndexName(this, options.indexDetailsKey);
+
+    var updateStats = function(stats, keepIndexDetails, indexName) {
+        if (!stats.indexDetails) return;
+        if (!keepIndexDetails) {
+            delete stats.indexDetails;
+            return;
         }
-    }
+        if (!indexName) return;
+        for (var key in stats.indexDetails) {
+            if (key == indexName) continue;
+            delete stats.indexDetails[key];
+        }
+    };
+
+    updateStats(res, options.indexDetails, filterIndexName);
 
     return res;
 }
