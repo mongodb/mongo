@@ -160,7 +160,15 @@ namespace mongo {
         const bool isRead = (_mode == MODE_S || _mode == MODE_IS);
 
         _lockState->lockGlobal(isRead ? MODE_IS : MODE_IX);
+
         if (supportsDocLocking() || enableCollectionLocking) {
+
+            // The check for the admin db is to ensure direct writes to auth collections
+            // are serialized (see SERVER-16092).
+            if (_id == resourceIdAdminDB && !isRead) {
+                _mode = MODE_X;
+            }
+
             _lockState->lock(_id, _mode);
         }
         else {

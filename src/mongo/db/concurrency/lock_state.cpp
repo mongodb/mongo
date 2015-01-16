@@ -868,5 +868,6 @@ namespace {
     const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));
     const ResourceId resourceIdOplog =
         ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
+    const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
 
 } // namespace mongo

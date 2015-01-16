@@ -217,6 +217,9 @@ namespace mongo {
     extern const ResourceId resourceIdLocalDB;
     extern const ResourceId resourceIdOplog;
 
+    // Hardcoded resource id for admin db. This is to ensure direct writes to auth collections
+    // are serialized (see SERVER-16092)
+    extern const ResourceId resourceIdAdminDB;
 
     /**
      * Interface on which granted lock requests will be notified. See the contract for the notify
