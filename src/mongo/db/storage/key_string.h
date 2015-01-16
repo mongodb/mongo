@@ -182,9 +182,19 @@ namespace mongo {
             uint8_t _buf[1/*size*/ + kMaxBytesNeeded];
         };
 
-        static const uint64_t kMaxBufferSize = 2048;
+        KeyString() {}
 
-        KeyString() : _size(0) {}
+        KeyString(const BSONObj& obj, Ordering ord, RecordId recordId) {
+            resetToKey(obj, ord, recordId);
+        }
+
+        KeyString(const BSONObj& obj, Ordering ord) {
+            resetToKey(obj, ord);
+        }
+
+        explicit KeyString(RecordId rid) {
+            appendRecordId(rid);
+        }
 
         static BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
         static BSONObj toBson(const char* buffer, size_t len, Ordering ord,
@@ -200,26 +210,6 @@ namespace mongo {
          */
         static RecordId decodeRecordId(BufReader* reader);
 
-        static KeyString make(const BSONObj& obj,
-                              Ordering ord,
-                              RecordId recordId) {
-            KeyString out;
-            out.resetToKey(obj, ord, recordId);
-            return out;
-        }
-
-        static KeyString make(const BSONObj& obj, Ordering ord) {
-            KeyString out;
-            out.resetToKey(obj, ord);
-            return out;
-        }
-
-        static KeyString make(RecordId rid) {
-            KeyString ks;
-            ks.appendRecordId(rid);
-            return ks;
-        }
-
         void appendRecordId(RecordId loc);
         void appendTypeBits(const TypeBits& bits);
 
@@ -228,20 +218,20 @@ namespace mongo {
          * Equivalent to but faster than *this = KeyString()
          */
         void resetToEmpty() {
-            _size = 0;
+            _buffer.reset();
             _typeBits.reset();
         }
 
         void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
         void resetToKey(const BSONObj& obj, Ordering ord);
         void resetFromBuffer(const void* buffer, size_t size) {
-            _size = size;
-            memcpy(_buffer, buffer, size);
+            _buffer.reset();
+            memcpy(_buffer.skip(size), buffer, size);
         }
 
-        const char* getBuffer() const { return _buffer; }
-        size_t getSize() const { return _size; }
-        bool isEmpty() const { return _size == 0; }
+        const char* getBuffer() const { return _buffer.buf(); }
+        size_t getSize() const { return _buffer.len(); }
+        bool isEmpty() const { return _buffer.len() == 0; }
 
         const TypeBits& getTypeBits() const { return _typeBits; }
 
@@ -293,8 +283,7 @@ namespace mongo {
         void _appendBytes(const void* source, size_t bytes, bool invert);
 
         TypeBits _typeBits;
-        size_t _size;
-        char _buffer[kMaxBufferSize];
+        StackBufBuilder _buffer;
     };
 
     inline bool operator<(const KeyString& lhs, const KeyString& rhs) {

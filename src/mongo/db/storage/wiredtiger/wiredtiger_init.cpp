@@ -121,14 +121,8 @@ namespace mongo {
                                          ("SetGlobalEnvironment"))
         (InitializerContext* context ) {
 
-        // XXX: These cannot be the same WiredTigerFactory instance because
-        //      some environments delete each registered factory separately.
         getGlobalEnvironment()->registerStorageEngine(kWiredTigerEngineName,
                                                       new WiredTigerFactory());
-
-        // Allow --storageEngine=wiredtiger to be specified on the command line
-        // (for backwards compatibility).
-        getGlobalEnvironment()->registerStorageEngine("wiredtiger", new WiredTigerFactory());
 
         return Status::OK();
     }

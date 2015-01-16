@@ -90,7 +90,7 @@ namespace mongo {
 
             _flushed(time_flushing);
 
-            if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || time_flushing >= 10000 ) {
+            if( shouldLog(logger::LogSeverity::Debug(1)) || time_flushing >= 10000 ) {
                 log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
             }
         }
@@ -98,6 +98,10 @@ namespace mongo {
 
     BSONObj DataFileSync::generateSection(OperationContext* txn,
                                           const BSONElement& configElement) const {
+        if (!running()) {
+            return BSONObj();
+        }
+
         BSONObjBuilder b;
         b.appendNumber( "flushes" , _flushes );
         b.appendNumber( "total_ms" , _total_time );

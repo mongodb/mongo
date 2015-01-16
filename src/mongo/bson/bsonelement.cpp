@@ -31,6 +31,9 @@
 
 #include "mongo/bson/bsonelement.h"
 
+#include <boost/functional/hash.hpp>
+
+#include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/base64.h"
@@ -817,54 +820,6 @@ namespace mongo {
         return ret.str();
     }
 
-namespace {
-    int compareInts(int lhs, int rhs) { return lhs == rhs ? 0 : lhs < rhs ? -1 : 1; }
-    int compareLongs(long long lhs, long long rhs) { return lhs == rhs ? 0 : lhs < rhs ? -1 : 1; }
-    int compareDoubles(double lhs, double rhs) {
-        if (lhs == rhs) return 0;
-        if (lhs < rhs) return -1;
-        if (lhs > rhs) return 1;
-
-        // If none of the above cases returned, lhs or rhs must be NaN.
-        if (isNaN(lhs)) return isNaN(rhs) ? 0 : -1;
-        dassert(isNaN(rhs));
-        return 1;
-    }
-
-    // This is the tricky one. Needs to support the following cases:
-    // * Doubles with a fractional component.
-    // * Longs that can't be precisely represented as a double.
-    // * Doubles outside of the range of Longs (including +/- Inf).
-    // * NaN (defined by us as less than all Longs)
-    // * Return value is always -1, 0, or 1 to ensure it is safe to negate.
-    int compareLongToDouble(long long lhs, double rhs) {
-        // All Longs are > NaN
-        if (isNaN(rhs)) return 1;
-
-        // Ints with magnitude <= 2**53 can be precisely represented as doubles.
-        // Additionally, doubles outside of this range can't have a fractional component.
-        static const long long kEndOfPreciseDoubles = 1ll << 53;
-        if (lhs <= kEndOfPreciseDoubles && lhs >= -kEndOfPreciseDoubles) {
-            return compareDoubles(lhs, rhs);
-        }
-
-        // Large magnitude doubles (including +/- Inf) are strictly > or < all Longs.
-        static const double kBoundOfLongRange = -static_cast<double>(LLONG_MIN); // positive 2**63
-        if (rhs >= kBoundOfLongRange) return -1; // Can't be represented in a Long.
-        if (rhs < -kBoundOfLongRange) return 1; // Can be represented in a Long.
-
-        // Remaining Doubles can have their integer component precisely represented as long longs.
-        // If they have a fractional component, they must be strictly > or < lhs even after
-        // truncation of the fractional component since low-magnitude lhs were handled above.
-        return compareLongs(lhs, rhs);
-    }
-
-    int compareDoubleToLong(double lhs, long long rhs) {
-        // Only implement the real logic once.
-        return -compareLongToDouble(rhs, lhs);
-    }
-} // namespace
-
     /**
      * l and r must be same canonicalType when called.
      */
@@ -977,5 +932,92 @@ namespace {
         return -1;
     }
  
+    size_t BSONElement::Hasher::operator()(const BSONElement& elem) const {
+        size_t hash = 0;
+
+        boost::hash_combine(hash, elem.canonicalType());
+
+        const StringData fieldName = elem.fieldNameStringData();
+        if (!fieldName.empty()) {
+            boost::hash_combine(hash, StringData::Hasher()(fieldName));
+        }
+
+        switch (elem.type()) {
+            // Order of types is the same as in compareElementValues().
+
+        case mongo::EOO:
+        case mongo::Undefined:
+        case mongo::jstNULL:
+        case mongo::MaxKey:
+        case mongo::MinKey:
+            // These are valueless types
+            break;
+
+        case mongo::Bool:
+            boost::hash_combine(hash, elem.boolean());
+            break;
+
+        case mongo::Timestamp:
+            boost::hash_combine(hash, elem._opTime().asDate());
+            break;
+
+        case mongo::Date:
+            boost::hash_combine(hash, elem.date().asInt64());
+            break;
+
+        case mongo::NumberDouble:
+        case mongo::NumberLong:
+        case mongo::NumberInt: {
+            // This converts all numbers to doubles, which ignores the low-order bits of
+            // NumberLongs > 2**53, but that is ok since the hash will still be the same for
+            // equal numbers and is still likely to be different for different numbers.
+            // SERVER-16851
+            const double dbl = elem.numberDouble();
+            if (isNaN(dbl)) {
+                boost::hash_combine(hash, std::numeric_limits<double>::quiet_NaN());
+            }
+            else {
+                boost::hash_combine(hash, dbl);
+            }
+            break;
+        }
+
+        case mongo::jstOID:
+            elem.__oid().hash_combine(hash);
+            break;
+
+        case mongo::Code:
+        case mongo::Symbol:
+        case mongo::String:
+            boost::hash_combine(hash, StringData::Hasher()(elem.valueStringData()));
+            break;
+
+        case mongo::Object:
+        case mongo::Array:
+            boost::hash_combine(hash, BSONObj::Hasher()(elem.embeddedObject()));
+            break;
+
+        case mongo::DBRef:
+        case mongo::BinData:
+            // All bytes of the value are required to be identical.
+            boost::hash_combine(hash, StringData::Hasher()(StringData(elem.value(),
+                                                                      elem.valuesize())));
+            break;
+
+        case mongo::RegEx:
+            boost::hash_combine(hash, StringData::Hasher()(elem.regex()));
+            boost::hash_combine(hash, StringData::Hasher()(elem.regexFlags()));
+            break;
+
+        case mongo::CodeWScope: {
+            boost::hash_combine(hash, StringData::Hasher()(
+                                        StringData(elem.codeWScopeCode(),
+                                                   elem.codeWScopeCodeLen())));
+            boost::hash_combine(hash, BSONObj::Hasher()(elem.codeWScopeObject()));
+            break;
+        }
+        }
+        return hash;
+    }
 
 } // namespace mongo

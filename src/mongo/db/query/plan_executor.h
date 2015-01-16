@@ -382,7 +382,7 @@ namespace mongo {
         boost::scoped_ptr<CanonicalQuery> _cq;
         boost::scoped_ptr<WorkingSet> _workingSet;
         boost::scoped_ptr<QuerySolution> _qs;
-        std::auto_ptr<PlanStage> _root;
+        boost::scoped_ptr<PlanStage> _root;
 
         // Deregisters this executor when it is destroyed.
         boost::scoped_ptr<ScopedExecutorRegistration> _safety;

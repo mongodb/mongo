@@ -124,13 +124,6 @@ namespace repl {
         }
     } cmdReplSetRBID;
 
-    /** helper to get rollback id from another server. */
-    int getRBID(DBClientConnection *c) {
-        bo info;
-        c->simpleCommand("admin", &info, "replSetGetRBID");
-        return info["rbid"].numberInt();
-    }
-
     class CmdReplSetGetStatus : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {

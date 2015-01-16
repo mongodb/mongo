@@ -86,7 +86,11 @@ namespace mongo {
         // --------------
 
         void initCollection( OperationContext* opCtx,
-                             const std::string& ns );
+                             const std::string& ns,
+                             bool forRepair );
+
+        void initCollectionBeforeRepair(OperationContext* opCtx, const std::string& ns);
+        void reinitCollectionAfterRepair(OperationContext* opCtx, const std::string& ns);
 
     private:
         class AddCollectionChange;

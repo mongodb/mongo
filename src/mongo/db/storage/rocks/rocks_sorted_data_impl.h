@@ -1,5 +1,3 @@
-// rocks_sorted_data_impl.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -90,8 +88,6 @@ namespace mongo {
         }
 
         virtual bool isEmpty(OperationContext* txn);
-
-        virtual Status touch(OperationContext* txn) const;
 
         virtual long long numEntries(OperationContext* txn) const;
 

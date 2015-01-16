@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/functional/hash.hpp>
+#include <boost/optional.hpp>
 #include <climits>
 #include <ostream>
 
@@ -126,6 +127,10 @@ namespace mongo {
 
     inline std::ostream& operator<<( std::ostream& stream, const RecordId& id ) {
         return stream << "RecordId(" << id.repr() << ')';
+    }
+
+    inline std::ostream& operator<<( std::ostream& stream, const boost::optional<RecordId>& id ) {
+        return stream << "RecordId(" << (id ? id.get().repr() : 0) << ')';
     }
 
     inline logger::LogstreamBuilder& operator<<(logger::LogstreamBuilder& stream,

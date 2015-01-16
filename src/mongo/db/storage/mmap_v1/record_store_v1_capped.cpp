@@ -177,7 +177,7 @@ namespace mongo {
                     return StatusWith<DiskLoc>( status );
                 deleteRecord( txn, fr );
 
-                compact(txn);
+                _compact(txn);
                 if ((++passes % 5000) == 0) {
                     StringBuilder sb;
                     log() << "passes = " << passes << " in CappedRecordStoreV1::allocRecord:"
@@ -267,7 +267,7 @@ namespace mongo {
        this is O(n^2) but we call it for capped tables where typically n==1 or 2!
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
-    void CappedRecordStoreV1::compact(OperationContext* txn) {
+    void CappedRecordStoreV1::_compact(OperationContext* txn) {
         DDD( "CappedRecordStoreV1::compact enter" );
 
         vector<DiskLoc> drecs;
@@ -490,7 +490,7 @@ namespace mongo {
             Status status = _deleteCallback->aboutToDeleteCapped( txn, currId );
             uassertStatusOK( status );
             deleteRecord( txn, currId );
-            compact(txn);
+            _compact(txn);
 
             // This is the case where we have not yet had to remove any
             // documents to make room for other documents, and we are allocating
@@ -596,7 +596,7 @@ namespace mongo {
         else {
             d->nextDeleted() = cappedFirstDeletedInCurExtent();
             setFirstDeletedInCurExtent( txn, dloc );
-            // always compact() after this so order doesn't matter
+            // always _compact() after this so order doesn't matter
         }
     }
 
@@ -661,13 +661,6 @@ namespace mongo {
         }
 
         return iterators.release();
-    }
-
-    Status CappedRecordStoreV1::compact( OperationContext* txn,
-                                         RecordStoreCompactAdaptor* adaptor,
-                                         const CompactOptions* options,
-                                         CompactStats* stats ) {
-        invariant(false);
     }
 
     void CappedRecordStoreV1::_maybeComplain( OperationContext* txn, int len ) const {

@@ -61,6 +61,7 @@ namespace mongo {
     namespace dur {
 
         extern Journal j;
+        extern CommitJob commitJob;
 
         const RelativePath local = RelativePath::fromRelativePath("local");
 
@@ -165,25 +166,20 @@ namespace mongo {
             prepBasicWrite_inlock(bb, &last, lastDbPath);
         }
 
-        static void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
-            bb.reset();
-
-            h.setSectionLen(0xffffffff);  // total length, will fill in later
-            h.seqNumber = getLastDataFileFlushTime();
-            h.fileId = j.curFileId();
-        }
-
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
             @return partially populated sectheader and _ab set
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
-            verify(storageGlobalParams.dur);
+            // Add the JSectHeader
 
-            resetLogBuffer(h, bb); // adds JSectHeader
+            // Invalidate the total length, we will fill it in later.
+            h.setSectionLen(0xffffffff);
+            h.seqNumber = getLastDataFileFlushTime();
+            h.fileId = j.curFileId();
 
-            // ops other than basic writes (DurOp's)
+            // Ops other than basic writes (DurOp's) go first
             const std::vector<boost::shared_ptr<DurOp> >& durOps = commitJob.ops();
             for (std::vector<boost::shared_ptr<DurOp> >::const_iterator i = durOps.begin();
                  i != durOps.end();

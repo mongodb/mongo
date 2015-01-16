@@ -86,8 +86,10 @@ var $config = (function() {
     }
 
     return {
-        threadCount: 5,
-        iterations: 10, // fewer iterations because each 'group' operation is fairly expensive
+        // Using few threads and iterations because each iteration per thread
+        // is fairly expensive compared to other workloads' iterations.
+        threadCount: 3,
+        iterations: 10,
         startState: 'group',
         states: states,
         transitions: transitions,

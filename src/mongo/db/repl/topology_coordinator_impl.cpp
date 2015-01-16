@@ -1038,7 +1038,7 @@ namespace {
                 if (_iAmPrimary()) {
                     OpTime remoteElectionTime = _hbdata[remotePrimaryIndex].getElectionTime();
                     log() << "replset: another primary seen with election time " 
-                          << remoteElectionTime << " my elction time is " << _electionTime;
+                          << remoteElectionTime << " my election time is " << _electionTime;
 
                     // Step down whomever has the older election time.
                     if (remoteElectionTime > _electionTime) {

@@ -1,5 +1,3 @@
-// kv_engine_test_harness.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -27,6 +25,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/scoped_ptr.hpp>

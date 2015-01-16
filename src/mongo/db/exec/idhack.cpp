@@ -186,6 +186,11 @@ namespace mongo {
     void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
+        // Since updates can't mutate the '_id' field, we can ignore mutation invalidations.
+        if (INVALIDATION_MUTATION == type) {
+            return;
+        }
+
         // It's possible that the loc getting invalidated is the one we're about to
         // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {

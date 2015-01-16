@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <boost/next_prior.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 

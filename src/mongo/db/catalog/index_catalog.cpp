@@ -135,9 +135,9 @@ namespace mongo {
                                                                   descriptorCleanup.release(),
                                                                   _collection->infoCache() ) );
 
-        entry->init( txn, _collection->_database->_dbEntry->getIndex( txn,
-                                                                      _collection->getCatalogEntry(),
-                                                                      entry.get() ) );
+        entry->init( txn, _collection->_dbce->getIndex( txn,
+                                                        _collection->getCatalogEntry(),
+                                                        entry.get() ) );
 
         IndexCatalogEntry* save = entry.get();
         _entries.add( entry.release() );
@@ -175,7 +175,7 @@ namespace mongo {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
-        if ( !_collection->_database->getDatabaseCatalogEntry()->isOlderThan24( txn ) ) {
+        if ( !_collection->_dbce->isOlderThan24( txn ) ) {
             // RulesFor24+
             // This assert will be triggered when downgrading from a future version that
             // supports an index plugin unsupported by this version.
@@ -222,20 +222,21 @@ namespace mongo {
             return Status::OK();
         }
 
-        Database* db = _collection->_database;
+        DatabaseCatalogEntry* dbce = _collection->_dbce;
 
-        if ( !db->getDatabaseCatalogEntry()->isOlderThan24( txn ) ) {
+        if ( !dbce->isOlderThan24( txn ) ) {
             return Status::OK(); // these checks have already been done
         }
 
-        auto_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(txn,
-                                            db->_indexesName,
-                                            db->getCollection(db->_indexesName)));
+        // Everything below is MMAPv1 specific since it was the only storage engine that existed
+        // before 2.4. We look at all indexes in this database to make sure that none of them use
+        // plugins that didn't exist before 2.4. If that holds, we mark the database as "2.4-clean"
+        // which allows creation of indexes using new plugins.
 
-        BSONObj index;
-        PlanExecutor::ExecState state;
-        while ( PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL)) ) {
+        RecordStore* indexes = dbce->getRecordStore(dbce->name() + ".system.indexes");
+        boost::scoped_ptr<RecordIterator> it(indexes->getIterator(txn));
+        while (!it->isEOF()) {
+            const BSONObj index = it->dataFor(it->getNext()).toBson();
             const BSONObj key = index.getObjectField("key");
             const string plugin = IndexNames::findPluginName(key);
             if ( IndexNames::existedBefore24(plugin) )
@@ -250,11 +251,7 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex, errmsg );
         }
 
-        if ( PlanExecutor::IS_EOF != state ) {
-            warning() << "Internal error while reading system.indexes collection";
-        }
-
-        db->_dbEntry->markIndexSafe24AndUp( txn );
+        dbce->markIndexSafe24AndUp( txn );
 
         return Status::OK();
     }
@@ -541,21 +538,26 @@ namespace {
             return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );
         }
 
-        StringData specNamespace = spec.getStringField("ns");
-        if ( specNamespace.size() == 0 )
+        const BSONElement specNamespace = spec["ns"];
+        if ( specNamespace.type() != String )
             return Status( ErrorCodes::CannotCreateIndex,
-                           "the index spec needs a 'ns' field'" );
+                           "the index spec needs a 'ns' string field" );
 
-        if ( nss.ns() != specNamespace )
+        if ( nss.ns() != specNamespace.valueStringData())
             return Status( ErrorCodes::CannotCreateIndex,
                            "the index spec ns does not match" );
 
         // logical name of the index
-        const char *name = spec.getStringField("name");
-        if ( !name[0] )
-            return Status( ErrorCodes::CannotCreateIndex, "no index name specified" );
+        const BSONElement nameElem = spec["name"];
+        if (nameElem.type() != String)
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "index name must be specified as a string");
 
-        string indexNamespace = IndexDescriptor::makeIndexNamespace( specNamespace, name );
+        const StringData name = nameElem.valueStringData();
+        if (name.find('\0') != std::string::npos)
+            return Status(ErrorCodes::CannotCreateIndex, "index names cannot contain NUL bytes");
+
+        const std::string indexNamespace = IndexDescriptor::makeIndexNamespace( nss.ns(), name );
         if ( indexNamespace.length() > NamespaceString::MaxNsLen )
             return Status( ErrorCodes::CannotCreateIndex,
                            str::stream() << "namespace name generated from index name \"" <<
@@ -837,14 +839,8 @@ namespace {
 
             log() << "error dropping index: " << indexNamespace
                   << " going to leak some memory to be safe";
-
-
-            _collection->_database->_clearCollectionCache( txn, indexNamespace );
-
             throw;
         }
-
-        _collection->_database->_clearCollectionCache( txn, indexNamespace );
 
         _checkMagic();
 

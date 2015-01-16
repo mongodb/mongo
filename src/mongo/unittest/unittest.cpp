@@ -289,7 +289,7 @@ namespace {
             for ( std::vector<std::string>::iterator i=torun.begin(); i!=torun.end(); i++ ) {
                 std::string name = *i;
                 boost::shared_ptr<Suite>& s = _allSuites()[name];
-                fassert( 16145,  s );
+                fassert( 16145, s != NULL );
 
                 log() << "going to run suite: " << name << std::endl;
                 results.push_back( s->run( filter, runsPerTest ) );

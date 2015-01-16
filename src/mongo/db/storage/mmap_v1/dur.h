@@ -42,18 +42,10 @@ namespace dur {
     // a smaller limit is likely better on 32 bit
     const unsigned UncommittedBytesLimit = (sizeof(void*) == 4) ? 50 * 1024 * 1024 : 512 * 1024 * 1024;
 
-    /**
-     * Called during startup so durability module can initialize and start the durability thread.
-     * Does nothing if storageGlobalParams.dur is false
-     */
-    void startup();
-
 
     class DurableInterface {
         MONGO_DISALLOW_COPYING(DurableInterface);
     public:
-
-        DurableInterface();
         virtual ~DurableInterface();
 
         /**
@@ -153,51 +145,33 @@ namespace dur {
             return static_cast<T*>(writingPtr(x, sizeof(T)));
         }
 
-
         static DurableInterface& getDur() { return *_impl; }
 
-    private:
+    protected:
+         DurableInterface();
 
-        // Needs to be able to enable/disable Durability
+    private:
         friend void startup();
 
-        static void enableDurability(); // makes _impl a DurableImpl
-
-        static DurableInterface* _impl; // NonDurableImpl at startup()
+        static DurableInterface* _impl;
     };
 
 
-    class NonDurableImpl : public DurableInterface {
-    public:
-        void* writingPtr(void *x, unsigned len);
-        void declareWriteIntent(void *, unsigned);
-        void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents) { }
-        void createdFile(const std::string& filename, unsigned long long len) { }
-        bool awaitCommit() { return false; }
-        bool commitNow(OperationContext* txn);
-        bool commitIfNeeded();
-        void syncDataAndTruncateJournal(OperationContext* txn) {}
-        bool isDurable() const { return false; }
-        void commitAndStopDurThread() { }
-    };
-
-    class DurableImpl : public DurableInterface {
-    public:
-        void* writingPtr(void *x, unsigned len);
-        void declareWriteIntent(void *, unsigned);
-        void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents);
-        void createdFile(const std::string& filename, unsigned long long len);
-        bool awaitCommit();
-        bool commitNow(OperationContext* txn);
-        bool commitIfNeeded();
-        void syncDataAndTruncateJournal(OperationContext* txn);
-        bool isDurable() const { return true; }
-        void commitAndStopDurThread();
-    };
+    /**
+     * Called during startup to startup the durability module.
+     * Does nothing if storageGlobalParams.dur is false
+     */
+    void startup();
 
 } // namespace dur
 
 
+    /**
+     * Provides a reference to the active durability interface.
+     *
+     * TODO: The only reason this is an inline function is that tests try to link it and fail if
+     *       the MMAP V1 engine is not included.
+     */
     inline dur::DurableInterface& getDur() { return dur::DurableInterface::getDur(); }
 
 } // namespace mongo

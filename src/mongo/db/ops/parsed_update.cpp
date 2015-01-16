@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrites
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/parsed_update.h"
@@ -79,7 +77,6 @@ namespace mongo {
                                                      &cqRaw,
                                                      whereCallback);
         if (status.isOK()) {
-            cqRaw->setIsForWrite(true);
             _canonicalQuery.reset(cqRaw);
         }
 

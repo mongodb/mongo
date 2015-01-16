@@ -133,7 +133,7 @@ namespace {
         boost::filesystem::path p(filename);
 #endif
         if (!exists(p)) {
-            log() << "file [" << filename << "] doesn't exist" << endl;
+            error() << "file [" << filename << "] doesn't exist" << endl;
             return false;
         }
 
@@ -152,7 +152,7 @@ namespace {
             }
 
             if (empty) {
-                log() << "directory [" << filename << "] doesn't have any *.js files" << endl;
+                error() << "directory [" << filename << "] doesn't have any *.js files" << endl;
                 return false;
             }
 
@@ -230,7 +230,7 @@ namespace {
                 _storedNames.insert(n.valuestr());
             }
             catch (const DBException& setElemEx) {
-                log() << "unable to load stored JavaScript function " << n.valuestr()
+                error() << "unable to load stored JavaScript function " << n.valuestr()
                       << "(): " << setElemEx.what() << endl;
             }
         }

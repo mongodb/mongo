@@ -87,12 +87,6 @@ namespace {
     mongo::mutex newOpMutex("oplogNewOp");
     boost::condition newOptimeNotifier;
 
-    void setNewOptime(const OpTime& newTime) {
-        mutex::scoped_lock lk(newOpMutex);
-        setGlobalOptime(newTime);
-        newOptimeNotifier.notify_all();
-    }
-
     // so we can fail the same way
     void checkOplogInsert( StatusWith<RecordId> result ) {
         massert( 17322,
@@ -452,7 +446,8 @@ namespace {
             OpTime myLastOptime = replCoord->getMyLastOptime();
             if (!(myLastOptime < ts)) {
                 severe() << "replication oplog stream went back in time. previous timestamp: "
-                         << myLastOptime << " newest timestamp: " << ts;
+                         << myLastOptime << " newest timestamp: " << ts << ". Op being applied: "
+                         << op;
                 fassertFailedNoTrace(18905);
             }
             wunit.commit();
@@ -793,6 +788,12 @@ namespace {
                                               boost::posix_time::seconds(1)))
                 return;
         }
+    }
+
+    void setNewOptime(const OpTime& newTime) {
+        mutex::scoped_lock lk(newOpMutex);
+        setGlobalOptime(newTime);
+        newOptimeNotifier.notify_all();
     }
 
     void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS) {

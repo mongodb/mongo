@@ -1,5 +1,3 @@
-// rocks_sorted_data_impl.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -30,12 +28,16 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <cstdlib>
+#include <sstream>
 #include <string>
+#include <vector>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -54,6 +56,9 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
+    using std::string;
+    using std::stringstream;
+    using std::vector;
 
     namespace {
 
@@ -528,18 +533,6 @@ namespace mongo {
 
         it->SeekToFirst();
         return !it->Valid();
-    }
-
-    Status RocksSortedDataImpl::touch(OperationContext* txn) const {
-        boost::scoped_ptr<rocksdb::Iterator> itr;
-        // no need to use snapshot to load into memory
-        itr.reset(_db->NewIterator(rocksdb::ReadOptions(), _columnFamily.get()));
-        itr->SeekToFirst();
-        for (; itr->Valid(); itr->Next()) {
-            invariant(itr->status().ok());
-        }
-
-        return Status::OK();
     }
 
     long long RocksSortedDataImpl::numEntries(OperationContext* txn) const {

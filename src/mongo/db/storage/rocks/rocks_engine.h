@@ -1,5 +1,3 @@
-// rocks_engine.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *

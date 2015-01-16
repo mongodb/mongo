@@ -101,104 +101,6 @@ namespace repl {
             }
             return false;
         }
-
-        size_t hashBSONObj(const BSONObj& obj);
-
-        size_t hashBSONElement(const BSONElement& elem) {
-            size_t hash = 0;
-
-            boost::hash_combine(hash, elem.canonicalType());
-
-            const StringData fieldName = elem.fieldNameStringData();
-            if (!fieldName.empty()) {
-                boost::hash_combine(hash, StringData::Hasher()(fieldName));
-            }
-
-            switch (elem.type()) {
-                // Order of types is the same as in compareElementValues().
-
-            case mongo::EOO:
-            case mongo::Undefined:
-            case mongo::jstNULL:
-            case mongo::MaxKey:
-            case mongo::MinKey:
-                // These are valueless types
-                break;
-
-            case mongo::Bool:
-                boost::hash_combine(hash, elem.boolean());
-                break;
-
-            case mongo::Timestamp:
-                boost::hash_combine(hash, elem._opTime().asDate());
-                break;
-
-            case mongo::Date:
-                boost::hash_combine(hash, elem.date().asInt64());
-                break;
-
-            case mongo::NumberDouble:
-            case mongo::NumberLong:
-            case mongo::NumberInt: {
-                // This converts all numbers to doubles, which ignores the low-order bits of
-                // NumberLongs > 2**53, but that is ok since the hash will still be the same for
-                // equal numbers and is still likely to be different for different numbers.
-                const double dbl = elem.numberDouble();
-                if (isNaN(dbl)) {
-                    boost::hash_combine(hash, std::numeric_limits<double>::quiet_NaN());
-                }
-                else {
-                    boost::hash_combine(hash, dbl);
-                }
-                break;
-            }
-
-            case mongo::jstOID:
-                elem.__oid().hash_combine(hash);
-                break;
-
-            case mongo::Code:
-            case mongo::Symbol:
-            case mongo::String:
-                boost::hash_combine(hash, StringData::Hasher()(elem.valueStringData()));
-                break;
-
-            case mongo::Object:
-            case mongo::Array:
-                boost::hash_combine(hash, hashBSONObj(elem.embeddedObject()));
-                break;
-
-            case mongo::DBRef:
-            case mongo::BinData:
-                // All bytes of the value are required to be identical.
-                boost::hash_combine(hash, StringData::Hasher()(StringData(elem.value(),
-                                                                          elem.valuesize())));
-                break;
-
-            case mongo::RegEx:
-                boost::hash_combine(hash, StringData::Hasher()(elem.regex()));
-                boost::hash_combine(hash, StringData::Hasher()(elem.regexFlags()));
-                break;
-
-            case mongo::CodeWScope: {
-                boost::hash_combine(hash, StringData::Hasher()(
-                                            StringData(elem.codeWScopeCode(),
-                                                       elem.codeWScopeCodeLen())));
-                boost::hash_combine(hash, hashBSONObj(elem.codeWScopeObject()));
-                break;
-            }
-            }
-            return hash;
-        }
-
-        size_t hashBSONObj(const BSONObj& obj) {
-            size_t hash = 0;
-            BSONForEach(elem, obj) {
-                boost::hash_combine(hash, hashBSONElement(elem));
-            }
-            return hash;
-        }
-
     }
 
     SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
@@ -407,7 +309,7 @@ namespace repl {
                     break;
                 }
 
-                const size_t idHash = hashBSONElement( id );
+                const size_t idHash = BSONElement::Hasher()( id );
                 MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
             }
 

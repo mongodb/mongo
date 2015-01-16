@@ -52,8 +52,7 @@ namespace mongo {
                              totalDocsExamined(0),
                              executionTimeMillis(0),
                              isIdhack(false),
-                             hasSortStage(false),
-                             summaryStr("") { }
+                             hasSortStage(false) { }
 
         // The number of results returned by the plan.
         size_t nReturned;
@@ -72,9 +71,6 @@ namespace mongo {
 
         // Did this plan use an in-memory sort stage?
         bool hasSortStage;
-
-        // A string summarizing the plan selected.
-        std::string summaryStr;
     };
 
     /**

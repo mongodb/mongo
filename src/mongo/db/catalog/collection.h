@@ -47,7 +47,7 @@
 namespace mongo {
 
     class CollectionCatalogEntry;
-    class Database;
+    class DatabaseCatalogEntry;
     class ExtentManager;
     class IndexCatalog;
     class MultiIndexBlock;
@@ -105,7 +105,7 @@ namespace mongo {
                     const StringData& fullNS,
                     CollectionCatalogEntry* details, // does not own
                     RecordStore* recordStore, // does not own
-                    Database* database ); // does not own
+                    DatabaseCatalogEntry* dbce ); // does not own
 
         ~Collection();
 
@@ -308,7 +308,7 @@ namespace mongo {
         NamespaceString _ns;
         CollectionCatalogEntry* _details;
         RecordStore* _recordStore;
-        Database* _database;
+        DatabaseCatalogEntry* _dbce;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
 

@@ -1,5 +1,3 @@
-// rocks_record_store.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -31,13 +29,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/rocks/rocks_record_store.h"
+#include "mongo/platform/basic.h"
 
-#include <memory>
-#include <algorithm>
+#include "mongo/db/storage/rocks/rocks_record_store.h"
 
 #include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
+#include <memory>
+#include <algorithm>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
@@ -57,6 +56,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
+    using std::string;
 
     namespace {
 
@@ -559,24 +559,6 @@ namespace mongo {
         bool valid = _db->GetProperty(_columnFamily.get(), "rocksdb.stats", &statsString);
         invariant( valid );
         result->append( "stats", statsString );
-    }
-
-    Status RocksRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
-        Timer t;
-        // no need to use snapshot here, since we're just loading records into memory
-        boost::scoped_ptr<rocksdb::Iterator> itr(
-            _db->NewIterator(_readOptions(), _columnFamily.get()));
-        itr->SeekToFirst();
-        for (; itr->Valid(); itr->Next()) {
-            invariant(itr->status().ok());
-        }
-        invariant(itr->status().ok());
-
-        if (output) {
-            output->append("numRanges", 1);
-            output->append("millis", t.millis());
-        }
-        return Status::OK();
     }
 
     Status RocksRecordStore::setCustomOption( OperationContext* txn,

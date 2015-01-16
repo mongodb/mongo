@@ -150,6 +150,13 @@ namespace {
                                 componentValue);
     }
 
+    /**
+     * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
+     */
+    inline bool shouldLog(logger::LogSeverity severity) {
+        return logger::globalLogDomain()->shouldLog(::MongoLogDefaultComponent_component, severity);
+    }
+
 }  // namespace
 
 // MONGO_LOG uses log component from MongoLogDefaultComponent from current or global namespace.

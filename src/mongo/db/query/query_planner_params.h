@@ -81,7 +81,11 @@ namespace mongo {
             // Set this if you want to handle batchSize properly with sort(). If limits on SORT
             // stages are always actually limits, then this should be left off. If they are
             // sometimes to be interpreted as batchSize, then this should be turned on.
-            SPLIT_LIMITED_SORT = 1 << 7
+            SPLIT_LIMITED_SORT = 1 << 7,
+
+            // Set this to prevent the planner from generating plans which answer a predicate
+            // implicitly via exact index bounds for index intersection solutions.
+            CANNOT_TRIM_IXISECT = 1 << 8,
         };
 
         // See Options enum above.

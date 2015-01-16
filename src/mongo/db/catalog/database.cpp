@@ -185,7 +185,7 @@ namespace mongo {
         invariant( rs.get() ); // if cce exists, so should this
 
         // Not registering AddCollectionChange since this is for collections that already exist.
-        Collection* c = new Collection( txn, fullns, cce.release(), rs.release(), this );
+        Collection* c = new Collection( txn, fullns, cce.release(), rs.release(), _dbEntry );
         return c;
     }
 
@@ -279,25 +279,28 @@ namespace mongo {
         }
     }
 
-    bool Database::setProfilingLevel( OperationContext* txn, int newLevel , string& errmsg ) {
-        if ( _profile == newLevel )
-            return true;
-
-        if ( newLevel < 0 || newLevel > 2 ) {
-            errmsg = "profiling level has to be >=0 and <= 2";
-            return false;
+    Status Database::setProfilingLevel(OperationContext* txn, int newLevel) {
+        if (_profile == newLevel) {
+            return Status::OK();
         }
 
-        if ( newLevel == 0 ) {
+        if (newLevel == 0) {
             _profile = 0;
-            return true;
+            return Status::OK();
         }
 
-        if (!getOrCreateProfileCollection(txn, this, true, &errmsg))
-            return false;
+        if (newLevel < 0 || newLevel > 2) {
+            return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
+        }
+
+        Status status = createProfileCollection(txn, this);
+        if (!status.isOK()) {
+            return status;
+        }
 
         _profile = newLevel;
-        return true;
+
+        return Status::OK();
     }
 
     void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {

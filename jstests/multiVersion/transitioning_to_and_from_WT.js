@@ -1,10 +1,10 @@
 // Test dump/restore upgrade/downgrade/transition process for:
-//      2.6 -> 2.8 wiredtiger
-//      2.8 wiredtiger -> 2.6
+//      2.6 -> 2.8 wiredTiger
+//      2.8 wiredTiger -> 2.6
 //      2.6 -> 2.8
-//      2.8 -> 2.8 wiredtiger
-//      2.8 wiredtiger -> 2.8
-// then back to 2.6 and rerun each transition with directoryperdb on all non-wiredtiger instances
+//      2.8 -> 2.8 wiredTiger
+//      2.8 wiredTiger -> 2.8
+// then back to 2.6 and rerun each transition with directoryperdb on all non-wiredTiger instances
 
 (function() {
 
@@ -55,13 +55,13 @@
     // between in the order they will be used
 
     // version is either "2.6" or null which indicates latest
-    // storageEngine is either "wiredtiger" or null which indicates mmapv1
+    // storageEngine is either "wiredTiger" or null which indicates mmapv1
     // directoryperdb is either "" which indicates it will be used or null which indicates it won't
     var modes = [
         // to 2.8 wired tiger
         {
             version: null,
-            storageEngine: "wiredtiger",
+            storageEngine: "wiredTiger",
             directoryperdb: null,
         },
         // back to 2.6
@@ -79,7 +79,7 @@
         // to 2.8 wired tiger
         {
             version: null,
-            storageEngine: "wiredtiger",
+            storageEngine: "wiredTiger",
             directoryperdb: null,
         },
         // back to 2.8 mmapv1
@@ -97,7 +97,7 @@
         // to 2.8 wired tiger
         {
             version: null,
-            storageEngine: "wiredtiger",
+            storageEngine: "wiredTiger",
             directoryperdb: null,
         },
         // back to 2.6 dir per db
@@ -115,7 +115,7 @@
         // to 2.8 wired tiger
         {
             version: null,
-            storageEngine: "wiredtiger",
+            storageEngine: "wiredTiger",
             directoryperdb: null,
         },
         // back to 2.8 mmapv1 dir per db

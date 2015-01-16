@@ -335,7 +335,7 @@ namespace mongo {
 
     template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
-        if (!logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)))
+        if (!shouldLog(logger::LogSeverity::Debug(1)))
              // don't collect stats unless verbose
              return;
 
@@ -477,7 +477,7 @@ namespace mongo {
      */
     std::string V8ScriptEngine::printKnownOps_inlock() {
         stringstream out;
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             out << "  known ops: " << endl;
             for(OpIdToScopeMap::iterator iSc = _opToScopeMap.begin();
                 iSc != _opToScopeMap.end(); ++iSc) {
@@ -1050,7 +1050,7 @@ namespace mongo {
 
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
-            log() << _error << endl;
+            error() << _error << endl;
             uasserted(16711, _error);
         }
 
@@ -1066,7 +1066,7 @@ namespace mongo {
 
         if (!nativePrologue()) {
             _error = "JavaScript execution terminated";
-            log() << _error << endl;
+            error() << _error << endl;
             uasserted(16712, _error);
         }
 
@@ -1105,7 +1105,7 @@ namespace mongo {
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
             if (reportError)
-                log() << _error << endl;
+                error() << _error << endl;
             if (assertOnError)
                 uasserted(13475, _error);
             return false;
@@ -1124,7 +1124,7 @@ namespace mongo {
         if (!nativePrologue()) {
             _error = "JavaScript execution terminated";
             if (reportError)
-                log() << _error << endl;
+                error() << _error << endl;
             if (assertOnError)
                 uasserted(16721, _error);
             return false;
@@ -1408,7 +1408,7 @@ namespace mongo {
             return newFunction(elem.valueStringData());
         case CodeWScope:
             if (!elem.codeWScopeObject().isEmpty())
-                log() << "warning: CodeWScope doesn't transfer to db.eval" << endl;
+                warning() << "CodeWScope doesn't transfer to db.eval" << endl;
             return newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1));
         case mongo::Symbol:
         case mongo::String:
@@ -1832,7 +1832,7 @@ namespace mongo {
 
         if (haveError) {
             if (reportError)
-                log() << _error << std::endl;
+                error() << _error << std::endl;
             if (assertOnError)
                 uasserted(16722, _error);
             return true;

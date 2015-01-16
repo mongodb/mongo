@@ -35,6 +35,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "mongo/base/owned_pointer_vector.h"
 
 using std::string;
 using namespace mongo;
@@ -53,13 +54,13 @@ TEST(KeyStringTest, Simple1) {
 
     ASSERT_LESS_THAN(a, b);
 
-    ASSERT_LESS_THAN(KeyString::make(a, ALL_ASCENDING, RecordId()),
-                     KeyString::make(b, ALL_ASCENDING, RecordId()));
+    ASSERT_LESS_THAN(KeyString(a, ALL_ASCENDING, RecordId()),
+                     KeyString(b, ALL_ASCENDING, RecordId()));
 }
 
 #define ROUNDTRIP_ORDER(x, order) do {                           \
         const BSONObj _orig = x;                                 \
-        const KeyString _ks = KeyString::make(_orig, order);     \
+        const KeyString _ks(_orig, order);                       \
         const BSONObj _converted = toBson(_ks, order);           \
         ASSERT_EQ(_converted, _orig);                            \
         ASSERT(_converted.binaryEqual(_orig));                   \
@@ -71,8 +72,8 @@ TEST(KeyStringTest, Simple1) {
     } while (0)
 
 #define COMPARES_SAME(_x,_y) do {                                \
-        KeyString _xKS = KeyString::make(_x, ONE_ASCENDING);     \
-        KeyString _yKS = KeyString::make(_y, ONE_ASCENDING);     \
+        KeyString _xKS(_x, ONE_ASCENDING);                       \
+        KeyString _yKS(_y, ONE_ASCENDING);                       \
         if (_x == _y) {                                          \
             ASSERT_EQUALS(_xKS, _yKS);                           \
         }                                                        \
@@ -83,8 +84,8 @@ TEST(KeyStringTest, Simple1) {
             ASSERT_LESS_THAN(_yKS, _xKS);                        \
         }                                                        \
                                                                  \
-        _xKS = KeyString::make(_x, ONE_DESCENDING);              \
-        _yKS = KeyString::make(_y, ONE_DESCENDING);              \
+        _xKS.resetToKey(_x, ONE_DESCENDING);                     \
+        _yKS.resetToKey(_y, ONE_DESCENDING);                     \
         if (_x == _y) {                                          \
             ASSERT_EQUALS(_xKS, _yKS);                           \
         }                                                        \
@@ -100,7 +101,7 @@ TEST(KeyStringTest, ActualBytesDouble) {
     // just one test like this for utter sanity
 
     BSONObj a = BSON("" << 5.5 );
-    KeyString ks = KeyString::make(a, ALL_ASCENDING);
+    KeyString ks(a, ALL_ASCENDING);
     log() << "size: " << ks.getSize() << " hex [" << toHex(ks.getBuffer(), ks.getSize()) << "]";
 
     ASSERT_EQUALS(10U, ks.getSize());
@@ -113,7 +114,7 @@ TEST(KeyStringTest, ActualBytesDouble) {
     ASSERT_EQUALS(hex,
                   toHex(ks.getBuffer(), ks.getSize()));
 
-    ks = KeyString::make(a, Ordering::make(BSON("a" << -1)));
+    ks.resetToKey(a, Ordering::make(BSON("a" << -1)));
 
     ASSERT_EQUALS(10U, ks.getSize());
 
@@ -162,14 +163,14 @@ TEST(KeyStringTest, Array1) {
     ROUNDTRIP(BSON("" << BSON_ARRAY(1 << 2 << 3)));
 
     {
-        KeyString a = KeyString::make(emptyArray, ALL_ASCENDING, RecordId::min());
-        KeyString b = KeyString::make(emptyArray, ALL_ASCENDING, RecordId(5));
+        KeyString a(emptyArray, ALL_ASCENDING, RecordId::min());
+        KeyString b(emptyArray, ALL_ASCENDING, RecordId(5));
         ASSERT_LESS_THAN(a, b);
     }
 
     {
-        KeyString a = KeyString::make(emptyArray, ALL_ASCENDING, RecordId(0));
-        KeyString b = KeyString::make(emptyArray, ALL_ASCENDING, RecordId(5));
+        KeyString a(emptyArray, ALL_ASCENDING, RecordId(0));
+        KeyString b(emptyArray, ALL_ASCENDING, RecordId(5));
         ASSERT_LESS_THAN(a, b);
     }
 
@@ -263,11 +264,11 @@ TEST(KeyStringTest, RecordIdOrder1) {
 
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
-    KeyString a = KeyString::make(BSON("" << 5), ordering, RecordId::min());
-    KeyString b = KeyString::make(BSON("" << 5), ordering, RecordId(2));
-    KeyString c = KeyString::make(BSON("" << 5), ordering, RecordId(3));
-    KeyString d = KeyString::make(BSON("" << 6), ordering, RecordId());
-    KeyString e = KeyString::make(BSON("" << 6), ordering, RecordId(1));
+    KeyString a(BSON("" << 5), ordering, RecordId::min());
+    KeyString b(BSON("" << 5), ordering, RecordId(2));
+    KeyString c(BSON("" << 5), ordering, RecordId(3));
+    KeyString d(BSON("" << 6), ordering, RecordId());
+    KeyString e(BSON("" << 6), ordering, RecordId(1));
 
     ASSERT_LESS_THAN(a, b);
     ASSERT_LESS_THAN(b, c);
@@ -280,10 +281,10 @@ TEST(KeyStringTest, RecordIdOrder2) {
 
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
-    KeyString a = KeyString::make(BSON("" << 5 << "" << 6), ordering, RecordId::min());
-    KeyString b = KeyString::make(BSON("" << 5 << "" << 6), ordering, RecordId(5));
-    KeyString c = KeyString::make(BSON("" << 5 << "" << 5), ordering, RecordId(4));
-    KeyString d = KeyString::make(BSON("" << 3 << "" << 4), ordering, RecordId(3));
+    KeyString a(BSON("" << 5 << "" << 6), ordering, RecordId::min());
+    KeyString b(BSON("" << 5 << "" << 6), ordering, RecordId(5));
+    KeyString c(BSON("" << 5 << "" << 5), ordering, RecordId(4));
+    KeyString d(BSON("" << 3 << "" << 4), ordering, RecordId(3));
 
     ASSERT_LESS_THAN(a, b);
     ASSERT_LESS_THAN(b, c);
@@ -297,9 +298,9 @@ TEST(KeyStringTest, RecordIdOrder2Double) {
 
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
-    KeyString a = KeyString::make(BSON("" << 5.0 << "" << 6.0), ordering, RecordId::min());
-    KeyString b = KeyString::make(BSON("" << 5.0 << "" << 6.0), ordering, RecordId(5));
-    KeyString c = KeyString::make(BSON("" << 3.0 << "" << 4.0), ordering, RecordId(3));
+    KeyString a(BSON("" << 5.0 << "" << 6.0), ordering, RecordId::min());
+    KeyString b(BSON("" << 5.0 << "" << 6.0), ordering, RecordId(5));
+    KeyString c(BSON("" << 3.0 << "" << 4.0), ordering, RecordId(3));
 
     ASSERT_LESS_THAN(a, b);
     ASSERT_LESS_THAN(b, c);
@@ -322,10 +323,10 @@ TEST(KeyStringTest, OpTime) {
         ASSERT_LESS_THAN(b, c);
         ASSERT_LESS_THAN(c, d);
 
-        KeyString ka = KeyString::make(a, ALL_ASCENDING);
-        KeyString kb = KeyString::make(b, ALL_ASCENDING);
-        KeyString kc = KeyString::make(c, ALL_ASCENDING);
-        KeyString kd = KeyString::make(d, ALL_ASCENDING);
+        KeyString ka(a, ALL_ASCENDING);
+        KeyString kb(b, ALL_ASCENDING);
+        KeyString kc(c, ALL_ASCENDING);
+        KeyString kd(d, ALL_ASCENDING);
 
         ASSERT(ka.compare(kb) < 0);
         ASSERT(kb.compare(kc) < 0);
@@ -343,10 +344,10 @@ TEST(KeyStringTest, OpTime) {
         ASSERT(c.woCompare(b, ALL_ASCENDING) < 0);
         ASSERT(b.woCompare(a, ALL_ASCENDING) < 0);
 
-        KeyString ka = KeyString::make(a, ALL_ASCENDING);
-        KeyString kb = KeyString::make(b, ALL_ASCENDING);
-        KeyString kc = KeyString::make(c, ALL_ASCENDING);
-        KeyString kd = KeyString::make(d, ALL_ASCENDING);
+        KeyString ka(a, ALL_ASCENDING);
+        KeyString kb(b, ALL_ASCENDING);
+        KeyString kc(c, ALL_ASCENDING);
+        KeyString kd(d, ALL_ASCENDING);
 
         ASSERT(ka.compare(kb) > 0);
         ASSERT(kb.compare(kc) > 0);
@@ -550,19 +551,19 @@ void testPermutation(const std::vector<BSONObj>& elementsOrig,
             if (debug) log() << "\to1: " << o1;
             ROUNDTRIP_ORDER(o1, ordering);
 
-            KeyString k1 = KeyString::make(o1, ordering);
+            KeyString k1(o1, ordering);
 
-            KeyString l1 = KeyString::make(BSON("l" << o1.firstElement()), ordering); // kLess
-            KeyString g1 = KeyString::make(BSON("g" << o1.firstElement()), ordering); // kGreater
+            KeyString l1(BSON("l" << o1.firstElement()), ordering); // kLess
+            KeyString g1(BSON("g" << o1.firstElement()), ordering); // kGreater
             ASSERT_LT(l1, k1);
             ASSERT_GT(g1, k1);
 
             if (i + 1 < elements.size()) {
                 const BSONObj& o2 = elements[i + 1];
                 if (debug) log() << "\t\t o2: " << o2;
-                KeyString k2 = KeyString::make(o2, ordering);
-                KeyString g2 = KeyString::make(BSON("g" << o2.firstElement()), ordering);
-                KeyString l2 = KeyString::make(BSON("l" << o2.firstElement()), ordering);
+                KeyString k2(o2, ordering);
+                KeyString g2(BSON("g" << o2.firstElement()), ordering);
+                KeyString l2(BSON("l" << o2.firstElement()), ordering);
 
                 int bsonCmp = o1.woCompare(o2, ordering);
                 invariant(bsonCmp <= 0); // We should be sorted...
@@ -691,11 +692,11 @@ TEST(KeyStringTest, NaNs) {
 
     // Since only output a single NaN, we can't use the normal ROUNDTRIP testing here.
 
-    const KeyString ks1a = KeyString::make(BSON("" << nan1), ONE_ASCENDING);
-    const KeyString ks1d = KeyString::make(BSON("" << nan1), ONE_DESCENDING);
+    const KeyString ks1a(BSON("" << nan1), ONE_ASCENDING);
+    const KeyString ks1d(BSON("" << nan1), ONE_DESCENDING);
 
-    const KeyString ks2a = KeyString::make(BSON("" << nan2), ONE_ASCENDING);
-    const KeyString ks2d = KeyString::make(BSON("" << nan2), ONE_DESCENDING);
+    const KeyString ks2a(BSON("" << nan2), ONE_ASCENDING);
+    const KeyString ks2d(BSON("" << nan2), ONE_DESCENDING);
 
     ASSERT_EQ(ks1a, ks2a);
     ASSERT_EQ(ks1d, ks2d);
@@ -754,15 +755,15 @@ TEST(KeyStringTest, NumberOrderLots) {
 
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
-    std::vector<KeyString> keyStrings;
+    OwnedPointerVector<KeyString> keyStrings;
     for (size_t i = 0; i < numbers.size(); i++) {
-        keyStrings.push_back(KeyString::make(numbers[i], ordering));
+        keyStrings.push_back(new KeyString(numbers[i], ordering));
     }
 
     for (size_t i = 0; i < numbers.size(); i++) {
         for (size_t j = 0; j < numbers.size(); j++) {
-            const KeyString& a = keyStrings[i];
-            const KeyString& b = keyStrings[j];
+            const KeyString& a = *keyStrings[i];
+            const KeyString& b = *keyStrings[j];
             ASSERT_EQUALS(a.compare(b), -b.compare(a));
 
             if (a.compare(b) != compareNumbers(numbers[i].firstElement(),
@@ -783,7 +784,7 @@ TEST(KeyStringTest, RecordIds) {
         const RecordId rid = RecordId(1ll << i);
 
         { // Test encoding / decoding of single RecordIds
-            const KeyString ks = KeyString::make(rid);
+            const KeyString ks(rid);
             ASSERT_GTE(ks.getSize(), 2u);
             ASSERT_LTE(ks.getSize(), 10u);
 
@@ -796,21 +797,21 @@ TEST(KeyStringTest, RecordIds) {
             }
 
             if (rid.isNormal()) {
-                ASSERT_GT(ks, KeyString::make(RecordId()));
-                ASSERT_GT(ks, KeyString::make(RecordId::min()));
-                ASSERT_LT(ks, KeyString::make(RecordId::max()));
+                ASSERT_GT(ks, KeyString(RecordId()));
+                ASSERT_GT(ks, KeyString(RecordId::min()));
+                ASSERT_LT(ks, KeyString(RecordId::max()));
 
-                ASSERT_GT(ks, KeyString::make(RecordId(rid.repr() - 1)));
-                ASSERT_LT(ks, KeyString::make(RecordId(rid.repr() + 1)));
+                ASSERT_GT(ks, KeyString(RecordId(rid.repr() - 1)));
+                ASSERT_LT(ks, KeyString(RecordId(rid.repr() + 1)));
             }
         }
 
         for (int j = 0; j < 63; j++) {
             RecordId other = RecordId(1ll << j);
 
-            if (rid == other) ASSERT_EQ(KeyString::make(rid), KeyString::make(other));
-            if (rid < other) ASSERT_LT(KeyString::make(rid), KeyString::make(other));
-            if (rid > other) ASSERT_GT(KeyString::make(rid), KeyString::make(other));
+            if (rid == other) ASSERT_EQ(KeyString(rid), KeyString(other));
+            if (rid < other) ASSERT_LT(KeyString(rid), KeyString(other));
+            if (rid > other) ASSERT_GT(KeyString(rid), KeyString(other));
 
             {
                 // Test concatenating RecordIds like in a unique index.

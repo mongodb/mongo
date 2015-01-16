@@ -176,9 +176,15 @@ namespace mongo {
 
         plannerParams->options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
 
-        // Doc-level locking storage engines do not use the invalidation framework, and therefore
+        // Doc-level locking storage engines cannot answer predicates implicitly via exact index
+        // bounds for index intersection plans, as this can lead to spurious matches.
+        //
+        // Such storage engines do not use the invalidation framework, and therefore
         // have no need for KEEP_MUTATIONS.
-        if (!supportsDocLocking()) {
+        if (supportsDocLocking()) {
+            plannerParams->options |= QueryPlannerParams::CANNOT_TRIM_IXISECT;
+        }
+        else {
             plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
         }
     }
@@ -681,8 +687,8 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
         const size_t defaultPlannerOptions = 0;
-        Status status = prepareExecution(txn, collection, ws.get(), cq.get(), defaultPlannerOptions,
-                                         &root, &querySolution);
+        Status status = prepareExecution(txn, collection, ws.get(), cq.get(),
+                                         defaultPlannerOptions, &root, &querySolution);
         if (!status.isOK()) {
             return status;
         }

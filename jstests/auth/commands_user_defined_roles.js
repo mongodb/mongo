@@ -33,16 +33,18 @@ function testProperAuthorization(conn, t, testcase) {
 
     var res = runOnDb.runCommand(t.command);
 
-    if (!testcase.expectFail && res.ok != 1) {
+    if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
+        // don't error if the test failed with code commandNotSupported since
+        // some storage engines (e.g wiredTiger) don't support some commands (e.g. touch)
         out = "command failed with " + tojson(res) +
               " on db " + testcase.runOnDb +
               " with privileges " + tojson(testcase.privileges);
     }
     else if (testcase.expectFail && res.code == authErrCode) {
-            out = "expected authorization success" +
-                  " but received " + tojson(res) + 
-                  " on db " + testcase.runOnDb +
-                  " with privileges " + tojson(testcase.privileges);
+        out = "expected authorization success" +
+              " but received " + tojson(res) +
+              " on db " + testcase.runOnDb +
+              " with privileges " + tojson(testcase.privileges);
     }
 
     firstDb.logout();

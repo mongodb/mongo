@@ -56,7 +56,6 @@ namespace mongo {
 
     class AuthenticationInfo;
     class CurOp;
-    class Client;
     class Collection;
     class AbstractMessagingPort;
     class Locker;

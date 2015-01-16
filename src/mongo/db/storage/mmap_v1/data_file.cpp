@@ -39,10 +39,8 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
-
 
 namespace mongo {
 
@@ -108,17 +106,24 @@ namespace {
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
     Status DataFile::openExisting(const char *filename) {
-        verify( _mb == 0 );
-        if( !boost::filesystem::exists(filename) )
-            return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );
+        invariant(_mb == 0);
 
-        if( !mmf.open(filename,false) ) {
-            return Status( ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed" );
+        if (!boost::filesystem::exists(filename)) {
+            return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
         }
-        _mb = mmf.getView(); verify(_mb);
-        unsigned long long sz = mmf.length();
-        verify( sz <= 0x7fffffff );
-        verify( sz % 4096 == 0 );
+
+        if (!mmf.open(filename, false)) {
+            return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
+        }
+
+        // The mapped view of the file should never be NULL if the open call above succeeded.
+        _mb = mmf.getView();
+        invariant(_mb);
+
+        const uint64_t sz = mmf.length();
+        invariant(sz <= 0x7fffffff);
+        invariant(sz % 4096 == 0);
+
         if (sz < 64*1024*1024 && !mmapv1GlobalOptions.smallfiles) {
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) {
                 log() << "info openExisting file size " << sz
@@ -131,6 +136,7 @@ namespace {
                 verify(false);
             }
         }
+
         data_file_check(_mb);
         return Status::OK();
     }
@@ -156,8 +162,8 @@ namespace {
             size = maxSize();
         }
 
-        verify(size >= 64*1024*1024 || mmapv1GlobalOptions.smallfiles);
-        verify( size % 4096 == 0 );
+        invariant(size >= 64 * 1024 * 1024 || mmapv1GlobalOptions.smallfiles);
+        invariant( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
             if (mmapv1GlobalOptions.prealloc) {
@@ -184,10 +190,10 @@ namespace {
     }
 
     DiskLoc DataFile::allocExtentArea( OperationContext* txn, int size ) {
-        massert( 10357, "shutdown in progress", !inShutdown() );
-        massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
-
-        verify( size <= header()->unusedLength );
+        // The header would be NULL if file open failed. However, if file open failed we should
+        // never be entering here.
+        invariant(header());
+        invariant(size <= header()->unusedLength);
 
         int offset = header()->unused.getOfs();
 

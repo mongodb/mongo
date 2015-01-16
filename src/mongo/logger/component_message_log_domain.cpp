@@ -40,10 +40,6 @@ namespace logger {
         return _settings.hasMinimumLogSeverity(component);
     }
 
-    bool ComponentMessageLogDomain::shouldLog(LogSeverity severity) const {
-        return _settings.shouldLog(severity);
-    }
-
     bool ComponentMessageLogDomain::shouldLog(LogComponent component, LogSeverity severity) const {
         return _settings.shouldLog(component, severity);
     }

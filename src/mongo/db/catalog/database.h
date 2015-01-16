@@ -68,9 +68,12 @@ namespace mongo {
         void clearTmpCollections(OperationContext* txn);
 
         /**
-         * @return true if success.  false if bad level or error creating profile ns
+         * Sets a new profiling level for the database and returns the outcome.
+         *
+         * @param txn Operation context which to use for creating the profiling collection.
+         * @param newLevel New profiling level to use.
          */
-        bool setProfilingLevel( OperationContext* txn, int newLevel , std::string& errmsg );
+        Status setProfilingLevel(OperationContext* txn, int newLevel);
 
         int getProfilingLevel() const { return _profile; }
         const char* getProfilingNS() const { return _profileName.c_str(); }

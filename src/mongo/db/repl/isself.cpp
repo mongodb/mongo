@@ -47,7 +47,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__) || defined(__openbsd__)
 #define FASTPATH_UNIX 1
 #endif
 
@@ -141,7 +141,7 @@ namespace {
 
         }
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             StringBuilder builder;
             builder << "getAddrsForHost(\"" << iporhost << ":" << port << "\"):";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {
@@ -194,6 +194,7 @@ namespace {
         try {
             DBClientConnection conn;
             std::string errmsg;
+            conn.setSoTimeout(30); // 30 second timeout
             if (!conn.connect(hostAndPort, errmsg)) {
                 return false;
             }
@@ -340,7 +341,7 @@ namespace {
 
 #endif  // defined(_WIN32)
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             StringBuilder builder;
             builder << "getBoundAddrs():";
             for (std::vector<std::string>::const_iterator o = out.begin(); o != out.end(); ++o) {

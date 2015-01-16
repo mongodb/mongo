@@ -245,7 +245,7 @@ namespace mongo {
 
     CursorCache::~CursorCache() {
         // TODO: delete old cursors?
-        bool print = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
+        bool print = shouldLog(logger::LogSeverity::Debug(1));
         if ( _cursors.size() || _refs.size() )
             print = true;
         verify(_refs.size() == _refsNS.size());

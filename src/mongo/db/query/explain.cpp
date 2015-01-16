@@ -297,6 +297,7 @@ namespace mongo {
 
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("nWouldDelete", spec->docsDeleted);
+                bob->appendNumber("nInvalidateSkips", spec->nInvalidateSkips);
             }
         }
         else if (STAGE_FETCH == stats.stageType) {
@@ -433,10 +434,8 @@ namespace mongo {
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("nMatched", spec->nMatched);
                 bob->appendNumber("nWouldModify", spec->nModified);
+                bob->appendNumber("nInvalidateSkips", spec->nInvalidateSkips);
                 bob->appendBool("wouldInsert", spec->inserted);
-            }
-
-            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendBool("fastmod", spec->fastmod);
                 bob->appendBool("fastmodinsert", spec->fastmodinsert);
             }
@@ -716,9 +715,6 @@ namespace mongo {
         const CommonStats* common = root->getCommonStats();
         statsOut->nReturned = common->advanced;
         statsOut->executionTimeMillis = common->executionTimeMillis;
-
-        // Generate the plan summary string.
-        statsOut->summaryStr = getPlanSummary(root);
 
         // The other fields are aggregations over the stages in the plan tree. We flatten
         // the tree into a list and then compute these aggregations.

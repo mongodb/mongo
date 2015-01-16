@@ -8,6 +8,8 @@
  * field. Asserts that the field has the correct value based on the number
  * of increments performed.
  */
+load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongod and isMMAPv1
+
 var $config = (function() {
 
     var data = {
@@ -28,10 +30,24 @@ var $config = (function() {
 
             var res = db[collName].update({ _id: this.id }, updateDoc);
             assertAlways.eq(0, res.nUpserted, tojson(res));
-            assertWhenOwnColl.eq(1, res.nMatched, tojson(res));
 
-            if (db.getMongo().writeMode() === 'commands') {
-                assertWhenOwnColl.eq(1, res.nModified, tojson(res));
+            var status = db.serverStatus();
+            if (isMongod(status) && !isMMAPv1(status)) {
+                // For non-mmap storage engines we can have a strong assertion that exactly one doc
+                // will be modified.
+                assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
+                if (db.getMongo().writeMode() === 'commands') {
+                    assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
+                }
+            }
+            else {
+                // Zero matches are possible for MMAP v1 because the update will skip a document
+                // that was invalidated during a yield.
+                assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
+                if (db.getMongo().writeMode() === 'commands') {
+                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                    assertAlways.eq(res.nModified, res.nMatched, tojson(res));
+                }
             }
 
             ++this.count;

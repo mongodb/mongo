@@ -79,3 +79,33 @@ env.CppUnitTest(
     ],
 )
 env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
+
+env.Library(
+    target='startup_warnings_common',
+    source=[
+        'startup_warnings_common.cpp',
+    ],
+    LIBDEPS=[
+    ]
+)
+
+env.Library(
+    target='startup_warnings_mongod',
+    source=[
+        'startup_warnings_mongod.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_common',
+        '$BUILD_DIR/mongo/processinfo',
+    ]
+)
+
+env.CppUnitTest(
+    target='startup_warnings_mongod_test',
+    source=[
+        'startup_warnings_mongod_test.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_mongod',
+    ],
+)

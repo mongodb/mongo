@@ -62,6 +62,7 @@ namespace {
     TEST_F(LogTestDetailsEncoder, LogFunctionsOverrideGlobalComponent) {
         // severe() - no component specified.
         severe() << "This is logged";
+        ASSERT_TRUE(shouldLog(LogSeverity::Severe()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentB.getNameForLog()),
                           std::string::npos);
@@ -69,6 +70,7 @@ namespace {
         // severe() - with component.
         _logLines.clear();
         severe(componentA) << "This is logged";
+        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Severe()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " F " << componentA.getNameForLog()),
                           std::string::npos);
@@ -76,6 +78,7 @@ namespace {
         // error() - no component specified.
         _logLines.clear();
         error() << "This is logged";
+        ASSERT_TRUE(shouldLog(LogSeverity::Error()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentB.getNameForLog()),
                           std::string::npos);
@@ -83,6 +86,7 @@ namespace {
         // error() - with component.
         _logLines.clear();
         error(componentA) << "This is logged";
+        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Error()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " E " << componentA.getNameForLog()),
                           std::string::npos);
@@ -90,6 +94,7 @@ namespace {
         // warning() - no component specified.
         _logLines.clear();
         warning() << "This is logged";
+        ASSERT_TRUE(shouldLog(LogSeverity::Warning()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentB.getNameForLog()),
                           std::string::npos);
@@ -97,6 +102,7 @@ namespace {
         // warning() - with component.
         _logLines.clear();
         warning(componentA) << "This is logged";
+        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Warning()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " W " << componentA.getNameForLog()),
                           std::string::npos);
@@ -104,6 +110,7 @@ namespace {
         // log() - no component specified.
         _logLines.clear();
         log() << "This is logged";
+        ASSERT_TRUE(shouldLog(LogSeverity::Log()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentB.getNameForLog()),
                           std::string::npos);
@@ -111,6 +118,7 @@ namespace {
         // log() - with component.
         _logLines.clear();
         log(componentA) << "This is logged";
+        ASSERT_TRUE(logger::globalLogDomain()->shouldLog(componentA, LogSeverity::Log()));
         ASSERT_EQUALS(1U, _logLines.size());
         ASSERT_NOT_EQUALS(_logLines[0].find(str::stream() << " I " << componentA.getNameForLog()),
                           std::string::npos);

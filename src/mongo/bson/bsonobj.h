@@ -405,6 +405,15 @@ namespace mongo {
         bool equal(const BSONObj& r) const;
 
         /**
+         * Functor compatible with std::hash for std::unordered_{map,set}
+         * Warning: The hash function is subject to change. Do not use in cases where hashes need
+         *          to be consistent across versions.
+         */
+        struct Hasher {
+            size_t operator() (const BSONObj& obj) const;
+        };
+
+        /**
          * @param otherObj
          * @return true if 'this' is a prefix of otherObj- in other words if
          * otherObj contains the same field names and field vals in the same

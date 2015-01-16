@@ -770,14 +770,6 @@ namespace {
 
     }
 
-    Status WiredTigerRecordStore::touch( OperationContext* txn, BSONObjBuilder* output ) const {
-        if (output) {
-            output->append("numRanges", 1);
-            output->append("millis", 0);
-        }
-        return Status::OK();
-    }
-
     Status WiredTigerRecordStore::setCustomOption( OperationContext* txn,
                                                    const BSONElement& option,
                                                    BSONObjBuilder* info ) {
@@ -863,6 +855,14 @@ namespace {
         ret = c->get_key(c, &key);
         invariantWTOK(ret);
         return _fromKey(key);
+    }
+
+    void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* txn,
+                                                       long long numRecords,
+                                                       long long dataSize) {
+        _numRecords.store(numRecords);
+        _dataSize.store(dataSize);
+        _sizeStorer->store(_uri, numRecords, dataSize);
     }
 
     RecordId WiredTigerRecordStore::_nextId() {

@@ -59,6 +59,7 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+        virtual void setGlobalOpTime(const OpTime& newTime);
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
         virtual void killAllUserOperations(OperationContext* txn);

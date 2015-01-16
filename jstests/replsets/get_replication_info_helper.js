@@ -1,4 +1,4 @@
-// Tests the output of the db.getReplicationInfo() shell helper
+// Tests the output of db.getReplicationInfo() and tests db.printSlaveReplicationInfo().
 
 (function () {
     "use strict";
@@ -25,4 +25,21 @@
     assert(replInfo.tFirst, replInfoString);
     assert(replInfo.tLast, replInfoString);
     assert(replInfo.now), replInfoString;
+
+    // calling this function with and without a primary, should provide sufficient code coverage
+    // to catch any JS errors
+    primary.getDB('admin').printSlaveReplicationInfo();
+
+    // get to a primaryless state
+    for (i in replSet.liveNodes.slaves) {
+        var secondary = replSet.liveNodes.slaves[i];
+        secondary.getDB('admin').runCommand({replSetFreeze: 120});
+    }
+    try {
+        primary.getDB('admin').runCommand({replSetStepDown: 120, force: true});
+    }
+    catch (e) {}
+
+    primary.getDB('admin').printSlaveReplicationInfo();
+
 })();
