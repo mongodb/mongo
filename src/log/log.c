@@ -240,6 +240,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 		if (log->log_close_fh != NULL)
 			F_SET(slot, SLOT_CLOSEFH);
 	}
+
 	/*
 	 * Checkpoints can be configured based on amount of log written.
 	 * Add in this log record to the sum and if needed, signal the
@@ -857,7 +858,6 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *close_fh;
 	WT_LOG *log;
 	WT_LSN close_end_lsn, close_lsn, sync_lsn;
 	size_t write_size;
@@ -872,26 +872,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * If we're going to have to close our log file, make a local copy
 	 * of the file handle structure.
 	 */
-	close_fh = NULL;
 	WT_INIT_LSN(&close_lsn);
 	WT_INIT_LSN(&close_end_lsn);
-	if (F_ISSET(slot, SLOT_CLOSEFH)) {
-		close_fh = log->log_close_fh;
-		/*
-		 * Set the close_end_lsn to the LSN immediately after ours.
-		 * That is, the beginning of the next log file.  We need to
-		 * know the LSN file number of our own close in case earlier
-		 * calls are still in progress and the next one to move the
-		 * sync_lsn into the next file for later syncs.
-		 */
-		WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
-		    &close_lsn.file));
-		close_lsn.offset = 0;
-		close_end_lsn = close_lsn;
-		close_end_lsn.file++;
-		log->log_close_fh = NULL;
-		F_CLR(slot, SLOT_CLOSEFH);
-	}
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
@@ -909,32 +891,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		__wt_yield();
 	log->write_lsn = slot->slot_end_lsn;
 
-	/*
-	 * If we have a file to close, close it now.  First fsync so
-	 * that a later sync will be assured all earlier transactions
-	 * in earlier log files are also on disk.  We have to do this
-	 * before potentially syncing our own operation.
-	 */
-	if (close_fh) {
-		WT_ERR(__wt_fsync(session, close_fh));
-		/*
-		 * This loop guarantees sync_lsn is updated in file order
-		 * so that when sync_lsn is updated, we know all earlier files
-		 * have already been fully processed.
-		 */
-		while (log->sync_lsn.file < close_lsn.file ||
-		    __wt_spin_trylock(session, &log->log_sync_lock, &id) != 0) {
-			WT_ERR(__wt_cond_wait(
-			    session, log->log_sync_cond, 10000));
-			continue;
-		}
-		locked = 1;
-		WT_ERR(__wt_close(session, close_fh));
-		log->sync_lsn = close_end_lsn;
-		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
-		locked = 0;
-		__wt_spin_unlock(session, &log->log_sync_lock);
-	}
+	if (F_ISSET(slot, SLOT_CLOSEFH))
+		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
