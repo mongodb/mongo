@@ -1035,7 +1035,7 @@ namespace {
             if (loc == locInIndex)
                 return Status::OK(); // already in index
 
-            if (loc < locInIndex) {
+            if (!insertedLoc && loc < locInIndex) {
                 value.appendRecordId(loc);
                 value.appendTypeBits(data.getTypeBits());
                 insertedLoc = true;
