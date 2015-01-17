@@ -405,14 +405,7 @@ namespace mongo {
             throw WriteConflictException();
         }
 
-        std::string old_value;
-        auto status = ru->Get(_columnFamily.get(), _makeKey(loc), &old_value);
-
-        if ( !status.ok() ) {
-            return StatusWith<RecordId>( ErrorCodes::InternalError, status.ToString() );
-        }
-
-        int old_length = old_value.size();
+        const int old_length = oldRec.size();
 
         ru->writeBatch()->Put(_columnFamily.get(), _makeKey(loc), rocksdb::Slice(data, len));
 
