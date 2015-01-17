@@ -298,9 +298,13 @@ __log_close_server(void *arg)
 	locked = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
-		 * If there is a log file to close, fsync and close it.
+		 * If there is a log file to close, make sure any outstanding
+		 * write operations have completed, then fsync and close it.
 		 */
-		if ((close_fh = log->log_close_fh) != NULL) {
+		if ((close_fh = log->log_close_fh) != NULL &&
+		    ((ret = __wt_log_extract_lognum(session, close_fh->name,
+		    &close_lsn.file) == 0) &&
+		    close_lsn.file < log->write_lsn.file)) {
 			/*
 			 * We've copied the file handle, clear out the one in
 			 * log structure to allow it to be set again.
@@ -314,8 +318,6 @@ __log_close_server(void *arg)
 			 * next one to move the sync_lsn into the next file for
 			 * later syncs.
 			 */
-			WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
-			    &close_lsn.file));
 			close_lsn.offset = 0;
 			close_end_lsn = close_lsn;
 			close_end_lsn.file++;
