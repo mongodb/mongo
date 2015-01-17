@@ -62,6 +62,8 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const;
 
+        virtual bool supportsDirectoryPerDB() const;
+
         virtual bool isDurable() const { return _durable; }
 
         virtual RecoveryUnit* newRecoveryUnit();

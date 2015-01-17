@@ -2,7 +2,7 @@
 import re
 import textwrap
 
-Import("env windows darwin solaris linux freebsd openbsd")
+Import("env windows darwin solaris linux freebsd openbsd debugBuild")
 
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
@@ -10,6 +10,13 @@ env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
 env.Append(CPPPATH=[
         "src/include",
     ])
+
+# Enable asserts, and optional rich logging in debug builds
+if debugBuild:
+    env.Append(CPPDEFINES=[
+        "HAVE_DIAGNOSTIC",
+        "HAVE_VERBOSE",
+        ])
 
 if windows:
     env.Append(CPPPATH=["build_win"])

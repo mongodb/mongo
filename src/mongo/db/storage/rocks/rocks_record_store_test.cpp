@@ -61,7 +61,6 @@ namespace mongo {
             std::vector<rocksdb::ColumnFamilyDescriptor> cfs;
             cfs.emplace_back();
             cfs.emplace_back("record_store", rocksdb::ColumnFamilyOptions());
-            cfs[1].options.comparator = RocksRecordStore::newRocksCollectionComparator();
             rocksdb::DBOptions db_options;
             db_options.create_if_missing = true;
             db_options.create_missing_column_families = true;

@@ -65,6 +65,8 @@ namespace mongo {
 
         virtual bool supportsDocLocking() const { return false; }
 
+        virtual bool supportsDirectoryPerDB() const { return false; }
+
         /**
          * This is sort of strange since "durable" has no meaning...
          */

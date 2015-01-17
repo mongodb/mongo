@@ -65,7 +65,6 @@ namespace mongo {
 
     RocksEngine::RocksEngine(const std::string& path, bool durable)
         : _path(path),
-          _collectionComparator(RocksRecordStore::newRocksCollectionComparator()),
           _durable(durable) {
 
         auto columnFamilyNames = _loadColumnFamilies();       // vector of column family names
@@ -321,16 +320,11 @@ namespace mongo {
 
     rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() const {
         rocksdb::ColumnFamilyOptions options;
-        invariant( _collectionComparator.get() );
-        options.comparator = _collectionComparator.get();
         return options;
     }
 
     rocksdb::ColumnFamilyOptions RocksEngine::_indexOptions(const Ordering& order) const {
-        rocksdb::ColumnFamilyOptions options;
-        invariant( _collectionComparator.get() );
-        options.comparator = RocksSortedDataImpl::newRocksComparator(order);
-        return options;
+        return rocksdb::ColumnFamilyOptions();
     }
 
     Status toMongoStatus( rocksdb::Status s ) {

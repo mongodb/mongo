@@ -221,6 +221,8 @@ namespace mongo {
 
         void installShellUtils( Scope& scope ) {
             scope.injectNative( "quit", Quit );
+            // SERVER-5399: Set `exit` as well, so that quit/exit both resolve.
+            scope.injectNative( "exit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_replMonitorStats" , replMonitorStats );
             scope.injectNative( "_srand" , JSSrand );

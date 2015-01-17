@@ -379,6 +379,73 @@ namespace mongo {
         }
     }
 
+    namespace {
+
+        /**
+         * For every node in the subtree rooted at 'node' that has a RelevantTag, removes index
+         * assignments from that tag.
+         *
+         * Used as a helper for stripUnneededAssignments().
+         */
+        void clearAssignments(MatchExpression* node) {
+            if (node->getTag()) {
+                RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+                rt->first.clear();
+                rt->notFirst.clear();
+            }
+
+            for (size_t i = 0; i < node->numChildren(); i++) {
+                clearAssignments(node->getChild(i));
+            }
+        }
+
+    } // namespace
+
+    // static
+    void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
+                                                        const std::vector<IndexEntry>& indices) {
+        if (MatchExpression::AND == node->matchType()) {
+            for (size_t i = 0; i < node->numChildren(); i++) {
+                MatchExpression* child = node->getChild(i);
+
+                if (MatchExpression::EQ != child->matchType()) {
+                    continue;
+                }
+
+                if (!child->getTag()) {
+                    continue;
+                }
+
+                // We found a EQ child of an AND which is tagged.
+                RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
+
+                // Look through all of the indices for which this predicate can be answered with
+                // the leading field of the index.
+                for (std::vector<size_t>::const_iterator i = rt->first.begin();
+                        i != rt->first.end(); ++i) {
+                    size_t index = *i;
+
+                    if (indices[index].unique && 1 == indices[index].keyPattern.nFields()) {
+                        // Found an EQ predicate which can use a single-field unique index.
+                        // Clear assignments from the entire tree, and add back a single assignment
+                        // for 'child' to the unique index.
+                        clearAssignments(node);
+                        RelevantTag* newRt = static_cast<RelevantTag*>(child->getTag());
+                        newRt->first.push_back(index);
+
+                        // Tag state has been reset in the entire subtree at 'root'; nothing
+                        // else for us to do.
+                        return;
+                    }
+                }
+            }
+        }
+
+        for (size_t i = 0; i < node->numChildren(); i++) {
+            stripUnneededAssignments(node->getChild(i), indices);
+        }
+    }
+
     //
     // Helpers used by stripInvalidAssignments
     //

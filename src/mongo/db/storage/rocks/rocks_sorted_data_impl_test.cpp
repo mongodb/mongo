@@ -60,8 +60,7 @@ namespace mongo {
             rocksdb::DB* db;
             std::vector<rocksdb::ColumnFamilyDescriptor> cfs;
             cfs.emplace_back();
-            cfs.emplace_back("sroted_data_impl", rocksdb::ColumnFamilyOptions());
-            cfs[1].options.comparator = RocksSortedDataImpl::newRocksComparator(_order);
+            cfs.emplace_back("sorted_data_impl", rocksdb::ColumnFamilyOptions());
             rocksdb::DBOptions db_options;
             db_options.create_if_missing = true;
             db_options.create_missing_column_families = true;

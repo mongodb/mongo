@@ -97,6 +97,10 @@ namespace mongo {
             return true;
         }
 
+        virtual bool supportsDirectoryPerDB() const override {
+            return false;
+        }
+
         virtual bool isDurable() const override { return _durable; }
 
         virtual int64_t getIdentSize(OperationContext* opCtx,
@@ -142,7 +146,6 @@ namespace mongo {
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
-        boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
         const bool _durable;
 

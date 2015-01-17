@@ -403,6 +403,7 @@ namespace {
             RecordId oldest;
             int ret = 0;
             while (( sizeSaved < sizeOverCap || docsRemoved < docsOverCap ) &&
+                   docsRemoved < 250 &&
                    (ret = c->next(c)) == 0 ) {
                 int64_t key;
                 ret = c->get_key(c, &key);
