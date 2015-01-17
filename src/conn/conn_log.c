@@ -302,9 +302,9 @@ __log_close_server(void *arg)
 		 * write operations have completed, then fsync and close it.
 		 */
 		if ((close_fh = log->log_close_fh) != NULL &&
-		    ((ret = __wt_log_extract_lognum(session, close_fh->name,
-		    &close_lsn.file) == 0) &&
-		    close_lsn.file < log->write_lsn.file)) {
+		    (ret = __wt_log_extract_lognum(session, close_fh->name,
+		    &close_lsn.file)) == 0 &&
+		    close_lsn.file < log->write_lsn.file) {
 			/*
 			 * We've copied the file handle, clear out the one in
 			 * log structure to allow it to be set again.
