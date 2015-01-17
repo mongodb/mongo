@@ -41,7 +41,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
-#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
+#include "mongo/db/storage/rocks/rocks_index.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/db/storage/rocks/rocks_transaction.h"
 #include "mongo/unittest/temp_dir.h"
@@ -53,14 +53,14 @@ namespace mongo {
     using boost::shared_ptr;
     using std::string;
 
-    class RocksSortedDataImplHarness : public HarnessHelper {
+    class RocksIndexHarness : public HarnessHelper {
     public:
-        RocksSortedDataImplHarness() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
+        RocksIndexHarness() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
             boost::filesystem::remove_all(_tempDir.path());
             rocksdb::DB* db;
             std::vector<rocksdb::ColumnFamilyDescriptor> cfs;
             cfs.emplace_back();
-            cfs.emplace_back("sorted_data_impl", rocksdb::ColumnFamilyOptions());
+            cfs.emplace_back("index", rocksdb::ColumnFamilyOptions());
             rocksdb::DBOptions db_options;
             db_options.create_if_missing = true;
             db_options.create_missing_column_families = true;
@@ -72,8 +72,13 @@ namespace mongo {
         }
 
         virtual SortedDataInterface* newSortedDataInterface(bool unique) {
-            return new RocksSortedDataImpl(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
-                                           _order);
+            if (unique) {
+                return new RocksUniqueIndex(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
+                                            _order);
+            } else {
+                return new RocksStandardIndex(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
+                                              _order);
+            }
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
@@ -89,9 +94,9 @@ namespace mongo {
         RocksTransactionEngine _transactionEngine;
     };
 
-    HarnessHelper* newHarnessHelper() { return new RocksSortedDataImplHarness(); }
+    HarnessHelper* newHarnessHelper() { return new RocksIndexHarness(); }
 
-    TEST(RocksSortedDataImplTest, Isolation) {
+    TEST(RocksIndexTest, Isolation) {
         scoped_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
         scoped_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 

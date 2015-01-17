@@ -48,56 +48,31 @@ namespace mongo {
 
     class RocksRecoveryUnit;
 
-    class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
-    public:
-        virtual Status addKey(const BSONObj& key, const RecordId& loc) = 0;
-    };
+    class RocksIndexBase : public SortedDataInterface {
+        MONGO_DISALLOW_COPYING(RocksIndexBase);
 
-    /**
-     * Rocks implementation of the SortedDataInterface. Each index is stored as a single column
-     * family. Each mapping from a BSONObj to a RecordId is stored as the key of a key-value pair
-     * in the column family. Consequently, each value in the database is simply an empty string.
-     * This is done because RocksDB only supports unique keys, and because RocksDB can take a custom
-     * comparator to use when ordering keys. We use a custom comparator which orders keys based
-     * first upon the BSONObj in the key, and uses the RecordId as a tiebreaker.
-     */
-    class RocksSortedDataImpl : public SortedDataInterface {
-        MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
-        RocksSortedDataImpl(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                            std::string ident, Ordering order);
+        RocksIndexBase(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
+                       std::string ident, Ordering order);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
-
-        virtual Status insert(OperationContext* txn,
-                              const BSONObj& key,
-                              const RecordId& loc,
-                              bool dupsAllowed);
-
-        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
-                             bool dupsAllowed);
-
-        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
 
         virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
                                   BSONObjBuilder* output) const;
 
-        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output, double scale)
-            const {
+        virtual bool appendCustomStats(OperationContext* txn, BSONObjBuilder* output,
+                                       double scale) const {
+            // TODO
             return false;
         }
 
         virtual bool isEmpty(OperationContext* txn);
 
-        virtual long long numEntries(OperationContext* txn) const;
-
-        virtual Cursor* newCursor(OperationContext* txn, int direction) const;
-
         virtual Status initAsEmpty(OperationContext* txn);
 
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-    private:
+    protected:
         std::string _getTransactionID(const KeyString& key) const;
 
         rocksdb::DB* _db; // not owned
@@ -110,11 +85,37 @@ namespace mongo {
 
         // used to construct RocksCursors
         const Ordering _order;
+    };
 
-        std::atomic<long long> _numEntries;
+    class RocksUniqueIndex : public RocksIndexBase {
+    public:
+        RocksUniqueIndex(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
+                         std::string ident, Ordering order);
 
-        const std::string _numEntriesKey;
+        virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
+                              bool dupsAllowed);
+        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
+                             bool dupsAllowed);
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
 
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc);
+    };
+
+    class RocksStandardIndex : public RocksIndexBase {
+    public:
+        RocksStandardIndex(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
+                           std::string ident, Ordering order);
+
+        virtual Status insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
+                              bool dupsAllowed);
+        virtual void unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
+                             bool dupsAllowed);
+        virtual SortedDataInterface::Cursor* newCursor(OperationContext* txn, int direction) const;
+
+        virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const RecordId& loc) {
+            // dupKeyCheck shouldn't be called for non-unique indexes
+            invariant(false);
+        }
     };
 
 } // namespace mongo
