@@ -217,7 +217,9 @@ public static int cursor_ops(Session session)
     {
     Cursor other = null;
     /*! [Cursor equality] */
-    if (cursor.equals(other)) {
+    int compare;
+    compare = cursor.equals(other);
+    if (compare == 0) {
         /* redtiger.iCursors reference the same key */
     } else {
 	/* Cursors don't reference the same key */
