@@ -1635,9 +1635,9 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 	 *
 	 * \return The result of the comparison.
 	 */
-	public boolean equals(Cursor other)
+	public int equals(Cursor other)
 	throws WiredTigerException {
-		return (equals_wrap(other) != 0);
+		return equals_wrap(other);
 	}
 
 	/**
