@@ -9,7 +9,7 @@ if has_option("rocksdb"):
             'rocks_engine.cpp',
             'rocks_record_store.cpp',
             'rocks_recovery_unit.cpp',
-            'rocks_sorted_data_impl.cpp',
+            'rocks_index.cpp',
             'rocks_transaction.cpp',
             ],
         LIBDEPS= [
@@ -42,8 +42,8 @@ if has_option("rocksdb"):
 
 
     env.CppUnitTest(
-       target='storage_rocks_sorted_data_impl_test',
-       source=['rocks_sorted_data_impl_test.cpp'
+       target='storage_rocks_index_test',
+       source=['rocks_index_test.cpp'
                ],
        LIBDEPS=[
             'storage_rocks_base',

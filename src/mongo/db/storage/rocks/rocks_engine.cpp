@@ -48,7 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
-#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
+#include "mongo/db/storage/rocks/rocks_index.h"
 #include "mongo/util/log.h"
 
 #define ROCKS_TRACE log()
@@ -176,8 +176,13 @@ namespace mongo {
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc) {
-        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident), ident.toString(),
-                                       Ordering::make(desc->keyPattern()));
+        if (desc->unique()) {
+            return new RocksUniqueIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+                                        Ordering::make(desc->keyPattern()));
+        } else {
+            return new RocksStandardIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+                                          Ordering::make(desc->keyPattern()));
+        }
     }
 
     Status RocksEngine::dropIdent(OperationContext* opCtx, const StringData& ident) {

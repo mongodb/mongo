@@ -674,7 +674,6 @@ namespace mongo {
 
     rocksdb::Slice RocksRecordStore::_makeKey(const RecordId& loc, int64_t* storage) {
         *storage = endian::nativeToBig(loc.repr());
-        RecordId a = loc;
         return rocksdb::Slice(reinterpret_cast<const char*>(storage), sizeof(*storage));
     }
 
