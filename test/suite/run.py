@@ -54,8 +54,8 @@ else:
     sys.exit(False)
 
 # Cannot import wiredtiger and supporting utils until we set up paths
-sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
-sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
+sys.path.insert(1, os.path.join(wt_builddir, 'lang', 'python'))
+sys.path.insert(1, os.path.join(wt_disttop, 'lang', 'python'))
 
 # Add all 3rd party directories: some have code in subdirectories
 for d in os.listdir(wt_3rdpartydir):
