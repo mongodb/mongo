@@ -96,6 +96,10 @@ namespace mongo {
                     errmsg = "remove and upsert can't co-exist";
                     return false;
                 }
+                if ( !update.isEmpty() ) {
+                    errmsg = "remove and update can't co-exist";
+                    return false;
+                }
                 if ( returnNew ) {
                     errmsg = "remove and returnNew can't co-exist";
                     return false;
