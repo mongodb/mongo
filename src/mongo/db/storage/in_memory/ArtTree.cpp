@@ -1,4 +1,4 @@
-//@file ArtTree.c
+//@file ArtTree.cpp
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
