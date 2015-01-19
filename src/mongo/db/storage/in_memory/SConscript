@@ -40,6 +40,15 @@ env.Library(
         ]
     )
 
+env.Library(
+    target= 'storage_arttree',
+    source= [
+        'ArtTree.cpp',
+        ],
+    LIBDEPS= [
+        ]
+    )
+
 env.CppUnitTest(
    target='storage_in_memory_btree_test',
    source=['in_memory_btree_impl_test.cpp'
