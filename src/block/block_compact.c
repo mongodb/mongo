@@ -174,7 +174,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	el = &block->live.avail;
 	size = block->fh->size;
 
-	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
 	    "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX
 	    "%% space available %" PRIuMAX "MB (%" PRIuMAX ")",
 	    (uintmax_t)size / WT_MEGABYTE, (uintmax_t)size,
@@ -200,7 +200,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 #ifdef __VERBOSE_OUTPUT_PERCENTILE
 	for (i = 0; i < WT_ELEMENTS(percentile); ++i) {
 		v = percentile[i] * 512;
-		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
 		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
@@ -209,7 +209,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 #endif
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
 		v = decile[i] * 512;
-		WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+		WT_RET(__wt_verbose(session, WT_VERB_COMPACT,
 		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i * 10, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
