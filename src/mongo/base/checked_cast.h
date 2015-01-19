@@ -45,33 +45,33 @@ namespace mongo {
     template<>
     struct checked_cast_impl<false> {
         template<typename T, typename U>
-        static void check_type(const U& u) {
+        static T cast(const U& u) {
+            return static_cast<T>(u);
         }
     };
 
     template<>
     struct checked_cast_impl<true> {
         template<typename T, typename U>
-        static void check_type(U* u) {
-            invariant(u == NULL || dynamic_cast<T>(u));
+        static T cast(U* u) {
+            if (!u) {
+                return NULL;
+            }
+            T t = dynamic_cast<T>(u);
+            invariant(t);
+            return t;
         }
 
         template<typename T, typename U>
-        static void check_type(const U& u) {
-            try {
-                invariant(&dynamic_cast<T>(u));
-            }
-            catch(...) {
-                invariant(false);
-            }
+        static T cast(const U& u) {
+            return dynamic_cast<T>(u);
         }
 
     };
 
     template<typename T, typename U>
     T checked_cast(const U& u) {
-        checked_cast_impl<debug>::check_type<T>(u);
-        return static_cast<T>(u);
+        return checked_cast_impl<debug>::cast<T>(u);
     };
 
 } // namespace mongo
