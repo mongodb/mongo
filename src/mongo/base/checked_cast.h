@@ -59,7 +59,7 @@ namespace mongo {
         template<typename T, typename U>
         static void check_type(const U& u) {
             try {
-                dynamic_cast<T>(u);
+                invariant(&dynamic_cast<T>(u));
             }
             catch(...) {
                 invariant(false);

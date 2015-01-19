@@ -153,8 +153,9 @@ namespace mongo {
         if ( !ctx )
             return;
 
+        // This dynamic_cast has semantics, should change ideally.
         HeapRecordStoreBtreeRecoveryUnit* ru =
-            checked_cast<HeapRecordStoreBtreeRecoveryUnit*>( ctx->recoveryUnit() );
+            dynamic_cast<HeapRecordStoreBtreeRecoveryUnit*>( ctx->recoveryUnit() );
 
         if ( !ru )
             return;
