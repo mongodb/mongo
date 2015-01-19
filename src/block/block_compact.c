@@ -137,8 +137,6 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	__wt_spin_lock(session, &block->live_lock);
-
 	/*
 	 * If this block is in the last 10% of the file and there's a block on
 	 * the available list that's in the first 90% of the file, rewrite the
@@ -146,6 +144,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	 * the block would extend the file), but there's an obvious race if the
 	 * file is sufficiently busy.
 	 */
+	__wt_spin_lock(session, &block->live_lock);
 	ninety = fh->size - fh->size / 10;
 	if (offset > ninety) {
 		el = &block->live.avail;
@@ -155,7 +154,6 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 				break;
 			}
 	}
-
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
