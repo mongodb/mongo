@@ -148,11 +148,14 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	ninety = fh->size - fh->size / 10;
 	if (offset > ninety) {
 		el = &block->live.avail;
-		WT_EXT_FOREACH(ext, el->off)
-			if (ext->off < ninety && ext->size >= size) {
+		WT_EXT_FOREACH(ext, el->off) {
+			if (ext->off >= ninety)
+				break;
+			if (ext->size >= size) {
 				*skipp = 0;
 				break;
 			}
+		}
 	}
 	__wt_spin_unlock(session, &block->live_lock);
 
