@@ -896,7 +896,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	ctable->plan = table->plan;
 
 	/* Handle projections. */
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 1, tmp));
