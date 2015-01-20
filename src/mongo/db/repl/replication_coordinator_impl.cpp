@@ -1399,6 +1399,12 @@ namespace {
                        this,
                        stdx::placeholders::_1,
                        response));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            response->markAsShutdownInProgress();
+            return;
+        }
+        fassert(28602, cbh.getStatus());
+
         _replExecutor.wait(cbh.getValue());
         if (isWaitingForApplierToDrain()) {
             // Report that we are secondary to ismaster callers until drain completes.
