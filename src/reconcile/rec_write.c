@@ -2432,15 +2432,7 @@ no_slots:
 		 * the "page" and try again after we accumulate some more rows.
 		 */
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail_temporary);
-
-split_grow:	/*
-		 * Double the page size and make sure we accommodate at least
-		 * one more record. The reason for the latter is that we may
-		 * be here because there's a large key/value pair that won't
-		 * fit in our initial page buffer, even at its expanded size.
-		 */
-		r->page_size *= 2;
-		return (__rec_split_grow(session, r, r->page_size + next_len));
+		goto split_grow;
 	}
 
 	/* We have a block, update the boundary counter. */
@@ -2462,6 +2454,22 @@ split_grow:	/*
 	} else
 		WT_RET(
 		    __rec_split_write(session, r, last, write_ref, last_block));
+
+	/*
+	 * We got called because there wasn't enough room in the buffer for the
+	 * next key and we might or might not have written a block. In any case,
+	 * make sure the next key fits into the buffer.
+	 */
+	if (r->space_avail < next_len) {
+split_grow:	/*
+		 * Double the page size and make sure we accommodate at least
+		 * one more record. The reason for the latter is that we may
+		 * be here because there's a large key/value pair that won't
+		 * fit in our initial page buffer, even at its expanded size.
+		 */
+		r->page_size *= 2;
+		return (__rec_split_grow(session, r, r->page_size + next_len));
+	}
 	return (0);
 }
 

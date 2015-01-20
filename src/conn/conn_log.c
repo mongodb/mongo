@@ -278,6 +278,72 @@ err:
 }
 
 /*
+ * __log_close_server --
+ *	The log close server thread.
+ */
+static void *
+__log_close_server(void *arg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_FH *close_fh;
+	WT_LOG *log;
+	WT_LSN close_end_lsn, close_lsn;
+	WT_SESSION_IMPL *session;
+	int locked;
+
+	session = arg;
+	conn = S2C(session);
+	log = conn->log;
+	locked = 0;
+	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
+		/*
+		 * If there is a log file to close, make sure any outstanding
+		 * write operations have completed, then fsync and close it.
+		 */
+		if ((close_fh = log->log_close_fh) != NULL &&
+		    (ret = __wt_log_extract_lognum(session, close_fh->name,
+		    &close_lsn.file)) == 0 &&
+		    close_lsn.file < log->write_lsn.file) {
+			/*
+			 * We've copied the file handle, clear out the one in
+			 * log structure to allow it to be set again.
+			 */
+			log->log_close_fh = NULL;
+			/*
+			 * Set the close_end_lsn to the LSN immediately after
+			 * ours.  That is, the beginning of the next log file.
+			 * We need to know the LSN file number of our own close
+			 * in case earlier calls are still in progress and the
+			 * next one to move the sync_lsn into the next file for
+			 * later syncs.
+			 */
+			close_lsn.offset = 0;
+			close_end_lsn = close_lsn;
+			close_end_lsn.file++;
+			WT_ERR(__wt_fsync(session, close_fh));
+			__wt_spin_lock(session, &log->log_sync_lock);
+			locked = 1;
+			WT_ERR(__wt_close(session, close_fh));
+			log->sync_lsn = close_end_lsn;
+			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
+			locked = 0;
+			__wt_spin_unlock(session, &log->log_sync_lock);
+		} else
+			/* Wait until the next event. */
+			WT_ERR(__wt_cond_wait(session,
+			    conn->log_close_cond, 10000));
+	}
+
+	if (0) {
+err:		__wt_err(session, ret, "log close server error");
+	}
+	if (locked)
+		__wt_spin_unlock(session, &log->log_sync_lock);
+	return (NULL);
+}
+
+/*
  * __log_server --
  *	The log server thread.
  */
@@ -294,7 +360,7 @@ __log_server(void *arg)
 	conn = S2C(session);
 	log = conn->log;
 	locked = 0;
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Perform log pre-allocation.
 		 */
@@ -322,7 +388,7 @@ __log_server(void *arg)
 	}
 
 	if (0) {
-err:		__wt_err(session, ret, "log archive server error");
+err:		__wt_err(session, ret, "log server error");
 	}
 	if (locked)
 		(void)__wt_writeunlock(session, log->log_archive_lock);
@@ -386,7 +452,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 
 /*
  * __wt_logmgr_open --
- *	Start the log subsystem and archive server thread.
+ *	Start the log service threads.
  */
 int
 __wt_logmgr_open(WT_SESSION_IMPL *session)
@@ -396,14 +462,33 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* If no log thread services are configured, we're done. */ 
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
-	    !FLD_ISSET(conn->log_flags,
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		return (0);
+
+	/*
+	 * Start the log close thread.  It is not configurable.
+	 * If logging is enabled, this thread runs.
+	 */
+	WT_RET(__wt_open_internal_session(
+	    conn, "log-close-server", 0, 0, &conn->log_close_session));
+	WT_RET(__wt_cond_alloc(conn->log_close_session,
+	    "log close server", 0, &conn->log_close_cond));
+
+	/*
+	 * Start the thread.
+	 */
+	WT_RET(__wt_thread_create(conn->log_close_session,
+	    &conn->log_close_tid, __log_close_server, conn->log_close_session));
+	conn->log_close_tid_set = 1;
+
+	/* If no log thread services are configured, we're done. */ 
+	if (!FLD_ISSET(conn->log_flags,
 	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
 		return (0);
 
 	/*
 	 * If a log server thread exists, the user may have reconfigured
-	 * archiving ore pre-allocation.  Signal the thread.  Otherwise the
+	 * archiving or pre-allocation.  Signal the thread.  Otherwise the
 	 * user wants archiving and/or allocation and we need to start up
 	 * the thread.
 	 */
@@ -457,6 +542,17 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		conn->log_tid_set = 0;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
+	if (conn->log_close_tid_set) {
+		WT_TRET(__wt_cond_signal(session, conn->log_close_cond));
+		WT_TRET(__wt_thread_join(session, conn->log_close_tid));
+		conn->log_close_tid_set = 0;
+	}
+	WT_TRET(__wt_cond_destroy(session, &conn->log_close_cond));
+	if (conn->log_close_session != NULL) {
+		wt_session = &conn->log_close_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		conn->log_close_session = NULL;
+	}
 
 	WT_TRET(__wt_log_close(session));
 

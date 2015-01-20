@@ -95,20 +95,16 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
-	WT_CURSOR *overwrite_cursor;
 	const char *key = "some key", *value = "some value";
 	/*! [Reconfigure a cursor] */
 	ret = session->open_cursor(
-	    session, "table:mytable", NULL, NULL, &cursor);
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
 	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
 
 	/* Reconfigure the cursor to overwrite the record. */
-	ret = session->open_cursor(
-	    session, NULL, cursor, "overwrite", &overwrite_cursor);
-	ret = cursor->close(cursor);
-
-	overwrite_cursor->set_value(overwrite_cursor, value);
-	ret = overwrite_cursor->insert(cursor);
+	ret = cursor->reconfigure(cursor, "overwrite=true");
+	ret = cursor->insert(cursor);
 	/*! [Reconfigure a cursor] */
 	}
 
@@ -239,6 +235,19 @@ cursor_ops(WT_SESSION *session)
 		/* Cursor key greater than other key */
 	}
 	/*! [Cursor comparison] */
+	}
+
+	{
+	WT_CURSOR *other = NULL;
+	/*! [Cursor equality] */
+	int equal;
+	ret = cursor->equals(cursor, other, &equal);
+	if (equal) {
+		/* Cursors reference the same key */
+	} else {
+		/* Cursors don't reference the same key */
+	}
+	/*! [Cursor equality] */
 	}
 
 	{

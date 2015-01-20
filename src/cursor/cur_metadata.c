@@ -409,6 +409,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curmetadata_compare,	/* compare */
+	    __wt_cursor_equal,		/* equals */
 	    __curmetadata_next,		/* next */
 	    __curmetadata_prev,		/* prev */
 	    __curmetadata_reset,	/* reset */
@@ -417,10 +418,12 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __curmetadata_insert,	/* insert */
 	    __curmetadata_update,	/* update */
 	    __curmetadata_remove,	/* remove */
+	    __wt_cursor_notsup,		/* reconfigure */
 	    __curmetadata_close);	/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_METADATA *mdc;
 	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
 
 	WT_RET(__wt_calloc_one(session, &mdc));
 
@@ -435,8 +438,16 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
-	/* Metadata cursors default to read only. */
-	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
+	/*
+	 * Metadata cursors default to readonly; if not set to not-readonly,
+	 * they are permanently readonly and cannot be reconfigured.
+	 */
+	WT_ERR(__wt_config_gets_def(session, cfg, "readonly", 1, &cval));
+	if (cval.val != 0) {
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
+	}
 
 	if (0) {
 err:		if (mdc->file_cursor != NULL)

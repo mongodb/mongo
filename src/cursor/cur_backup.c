@@ -109,6 +109,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* set-key */
 	    __wt_cursor_notsup,		/* set-value */
 	    __wt_cursor_notsup,		/* compare */
+	    __wt_cursor_notsup,		/* equals */
 	    __curbackup_next,		/* next */
 	    __wt_cursor_notsup,		/* prev */
 	    __curbackup_reset,		/* reset */
@@ -117,6 +118,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* insert */
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
+	    __wt_cursor_notsup,		/* reconfigure */
 	    __curbackup_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_BACKUP *cb;

@@ -270,7 +270,8 @@ struct __wt_cursor {
 	 */
 	/*!
 	 * Return the ordering relationship between two cursors: both cursors
-	 * must have the same data source and have valid keys.
+	 * must have the same data source and have valid keys. (When testing
+	 * only for equality, WT_CURSOR::equals may be faster.)
 	 *
 	 * @snippet ex_all.c Cursor comparison
 	 *
@@ -284,6 +285,21 @@ struct __wt_cursor {
 	 * @errors
 	 */
 	int __F(compare)(WT_CURSOR *cursor, WT_CURSOR *other, int *comparep);
+
+	/*!
+	 * Return the ordering relationship between two cursors, testing only
+	 * for equality: both cursors must have the same data source and have
+	 * valid keys.
+	 *
+	 * @snippet ex_all.c Cursor equality
+	 *
+	 * @param cursor the cursor handle
+	 * @param other another cursor handle
+	 * @param[out] equalp the status of the comparison: 1 if the cursors
+	 * refer to the same key, otherwise 0.
+	 * @errors
+	 */
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
 
 	/*!
 	 * Return the next record.
@@ -495,6 +511,29 @@ struct __wt_cursor {
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_CURSOR) *cursor);
 
+	/*!
+	 * Reconfigure the cursor.
+	 *
+	 * The cursor is reset.
+	 *
+	 * @snippet ex_all.c Reconfigure a cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @configstart{cursor.reconfigure, see dist/api_data.py}
+	 * @config{append, append the value as a new record\, creating a new
+	 * record number key; valid only for cursors with record number keys., a
+	 * boolean flag; default \c false.}
+	 * @config{overwrite, configures whether the cursor's insert\, update
+	 * and remove methods check the existing state of the record.  If \c
+	 * overwrite is \c false\, WT_CURSOR::insert fails with
+	 * ::WT_DUPLICATE_KEY if the record exists\, WT_CURSOR::update and
+	 * WT_CURSOR::remove fail with ::WT_NOTFOUND if the record does not
+	 * exist., a boolean flag; default \c true.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
+
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
@@ -522,6 +561,7 @@ struct __wt_cursor {
 	 * user on open.
 	 */
 	const char *internal_uri;
+					/* Saved modification methods. */
 
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_BULK		0x0002
@@ -812,10 +852,6 @@ struct __wt_session {
 	 * Cursors being duplicated must have a key set, and successfully
 	 * duplicated cursors are positioned at the same place in the data
 	 * source as the original.
-	 *
-	 * To reconfigure a cursor, duplicate it with a new configuration value:
-	 *
-	 * @snippet ex_all.c Reconfigure a cursor
 	 *
 	 * Cursor handles should be discarded by calling WT_CURSOR::close.
 	 *

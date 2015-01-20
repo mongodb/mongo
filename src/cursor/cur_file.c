@@ -46,10 +46,11 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	CURSOR_API_CALL(a, session, compare, cbt->btree);
 
 	/*
-	 * Confirm both cursors refer to the same source and have keys, then
-	 * call the underlying object to compare them.
+	 * Check both cursors are a "file:" type then call the underlying
+	 * function, it can handle cursors pointing to different objects.
 	 */
-	if (strcmp(a->internal_uri, b->internal_uri) != 0)
+	if (!WT_PREFIX_MATCH(a->internal_uri, "file:") ||
+	    !WT_PREFIX_MATCH(b->internal_uri, "file:"))
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
@@ -58,6 +59,38 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
+
+err:	API_END_RET(session, ret);
+}
+
+/*
+ * __curfile_equals --
+ *	WT_CURSOR->equals method for the btree cursor type.
+ */
+static int
+__curfile_equals(WT_CURSOR *a, WT_CURSOR *b, int *equalp)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cbt = (WT_CURSOR_BTREE *)a;
+	CURSOR_API_CALL(a, session, equals, cbt->btree);
+
+	/*
+	 * Check both cursors are a "file:" type then call the underlying
+	 * function, it can handle cursors pointing to different objects.
+	 */
+	if (!WT_PREFIX_MATCH(a->internal_uri, "file:") ||
+	    !WT_PREFIX_MATCH(b->internal_uri, "file:"))
+		WT_ERR_MSG(session, EINVAL,
+		    "Cursors must reference the same object");
+
+	WT_CURSOR_CHECKKEY(a);
+	WT_CURSOR_CHECKKEY(b);
+
+	ret = __wt_btcur_equals(
+	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, equalp);
 
 err:	API_END_RET(session, ret);
 }
@@ -356,6 +389,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curfile_compare,		/* compare */
+	    __curfile_equals,		/* equals */
 	    __curfile_next,		/* next */
 	    __curfile_prev,		/* prev */
 	    __curfile_reset,		/* reset */
@@ -364,6 +398,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	    __curfile_insert,		/* insert */
 	    __curfile_update,		/* update */
 	    __curfile_remove,		/* remove */
+	    __wt_cursor_reconfigure,	/* reconfigure */
 	    __curfile_close);		/* close */
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;

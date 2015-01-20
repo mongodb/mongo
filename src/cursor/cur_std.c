@@ -59,28 +59,6 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 }
 
 /*
- * __wt_cursor_config_readonly --
- *	Parse read only configuration and setup cursor appropriately.
- */
-int
-__wt_cursor_config_readonly(WT_CURSOR *cursor, const char *cfg[], int def)
-{
-	WT_CONFIG_ITEM cval;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET(__wt_config_gets_def(session, cfg, "readonly", def, &cval));
-	if (cval.val != 0) {
-		/* Reset all cursor methods that could modify data. */
-		cursor->insert = __wt_cursor_notsup;
-		cursor->update = __wt_cursor_notsup;
-		cursor->remove = __wt_cursor_notsup;
-	}
-	return (0);
-}
-
-/*
  * __wt_cursor_kv_not_set --
  *	Standard error message for key/values not set.
  */
@@ -502,29 +480,68 @@ __wt_cursor_close(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_runtime_config --
+ * __wt_cursor_equal --
+ *	WT_CURSOR->equals default implementation.
+ */
+int
+__wt_cursor_equal(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	int cmp;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+	CURSOR_API_CALL(cursor, session, equals, NULL);
+
+	WT_ERR(cursor->compare(cursor, other, &cmp));
+	*equalp = (cmp == 0) ? 1 : 0;
+
+err:	API_END(session, ret);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_reconfigure --
  *	Set runtime-configurable settings.
  */
-static int
-__cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
+int
+__wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	/* 
-	 * !!!
-	 * There's no way yet to reconfigure cursor flags at runtime; if, in
-	 * the future there is a way to do that, similar support needs to be
-	 * added for data-source cursors, or, this call needs to return an
-	 * error in the case of a data-source cursor.
+	/* Reconfiguration resets the cursor. */
+	WT_RET(cursor->reset(cursor));
+
+	/*
+	 * append
+	 * Only relevant to column stores.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
-	if (cval.val)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
-	else
-		F_CLR(cursor, WT_CURSTD_OVERWRITE);
+	if (WT_CURSOR_RECNO(cursor)) {
+		if ((ret = __wt_config_getones(
+		    session, config, "append", &cval)) == 0) {
+			if (cval.val)
+				F_SET(cursor, WT_CURSTD_APPEND);
+			else
+				F_CLR(cursor, WT_CURSTD_APPEND);
+		} else
+			WT_RET_NOTFOUND_OK(ret);
+	}
+
+	/*
+	 * overwrite
+	 */
+	if ((ret = __wt_config_getones(
+	    session, config, "overwrite", &cval)) == 0) {
+		if (cval.val)
+			F_SET(cursor, WT_CURSTD_OVERWRITE);
+		else
+			F_CLR(cursor, WT_CURSTD_OVERWRITE);
+	} else
+		WT_RET_NOTFOUND_OK(ret);
 
 	return (0);
 }
@@ -587,9 +604,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	if (cursor->internal_uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));
 
-	/* Set runtime-configurable settings. */
-	WT_RET(__cursor_runtime_config(cursor, cfg));
-
 	/*
 	 * append
 	 * The append flag is only relevant to column stores.
@@ -601,14 +615,23 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	}
 
 	/*
-	 * checkpoint
-	 * Checkpoint cursors are read-only.
+	 * checkpoint, readonly
+	 * Checkpoint cursors are permanently read-only, avoid the extra work
+	 * of two configuration string checks.
 	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
 	if (cval.len != 0) {
 		cursor->insert = __wt_cursor_notsup;
 		cursor->update = __wt_cursor_notsup;
 		cursor->remove = __wt_cursor_notsup;
+	} else {
+		WT_RET(
+		    __wt_config_gets_def(session, cfg, "readonly", 0, &cval));
+		if (cval.val != 0) {
+			cursor->insert = __wt_cursor_notsup;
+			cursor->update = __wt_cursor_notsup;
+			cursor->remove = __wt_cursor_notsup;
+		}
 	}
 
 	/*
@@ -635,13 +658,17 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	/* overwrite */
+	WT_RET(__wt_config_gets_def(session, cfg, "overwrite", 1, &cval));
+	if (cval.val)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+	else
+		F_CLR(cursor, WT_CURSTD_OVERWRITE);
+
 	/* raw */
 	WT_RET(__wt_config_gets_def(session, cfg, "raw", 0, &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
-
-	/* readonly */
-	WT_RET(__wt_cursor_config_readonly(cursor, cfg, 0));
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors

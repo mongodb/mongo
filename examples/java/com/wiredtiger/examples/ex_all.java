@@ -215,6 +215,19 @@ public static int cursor_ops(Session session)
     }
 
     {
+    Cursor other = null;
+    /*! [Cursor equality] */
+    int compare;
+    compare = cursor.equals(other);
+    if (compare == 0) {
+        /* redtiger.iCursors reference the same key */
+    } else {
+	/* Cursors don't reference the same key */
+    }
+    /*! [Cursor equality] */
+    }
+
+    {
     /*! [Search for an exact match] */
     String key = "some key";
     cursor.putKeyString(key);

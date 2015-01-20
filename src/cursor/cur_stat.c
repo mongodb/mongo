@@ -408,11 +408,15 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		 * We're likely holding the handle lock inside the statistics
 		 * logging thread, not to mention calling __wt_conn_btree_apply
 		 * from there as well.  Save/restore the handle.
+		 * Take the schema lock now, in case btree apply needs to
+		 * get it later - that would violate lock ordering
+		 * conventions and can lead to deadlocks.
 		 */
 		saved_dhandle = dhandle;
-		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __wt_conn_btree_apply(
-		    session, 1, dhandle->name, __curstat_checkpoint, cfg_arg));
+		WT_WITH_SCHEMA_LOCK(session,
+		    WT_WITH_DHANDLE_LOCK(session,
+		    ret = __wt_conn_btree_apply(session,
+		    1, dhandle->name, __curstat_checkpoint, cfg_arg)));
 		session->dhandle = saved_dhandle;
 	}
 
@@ -485,6 +489,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	    __curstat_set_key,		/* set-key */
 	    __curstat_set_value,	/* set-value */
 	    __wt_cursor_notsup,		/* compare */
+	    __wt_cursor_notsup,		/* equals */
 	    __curstat_next,		/* next */
 	    __curstat_prev,		/* prev */
 	    __curstat_reset,		/* reset */
@@ -493,6 +498,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* insert */
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
+	    __wt_cursor_notsup,		/* reconfigure */
 	    __curstat_close);		/* close */
 	WT_CONFIG_ITEM cval, sval;
 	WT_CURSOR *cursor;

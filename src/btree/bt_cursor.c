@@ -800,16 +800,19 @@ err:	if (ret != 0)
 int
 __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *a, *b;
 	WT_SESSION_IMPL *session;
 
 	a = (WT_CURSOR *)a_arg;
 	b = (WT_CURSOR *)b_arg;
-	btree = a_arg->btree;
 	session = (WT_SESSION_IMPL *)a->session;
 
-	switch (btree->type) {
+	/* Confirm both cursors reference the same object. */
+	if (a_arg->btree != b_arg->btree)
+		WT_RET_MSG(
+		    session, EINVAL, "Cursors must reference the same object");
+
+	switch (a_arg->btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
 		/*
@@ -826,7 +829,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
 		break;
 	case BTREE_ROW:
 		WT_RET(__wt_compare(
-		    session, btree->collator, &a->key, &b->key, cmpp));
+		    session, a_arg->btree->collator, &a->key, &b->key, cmpp));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -837,7 +840,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
  * __cursor_equals --
  *	Return if two cursors reference the same row.
  */
-static int
+static inline int
 __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 {
 	switch (a->btree->type) {
@@ -862,6 +865,43 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 		if (a->slot == b->slot)
 			return (1);
 		break;
+	}
+	return (0);
+}
+
+/*
+ * __wt_btcur_equals --
+ *	Return an equality comparison between two cursors.
+ */
+int
+__wt_btcur_equals(
+    WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *equalp)
+{
+	WT_CURSOR *a, *b;
+	WT_SESSION_IMPL *session;
+	int cmp;
+
+	a = (WT_CURSOR *)a_arg;
+	b = (WT_CURSOR *)b_arg;
+	session = (WT_SESSION_IMPL *)a->session;
+
+	/* Confirm both cursors reference the same object. */
+	if (a_arg->btree != b_arg->btree)
+		WT_RET_MSG(
+		    session, EINVAL, "Cursors must reference the same object");
+
+	/*
+	 * The reason for an equals method is because we can avoid doing
+	 * a full key comparison in some cases. If both cursors point into the
+	 * tree, take the fast path, otherwise fall back to the slower compare
+	 * method; in both cases, return 1 if the cursors are equal, 0 if they
+	 * are not.
+	 */
+	if (F_ISSET(a, WT_CURSTD_KEY_INT) && F_ISSET(b, WT_CURSTD_KEY_INT))
+		*equalp = __cursor_equals(a_arg, b_arg);
+	else {
+		WT_RET(__wt_btcur_compare(a_arg, b_arg, &cmp));
+		*equalp = (cmp == 0) ? 1 : 0;
 	}
 	return (0);
 }
