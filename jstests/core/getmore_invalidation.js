@@ -1,80 +1,147 @@
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.
 // See SERVER-16675.
+(function() {
+    "use strict";
 
-var t = db.jstests_getmore_invalidation;
+    var t = db.jstests_getmore_invalidation;
 
-// Case #1: Text search with deletion invalidation.
-t.drop();
-assert.commandWorked(t.ensureIndex({a: "text"}));
-assert.writeOK(t.insert({_id: 1, a: "bar"}));
-assert.writeOK(t.insert({_id: 2, a: "bar"}));
-assert.writeOK(t.insert({_id: 3, a: "bar"}));
+    var count;
+    var cursor;
+    var x;
+    var y;
 
-var cursor = t.find({$text: {$search: "bar"}}).batchSize(2);
-cursor.next();
-cursor.next();
+    // Case #1: Text search with deletion invalidation.
+    t.drop();
+    assert.commandWorked(t.ensureIndex({a: "text"}));
+    assert.writeOK(t.insert({_id: 1, a: "bar"}));
+    assert.writeOK(t.insert({_id: 2, a: "bar"}));
+    assert.writeOK(t.insert({_id: 3, a: "bar"}));
 
-assert.writeOK(t.remove({_id: 3}));
+    cursor = t.find({$text: {$search: "bar"}}).batchSize(2);
+    cursor.next();
+    cursor.next();
 
-// We should get back the document or not (depending on the storage engine / concurrency model).
-// Either is fine as long as we don't crash.
-var count = cursor.itcount();
-assert(count === 0 || count === 1);
+    assert.writeOK(t.remove({_id: 3}));
 
-// Case #2: Text search with mutation invalidation.
-t.drop();
-assert.commandWorked(t.ensureIndex({a: "text"}));
-assert.writeOK(t.insert({_id: 1, a: "bar"}));
-assert.writeOK(t.insert({_id: 2, a: "bar"}));
-assert.writeOK(t.insert({_id: 3, a: "bar"}));
+    // We should get back the document or not (depending on the storage engine / concurrency model).
+    // Either is fine as long as we don't crash.
+    count = cursor.itcount();
+    assert(count === 0 || count === 1);
 
-var cursor = t.find({$text: {$search: "bar"}}).batchSize(2);
-cursor.next();
-cursor.next();
+    // Case #2: Text search with mutation invalidation.
+    t.drop();
+    assert.commandWorked(t.ensureIndex({a: "text"}));
+    assert.writeOK(t.insert({_id: 1, a: "bar"}));
+    assert.writeOK(t.insert({_id: 2, a: "bar"}));
+    assert.writeOK(t.insert({_id: 3, a: "bar"}));
 
-// Update the next matching doc so that it no longer matches.
-assert.writeOK(t.update({_id: 3}, {$set: {a: "nomatch"}}));
+    cursor = t.find({$text: {$search: "bar"}}).batchSize(2);
+    cursor.next();
+    cursor.next();
 
-// Either the cursor should skip the result that no longer matches, or we should get back the old
-// version of the doc.
-assert(!cursor.hasNext() || cursor.next()["a"] === "bar");
+    // Update the next matching doc so that it no longer matches.
+    assert.writeOK(t.update({_id: 3}, {$set: {a: "nomatch"}}));
 
-// Case #3: Merge sort with deletion invalidation.
-t.drop();
-assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
-assert.writeOK(t.insert({a: 1, b: 1}));
-assert.writeOK(t.insert({a: 1, b: 2}));
-assert.writeOK(t.insert({a: 2, b: 3}));
-assert.writeOK(t.insert({a: 2, b: 4}));
+    // Either the cursor should skip the result that no longer matches, or we should get back the old
+    // version of the doc.
+    assert(!cursor.hasNext() || cursor.next()["a"] === "bar");
 
-var cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
-cursor.next();
-cursor.next();
+    // Case #3: Merge sort with deletion invalidation.
+    t.drop();
+    assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
+    assert.writeOK(t.insert({a: 1, b: 1}));
+    assert.writeOK(t.insert({a: 1, b: 2}));
+    assert.writeOK(t.insert({a: 2, b: 3}));
+    assert.writeOK(t.insert({a: 2, b: 4}));
 
-assert.writeOK(t.remove({a: 2, b: 3}));
+    cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
+    cursor.next();
+    cursor.next();
 
-var count = cursor.itcount();
-assert(count === 1 || count === 2);
+    assert.writeOK(t.remove({a: 2, b: 3}));
 
-// Case #4: Merge sort with mutation invalidation.
-t.drop();
-assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
-assert.writeOK(t.insert({a: 1, b: 1}));
-assert.writeOK(t.insert({a: 1, b: 2}));
-assert.writeOK(t.insert({a: 2, b: 3}));
-assert.writeOK(t.insert({a: 2, b: 4}));
+    count = cursor.itcount();
+    assert(count === 1 || count === 2);
 
-var cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
-cursor.next();
-cursor.next();
+    // Case #4: Merge sort with mutation invalidation.
+    t.drop();
+    assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
+    assert.writeOK(t.insert({a: 1, b: 1}));
+    assert.writeOK(t.insert({a: 1, b: 2}));
+    assert.writeOK(t.insert({a: 2, b: 3}));
+    assert.writeOK(t.insert({a: 2, b: 4}));
 
-assert.writeOK(t.update({a: 2, b: 3}, {$set: {a: 6}}));
+    cursor = t.find({a: {$in: [1,2]}}).sort({b: 1}).batchSize(2);
+    cursor.next();
+    cursor.next();
 
-// Either the cursor should skip the result that no longer matches, or we should get back the old
-// version of the doc.
-assert(cursor.hasNext());
-assert(cursor.next()["a"] === 2);
-if (cursor.hasNext()) {
+    assert.writeOK(t.update({a: 2, b: 3}, {$set: {a: 6}}));
+
+    // Either the cursor should skip the result that no longer matches, or we should get back the old
+    // version of the doc.
+    assert(cursor.hasNext());
     assert(cursor.next()["a"] === 2);
-}
-assert(!cursor.hasNext());
+    if (cursor.hasNext()) {
+        assert(cursor.next()["a"] === 2);
+    }
+    assert(!cursor.hasNext());
+
+    // Case #5: 2d near with deletion invalidation.
+    t.drop();
+    t.ensureIndex({geo: "2d"});
+    for (x = -1; x < 1; x++) {
+        for (y = -1; y < 1; y++) {
+            assert.writeOK(t.insert({geo: [x, y]}));
+        }
+    }
+
+    cursor = t.find({geo: {$near: [0, 0], $maxDistance: 5}}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    // Drop all documents in the collection.
+    assert.writeOK(t.remove({}));
+
+    // Both MMAP v1 and doc-locking storage engines should force fetch the doc (it will be buffered
+    // because it is the same distance from the center point as a doc already returned).
+    assert(cursor.hasNext());
+
+    // Case #6: 2dsphere near with deletion invalidation.
+    t.drop();
+    t.ensureIndex({geo: "2dsphere"});
+    for (x = -1; x < 1; x++) {
+        for (y = -1; y < 1; y++) {
+            assert.writeOK(t.insert({geo: [x, y]}));
+        }
+    }
+
+    cursor = t.find({geo: {$nearSphere: [0, 0], $maxDistance: 5}}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    // Drop all documents in the collection.
+    assert.writeOK(t.remove({}));
+
+    // Both MMAP v1 and doc-locking storage engines should force fetch the doc (it will be buffered
+    // because it is the same distance from the center point as a doc already returned).
+    assert(cursor.hasNext());
+
+    // Case #7: 2dsphere near with deletion invalidation (again).
+    t.drop();
+    t.ensureIndex({geo: "2dsphere"});
+    for (x = 0; x < 6; x++) {
+        assert.writeOK(t.insert({geo: [x, x]}));
+    }
+
+    cursor = t.find({geo: {$nearSphere: [0, 0], $maxDistance: 10}}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    // Drop all documents in the collection.
+    assert.writeOK(t.remove({}));
+
+    // We might force-fetch or we might skip over the deleted documents, depending on the internals
+    // of the geo near search. Just make sure that we can exhaust the cursor without crashing.
+    assert.gte(cursor.itcount(), 0);
+
+})();
