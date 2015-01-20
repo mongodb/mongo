@@ -297,6 +297,10 @@ boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
            type='choice', default=boost_choices[0], choices=boost_choices)
 
+add_option( "system-boost-lib-search-suffixes",
+            "Comma delimited sequence of boost library suffixes to search",
+            1, False )
+
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
@@ -1015,6 +1019,21 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
+# boostSuffixList is used when using system boost to select a search sequence
+# for boost libraries.
+boostSuffixList = ["-mt", ""]
+if get_option("system-boost-lib-search-suffixes") is not None:
+    if not use_system_version_of_library("boost"):
+        print("The --system-boost-lib-search-suffixes option is only valid with --use-system-boost")
+        Exit(1)
+    boostSuffixList = get_option("system-boost-lib-search-suffixes")
+    if boostSuffixList == "":
+        boostSuffixList = []
+    else:
+        boostSuffixList = boostSuffixList.split(',')
+
+# boostSuffix is used when using internal boost to select which version
+# of boost is in play.
 boostSuffix = "";
 if not use_system_version_of_library("boost"):
     if get_option( "internal-boost") != "1.49":
@@ -2006,11 +2025,18 @@ def doConfigure(myenv):
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
 
-        # Note that on Windows with using-system-boost builds, the following 
+        # Note that on Windows with using-system-boost builds, the following
         # FindSysLibDep calls do nothing useful (but nothing problematic either)
-        for b in boostLibs:
-            boostlib = "boost_" + b
-            conf.FindSysLibDep( boostlib, [ boostlib + "-mt", boostlib ], language='C++' )
+        #
+        # NOTE: Pass --system-boost-lib-search-suffixes= to suppress these checks, which you
+        # might want to do if using autolib linking on Windows, for example.
+        if boostSuffixList:
+            for b in boostLibs:
+                boostlib = "boost_" + b
+                conf.FindSysLibDep(
+                    boostlib,
+                    [boostlib + suffix for suffix in boostSuffixList],
+                    language='C++')
 
     if posix_system:
         conf.env.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
