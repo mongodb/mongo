@@ -237,7 +237,7 @@ request = { insert: "system.indexes",
                            key: { x: 1 }, name: "x_1", unique: true}]};
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
-assert.eq(0, result.n);
+assert.eq(0, result.n, 'duplicate index insertion should give n = 0: ' + tojson(result));
 assert(!('writeErrors' in result));
 assert.eq(coll.getIndexes().length, 2);
 

@@ -1166,20 +1166,8 @@ namespace mongo {
         Command::appendCommandStatus(resultBuilder, success, errmsg);
         BSONObj cmdResult = resultBuilder.done();
         uassertStatusOK(Command::getStatusFromCommandResult(cmdResult));
-        const long long numIndexesBefore = cmdResult["numIndexesBefore"].safeNumberLong();
-        const long long numIndexesAfter = cmdResult["numIndexesAfter"].safeNumberLong();
-        if (numIndexesAfter - numIndexesBefore == 1) {
-            result->getStats().n = 1;
-        }
-        else if (numIndexesAfter != 0 && numIndexesAfter != numIndexesBefore) {
-            severe() <<
-                "Created multiple indexes while attempting to create only 1; numIndexesBefore = " <<
-                numIndexesBefore << "; numIndexesAfter = " << numIndexesAfter;
-            fassertFailed(28547);
-        }
-        else {
-            result->getStats().n = 0;
-        }
+        result->getStats().n =
+            cmdResult["numIndexesAfter"].numberInt() - cmdResult["numIndexesBefore"].numberInt();
     }
 
     static void multiUpdate( OperationContext* txn,
