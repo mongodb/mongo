@@ -69,10 +69,12 @@ func TestStatLine(t *testing.T) {
 			".": {
 				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, //locked
 				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
+				nil,
 			},
 			"test": {
 				ReadWriteLockTimes{Read: 663190, Write: 379}, //locked
 				ReadWriteLockTimes{Read: 200443, Write: 6},   // acquiring
+				nil,
 			},
 		},
 		Network: &NetworkStats{
@@ -163,10 +165,12 @@ func TestStatLine(t *testing.T) {
 			".": {
 				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, //locked
 				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
+				nil,
 			},
 			"test": {
 				ReadWriteLockTimes{Read: 663190, Write: 500397}, //locked
 				ReadWriteLockTimes{Read: 200443, Write: 6},      // acquiring
+				nil,
 			},
 		},
 		Network: &NetworkStats{

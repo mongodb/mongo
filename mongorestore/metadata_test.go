@@ -22,7 +22,7 @@ func TestCollectionExists(t *testing.T) {
 		sessionProvider, err := db.NewSessionProvider(commonOpts.ToolOptions{
 			Connection: &commonOpts.Connection{
 				Host: "localhost",
-				Port: DefaultTestPort,
+				Port: db.DefaultTestPort,
 			},
 			Auth: &auth,
 			SSL:  &ssl,
