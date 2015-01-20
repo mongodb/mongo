@@ -1429,6 +1429,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __clsm_compare,		/* compare */
+	    __wt_cursor_equal,		/* equals */
 	    __clsm_next,		/* next */
 	    __clsm_prev,		/* prev */
 	    __clsm_reset,		/* reset */
@@ -1437,6 +1438,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __clsm_insert,		/* insert */
 	    __clsm_update,		/* update */
 	    __clsm_remove,		/* remove */
+	    __wt_cursor_reconfigure,	/* reconfigure */
 	    __clsm_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;
@@ -1467,8 +1469,6 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	cursor->uri = lsm_tree->name;
 	cursor->key_format = lsm_tree->key_format;
 	cursor->value_format = lsm_tree->value_format;
-
-	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 0));
 
 	clsm->lsm_tree = lsm_tree;
 

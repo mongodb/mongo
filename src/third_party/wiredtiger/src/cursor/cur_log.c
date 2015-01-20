@@ -344,6 +344,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curlog_compare,		/* compare */
+	    __wt_cursor_equal,		/* equals */
 	    __curlog_next,		/* next */
 	    __wt_cursor_notsup,		/* prev */
 	    __curlog_reset,		/* reset */
@@ -352,6 +353,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* insert */
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
+	    __wt_cursor_notsup,		/* reconfigure */
 	    __curlog_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LOG *cl;

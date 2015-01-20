@@ -90,6 +90,7 @@ flags = {
         'CONN_CKPT_SYNC',
         'CONN_EVICTION_RUN',
         'CONN_LEAK_MEMORY',
+        'CONN_LOG_SERVER_RUN',
         'CONN_LSM_MERGE',
         'CONN_PANIC',
         'CONN_SERVER_RUN',

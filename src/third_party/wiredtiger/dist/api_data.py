@@ -559,6 +559,20 @@ common_wiredtiger_open = [
         ]),
 ]
 
+cursor_runtime_config = [
+    Config('append', 'false', r'''
+        append the value as a new record, creating a new record
+        number key; valid only for cursors with record number keys''',
+        type='boolean'),
+    Config('overwrite', 'true', r'''
+        configures whether the cursor's insert, update and remove
+        methods check the existing state of the record.  If \c overwrite
+        is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+        fail with ::WT_NOTFOUND if the record does not exist''',
+        type='boolean'),
+]
+
 methods = {
 'file.meta' : Method(file_meta),
 
@@ -569,6 +583,8 @@ methods = {
 'table.meta' : Method(table_meta),
 
 'cursor.close' : Method([]),
+
+'cursor.reconfigure' : Method(cursor_runtime_config),
 
 'session.close' : Method([]),
 
@@ -600,11 +616,7 @@ methods = {
 
 'session.log_printf' : Method([]),
 
-'session.open_cursor' : Method([
-    Config('append', 'false', r'''
-        append the value as a new record, creating a new record
-        number key; valid only for cursors with record number keys''',
-        type='boolean'),
+'session.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
         configure the cursor for bulk-loading, a fast, initial load
         path (see @ref tune_bulk_load for more information).  Bulk-load
@@ -640,13 +652,6 @@ methods = {
         configured with \c next_random=true only support the
         WT_CURSOR::next and WT_CURSOR::close methods.  See @ref
         cursor_random for details''',
-        type='boolean'),
-    Config('overwrite', 'true', r'''
-        configures whether the cursor's insert, update and remove
-        methods check the existing state of the record.  If \c overwrite
-        is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
-        if the record exists, WT_CURSOR::update and WT_CURSOR::remove
-        fail with ::WT_NOTFOUND if the record does not exist''',
         type='boolean'),
     Config('raw', 'false', r'''
         ignore the encodings for the key and value, manage data as if
