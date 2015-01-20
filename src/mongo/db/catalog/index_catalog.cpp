@@ -498,6 +498,14 @@ namespace {
                                str::stream() << "non-numeric value for \"v\" field:" << vElt );
             }
             double v = vElt.Number();
+
+            // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
+            if (v == 0 && !getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1()) {
+                return Status( ErrorCodes::CannotCreateIndex,
+                               str::stream() << "use of v0 indexes is only allowed with the "
+                                             << "mmapv1 storage engine");
+            }
+
             // note (one day) we may be able to fresh build less versions than we can use
             // isASupportedIndexVersionNumber() is what we can use
             if ( v != 0 && v != 1 ) {
