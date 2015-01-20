@@ -355,6 +355,15 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * pages after we've written them.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page)) {
+		/*
+		 * Quit if we're trying to push out a "tree", an internal page
+		 * with internal pages as children, it's not likely to succeed.
+		 */
+		if (!top) {
+			WT_ASSERT(session, exclusive == 0);
+			return (EBUSY);
+		}
+
 		WT_WITH_PAGE_INDEX(session, ret = __evict_review_subtree(
 		    session, ref, exclusive, inmem_splitp, istreep));
 		WT_RET(ret);
