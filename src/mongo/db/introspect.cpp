@@ -94,7 +94,9 @@ namespace {
         AuthorizationSession * authSession = txn->getClient()->getAuthorizationSession();
         _appendUserInfo(*txn->getCurOp(), b, authSession);
 
-        BSONObj p = b.done();
+        const BSONObj p = b.done();
+
+        const bool wasLocked = txn->lockState()->isLocked();
 
         const string dbName(nsToDatabase(txn->getCurOp()->getNS()));
 
@@ -132,7 +134,8 @@ namespace {
 
                     break;
                 }
-                else if (!acquireDbXLock && !txn->lockState()->isLocked()) {
+                else if (!acquireDbXLock &&
+                            (!wasLocked || txn->lockState()->isDbLockedForMode(dbName, MODE_X))) {
                     // Try to create the collection only if we are not under lock, in order to
                     // avoid deadlocks due to lock conversion. This would only be hit if someone
                     // deletes the profiler collection after setting profile level.

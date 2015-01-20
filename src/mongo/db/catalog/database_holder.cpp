@@ -136,12 +136,13 @@ namespace {
             *justCreated = !exists;
         }
 
-        // Only one thread can be inside this method for the same DB name, because of the
-        // requirement for X-lock on the database. So there is no way we can insert two different
-        // databases for the same name.
-        SimpleMutex::scoped_lock lk(_m);
-
+        // Do this outside of the scoped lock, because database creation does transactional
+        // operations which may block. Only one thread can be inside this method for the same DB
+        // name, because of the requirement for X-lock on the database when we enter. So there is
+        // no way we can insert two different databases for the same name.
         db = new Database(txn, dbname, entry);
+
+        SimpleMutex::scoped_lock lk(_m);
         _dbs[dbname] = db;
 
         return db;
