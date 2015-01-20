@@ -479,12 +479,11 @@ pre:
           remote_key: "kerberos_password"
   - command: shell.exec
     params:
+      silent: true
       script: |
-        set -o verbose
-        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
-        rm -rf src || true
-        rm -rf /data/db/*
-        true
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
+        rm -rf src /data/db/*
+        exit 0
 
 post:
   - command: attach.results
@@ -492,10 +491,10 @@ post:
       file_location: src/report.json
   - command: shell.exec
     params:
+      silent: true
       script: |
-        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py} >/dev/null 2>&1
         exit 0
-
 
 tasks:
 - name: bsonutil
