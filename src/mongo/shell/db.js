@@ -815,16 +815,14 @@ DB.prototype.printSlaveReplicationInfo = function() {
     };
 
     function getMaster(members) {
-        var found = null;
         for (i in members) {
             var row = members[i];
             if (row.state === 1) {
-                found = row;
-                return false;
+                return row;
             }
         }
 
-        return found;
+        return null;
     };
 
     function g(x) {
@@ -866,8 +864,8 @@ DB.prototype.printSlaveReplicationInfo = function() {
         else {
             startOptimeDate = new Date(0, 0);
             for (i in status.members) {
-                if (status.members.optimeDate > startOptimeDate) {
-                    startOptimeDate = status.members.optimeDate;
+                if (status.members[i].optimeDate > startOptimeDate) {
+                    startOptimeDate = status.members[i].optimeDate;
                 }
             }
         }

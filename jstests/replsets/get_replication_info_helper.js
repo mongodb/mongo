@@ -28,7 +28,10 @@
 
     // calling this function with and without a primary, should provide sufficient code coverage
     // to catch any JS errors
-    primary.getDB('admin').printSlaveReplicationInfo();
+    var mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();",
+                                   primary.port);
+    mongo();
+    assert(rawMongoProgramOutput().match("behind the primary"));
 
     // get to a primaryless state
     for (i in replSet.liveNodes.slaves) {
@@ -40,6 +43,9 @@
     }
     catch (e) {}
 
-    primary.getDB('admin').printSlaveReplicationInfo();
+    mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();",
+                               primary.port);
+    mongo();
+    assert(rawMongoProgramOutput().match("behind the freshest"));
 
 })();
