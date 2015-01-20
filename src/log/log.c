@@ -1457,6 +1457,13 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	conn = S2C(session);
 	log = conn->log;
+	/*
+	 * An error during opening the logging subsystem can result in it
+	 * being enabled, but without an open log file.  In that case,
+	 * just return.
+	 */
+	if (log->log_fh == NULL)
+		return (0);
 	ip = record;
 	if ((compressor = conn->log_compressor) != NULL &&
 	    record->size < log->allocsize)
