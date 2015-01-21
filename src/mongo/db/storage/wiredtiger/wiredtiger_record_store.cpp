@@ -169,6 +169,7 @@ namespace {
               _isCapped( isCapped ),
               _isOplog( NamespaceString::oplog( ns ) ),
               _cappedMaxSize( cappedMaxSize ),
+              _cappedMaxSizeSlack( std::min(cappedMaxSize/10, int64_t(16*1024*1024)) ),
               _cappedMaxDocs( cappedMaxDocs ),
               _cappedDeleteCallback( cappedDeleteCallback ),
               _cappedDeleteCheckCount(0),
@@ -370,24 +371,39 @@ namespace {
         // We only want to do the checks occasionally as they are expensive.
         // This variable isn't thread safe, but has loose semantics anyway.
         dassert( !_isOplog || _cappedMaxDocs == -1 );
-        if ( _cappedMaxDocs == -1 && // Max docs has to be exact, so have to check every time.
-             _cappedDeleteCheckCount++ % 100 > 0 )
-            return;
 
         if (!cappedAndNeedDelete())
             return;
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::try_to_lock);
-        if ( !lock )
-            return;
+        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
 
-        // we do this is a sub transaction in case it aborts
+        if (_cappedMaxDocs != -1) {
+            lock.lock(); // Max docs has to be exact, so have to check every time.
+        }
+        else {
+            if (!lock.try_lock()) {
+                // Someone else is deleting old records. Apply back-pressure if too far behind,
+                // otherwise continue.
+                if ((_dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
+                    return;
+
+                lock.lock();
+
+                // If we already waited, let someone else do cleanup unless we are significantly
+                // over the limit.
+                if ((_dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
+                    return;
+            }
+        }
+
+        // we do this is a side transaction in case it aborts
         WiredTigerRecoveryUnit* realRecoveryUnit =
             checked_cast<WiredTigerRecoveryUnit*>( txn->releaseRecoveryUnit() );
         invariant( realRecoveryUnit );
         WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
         txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
+        WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession()->getSession();
 
         int64_t dataSize = _dataSize.load();
         int64_t numRecords = _numRecords.load();
@@ -399,46 +415,53 @@ namespace {
             docsOverCap = numRecords - _cappedMaxDocs;
 
         try {
+            WriteUnitOfWork wuow(txn);
+
             WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
             WT_CURSOR *c = curwrap.get();
-            RecordId oldest;
+            RecordId newestOld;
             int ret = 0;
             while (( sizeSaved < sizeOverCap || docsRemoved < docsOverCap ) &&
-                   docsRemoved < 250 &&
+                   docsRemoved < 1000 &&
                    (ret = c->next(c)) == 0 ) {
                 int64_t key;
                 ret = c->get_key(c, &key);
                 invariantWTOK(ret);
 
                 // don't go past the record we just inserted
-                oldest = _fromKey(key);
-                if ( oldest >= justInserted )
+                newestOld = _fromKey(key);
+                if ( newestOld >= justInserted ) // TODO: use oldest uncommitted instead
                     break;
 
-                if ( _cappedDeleteCallback ) {
-                    uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
-                }
-
                 WT_ITEM old_value;
-                ret = c->get_value(c, &old_value);
-                invariantWTOK(ret);
+                invariantWTOK(c->get_value(c, &old_value));
 
                 ++docsRemoved;
                 sizeSaved += old_value.size;
+
+                if ( _cappedDeleteCallback ) {
+                    uassertStatusOK(
+                        _cappedDeleteCallback->aboutToDeleteCapped(
+                            txn,
+                            newestOld,
+                            RecordData(static_cast<const char*>(old_value.data), old_value.size)));
+                }
             }
 
             if (ret != WT_NOTFOUND) invariantWTOK(ret);
 
             if (docsRemoved > 0) {
                 // if we scanned to the end of the collection or past our insert, go back one
-                if ( ret == WT_NOTFOUND || oldest >= justInserted ) {
+                if ( ret == WT_NOTFOUND || newestOld >= justInserted ) {
                     ret = c->prev(c);
                 }
                 invariantWTOK(ret);
 
-                WriteUnitOfWork wuow( txn );
-                ret = c->session->truncate(c->session, NULL, NULL, c, NULL);
-                invariantWTOK(ret);
+                WiredTigerCursor startWrap( _uri, _instanceId, true, txn);
+                WT_CURSOR* start = startWrap.get();
+                start->next(start);
+
+                invariantWTOK(session->truncate(session, NULL, start, c, NULL));
                 _changeNumRecords(txn, -docsRemoved);
                 _increaseDataSize(txn, -sizeSaved);
                 wuow.commit();

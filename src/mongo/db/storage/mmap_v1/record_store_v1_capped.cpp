@@ -172,7 +172,7 @@ namespace mongo {
                 }
 
                 const RecordId fr = theCapExtent()->firstRecord.toRecordId();
-                Status status = _deleteCallback->aboutToDeleteCapped( txn, fr );
+                Status status = _deleteCallback->aboutToDeleteCapped( txn, fr, dataFor(txn, fr) );
                 if ( !status.isOK() )
                     return StatusWith<DiskLoc>( status );
                 deleteRecord( txn, fr );
@@ -487,7 +487,7 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            Status status = _deleteCallback->aboutToDeleteCapped( txn, currId );
+            Status status = _deleteCallback->aboutToDeleteCapped(txn, currId, dataFor(txn, currId));
             uassertStatusOK( status );
             deleteRecord( txn, currId );
             _compact(txn);

@@ -293,7 +293,7 @@ namespace mongo {
         Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
                                                 const RecordId& loc );
 
-        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc );
+        Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc, RecordData data );
 
         /**
          * same semantics as insertDocument, but doesn't do:

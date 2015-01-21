@@ -201,12 +201,14 @@ namespace mongo {
         while (cappedAndNeedDelete(txn)) {
             invariant(!_data->records.empty());
 
-            RecordId oldest = _data->records.begin()->first;
+            Records::iterator oldest = _data->records.begin();
+            RecordId id = oldest->first;
+            RecordData data = oldest->second.toRecordData();
 
             if (_cappedDeleteCallback)
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, id, data));
 
-            deleteRecord(txn, oldest);
+            deleteRecord(txn, id);
         }
     }
 

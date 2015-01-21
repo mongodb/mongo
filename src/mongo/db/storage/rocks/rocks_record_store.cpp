@@ -317,7 +317,11 @@ namespace mongo {
                 }
 
                 if (_cappedDeleteCallback) {
-                    uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+                    uassertStatusOK(
+                        _cappedDeleteCallback->aboutToDeleteCapped(
+                            txn,
+                            oldest,
+                            RecordData(iter->value().data(), iter->value().size())));
                 }
 
                 deleteRecord(txn, oldest);

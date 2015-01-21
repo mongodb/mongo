@@ -261,6 +261,7 @@ namespace mongo {
         const bool _isCapped;
         const bool _isOplog;
         const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxSizeSlack; // when to start applying backpressure
         const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
         int _cappedDeleteCheckCount; // see comment in ::cappedDeleteAsNeeded

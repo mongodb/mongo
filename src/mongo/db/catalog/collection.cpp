@@ -270,13 +270,14 @@ namespace mongo {
         return loc;
     }
 
-    Status Collection::aboutToDeleteCapped( OperationContext* txn, const RecordId& loc ) {
-
-        BSONObj doc = docFor( txn, loc );
+    Status Collection::aboutToDeleteCapped( OperationContext* txn,
+                                            const RecordId& loc,
+                                            RecordData data ) {
 
         /* check if any cursors point to us.  if so, advance them. */
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
 
+        BSONObj doc = data.releaseToBson();
         _indexCatalog.unindexRecord(txn, doc, loc, false);
 
         return Status::OK();
