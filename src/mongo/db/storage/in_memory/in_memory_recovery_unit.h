@@ -63,6 +63,8 @@ namespace mongo {
             invariant(!"don't call writingPtr");
         }
 
+        virtual void setRollbackWritesDisabled() {}
+
     private:
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;

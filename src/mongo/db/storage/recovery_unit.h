@@ -159,6 +159,21 @@ namespace mongo {
             return x;
         }
 
+        /**
+         * Sets a flag that declares this RecoveryUnit will skip rolling back writes, for the
+         * duration of the current outermost WriteUnitOfWork.  This function can only be called
+         * between a pair of unnested beginUnitOfWork() / endUnitOfWork() calls.
+         * The flag is cleared when endUnitOfWork() is called.
+         * While the flag is set, rollback will skip rolling back writes, but custom rollback
+         * change functions are still called.  Clearly, this functionality should only be used when
+         * writing to temporary collections that can be cleaned up externally.  For example,
+         * foreground index builds write to a temporary collection; if something goes wrong that
+         * normally requires a rollback, we can instead clean up the index by dropping the entire
+         * index.
+         * Setting the flag may permit increased performance.
+         */
+        virtual void setRollbackWritesDisabled() = 0;
+
     protected:
         RecoveryUnit() { }
     };

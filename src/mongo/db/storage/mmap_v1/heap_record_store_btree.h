@@ -204,6 +204,8 @@ namespace mongo {
 
         virtual void* writingPtr(void* data, size_t len);
 
+        virtual void setRollbackWritesDisabled() {}
+
         // -----------------------
 
         void notifyInsert( HeapRecordStoreBtree* rs, const RecordId& loc );

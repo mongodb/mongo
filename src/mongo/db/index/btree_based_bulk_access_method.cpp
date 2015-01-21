@@ -150,6 +150,11 @@ namespace mongo {
             }
 
             WriteUnitOfWork wunit(_txn);
+            // Improve performance in the btree-building phase by disabling rollback tracking.
+            // This avoids copying all the written bytes to a buffer that is only used to roll back.
+            // Note that this is safe to do, as this entire index-build-in-progress will be cleaned
+            // up by the index system.
+            _txn->recoveryUnit()->setRollbackWritesDisabled();
 
             // Get the next datum and add it to the builder.
             BSONObjExternalSorter::Data d = i->next();

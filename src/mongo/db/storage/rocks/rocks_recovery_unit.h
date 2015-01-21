@@ -78,6 +78,8 @@ namespace mongo {
 
         virtual void registerChange(Change* change);
 
+        virtual void setRollbackWritesDisabled() {}
+
         // local api
 
         rocksdb::WriteBatchWithIndex* writeBatch();

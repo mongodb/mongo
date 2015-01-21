@@ -49,14 +49,16 @@ namespace mongo {
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 
-        virtual void commitAndRestart();
-
         virtual bool awaitCommit();
 
-        virtual void* writingPtr(void* data, size_t len);
+        virtual void commitAndRestart();
 
         //  The recovery unit takes ownership of change.
         virtual void registerChange(Change* change);
+
+        virtual void* writingPtr(void* data, size_t len);
+
+        virtual void setRollbackWritesDisabled();
 
     private:
         void commitChanges();
@@ -110,6 +112,11 @@ namespace mongo {
         // If true, this RU is in a "failed" state and all changes must be rolled back. Once the
         // outermost WUOW rolls back it reverts to false.
         bool _mustRollback;
+
+        // Default is false.  
+        // If true, no preimages are tracked.  If rollback is subsequently attempted, the process
+        // will abort.
+        bool _rollbackDisabled;
     };
 
 }  // namespace mongo

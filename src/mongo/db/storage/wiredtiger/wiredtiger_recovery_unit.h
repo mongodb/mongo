@@ -75,6 +75,8 @@ namespace mongo {
         // un-used API
         virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
 
+        virtual void setRollbackWritesDisabled() {}
+
         virtual uint64_t getMyTransactionCount() const;
 
         // ---- WT STUFF
