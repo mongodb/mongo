@@ -1253,8 +1253,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_MEMSIZE_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
 	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
 	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
-		WT_MEMSIZE_TRANSFER(
-		    page_decr, right_incr, sizeof(WT_UPDATE) + upd->size);
+		WT_MEMSIZE_TRANSFER(page_decr, right_incr,
+		    sizeof(WT_UPDATE) +
+		    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size));
 
 	/*
 	 * Allocation operations completed, move the last insert list item from
