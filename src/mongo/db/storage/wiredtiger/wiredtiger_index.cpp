@@ -149,7 +149,7 @@ namespace {
         // override values in the prefix, but not values in the suffix.
         ss << "type=file,leaf_page_max=16k,";
         if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
-            ss << "prefix_compression,";
+            ss << "prefix_compression=true,";
         }
 
         ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
