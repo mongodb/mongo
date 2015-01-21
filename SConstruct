@@ -19,6 +19,7 @@ import datetime
 import imp
 import os
 import re
+import shlex
 import shutil
 import stat
 import sys
@@ -331,6 +332,9 @@ add_option('propagate-shell-environment',
            "Pass shell environment to sub-processes (NEVER for production builds)",
            0, False)
 
+add_option('variables-help',
+           "Print the help text for SCons variables", 0, False)
+
 if darwin:
     osx_version_choices = ['10.7', '10.8', '10.9', '10.10']
     add_option("osx-version-min", "minimum OS X version to support", 1, True,
@@ -370,6 +374,64 @@ add_option('cache',
 add_option('cache-dir',
            "Specify the directory to use for caching objects if --cache is in use",
            1, False, default="$BUILD_ROOT/scons/cache")
+
+# Setup the command-line variables
+def variable_shlex_converter(val):
+    return shlex.split(val)
+
+env_vars = Variables()
+
+env_vars.Add('ARFLAGS',
+    help='Sets flags for the archiver',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CCFLAGS',
+    help='Sets flags for the C and C++ compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CFLAGS',
+    help='Sets flags for the C compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CPPDEFINES',
+    help='Sets pre-processor definitions for C and C++',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CPPPATH',
+    help='Adds paths to the preprocessor search path',
+    converter=variable_shlex_converter)
+
+env_vars.Add('CXXFLAGS',
+    help='Sets flags for the C++ compiler',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LIBPATH',
+    help='Adds paths to the linker search path',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LIBS',
+    help='Adds extra libraries to link against',
+    converter=variable_shlex_converter)
+
+env_vars.Add('LINKFLAGS',
+    help='Sets flags for the linker',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCCFLAGS',
+    help='Sets flags for the C and C++ compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCFLAGS',
+    help='Sets flags for the C compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHCXXFLAGS',
+    help='Sets flags for the C++ compiler when building shared libraries',
+    converter=variable_shlex_converter)
+
+env_vars.Add('SHLINKFLAGS',
+    help='Sets flags for the linker when building shared libraries',
+    converter=variable_shlex_converter)
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -545,8 +607,37 @@ if windows:
             msvc_script = None
         envDict['MSVC_USE_SCRIPT'] = msvc_script
 
-env = Environment(**envDict)
+env = Environment(variables=env_vars, **envDict)
 del envDict
+
+if has_option('variables-help'):
+    print env_vars.GenerateHelpText(env)
+    Exit(0)
+
+unknown_vars = env_vars.UnknownVariables()
+if unknown_vars:
+    print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
+    Exit(1)
+
+
+# Add any scons options that conflict with scons variables here.
+# The first item in each tuple is the option name and the second
+# is the variable name
+variable_conflicts = [
+    ('libpath', 'LIBPATH'),
+    ('cpppath', 'CPPPATH'),
+    ('extrapath', 'CPPPATH'),
+    ('extrapathdyn', 'CPPPATH'),
+    ('extrapath', 'LIBPATH'),
+    ('extrapathdyn', 'LIBPATH'),
+    ('extralib', 'LIBS')
+]
+
+for (opt_name, var_name) in variable_conflicts:
+    if has_option(opt_name) and var_name in env:
+        print("Both option \"--{0}\" and variable {1} were specified".
+            format(opt_name, var_name))
+        Exit(1)
 
 if has_option("cache"):
     EnsureSConsVersion( 2, 3, 0 )
@@ -667,8 +758,6 @@ elif env['PYSYSPLATFORM'].startswith('sunos'):
     env['RELOBJ_LIBDEPS_START'] = '-z allextract'
     env['RELOBJ_LIBDEPS_END'] = '-z defaultextract'
     env['RELOBJ_LIBDEPS_ITEM'] = ''
-
-env["LIBPATH"] = []
 
 if has_option( "libpath" ):
     env["LIBPATH"] = [get_option( "libpath" )]
