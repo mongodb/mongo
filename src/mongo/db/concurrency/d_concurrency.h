@@ -28,12 +28,10 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <climits> // For UINT_MAX
 
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/timer.h"
 
@@ -41,7 +39,7 @@ namespace mongo {
 
     class StringData;
 
-    class Lock { 
+    class Lock {
     public:
 
         /**
@@ -76,25 +74,45 @@ namespace mongo {
         public:
             ParallelBatchWriterMode() : _lk(_batchLock) { }
 
-            static void iAmABatchParticipant(Locker* lockState);
-            static RWLockRecursive &_batchLock;
+            static RWLockRecursive _batchLock;
 
         private:
             RWLockRecursive::Exclusive _lk;
         };
 
 
-        class ScopedLock {
-            MONGO_DISALLOW_COPYING(ScopedLock);
+        /**
+         * Global lock.
+         *
+         * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
+         * in any mode, see LockMode.
+         * NOTE: Does not acquire flush lock.
+         */
+        class GlobalLock {
         public:
-            virtual ~ScopedLock() { }
+            explicit GlobalLock(Locker* locker) : _locker(locker), _result(LOCK_INVALID) { }
 
-        protected:
-            ScopedLock(Locker* lockState);
+            GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
+                : _locker(locker),
+                  _result(LOCK_INVALID) {
 
-            Locker* const _lockState;
+                _lock(lockMode, timeoutMs);
+            }
+
+            ~GlobalLock() {
+                _unlock();
+            }
+
+            bool isLocked() const { return _result == LOCK_OK; }
 
         private:
+
+            void _lock(LockMode lockMode, unsigned timeoutMs);
+            void _unlock();
+
+            Locker* const _locker;
+            LockResult _result;
+
             boost::scoped_ptr<RWLockRecursive::Shared> _pbws_lk;
         };
 
@@ -106,11 +124,15 @@ namespace mongo {
          * access. Allows further (recursive) acquisition of the global lock in any mode,
          * see LockMode.
          */
-        class GlobalWrite : public ScopedLock {
+        class GlobalWrite : public GlobalLock {
         public:
-            // timeoutms is only for writelocktry -- deprecated -- do not use
-            GlobalWrite(Locker* lockState, unsigned timeoutms = UINT_MAX);
-            ~GlobalWrite();
+            explicit GlobalWrite(Locker* locker, unsigned timeoutMs = UINT_MAX)
+                : GlobalLock(locker, MODE_X, timeoutMs) {
+
+                if (isLocked()) {
+                    locker->lockMMAPV1Flush();
+                }
+            }
         };
 
 
@@ -121,25 +143,17 @@ namespace mongo {
          * Allows further (recursive) acquisition of the global lock in shared (S) or intent-shared
          * (IS) mode, see LockMode.
          */
-        class GlobalRead : public ScopedLock {
+        class GlobalRead : public GlobalLock {
         public:
-            // timeoutms is only for readlocktry -- deprecated -- do not use
-            GlobalRead(Locker* lockState, unsigned timeoutms = UINT_MAX);
-            ~GlobalRead();
+            explicit GlobalRead(Locker* locker, unsigned timeoutMs = UINT_MAX)
+                : GlobalLock(locker, MODE_S, timeoutMs) {
+
+                if (isLocked()) {
+                    locker->lockMMAPV1Flush();
+                }
+            }
         };
 
-        /**
-         * Global lock.
-         *
-         * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
-         * in any mode, see LockMode.
-         * NOTE: Does not acquire flush lock.
-         */
-        class GlobalLock : public ScopedLock {
-        public:
-            GlobalLock(Locker* lockState, LockMode lockMode);
-            ~GlobalLock();
-        };
 
         /**
          * Database lock with support for collection- and document-level locking
@@ -155,9 +169,9 @@ namespace mongo {
          * For storage engines that do not support collection-level locking, MODE_IS will be
          * upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
          */
-        class DBLock : public ScopedLock {
+        class DBLock {
         public:
-            DBLock(Locker* lockState, const StringData& db, LockMode mode);
+            DBLock(Locker* locker, const StringData& db, LockMode mode);
             ~DBLock();
 
             /**
@@ -166,13 +180,19 @@ namespace mongo {
              * MODE_S to MODE_IX or MODE_X is not allowed to avoid violating the global intent.
              * Use relockWithMode() instead of upgrading to avoid deadlock.
              */
-            void relockWithMode(const LockMode newMode);
+            void relockWithMode(LockMode newMode);
 
         private:
             const ResourceId _id;
-            Locker* const _lockState;
+            Locker* const _locker;
 
-            LockMode _mode; // may be changed through relockWithMode
+            // May be changed through relockWithMode. The global lock mode won't change though,
+            // because we never change from IS/S to IX/X or vice versa, just convert locks from
+            // IX -> X.
+            LockMode _mode;
+
+            // Acquires the global lock on our behalf.
+            GlobalLock _globalLock;
         };
 
 
@@ -196,7 +216,7 @@ namespace mongo {
             CollectionLock(Locker* lockState, const StringData& ns, LockMode mode);
             ~CollectionLock();
 
-            void relockWithMode( const LockMode mode, Lock::DBLock& dblock );
+            void relockWithMode(LockMode mode, Lock::DBLock& dblock);
 
         private:
             const ResourceId _id;
@@ -230,36 +250,36 @@ namespace mongo {
         class ResourceLock {
             MONGO_DISALLOW_COPYING(ResourceLock);
         public:
-            ResourceLock(Locker* lockState, const ResourceId rid, const LockMode);
-            ~ResourceLock();
+            ResourceLock(Locker* locker, ResourceId rid)
+                : _rid(rid),
+                  _locker(locker),
+                  _result(LOCK_INVALID) {
+
+            }
+
+            ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
+                : _rid(rid),
+                  _locker(locker),
+                  _result(LOCK_INVALID) {
+
+                lock(mode);
+            }
+
+            ~ResourceLock() {
+                unlock();
+            }
+
+            void lock(LockMode mode);
+            void unlock();
+
+            bool isLocked() const { return _result == LOCK_OK; }
 
         private:
             const ResourceId _rid;
-            Locker* const _lockState;
+            Locker* const _locker;
+
+            LockResult _result;
         };
-    };
 
-    class DBTryLockTimeoutException : public std::exception {
-    public:
-        DBTryLockTimeoutException();
-        virtual ~DBTryLockTimeoutException() throw();
-    };
-
-    class readlocktry : boost::noncopyable {
-        bool _got;
-        boost::scoped_ptr<Lock::GlobalRead> _dbrlock;
-    public:
-        readlocktry(Locker* lockState, int tryms);
-        ~readlocktry();
-        bool got() const { return _got; }
-    };
-
-    class writelocktry : boost::noncopyable {
-        bool _got;
-        boost::scoped_ptr<Lock::GlobalWrite> _dbwlock;
-    public:
-        writelocktry(Locker* lockState, int tryms);
-        ~writelocktry();
-        bool got() const { return _got; }
     };
 }

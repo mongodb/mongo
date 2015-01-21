@@ -140,13 +140,6 @@ namespace {
 
 
     /**
-     * Returns whether the passed in mode is S or IS. Used for validation checks.
-     */
-    bool isSharedMode(LockMode mode) {
-        return (mode == MODE_IS || mode == MODE_S);
-    }
-
-    /**
      * Whether the particular lock's release should be held until the end of the operation. We
      * delay release of exclusive locks (locks that are for write operations) in order to ensure
      * that the data they protect is committed successfully.
@@ -459,7 +452,7 @@ namespace {
         invariant(nsIsDbOnly(dbName));
 
         if (isW()) return true;
-        if (isR() && isSharedMode(mode)) return true;
+        if (isR() && isSharedLockMode(mode)) return true;
 
         const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
         return isLockHeldForMode(resIdDb, mode);
@@ -471,7 +464,7 @@ namespace {
         invariant(nsIsFull(ns));
 
         if (isW()) return true;
-        if (isR() && isSharedMode(mode)) return true;
+        if (isR() && isSharedLockMode(mode)) return true;
 
         const NamespaceString nss(ns);
         const ResourceId resIdDb(RESOURCE_DATABASE, nss.db());
@@ -481,7 +474,7 @@ namespace {
         switch (dbMode) {
         case MODE_NONE: return false;
         case MODE_X: return true;
-        case MODE_S: return isSharedMode(mode);
+        case MODE_S: return isSharedLockMode(mode);
         case MODE_IX:
         case MODE_IS:
             {

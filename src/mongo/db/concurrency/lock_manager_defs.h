@@ -84,6 +84,13 @@ namespace mongo {
      */
     bool isModeCovered(LockMode mode, LockMode coveringMode);
 
+    /**
+     * Returns whether the passed in mode is S or IS. Used for validation checks.
+     */
+    inline bool isSharedLockMode(LockMode mode) {
+        return (mode == MODE_IS || mode == MODE_S);
+    }
+
 
     /**
      * Return values for the locking functions of the lock manager.

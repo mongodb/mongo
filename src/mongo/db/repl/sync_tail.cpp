@@ -144,8 +144,11 @@ namespace repl {
 
         for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
             try {
-                boost::scoped_ptr<Lock::ScopedLock> lk;
-                boost::scoped_ptr<Lock::CollectionLock> lk2;
+                boost::scoped_ptr<Lock::GlobalWrite> globalWriteLock;
+
+                // DB lock always acquires the global lock
+                boost::scoped_ptr<Lock::DBLock> dbLock;
+                boost::scoped_ptr<Lock::CollectionLock> collectionLock;
 
                 bool isIndexBuild = opType[0] == 'i' &&
                     nsToCollectionSubstring( ns ) == "system.indexes";
@@ -153,15 +156,17 @@ namespace repl {
                 if (isCommand) {
                     // a command may need a global write lock. so we will conservatively go
                     // ahead and grab one here. suboptimal. :-(
-                    lk.reset(new Lock::GlobalWrite(txn->lockState()));
+                    globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
                 }
                 else if (isIndexBuild) {
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), MODE_X));
                 }
                 else if (isCrudOpType(opType)) {
                     LockMode mode = createCollection ? MODE_X : MODE_IX;
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
-                    lk2.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), mode));
+                    collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
 
                     if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
                         // need to create database, try again
@@ -170,7 +175,8 @@ namespace repl {
                 }
                 else {
                     // Unknown op?
-                    lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
+                    dbLock.reset(new Lock::DBLock(txn->lockState(),
+                                                  nsToDatabaseSubstring(ns), MODE_X));
                 }
 
                 Client::Context ctx(txn, ns);
@@ -191,13 +197,16 @@ namespace repl {
                 opsAppliedStats.increment();
                 return ok;
             }
-            catch ( const WriteConflictException& wce ) {
+            catch (const WriteConflictException&) {
                 log() << "WriteConflictException while doing oplog application on: " << ns
                       << ", retrying.";
                 createCollection--;
             }
         }
-        invariant(!"impossible");
+
+        // Keeps the compiler warnings happy
+        invariant(false);
+        return false;
     }
 
     // The pool threads call this to prefetch each op
@@ -609,7 +618,7 @@ namespace {
         OperationContextImpl txn;
 
         // allow us to get through the magic barrier
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+        txn.lockState()->setIsBatchWriter(true);
 
         bool convertUpdatesToUpserts = true;
 
@@ -641,7 +650,7 @@ namespace {
         OperationContextImpl txn;
 
         // allow us to get through the magic barrier
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+        txn.lockState()->setIsBatchWriter(true);
 
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();

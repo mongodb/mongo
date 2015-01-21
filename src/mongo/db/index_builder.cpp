@@ -82,8 +82,7 @@ namespace {
         LOG(2) << "IndexBuilder building index " << _index;
 
         OperationContextImpl txn;
-
-        Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
+        txn.lockState()->setIsBatchWriter(true);
 
         txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
 

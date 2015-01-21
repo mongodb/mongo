@@ -64,68 +64,68 @@ namespace mongo {
         ASSERT(ls.isW());
     }
 
-    TEST(DConcurrency, readlocktryTimeout) {
+    TEST(DConcurrency, GlobalLockS_Timeout) {
         MMAPV1LockerImpl ls;
-        writelocktry globalWrite(&ls, 0);
-        ASSERT(globalWrite.got());
+        Lock::GlobalLock globalWrite(&ls, MODE_X, 0);
+        ASSERT(globalWrite.isLocked());
 
         {
             MMAPV1LockerImpl lsTry;
-            readlocktry lockTry(&lsTry, 1);
-            ASSERT(!lockTry.got());
+            Lock::GlobalLock globalReadTry(&lsTry, MODE_S, 1);
+            ASSERT(!globalReadTry.isLocked());
         }
     }
 
-    TEST(DConcurrency, writelocktryTimeout) {
+    TEST(DConcurrency, GlobalLockX_Timeout) {
         MMAPV1LockerImpl ls;
-        writelocktry globalWrite(&ls, 0);
-        ASSERT(globalWrite.got());
+        Lock::GlobalLock globalWrite(&ls, MODE_X, 0);
+        ASSERT(globalWrite.isLocked());
 
         {
             MMAPV1LockerImpl lsTry;
-            writelocktry lockTry(&lsTry, 1);
-            ASSERT(!lockTry.got());
+            Lock::GlobalLock globalWriteTry(&lsTry, MODE_X, 1);
+            ASSERT(!globalWriteTry.isLocked());
         }
     }
 
-    TEST(DConcurrency, readlocktryNoTimeoutDueToGlobalLockS) {
+    TEST(DConcurrency, GlobalLockS_NoTimeoutDueToGlobalLockS) {
         MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
 
         MMAPV1LockerImpl lsTry;
-        readlocktry lockTry(&lsTry, 1);
+        Lock::GlobalLock globalReadTry(&lsTry, MODE_S, 1);
 
-        ASSERT(lockTry.got());
+        ASSERT(globalReadTry.isLocked());
     }
 
-    TEST(DConcurrency, writelocktryTimeoutDueToGlobalLockS) {
+    TEST(DConcurrency, GlobalLockX_TimeoutDueToGlobalLockS) {
         MMAPV1LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
 
         MMAPV1LockerImpl lsTry;
-        writelocktry lockTry(&lsTry, 1);
+        Lock::GlobalLock globalWriteTry(&lsTry, MODE_X, 1);
 
-        ASSERT(!lockTry.got());
+        ASSERT(!globalWriteTry.isLocked());
     }
 
-    TEST(DConcurrency, readlocktryTimeoutDueToGlobalLockX) {
+    TEST(DConcurrency, GlobalLockS_TimeoutDueToGlobalLockX) {
         MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
         MMAPV1LockerImpl lsTry;
-        readlocktry lockTry(&lsTry, 1);
+        Lock::GlobalLock globalReadTry(&lsTry, MODE_S, 1);
 
-        ASSERT(!lockTry.got());
+        ASSERT(!globalReadTry.isLocked());
     }
 
-    TEST(DConcurrency, writelocktryTimeoutDueToGlobalLockX) {
+    TEST(DConcurrency, GlobalLockX_TimeoutDueToGlobalLockX) {
         MMAPV1LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
         MMAPV1LockerImpl lsTry;
-        writelocktry lockTry(&lsTry, 1);
+        Lock::GlobalLock globalWriteTry(&lsTry, MODE_X, 1);
 
-        ASSERT(!lockTry.got());
+        ASSERT(!globalWriteTry.isLocked());
     }
 
     TEST(DConcurrency, TempReleaseGlobalWrite) {
