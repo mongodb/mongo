@@ -369,9 +369,17 @@ namespace mongo {
                                                          const char* data,
                                                          int dataSize,
                                                          bool enforceQuota,
-                                                         UpdateMoveNotifier* notifier ) {
+                                                         UpdateNotifier* notifier ) {
         Record* oldRecord = recordFor( DiskLoc::fromRecordId(oldLocation) );
         if ( oldRecord->netLength() >= dataSize ) {
+            // Make sure to notify other queries before we do an in-place update.
+            if ( notifier ) {
+                Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace( txn,
+                                                                                   oldLocation );
+                if ( !callbackStatus.isOK() )
+                    return StatusWith<RecordId>( callbackStatus );
+            }
+
             // we fit
             memcpy( txn->recoveryUnit()->writingPtr( oldRecord->data(), dataSize ), data, dataSize );
             return StatusWith<RecordId>( oldLocation );

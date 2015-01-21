@@ -405,7 +405,7 @@ namespace mongo {
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota,
-                                                        UpdateMoveNotifier* notifier ) {
+                                                        UpdateNotifier* notifier ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
         if (!ru->transaction()->registerWrite(_getTransactionID(loc))) {
             throw WriteConflictException();

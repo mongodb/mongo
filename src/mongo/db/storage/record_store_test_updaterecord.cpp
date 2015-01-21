@@ -171,7 +171,7 @@ namespace mongo {
         }
     }
 
-    // Insert a record, try to update it, and examine how the UpdateMoveNotifier is called.
+    // Insert a record, try to update it, and examine how the UpdateNotifier is called.
     TEST( RecordStoreTestHarness, UpdateRecordWithMoveNotifier ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
@@ -206,7 +206,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
-                UpdateMoveNotifierSpy umn( opCtx.get(), loc, oldData.c_str(), oldData.size() );
+                UpdateNotifierSpy umn( opCtx.get(), loc, oldData.c_str(), oldData.size() );
 
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->updateRecord( opCtx.get(),
@@ -216,12 +216,16 @@ namespace mongo {
                                                             false,
                                                             &umn );
                 ASSERT_OK( res.getStatus() );
-                // UpdateMoveNotifier::recordStoreGoingToMove() called only if
+                // UpdateNotifier::recordStoreGoingToMove() called only if
                 // the RecordId for the record changes
                 if ( loc == res.getValue() ) {
-                    ASSERT_EQUALS( 0, umn.getNumCalls() );
+                    ASSERT_EQUALS( 0, umn.numMoveCallbacks() );
+                    // Only MMAP v1 is required to use the UpdateNotifier for in-place updates,
+                    // so the number of callbacks is expected to be 0 for non-MMAP storage engines.
+                    ASSERT_GTE( 1, umn.numInPlaceCallbacks() );
                 } else {
-                    ASSERT_EQUALS( 1, umn.getNumCalls() );
+                    ASSERT_EQUALS( 1, umn.numMoveCallbacks() );
+                    ASSERT_EQUALS( 0, umn.numInPlaceCallbacks() );
                 }
                 loc = res.getValue();
                 uow.commit();

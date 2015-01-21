@@ -71,13 +71,15 @@ namespace mongo {
     /**
      * @see RecordStore::updateRecord
      */
-    class UpdateMoveNotifier {
+    class UpdateNotifier {
     public:
-        virtual ~UpdateMoveNotifier(){}
+        virtual ~UpdateNotifier(){}
         virtual Status recordStoreGoingToMove( OperationContext* txn,
                                                const RecordId& oldLocation,
                                                const char* oldBuffer,
                                                size_t oldSize ) = 0;
+        virtual Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                        const RecordId& loc ) = 0;
     };
 
     /**
@@ -170,9 +172,12 @@ namespace mongo {
                                                   bool enforceQuota ) = 0;
 
         /**
-         * @param notifier - this is called if the document is moved
-         *                   it is to be called after the document has been written to new
-         *                   location, before deleted from old.
+         * @param notifier - Only used by record stores which do not support doc-locking.
+         *                   In the case of a document move, this is called after the document
+         *                   has been written to the new location, but before it is deleted from
+         *                   the old location.
+         *                   In the case of an in-place update, this is called just before the
+         *                   in-place write occurs.
          * @return Status or RecordId, RecordId might be different
          */
         virtual StatusWith<RecordId> updateRecord( OperationContext* txn,
@@ -180,7 +185,7 @@ namespace mongo {
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier ) = 0;
+                                                  UpdateNotifier* notifier ) = 0;
 
         /**
          * @return Returns 'false' if this record store does not implement

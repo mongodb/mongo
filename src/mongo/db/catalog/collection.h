@@ -99,7 +99,7 @@ namespace mongo {
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
      */
-    class Collection : CappedDocumentDeleteCallback, UpdateMoveNotifier {
+    class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
     public:
         Collection( OperationContext* txn,
                     const StringData& fullNS,
@@ -289,6 +289,9 @@ namespace mongo {
                                        const RecordId& oldLocation,
                                        const char* oldBuffer,
                                        size_t oldSize );
+
+        Status recordStoreGoingToUpdateInPlace( OperationContext* txn,
+                                                const RecordId& loc );
 
         Status aboutToDeleteCapped( OperationContext* txn, const RecordId& loc );
 

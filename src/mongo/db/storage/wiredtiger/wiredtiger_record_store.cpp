@@ -551,7 +551,7 @@ namespace {
                                                               const char* data,
                                                               int len,
                                                               bool enforceQuota,
-                                                              UpdateMoveNotifier* notifier ) {
+                                                              UpdateNotifier* notifier ) {
         WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         curwrap.assertInActiveTxn();
         WT_CURSOR *c = curwrap.get();

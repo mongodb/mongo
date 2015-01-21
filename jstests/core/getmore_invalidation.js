@@ -7,6 +7,7 @@
 
     var count;
     var cursor;
+    var nextDoc;
     var x;
     var y;
 
@@ -143,5 +144,51 @@
     // We might force-fetch or we might skip over the deleted documents, depending on the internals
     // of the geo near search. Just make sure that we can exhaust the cursor without crashing.
     assert.gte(cursor.itcount(), 0);
+
+    // Case #8: 2d near with mutation invalidation.
+    t.drop();
+    t.ensureIndex({geo: "2d"});
+    for (x = -1; x < 1; x++) {
+        for (y = -1; y < 1; y++) {
+            assert.writeOK(t.insert({geo: [x, y]}));
+        }
+    }
+
+    cursor = t.find({geo: {$near: [0, 0], $maxDistance: 5}}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    // Update all documents in the collection to have position [15, 15].
+    assert.writeOK(t.update({}, {$set: {geo: [15, 15]}}, false, true));
+
+    // The old version of the document should be returned (the update should not be reflected in the
+    // results of the near search).
+    nextDoc = cursor.next();
+    printjson(nextDoc);
+    assert.neq([15, 15], nextDoc.geo);
+    assert(nextDoc.geo[0] === 0 || nextDoc.geo[1] === 0);
+
+    // Case #9: 2dsphere near with mutation invalidation.
+    t.drop();
+    t.ensureIndex({geo: "2dsphere"});
+    for (x = -1; x < 1; x++) {
+        for (y = -1; y < 1; y++) {
+            assert.writeOK(t.insert({geo: [x, y]}));
+        }
+    }
+
+    cursor = t.find({geo: {$nearSphere: [0, 0], $maxDistance: 5}}).batchSize(2);
+    cursor.next();
+    cursor.next();
+
+    // Update all documents in the collection to have position [15, 15].
+    assert.writeOK(t.update({}, {$set: {geo: [15, 15]}}, false, true));
+
+    // The old version of the document should be returned (the update should not be reflected in the
+    // results of the near search).
+    nextDoc = cursor.next();
+    printjson(nextDoc);
+    assert.neq([15, 15], nextDoc.geo);
+    assert(nextDoc.geo[0] === 0 || nextDoc.geo[1] === 0);
 
 })();

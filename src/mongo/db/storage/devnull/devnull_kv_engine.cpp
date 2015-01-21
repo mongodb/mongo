@@ -103,7 +103,7 @@ namespace mongo {
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,
-                                                  UpdateMoveNotifier* notifier ) {
+                                                  UpdateNotifier* notifier ) {
             return StatusWith<RecordId>( oldLocation );
         }
 

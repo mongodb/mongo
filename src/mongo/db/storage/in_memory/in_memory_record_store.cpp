@@ -295,7 +295,7 @@ namespace mongo {
                                                           const char* data,
                                                           int len,
                                                           bool enforceQuota,
-                                                          UpdateMoveNotifier* notifier ) {
+                                                          UpdateNotifier* notifier ) {
         InMemoryRecord* oldRecord = recordFor( loc );
         int oldLen = oldRecord->size;
 
@@ -303,6 +303,15 @@ namespace mongo {
             return StatusWith<RecordId>( ErrorCodes::InternalError,
                                         "failing update: objects in a capped ns cannot grow",
                                         10003 );
+        }
+
+        if (notifier) {
+            // The in-memory KV engine uses the invalidation framework (does not support
+            // doc-locking), and therefore must notify that it is updating a document.
+            Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(txn, loc);
+            if (!callbackStatus.isOK()) {
+                return StatusWith<RecordId>(callbackStatus);
+            }
         }
 
         InMemoryRecord newRecord(len);
