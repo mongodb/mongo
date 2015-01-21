@@ -1232,31 +1232,28 @@ namespace repl {
         Client::initThread("replmaster");
         int toSleep = 10;
         while( 1 ) {
+            sleepsecs(toSleep);
 
-            sleepsecs( toSleep );
-            /* write a keep-alive like entry to the log.  this will make things like
-               printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date
-               even when things are idle.
-            */
-            {
-                OperationContextImpl txn;
-                writelocktry lk(txn.lockState(), 1);
-                if ( lk.got() ) {
-                    toSleep = 10;
+            // Write a keep-alive like entry to the log. This will make things like
+            // printReplicationStatus() and printSlaveReplicationStatus() stay up-to-date even
+            // when things are idle.
+            OperationContextImpl txn;
+            txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
 
-                    txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+            Lock::GlobalWrite globalWrite(txn.lockState(), 1);
+            if (globalWrite.isLocked()) {
+                toSleep = 10;
 
-                    try {
-                        logKeepalive(&txn);
-                    }
-                    catch(...) {
-                        log() << "caught exception in replMasterThread()" << endl;
-                    }
+                try {
+                    logKeepalive(&txn);
                 }
-                else {
-                    LOG(5) << "couldn't logKeepalive" << endl;
-                    toSleep = 1;
+                catch (...) {
+                    log() << "caught exception in replMasterThread()" << endl;
                 }
+            }
+            else {
+                LOG(5) << "couldn't logKeepalive" << endl;
+                toSleep = 1;
             }
         }
     }

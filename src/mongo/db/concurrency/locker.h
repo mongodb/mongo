@@ -31,7 +31,6 @@
 #include <climits> // For UINT_MAX
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_stats.h"
 

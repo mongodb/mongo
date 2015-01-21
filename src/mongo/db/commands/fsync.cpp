@@ -146,7 +146,7 @@ namespace mongo {
                 }
 
                 // Take a global IS lock to ensure the storage engine is not shutdown
-                Lock::GlobalLock global(txn->lockState(), MODE_IS);
+                Lock::GlobalLock global(txn->lockState(), MODE_IS, UINT_MAX);
                 StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
                 result.append( "numFiles" , storageEngine->flushAllFiles( sync ) );
             }
