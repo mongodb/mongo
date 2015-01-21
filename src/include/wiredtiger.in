@@ -2023,11 +2023,11 @@ struct __wt_connection {
  * commits., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to sync the log on every
  * commit by default\, can be overridden by the \c sync setting to
- * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
+ * WT_SESSION::begin_transaction., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
  * are stable on disk\, see @ref tune_durability for more information., a
  * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
- * "none"; default \c fsync.}
+ * "none"; default \c none.}
  * @config{ ),,}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
