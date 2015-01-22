@@ -374,6 +374,10 @@ namespace {
                BSONObj* patt,
                bool* b,
                bool fromMigrate) {
+        if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
+            _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
+        }
+
         try {
             // TODO SERVER-15192 remove this once all listeners are rollback-safe.
             class RollbackPreventer : public RecoveryUnit::Change {
@@ -384,11 +388,6 @@ namespace {
                 }
             };
             txn->recoveryUnit()->registerChange(new RollbackPreventer());
-
-            if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
-                _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
-            }
-
             logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
             logOpForDbHash(ns);
             getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
