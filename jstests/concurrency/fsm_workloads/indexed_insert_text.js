@@ -40,7 +40,8 @@ var $config = (function() {
     function setup(db, collName, cluster) {
         var ixSpec = {};
         ixSpec[this.indexedField] = 'text';
-        assertAlways.commandWorked(db[collName].ensureIndex(ixSpec));
+        // Only allowed to create one text index, other tests may create one.
+        assertWhenOwnColl.commandWorked(db[collName].ensureIndex(ixSpec));
     }
 
     var text = [

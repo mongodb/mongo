@@ -154,7 +154,7 @@ namespace mongo {
 
             PlanExecutor* rawExec;
             Status execStatus = PlanExecutor::make(txn, ws.release(), rootFetch, collection,
-                                                   PlanExecutor::YIELD_MANUAL, &rawExec);
+                                                   PlanExecutor::YIELD_AUTO, &rawExec);
             fassert(28536, execStatus);
             boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
