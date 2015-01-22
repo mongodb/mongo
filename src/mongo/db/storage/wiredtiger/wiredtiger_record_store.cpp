@@ -50,6 +50,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -77,6 +79,16 @@ namespace {
 
         return (appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
     }
+
+    // Throws a WriteConflictException to ensure the calling code can handle it
+    MONGO_FP_DECLARE(wtWriteConflictException);
+
+    void checkWriteConflictExceptionFPEnabled() {
+        if (MONGO_FAIL_POINT(wtWriteConflictException)) {
+            throw WriteConflictException();
+        }
+    }
+
 } // namespace
 
     const std::string kWiredTigerEngineName = "wiredTiger";
@@ -304,34 +316,39 @@ namespace {
     }
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
+        checkWriteConflictExceptionFPEnabled();
+
         // ownership passes to the shared_array created below
         WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        massert( 28556,
-                 "Didn't find RecordId in WiredTigerRecordStore",
-                 ret != WT_NOTFOUND );
+        massert(28556, "Didn't find RecordId in WiredTigerRecordStore", ret != WT_NOTFOUND);
         invariantWTOK(ret);
         return _getData(curwrap);
     }
 
     bool WiredTigerRecordStore::findRecord( OperationContext* txn,
                                             const RecordId& loc, RecordData* out ) const {
+        checkWriteConflictExceptionFPEnabled();
+
         WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        if ( ret == WT_NOTFOUND )
+        if (ret == WT_NOTFOUND) {
             return false;
+        }
         invariantWTOK(ret);
         *out = _getData(curwrap);
         return true;
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const RecordId& loc ) {
+        checkWriteConflictExceptionFPEnabled();
+
         WiredTigerCursor cursor( _uri, _instanceId, true, txn );
         cursor.assertInActiveTxn();
         WT_CURSOR *c = cursor.get();
@@ -492,6 +509,8 @@ namespace {
                                                               const char* data,
                                                               int len,
                                                               bool enforceQuota ) {
+        checkWriteConflictExceptionFPEnabled();
+
         if ( _isCapped && len > _cappedMaxSize ) {
             return StatusWith<RecordId>( ErrorCodes::BadValue,
                                          "object to insert exceeds cappedMaxSize" );
@@ -528,9 +547,8 @@ namespace {
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
         int ret = c->insert(c);
-        if ( ret ) {
-            return StatusWith<RecordId>( wtRCToStatus( ret,
-                                                       "WiredTigerRecordStore::insertRecord" ) );
+        if (ret) {
+            return StatusWith<RecordId>(wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord"));
         }
 
         _changeNumRecords( txn, 1 );
@@ -660,8 +678,6 @@ namespace {
             RecordId loc = iter->getNext();
             deleteRecord( txn, loc );
         }
-
-        // WiredTigerRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         return Status::OK();
     }
@@ -857,8 +873,11 @@ namespace {
             OperationContext* txn,
             const RecordId& startingPosition) const {
 
-        if (!_useOplogHack)
+        if (!_useOplogHack) {
             return boost::none;
+        }
+
+        checkWriteConflictExceptionFPEnabled();
 
         {
             WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
