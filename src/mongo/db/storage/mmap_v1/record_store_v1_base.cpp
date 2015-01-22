@@ -99,7 +99,7 @@ namespace mongo {
     void SavedCursorRegistry::invalidateCursorsForBucket(DiskLoc bucket) {
         // While this is not strictly necessary as an exclusive collection lock will be held,
         // it's cleaner to just make the SavedCursorRegistry thread-safe. Spinlock is OK here.
-        scoped_spinlock lock(mutex);
+        scoped_spinlock lock(_mutex);
         for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end();) {
             if ((*it)->bucket == bucket) {
                 (*it)->_registry = NULL; // prevent ~SavedCursor from trying to unregister
