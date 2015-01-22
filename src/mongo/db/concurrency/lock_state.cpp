@@ -611,7 +611,7 @@ namespace {
 
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
-        invariant(!getWaitingResource().isValid());
+        dassert(!getWaitingResource().isValid());
 
         LockRequest* request;
         bool isNew = true;
