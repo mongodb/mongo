@@ -44,6 +44,34 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	}
 }
 
+/* 
+ * WT_CACHE_DECR --
+ *	Macro to decrement a field by a size.
+ *
+ * Be defensive and don't underflow: a band-aid on a gaping wound, but underflow
+ * won't make things better no matter the problem (specifically, underflow makes
+ * eviction crazy trying to evict non-existent memory).
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_CACHE_DECR(session, f, sz) do {				\
+	static int __first = 1;						\
+	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE) {			\
+		(void)WT_ATOMIC_ADD8(f, sz);				\
+		if (__first) {						\
+			__wt_errx(session,				\
+			    "%s underflow: decrementing %" WT_SIZET_FMT,\
+			    #f, sz);					\
+			__first = 0;					\
+		}							\
+	}								\
+} while (0)
+#else
+#define	WT_CACHE_DECR(s, f, sz) do {					\
+	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE)				\
+		(void)WT_ATOMIC_ADD8(f, sz);				\
+} while (0)
+#endif
+
 /*
  * __wt_cache_page_inmem_decr --
  *	Decrement a page's memory footprint in the cache.
@@ -54,11 +82,12 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_SUB8(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_SUB8(page->memory_footprint, size);
+
+	WT_CACHE_DECR(session, cache->bytes_inmem, size);
+	WT_CACHE_DECR(session, page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_SUB8(cache->bytes_dirty, size);
-		(void)WT_ATOMIC_SUB8(page->modify->bytes_dirty, size);
+		WT_CACHE_DECR(session, cache->bytes_dirty, size);
+		WT_CACHE_DECR(session, page->modify->bytes_dirty, size);
 	}
 }
 
