@@ -183,7 +183,7 @@ DESTRUCTOR(__wt_session, close)
 %extend cclass {
 %pythoncode %{
 	def method(self, *args):
-		'''equals pyargs -> int
+		'''method pyargs -> int
 
 		@copydoc class::method'''
 		return self._##method(*args)
