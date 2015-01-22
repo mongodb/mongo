@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
@@ -262,20 +263,26 @@ namespace mongo {
             CollectionOptions options = coll->getCollectionOptions( txn );
             if ( !options.temp )
                 continue;
+            try {
+                WriteUnitOfWork wunit(txn);
+                Status status = dropCollection( txn, ns );
+                if ( !status.isOK() ) {
+                    warning() << "could not drop temp collection '" << ns << "': " << status;
+                    continue;
+                }
 
-            WriteUnitOfWork wunit(txn);
-            Status status = dropCollection( txn, ns );
-            if ( !status.isOK() ) {
-                warning() << "could not drop temp collection '" << ns << "': " << status;
-                continue;
+                string cmdNs = _name + ".$cmd";
+                repl::logOp( txn,
+                             "c",
+                             cmdNs.c_str(),
+                             BSON( "drop" << nsToCollectionSubstring( ns ) ) );
+                wunit.commit();
             }
-
-            string cmdNs = _name + ".$cmd";
-            repl::logOp( txn,
-                         "c",
-                         cmdNs.c_str(),
-                         BSON( "drop" << nsToCollectionSubstring( ns ) ) );
-            wunit.commit();
+            catch (const WriteConflictException& exp) {
+                warning() << "could not drop temp collection '" << ns << "' due to "
+                    "WriteConflictException";
+                txn->recoveryUnit()->commitAndRestart();
+            }
         }
     }
 
