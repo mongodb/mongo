@@ -737,16 +737,21 @@ namespace {
             bool done = false;
             while (!done) {
                 BufBuilder bb;
-                BSONObjBuilder ob;
+                BSONObjBuilder runCommandResult;
 
                 // Applying commands in repl is done under Global W-lock, so it is safe to not
                 // perform the current DB checks after reacquiring the lock.
                 invariant(txn->lockState()->isW());
 
-                _runCommands(txn, ns, o, bb, ob, true, 0);
+                _runCommands(txn, ns, o, bb, runCommandResult, true, 0);
                 // _runCommands takes care of adjusting opcounters for command counting.
-                Status status = Command::getStatusFromCommandResult(ob.done());
+                Status status = Command::getStatusFromCommandResult(runCommandResult.done());
                 switch (status.code()) {
+                case ErrorCodes::WriteConflict: {
+                    // Need to throw this up to a higher level where it will be caught and the
+                    // operation retried.
+                    throw WriteConflictException();
+                }
                 case ErrorCodes::BackgroundOperationInProgressForDatabase: {
                     Lock::TempRelease release(txn->lockState());
 
