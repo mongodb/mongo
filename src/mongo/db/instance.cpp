@@ -867,21 +867,32 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
-        WriteUnitOfWork wunit(txn);
-        Collection* collection = ctx.db()->getCollection( ns );
-        if ( !collection ) {
-            collection = ctx.db()->createCollection( txn, ns );
-            verify( collection );
-            repl::logOp(txn,
-                        "c",
-                        (ctx.db()->name() + ".$cmd").c_str(),
-                        BSON("create" << nsToCollectionSubstring(ns)));
-        }
+        int attempt = 0;
+        while ( true ) {
+            try {
+                WriteUnitOfWork wunit(txn);
+                Collection* collection = ctx.db()->getCollection( ns );
+                if ( !collection ) {
+                    collection = ctx.db()->createCollection( txn, ns );
+                    verify( collection );
+                    repl::logOp(txn,
+                                "c",
+                                (ctx.db()->name() + ".$cmd").c_str(),
+                                BSON("create" << nsToCollectionSubstring(ns)));
+                }
 
-        StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
-        uassertStatusOK( status.getStatus() );
-        repl::logOp(txn, "i", ns, js);
-        wunit.commit();
+                StatusWith<RecordId> status = collection->insertDocument( txn, js, true );
+                uassertStatusOK( status.getStatus() );
+                repl::logOp(txn, "i", ns, js);
+                wunit.commit();
+                break;
+            }
+            catch( const WriteConflictException& e ) {
+                txn->getCurOp()->debug().writeConflicts++;
+                txn->recoveryUnit()->commitAndRestart();
+                WriteConflictException::logAndBackoff( attempt++, "insert", ns);
+            }
+        }
     }
 
     NOINLINE_DECL void insertMulti(OperationContext* txn,

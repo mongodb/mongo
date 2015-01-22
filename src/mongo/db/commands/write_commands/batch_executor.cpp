@@ -1045,7 +1045,10 @@ namespace mongo {
     }
 
     static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result) {
+        // we have to be top level so we can retry
+        invariant(!state->txn->lockState()->inAWriteUnitOfWork() );
         invariant(state->currIndex < state->normalizedInserts.size());
+
         const StatusWith<BSONObj>& normalizedInsert(state->normalizedInserts[state->currIndex]);
 
         if (!normalizedInsert.isOK()) {
@@ -1057,21 +1060,35 @@ namespace mongo {
             state->request->getInsertRequest()->getDocumentsAt( state->currIndex ) :
             normalizedInsert.getValue();
 
-        try {
-            if (!state->request->isInsertIndexRequest()) {
-                if (state->lockAndCheck(result)) {
-                    singleInsert(state->txn, insertDoc, state->getCollection(), result);
+        int attempt = 0;
+        while (true) {
+            try {
+                if (!state->request->isInsertIndexRequest()) {
+                    if (state->lockAndCheck(result)) {
+                        singleInsert(state->txn, insertDoc, state->getCollection(), result);
+                    }
                 }
+                else {
+                    singleCreateIndex(state->txn, insertDoc, result);
+                }
+                break;
             }
-            else {
-                singleCreateIndex(state->txn, insertDoc, result);
+            catch ( const WriteConflictException& wce ) {
+                state->txn->getCurOp()->debug().writeConflicts++;
+                state->txn->recoveryUnit()->commitAndRestart();
+                WriteConflictException::logAndBackoff( attempt++,
+                                                       "insert",
+                                                       state->getCollection() ?
+                                                       state->getCollection()->ns().ns() :
+                                                       "index" );
             }
-        }
-        catch (const DBException& ex) {
-            Status status(ex.toStatus());
-            if (ErrorCodes::isInterruption(status.code()))
-                throw;
-            result->setError(toWriteError(status));
+            catch (const DBException& ex) {
+                Status status(ex.toStatus());
+                if (ErrorCodes::isInterruption(status.code()))
+                    throw;
+                result->setError(toWriteError(status));
+                break;
+            }
         }
 
         // Errors release the write lock, as a matter of policy.
