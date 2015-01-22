@@ -1164,11 +1164,11 @@ namespace mongo {
             warning() << "couldn't create host_1 index on config db" << causedBy(result);
         }
 
-        result = clusterCreateIndex( LocksType::ConfigNS,
-                                     BSON( LocksType::lockID() << 1 ),
-                                     true, // unique
-                                     WriteConcernOptions::AllConfigs,
-                                     NULL );
+        result = clusterCreateIndex(LocksType::ConfigNS,
+                                    BSON(LocksType::lockID() << 1),
+                                    false, // unique
+                                    WriteConcernOptions::AllConfigs,
+                                    NULL);
 
         if (!result.isOK()) {
             warning() << "couldn't create lock id index on config db" << causedBy(result);
