@@ -1,0 +1,19 @@
+#! /bin/sh
+
+# Check lang directories for potential name conflicts
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+cd ..
+
+for l in java python; do
+	sed -e '/SWIGINTERN.*__wt_[a-z][a-z]*_[a-z]/!d' \
+	    -e '/__wt_[^(]*__.*(/d' \
+	    -e '/_wrap/d' \
+	    -e "/_${l}_/d" \
+	    lang/$l/wiredtiger_wrap.c > $t
+	if [ -s $t ]; then
+		echo "$l: potential name conflict"
+		cat $t
+	fi
+done
