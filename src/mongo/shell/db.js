@@ -952,7 +952,7 @@ DB.prototype.listCommands = function(){
         var s = name + ": ";
 
         if (c.adminOnly) s += " adminOnly ";
-        if (c.adminOnly) s += " slaveOk ";
+        if (c.slaveOk) s += " slaveOk ";
 
         s += "\n  ";
         s += c.help.replace(/\n/g, '\n  ');
