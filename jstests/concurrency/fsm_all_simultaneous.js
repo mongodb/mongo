@@ -7,6 +7,9 @@ var dir = 'jstests/concurrency/fsm_workloads';
 var blacklist = [
     // Disabled due to known bugs
     'findAndModify_update_grow.js', // SERVER-17021 Perf. Regression for WT overflow items
+    'agg_sort_external.js', // SERVER-16700 Deadlock on WiredTiger LSM
+    'yield_and_hashed.js', // SERVER-17119 Verify fails during AND_HASH query stage's readFirstChild
+    'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
 

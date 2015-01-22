@@ -8,6 +8,8 @@ var blacklist = [
     // Disabled due to known bugs
     'agg_sort_external.js', // SERVER-16700 Deadlock on WiredTiger LSM
     'findAndModify_update_grow.js', // SERVER-17021 Perf. Regression for WT overflow items
+    'yield_and_hashed.js', // SERVER-17119 Verify fails during AND_HASH query stage's readFirstChild
+    'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -26,6 +28,6 @@ var blacklist = [
 ].map(function(file) { return dir + '/' + file; });
 
 // SERVER-16196 re-enable executing workloads against replica sets
-// runWorkloadsSerially(ls(dir).filter(function(file) {
-//     return !Array.contains(blacklist, file);
-// }), { replication: true });
+runWorkloadsSerially(ls(dir).filter(function(file) {
+    return !Array.contains(blacklist, file);
+}), { replication: true });
