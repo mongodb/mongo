@@ -23,6 +23,7 @@ const (
 	Locks                // only active if node is capable of calculating lock info
 	AllOnly              // only active if mongostat was run with --all option
 	MMAPOnly             // only active if node has mmap-specific fields
+	WTOnly               // only active if node has wiredtiger-specific fields
 )
 
 type StatLines []StatLine
@@ -73,6 +74,13 @@ type ServerStatus struct {
 
 type WiredTiger struct {
 	Transaction TransactionStats `bson:"transaction"`
+	Cache       CacheStats       `bson:"cache"`
+}
+
+type CacheStats struct {
+	TrackedDirtyBytes  int64 `bson:"tracked dirty bytes in the cache"`
+	CurrentCachedBytes int64 `bson:"bytes currently in the cache"`
+	MaxBytesConfigured int64 `bson:"maximum bytes configured"`
 }
 
 type TransactionStats struct {
@@ -222,6 +230,8 @@ var StatHeaders = []StatHeader{
 	{"delete", Always},
 	{"getmore", Always},
 	{"command", Always},
+	{"% dirty", WTOnly},
+	{"% used", WTOnly},
 	{"flushes", Always},
 	{"mapped", MMAPOnly},
 	{"vsize", Always},
@@ -292,6 +302,10 @@ type StatLine struct {
 
 	//Opcounter fields
 	Insert, Query, Update, Delete, GetMore, Command int64
+
+	//Cache utilization (wiredtiger only)
+	CacheDirtyPercent float64
+	CacheUsedPercent  float64
 
 	//Replicated Opcounter fields
 	InsertR, QueryR, UpdateR, DeleteR, GetMoreR, CommandR int64
@@ -484,6 +498,9 @@ func getLineFlags(lines []StatLine) int {
 		if line.StorageEngine == "mmapv1" {
 			flags |= MMAPOnly
 		}
+		if line.CacheDirtyPercent >= 0 || line.CacheUsedPercent >= 0 {
+			flags |= WTOnly
+		}
 	}
 	return flags
 }
@@ -542,6 +559,19 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		out.WriteCell(formatOpcount(line.Delete, line.DeleteR, false))
 		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
 		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
+
+		if lineFlags&WTOnly > 0 {
+			if line.CacheDirtyPercent < 0 {
+				out.WriteCell("")
+			} else {
+				out.WriteCell(fmt.Sprintf("%.1f", line.CacheDirtyPercent*100))
+			}
+			if line.CacheUsedPercent < 0 {
+				out.WriteCell("")
+			} else {
+				out.WriteCell(fmt.Sprintf("%.1f", line.CacheUsedPercent*100))
+			}
+		}
 
 		out.WriteCell(fmt.Sprintf("%v", line.Flushes))
 
@@ -669,8 +699,12 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 		returnVal.CommandR = diff(newStat.OpcountersRepl.Command, oldStat.OpcountersRepl.Command, sampleSecs)
 	}
 
+	returnVal.CacheDirtyPercent = -1
+	returnVal.CacheUsedPercent = -1
 	if newStat.WiredTiger != nil && oldStat.WiredTiger != nil {
 		returnVal.Flushes = newStat.WiredTiger.Transaction.TransCheckpoints - oldStat.WiredTiger.Transaction.TransCheckpoints
+		returnVal.CacheDirtyPercent = float64(newStat.WiredTiger.Cache.TrackedDirtyBytes) / float64(newStat.WiredTiger.Cache.MaxBytesConfigured)
+		returnVal.CacheUsedPercent = float64(newStat.WiredTiger.Cache.CurrentCachedBytes) / float64(newStat.WiredTiger.Cache.MaxBytesConfigured)
 	} else if newStat.BackgroundFlushing != nil && oldStat.BackgroundFlushing != nil {
 		returnVal.Flushes = newStat.BackgroundFlushing.Flushes - oldStat.BackgroundFlushing.Flushes
 	}
