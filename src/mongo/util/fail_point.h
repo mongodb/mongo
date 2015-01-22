@@ -71,6 +71,12 @@ namespace mongo {
         enum Mode { off, alwaysOn, random, nTimes, numModes };
         enum RetCode { fastOff = 0, slowOff, slowOn };
 
+        /**
+         * Explicitly resets the seed used for the PRNG in this thread.  If not called on a thread,
+         * an instance of SecureRandom is used to seed the PRNG.
+         */
+        static void setThreadPRNGSeed(int32_t seed);
+
         FailPoint();
 
         /**
@@ -119,7 +125,9 @@ namespace mongo {
          * @param val the value that can have different usage depending on the mode:
          *
          *     - off, alwaysOn: ignored
-         *     - random:
+         *     - random: static_cast<int32_t>(std::numeric_limits<int32_t>::max() * p), where
+         *           where p is the probability that any given evaluation of the failpoint should
+         *           activate.
          *     - nTimes: the number of times this fail point will be active when
          *         #shouldFail or #shouldFailOpenBlock is called.
          *
