@@ -272,6 +272,11 @@ namespace mongo {
         string pwd = userObj->getCredentials().password;
         getGlobalAuthorizationManager()->releaseUser(userObj);
 
+        if (pwd.empty()) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "MONGODB-CR credentials missing in the user document");
+        }
+
         md5digest d;
         {
             digestBuilder << user.getUser() << pwd;
