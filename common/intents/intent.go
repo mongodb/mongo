@@ -1,3 +1,4 @@
+// Package intents provides utilities for performing dump/restore operations.
 package intents
 
 import (

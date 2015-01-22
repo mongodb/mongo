@@ -389,7 +389,7 @@ func TestProcessDocuments(t *testing.T) {
 			"pass then on the output channel, and close the input channel if ordered is true", func() {
 			inputChannel := make(chan Converter, 100)
 			outputChannel := make(chan bson.D, 100)
-			importWorker := &ImportWorker{
+			iw := &importWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
 				tomb: &tomb.Tomb{},
@@ -397,7 +397,7 @@ func TestProcessDocuments(t *testing.T) {
 			inputChannel <- csvConverters[0]
 			inputChannel <- csvConverters[1]
 			close(inputChannel)
-			So(importWorker.processDocuments(true), ShouldBeNil)
+			So(iw.processDocuments(true), ShouldBeNil)
 			doc1, open := <-outputChannel
 			So(doc1, ShouldResemble, expectedDocuments[0])
 			So(open, ShouldEqual, true)
@@ -411,7 +411,7 @@ func TestProcessDocuments(t *testing.T) {
 			"pass then on the output channel, and leave the input channel open if ordered is false", func() {
 			inputChannel := make(chan Converter, 100)
 			outputChannel := make(chan bson.D, 100)
-			importWorker := &ImportWorker{
+			iw := &importWorker{
 				unprocessedDataChan:   inputChannel,
 				processedDocumentChan: outputChannel,
 				tomb: &tomb.Tomb{},
@@ -419,7 +419,7 @@ func TestProcessDocuments(t *testing.T) {
 			inputChannel <- csvConverters[0]
 			inputChannel <- csvConverters[1]
 			close(inputChannel)
-			So(importWorker.processDocuments(false), ShouldBeNil)
+			So(iw.processDocuments(false), ShouldBeNil)
 			doc1, open := <-outputChannel
 			So(doc1, ShouldResemble, expectedDocuments[0])
 			So(open, ShouldEqual, true)
@@ -446,13 +446,13 @@ func TestDoSequentialStreaming(t *testing.T) {
 			make(chan bson.D),
 			make(chan bson.D),
 		}
-		importWorkers := []*ImportWorker{
-			&ImportWorker{
+		importWorkers := []*importWorker{
+			&importWorker{
 				unprocessedDataChan:   workerInputChannel[0],
 				processedDocumentChan: workerOutputChannel[0],
 				tomb: &tomb.Tomb{},
 			},
-			&ImportWorker{
+			&importWorker{
 				unprocessedDataChan:   workerInputChannel[1],
 				processedDocumentChan: workerOutputChannel[1],
 				tomb: &tomb.Tomb{},
@@ -460,8 +460,8 @@ func TestDoSequentialStreaming(t *testing.T) {
 		}
 		Convey("documents moving through the input channel should be processed and returned in sequence", func() {
 			// start goroutines to do sequential processing
-			for _, importWorker := range importWorkers {
-				go importWorker.processDocuments(true)
+			for _, iw := range importWorkers {
+				go iw.processDocuments(true)
 			}
 			// feed in a bunch of documents
 			for _, inputCSVDocument := range csvConverters {

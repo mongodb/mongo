@@ -1,3 +1,4 @@
+// Package mongodump creates BSON data from the contents of a MongoDB instance.
 package mongodump
 
 import (

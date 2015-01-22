@@ -1,3 +1,4 @@
+// Main package for the bsondump tool.
 package main
 
 import (

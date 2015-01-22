@@ -53,49 +53,50 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 	}
 }
 
-// ReadAndValidateHeader sets the import fields for a CSV importer
-func (csvInputReader *CSVInputReader) ReadAndValidateHeader() (err error) {
-	fields, err := csvInputReader.csvReader.Read()
+// ReadAndValidateHeader reads the header from the underlying reader and validates
+// the header fields. It sets err if validation fails.
+func (r *CSVInputReader) ReadAndValidateHeader() (err error) {
+	fields, err := r.csvReader.Read()
 	if err != nil {
 		return err
 	}
-	csvInputReader.fields = fields
-	return validateReaderFields(csvInputReader.fields)
+	r.fields = fields
+	return validateReaderFields(r.fields)
 }
 
 // StreamDocument takes a boolean indicating if the documents should be streamed
 // in read order and a channel on which to stream the documents processed from
-// the underlying reader. Returns a non-nil error if encountered
-func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
-	csvRecordChan := make(chan Converter, csvInputReader.numDecoders)
+// the underlying reader. Returns a non-nil error if streaming fails.
+func (r *CSVInputReader) StreamDocument(ordered bool, readDocs chan bson.D) (retErr error) {
+	csvRecordChan := make(chan Converter, r.numDecoders)
 	csvErrChan := make(chan error)
 
 	// begin reading from source
 	go func() {
 		var err error
 		for {
-			csvInputReader.csvRecord, err = csvInputReader.csvReader.Read()
+			r.csvRecord, err = r.csvReader.Read()
 			if err != nil {
 				close(csvRecordChan)
 				if err == io.EOF {
 					csvErrChan <- nil
 				} else {
-					csvInputReader.numProcessed++
-					csvErrChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
+					r.numProcessed++
+					csvErrChan <- fmt.Errorf("read error on entry #%v: %v", r.numProcessed, err)
 				}
 				return
 			}
 			csvRecordChan <- CSVConverter{
-				fields: csvInputReader.fields,
-				data:   csvInputReader.csvRecord,
-				index:  csvInputReader.numProcessed,
+				fields: r.fields,
+				data:   r.csvRecord,
+				index:  r.numProcessed,
 			}
-			csvInputReader.numProcessed++
+			r.numProcessed++
 		}
 	}()
 
 	go func() {
-		csvErrChan <- streamDocuments(ordered, csvInputReader.numDecoders, csvRecordChan, readDocChan)
+		csvErrChan <- streamDocuments(ordered, r.numDecoders, csvRecordChan, readDocs)
 	}()
 
 	return channelQuorumError(csvErrChan, 2)

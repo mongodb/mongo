@@ -5,7 +5,7 @@ type InputOptions struct {
 	TableScan bool   `long:"forceTableScan" description:"force a table scan"`
 }
 
-func (self *InputOptions) Name() string {
+func (_ *InputOptions) Name() string {
 	return "query"
 }
 
@@ -18,6 +18,6 @@ type OutputOptions struct {
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix"`
 }
 
-func (self *OutputOptions) Name() string {
+func (_ *OutputOptions) Name() string {
 	return "output"
 }

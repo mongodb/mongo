@@ -1,3 +1,4 @@
+// Package bsondump converts BSON files into human-readable formats such as JSON.
 package bsondump
 
 import (

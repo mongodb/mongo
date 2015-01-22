@@ -1,3 +1,4 @@
+// Main package for the mongooplog tool.
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Main package for the mongofiles tool.
 package main
 
 import (

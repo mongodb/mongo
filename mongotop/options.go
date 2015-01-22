@@ -1,7 +1,5 @@
 package mongotop
 
-import ()
-
 // Output options for mongotop
 type Output struct {
 	Locks    bool `long:"locks" description:"report on use of per-database locks"`
@@ -9,14 +7,14 @@ type Output struct {
 	Json     bool `long:"json" description:"format output as JSON"`
 }
 
-func (self *Output) Name() string {
+func (_ *Output) Name() string {
 	return "output"
 }
 
-func (self *Output) PostParse() error {
+func (_ *Output) PostParse() error {
 	return nil
 }
 
-func (self *Output) Validate() error {
+func (_ *Output) Validate() error {
 	return nil
 }

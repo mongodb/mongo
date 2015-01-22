@@ -6,14 +6,14 @@ type BSONDumpOptions struct {
 	Pretty   bool   `long:"pretty" description:"output JSON formatted to be human-readable"`
 }
 
-func (self *BSONDumpOptions) Name() string {
+func (_ *BSONDumpOptions) Name() string {
 	return "output"
 }
 
-func (self *BSONDumpOptions) PostParse() error {
+func (_ *BSONDumpOptions) PostParse() error {
 	return nil
 }
 
-func (self *BSONDumpOptions) Validate() error {
+func (_ *BSONDumpOptions) Validate() error {
 	return nil
 }

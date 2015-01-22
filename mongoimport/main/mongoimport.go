@@ -1,3 +1,4 @@
+// Main package for the mongoimport tool.
 package main
 
 import (
@@ -55,20 +56,20 @@ func main() {
 		os.Exit(util.ExitError)
 	}
 
-	mongoImport := mongoimport.MongoImport{
+	m := mongoimport.MongoImport{
 		ToolOptions:     opts,
 		InputOptions:    inputOpts,
 		IngestOptions:   ingestOpts,
 		SessionProvider: sessionProvider,
 	}
 
-	if err = mongoImport.ValidateSettings(args); err != nil {
+	if err = m.ValidateSettings(args); err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
 		log.Logf(log.Always, "try 'mongoimport --help' for more information")
 		os.Exit(util.ExitError)
 	}
 
-	numDocs, err := mongoImport.ImportDocuments()
+	numDocs, err := m.ImportDocuments()
 	if !opts.Quiet {
 		if err != nil {
 			log.Logf(log.Always, "Failed: %v", err)

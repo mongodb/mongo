@@ -130,7 +130,7 @@ type Kerberos struct {
 	ServiceHost string `long:"gssapiHostName" description:"hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
 }
 
-type OptionRegistrationFunction func(self *ToolOptions) error
+type OptionRegistrationFunction func(o *ToolOptions) error
 
 var ConnectionOptFunctions []OptionRegistrationFunction
 
@@ -208,21 +208,21 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 
 // Print the usage message for the tool to stdout.  Returns whether or not the
 // help flag is specified.
-func (self *ToolOptions) PrintHelp(force bool) bool {
-	if self.Help || force {
-		self.parser.WriteHelp(os.Stdout)
+func (o *ToolOptions) PrintHelp(force bool) bool {
+	if o.Help || force {
+		o.parser.WriteHelp(os.Stdout)
 	}
-	return self.Help
+	return o.Help
 }
 
 // Print the tool version to stdout.  Returns whether or not the version flag
 // is specified.
-func (self *ToolOptions) PrintVersion() bool {
-	if self.Version {
-		fmt.Printf("%v version: %v\n", self.AppName, self.VersionStr)
+func (o *ToolOptions) PrintVersion() bool {
+	if o.Version {
+		fmt.Printf("%v version: %v\n", o.AppName, o.VersionStr)
 		fmt.Printf("git version: %v\n", Gitspec)
 	}
-	return self.Version
+	return o.Version
 }
 
 // Interface for extra options that need to be used by specific tools
@@ -238,20 +238,20 @@ func (auth *Auth) RequiresExternalDB() bool {
 // Get the authentication database to use. Should be the value of
 // --authenticationDatabase if it's provided, otherwise, the database that's
 // specified in the tool's --db arg.
-func (self *ToolOptions) GetAuthenticationDatabase() string {
-	if self.Auth.Source != "" {
-		return self.Auth.Source
-	} else if self.Auth.RequiresExternalDB() {
+func (o *ToolOptions) GetAuthenticationDatabase() string {
+	if o.Auth.Source != "" {
+		return o.Auth.Source
+	} else if o.Auth.RequiresExternalDB() {
 		return "$external"
-	} else if self.Namespace != nil && self.Namespace.DB != "" {
-		return self.Namespace.DB
+	} else if o.Namespace != nil && o.Namespace.DB != "" {
+		return o.Namespace.DB
 	}
 	return ""
 }
 
 // AddOptions registers an additional options group to this instance
-func (self *ToolOptions) AddOptions(opts ExtraOptions) error {
-	_, err := self.parser.AddGroup(opts.Name()+" options", "", opts)
+func (o *ToolOptions) AddOptions(opts ExtraOptions) error {
+	_, err := o.parser.AddGroup(opts.Name()+" options", "", opts)
 	if err != nil {
 		return fmt.Errorf("error setting command line options for"+
 			" %v: %v", opts.Name(), err)
@@ -261,8 +261,8 @@ func (self *ToolOptions) AddOptions(opts ExtraOptions) error {
 
 // Parse the command line args.  Returns any extra args not accounted for by
 // parsing, as well as an error if the parsing returns an error.
-func (self *ToolOptions) Parse() ([]string, error) {
-	return self.parser.Parse()
+func (o *ToolOptions) Parse() ([]string, error) {
+	return o.parser.Parse()
 }
 
 func parseHiddenOption(opts *HiddenOptions, option string, arg flags.SplitArgument, args []string) ([]string, error) {

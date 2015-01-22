@@ -8,7 +8,7 @@ type InputOptions struct {
 	Directory              string `long:"dir" description:"input directory, use '-' for stdin"`
 }
 
-func (self *InputOptions) Name() string {
+func (_ *InputOptions) Name() string {
 	return "input"
 }
 
@@ -23,6 +23,6 @@ type OutputOptions struct {
 	StopOnError            bool   `long:"stopOnError" description:"stop restoring if an error is encountered on insert (off by default)"`
 }
 
-func (self *OutputOptions) Name() string {
+func (_ *OutputOptions) Name() string {
 	return "restore"
 }

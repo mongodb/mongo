@@ -21,6 +21,6 @@ type StorageOptions struct {
 	WriteConcern string `long:"writeConcern" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
 }
 
-func (self *StorageOptions) Name() string {
+func (_ *StorageOptions) Name() string {
 	return "storage"
 }

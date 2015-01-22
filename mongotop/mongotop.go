@@ -1,3 +1,4 @@
+// Package mongotop provides a method to track the amount of time a MongoDB instance spends reading and writing data.
 package mongotop
 
 import (

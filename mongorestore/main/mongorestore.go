@@ -1,3 +1,4 @@
+// Main package for the mongorestore tool.
 package main
 
 import (

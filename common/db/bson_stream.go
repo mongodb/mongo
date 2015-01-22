@@ -7,8 +7,6 @@ import (
 	"io"
 )
 
-// ===================== Source =====================
-//BSONSource wraps a stream
 type BSONSource struct {
 	Stream io.ReadCloser
 	err    error

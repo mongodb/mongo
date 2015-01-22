@@ -11,12 +11,12 @@ type SourceOptions struct {
 	Seconds bson.MongoTimestamp `long:"seconds" short:"s" description:"specify a number of seconds for mongooplog to pull from the remote host" default:"86400"  default-mask:"-"`
 }
 
-func (self *SourceOptions) Name() string {
+func (_ *SourceOptions) Name() string {
 	return "source"
 }
 
-func (self *SourceOptions) Validate() error {
-	if self.From == "" {
+func (o *SourceOptions) Validate() error {
+	if o.From == "" {
 		return fmt.Errorf("need to specify --from")
 	}
 	return nil

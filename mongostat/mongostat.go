@@ -1,3 +1,4 @@
+// Package mongostat provides an overview of the status of a currently running mongod or mongos instance.
 package mongostat
 
 import (

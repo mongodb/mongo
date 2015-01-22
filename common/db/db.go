@@ -9,16 +9,21 @@ import (
 	"gopkg.in/mgo.v2"
 	"io"
 	"sync"
+	"time"
 )
 
-const MaxBSONSize = 16 * 1024 * 1024
-
-type sessionFlag uint32
+type (
+	sessionFlag      uint32
+	GetConnectorFunc func(opts options.ToolOptions) DBConnector
+)
 
 const (
 	None      sessionFlag = 0
 	Monotonic sessionFlag = 1 << iota
+)
 
+const (
+	MaxBSONSize     = 16 * 1024 * 1024
 	DefaultTestPort = "33333"
 )
 
@@ -26,11 +31,9 @@ var (
 	ErrLostConnection     = errors.New("lost connection to server")
 	ErrNoReachableServers = errors.New("no reachable servers")
 	ErrNsNotFound         = errors.New("ns not found")
+	DefaultDialTimeout    = time.Second * 3
+	GetConnectorFuncs     = []GetConnectorFunc{}
 )
-
-type GetConnectorFunc func(opts options.ToolOptions) DBConnector
-
-var GetConnectorFuncs []GetConnectorFunc
 
 // Used to manage database sessions
 type SessionProvider struct {
@@ -87,7 +90,6 @@ func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 	if self.masterSession != nil {
 		panic("cannot set session provider flags after calling GetSession()")
 	}
-
 	self.flags = flagBits
 }
 
@@ -105,9 +107,7 @@ func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error configuring the connector: %v", err)
 	}
-
 	return provider, nil
-
 }
 
 // IsConnectionError returns a boolean indicating if a given error is due to

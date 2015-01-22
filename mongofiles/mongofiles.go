@@ -1,3 +1,4 @@
+// Package mongofiles provides an interface to GridFS collections in a MongoDB instance.
 package mongofiles
 
 import (

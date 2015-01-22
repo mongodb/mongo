@@ -1,3 +1,4 @@
+// Package mongorestore writes BSON data to a MongoDB instance.
 package mongorestore
 
 import (

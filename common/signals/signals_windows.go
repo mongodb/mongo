@@ -1,3 +1,4 @@
+// Package signals properly handles platform-specific OS signals.
 package signals
 
 import (

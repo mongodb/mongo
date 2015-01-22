@@ -22,9 +22,9 @@ type Converter interface {
 	Convert() (bson.D, error)
 }
 
-// An ImportWorker reads Converter from the unprocessedDataChan channel and
+// An importWorker reads Converter from the unprocessedDataChan channel and
 // sends processed BSON documents on the processedDocumentChan channel
-type ImportWorker struct {
+type importWorker struct {
 	// unprocessedDataChan is used to stream the input data for a worker to process
 	unprocessedDataChan chan Converter
 
@@ -87,18 +87,18 @@ func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
 	return upsertDocument
 }
 
-// doSequentialStreaming takes a slice of workers, a readDocChan (input) channel and
+// doSequentialStreaming takes a slice of workers, a readDocs (input) channel and
 // an outputChan (output) channel. It sequentially writes unprocessed data read from
 // the input channel to each worker and then sequentially reads the processed data
 // from each worker before passing it on to the output channel
-func doSequentialStreaming(workers []*ImportWorker, readDocChan chan Converter, outputChan chan bson.D) {
+func doSequentialStreaming(workers []*importWorker, readDocs chan Converter, outputChan chan bson.D) {
 	numWorkers := len(workers)
 
 	// feed in the data to be processed and do round-robin
 	// reads from each worker once processing is completed
 	go func() {
 		i := 0
-		for doc := range readDocChan {
+		for doc := range readDocs {
 			workers[i].unprocessedDataChan <- doc
 			i = (i + 1) % numWorkers
 		}
@@ -239,46 +239,46 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // channel in parallel and then sends over the processed data to the outputChan
 // channel - either in sequence or concurrently (depending on the value of
 // ordered) - in which the data was received
-func streamDocuments(ordered bool, numDecoders int, readDocChan chan Converter, outputChan chan bson.D) (retErr error) {
+func streamDocuments(ordered bool, numDecoders int, readDocs chan Converter, outputChan chan bson.D) (retErr error) {
 	if numDecoders == 0 {
 		numDecoders = 1
 	}
-	var importWorkers []*ImportWorker
+	var importWorkers []*importWorker
 	wg := &sync.WaitGroup{}
 	mt := &sync.Mutex{}
 	importTomb := &tomb.Tomb{}
-	inChan := readDocChan
+	inChan := readDocs
 	outChan := outputChan
 	for i := 0; i < numDecoders; i++ {
 		if ordered {
 			inChan = make(chan Converter, workerBufferSize)
 			outChan = make(chan bson.D, workerBufferSize)
 		}
-		importWorker := &ImportWorker{
+		iw := &importWorker{
 			unprocessedDataChan:   inChan,
 			processedDocumentChan: outChan,
 			tomb: importTomb,
 		}
-		importWorkers = append(importWorkers, importWorker)
+		importWorkers = append(importWorkers, iw)
 		wg.Add(1)
-		go func() {
+		go func(iw importWorker) {
 			defer wg.Done()
 			// only set the first worker error and cause sibling goroutines
 			// to terminate immediately
-			err := importWorker.processDocuments(ordered)
+			err := iw.processDocuments(ordered)
 			mt.Lock()
 			defer mt.Unlock()
 			if err != nil && retErr == nil {
 				retErr = err
-				importWorker.tomb.Kill(err)
+				iw.tomb.Kill(err)
 			}
-		}()
+		}(*iw)
 	}
 
 	// if ordered, we have to coordinate the sequence in which processed
 	// documents are passed to the main read channel
 	if ordered {
-		doSequentialStreaming(importWorkers, readDocChan, outputChan)
+		doSequentialStreaming(importWorkers, readDocs, outputChan)
 	}
 	wg.Wait()
 	close(outputChan)
@@ -367,13 +367,13 @@ func validateReaderFields(fields []string) error {
 // to a bson.D document before sending it on the processedDocumentChan channel. Once the
 // input channel is closed the processed channel is also closed if the worker streams its
 // reads in order
-func (importWorker *ImportWorker) processDocuments(ordered bool) error {
+func (iw *importWorker) processDocuments(ordered bool) error {
 	if ordered {
-		defer close(importWorker.processedDocumentChan)
+		defer close(iw.processedDocumentChan)
 	}
 	for {
 		select {
-		case converter, alive := <-importWorker.unprocessedDataChan:
+		case converter, alive := <-iw.unprocessedDataChan:
 			if !alive {
 				return nil
 			}
@@ -381,8 +381,8 @@ func (importWorker *ImportWorker) processDocuments(ordered bool) error {
 			if err != nil {
 				return err
 			}
-			importWorker.processedDocumentChan <- document
-		case <-importWorker.tomb.Dying():
+			iw.processedDocumentChan <- document
+		case <-iw.tomb.Dying():
 			return nil
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
-	"time"
 )
 
 // Interface type for connecting to the database.
@@ -15,10 +14,6 @@ type DBConnector interface {
 	// dial the database and get a fresh new session
 	GetNewSession() (*mgo.Session, error)
 }
-
-var (
-	DefaultDialTimeout = time.Second * 3
-)
 
 // Basic connector for dialing the database, with no authentication.
 type VanillaDBConnector struct {

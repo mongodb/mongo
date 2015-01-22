@@ -1,3 +1,4 @@
+// Package bsonutil provides utilities for processing BSON data.
 package bsonutil
 
 import (

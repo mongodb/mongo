@@ -78,7 +78,6 @@ mongo_tools_variables:
       - name: legacy24
       - name: lint
       - name: log
-      - name: pool
       - name: progress
       - name: qa-tests
       - name: qa-tests-wt
@@ -103,7 +102,6 @@ mongo_tools_variables:
       - name: legacy28
       - name: lint
       - name: log
-      - name: pool
       - name: progress
       - name: qa-tests
       - name: text
@@ -121,7 +119,6 @@ mongo_tools_variables:
       - name: legacy26
       - name: legacy24
       - name: log
-      - name: pool
       - name: qa-tests
       - name: qa-tests-wt
       - name: text
@@ -940,21 +937,6 @@ tasks:
         updates:
           - key: "package"
             value: "common/log"
-    - func: "run unit test"
-
-- name: pool
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/pool"
     - func: "run unit test"
 
 - name: progress

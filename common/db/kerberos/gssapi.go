@@ -1,3 +1,4 @@
+// Package kerberos implements connection to MongoDB using kerberos.
 package kerberos
 
 // #cgo windows CFLAGS: -Ic:/sasl/include

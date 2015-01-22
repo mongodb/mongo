@@ -20,7 +20,7 @@ type OutputFormatOptions struct {
 	Pretty bool `long:"pretty" description:"output JSON formatted to be human-readable"`
 }
 
-func (self *OutputFormatOptions) Name() string {
+func (_ *OutputFormatOptions) Name() string {
 	return "output"
 }
 
@@ -33,6 +33,6 @@ type InputOptions struct {
 	Sort           string `long:"sort" description:"sort order, as a JSON string, e.g. '{x:1}'"`
 }
 
-func (self *InputOptions) Name() string {
+func (_ *InputOptions) Name() string {
 	return "querying"
 }

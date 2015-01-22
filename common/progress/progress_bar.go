@@ -1,3 +1,4 @@
+// Package progress exposes utilities to asynchronously monitor and display processing progress.
 package progress
 
 import (
@@ -11,10 +12,10 @@ import (
 
 const (
 	DefaultWaitTime = 3 * time.Second
-	BarFilling = "#"
-	BarEmpty   = "."
-	BarLeft    = "["
-	BarRight   = "]"
+	BarFilling      = "#"
+	BarEmpty        = "."
+	BarLeft         = "["
+	BarRight        = "]"
 )
 
 // countProgressor is an implementation of Progressor that uses

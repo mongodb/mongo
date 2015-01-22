@@ -1,3 +1,4 @@
+// Main package for the mongodump tool.
 package main
 
 import (

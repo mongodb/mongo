@@ -1,3 +1,4 @@
+// Package text provides utilities for formatting text data.
 package text
 
 import (

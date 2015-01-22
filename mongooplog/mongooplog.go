@@ -1,3 +1,4 @@
+// Package mongooplog polls operations from the replication oplog of one server, and applies them to another.
 package mongooplog
 
 import (

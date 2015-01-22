@@ -1,3 +1,4 @@
+// Main package for the mongostat tool.
 package main
 
 import (

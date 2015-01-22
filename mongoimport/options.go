@@ -20,7 +20,8 @@ type InputOptions struct {
 	Type string `long:"type" default:"json" default-mask:"-" description:"input format to import: json, csv, or tsv (defaults to 'json')"`
 }
 
-func (self *InputOptions) Name() string {
+// Name returns a description of the InputOptions struct.
+func (_ *InputOptions) Name() string {
 	return "input"
 }
 
@@ -47,6 +48,7 @@ type IngestOptions struct {
 	WriteConcern string `long:"writeConcern" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
 }
 
-func (self *IngestOptions) Name() string {
+// Name returns a description of the IngestOptions struct.
+func (_ *IngestOptions) Name() string {
 	return "ingest"
 }

@@ -20,9 +20,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", 2},
 				bson.DocElem{"c", "3e"},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, 1)
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 
@@ -35,9 +35,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", `"cccc,cccc"`},
 				bson.DocElem{"field3", "d"},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, 1)
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 
@@ -50,9 +50,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", "3e"},
 				bson.DocElem{"field3", " may"},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, 1)
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 
@@ -65,9 +65,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"c", "Inline"},
 				bson.DocElem{"d", 14},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, 1)
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedRead)
 		})
 
@@ -87,9 +87,9 @@ func TestTSVStreamDocument(t *testing.T) {
 					bson.DocElem{"c", 6},
 				},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, len(expectedReads))
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			for i := 0; i < len(expectedReads); i++ {
 				for j, readDocument := range <-docChan {
 					So(readDocument.Name, ShouldEqual, expectedReads[i][j].Name)
@@ -112,9 +112,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				bson.DocElem{"b", `"`},
 				bson.DocElem{"c", 6},
 			}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
 			docChan := make(chan bson.D, 2)
-			So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+			So(r.StreamDocument(true, docChan), ShouldBeNil)
 			So(<-docChan, ShouldResemble, expectedReadOne)
 			So(<-docChan, ShouldResemble, expectedReadTwo)
 		})
@@ -135,9 +135,9 @@ func TestTSVStreamDocument(t *testing.T) {
 				}
 				fileHandle, err := os.Open("testdata/test.tsv")
 				So(err, ShouldBeNil)
-				tsvInputReader := NewTSVInputReader(fields, fileHandle, 1)
+				r := NewTSVInputReader(fields, fileHandle, 1)
 				docChan := make(chan bson.D, 50)
-				So(tsvInputReader.StreamDocument(true, docChan), ShouldBeNil)
+				So(r.StreamDocument(true, docChan), ShouldBeNil)
 				So(<-docChan, ShouldResemble, expectedReadOne)
 				So(<-docChan, ShouldResemble, expectedReadTwo)
 			})
@@ -150,9 +150,9 @@ func TestTSVReadAndValidateHeader(t *testing.T) {
 		Convey("setting the header should read the first line of the TSV", func() {
 			contents := "extraHeader1\textraHeader2\textraHeader3\n"
 			fields := []string{}
-			tsvInputReader := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
-			So(tsvInputReader.ReadAndValidateHeader(), ShouldBeNil)
-			So(len(tsvInputReader.fields), ShouldEqual, 3)
+			r := NewTSVInputReader(fields, bytes.NewReader([]byte(contents)), 1)
+			So(r.ReadAndValidateHeader(), ShouldBeNil)
+			So(len(r.fields), ShouldEqual, 3)
 		})
 	})
 }

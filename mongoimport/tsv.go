@@ -14,7 +14,7 @@ const (
 )
 
 // TSVInputReader is a struct that implements the InputReader interface for a
-// TSV input source
+// TSV input source.
 type TSVInputReader struct {
 	// fields is a list of field names in the BSON documents to be imported
 	fields []string
@@ -36,7 +36,7 @@ type TSVInputReader struct {
 	sizeTracker
 }
 
-// TSVConverter implements the Converter interface for TSV input
+// TSVConverter implements the Converter interface for TSV input.
 type TSVConverter struct {
 	fields []string
 	data   string
@@ -56,63 +56,64 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 	}
 }
 
-// ReadAndValidateHeader sets the import fields for a TSV importer
-func (tsvInputReader *TSVInputReader) ReadAndValidateHeader() (err error) {
-	header, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
+// ReadAndValidateHeader reads the header from the underlying reader and validates
+// the header fields. It sets err if validation fails.
+func (r *TSVInputReader) ReadAndValidateHeader() (err error) {
+	header, err := r.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
 		return err
 	}
 	for _, field := range strings.Split(header, tokenSeparator) {
-		tsvInputReader.fields = append(tsvInputReader.fields, strings.TrimRight(field, "\r\n"))
+		r.fields = append(r.fields, strings.TrimRight(field, "\r\n"))
 	}
-	return validateReaderFields(tsvInputReader.fields)
+	return validateReaderFields(r.fields)
 }
 
 // StreamDocument takes a boolean indicating if the documents should be streamed
 // in read order and a channel on which to stream the documents processed from
-// the underlying reader. Returns a non-nil error if encountered
-func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readDocChan chan bson.D) (retErr error) {
-	tsvRecordChan := make(chan Converter, tsvInputReader.numDecoders)
+// the underlying reader. Returns a non-nil error if streaming fails.
+func (r *TSVInputReader) StreamDocument(ordered bool, readDocs chan bson.D) (retErr error) {
+	tsvRecordChan := make(chan Converter, r.numDecoders)
 	tsvErrChan := make(chan error)
 
 	// begin reading from source
 	go func() {
 		var err error
 		for {
-			tsvInputReader.tsvRecord, err = tsvInputReader.tsvReader.ReadString(entryDelimiter)
+			r.tsvRecord, err = r.tsvReader.ReadString(entryDelimiter)
 			if err != nil {
 				close(tsvRecordChan)
 				if err == io.EOF {
 					tsvErrChan <- nil
 				} else {
-					tsvInputReader.numProcessed++
-					tsvErrChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
+					r.numProcessed++
+					tsvErrChan <- fmt.Errorf("read error on entry #%v: %v", r.numProcessed, err)
 				}
 				return
 			}
 			tsvRecordChan <- TSVConverter{
-				fields: tsvInputReader.fields,
-				data:   tsvInputReader.tsvRecord,
-				index:  tsvInputReader.numProcessed,
+				fields: r.fields,
+				data:   r.tsvRecord,
+				index:  r.numProcessed,
 			}
-			tsvInputReader.numProcessed++
+			r.numProcessed++
 		}
 	}()
 
 	// begin processing read bytes
 	go func() {
-		tsvErrChan <- streamDocuments(ordered, tsvInputReader.numDecoders, tsvRecordChan, readDocChan)
+		tsvErrChan <- streamDocuments(ordered, r.numDecoders, tsvRecordChan, readDocs)
 	}()
 
 	return channelQuorumError(tsvErrChan, 2)
 }
 
 // This is required to satisfy the Converter interface for TSV input. It
-// does TSV-specific processing to convert the TSVConverter struct to a bson.D
-func (t TSVConverter) Convert() (bson.D, error) {
+// does TSV-specific processing to convert the TSVConverter struct to a bson.D.
+func (c TSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
-		t.fields,
-		strings.Split(strings.TrimRight(t.data, "\r\n"), tokenSeparator),
-		t.index,
+		c.fields,
+		strings.Split(strings.TrimRight(c.data, "\r\n"), tokenSeparator),
+		c.index,
 	)
 }

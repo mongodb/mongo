@@ -1,3 +1,4 @@
+// Package mongoexport produces a JSON or CSV export of data stored in a MongoDB instance.
 package mongoexport
 
 import (

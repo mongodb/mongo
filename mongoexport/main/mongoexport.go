@@ -1,3 +1,4 @@
+// Main package for the mongoexport tool.
 package main
 
 import (

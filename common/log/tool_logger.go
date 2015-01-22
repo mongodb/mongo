@@ -1,3 +1,4 @@
+// Package log provides a utility to log timestamped messages to an io.Writer.
 package log
 
 import (
