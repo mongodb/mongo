@@ -34,6 +34,7 @@
 
 #include "mongo/db/repl/oplog.h"
 
+#include <deque>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -410,58 +412,64 @@ namespace {
         }
     }
 
-    /** write an op to the oplog that is already built.
-        todo : make _logOpRS() call this so we don't repeat ourself?
+    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        OpTime lastOptime = replCoord->getMyLastOptime();
+        invariant(!ops.empty());
 
-        NOTE(schwerin): This implementation requires that the lock for the oplog or one of its
-        parents be held in the exclusive (MODE_X) state, or to otherwise ensure that setMyLastOptime
-        is called with strictly increasing timestamp values.
-        */
-    OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+        while (1) {
+            try {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock lk(txn->lockState(), "local", MODE_X);
 
-        const OpTime ts = op["ts"]._opTime();
-        long long hash = op["h"].numberLong();
+                if ( localOplogRSCollection == 0 ) {
+                    Client::Context ctx(txn, rsoplog);
 
-        {
-            if ( localOplogRSCollection == 0 ) {
-                Client::Context ctx(txn, rsoplog);
+                    localDB = ctx.db();
+                    verify( localDB );
+                    localOplogRSCollection = localDB->getCollection(rsoplog);
+                    massert(13389,
+                            "local.oplog.rs missing. did you drop it? if so restart server",
+                            localOplogRSCollection);
+                }
 
-                localDB = ctx.db();
-                verify( localDB );
-                localOplogRSCollection = localDB->getCollection(rsoplog);
-                massert(13389,
-                        "local.oplog.rs missing. did you drop it? if so restart server",
-                        localOplogRSCollection);
+                Client::Context ctx(txn, rsoplog, localDB);
+                WriteUnitOfWork wunit(txn);
+
+                for (std::deque<BSONObj>::const_iterator it = ops.begin();
+                     it != ops.end();
+                     ++it) {
+                    const BSONObj& op = *it;
+                    const OpTime ts = op["ts"]._opTime();
+
+                    checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
+
+                    if (!(lastOptime < ts)) {
+                        severe() << "replication oplog stream went back in time. "
+                            "previous timestamp: " << lastOptime << " newest timestamp: " << ts
+                                 << ". Op being applied: " << op;
+                        fassertFailedNoTrace(18905);
+                    }
+                    lastOptime = ts;
+                }
+                wunit.commit();
+
+                BackgroundSync* bgsync = BackgroundSync::get();
+                // Keep this up-to-date, in case we step up to primary.
+                long long hash = ops.back()["h"].numberLong();
+                bgsync->setLastAppliedHash(hash);
+
+                ctx.getClient()->setLastOp(lastOptime);
+
+                replCoord->setMyLastOptime(lastOptime);
+                setNewOptime(lastOptime);
+
+                return lastOptime;
             }
-            Client::Context ctx(txn, rsoplog, localDB);
-            // TODO(geert): soon this needs to be part of an outer WUOW not its own.
-            // We can't do this yet due to locking limitations.
-            WriteUnitOfWork wunit(txn);
-            checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
-
-            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-            OpTime myLastOptime = replCoord->getMyLastOptime();
-            if (!(myLastOptime < ts)) {
-                severe() << "replication oplog stream went back in time. previous timestamp: "
-                         << myLastOptime << " newest timestamp: " << ts << ". Op being applied: "
-                         << op;
-                fassertFailedNoTrace(18905);
+            catch (const WriteConflictException& wce) {
+                log() << "WriteConflictException while writing oplog, retrying.";
             }
-            wunit.commit();
-
-            BackgroundSync* bgsync = BackgroundSync::get();
-            // Keep this up-to-date, in case we step up to primary.
-            bgsync->setLastAppliedHash(hash);
-
-            ctx.getClient()->setLastOp( ts );
-
-            replCoord->setMyLastOptime(ts);
         }
-
-        setNewOptime(ts);
-        return ts;
     }
 
     void createOplog(OperationContext* txn) {

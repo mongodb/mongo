@@ -277,9 +277,12 @@ namespace repl {
         }
 
         applyOps(writerVectors);
-        return applyOpsToOplog(txn, &ops);
-    }
+        OpTime lastOpTime = writeOpsToOplog(txn, ops);
 
+        BackgroundSync::get()->notify(txn);
+
+        return lastOpTime;
+    }
 
     void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
                                      std::vector< std::vector<BSONObj> >* writerVectors) {
@@ -552,31 +555,6 @@ namespace {
 
         // Go back for more ops
         return false;
-    }
-
-    OpTime SyncTail::applyOpsToOplog(OperationContext* txn, std::deque<BSONObj>* ops) {
-        OpTime lastOpTime;
-        {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            WriteUnitOfWork wunit(txn);
-
-            while (!ops->empty()) {
-                const BSONObj& op = ops->front();
-                // this updates lastOpTimeApplied
-                lastOpTime = _logOpObjRS(txn, op);
-                ops->pop_front();
-             }
-            wunit.commit();
-        }
-
-        // This call may result in us assuming PRIMARY role if we'd been waiting for our sync
-        // buffer to drain and it's now empty.  This will acquire a global lock to drop all
-        // temp collections, so we must release the above lock on the local database before
-        // doing so.
-        BackgroundSync::get()->notify(txn);
-
-        return lastOpTime;
     }
 
     void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {

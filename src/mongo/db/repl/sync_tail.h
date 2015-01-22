@@ -111,13 +111,6 @@ namespace repl {
         void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
 
     private:
-        // After ops have been written to db, call this
-        // to update local oplog.rs, as well as notify the primary
-        // that we have applied the ops.
-        // Ops are removed from the deque.
-        // Returns the optime of the last op applied.
-        OpTime applyOpsToOplog(OperationContext* txn, std::deque<BSONObj>* ops);
-
         BackgroundSyncInterface* _networkQueue;
 
         // Function to use during applyOps
