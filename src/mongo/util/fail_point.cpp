@@ -30,15 +30,56 @@
 
 #include "mongo/util/fail_point.h"
 
-#include "mongo/util/mongoutils/str.h"
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/platform/random.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
-using std::endl;
-
-using mongoutils::str::stream;
-
 namespace mongo {
+namespace {
+
+    /**
+     * Type representing the per-thread PRNG used by fail-points.  Required because TSP_* macros,
+     * below, only let you create one thread-specific object per type.
+     */
+    class FailPointPRNG {
+    public:
+        FailPointPRNG() :
+            _prng(boost::scoped_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {}
+
+        void resetSeed(int32_t seed) {
+            _prng = PseudoRandom(seed);
+        }
+
+        int32_t nextPositiveInt32() {
+            return _prng.nextInt32() & ~(1 << 31);
+        }
+
+    private:
+        PseudoRandom _prng;
+    };
+
+}  // namespace
+
+
+    TSP_DECLARE(FailPointPRNG, failPointPrng);
+    TSP_DEFINE(FailPointPRNG, failPointPrng);
+
+namespace {
+
+    int32_t prngNextPositiveInt32() {
+        return failPointPrng.getMake()->nextPositiveInt32();
+    }
+
+}  // namespace
+
+    void FailPoint::setThreadPRNGSeed(int32_t seed) {
+        failPointPrng.getMake()->resetSeed(seed);
+    }
+
     FailPoint::FailPoint():
             _fpInfo(0),
             _mode(off),
@@ -70,7 +111,7 @@ namespace mongo {
         }
 
         // Step 3
-        uassert(16442, stream() << "mode not supported " << static_cast<int>(mode),
+        uassert(16442, str::stream() << "mode not supported " << static_cast<int>(mode),
                 mode >= off && mode < numModes);
 
         _mode = mode;
@@ -125,10 +166,13 @@ namespace mongo {
             return slowOn;
 
         case random:
-            // TODO: randomly determine if should be active or not
-            error() << "FailPoint Mode random is not yet supported." << endl;
-            fassertFailed(16443);
-
+        {
+            const AtomicInt32::WordType maxActivationValue = _timesOrPeriod.load();
+            if (prngNextPositiveInt32() < maxActivationValue) {
+                return slowOn;
+            }
+            return slowOff;
+        }
         case nTimes:
         {
             AtomicInt32::WordType newVal = _timesOrPeriod.subtractAndFetch(1);
@@ -141,7 +185,7 @@ namespace mongo {
         }
 
         default:
-            error() << "FailPoint Mode not supported: " << static_cast<int>(_mode) << endl;
+            error() << "FailPoint Mode not supported: " << static_cast<int>(_mode);
             fassertFailed(16444);
         }
     }

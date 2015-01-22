@@ -28,15 +28,18 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include <boost/thread/thread.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "mongo/stdx/functional.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
-#include "mongo/unittest/unittest.h"
 
 using mongo::FailPoint;
 
@@ -252,4 +255,87 @@ namespace mongo_test {
         mongo::sleepsecs(30);
         stopTest();
     }
+
+    static void parallelFailPointTestThread(FailPoint* fp,
+                                            const int64_t numIterations,
+                                            int64_t* outNumActivations) {
+        int64_t numActivations = 0;
+        for (int64_t i = 0; i < numIterations; ++i) {
+            if (fp->shouldFail()) {
+                ++numActivations;
+            }
+        }
+        *outNumActivations = numActivations;
+    }
+    /**
+     * Encounters a failpoint with the given fpMode and fpVal numEncountersPerThread
+     * times in each of numThreads parallel threads, and returns the number of total
+     * times that the failpoint was activiated.
+     */
+    static int64_t runParallelFailPointTest(
+            FailPoint::Mode fpMode,
+            FailPoint::ValType fpVal,
+            const int32_t numThreads,
+            const int32_t numEncountersPerThread) {
+
+        ASSERT_GT(numThreads, 0);
+        ASSERT_GT(numEncountersPerThread, 0);
+        FailPoint failPoint;
+        failPoint.setMode(fpMode, fpVal);
+        std::vector<boost::thread*> tasks;
+        std::vector<int64_t> counts(numThreads, 0);
+        ASSERT_EQUALS(static_cast<uint32_t>(numThreads), counts.size());
+        for (int32_t i = 0; i < numThreads; ++i) {
+            tasks.push_back(new boost::thread(parallelFailPointTestThread,
+                                              &failPoint,
+                                              numEncountersPerThread,
+                                              &counts[i]));
+        }
+        int64_t totalActivations = 0;
+        for (int32_t i = 0; i < numThreads; ++i) {
+            tasks[i]->join();
+            delete tasks[i];
+            totalActivations += counts[i];
+        }
+        return totalActivations;
+    }
+
+    TEST(FailPoint, CountActivation100) {
+        ASSERT_EQUALS(100, runParallelFailPointTest(FailPoint::nTimes, 100, 10, 100000));
+    }
+
+    TEST(FailPoint, RandomActivationP0) {
+        ASSERT_EQUALS(0, runParallelFailPointTest(FailPoint::random, 0, 1, 1000000));
+    }
+
+    TEST(FailPoint, RandomActivationP5) {
+        ASSERT_APPROX_EQUAL(
+                500000,
+                runParallelFailPointTest(FailPoint::random,
+                                         std::numeric_limits<int32_t>::max() / 2,
+                                         10,
+                                         100000),
+                500);
+    }
+
+    TEST(FailPoint, RandomActivationP01) {
+        ASSERT_APPROX_EQUAL(
+                10000,
+                runParallelFailPointTest(FailPoint::random,
+                                         std::numeric_limits<int32_t>::max() / 100,
+                                         10,
+                                         100000),
+                500);
+    }
+
+    TEST(FailPoint, RandomActivationP001) {
+        ASSERT_APPROX_EQUAL(
+                1000,
+                runParallelFailPointTest(FailPoint::random,
+                                         std::numeric_limits<int32_t>::max() / 1000,
+                                         10,
+                                         100000),
+                500);
+    }
+
 }

@@ -51,10 +51,9 @@ namespace mongo {
      *
      *        1. 'off' - disable fail point.
      *        2. 'alwaysOn' - fail point is always active.
-     *        3. { period: <n> } - n should be within the range of a 32 bit signed
-     *            integer and this would be the approximate period for every activation.
-     *            For example, for { period: 120 }, the probability of the fail point to
-     *            be activated is 1 in 120. NOT YET SUPPORTED.
+     *        3. { activationProbability: <n> } - n should be a double between 0 and 1,
+     *           representing the probability that the fail point will fire.  0 means never,
+     *           1 means (nearly) always.
      *        4. { times: <n> } - n should be positive and within the range of a 32 bit
      *            signed integer and this is the number of passes on the fail point will
      *            remain activated.
@@ -136,12 +135,18 @@ namespace mongo {
 
                     val = intVal;
                 }
-                else if (modeObj.hasField("period")) {
+                else if (modeObj.hasField("activationProbability")) {
                     mode = FailPoint::random;
-
-                    // TODO: implement
-                    errmsg = "random is not yet supported";
-                    return false;
+                    const double activationProbability =
+                        modeObj["activationProbability"].numberDouble();
+                    if (activationProbability < 0 || activationProbability > 1) {
+                        errmsg = str::stream() <<
+                            "activationProbability must be between 0.0 and 1.0; found " <<
+                            activationProbability;
+                        return false;
+                    }
+                    val = static_cast<int32_t>(
+                            std::numeric_limits<int32_t>::max() * activationProbability);
                 }
                 else {
                     errmsg = "invalid mode object";
