@@ -27,14 +27,6 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
- * Estimate the per-allocation overhead.  All implementations of malloc / free
- * have some kind of header and pad for alignment.  We can't know for sure what
- * that adds up to, but this is an estimate based on some measurements of heap
- * size versus bytes in use.
- */
-#define	WT_ALLOC_OVERHEAD	32U
-
-/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -42,8 +34,6 @@ static inline void
 __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
-
-	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD8(cache->bytes_inmem, size);
@@ -62,8 +52,6 @@ static inline void
 __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
-
-	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB8(cache->bytes_inmem, size);

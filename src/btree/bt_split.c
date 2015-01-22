@@ -13,7 +13,7 @@
  * estimate of allocation overhead to every object.
  */
 #define	WT_MEMSIZE_ADD(total, len)	do {				\
-	total += (len) + WT_ALLOC_OVERHEAD;				\
+	total += (len);							\
 } while (0)
 #define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
 	WT_MEMSIZE_ADD(from_decr, len);					\
