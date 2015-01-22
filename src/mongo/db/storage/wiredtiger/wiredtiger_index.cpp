@@ -584,15 +584,14 @@ namespace {
             else if ( _eof || other._eof )
                 return false;
 
-            // Check the locs first since they are likely to differ and comparing them is fast.
-            if ( getRecordId() != other.getRecordId() )
+            // First try WT_CURSOR equals(), as this should be cheap.
+            int equal;
+            invariantWTOK(_cursor.get()->equals(_cursor.get(), other._cursor.get(), &equal));
+            if (!equal)
                 return false;
 
-            loadKeyIfNeeded();
-            other.loadKeyIfNeeded();
-
-            return _key.getSize() == other._key.getSize()
-                && memcmp(_key.getBuffer(), other._key.getBuffer(), _key.getSize()) == 0;
+            // WT says cursors are equal, but need to double-check that the RecordIds match.
+            return getRecordId() == other.getRecordId();
         }
 
         bool locate(const BSONObj &key, const RecordId& loc) {
