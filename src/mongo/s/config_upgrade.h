@@ -111,6 +111,7 @@ namespace mongo {
          *
          * + "_secondaryThrottle" field for config.settings now accepts write concern
          *   specifications.
+         * + config.locks { ts: 1 } index is no longer unique.
          */
         UpgradeHistory_DummyBumpPre2_8 = 6,
     };
