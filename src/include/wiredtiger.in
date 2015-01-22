@@ -1542,10 +1542,10 @@ struct __wt_connection {
 	 * (for example\, if the cache size is 100GB\, a percentage of 10 means
 	 * WiredTiger limits itself to a cache size of 90GB). This value is
 	 * configurable because different heap allocators have different
-	 * allocation overhead\, and no fixed value is correct\, as different
-	 * workloads will have different heap allocation sizes and patterns\,
-	 * and applications may need to adjust this value based on their
-	 * measured workloads., an integer between 0 and 20; default \c 8.}
+	 * overhead and different workloads will have different heap allocation
+	 * sizes and patterns\, therefore applications may need to adjust this
+	 * value based on allocator choice and behavior in measured workloads.,
+	 * an integer between 0 and 20; default \c 8.}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either \c cache_size or \c shared_cache but
 	 * not both., an integer between 1MB and 10TB; default \c 100MB.}
@@ -1877,10 +1877,10 @@ struct __wt_connection {
  * percentage\, and decrement the cache size by that amount (for example\, if
  * the cache size is 100GB\, a percentage of 10 means WiredTiger limits itself
  * to a cache size of 90GB). This value is configurable because different heap
- * allocators have different allocation overhead\, and no fixed value is
- * correct\, as different workloads will have different heap allocation sizes
- * and patterns\, and applications may need to adjust this value based on their
- * measured workloads., an integer between 0 and 20; default \c 8.}
+ * allocators have different overhead and different workloads will have
+ * different heap allocation sizes and patterns\, therefore applications may
+ * need to adjust this value based on allocator choice and behavior in measured
+ * workloads., an integer between 0 and 20; default \c 8.}
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either \c cache_size or \c shared_cache but not
  * both., an integer between 1MB and 10TB; default \c 100MB.}
