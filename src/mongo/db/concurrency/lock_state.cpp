@@ -35,6 +35,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -726,7 +727,10 @@ namespace {
             }
 
             // If infinite timeout was requested, just keep waiting
-            if (timeoutMs == UINT_MAX) continue;
+            if (timeoutMs == UINT_MAX) {
+                markThreadIdle();
+                continue;
+            }
 
             const unsigned elapsedTimeMs = elapsedTimeMicros / 1000;
             waitTimeMs = (elapsedTimeMs < timeoutMs) ?
@@ -735,6 +739,9 @@ namespace {
             if (waitTimeMs == 0) {
                 break;
             }
+
+            // We have waited for a while and may likely be waiting even longer, mark us as idle
+            markThreadIdle();
         }
 
         // Cleanup the state, since this is an unused lock now

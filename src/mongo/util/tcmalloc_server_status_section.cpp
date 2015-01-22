@@ -29,10 +29,38 @@
 
 #include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
 
+#include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/net/listen.h"
 
 namespace mongo {
+
 namespace {
+    // If many clients are used, the per-thread caches become smaller and chances of
+    // rebalancing of free space during critical sections increases. In such situations,
+    // it is better to release memory when it is likely the thread will be blocked for
+    // a long time.
+    const int kManyClients = 40;
+
+    /**
+     *  Callback to allow TCMalloc to release freed memory to the central list at
+     *  favorable times. Ideally would do some milder cleanup or scavenge...
+     */
+    void threadStateChange() {
+        if (Listener::globalTicketHolder.used() > kManyClients) {
+            //  Mark thread busy while we're idle, so that overhead is incurred now.
+            MallocExtension::instance()->MarkThreadIdle();
+            MallocExtension::instance()->MarkThreadBusy();
+        }
+    }
+
+    // Register threadStateChange callback
+    MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
+        registerThreadIdleCallback(&threadStateChange);
+        return Status::OK();
+    }
+
     class TCMallocServerStatusSection : public ServerStatusSection {
     public:
 
