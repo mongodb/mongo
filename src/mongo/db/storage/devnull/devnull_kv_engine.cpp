@@ -1,5 +1,3 @@
-// devnull_kv_engine.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,8 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -175,12 +176,25 @@ namespace mongo {
         BSONObj _dummy;
     };
 
+    class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
+        MONGO_DISALLOW_COPYING(DevNullSortedDataBuilderInterface);
+
+    public:
+        DevNullSortedDataBuilderInterface() { }
+
+        virtual Status addKey(const BSONObj& key, const RecordId& loc) {
+            return Status::OK();
+        }
+    };
+
     class DevNullSortedDataInterface : public SortedDataInterface {
     public:
         virtual ~DevNullSortedDataInterface() { }
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn,
-                                                           bool dupsAllowed) { return NULL; }
+                                                           bool dupsAllowed) {
+            return new DevNullSortedDataBuilderInterface();
+        }
 
         virtual Status insert(OperationContext* txn,
                               const BSONObj& key,
