@@ -197,6 +197,7 @@ struct __wt_connection_impl {
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
+	int	   cache_overhead;
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
