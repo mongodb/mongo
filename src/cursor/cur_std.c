@@ -480,11 +480,11 @@ __wt_cursor_close(WT_CURSOR *cursor)
 }
 
 /*
- * __wt_cursor_equal --
+ * __wt_cursor_equals --
  *	WT_CURSOR->equals default implementation.
  */
 int
-__wt_cursor_equal(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
+__wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;

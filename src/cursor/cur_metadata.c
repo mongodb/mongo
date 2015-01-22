@@ -409,7 +409,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curmetadata_compare,	/* compare */
-	    __wt_cursor_equal,		/* equals */
+	    __wt_cursor_equals,		/* equals */
 	    __curmetadata_next,		/* next */
 	    __curmetadata_prev,		/* prev */
 	    __curmetadata_reset,	/* reset */

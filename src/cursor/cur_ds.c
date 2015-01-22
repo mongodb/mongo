@@ -454,7 +454,7 @@ __wt_curds_open(
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __curds_compare,		/* compare */
-	    __wt_cursor_equal,		/* equals */
+	    __wt_cursor_equals,		/* equals */
 	    __curds_next,		/* next */
 	    __curds_prev,		/* prev */
 	    __curds_reset,		/* reset */

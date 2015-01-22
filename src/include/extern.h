@@ -280,7 +280,7 @@ extern int __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
-extern int __wt_cursor_equal(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
+extern int __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
 extern int __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config);
 extern int __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor);
 extern int __wt_cursor_init(WT_CURSOR *cursor, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
