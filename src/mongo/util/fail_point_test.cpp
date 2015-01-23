@@ -303,10 +303,6 @@ namespace mongo_test {
         return totalActivations;
     }
 
-    TEST(FailPoint, CountActivation100) {
-        ASSERT_EQUALS(100, runParallelFailPointTest(FailPoint::nTimes, 100, 10, 100000));
-    }
-
     TEST(FailPoint, RandomActivationP0) {
         ASSERT_EQUALS(0, runParallelFailPointTest(FailPoint::random, 0, 1, 1000000));
     }
