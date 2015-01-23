@@ -362,7 +362,7 @@ __evict_worker(void *arg)
 			WT_ERR(__wt_cond_wait(
 			    session, cache->evict_waiter_cond, 10000));
 		else
-			WT_ERR(__evict_lru_pages(session, 1));
+			WT_ERR(__evict_lru_pages(session, 0));
 	}
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_EVICTSERVER, "cache eviction worker exiting"));
@@ -704,7 +704,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
  *	Get pages from the LRU queue to evict.
  */
 static int
-__evict_lru_pages(WT_SESSION_IMPL *session, int is_app)
+__evict_lru_pages(WT_SESSION_IMPL *session, int is_server)
 {
 	WT_DECL_RET;
 
@@ -712,7 +712,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, int is_app)
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails
 	 * eviction because it's unavailable, continue in that case.
 	 */
-	while ((ret = __wt_evict_lru_page(session, is_app)) == 0 ||
+	while ((ret = __wt_evict_lru_page(session, is_server)) == 0 ||
 	    ret == EBUSY)
 		;
 	return (ret == WT_NOTFOUND ? 0 : ret);
@@ -822,10 +822,8 @@ __evict_server_work(WT_SESSION_IMPL *session)
 		if (cache->evict_candidates > 10 &&
 		    cache->evict_current != NULL)
 			__wt_yield();
-	} else {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_server_evicting);
-		WT_RET(__evict_lru_pages(session, 0));
-	}
+	} else
+		WT_RET(__evict_lru_pages(session, 1));
 
 	return (0);
 }
@@ -1185,7 +1183,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
  */
 static int
 __evict_get_ref(
-    WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_REF **refp)
+    WT_SESSION_IMPL *session, int is_server, WT_BTREE **btreep, WT_REF **refp)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
@@ -1195,18 +1193,6 @@ __evict_get_ref(
 	cache = S2C(session)->cache;
 	*btreep = NULL;
 	*refp = NULL;
-
-	/*
-	 * A pathological case: if we're the oldest transaction in the system
-	 * and the eviction server is stuck trying to find space, abort the
-	 * transaction to give up all hazard pointers before trying again.
-	 */
-	if (is_app && F_ISSET(cache, WT_EVICT_STUCK) &&
-	    __wt_txn_am_oldest(session)) {
-		F_CLR(cache, WT_EVICT_STUCK);
-		WT_STAT_FAST_CONN_INCR(session, txn_fail_cache);
-		return (WT_ROLLBACK);
-	}
 
 	/*
 	 * Avoid the LRU lock if no pages are available.  If there are pages
@@ -1228,7 +1214,7 @@ __evict_get_ref(
 	 * looking for more.
 	 */
 	candidates = cache->evict_candidates;
-	if (!is_app && candidates > 1)
+	if (is_server && candidates > 1)
 		candidates /= 2;
 
 	/* Get the next page queued for eviction. */
@@ -1280,7 +1266,7 @@ __evict_get_ref(
  *	Called by both eviction and application threads to evict a page.
  */
 int
-__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
+__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -1288,11 +1274,22 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_PAGE *page;
 	WT_REF *ref;
 
-	if (is_app)
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
-
-	WT_RET(__evict_get_ref(session, is_app, &btree, &ref));
+	WT_RET(__evict_get_ref(session, is_server, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+
+	/*
+	 * An internal session flags either the server itself or an eviction
+	 * worker thread.
+	 */
+	if (F_ISSET(session, WT_SESSION_INTERNAL)) {
+		if (is_server)
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_server_evicting);
+		else
+			WT_STAT_FAST_CONN_INCR(
+			    session, cache_eviction_worker_evicting);
+	} else
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_app);
 
 	/*
 	 * In case something goes wrong, don't pick the same set of pages every
@@ -1308,7 +1305,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
-	WT_ASSERT(session, is_app || session->split_gen == 0);
+	WT_ASSERT(session,
+	    !F_ISSET(session, WT_SESSION_INTERNAL) || session->split_gen == 0);
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 

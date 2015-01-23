@@ -136,10 +136,13 @@ static inline int
 __wt_cache_full_check(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
 	int busy, count, full;
+
+	cache = S2C(session)->cache;
 
 	/*
 	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
@@ -190,7 +193,20 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	count = busy ? 1 : 10;
 
 	for (;;) {
-		switch (ret = __wt_evict_lru_page(session, 1)) {
+		/*
+		 * A pathological case: if we're the oldest transaction in the
+		 * system and the eviction server is stuck trying to find space,
+		 * abort the transaction to give up all hazard pointers before
+		 * trying again.
+		 */
+		if (F_ISSET(cache, WT_EVICT_STUCK) &&
+		    __wt_txn_am_oldest(session)) {
+			F_CLR(cache, WT_EVICT_STUCK);
+			WT_STAT_FAST_CONN_INCR(session, txn_fail_cache);
+			return (WT_ROLLBACK);
+		}
+
+		switch (ret = __wt_evict_lru_page(session, 0)) {
 		case 0:
 			if (--count == 0)
 				return (0);
