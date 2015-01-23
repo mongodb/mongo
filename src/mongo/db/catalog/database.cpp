@@ -385,20 +385,11 @@ namespace mongo {
 
         audit::logDropCollection( currentClient.get(), fullns );
 
-        try {
-            Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
-            if ( !s.isOK() ) {
-                warning() << "could not drop collection, trying to drop indexes"
-                          << fullns << " because of " << s.toString();
-                return s;
-            }
-        }
-        catch( DBException& e ) {
-            stringstream ss;
-            ss << "drop: dropIndexes for collection failed. cause: " << e.what();
-            ss << ". See http://dochub.mongodb.org/core/data-recovery";
-            warning() << ss.str() << endl;
-            return Status( ErrorCodes::InternalError, ss.str() );
+        Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
+        if ( !s.isOK() ) {
+            warning() << "could not drop collection, trying to drop indexes"
+                      << fullns << " because of " << s.toString();
+            return s;
         }
 
         verify( collection->_details->getTotalIndexCount( txn ) == 0 );
@@ -406,7 +397,7 @@ namespace mongo {
 
         Top::global.collectionDropped( fullns );
 
-        Status s = _dbEntry->dropCollection( txn, fullns );
+        s = _dbEntry->dropCollection( txn, fullns );
 
         _clearCollectionCache( txn, fullns ); // we want to do this always
 
