@@ -258,7 +258,9 @@ namespace mongo_test {
 
     static void parallelFailPointTestThread(FailPoint* fp,
                                             const int64_t numIterations,
+                                            const int32_t seed,
                                             int64_t* outNumActivations) {
+        fp->setThreadPRNGSeed(seed);
         int64_t numActivations = 0;
         for (int64_t i = 0; i < numIterations; ++i) {
             if (fp->shouldFail()) {
@@ -289,6 +291,7 @@ namespace mongo_test {
             tasks.push_back(new boost::thread(parallelFailPointTestThread,
                                               &failPoint,
                                               numEncountersPerThread,
+                                              i, // hardcoded seed, different for each thread.
                                               &counts[i]));
         }
         int64_t totalActivations = 0;
