@@ -177,9 +177,6 @@ namespace {
                 fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate));
                 logProcessDetailsForLogRotate();
                 break;
-            case SIGQUIT:
-                log() << "Received SIGQUIT; terminating.";
-                quickExit(EXIT_ABRUPT);
             default:
                 // interrupt/terminate signal
                 log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
@@ -209,7 +206,6 @@ namespace {
            sigaddset( &asyncSignals, SIGINT );
         }
         sigaddset( &asyncSignals, SIGTERM );
-        sigaddset( &asyncSignals, SIGQUIT );
         sigaddset( &asyncSignals, SIGUSR1 );
         sigaddset( &asyncSignals, SIGXCPU );
 #endif
