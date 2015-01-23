@@ -38,9 +38,10 @@
 namespace mongo {
     namespace {
         CollectionMetadataPtr getMetadata(const NamespaceString& nsString) {
-            if (shardingState.needCollectionMetadata(nsString.ns())) {
+            if (shardingState.enabled()) {
                 return shardingState.getCollectionMetadata(nsString.ns());
             }
+
             return CollectionMetadataPtr();
         }
     }
