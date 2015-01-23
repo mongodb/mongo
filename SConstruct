@@ -10,29 +10,44 @@ if not os.sys.platform == "win32":
     print ("SConstruct is only supported for Windows, use build_posix for other platforms")
     Exit(1)
 
-AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
-          help="Berkeley DB install path, ie, /usr/local")
+# Command line options
+#
+AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=False,
+          help="Link with the MSVCRT DLL version")
 
-AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
-          help="Use zlib compression")
+AddOption("--enable-attach", dest="attach", action="store_true", default=False,
+          help="Configure for debugger attach on failure.")
+
+AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default=False,
+          help="Configure WiredTiger to perform various run-time diagnostic tests. DO NOT configure this option in production environments.")
+
+AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action="store",
+          help="Build Python extension, specify location of swig.exe binary")
 
 AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="store",
           help="Use snappy compression")
 
-AddOption("--enable-swig", dest="swig", type="string", nargs=1, action="store",
-          help="Build python extension, specify location of swig.exe binary")
+AddOption("--enable-verbose", dest="verbose", action="store_true", default=False,
+          help="Configure WiredTiger to support the verbose configuration string to wiredtiger_open")
 
-AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=False,
-          help="Link with the MSVCRT DLL version")
+AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
+          help="Use zlib compression")
 
+AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
+          help="Berkeley DB install path, ie, /usr/local")
+
+# Get the swig binary from the command line option since SCONS cannot find it automatically
+#
+swig_binary = GetOption("lang-python")
+
+# Initialize environment
+#
 env = Environment(
     CPPPATH = ["#/src/include/",
                "#/build_win",
                "#/test/windows",
                "#/.",
-               distutils.sysconfig.get_python_inc()
            ],
-    #CPPDEFINES = ["HAVE_DIAGNOSTIC", "HAVE_VERBOSE"],
     CFLAGS = [
         "/Z7", # Generate debugging symbols
         "/wd4090", # Ignore warning about mismatched const qualifiers
@@ -59,15 +74,8 @@ env = Environment(
         "/DYNAMICBASE",
         "/NXCOMPAT",
         ],
-    LIBPATH=[ distutils.sysconfig.PREFIX + r"\libs"],
     tools=["default", "swig", "textfile"],
-    SWIGFLAGS=['-python',
-               "-threads",
-               "-O",
-               "-nodefaultctor",
-               "-nodefaultdtor"
-    ],
-    SWIG=GetOption("swig")
+    SWIG=swig_binary
 )
 
 useZlib = GetOption("zlib")
@@ -109,7 +117,24 @@ if useBdb:
 
 env = conf.Finish()
 
+# Configure build environment variables
+#
+if GetOption("attach"):
+    env.Append(CPPDEFINES = ["HAVE_ATTACH"])
 
+if GetOption("diagnostic"):
+    env.Append(CPPDEFINES = ["HAVE_DIAGNOSTIC"])
+
+if GetOption("lang-python"):
+    env.Append(LIBPATH=[distutils.sysconfig.PREFIX + r"\libs"])
+    env.Append(CPPPATH=[distutils.sysconfig.get_python_inc()])
+
+if GetOption("verbose"):
+    env.Append(CPPDEFINES = ["HAVE_VERBOSE"])
+
+
+# Build WiredTiger.h file
+#
 version_file = 'build_posix/aclocal/version-set.m4'
 
 VERSION_MAJOR = None
@@ -170,7 +195,7 @@ if useZlib:
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
 
-wtlib = env.Library("wiredtiger", wtsources)
+wtlib = env.Library("libwiredtiger", wtsources)
 
 env.Depends(wtlib, [filelistfile, version_file])
 
@@ -198,19 +223,29 @@ env.Program("wt", [
     "src/utilities/util_write.c"],
     LIBS=[wtlib] + wtlibs)
 
-if GetOption("swig"):
-    swiglib = env.SharedLibrary('_wiredtiger',
+# Python SWIG wrapper for WiredTiger
+if GetOption("lang-python"):
+    pythonEnv = env.Clone()
+    pythonEnv.Append(SWIGFLAGS=[
+            "-python",
+            "-threads",
+            "-O",
+            "-nodefaultctor",
+            "-nodefaultdtor",
+            ])
+
+    swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
                       SHLIBSUFFIX=".pyd",
                       LIBS=[wtlib])
 
-    copySwig = env.Command(
+    copySwig = pythonEnv.Command(
         'lang/python/wiredtiger/__init__.py',
         'lang/python/wiredtiger.py',
         Copy('$TARGET', '$SOURCE'))
-    env.Depends(copySwig, swiglib)
+    pythonEnv.Depends(copySwig, swiglib)
 
-    env.Install('lang/python/wiredtiger/', swiglib)
+    pythonEnv.Install('lang/python/wiredtiger/', swiglib)
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",
