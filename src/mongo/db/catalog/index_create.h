@@ -197,6 +197,7 @@ namespace mongo {
 
     private:
         class SetNeedToCleanupOnRollback;
+        class CleanupIndexesVectorOnRollback;
 
         struct IndexToBuild {
             IndexToBuild() : real(NULL) {}
