@@ -51,7 +51,7 @@ env = Environment(
     CFLAGS = [
         "/Z7", # Generate debugging symbols
         "/wd4090", # Ignore warning about mismatched const qualifiers
-        "/wd4996", 
+        "/wd4996",
         "/W3", # Warning level 3
         "/we4013", # Error on undefined functions
         "/TC", # Compile as C code
@@ -195,11 +195,25 @@ if useZlib:
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
 
-wtlib = env.Library("libwiredtiger", wtsources)
+wt_objs = [env.Object(a) for a in wtsources]
+
+# Static Library - libwiredtiger.lib
+#
+wtlib = env.Library(
+    target="libwiredtiger",
+    source=wt_objs, LIBS=wtlibs)
 
 env.Depends(wtlib, [filelistfile, version_file])
 
-env.Program("wt", [
+# Dynamically Loaded Library - wiredtiger.dll
+#
+wtdll = env.SharedLibrary(
+    target="wiredtiger",
+    source=wt_objs + ['build_win/wiredtiger.def'], LIBS=wtlibs)
+
+env.Depends(wtdll, [filelistfile, version_file])
+
+wtbin = env.Program("wt", [
     "src/utilities/util_backup.c",
     "src/utilities/util_cpyright.c",
     "src/utilities/util_compact.c",
@@ -237,7 +251,7 @@ if GetOption("lang-python"):
     swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
                       SHLIBSUFFIX=".pyd",
-                      LIBS=[wtlib])
+                      LIBS=[wtlib] + wtlibs)
 
     copySwig = pythonEnv.Command(
         'lang/python/wiredtiger/__init__.py',
@@ -245,7 +259,7 @@ if GetOption("lang-python"):
         Copy('$TARGET', '$SOURCE'))
     pythonEnv.Depends(copySwig, swiglib)
 
-    pythonEnv.Install('lang/python/wiredtiger/', swiglib)
+    swiginstall = pythonEnv.Install('lang/python/wiredtiger/', swiglib)
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",
@@ -253,7 +267,7 @@ shim = env.Library("window_shim",
 
 env.Program("t_bloom",
     "test/bloom/test_bloom.c",
-    LIBS=[wtlib])
+    LIBS=[wtlib] + wtlibs)
 
 #env.Program("t_checkpoint",
     #["test/checkpoint/checkpointer.c",
@@ -263,7 +277,7 @@ env.Program("t_bloom",
 
 env.Program("t_huge",
     "test/huge/huge.c",
-    LIBS=[wtlib])
+    LIBS=[wtlib] + wtlibs)
 
 #env.Program("t_fops",
     #["test/fops/file.c",
@@ -287,7 +301,7 @@ if useBdb:
         "test/format/t.c",
         "test/format/util.c",
         "test/format/wts.c"],
-         LIBS=[wtlib, shim, "libdb61"])
+         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
 
 #env.Program("t_thread",
     #["test/thread/file.c",
@@ -306,7 +320,7 @@ env.Program("wtperf", [
     "bench/wtperf/track.c",
     "bench/wtperf/wtperf.c",
     ],
-    LIBS=[wtlib, shim] )
+    LIBS=[wtlib, shim]  + wtlibs)
 
 examples = [
     "ex_access",
@@ -329,8 +343,8 @@ examples = [
     ]
 
 for ex in examples:
-    if(ex in ['ex_async', 'ex_thread']):
-        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim])
+    if(ex in ['ex_all', 'ex_async', 'ex_thread']):
+        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
     else:
-        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib])
+        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtdll[1]] + wtlibs)
 
