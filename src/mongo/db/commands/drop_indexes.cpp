@@ -38,6 +38,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -110,27 +111,20 @@ namespace mongo {
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
-            int attempt = 0;
-            while (1) {
-                try {
-                    ScopedTransaction transaction(txn, MODE_IX);
-                    Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-                    WriteUnitOfWork wunit(txn);
-                    bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
-                    if (!ok) {
-                        return false;
-                    }
-                    if (!fromRepl)
-                        repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
-                    wunit.commit();
-                    return true;
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+                WriteUnitOfWork wunit(txn);
+                bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
+                if (!ok) {
+                    return false;
                 }
-                catch (const WriteConflictException& wce) {
-                    WriteConflictException::logAndBackoff(attempt++,
-                                                          "dropIndexes",
-                                                          dbname);
+                if (!fromRepl) {
+                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
                 }
-            }
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "dropIndexes", dbname);
+            return true;
         }
 
         bool wrappedRun(OperationContext* txn,

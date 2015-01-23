@@ -488,49 +488,40 @@ namespace mongo {
                 return false;
             }
 
-            int attempt = 0;
-            while (1) {
-                try {
-                    ScopedTransaction transaction(txn, MODE_IX);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
 
-                    AutoGetDb autoDb(txn, dbname, MODE_X);
-                    Database* const db = autoDb.getDb();
-                    Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
+                AutoGetDb autoDb(txn, dbname, MODE_X);
+                Database* const db = autoDb.getDb();
+                Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
 
-                    // If db/collection does not exist, short circuit and return.
-                    if ( !db || !coll ) {
-                        errmsg = "ns not found";
-                        return false;
-                    }
-                    Client::Context context(txn, nsToDrop);
-
-                    int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
-
-                    stopIndexBuilds(txn, db, cmdObj);
-
-                    result.append( "ns", nsToDrop );
-                    result.append( "nIndexesWas", numIndexes );
-
-                    WriteUnitOfWork wunit(txn);
-                    Status s = db->dropCollection( txn, nsToDrop );
-
-                    if ( !s.isOK() ) {
-                        return appendCommandStatus( result, s );
-                    }
-
-                    if ( !fromRepl ) {
-                        repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
-                    }
-                    wunit.commit();
-                    return true;
+                // If db/collection does not exist, short circuit and return.
+                if ( !db || !coll ) {
+                    errmsg = "ns not found";
+                    return false;
                 }
-                catch (const WriteConflictException& wce) {
-                    WriteConflictException::logAndBackoff( attempt++,
-                                                           "drop",
-                                                           nsToDrop);
+                Client::Context context(txn, nsToDrop);
 
+                int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
+
+                stopIndexBuilds(txn, db, cmdObj);
+
+                result.append( "ns", nsToDrop );
+                result.append( "nIndexesWas", numIndexes );
+
+                WriteUnitOfWork wunit(txn);
+                Status s = db->dropCollection( txn, nsToDrop );
+
+                if ( !s.isOK() ) {
+                    return appendCommandStatus( result, s );
                 }
-            }
+
+                if ( !fromRepl ) {
+                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                }
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "drop", nsToDrop);
+            return true;
         }
     } cmdDrop;
 
