@@ -117,7 +117,9 @@ MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
                                // Latest unstable and next stable are effectively the
                                // same release
                                new MongoRunner.VersionSub(/^2\.7(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.0(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  
