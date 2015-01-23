@@ -54,6 +54,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -487,39 +488,49 @@ namespace mongo {
                 return false;
             }
 
-            ScopedTransaction transaction(txn, MODE_IX);
+            int attempt = 0;
+            while (1) {
+                try {
+                    ScopedTransaction transaction(txn, MODE_IX);
 
-            AutoGetDb autoDb(txn, dbname, MODE_X);
-            Database* const db = autoDb.getDb();
-            Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
+                    AutoGetDb autoDb(txn, dbname, MODE_X);
+                    Database* const db = autoDb.getDb();
+                    Collection* coll = db ? db->getCollection( nsToDrop ) : NULL;
 
-            // If db/collection does not exist, short circuit and return.
-            if ( !db || !coll ) {
-                errmsg = "ns not found";
-                return false;
+                    // If db/collection does not exist, short circuit and return.
+                    if ( !db || !coll ) {
+                        errmsg = "ns not found";
+                        return false;
+                    }
+                    Client::Context context(txn, nsToDrop);
+
+                    int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
+
+                    stopIndexBuilds(txn, db, cmdObj);
+
+                    result.append( "ns", nsToDrop );
+                    result.append( "nIndexesWas", numIndexes );
+
+                    WriteUnitOfWork wunit(txn);
+                    Status s = db->dropCollection( txn, nsToDrop );
+
+                    if ( !s.isOK() ) {
+                        return appendCommandStatus( result, s );
+                    }
+
+                    if ( !fromRepl ) {
+                        repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                    }
+                    wunit.commit();
+                    return true;
+                }
+                catch (const WriteConflictException& wce) {
+                    WriteConflictException::logAndBackoff( attempt++,
+                                                           "drop",
+                                                           nsToDrop);
+
+                }
             }
-            Client::Context context(txn, nsToDrop);
-
-            int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
-
-            stopIndexBuilds(txn, db, cmdObj);
-
-            result.append( "ns", nsToDrop );
-            result.append( "nIndexesWas", numIndexes );
-
-            WriteUnitOfWork wunit(txn);
-            Status s = db->dropCollection( txn, nsToDrop );
-
-            if ( !s.isOK() ) {
-                return appendCommandStatus( result, s );
-            }
-
-            if ( !fromRepl ) {
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
-            }
-            wunit.commit();
-            return true;
-
         }
     } cmdDrop;
 
