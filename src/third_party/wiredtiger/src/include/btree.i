@@ -35,6 +35,31 @@ __wt_page_is_modified(WT_PAGE *page)
 #define	WT_ALLOC_OVERHEAD	32U
 
 /*
+ * Track a field in the cache. Use atomic CAS so that we can reliably avoid
+ * decrementing the cache below zero - since we use an unsigned number.
+ * Track if we would go below zero in a diagnostic build - something has gone
+ * wrong.
+ */
+#ifdef	HAVE_DIAGNOSTIC
+#define	WT_CACHE_DECR(session, f, sz) do {				\
+	uint64_t __val = f;						\
+	uint64_t __sz = WT_MIN(__val, sz);				\
+	if (__sz < sz)							\
+		__wt_errx(session, "%s underflow: decrementing %"	\
+		    WT_SIZET_FMT, #f, sz);				\
+	while (!WT_ATOMIC_CAS8(f, __val, __val - __sz))			\
+		__val = f, __sz = WT_MIN(__val, __sz);			\
+} while (0)
+#else
+#define	WT_CACHE_DECR(session, f, sz) do {				\
+	uint64_t __val = f;						\
+	uint64_t __sz = WT_MIN(__val, sz);				\
+	while (!WT_ATOMIC_CAS8(f, __val, __val - __sz))			\
+		__val = f, __sz = WT_MIN(__val, __sz);			\
+} while (0)
+#endif
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -66,11 +91,11 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	size += WT_ALLOC_OVERHEAD;
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_SUB8(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_SUB8(page->memory_footprint, size);
+	WT_CACHE_DECR(session, cache->bytes_inmem, size);
+	WT_CACHE_DECR(session, page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_SUB8(cache->bytes_dirty, size);
-		(void)WT_ATOMIC_SUB8(page->modify->bytes_dirty, size);
+		WT_CACHE_DECR(session, cache->bytes_dirty, size);
+		WT_CACHE_DECR(session, page->modify->bytes_dirty, size);
 	}
 }
 
