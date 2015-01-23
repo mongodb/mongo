@@ -32,7 +32,8 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
 		conn->cache_overhead = (int)cval.val;
 		if (cval.val != 0)
-			conn->cache_size -= (conn->cache_size * cval.val) / 100;
+			conn->cache_size -=
+			    (conn->cache_size * (uint64_t)cval.val) / 100;
 	} else {
 		WT_RET(__wt_config_gets(
 		    session, cfg, "shared_cache.reserve", &cval));
