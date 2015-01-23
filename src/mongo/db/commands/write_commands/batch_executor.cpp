@@ -741,7 +741,7 @@ namespace mongo {
         std::vector<StatusWith<BSONObj> > normalizedInserts;
 
     private:
-        bool _lockAndCheckImpl(WriteOpResult* result, bool intentLock=true);
+        bool _lockAndCheckImpl(WriteOpResult* result, bool intentLock);
 
         ScopedTransaction _transaction;
         // Guard object for the write lock on the target database.
@@ -1031,7 +1031,7 @@ namespace mongo {
     }
 
     bool WriteBatchExecutor::ExecInsertsState::lockAndCheck(WriteOpResult* result) {
-        if (_lockAndCheckImpl(result))
+        if (_lockAndCheckImpl(result, true))
             return true;
         unlock();
         return false;
@@ -1074,6 +1074,7 @@ namespace mongo {
                 break;
             }
             catch ( const WriteConflictException& wce ) {
+                state->unlock();
                 state->txn->getCurOp()->debug().writeConflicts++;
                 state->txn->recoveryUnit()->commitAndRestart();
                 WriteConflictException::logAndBackoff( attempt++,
