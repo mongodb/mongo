@@ -46,8 +46,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 #if 0
@@ -330,7 +331,7 @@ namespace {
         WT_CURSOR *c = curwrap.get();
         if (!c)
             return true;
-        int ret = c->next(c);
+        int ret = WT_OP_CHECK(c->next(c));
         if (ret == WT_NOTFOUND)
             return true;
         invariantWTOK(ret);
@@ -349,9 +350,10 @@ namespace {
         KeyString data( key, _ordering );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key( c, item.Get() );
-        int ret = c->search(c);
-        if ( ret == WT_NOTFOUND )
+        int ret = WT_OP_CHECK(c->search(c));
+        if (ret == WT_NOTFOUND) {
             return false;
+        }
         invariantWTOK( ret );
 
         // If the key exists, check if we already have this loc at this key. If so, we don't
@@ -449,7 +451,7 @@ namespace {
 
             _cursor->set_value(_cursor, valueItem.Get());
 
-            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(WT_OP_CHECK(_cursor->insert(_cursor)));
             invariantWTOK(_cursor->reset(_cursor));
 
             return Status::OK();
@@ -543,7 +545,7 @@ namespace {
             _cursor->set_key(_cursor, keyItem.Get());
             _cursor->set_value(_cursor, valueItem.Get());
 
-            invariantWTOK(_cursor->insert(_cursor));
+            invariantWTOK(WT_OP_CHECK(_cursor->insert(_cursor)));
             invariantWTOK(_cursor->reset(_cursor));
 
             _records.clear();
@@ -677,7 +679,7 @@ namespace {
         void advanceWTCursor() {
             invalidateCache();
             WT_CURSOR *c = _cursor.get();
-            int ret = _forward ? c->next(c) : c->prev(c);
+            int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
                 return;
@@ -695,7 +697,7 @@ namespace {
             const WiredTigerItem keyItem(_key.getBuffer(), _key.getSize());
             c->set_key(c, keyItem.Get());
 
-            int ret = c->search_near(c, &cmp);
+            int ret = WT_OP_CHECK(c->search_near(c, &cmp));
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
                 TRACE_CURSOR << "\t not found";
@@ -717,13 +719,13 @@ namespace {
             if (_forward) {
                 // We need to be >=
                 if (cmp < 0) {
-                    ret = c->next(c);
+                    ret = WT_OP_CHECK(c->next(c));
                 }
             }
             else {
                 // We need to be <=
                 if (cmp > 0) {
-                    ret = c->prev(c);
+                    ret = WT_OP_CHECK(c->prev(c));
                 }
             }
 
@@ -1003,7 +1005,7 @@ namespace {
         WiredTigerItem valueItem(value.getBuffer(), value.getSize());
         c->set_key( c, keyItem.Get() );
         c->set_value( c, valueItem.Get() );
-        int ret = c->insert( c );
+        int ret = WT_OP_CHECK(c->insert(c));
 
         if ( ret == WT_ROLLBACK && !dupsAllowed ) {
             // if there is a conflict on a unique key, it means there is a dup key
@@ -1019,7 +1021,7 @@ namespace {
         // we put them all in the "list"
         // Note that we can't omit AllZeros when there are multiple locs for a value. When we remove
         // down to a single value, it will be cleaned up.
-        ret = c->search(c);
+        ret = WT_OP_CHECK(c->search(c));
         invariantWTOK( ret );
 
         WT_ITEM old;
@@ -1069,7 +1071,7 @@ namespace {
 
         if ( !dupsAllowed ) {
             // nice and clear
-            int ret = c->remove(c);
+            int ret = WT_OP_CHECK(c->remove(c));
             if (ret == WT_NOTFOUND) {
                 return;
             }
@@ -1079,7 +1081,7 @@ namespace {
 
         // dups are allowed, so we have to deal with a vector of RecordIds.
 
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         if ( ret == WT_NOTFOUND )
             return;
         invariantWTOK( ret );
@@ -1099,7 +1101,7 @@ namespace {
                 if (records.empty() && !br.remaining()) {
                     // This is the common case: we are removing the only loc for this key.
                     // Remove the whole entry.
-                    invariantWTOK(c->remove(c));
+                    invariantWTOK(WT_OP_CHECK(c->remove(c)));
                     return;
                 }
 
@@ -1171,7 +1173,7 @@ namespace {
 
         c->set_key(c, keyItem.Get());
         c->set_value(c, valueItem.Get());
-        int ret = c->insert( c );
+        int ret = WT_OP_CHECK(c->insert(c));
 
         if ( ret != WT_DUPLICATE_KEY )
             return wtRCToStatus( ret );
@@ -1189,7 +1191,7 @@ namespace {
         KeyString data( key, _ordering, loc );
         WiredTigerItem item( data.getBuffer(), data.getSize() );
         c->set_key(c, item.Get() );
-        int ret = c->remove(c);
+        int ret = WT_OP_CHECK(c->remove(c));
         if (ret != WT_NOTFOUND) {
             invariantWTOK(ret);
         }

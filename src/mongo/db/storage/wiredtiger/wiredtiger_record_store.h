@@ -41,6 +41,13 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/fail_point_service.h"
+
+/**
+ * Either executes the specified operation and returns it's value or randomly throws a write
+ * conflict exception if the WTWriteConflictException failpoint is enabled.
+ */
+#define WT_OP_CHECK(x) (((MONGO_FAIL_POINT(WTWriteConflictException))) ? (WT_ROLLBACK) : (x))
 
 namespace mongo {
 
@@ -282,4 +289,8 @@ namespace mongo {
         WiredTigerSizeStorer* _sizeStorer; // not owned, can be NULL
         int _sizeStorerCounter;
     };
+
+    // WT failpoint to throw write conflict exceptions randomly
+    MONGO_FP_FORWARD_DECLARE(WTWriteConflictException);
+
 }

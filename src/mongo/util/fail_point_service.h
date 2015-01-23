@@ -26,28 +26,33 @@
  *    then also delete it in the license file.
  */
 
-/**
- * Should NOT be included by other header files.  Include only in source files.
- */
-
 #pragma once
 
 #include "mongo/base/init.h"
 #include "mongo/util/fail_point_registry.h"
 
 namespace mongo {
+
     /**
      * @return the global fail point registry.
      */
     FailPointRegistry* getGlobalFailPointRegistry();
 
     /**
-     * Convenience macro for declaring a fail point. Must be used in global scope and
-     * never in a block with limited scope (ie, inside functions, loops, etc.)
+     * Convenience macro for declaring a fail point. Must be used in global scope and never in a
+     * block with limited scope (ie, inside functions, loops, etc.).
+     *
+     * NOTE: Never use in header files, only sources.
      */
     #define MONGO_FP_DECLARE(fp) FailPoint fp; \
         MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
                 (::mongo::InitializerContext* context) { \
             return getGlobalFailPointRegistry()->addFailPoint(#fp, &fp); \
         }
+
+    /**
+     * Convenience macro for defining a fail point in a header scope.
+     */
+    #define MONGO_FP_FORWARD_DECLARE(fp) extern FailPoint fp;
+
 }

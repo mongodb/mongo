@@ -51,7 +51,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -65,6 +64,7 @@ namespace mongo {
     using std::string;
 
 namespace {
+
     static const int kMinimumRecordStoreVersion = 1;
     static const int kCurrentRecordStoreVersion = 1; // New record stores use this by default.
     static const int kMaximumRecordStoreVersion = 1;
@@ -80,16 +80,9 @@ namespace {
         return (appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
     }
 
-    // Throws a WriteConflictException to ensure the calling code can handle it
-    MONGO_FP_DECLARE(wtWriteConflictException);
-
-    void checkWriteConflictExceptionFPEnabled() {
-        if (MONGO_FAIL_POINT(wtWriteConflictException)) {
-            throw WriteConflictException();
-        }
-    }
-
 } // namespace
+
+    MONGO_FP_DECLARE(WTWriteConflictException);
 
     const std::string kWiredTigerEngineName = "wiredTiger";
 
@@ -316,14 +309,12 @@ namespace {
     }
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
-        checkWriteConflictExceptionFPEnabled();
-
         // ownership passes to the shared_array created below
         WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         massert(28556, "Didn't find RecordId in WiredTigerRecordStore", ret != WT_NOTFOUND);
         invariantWTOK(ret);
         return _getData(curwrap);
@@ -331,13 +322,11 @@ namespace {
 
     bool WiredTigerRecordStore::findRecord( OperationContext* txn,
                                             const RecordId& loc, RecordData* out ) const {
-        checkWriteConflictExceptionFPEnabled();
-
         WiredTigerCursor curwrap( _uri, _instanceId, true, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         if (ret == WT_NOTFOUND) {
             return false;
         }
@@ -347,13 +336,11 @@ namespace {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const RecordId& loc ) {
-        checkWriteConflictExceptionFPEnabled();
-
         WiredTigerCursor cursor( _uri, _instanceId, true, txn );
         cursor.assertInActiveTxn();
         WT_CURSOR *c = cursor.get();
         c->set_key(c, _makeKey(loc));
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         invariantWTOK(ret);
 
         WT_ITEM old_value;
@@ -362,7 +349,7 @@ namespace {
 
         int old_length = old_value.size;
 
-        ret = c->remove(c);
+        ret = WT_OP_CHECK(c->remove(c));
         invariantWTOK(ret);
 
         _changeNumRecords(txn, -1);
@@ -438,9 +425,10 @@ namespace {
             WT_CURSOR *c = curwrap.get();
             RecordId newestOld;
             int ret = 0;
-            while (( sizeSaved < sizeOverCap || docsRemoved < docsOverCap ) &&
-                   docsRemoved < 1000 &&
-                   (ret = c->next(c)) == 0 ) {
+            while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) &&
+                   (docsRemoved < 1000) &&
+                   (ret = WT_OP_CHECK(c->next(c))) == 0) {
+
                 int64_t key;
                 ret = c->get_key(c, &key);
                 invariantWTOK(ret);
@@ -465,18 +453,21 @@ namespace {
                 }
             }
 
-            if (ret != WT_NOTFOUND) invariantWTOK(ret);
+            if (ret != WT_NOTFOUND) {
+                invariantWTOK(ret);
+            }
 
             if (docsRemoved > 0) {
                 // if we scanned to the end of the collection or past our insert, go back one
-                if ( ret == WT_NOTFOUND || newestOld >= justInserted ) {
-                    ret = c->prev(c);
+                if (ret == WT_NOTFOUND || newestOld >= justInserted) {
+                    ret = WT_OP_CHECK(c->prev(c));
                 }
                 invariantWTOK(ret);
 
                 WiredTigerCursor startWrap( _uri, _instanceId, true, txn);
                 WT_CURSOR* start = startWrap.get();
-                start->next(start);
+                ret = WT_OP_CHECK(start->next(start));
+                invariantWTOK(ret);
 
                 invariantWTOK(session->truncate(session, NULL, start, c, NULL));
                 _changeNumRecords(txn, -docsRemoved);
@@ -509,8 +500,6 @@ namespace {
                                                               const char* data,
                                                               int len,
                                                               bool enforceQuota ) {
-        checkWriteConflictExceptionFPEnabled();
-
         if ( _isCapped && len > _cappedMaxSize ) {
             return StatusWith<RecordId>( ErrorCodes::BadValue,
                                          "object to insert exceeds cappedMaxSize" );
@@ -546,7 +535,7 @@ namespace {
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
-        int ret = c->insert(c);
+        int ret = WT_OP_CHECK(c->insert(c));
         if (ret) {
             return StatusWith<RecordId>(wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord"));
         }
@@ -598,7 +587,7 @@ namespace {
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
-        int ret = c->search(c);
+        int ret = WT_OP_CHECK(c->search(c));
         invariantWTOK(ret);
 
         WT_ITEM old_value;
@@ -610,7 +599,7 @@ namespace {
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
-        ret = c->insert(c);
+        ret = WT_OP_CHECK(c->insert(c));
         invariantWTOK(ret);
 
         _increaseDataSize(txn, len - old_length);
@@ -873,11 +862,8 @@ namespace {
             OperationContext* txn,
             const RecordId& startingPosition) const {
 
-        if (!_useOplogHack) {
+        if (!_useOplogHack)
             return boost::none;
-        }
-
-        checkWriteConflictExceptionFPEnabled();
 
         {
             WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
@@ -889,7 +875,7 @@ namespace {
 
         int cmp;
         c->set_key(c, _makeKey(startingPosition));
-        int ret = c->search_near(c, &cmp);
+        int ret = WT_OP_CHECK(c->search_near(c, &cmp));
         if (ret == 0 && cmp > 0) ret = c->prev(c); // landed one higher than startingPosition
         if (ret == WT_NOTFOUND) return RecordId(); // nothing <= startingPosition
         invariantWTOK(ret);
