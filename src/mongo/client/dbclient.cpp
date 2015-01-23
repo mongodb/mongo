@@ -903,9 +903,9 @@ namespace mongo {
         list<BSONObj> infos;
 
         // first we're going to try the command
-        // it was only added in 2.8, so if we're talking to an older server
+        // it was only added in 3.0, so if we're talking to an older server
         // we'll fail back to querying system.namespaces
-        // TODO(spencer): remove fallback behavior after 2.8
+        // TODO(spencer): remove fallback behavior after 3.0 
 
         {
             BSONObj res;
@@ -1407,7 +1407,7 @@ namespace mongo {
         }
 
         // fallback to querying system.indexes
-        // TODO(spencer): Remove fallback behavior after 2.8
+        // TODO(spencer): Remove fallback behavior after 3.0
         auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
                                                 BSON("ns" << ns), 0, 0, 0, options);
         while ( cursor->more() ) {

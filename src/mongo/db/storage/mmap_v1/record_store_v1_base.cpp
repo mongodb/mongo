@@ -859,7 +859,7 @@ namespace mongo {
                                                double scale ) const {
         result->append( "lastExtentSize", _details->lastExtentSize(txn) / scale );
         result->append( "paddingFactor", 1.0 ); // hard coded
-        result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 2.8. It "
+        result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 3.0. It "
                                              "remains hard coded to 1.0 for compatibility only." );
         result->append( "userFlags", _details->userFlags() );
         result->appendBool( "capped", isCapped() );

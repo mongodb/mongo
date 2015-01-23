@@ -118,7 +118,7 @@ DB.prototype.createCollection = function(name, opt) {
     var sendFlags = false;
     var flags = 0;
     if (options.usePowerOf2Sizes != undefined) {
-        print("WARNING: The 'usePowerOf2Sizes' flag is ignored in 2.8 and higher as all MMAPv1 "
+        print("WARNING: The 'usePowerOf2Sizes' flag is ignored in 3.0 and higher as all MMAPv1 "
             + "collections use fixed allocation sizes unless the 'noPadding' flag is specified");
 
         sendFlags = true;

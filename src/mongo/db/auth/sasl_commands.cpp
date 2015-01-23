@@ -368,7 +368,7 @@ namespace {
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
             CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
 
-        // For backwards compatibility, in 2.8 we are letting MONGODB-CR imply general
+        // For backwards compatibility, in 3.0 we are letting MONGODB-CR imply general
         // challenge-response auth and hence SCRAM-SHA-1 is enabled by either specifying
         // SCRAM-SHA-1 or MONGODB-CR in the authenticationMechanism server parameter.
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&

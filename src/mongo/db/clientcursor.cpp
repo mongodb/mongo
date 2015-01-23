@@ -320,7 +320,7 @@ namespace mongo {
 
     // QUESTION: Restrict to the namespace from which this command was issued?
     // Alternatively, make this command admin-only?
-    // TODO: remove this for 2.8
+    // TODO: remove this for 3.0
     class CmdCursorInfo : public Command {
     public:
         CmdCursorInfo() : Command( "cursorInfo", true ) {}

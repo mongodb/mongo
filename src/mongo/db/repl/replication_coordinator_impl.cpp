@@ -764,7 +764,7 @@ namespace {
         }
         else {
             // The command we received didn't contain a memberId, most likely this is because it
-            // came from a member running something prior to 2.8.
+            // came from a member running something prior to 3.0.
             // Fall back to finding the node by RID.
             slaveInfo = _findSlaveInfoByRID_inlock(args.rid);
             if (!slaveInfo) {
@@ -1333,9 +1333,9 @@ namespace {
                 entry.append("optime", itr->opTime);
                 entry.append("memberId", itr->memberId);
                 entry.append("cfgver", _rsConfig.getConfigVersion());
-                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
                 // we need to keep sending it for 2.6 compatibility.
-                // TODO(spencer): Remove this after 2.8 is released.
+                // TODO(spencer): Remove this after 3.0 is released.
                 const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18651, member); // We ensured the member existed in processHandshake.
                 entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
@@ -1360,9 +1360,9 @@ namespace {
                 BSONObjBuilder subCmd (cmd.subobjStart("handshake"));
                 subCmd.append("handshake", itr->rid);
                 subCmd.append("member", itr->memberId);
-                // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
+                // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
                 // we need to keep sending it for 2.6 compatibility.
-                // TODO(spencer): Remove this after 2.8 is released.
+                // TODO(spencer): Remove this after 3.0 is released.
                 const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
                 fassert(18650, member); // We ensured the member existed in processHandshake.
                 subCmd.append("config", member->toBSON(_rsConfig.getTagConfig()));

@@ -760,7 +760,7 @@ namespace {
         BSONElement credentialsElement = userDoc["credentials"];
         uassert(18806,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
-                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
                         "with missing or incorrectly formatted credentials: "
                         << userDoc.toString(),
                         credentialsElement.type() == Object);
@@ -777,7 +777,7 @@ namespace {
 
         uassert(18744,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
-                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "2.6/3.0 user data schema to the 3.0 SCRAM only schema, found a user doc "
                         "missing MONGODB-CR credentials :"
                         << userDoc.toString(),
                 !mongoCRElement.eoo());

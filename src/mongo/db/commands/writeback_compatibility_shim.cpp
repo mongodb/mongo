@@ -49,7 +49,7 @@ namespace mongo {
     using mongoutils::str::stream;
 
     /**
-     * This command is required in v2.8 mongod to prevent v2.6 mongos from entering a tight loop and
+     * This command is required in v3.0 mongod to prevent v2.6 mongos from entering a tight loop and
      * spamming the server with invalid writebacklisten requests.  This command reports an error
      * and pauses, which is safe because the original v2.6 WBL command was a long-poll (30s).
      */
@@ -58,7 +58,7 @@ namespace mongo {
         WriteBackCommand() : Command("writebacklisten") {}
 
         void help(stringstream& helpOut) const {
-            helpOut << "v2.8 disallowed internal command, present for compatibility only";
+            helpOut << "v3.0 disallowed internal command, present for compatibility only";
         }
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
@@ -82,8 +82,8 @@ namespace mongo {
                          const string&, BSONObj&, int, string&, BSONObjBuilder& result, bool) {
 
             string errMsg = stream()
-                << "Writeback functionality is no longer present in v2.8 mongod, "
-                << "a v2.6 mongos may be running in the v2.8 cluster at "
+                << "Writeback functionality is no longer present in v3.0 mongod, "
+                << "a v2.6 mongos may be running in the v3.0 cluster at "
                 << opCtx->getClient()->clientAddress(false);
 
             error() << errMsg;

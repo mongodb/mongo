@@ -41,7 +41,7 @@ namespace repl {
 namespace {
 
     const std::string kRIDFieldName = "handshake";
-    // TODO(danneberg) remove after 2.8 since this field is only allowed for backwards compatibility
+    // TODO(danneberg) remove after 3.0 since this field is only allowed for backwards compatibility
     const std::string kOldMemberConfigFieldName = "config";
     const std::string kMemberIdFieldName = "member";
 

@@ -135,7 +135,7 @@ namespace repl {
                         << errMsg;
 
                     // sleep half a second if we are not in our sync source's config
-                    // TODO(dannenberg) after 2.8, remove the string comparison 
+                    // TODO(dannenberg) after 3.0, remove the string comparison 
                     if (res["code"].numberInt() == ErrorCodes::NodeNotFound ||
                             errMsg.find("could not be found in replica set config while attempting "
                                         "to associate it with") != std::string::npos) {
