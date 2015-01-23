@@ -1106,7 +1106,7 @@ namespace mongo {
     }
 
     void exitCleanly(ExitCode code) {
-        if (shutdownInProgress.fetchAndAdd(1) != 0) {
+        if (shutdownInProgress.compareAndSwap(0, 1) != 0) {
             while (true) {
                 sleepsecs(1000);
             }
