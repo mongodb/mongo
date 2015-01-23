@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
@@ -109,17 +110,27 @@ namespace mongo {
 
         CmdDropIndexes() : Command("dropIndexes", false, "deleteIndexes") { }
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool fromRepl) {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
-            bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
-            if (!ok) {
-                return false;
+            int attempt = 0;
+            while (1) {
+                try {
+                    ScopedTransaction transaction(txn, MODE_IX);
+                    Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+                    WriteUnitOfWork wunit(txn);
+                    bool ok = wrappedRun(txn, dbname, jsobj, errmsg, anObjBuilder);
+                    if (!ok) {
+                        return false;
+                    }
+                    if (!fromRepl)
+                        repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
+                    wunit.commit();
+                    return true;
+                }
+                catch (const WriteConflictException& wce) {
+                    WriteConflictException::logAndBackoff(attempt++,
+                                                          "dropIndexes",
+                                                          dbname);
+                }
             }
-            if (!fromRepl)
-                repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
-            wunit.commit();
-            return true;
         }
 
         bool wrappedRun(OperationContext* txn,
