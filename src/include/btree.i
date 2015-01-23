@@ -41,7 +41,7 @@ __wt_page_is_modified(WT_PAGE *page)
  * wrong.
  */
 #ifdef	HAVE_DIAGNOSTIC
-#define WT_CACHE_DECR(session, f, sz) do {				\
+#define	WT_CACHE_DECR(session, f, sz) do {				\
 	uint64_t __val = f;						\
 	uint64_t __sz = WT_MIN(__val, sz);				\
 	if (__sz < sz)							\
@@ -51,7 +51,7 @@ __wt_page_is_modified(WT_PAGE *page)
 		__val = f, __sz = WT_MIN(__val, __sz);			\
 } while (0)
 #else
-#define WT_CACHE_DECR(session, f, sz) do {				\
+#define	WT_CACHE_DECR(session, f, sz) do {				\
 	uint64_t __val = f;						\
 	uint64_t __sz = WT_MIN(__val, sz);				\
 	while (!WT_ATOMIC_CAS8(f, __val, __val - __sz))			\
