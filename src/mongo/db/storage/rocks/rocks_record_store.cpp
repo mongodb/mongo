@@ -406,6 +406,7 @@ namespace mongo {
 
     StatusWith<RecordId> RocksRecordStore::updateRecord( OperationContext* txn,
                                                         const RecordId& loc,
+                                                        const RecordData& oldRec,
                                                         const char* data,
                                                         int len,
                                                         bool enforceQuota,
@@ -415,17 +416,10 @@ namespace mongo {
             throw WriteConflictException();
         }
 
-        std::string old_value;
+        const int old_length = oldRec.size();
+
         int64_t locStorage;
         rocksdb::Slice key = _makeKey(loc, &locStorage);
-        auto status = ru->Get(_columnFamily.get(), key, &old_value);
-
-        if ( !status.ok() ) {
-            return StatusWith<RecordId>( ErrorCodes::InternalError, status.ToString() );
-        }
-
-        int old_length = old_value.size();
-
         ru->writeBatch()->Put(_columnFamily.get(), key, rocksdb::Slice(data, len));
 
         _increaseDataSize(txn, len - old_length);

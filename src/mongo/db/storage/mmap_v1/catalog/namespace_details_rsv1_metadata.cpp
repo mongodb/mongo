@@ -229,6 +229,7 @@ namespace mongo {
 
             StatusWith<RecordId> result = _namespaceRecordStore->updateRecord(txn,
                                                                               loc,
+                                                                              RecordData(oldEntry.objdata(), oldEntry.objsize()),
                                                                               newEntry.objdata(),
                                                                               newEntry.objsize(),
                                                                               false,
