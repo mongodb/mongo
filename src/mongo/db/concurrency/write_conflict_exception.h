@@ -34,6 +34,17 @@
 
 #include "mongo/util/assert_util.h"
 
+#define MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN do { int wcr__Attempts = 0; do { try
+#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(OPDBG, OPSTR, NSSTR)        \
+        catch (const ::mongo::WriteConflictException &wce) {            \
+            ++(OPDBG).writeConflicts;                                   \
+            wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));         \
+            ++wcr__Attempts;                                            \
+            continue;                                                   \
+        }                                                               \
+        break;                                                          \
+    } while (true); } while (false)
+
 namespace mongo {
 
     /**
