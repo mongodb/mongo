@@ -367,6 +367,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_inmem_split.desc = "cache: in-memory page splits";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
+	stats->cache_bytes_max_adjusted.desc =
+	    "cache: maximum bytes configured, adjusted for overhead";
 	stats->cache_eviction_maximum_page_size.desc =
 	    "cache: maximum page size at eviction";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";

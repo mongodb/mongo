@@ -196,8 +196,9 @@ struct __wt_connection_impl {
 	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
-	uint64_t   cache_size;
-	int	   cache_overhead;
+	uint64_t   cache_bytes_max;	/* Configured cache size */
+	int	   cache_overhead;	/* Cache percent adjustment */
+	uint64_t   cache_size;		/* Adjusted (real) cache size */
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
