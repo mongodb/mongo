@@ -839,7 +839,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	    __wt_curtable_set_key,	/* set-key */
 	    __wt_curtable_set_value,	/* set-value */
 	    __curtable_compare,		/* compare */
-	    __wt_cursor_equal,		/* equals */
+	    __wt_cursor_equals,		/* equals */
 	    __curtable_next,		/* next */
 	    __curtable_prev,		/* prev */
 	    __curtable_reset,		/* reset */
