@@ -176,6 +176,13 @@ namespace {
             return StatusWith<double>(member->obj.value()["distance"].numberDouble());
         }
 
+        virtual StageState initialize(OperationContext* txn,
+                                      WorkingSet* workingSet,
+                                      Collection* collection,
+                                      WorkingSetID* out) {
+            return IS_EOF;
+        }
+
     private:
 
         OwnedPointerVector<MockInterval> _intervals;

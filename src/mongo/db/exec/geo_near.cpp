@@ -300,6 +300,7 @@ namespace mongo {
         PlanStage::StageState work(OperationContext* txn,
                                    WorkingSet* workingSet,
                                    Collection* collection,
+                                   WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
@@ -364,6 +365,7 @@ namespace mongo {
     PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* txn,
                                                                  WorkingSet* workingSet,
                                                                  Collection* collection,
+                                                                 WorkingSetID* out,
                                                                  double* estimatedDistance)
     {
         if (!_indexScan) {
@@ -393,9 +395,9 @@ namespace mongo {
             // Clean up working set.
             workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
+        } else if (state == PlanStage::NEED_FETCH) {
+            *out = workingSetID;
         }
-
-        invariant(state != NEED_FETCH);
 
         // Propagate NEED_TIME or errors
         return state;
@@ -403,7 +405,8 @@ namespace mongo {
 
     PlanStage::StageState GeoNear2DStage::initialize(OperationContext* txn,
                                                      WorkingSet* workingSet,
-                                                     Collection* collection)
+                                                     Collection* collection,
+                                                     WorkingSetID* out)
     {
         if (SPHERE == _nearParams.nearQuery->centroid->crs) {
             _boundsIncrement = kMaxEarthDistanceInMeters / 1000.0;
@@ -415,7 +418,8 @@ namespace mongo {
         }
 
         double estimatedDistance;
-        PlanStage::StageState state = _densityEstimator->work(txn, workingSet, collection, &estimatedDistance);
+        PlanStage::StageState state = _densityEstimator->work(txn, workingSet, collection, out,
+                                                              &estimatedDistance);
 
         if (state == PlanStage::IS_EOF) {
             // Estimator finished its work, we need to finish initialization too.
@@ -969,6 +973,7 @@ namespace mongo {
         PlanStage::StageState work(OperationContext* txn,
                                    WorkingSet* workingSet,
                                    Collection* collection,
+                                   WorkingSetID* out,
                                    double* estimatedDistance);
 
     private:
@@ -1032,6 +1037,7 @@ namespace mongo {
     PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationContext* txn,
                                                                        WorkingSet* workingSet,
                                                                        Collection* collection,
+                                                                       WorkingSetID* out,
                                                                        double* estimatedDistance)
     {
         if (!_indexScan) {
@@ -1061,9 +1067,9 @@ namespace mongo {
             // Clean up working set.
             workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
+        } else if (state == PlanStage::NEED_FETCH) {
+            *out = workingSetID;
         }
-
-        invariant(state != NEED_FETCH);
 
         // Propagate NEED_TIME or errors
         return state;
@@ -1072,14 +1078,16 @@ namespace mongo {
 
     PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* txn,
                                                            WorkingSet* workingSet,
-                                                           Collection* collection)
+                                                           Collection* collection,
+                                                           WorkingSetID* out)
     {
         if (!_densityEstimator) {
             _densityEstimator.reset(new DensityEstimator(_s2Index, &_nearParams));
         }
 
         double estimatedDistance;
-        PlanStage::StageState state = _densityEstimator->work(txn, workingSet, collection, &estimatedDistance);
+        PlanStage::StageState state = _densityEstimator->work(txn, workingSet, collection, out,
+                                                              &estimatedDistance);
 
         if (state == IS_EOF) {
             // We find a document in 4 neighbors at current level, but didn't at previous level.

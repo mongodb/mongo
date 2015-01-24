@@ -28,8 +28,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/exec/index_scan.h"
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
@@ -187,11 +190,30 @@ namespace mongo {
 
         if (INITIALIZING == _scanState) {
             invariant(NULL == _indexCursor.get());
-            initIndexScan();
+            try {
+                initIndexScan();
+            }
+            catch (const WriteConflictException& wce) {
+                // Release our owned cursors and try again next time.
+                _scanState = INITIALIZING;
+                _indexCursor.reset();
+                _endCursor.reset();
+                _btreeCursor = NULL;
+                *out = WorkingSet::INVALID_ID;
+                return PlanStage::NEED_FETCH;
+            }
         }
 
         if (CHECKING_END == _scanState) {
-            checkEnd();
+            try {
+                checkEnd();
+            }
+            catch (const WriteConflictException& wce) {
+                // checkEnd only fails in ways that is safe to call again after yielding.
+                _scanState = CHECKING_END;
+                *out = WorkingSet::INVALID_ID;
+                return PlanStage::NEED_FETCH;
+            }
         }
 
         if (isEOF()) {
@@ -211,12 +233,21 @@ namespace mongo {
                 keyObj = keyObj.getOwned();
             }
 
+            _scanState = CHECKING_END;
+
             // Move to the next result.
             // The underlying IndexCursor points at the *next* thing we want to return.  We do this
             // so that if we're scanning an index looking for docs to delete we don't continually
             // clobber the thing we're pointing at.
-            _indexCursor->next();
-            _scanState = CHECKING_END;
+            try {
+                _indexCursor->next();
+            }
+            catch (const WriteConflictException& wce) {
+                // If next throws, it leaves us at the original position.
+                invariant(_indexCursor->getValue() == loc);
+                *out = WorkingSet::INVALID_ID;
+                return PlanStage::NEED_FETCH;
+            }
 
             if (_shouldDedup) {
                 ++_specificStats.dupsTested;
@@ -239,7 +270,7 @@ namespace mongo {
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = loc;
-                member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj));
+                member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj, _iam));
                 member->state = WorkingSetMember::LOC_AND_IDX;
 
                 if (_params.addKeyMetadata) {
@@ -275,6 +306,11 @@ namespace mongo {
     }
 
     void IndexScan::saveState() {
+        if (!_txn) {
+            // We were already saved. Nothing to do.
+            return;
+        }
+
         _txn = NULL;
         ++_commonStats.yields;
 

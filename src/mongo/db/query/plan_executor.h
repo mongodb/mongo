@@ -81,8 +81,14 @@ namespace mongo {
          */
         enum YieldPolicy {
             // Any call to getNext() may yield. In particular, the executor may be killed during any
-            // call to getNext().  If this occurs, getNext() will return DEAD.
+            // call to getNext().  If this occurs, getNext() will return DEAD. Additionally, this
+            // will handle all WriteConflictExceptions that occur while processing the query.
             YIELD_AUTO,
+
+            // This will handle WriteConflictExceptions that occur while processing the query, but
+            // will not yield locks. commitAndRestart() will be called if a WriteConflictException
+            // occurs so callers must be prepared to get a new snapshot.
+            WRITE_CONFLICT_RETRY_ONLY,
 
             // Owner must yield manually if yields are requested.  How to yield yourself:
             //
@@ -102,6 +108,9 @@ namespace mongo {
             // 4. The call to yield() returns a boolean indicating whether or not 'exec' is
             // still alove. If it is false, then 'exec' was killed during the yield and is
             // no longer valid.
+            //
+            // It is not possible to handle WriteConflictExceptions in this mode without restarting
+            // the query.
             YIELD_MANUAL,
         };
 
@@ -177,7 +186,7 @@ namespace mongo {
         //
 
         /**
-         * Get the working set used by this executor, withour transferring ownership.
+         * Get the working set used by this executor, without transferring ownership.
          */
         WorkingSet* getWorkingSet() const;
 
@@ -231,9 +240,19 @@ namespace mongo {
          * Returns true if the state was successfully restored and the execution tree can be
          * work()'d.
          *
+         * If allowed, will yield and retry if a WriteConflictException is encountered.
+         *
          * Returns false otherwise.  The execution tree cannot be worked and should be deleted.
          */
         bool restoreState(OperationContext* opCtx);
+
+        /**
+         * Same as restoreState but without the logic to retry if a WriteConflictException is
+         * thrown.
+         *
+         * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
+         */
+        bool restoreStateWithoutRetrying(OperationContext* opCtx);
 
         //
         // Running Support
@@ -396,9 +415,10 @@ namespace mongo {
         // we'll be killed.
         bool _killed;
 
-        // If the yield policy is YIELD_AUTO, this is used to enforce automatic yielding. The plan
-        // may yield on any call to getNext() if this is non-NULL.
-        boost::scoped_ptr<PlanYieldPolicy> _yieldPolicy;
+        // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
+        // TODO make this a non-pointer member. This requires some header shuffling so that this
+        // file includes plan_yield_policy.h rather than the other way around.
+        const boost::scoped_ptr<PlanYieldPolicy> _yieldPolicy;
     };
 
 }  // namespace mongo

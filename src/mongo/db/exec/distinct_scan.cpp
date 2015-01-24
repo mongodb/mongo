@@ -152,7 +152,7 @@ namespace mongo {
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj));
+            member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj, _iam));
             member->state = WorkingSetMember::LOC_AND_IDX;
 
             *out = id;

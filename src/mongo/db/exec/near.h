@@ -144,7 +144,8 @@ namespace mongo {
          */
         virtual StageState initialize(OperationContext* txn,
                                       WorkingSet* workingSet,
-                                      Collection* collection);
+                                      Collection* collection,
+                                      WorkingSetID* out) = 0;
 
     private:
 
@@ -152,7 +153,7 @@ namespace mongo {
         // Generic methods for progressive search functionality
         //
 
-        StageState initNext();
+        StageState initNext(WorkingSetID* out);
         StageState bufferNext(WorkingSetID* toReturn, Status* error);
         StageState advanceNext(WorkingSetID* toReturn);
 

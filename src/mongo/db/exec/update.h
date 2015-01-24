@@ -159,6 +159,9 @@ namespace mongo {
         // Owned by us.
         boost::scoped_ptr<PlanStage> _child;
 
+        // If not Null, we use this rather than asking our child what to do next.
+        WorkingSetID _idRetrying;
+
         // Stats
         CommonStats _commonStats;
         UpdateStats _specificStats;

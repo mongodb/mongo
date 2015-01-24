@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -440,6 +441,7 @@ namespace mongo {
           _ws(ws),
           _collection(collection),
           _child(child),
+          _idRetrying(WorkingSet::INVALID_ID),
           _commonStats(kStageType),
           _updatedLocs(params.request->isMulti() ? new DiskLocSet() : NULL),
           _doc(params.driver->getDocument()) {
@@ -545,6 +547,8 @@ namespace mongo {
             BSONObj newObj;
             WriteUnitOfWork wunit(_txn);
 
+            RecordId newLoc;
+
             if (inPlace) {
 
                 // Don't actually do the write if this is an explain.
@@ -559,7 +563,7 @@ namespace mongo {
 
                 newObj = oldObj.value();
                 _specificStats.fastmod = true;
-
+                newLoc = loc;
             }
             else {
                 // The updates were not in place. Apply them through the file manager.
@@ -579,17 +583,7 @@ namespace mongo {
                         true, driver->modsAffectIndices(),
                         _params.opDebug);
                     uassertStatusOK(res.getStatus());
-                    RecordId newLoc = res.getValue();
-
-                    // If the document moved, we might see it again in a collection scan (maybe it's
-                    // a document after our current document).
-                    //
-                    // If the document is indexed and the mod changes an indexed value, we might see
-                    // it again.  For an example, see the comment above near declaration of
-                    // updatedLocs.
-                    if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
-                        _updatedLocs->insert(newLoc);
-                    }
+                    newLoc = res.getValue();
                 }
             }
 
@@ -611,6 +605,18 @@ namespace mongo {
             if (request->shouldStoreResultDoc()) {
                 // We just committed a single update. Hold onto the resulting document.
                 _specificStats.newObj = newObj.getOwned();
+            }
+
+            // If the document moved, we might see it again in a collection scan (maybe it's
+            // a document after our current document).
+            //
+            // If the document is indexed and the mod changes an indexed value, we might see
+            // it again.  For an example, see the comment above near declaration of
+            // updatedLocs.
+            //
+            // This must be done after the wunit commits so we are sure we won't be rolling back.
+            if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
+                _updatedLocs->insert(newLoc);
             }
         }
 
@@ -718,13 +724,16 @@ namespace mongo {
                         request->isFromMigration());
         }
 
+        // Technically, we should save/restore state here, but since we are going to return EOF
+        // immediately after, it would just be wasted work.
         wunit.commit();
     }
 
     bool UpdateStage::doneUpdating() {
         // We're done updating if either the child has no more results to give us, or we've
         // already gotten a result back and we're not a multi-update.
-        return _child->isEOF() || (_specificStats.nMatched > 0 && !_params.request->isMulti());
+        return _idRetrying == WorkingSet::INVALID_ID
+            && (_child->isEOF() || (_specificStats.nMatched > 0 && !_params.request->isMulti()));
     }
 
     bool UpdateStage::needInsert() {
@@ -752,6 +761,11 @@ namespace mongo {
         if (doneUpdating()) {
             // Even if we're done updating, we may have some inserting left to do.
             if (needInsert()) {
+                // TODO we may want to handle WriteConflictException here. Currently we bounce it
+                // out to a higher level since if this WCEs it is likely that we raced with another
+                // upsert that may have matched our query, and therefore this may need to perform an
+                // update rather than an insert. Bouncing to the higher level allows restarting the
+                // query in this case.
                 doInsert();
             }
 
@@ -765,8 +779,17 @@ namespace mongo {
         // updates to them. We should only get here if the collection exists.
         invariant(_collection);
 
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        StageState status = _child->work(&id);
+        // Either retry the last WSM we worked on or get a new one from our child.
+        WorkingSetID id;
+        StageState status;
+        if (_idRetrying == WorkingSet::INVALID_ID) {
+            status = _child->work(&id);
+        }
+        else {
+            status = ADVANCED;
+            id = _idRetrying;
+            _idRetrying = WorkingSet::INVALID_ID;
+        }
 
         if (PlanStage::ADVANCED == status) {
             // Need to get these things from the result returned by the child.
@@ -774,12 +797,13 @@ namespace mongo {
 
             WorkingSetMember* member = _ws->get(id);
 
+            // We want to free this member when we return, unless we need to retry it.
+            ScopeGuard memberFreer = MakeGuard(&WorkingSet::free, _ws, id);
+
             if (!member->hasLoc()) {
                 // We expect to be here because of an invalidation causing a force-fetch, and
                 // doc-locking storage engines do not issue invalidations.
                 dassert(!supportsDocLocking());
-
-                _ws->free(id);
                 ++_specificStats.nInvalidateSkips;
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
@@ -790,14 +814,6 @@ namespace mongo {
             // a fetch. We should always get fetched data, and never just key data.
             invariant(member->hasObj());
 
-            Snapshotted<BSONObj> oldObj = member->obj;
-
-            // If we're here, then we have retrieved both a RecordId and the corresponding
-            // object from the child stage. Since we have the object and the diskloc,
-            // we can free the WSM.
-            _ws->free(id);
-            member = NULL;
-
             // We fill this with the new locs of moved doc so we don't double-update.
             if (_updatedLocs && _updatedLocs->count(loc) > 0) {
                 // Found a loc that we already updated.
@@ -805,73 +821,46 @@ namespace mongo {
                 return PlanStage::NEED_TIME;
             }
 
-            // Save state before making changes
-            _child->saveState();
-            if (supportsDocLocking()) {
-                // Doc-locking engines require this after saveState() since they don't use
-                // invalidations.
-                WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
-            }
+            try {
+                if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
+                    // our snapshot has changed, refetch
+                    if (!WorkingSetCommon::fetch(_txn, member, _collection)) {
+                        // document was deleted, we're done here
+                        ++_commonStats.needTime;
+                        return PlanStage::NEED_TIME;
+                    }
 
-            // Do the update and return.
-            uint64_t attempt = 1;
+                    // we have to re-match the doc as it might not match anymore
+                    CanonicalQuery* cq = _params.canonicalQuery;
+                    if (cq && !cq->root()->matchesBSON(member->obj.value(), NULL)) {
+                        // doesn't match predicates anymore!
+                        ++_commonStats.needTime;
+                        return PlanStage::NEED_TIME;
+                    }
+                }
 
-            while ( attempt++ ) {
+                // Save state before making changes
                 try {
-                    if (_txn->recoveryUnit()->getSnapshotId() != oldObj.snapshotId()) {
-                        // our snapshot has changed, refetch
-                        if ( !_collection->findDoc( _txn, loc, &oldObj ) ) {
-                            // document was deleted, we're done here
-                            ++_commonStats.needTime;
-                            _child->restoreState(_txn);
-                            return PlanStage::NEED_TIME;
-                        }
-
-                        // we have to re-match the doc as it might not match anymore
-                        if ( _params.canonicalQuery &&
-                             _params.canonicalQuery->root() &&
-                             !_params.canonicalQuery->root()->matchesBSON(oldObj.value(), NULL)) {
-                            // doesn't match predicates anymore!
-                            _child->restoreState(_txn);
-                            ++_commonStats.needTime;
-                            return PlanStage::NEED_TIME;
-                        }
-
-                    }
-                    transformAndUpdate(oldObj, loc);
-                    break;
-                }
-                catch ( const WriteConflictException& de ) {
-                    if (_txn->lockState()->inAWriteUnitOfWork()) {
-                        // If we're in an outer WriteUnitOfWork we're not allowed to refresh our
-                        // snapshot. In this case we just re-throw.
-                        // Note that multi updates in this case are safe because the outer
-                        // WriteUnitOfWork ensure that this entire update is in one
-                        // transaction.
-                        throw;
-                    }
-                    _params.opDebug->writeConflicts++;
-
-                    // This is ok because we re-check all docs and predicates if the snapshot
-                    // changes out from under us in the retry loop above.
-                    _txn->recoveryUnit()->commitAndRestart();
-
-                    _txn->checkForInterrupt();
-
-                    WriteConflictException::logAndBackoff( attempt,
-                                                           "update",
-                                                           _collection->ns().ns() );
-
-                    if ( attempt > 2 ) {
-                        // This means someone else is in this same loop trying to update
-                        // the same doc.  Lets make sure we give them a chance to finish.
-#if !defined(_WIN32)
-                        sched_yield();
-#else
-                        SwitchToThread();
-#endif
+                    _child->saveState();
+                    if (supportsDocLocking()) {
+                        // Doc-locking engines require this after saveState() since they don't use
+                        // invalidations.
+                        WorkingSetCommon::prepareForSnapshotChange(_ws);
                     }
                 }
+                catch ( const WriteConflictException& wce ) {
+                    std::terminate();
+                }
+
+                // Do the update
+                transformAndUpdate(member->obj, loc);
+            }
+            catch ( const WriteConflictException& wce ) {
+                _idRetrying = id;
+                memberFreer.Dismiss(); // Keep this member around so we can retry updating it.
+                *out = WorkingSet::INVALID_ID;
+                _commonStats.needFetch++;
+                return NEED_FETCH;
             }
 
             // This should be after transformAndUpdate to make sure we actually updated this doc.
@@ -881,8 +870,16 @@ namespace mongo {
 
             // As restoreState may restore (recreate) cursors, make sure to restore the
             // state outside of the WritUnitOfWork.
-
-            _child->restoreState(_txn);
+            try {
+                _child->restoreState(_txn);
+            }
+            catch ( const WriteConflictException& wce ) {
+                // Note we don't need to retry anything in this case since the update already
+                // was committed.
+                *out = WorkingSet::INVALID_ID;
+                _commonStats.needFetch++;
+                return NEED_FETCH;
+            }
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;

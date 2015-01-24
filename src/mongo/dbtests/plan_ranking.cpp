@@ -127,9 +127,9 @@ namespace PlanRankingTests {
                 // Takes ownership of all (actually some) arguments.
                 _mps->addPlan(solutions[i], root, ws.get());
             }
-            // This is what sets a backup plan, should we test for it. NULL means that there
-            // is no yield policy for this MultiPlanStage's plan selection.
-            _mps->pickBestPlan(NULL);
+            // This is what sets a backup plan, should we test for it.
+            PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+            _mps->pickBestPlan(&yieldPolicy);
             ASSERT(_mps->bestPlanChosen());
 
             size_t bestPlanIdx = _mps->bestPlanIdx();

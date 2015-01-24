@@ -158,9 +158,9 @@ namespace QueryMultiPlanRunner {
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
-            // Plan 0 aka the first plan aka the index scan should be the best. NULL means that
-            // 'mps' will not yield during plan selection.
-            mps->pickBestPlan(NULL);
+            // Plan 0 aka the first plan aka the index scan should be the best.
+            PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+            mps->pickBestPlan(&yieldPolicy);
             ASSERT(mps->bestPlanChosen());
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
@@ -238,8 +238,9 @@ namespace QueryMultiPlanRunner {
                 mps->addPlan(solutions[i], root, ws.get());
             }
 
-            // This sets a backup plan. NULL means that 'mps' will not yield.
-            mps->pickBestPlan(NULL);
+            // This sets a backup plan.
+            PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);
+            mps->pickBestPlan(&yieldPolicy);
             ASSERT(mps->bestPlanChosen());
             ASSERT(mps->hasBackupPlan());
 

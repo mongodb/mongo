@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/multi_iterator.h"
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/storage/record_fetcher.h"
 
@@ -59,31 +60,47 @@ namespace mongo {
         if ( _collection == NULL )
             return PlanStage::DEAD;
 
+        if (_iterators.empty())
+            return PlanStage::IS_EOF;
+
+        const RecordId curr = _iterators.back()->curr();
+        Snapshotted<BSONObj> obj;
+
         // The RecordId we're about to look at it might not be in memory. In this case
         // we request a yield while we fetch the document.
-        if (!_iterators.empty()) {
-            RecordId curr = _iterators.back()->curr();
-            if (!curr.isNull()) {
-                std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
-                if (NULL != fetcher.get()) {
-                    WorkingSetMember* member = _ws->get(_wsidForFetch);
-                    member->loc = curr;
-                    // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
-                    member->setFetcher(fetcher.release());
-                    *out = _wsidForFetch;
-                    return NEED_FETCH;
-                }
+        if (!curr.isNull()) {
+            std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
+            if (NULL != fetcher.get()) {
+                WorkingSetMember* member = _ws->get(_wsidForFetch);
+                member->loc = curr;
+                // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
+                member->setFetcher(fetcher.release());
+                *out = _wsidForFetch;
+                return NEED_FETCH;
             }
+
+            obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
+                                       _iterators.back()->dataFor(curr).releaseToBson());
         }
 
-        RecordId next = _advance();
-        if (next.isNull())
-            return PlanStage::IS_EOF;
+        try {
+            _advance();
+        }
+        catch (const WriteConflictException& wce) {
+            // If _advance throws a WCE we shouldn't have moved.
+            invariant(!_iterators.empty());
+            invariant(_iterators.back()->curr() == curr);
+            *out = WorkingSet::INVALID_ID;
+            return NEED_FETCH;
+        }
+
+        if (curr.isNull())
+            return NEED_TIME;
 
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->loc = next;
-        member->obj = _collection->docFor(_txn, next);
+        member->loc = curr;
+        member->obj = obj;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         return PlanStage::ADVANCED;
     }
@@ -134,16 +151,13 @@ namespace mongo {
         return empty;
     }
 
-    RecordId MultiIteratorStage::_advance() {
-        while (!_iterators.empty()) {
-            RecordId out = _iterators.back()->getNext();
-            if (!out.isNull())
-                return out;
-
+    void MultiIteratorStage::_advance() {
+        if (_iterators.back()->isEOF()) {
             _iterators.popAndDeleteBack();
         }
-
-        return RecordId();
+        else {
+            _iterators.back()->getNext();
+        }
     }
 
 } // namespace mongo

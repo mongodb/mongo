@@ -117,7 +117,7 @@ namespace {
         string secondName = "y";
         int secondValue = 10;
 
-        member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue)));
+        member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
         // Also a minor lie as loc is bogus.
         member->state = WorkingSetMember::LOC_AND_IDX;
         BSONElement elt;
@@ -127,7 +127,7 @@ namespace {
         ASSERT_FALSE(member->getFieldDotted("foo", &elt));
 
         // Add another index datum.
-        member->keyData.push_back(IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue)));
+        member->keyData.push_back(IndexKeyDatum(BSON(secondName << 1), BSON("" << secondValue), NULL));
         ASSERT_TRUE(member->getFieldDotted(secondName, &elt));
         ASSERT_EQUALS(elt.numberInt(), secondValue);
         ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -140,7 +140,7 @@ namespace {
         string firstName = "x.y";
         int firstValue = 5;
 
-        member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue)));
+        member->keyData.push_back(IndexKeyDatum(BSON(firstName << 1), BSON("" << firstValue), NULL));
         member->state = WorkingSetMember::LOC_AND_IDX;
         BSONElement elt;
         ASSERT_TRUE(member->getFieldDotted(firstName, &elt));
@@ -159,7 +159,7 @@ namespace {
         WorkingSetID id1 = ws.allocate();
         WorkingSetMember* member1 = ws.get(id1);
         member1->state = WorkingSetMember::LOC_AND_IDX;
-        member1->keyData.push_back(IndexKeyDatum(BSON("a" << 1), BSON("" << 3)));
+        member1->keyData.push_back(IndexKeyDatum(BSON("a" << 1), BSON("" << 3), NULL));
 
         WorkingSetID id2 = ws.allocate();
         WorkingSetMember* member2 = ws.get(id2);

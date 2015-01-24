@@ -35,6 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
@@ -86,25 +87,34 @@ namespace mongo {
                 return PlanStage::DEAD;
             }
 
-            if (_lastSeenLoc.isNull()) {
-                _iter.reset( _params.collection->getIterator( _txn,
-                                                              _params.start,
-                                                              _params.direction ) );
-            }
-            else {
-                invariant(_params.tailable);
-
-                _iter.reset( _params.collection->getIterator( _txn,
-                                                              _lastSeenLoc,
-                                                              _params.direction ) );
-
-                // Advance _iter past where we were last time. If it returns something else, mark us
-                // as dead since we want to signal an error rather than silently dropping data from
-                // the stream. This is related to the _lastSeenLock handling in invalidate.
-                if (_iter->getNext() != _lastSeenLoc) {
-                    _isDead = true;
-                    return PlanStage::DEAD;
+            try {
+                if (_lastSeenLoc.isNull()) {
+                    _iter.reset( _params.collection->getIterator( _txn,
+                                                                  _params.start,
+                                                                  _params.direction ) );
                 }
+                else {
+                    invariant(_params.tailable);
+
+                    _iter.reset( _params.collection->getIterator( _txn,
+                                                                  _lastSeenLoc,
+                                                                  _params.direction ) );
+
+                    // Advance _iter past where we were last time. If it returns something else,
+                    // mark us as dead since we want to signal an error rather than silently
+                    // dropping data from the stream. This is related to the _lastSeenLock handling
+                    // in invalidate.
+                    if (_iter->getNext() != _lastSeenLoc) {
+                        _isDead = true;
+                        return PlanStage::DEAD;
+                    }
+                }
+            }
+            catch (const WriteConflictException& wce) {
+                // Leave us in a state to try again next time.
+                _iter.reset();
+                *out = WorkingSet::INVALID_ID;
+                return PlanStage::NEED_FETCH;
             }
 
             ++_commonStats.needTime;
@@ -143,15 +153,27 @@ namespace mongo {
             }
         }
 
+        // Do this before advancing because it is more efficient while the iterator is still on this
+        // document.
+        const Snapshotted<BSONObj> obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
+                                                              _iter->dataFor(curr).releaseToBson());
+
+        // Advance the iterator.
+        try {
+            invariant(_iter->getNext() == curr);
+        }
+        catch (const WriteConflictException& wce) {
+            // If getNext thows, it leaves us on the original document.
+            invariant(_iter->curr() == curr);
+            *out = WorkingSet::INVALID_ID;
+            return PlanStage::NEED_FETCH;
+        }
+
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = curr;
-        member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
-                                           _iter->dataFor(member->loc).releaseToBson());
+        member->obj = obj;
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-
-        // Advance the iterator.
-        invariant(_iter->getNext() == curr);
 
         return returnIfMatches(member, id, out);
     }

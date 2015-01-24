@@ -254,6 +254,9 @@ namespace mongo {
             invariant(_allowInterruption);
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
         }
+        else {
+            exec->setYieldPolicy(PlanExecutor::WRITE_CONFLICT_RETRY_ONLY);
+        }
 
         BSONObj objToIndex;
         RecordId loc;

@@ -31,6 +31,8 @@
 #include "mongo/db/exec/working_set.h"
 
 namespace mongo {
+    class CanonicalQuery;
+    class Collection;
 
     class WorkingSetCommon {
     public:
@@ -44,26 +46,35 @@ namespace mongo {
                                           const Collection* collection);
 
         /**
-         * Iterates over 'workingSet'. For all valid working set members, if the member has a
-         * RecordId but does not have an owned obj, then puts the member in "loc with owned
-         * obj" state.
+         * This must be called as part of "saveState" operations after all nodes in the tree save
+         * their state.
          *
-         * This "force-fetching" is called on saveState() for storage-engines that support document-
-         * level locking. This ensures that all WS members are still valid, even after the
-         * OperationContext becomes invalid due to a yield.
+         * Iterates over 'workingSet' and converts all LOC_AND_UNOWNED_OBJ members to
+         * LOC_AND_OWNED_OBJ by calling getOwned on their obj. Also sets the isSuspicious flag on
+         * all nodes in LOC_AND_IDX state.
          */
-        static void forceFetchAllLocs(OperationContext* txn,
-                                      WorkingSet* workingSet,
-                                      const Collection* collection);
+        static void prepareForSnapshotChange(WorkingSet* workingSet);
 
         /**
          * After a NEED_FETCH is requested, this is used to actually retrieve the document
          * corresponding to 'member' from 'collection', and to set the state of 'member'
          * appropriately.
+         *
+         * If false is returned, the document should not be considered for the result set. It is the
+         * caller's responsibility to free 'member' in this case.
+         *
+         * WriteConflict exceptions may be thrown. When they are, 'member' will be unmodified.
          */
-        static void completeFetch(OperationContext* txn,
-                                  WorkingSetMember* member,
-                                  const Collection* collection);
+        static bool fetch(OperationContext* txn,
+                          WorkingSetMember* member,
+                          const Collection* collection);
+
+        static bool fetchIfUnfetched(OperationContext* txn,
+                                     WorkingSetMember* member,
+                                     const Collection* collection) {
+            if (member->hasObj()) return true;
+            return fetch(txn, member, collection);
+        }
 
         /**
          * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.

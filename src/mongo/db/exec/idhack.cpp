@@ -31,6 +31,7 @@
 #include "mongo/db/exec/idhack.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -100,58 +101,78 @@ namespace mongo {
             _idBeingPagedIn = WorkingSet::INVALID_ID;
             WorkingSetMember* member = _workingSet->get(id);
 
-            WorkingSetCommon::completeFetch(_txn, member, _collection);
+            invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _collection));
 
             return advance(id, member, out);
         }
 
-        // Use the index catalog to get the id index.
-        const IndexCatalog* catalog = _collection->getIndexCatalog();
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        try {
+            // Use the index catalog to get the id index.
+            const IndexCatalog* catalog = _collection->getIndexCatalog();
 
-        // Find the index we use.
-        IndexDescriptor* idDesc = catalog->findIdIndex(_txn);
-        if (NULL == idDesc) {
-            _done = true;
-            return PlanStage::IS_EOF;
+            // Find the index we use.
+            IndexDescriptor* idDesc = catalog->findIdIndex(_txn);
+            if (NULL == idDesc) {
+                _done = true;
+                return PlanStage::IS_EOF;
+            }
+
+            // This may not be valid always.  See SERVER-12397.
+            const BtreeBasedAccessMethod* accessMethod =
+                static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
+
+            // Look up the key by going directly to the Btree.
+            RecordId loc = accessMethod->findSingle(_txn, _key);
+
+            // Key not found.
+            if (loc.isNull()) {
+                _done = true;
+                return PlanStage::IS_EOF;
+            }
+
+            ++_specificStats.keysExamined;
+            ++_specificStats.docsExamined;
+
+            // Create a new WSM for the result document.
+            id = _workingSet->allocate();
+            WorkingSetMember* member = _workingSet->get(id);
+            member->state = WorkingSetMember::LOC_AND_IDX;
+            member->loc = loc;
+
+            // We may need to request a yield while we fetch the document.
+            std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, loc));
+            if (NULL != fetcher.get()) {
+                // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
+                // fetch request.
+                _idBeingPagedIn = id;
+                member->setFetcher(fetcher.release());
+                *out = id;
+                _commonStats.needFetch++;
+                return NEED_FETCH;
+            }
+
+            // The doc was already in memory, so we go ahead and return it.
+            if (!WorkingSetCommon::fetch(_txn, member, _collection)) {
+                // _id is immutable so the index would return the only record that could
+                // possibly match the query.
+                _workingSet->free(id);
+                _commonStats.isEOF = true;
+                _done = true;
+                return IS_EOF;
+            }
+
+            return advance(id, member, out);
         }
+        catch (const WriteConflictException& wce) {
+            // Restart at the beginning on retry.
+            if (id != WorkingSet::INVALID_ID)
+                _workingSet->free(id);
 
-        // This may not be valid always.  See SERVER-12397.
-        const BtreeBasedAccessMethod* accessMethod =
-            static_cast<const BtreeBasedAccessMethod*>(catalog->getIndex(idDesc));
-
-        // Look up the key by going directly to the Btree.
-        RecordId loc = accessMethod->findSingle(_txn, _key);
-
-        // Key not found.
-        if (loc.isNull()) {
-            _done = true;
-            return PlanStage::IS_EOF;
-        }
-
-        ++_specificStats.keysExamined;
-        ++_specificStats.docsExamined;
-
-        // Create a new WSM for the result document.
-        WorkingSetID id = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(id);
-        member->loc = loc;
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-
-        // We may need to request a yield while we fetch the document.
-        std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, loc));
-        if (NULL != fetcher.get()) {
-            // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
-            // fetch request.
-            _idBeingPagedIn = id;
-            member->setFetcher(fetcher.release());
-            *out = id;
+            *out = WorkingSet::INVALID_ID;
             _commonStats.needFetch++;
             return NEED_FETCH;
         }
-
-        // The doc was already in memory, so we go ahead and return it.
-        member->obj = _collection->docFor(_txn, member->loc);
-        return advance(id, member, out);
     }
 
     PlanStage::StageState IDHackStage::advance(WorkingSetID id,

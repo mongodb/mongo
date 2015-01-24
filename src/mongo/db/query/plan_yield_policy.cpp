@@ -30,18 +30,24 @@
 
 #include "mongo/db/query/plan_yield_policy.h"
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
 
 namespace mongo {
 
-    PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec)
-        : _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
+    PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
+        : _policy(policy),
+          _forceYield(false),
+          _elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS),
           _planYielding(exec) { }
 
     bool PlanYieldPolicy::shouldYield() {
+        if (!allowedToYield()) return false;
         invariant(!_planYielding->getOpCtx()->lockState()->inAWriteUnitOfWork());
+        if (_forceYield) return true;
         return _elapsedTracker.intervalHasElapsed();
     }
 
@@ -51,26 +57,56 @@ namespace mongo {
 
     bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
         invariant(_planYielding);
+        invariant(allowedToYield());
+
+        _forceYield = false;
 
         OperationContext* opCtx = _planYielding->getOpCtx();
         invariant(opCtx);
+        invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-        // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers that
-        // it's time to yield. Whether or not we will actually yield, we need to check if this
-        // operation has been interrupted. Throws if the interrupt flag is set.
-        opCtx->checkForInterrupt();
+        // Can't use MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN/END since we need to call saveState
+        // before reseting the transaction.
+        for (int attempt = 1; true; attempt++) {
+            try {
+                // All YIELD_AUTO plans will get here eventually when the elapsed tracker triggers
+                // that it's time to yield. Whether or not we will actually yield, we need to check
+                // if this operation has been interrupted. Throws if the interrupt flag is set.
+                if (_policy == PlanExecutor::YIELD_AUTO) {
+                    opCtx->checkForInterrupt();
+                }
 
-        // No need to yield if the collection is NULL.
-        if (NULL == _planYielding->collection()) {
-            return true;
+                // No need to yield if the collection is NULL.
+                if (NULL == _planYielding->collection()) {
+                    return true;
+                }
+
+                try {
+                    _planYielding->saveState();
+                }
+                catch (const WriteConflictException& wce) {
+                    invariant(!"WriteConflictException not allowed in saveState");
+                }
+
+                if (_policy == PlanExecutor::WRITE_CONFLICT_RETRY_ONLY) {
+                    // Just reset the snapshot. Leave all LockManager locks alone.
+                    opCtx->recoveryUnit()->commitAndRestart();
+                }
+                else {
+                    // Release and reacquire locks.
+                    QueryYield::yieldAllLocks(opCtx, fetcher);
+                }
+
+                return _planYielding->restoreStateWithoutRetrying(opCtx);
+            }
+            catch (const WriteConflictException& wce) {
+                opCtx->getCurOp()->debug().writeConflicts++;
+                WriteConflictException::logAndBackoff(attempt,
+                                                      "plan execution restoreState",
+                                                      _planYielding->collection()->ns().ns());
+                // retry
+            }
         }
-
-        _planYielding->saveState();
-
-        // Release and reacquire locks.
-        QueryYield::yieldAllLocks(opCtx, fetcher);
-
-        return _planYielding->restoreState(opCtx);
     }
 
 } // namespace mongo

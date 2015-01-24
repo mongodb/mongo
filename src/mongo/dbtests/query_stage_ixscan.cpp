@@ -55,7 +55,11 @@ namespace QueryStageIxscan {
             _ctx.db()->dropCollection(&_txn, ns());
             _coll = _ctx.db()->createCollection(&_txn, ns());
 
-            ASSERT_OK(dbtests::createIndex(&_txn, ns(), BSON("x" << 1)));
+            ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
+                        &_txn,
+                        BSON("ns" << ns()
+                          << "key" << BSON("x" << 1)
+                          << "name" << DBClientBase::genIndexName(BSON("x" << 1)))));
 
             wunit.commit();
         }

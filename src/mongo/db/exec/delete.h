@@ -124,6 +124,9 @@ namespace mongo {
 
         boost::scoped_ptr<PlanStage> _child;
 
+        // If not Null, we use this rather than asking our child what to do next.
+        WorkingSetID _idRetrying;
+
         // Stats
         CommonStats _commonStats;
         DeleteStats _specificStats;

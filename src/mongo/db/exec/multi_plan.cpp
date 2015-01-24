@@ -38,6 +38,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -162,7 +163,7 @@ namespace mongo {
         //   1) The yield policy's timer elapsed, or
         //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
         // In both cases, the actual yielding happens here.
-        if (NULL != yieldPolicy && (yieldPolicy->shouldYield() || NULL != _fetcher.get())) {
+        if (yieldPolicy->shouldYield()) {
             // Here's where we yield.
             bool alive = yieldPolicy->yield(_fetcher.get());
 
@@ -381,10 +382,21 @@ namespace mongo {
             else if (PlanStage::NEED_FETCH == state) {
                 // Yielding for a NEED_FETCH is handled above. Here we just make sure that the
                 // WSM is fetchable as a sanity check.
-                WorkingSetMember* member = candidate.ws->get(id);
-                invariant(member->hasFetcher());
-                // Transfer ownership of the fetcher and yield.
-                _fetcher.reset(member->releaseFetcher());
+                if (id == WorkingSet::INVALID_ID) {
+                    if (!yieldPolicy->allowedToYield())
+                        throw WriteConflictException();
+                }
+                else {
+                    WorkingSetMember* member = candidate.ws->get(id);
+                    invariant(member->hasFetcher());
+                    // Transfer ownership of the fetcher and yield.
+                    _fetcher.reset(member->releaseFetcher());
+                }
+
+                if (yieldPolicy->allowedToYield()) {
+                    yieldPolicy->forceYield();
+                }
+
                 if (!(tryYield(yieldPolicy)).isOK()) {
                     return false;
                 }

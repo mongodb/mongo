@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/working_set.h"
+
 namespace mongo {
 
     class AndCommon {
@@ -85,6 +87,9 @@ namespace mongo {
                 }
                 if (!found) { dest->keyData.push_back(src.keyData[i]); }
             }
+            
+            if (src.isSuspicious)
+                dest->isSuspicious = true;
         }
     };
 

@@ -72,24 +72,17 @@ namespace mongo {
     }
 
 
-    PlanStage::StageState NearStage::initNext() {
-        PlanStage::StageState state = initialize(_txn, _workingSet, _collection);
+    PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
+        PlanStage::StageState state = initialize(_txn, _workingSet, _collection, out);
         if (state == PlanStage::IS_EOF) {
             _searchState = SearchState_Buffering;
             return PlanStage::NEED_TIME;
         }
 
-        invariant(state != PlanStage::ADVANCED && state != PlanStage::NEED_FETCH);
+        invariant(state != PlanStage::ADVANCED);
 
         // Propagate NEED_TIME or errors upward.
         return state;
-    }
-
-    PlanStage::StageState NearStage::initialize(OperationContext* txn,
-                                                WorkingSet* workingSet,
-                                                Collection* collection)
-    {
-        return PlanStage::IS_EOF;
     }
 
     PlanStage::StageState NearStage::work(WorkingSetID* out) {
@@ -108,7 +101,7 @@ namespace mongo {
         //
 
         if (SearchState_Initializing == _searchState) {
-            nextState = initNext();
+            nextState = initNext(&toReturn);
         }
         else if (SearchState_Buffering == _searchState) {
             nextState = bufferNext(&toReturn, &error);

@@ -86,7 +86,8 @@ namespace mongo {
 
         virtual PlanStage::StageState initialize(OperationContext* txn,
                                                  WorkingSet* workingSet,
-                                                 Collection* collection);
+                                                 Collection* collection,
+                                                 WorkingSetID* out);
     private:
         const GeoNearParams _nearParams;
 
@@ -131,7 +132,8 @@ namespace mongo {
 
         virtual PlanStage::StageState initialize(OperationContext* txn,
                                                  WorkingSet* workingSet,
-                                                 Collection* collection);
+                                                 Collection* collection,
+                                                 WorkingSetID* out);
     private:
         const GeoNearParams _nearParams;
 

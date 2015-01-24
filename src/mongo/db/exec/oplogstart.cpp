@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 
 namespace mongo {
 
@@ -59,6 +60,7 @@ namespace mongo {
             params.collection = _collection;
             params.direction = CollectionScanParams::BACKWARD;
             _cs.reset(new CollectionScan(_txn, params, _workingSet, NULL));
+
             _needInit = false;
             _backwardsScanning = true;
             _timer.reset();
@@ -71,7 +73,16 @@ namespace mongo {
             if (_timer.seconds() < _backwardsScanTime) {
                 return workBackwardsScan(out);
             }
-            switchToExtentHopping();
+
+            try {
+                // If this throws WCE, it leave us in a state were the next call to work will retry.
+                switchToExtentHopping();
+            }
+            catch (const WriteConflictException& wce) {
+                _subIterators.clear();
+                *out = WorkingSet::INVALID_ID;
+                return NEED_FETCH;
+            }
         }
 
         // Don't find it in time?  Swing from extent to extent like tarzan.com.
@@ -85,34 +96,36 @@ namespace mongo {
         }
 
         // we work from the back to the front since the back has the newest data.
-        const RecordId loc = _subIterators.back()->getNext();
-        _subIterators.popAndDeleteBack();
+        const RecordId loc = _subIterators.back()->curr();
+        if (loc.isNull()) return PlanStage::NEED_TIME;
 
         // TODO: should we ever try and return NEED_FETCH here?
-        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc).value())) {
+        const BSONObj obj = _subIterators.back()->dataFor(loc).releaseToBson();
+        if (!_filter->matchesBSON(obj)) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->obj = _collection->docFor(_txn, member->loc);
+            member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(), obj);
             member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             *out = id;
             return PlanStage::ADVANCED;
         }
 
+        _subIterators.popAndDeleteBack();
         return PlanStage::NEED_TIME;
     }
 
     void OplogStart::switchToExtentHopping() {
+        // Set up our extent hopping state.
+        _subIterators = _collection->getManyIterators(_txn);
+
         // Transition from backwards scanning to extent hopping.
         _backwardsScanning = false;
         _extentHopping = true;
 
         // Toss the collection scan we were using.
         _cs.reset();
-
-        // Set up our extent hopping state.
-        _subIterators = _collection->getManyIterators(_txn);
     }
 
     PlanStage::StageState OplogStart::workBackwardsScan(WorkingSetID* out) {

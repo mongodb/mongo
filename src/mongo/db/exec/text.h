@@ -141,7 +141,7 @@ namespace mongo {
          * score) pair for this document.  Also rejects documents that don't match this stage's
          * filter.
          */
-        void addTerm(const BSONObj key, WorkingSetID wsid);
+        StageState addTerm(WorkingSetID wsid, WorkingSetID* out);
 
         /**
          * Possibly return a result.  FYI, this may perform a fetch directly if it is needed to
@@ -177,6 +177,9 @@ namespace mongo {
 
         // Which _scanners are we currently reading from?
         size_t _currentIndexScanner;
+
+        // If not Null, we use this rather than asking our child what to do next.
+        WorkingSetID _idRetrying;
 
         // Map each buffered record id to this data.
         struct TextRecordData {
