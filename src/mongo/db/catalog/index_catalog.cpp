@@ -443,24 +443,42 @@ namespace {
     }
 
     IndexCatalog::IndexBuildBlock::~IndexBuildBlock() {
-        // Don't need to call fail() here, as rollback will clean everything up for us.
+        if ( !_inProgress ) {
+            // taken care of already when success() is called
+            return;
+        }
+
+        try {
+            fail();
+        }
+        catch ( const AssertionException& exc ) {
+            log() << "exception in ~IndexBuildBlock trying to cleanup: " << exc;
+            log() << " going to fassert to preserve state";
+            fassertFailed( 17345 );
+        }
     }
 
     void IndexCatalog::IndexBuildBlock::fail() {
-        fassert( 17204, _catalog->_collection->ok() ); // defensive
+        try {
+            fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-        _inProgress = false;
+            _inProgress = false;
 
-        IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
-        invariant( entry == _entry );
+            IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
+            invariant( entry == _entry );
 
-        if ( entry ) {
-            _catalog->_dropIndex(_txn, entry);
+            if ( entry ) {
+                _catalog->_dropIndex(_txn, entry);
+            }
+            else {
+                _catalog->_deleteIndexFromDisk( _txn,
+                                                _indexName,
+                                                _indexNamespace );
+            }
         }
-        else {
-            _catalog->_deleteIndexFromDisk( _txn,
-                                            _indexName,
-                                            _indexNamespace );
+        catch (const DBException& exc) {
+            error() << "exception while cleaning up in-progress index build: " << exc.what();
+            fassertFailedWithStatus(17493, exc.toStatus());
         }
     }
 
