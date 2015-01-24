@@ -413,12 +413,11 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Check for an append-only workload needing an in-memory split.
 	 *
 	 * We can't do this earlier because in-memory splits require exclusive
-	 * access.  If an in-memory split completes, the page stays in memory
-	 * and the tree is left in the desired state: avoid the usual cleanup.
+	 * access, and we can't split if a checkpoint is in progress because
+	 * the checkpoint could be walking the parent page.
 	 *
-	 * Attempt the split before checking whether a checkpoint is running -
-	 * that's not a problem here because we aren't evicting any dirty
-	 * pages.
+	 * If an in-memory split completes, the page stays in memory and the
+	 * tree is left in the desired state: avoid the usual cleanup.
 	 */
 	if (top && !exclusive) {
 		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
