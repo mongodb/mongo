@@ -43,7 +43,6 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
@@ -73,22 +72,6 @@ namespace mongo {
         MultiIndexBlock* const _indexer;
     };
 
-    /**
-     * On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean
-     * up _indexes manually (since the changes were already rolled back).
-     * Due to this, it is thus legal to call init() again after it fails.
-     */
-    class MultiIndexBlock::CleanupIndexesVectorOnRollback : public RecoveryUnit::Change {
-    public:
-        explicit CleanupIndexesVectorOnRollback(MultiIndexBlock* indexer) : _indexer(indexer) {}
-
-        virtual void commit() {}
-        virtual void rollback() { _indexer->_indexes.clear(); }
-
-    private:
-        MultiIndexBlock* const _indexer;
-    };
-
     MultiIndexBlock::MultiIndexBlock(OperationContext* txn, Collection* collection)
         : _collection(collection),
           _txn(txn),
@@ -101,30 +84,24 @@ namespace mongo {
     MultiIndexBlock::~MultiIndexBlock() {
         if (!_needToCleanup || _indexes.empty())
             return;
-        while (true) {
-            try {
-                WriteUnitOfWork wunit(_txn);
-                // This cleans up all index builds. 
-                // Because that may need to write, it is done inside
-                // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
-                for (size_t i = 0; i < _indexes.size(); i++) {
-                    _indexes[i].block->fail();
-                }
-                wunit.commit();
-                return;
+
+        try {
+            WriteUnitOfWork wunit(_txn);
+            // This cleans up all index builds. Because that may need to write, it is done inside
+            // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
+            for (size_t i = 0; i < _indexes.size(); i++) {
+                _indexes[i].block->fail();
             }
-            catch (const WriteConflictException& e) {
-                continue;
-            }
-            catch (const std::exception& e) {
-                error() << "Caught exception while cleaning up partially built indexes: "
-                        << e.what();
-            }
-            catch (...) {
-                error() << "Caught unknown exception while cleaning up partially built indexes.";
-            }
-            fassertFailed(18644);
+            wunit.commit();
+            return;
         }
+        catch (const std::exception& e) {
+            error() << "Caught exception while cleaning up partially built indexes: " << e.what();
+        }
+        catch (...) {
+            error() << "Caught unknown exception while cleaning up partially built indexes.";
+        }
+        fassertFailed(18644);
     }
 
     void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
@@ -141,10 +118,6 @@ namespace mongo {
 
     Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         WriteUnitOfWork wunit(_txn);
-
-        invariant(_indexes.empty());
-        _txn->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
-
         const string& ns = _collection->ns().ns();
 
         Status status = _collection->getIndexCatalog()->checkUnfinished();
