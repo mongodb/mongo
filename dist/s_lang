@@ -4,16 +4,22 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-cd ..
+cd ../lang
 
-for l in java python; do
+for d in *; do
+	f=`find $d -name 'wiredtiger_wrap.c'`
+	test -z "$f" && continue
+
 	sed -e '/SWIGINTERN.*__wt_[a-z][a-z]*_[a-z]/!d' \
 	    -e '/__wt_[^(]*__.*(/d' \
 	    -e '/_wrap/d' \
-	    -e "/_${l}_/d" \
-	    lang/$l/wiredtiger_wrap.c > $t
-	if [ -s $t ]; then
-		echo "$l: potential name conflict"
+	    -e "/_${d}_/d" \
+	    $f > $t
+
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo "$l: potential SWIG naming conflict"
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		cat $t
-	fi
+	}
 done
