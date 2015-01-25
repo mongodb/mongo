@@ -1,8 +1,6 @@
 MongoDB Tools
 ===================================
 
-This is the 2.7.x **unstable** branch. This project is a work in progress.
- 
  - **bsondump** - _display BSON files in a human-readable format_
  - **mongoimport** - _Convert data from JSON, TSV or CSV and insert them into a collection_
  - **mongoexport** - _Write an existing collection to CSV or JSON format_
