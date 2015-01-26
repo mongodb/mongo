@@ -889,8 +889,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
-		if (next_ref->state == WT_REF_DELETED &&
-		    next_ref->page_del == NULL &&
+		if (__wt_delete_page_skip(session, next_ref) &&
 		    WT_ATOMIC_CAS4(next_ref->state,
 		    WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
@@ -985,6 +984,18 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 					WT_TRET(__split_safe_free(
 					    session, 0, ikey, size));
 					WT_MEMSIZE_ADD(parent_decr, size);
+				}
+				/*
+				 * The page_del structure can be freed
+				 * immediately: it is only read when the ref
+				 * state is WT_REF_DELETED.  The size of the
+				 * structures wasn't added to the parent: don't
+				 * decrement.
+				 */
+				if (next_ref->page_del != NULL) {
+					__wt_free(session,
+					    next_ref->page_del->update_list);
+					__wt_free(session, next_ref->page_del);
 				}
 			}
 
