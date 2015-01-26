@@ -37,9 +37,13 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 		/*
 		 * If we fail to wait, we will leak handles so do not continue
 		 */
-		WT_PANIC_RET(session, WT_PANIC, "Wait for thread join failed");
+		WT_PANIC_RET(session, ret == WAIT_FAILED ? __wt_errno() : ret,
+		    "Wait for thread join failed");
 
-	CloseHandle(tid);
+	if (CloseHandle(tid) == 0) {
+		WT_RET_MSG(session, __wt_errno(),
+		    "CloseHandle: thread join");
+	}
 
 	return (0);
 }

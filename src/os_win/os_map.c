@@ -99,7 +99,10 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
 		    fh->name, len);
 	}
 
-	CloseHandle(*mappingcookie);
+	if (CloseHandle(*mappingcookie) == 0) {
+		WT_RET_MSG(session, __wt_errno(),
+		    "CloseHandle: MapViewOfFile: %s", fh->name);
+	}
 
 	*mappingcookie = 0;
 
