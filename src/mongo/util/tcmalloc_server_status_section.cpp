@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <third_party/gperftools-2.2/src/gperftools/malloc_extension.h>
@@ -32,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 
 namespace mongo {
@@ -43,16 +46,35 @@ namespace {
     // a long time.
     const int kManyClients = 40;
 
+    boost::mutex tcmallocCleanupLock;
+
     /**
      *  Callback to allow TCMalloc to release freed memory to the central list at
      *  favorable times. Ideally would do some milder cleanup or scavenge...
      */
     void threadStateChange() {
-        if (Listener::globalTicketHolder.used() > kManyClients) {
-            //  Mark thread busy while we're idle, so that overhead is incurred now.
-            MallocExtension::instance()->MarkThreadIdle();
-            MallocExtension::instance()->MarkThreadBusy();
+        if (Listener::globalTicketHolder.used() <= kManyClients) {
+            return;
         }
+
+        size_t threadCacheSizeBytes = MallocExtension::instance()->GetThreadCacheSize();
+
+        static const size_t kMaxThreadCacheSizeBytes = 0x10000;
+        if (threadCacheSizeBytes < kMaxThreadCacheSizeBytes) {
+            // This number was chosen a bit magically.
+            // At 1000 threads and the current (64mb) thread local cache size, we're "full".
+            // So we may want this number to scale with the number of current clients.
+            return;
+        }
+
+        LOG(1) << "thread over memory limit, cleaning up, current: "
+               << (threadCacheSizeBytes/1024) << "k";
+
+        // We synchronize as the tcmalloc central list uses a spinlock, and we can cause a really
+        // terrible runaway if we're not careful.
+        boost::mutex::scoped_lock lk(tcmallocCleanupLock);
+        MallocExtension::instance()->MarkThreadIdle();
+        MallocExtension::instance()->MarkThreadBusy();
     }
 
     // Register threadStateChange callback

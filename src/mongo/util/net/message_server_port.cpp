@@ -204,8 +204,7 @@ namespace {
             portWithHandler->psock->setLogLevel(logger::LogSeverity::Debug(1));
 
             Message m;
-            int64_t lastIdle = Listener::getElapsedTimeMillis();
-            int64_t avgMillisBetweenIdle = 0;
+            int64_t counter = 0;
             try {
                 LastError * le = new LastError();
                 lastError.reset( le ); // lastError now has ownership
@@ -231,20 +230,10 @@ namespace {
                     networkCounter.hit(portWithHandler->psock->getBytesIn(),
                                        portWithHandler->psock->getBytesOut());
 
-                    //  Connections that don't run at a high rate should mark an idle point
-                    //  between operations to allow cleanup of the thread-local malloc cache.
-                    //  Just before a receive is a reasonable point, as we may overlap with
-                    //  the processing of a command response. Avoid doing this in very active
-                    //  threads as they are actively using their memory and not experiencing
-                    //  resource starvation. Use the course clock with averaging for efficiency.
-
-                    const int64_t now = Listener::getElapsedTimeMillis();
-                    const int64_t millisSinceIdle = now - lastIdle;
-                    avgMillisBetweenIdle = (7 * avgMillisBetweenIdle + millisSinceIdle) / 8;
-                    if (avgMillisBetweenIdle >= 10) {
+                    // Occasionally we want to see if we're using too much memory.
+                    if ((counter++ & 0xf) == 0) {
                         markThreadIdle();
                     }
-                    lastIdle = now;
                 }
             }
             catch ( AssertionException& e ) {
