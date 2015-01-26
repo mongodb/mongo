@@ -226,6 +226,49 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	return nil
 }
 
+// small helper that checks if the file pointed to is not a directory.
+func isBSON(path string) bool {
+	file, err := os.Lstat(path)
+	if err != nil {
+		// swallow error -- it will come up again in a place
+		// that provides more helpful context to the user
+		return false
+	}
+	return !file.IsDir() 
+}
+
+// handleBSONInsteadOfDirectory updates -d and -c settings based on
+// the path to the BSON file passed to mongorestore. This is only
+// applicable if the target path points to a .bson file.
+//
+// As an example, when the user passes 'dump/mydb/col.bson', this method
+// will infer that 'mydb' is the database and 'col' is the collection name.
+func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
+	// we know we have been given a non-directory, so we should handle it 
+	// like a bson file and infer as much as we can
+	if restore.ToolOptions.Collection == "" {
+		// if the user did not set -c, use the file name for the collection
+		newCollectionName, fileType := GetInfoFromFilename(path)
+		if fileType != BSONFileType {
+			return fmt.Errorf("file %v does not have .bson extension", path)
+		}
+		restore.ToolOptions.Collection = newCollectionName
+		log.Logf(log.DebugLow, "inferred collection '%v' from file", restore.ToolOptions.Collection)
+	}
+	if restore.ToolOptions.DB == "" {
+		// if the user did not set -d, use the directory containing the target
+		// file as the db name (as it would be in a dump directory). If
+		// we cannot determine the directory name, use "test"
+		dirForFile := filepath.Base(filepath.Dir(path))
+		if dirForFile == "." || dirForFile == ".." {
+			dirForFile = "test"
+		}
+		restore.ToolOptions.DB = dirForFile
+		log.Logf(log.DebugLow, "inferred db '%v' from the file's directory", restore.ToolOptions.DB)
+	}
+	return nil
+}
+
 // readDirWithSymlinks acts like ioutil.ReadDir, except symlinks are treated
 // as directories instead of regular files
 func readDirWithSymlinks(fullpath string) ([]os.FileInfo, error) {

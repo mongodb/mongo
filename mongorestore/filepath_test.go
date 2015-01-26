@@ -153,6 +153,47 @@ func TestCreateIntentsForDB(t *testing.T) {
 	})
 }
 
+func TestHandlingBSON(t *testing.T) {
+	var mr *MongoRestore
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
+	Convey("With a test MongoRestore", t, func() {
+		mr = &MongoRestore{
+			manager:     intents.NewCategorizingIntentManager(),
+			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
+		}
+
+		Convey("with a target path to a bson file instead of a directory", func() {
+			err := mr.handleBSONInsteadOfDirectory("testdata/testdirs/db1/c2.bson")
+			So(err, ShouldBeNil)
+
+			Convey("the proper DB and Coll should be inferred", func() {
+				So(mr.ToolOptions.DB, ShouldEqual, "db1")
+				So(mr.ToolOptions.Collection, ShouldEqual, "c2")
+			})
+		})
+
+		Convey("but pre-existing settings should not be overwritten", func() {
+			mr.ToolOptions.DB = "a"
+
+			Convey("either collection settings", func() {
+				mr.ToolOptions.Collection = "b"
+				err := mr.handleBSONInsteadOfDirectory("testdata/testdirs/db1/c1.bson")
+				So(err, ShouldBeNil)
+				So(mr.ToolOptions.DB, ShouldEqual, "a")
+				So(mr.ToolOptions.Collection, ShouldEqual, "b")
+			})
+
+			Convey("or db settings", func() {
+				err := mr.handleBSONInsteadOfDirectory("testdata/testdirs/db1/c1.bson")
+				So(err, ShouldBeNil)
+				So(mr.ToolOptions.DB, ShouldEqual, "a")
+				So(mr.ToolOptions.Collection, ShouldEqual, "c1")
+			})
+		})
+	})
+}
+
 func TestCreateIntentsForCollection(t *testing.T) {
 	var mr *MongoRestore
 	var buff bytes.Buffer

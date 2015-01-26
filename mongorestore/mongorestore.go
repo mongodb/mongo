@@ -146,6 +146,17 @@ func (restore *MongoRestore) Restore() error {
 	// Build up all intents to be restored
 	restore.manager = intents.NewCategorizingIntentManager()
 
+	// handle cases where the user passes in a file instead of a directory
+	if isBSON(restore.TargetDirectory) {
+		log.Log(log.DebugLow, "mongorestore target is a file, not a directory")
+		err = restore.handleBSONInsteadOfDirectory(restore.TargetDirectory)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Log(log.DebugLow, "mongorestore target is a directory, not a file")
+	}
+
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
 		log.Logf(log.Always,
