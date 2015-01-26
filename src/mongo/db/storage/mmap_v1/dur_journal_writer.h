@@ -93,14 +93,19 @@ namespace dur {
         /**
          * Initializes the journal writer.
          *
-         * @param commitNotify Notification object to be called as journal entries are being
-         *      written. The caller retains ownership and the notify object must outlive the
-         *      journal writer object.
+         * @param commitNotify Notification object to be called after journal entries have been
+         *      written to disk. The caller retains ownership and the notify object must outlive
+         *      the journal writer object.
+         * @param applyToDataFilesNotify Notification object to be called after journal entries
+         *      have been applied to the shared view. This means that if the shared view were to be
+         *      flushed at this point, the journal files before this point are not necessary. The
+         *      caller retains ownership and the notify object must outlive the journal writer
+         *      object.
          * @param numBuffers How many buffers to create to hold outstanding writes. If there are
          *      more than this number of journal writes that have not completed, the write calls
          *      will block.
          */
-        JournalWriter(NotifyAll* commitNotify, size_t numBuffers);
+        JournalWriter(NotifyAll* commitNotify, NotifyAll* applyToDataFilesNotify, size_t numBuffers);
         ~JournalWriter();
 
         /**
@@ -161,6 +166,9 @@ namespace dur {
         // This gets notified as journal buffers are written. It is not owned and needs to outlive
         // the journal writer object.
         NotifyAll* const _commitNotify;
+
+        // This gets notified as journal buffers are done being applied to the shared view
+        NotifyAll* const _applyToDataFilesNotify;
 
         // Wraps and controls the journal writer thread
         boost::thread _journalWriterThreadHandle;

@@ -346,16 +346,11 @@ namespace {
             log() << "shutdown: final commit..." << endl;
 
             getDur().commitAndStopDurThread();
-            flushAllFiles(true);
         }
 
         log() << "shutdown: closing all files..." << endl;
         stringstream ss3;
         MemoryMappedFile::closeAllFiles( ss3 );
         log() << ss3.str() << endl;
-
-        if (storageGlobalParams.dur) {
-            dur::journalCleanup(true);
-        }
     }
 }

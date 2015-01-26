@@ -108,8 +108,11 @@ namespace {
     // JournalWriter
     //
 
-    JournalWriter::JournalWriter(NotifyAll* commitNotify, size_t numBuffers)
+    JournalWriter::JournalWriter(NotifyAll* commitNotify,
+                                 NotifyAll* applyToDataFilesNotify,
+                                 size_t numBuffers)
         : _commitNotify(commitNotify),
+          _applyToDataFilesNotify(applyToDataFilesNotify),
           _shutdownRequested(false),
           _journalQueue(numBuffers),
           _lastCommitNumber(0),
@@ -224,6 +227,7 @@ namespace {
 
                     // There's nothing to be writen, but we still need to notify this commit number
                     _commitNotify->notifyAll(buffer->_commitNumber);
+                    _applyToDataFilesNotify->notifyAll(buffer->_commitNumber);
                     continue;
                 }
 
@@ -242,6 +246,10 @@ namespace {
                 // Apply the journal entries on top of the shared view so that when flush is
                 // requested it would write the latest.
                 WRITETODATAFILES(buffer->_header, buffer->_builder);
+
+                // Data is now persisted on the shared view, so notify any potential journal file
+                // cleanup waiters.
+                _applyToDataFilesNotify->notifyAll(buffer->_commitNumber);
             }
         }
         catch (const DBException& e) {
