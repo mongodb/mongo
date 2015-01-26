@@ -547,12 +547,12 @@ common_wiredtiger_open = [
     Config('transaction_sync', '', r'''
         how to sync log records when the transaction commits''',
         type='category', subconfig=[
-        Config('enabled', 'true', r'''
+        Config('enabled', 'false', r'''
             whether to sync the log on every commit by default, can
         be overridden by the \c sync setting to
         WT_SESSION::begin_transaction''',
             type='boolean'),
-        Config('method', 'none', r'''
+        Config('method', 'fsync', r'''
             the method used to ensure log records are stable on disk,
         see @ref tune_durability for more information''',
             choices=['dsync', 'fsync', 'none']),
