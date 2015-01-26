@@ -955,17 +955,19 @@ namespace mongo {
         QuerySolution* querySolution;
 
         // If collection exists and the query is empty, no additional canonicalization is needed.
-        if (collection && request.query.isEmpty()) {
-            // If the query is empty, then we can determine the count by just asking the collection
-            // for its number of records. This is implemented by the CountStage, and we don't need
-            // to create a child for the count stage in this case.
+        // If the query is empty, then we can determine the count by just asking the collection
+        // for its number of records. This is implemented by the CountStage, and we don't need
+        // to create a child for the count stage in this case.
+        //
+        // If there is a hint, then we can't use a trival count plan as described above.
+        if (collection && request.query.isEmpty() && request.hint.isEmpty()) {
             root = new CountStage(txn, collection, request, ws.get(), NULL);
             return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
         }
 
         auto_ptr<CanonicalQuery> cq;
-        if (!request.query.isEmpty()) {
-            // If query is not empty, canonicalize it before working with collection.
+        if (!request.query.isEmpty() || !request.hint.isEmpty()) {
+            // If query or hint is not empty, canonicalize the query before working with collection.
             typedef MatchExpressionParser::WhereCallback WhereCallback;
             CanonicalQuery* rawCq = NULL;
             Status canonStatus = CanonicalQuery::canonicalize(
