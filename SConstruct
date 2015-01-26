@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 import re
 import os
+import sys
 import textwrap
 import distutils.sysconfig
 
@@ -242,6 +243,12 @@ wtbin = env.Program("wt", [
 
 # Python SWIG wrapper for WiredTiger
 if GetOption("lang-python"):
+    # Check that this version of python is 64-bit
+    #
+    if sys.maxsize < 2**32:
+        print "The Python Interpreter must be 64-bit in order to build the python bindings"
+        Exit(1)
+
     pythonEnv = env.Clone()
     pythonEnv.Append(SWIGFLAGS=[
             "-python",
