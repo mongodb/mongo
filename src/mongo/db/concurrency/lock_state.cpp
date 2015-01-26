@@ -728,7 +728,6 @@ namespace {
 
             // If infinite timeout was requested, just keep waiting
             if (timeoutMs == UINT_MAX) {
-                markThreadIdle();
                 continue;
             }
 
@@ -739,9 +738,6 @@ namespace {
             if (waitTimeMs == 0) {
                 break;
             }
-
-            // We have waited for a while and may likely be waiting even longer, mark us as idle
-            markThreadIdle();
         }
 
         // Cleanup the state, since this is an unused lock now

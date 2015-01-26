@@ -731,6 +731,13 @@ class TCMallocImplementation : public MallocExtension {
 
   virtual void MarkThreadBusy();  // Implemented below
 
+  virtual size_t GetThreadCacheSize() {
+    ThreadCache* tc = ThreadCache::GetCacheIfPresent();
+    if (!tc)
+      return 0;
+    return tc->Size();
+  }
+
   virtual SysAllocator* GetSystemAllocator() {
     SpinLockHolder h(Static::pageheap_lock());
     return sys_alloc;
