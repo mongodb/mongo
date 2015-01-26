@@ -42,6 +42,7 @@ if wiredtiger:
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
             'wiredtiger_parameters.cpp',
+            'wiredtiger_record_store_mongod.cpp',
             'wiredtiger_server_status.cpp',
             ],
         LIBDEPS=['storage_wiredtiger_core',
@@ -49,12 +50,21 @@ if wiredtiger:
                  ]
         )
 
+    wtEnv.Library(
+        target='storage_wiredtiger_mock',
+        source=[
+            'wiredtiger_record_store_mock.cpp',
+            ],
+        LIBDEPS=['storage_wiredtiger_core',
+             ]
+        )
+
     wtEnv.CppUnitTest(
         target='storage_wiredtiger_record_store_test',
         source=['wiredtiger_record_store_test.cpp',
                 ],
         LIBDEPS=[
-            'storage_wiredtiger_core',
+            'storage_wiredtiger_mock',
             '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
             ],
         )
@@ -64,7 +74,7 @@ if wiredtiger:
         source=['wiredtiger_index_test.cpp',
                 ],
         LIBDEPS=[
-            'storage_wiredtiger_core',
+            'storage_wiredtiger_mock',
             '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
             ],
         )
@@ -86,7 +96,7 @@ if wiredtiger:
         source=['wiredtiger_kv_engine_test.cpp',
                 ],
         LIBDEPS=[
-            'storage_wiredtiger_core',
+            'storage_wiredtiger_mock',
             '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
             ],
         )
@@ -96,6 +106,6 @@ if wiredtiger:
         source=['wiredtiger_util_test.cpp',
                 ],
         LIBDEPS=[
-            'storage_wiredtiger_core',
+            'storage_wiredtiger_mock',
             ],
         )
