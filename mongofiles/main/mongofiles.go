@@ -12,24 +12,10 @@ import (
 	"os"
 )
 
-const (
-	Usage = `[options] command [gridfs filename]
-        command:
-          one of (list|search|put|get|delete)
-          list - list all files.  'gridfs filename' is an optional prefix
-                 which listed filenames must begin with.
-          search - search all files. 'gridfs filename' is a substring
-                   which listed filenames must contain.
-          put - add a file with filename 'gridfs filename'
-          get - get a file with filename 'gridfs filename'
-          delete - delete all files with filename 'gridfs filename'
-        `
-)
-
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("mongofiles", Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
+	opts := options.New("mongofiles", mongofiles.Usage, options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	storageOpts := &mongofiles.StorageOptions{}
 	opts.AddOptions(storageOpts)

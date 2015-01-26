@@ -1,5 +1,14 @@
 package mongodump
 
+var Usage = `<options>
+
+Export the content of a running server into .bson files.
+
+Specify a database with -d and a collection with -c to only dump that database or collection.
+
+See http://docs.mongodb.org/manual/reference/program/mongodump/ for more information.`
+
+
 type InputOptions struct {
 	Query     string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	TableScan bool   `long:"forceTableScan" description:"force a table scan"`

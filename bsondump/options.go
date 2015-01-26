@@ -1,5 +1,12 @@
 package bsondump
 
+var Usage = `<options> <file>
+
+View and debug .bson files.
+
+See http://docs.mongodb.org/manual/reference/program/bsondump/ for more information.`
+
+
 type BSONDumpOptions struct {
 	Type     string `long:"type" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
 	ObjCheck bool   `long:"objcheck" description:"validate BSON during processing"`

@@ -17,7 +17,7 @@ func main() {
 	go signals.Handle()
 
 	// initialize command-line opts
-	opts := options.New("mongotop", "<options> <sleeptime>",
+	opts := options.New("mongotop", mongotop.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add mongotop-specific options

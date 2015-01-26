@@ -1,5 +1,11 @@
 package mongoexport
 
+var Usage = `<options>
+
+Export data from MongoDB in CSV or JSON format.
+
+See http://docs.mongodb.org/manual/reference/program/mongoexport/ for more information.`
+
 type OutputFormatOptions struct {
 	//Fields is an option to directly specify comma-separated fields to export to CSV
 	Fields string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
@@ -8,7 +14,7 @@ type OutputFormatOptions struct {
 	FieldFile string `long:"fieldFile" description:"file with field names - 1 per line"`
 
 	//Type selects the type of output to export as (json or csv)
-	Type string `long:"type" default:"json" default-mask:"-" description:"the output format, either JSON or CSV (defaults to 'json')"`
+	Type string `long:"type" default:"json" default-mask:"-" description:"the output format, either json or csv (defaults to 'json')"`
 
 	//OutputFile specifies an output file path.
 	OutputFile string `long:"out" short:"o" description:"output file; if not specified, stdout is used"`

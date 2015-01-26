@@ -15,10 +15,8 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	usageStr := " --host myhost --db my_cms --collection docs < mydocfile." +
-		"json \n\nImport CSV, TSV or JSON data into MongoDB.\n\nWhen importing " +
-		"JSON documents, each document must be a separate line of the input file."
-	opts := options.New("mongoimport", usageStr, options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := options.New("mongoimport", mongoimport.Usage,
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
 	inputOpts := &mongoimport.InputOptions{}
 	opts.AddOptions(inputOpts)

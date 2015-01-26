@@ -17,7 +17,7 @@ func main() {
 	// initialize command-line opts
 	opts := options.New(
 		"mongostat",
-		"[options] <polling interval in seconds>",
+		mongostat.Usage,
 		options.EnabledOptions{Connection: true, Auth: true, Namespace: false})
 
 	// add mongostat-specific options

@@ -1,5 +1,11 @@
 package mongoimport
 
+var Usage = `<options> <file>
+
+Import CSV, TSV or JSON data into MongoDB. If no file is provided, the tool reads from stdin.
+
+See http://docs.mongodb.org/manual/reference/program/mongoimport/ for more information.`
+
 type InputOptions struct {
 	// Fields is an option to directly specify comma-separated fields to import to CSV.
 	Fields *string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`

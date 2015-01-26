@@ -1,5 +1,11 @@
 package mongotop
 
+var Usage = `<options> <polling interval in seconds>
+
+Monitor basic usage statistics for each collection.
+
+See http://docs.mongodb.org/manual/reference/program/mongotop/ for more information.`
+
 // Output options for mongotop
 type Output struct {
 	Locks    bool `long:"locks" description:"report on use of per-database locks"`

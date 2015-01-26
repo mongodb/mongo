@@ -1,5 +1,14 @@
 package mongorestore
 
+var Usage = `<options> <directory or file to restore>
+
+Restore backups generated with mongodump to a running server.
+
+Specify a database with -d to restore a single database from the target directory,
+or use -d and -c to restore a single collection from a single .bson file.
+
+See http://docs.mongodb.org/manual/reference/program/mongorestore/ for more information.`
+
 type InputOptions struct {
 	Objcheck               bool   `long:"objcheck" description:"validate all objects before inserting"`
 	OplogReplay            bool   `long:"oplogReplay" description:"replay oplog for point-in-time restore"`

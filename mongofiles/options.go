@@ -1,5 +1,18 @@
 package mongofiles
 
+var Usage = `<options> <command> <filename>
+
+Manipulate gridfs files using the command line.
+
+Possible commands include:
+	list   - list all files; 'filename' is an optional prefix which listed filenames must begin with
+	search - search all files; 'filename' is a substring which listed filenames must contain
+	put    - add a file with filename 'filename'
+	get    - get a file with filename 'filename'
+	delete - delete all files with filename 'filename'
+
+See http://docs.mongodb.org/manual/reference/program/mongofiles/ for more information.`
+
 type StorageOptions struct {
 	// Specified database to use. defaults to 'test' if none is specified
 	DB string `short:"d" default:"test" default-mask:"-" long:"db" description:"database to use (default is 'test')"`

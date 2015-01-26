@@ -15,7 +15,8 @@ func main() {
 	go signals.Handle()
 
 	// initialize command line options
-	opts := options.New("mongooplog", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
+	opts := options.New("mongooplog", mongooplog.Usage,
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: false})
 
 	// add the mongooplog-specific options
 	sourceOpts := &mongooplog.SourceOptions{}

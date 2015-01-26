@@ -14,7 +14,8 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("mongoexport", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := options.New("mongoexport", mongoexport.Usage,
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 
 	outputOpts := &mongoexport.OutputFormatOptions{}
 	opts.AddOptions(outputOpts)

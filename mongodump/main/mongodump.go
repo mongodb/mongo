@@ -13,7 +13,7 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("mongodump", "<options>", options.EnabledOptions{true, true, true})
+	opts := options.New("mongodump", mongodump.Usage, options.EnabledOptions{true, true, true})
 
 	inputOpts := &mongodump.InputOptions{}
 	opts.AddOptions(inputOpts)

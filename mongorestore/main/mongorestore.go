@@ -15,7 +15,8 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("mongorestore", "<options>", options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
+	opts := options.New("mongorestore", mongorestore.Usage, 
+		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 	inputOpts := &mongorestore.InputOptions{}
 	opts.AddOptions(inputOpts)
 	outputOpts := &mongorestore.OutputOptions{}

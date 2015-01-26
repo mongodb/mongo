@@ -1,5 +1,11 @@
 package mongostat
 
+var Usage = `<options> <polling interval in seconds>
+
+Monitor basic MongoDB server statistics.
+
+See http://docs.mongodb.org/manual/reference/program/mongostat/ for more information.`
+
 // Output options for mongostat
 type StatOptions struct {
 	NoHeaders bool `long:"noheaders" description:"don't output column names"`

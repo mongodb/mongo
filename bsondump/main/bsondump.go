@@ -13,7 +13,7 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("bsondump", "<file>", options.EnabledOptions{})
+	opts := options.New("bsondump", bsondump.Usage, options.EnabledOptions{})
 	bsonDumpOpts := &bsondump.BSONDumpOptions{}
 	opts.AddOptions(bsonDumpOpts)
 
