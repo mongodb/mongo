@@ -673,77 +673,79 @@ namespace mongo {
                 return 0;
             }
 
-            // Check shard version at startup.
-            // This will throw before we've done any work if shard version is outdated
-            // We drop and re-acquire these locks every document because md5'ing is expensive
-            scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
-            Collection* coll = ctx->getCollection();
-            const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                // Check shard version at startup.
+                // This will throw before we've done any work if shard version is outdated
+                // We drop and re-acquire these locks every document because md5'ing is expensive
+                scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
+                Collection* coll = ctx->getCollection();
+                const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
-            PlanExecutor* rawExec;
-            if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
-                             QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
-                uasserted(17241, "Can't get executor for query " + query.toString());
-                return 0;
-            }
+                PlanExecutor* rawExec;
+                if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
+                                 QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+                    uasserted(17241, "Can't get executor for query " + query.toString());
+                    return 0;
+                }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-            // Process notifications when the lock is released/reacquired in the loop below
-            exec->registerExec();
+                auto_ptr<PlanExecutor> exec(rawExec);
+                // Process notifications when the lock is released/reacquired in the loop below
+                exec->registerExec();
 
-            BSONObj obj;
-            PlanExecutor::ExecState state;
-            while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-                BSONElement ne = obj["n"];
-                verify(ne.isNumber());
-                int myn = ne.numberInt();
-                if ( n != myn ) {
-                    if (partialOk) {
-                        break; // skipped chunk is probably on another shard
+                BSONObj obj;
+                PlanExecutor::ExecState state;
+                while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+                    BSONElement ne = obj["n"];
+                    verify(ne.isNumber());
+                    int myn = ne.numberInt();
+                    if ( n != myn ) {
+                        if (partialOk) {
+                            break; // skipped chunk is probably on another shard
+                        }
+                        log() << "should have chunk: " << n << " have:" << myn << endl;
+                        dumpChunks(txn, ns, query, sort);
+                        uassert( 10040 ,  "chunks out of order" , n == myn );
                     }
-                    log() << "should have chunk: " << n << " have:" << myn << endl;
-                    dumpChunks(txn, ns, query, sort);
-                    uassert( 10040 ,  "chunks out of order" , n == myn );
-                }
 
-                // make a copy of obj since we access data in it while yielding locks
-                BSONObj owned = obj.getOwned();
-                exec->saveState();
-                // UNLOCKED
-                ctx.reset();
+                    // make a copy of obj since we access data in it while yielding locks
+                    BSONObj owned = obj.getOwned();
+                    exec->saveState();
+                    // UNLOCKED
+                    ctx.reset();
 
-                int len;
-                const char * data = owned["data"].binDataClean( len );
-                // This is potentially an expensive operation, so do it out of the lock
-                md5_append( &st , (const md5_byte_t*)(data) , len );
-                n++;
+                    int len;
+                    const char * data = owned["data"].binDataClean( len );
+                    // This is potentially an expensive operation, so do it out of the lock
+                    md5_append( &st , (const md5_byte_t*)(data) , len );
+                    n++;
 
-                try {
-                    // RELOCKED
-                    ctx.reset(new AutoGetCollectionForRead(txn, ns));
-                }
-                catch (const SendStaleConfigException& ex) {
-                    LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
-                    break;
-                }
+                    try {
+                        // RELOCKED
+                        ctx.reset(new AutoGetCollectionForRead(txn, ns));
+                    }
+                    catch (const SendStaleConfigException& ex) {
+                        LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
+                        break;
+                    }
 
-                // Have the lock again. See if we were killed.
-                if (!exec->restoreState(txn)) {
-                    if (!partialOk) {
-                        uasserted(13281, "File deleted during filemd5 command");
+                    // Have the lock again. See if we were killed.
+                    if (!exec->restoreState(txn)) {
+                        if (!partialOk) {
+                            uasserted(13281, "File deleted during filemd5 command");
+                        }
                     }
                 }
-            }
 
-            if (partialOk)
-                result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
+                if (partialOk)
+                    result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
 
-            // This must be *after* the capture of md5state since it mutates st
-            md5_finish(&st, d);
+                // This must be *after* the capture of md5state since it mutates st
+                md5_finish(&st, d);
 
-            result.append( "numChunks" , n );
-            result.append( "md5" , digestToString( d ) );
-            return true;
+                result.append( "numChunks" , n );
+                result.append( "md5" , digestToString( d ) );
+                return true;
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "filemd5", dbname);
         }
 
         void dumpChunks(OperationContext* txn,
