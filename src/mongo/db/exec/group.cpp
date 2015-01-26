@@ -101,8 +101,8 @@ namespace mongo {
         }
         _scope->setObject("$initial", _request.initial, true);
         _scope->exec("$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true,
-                     100);
-        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+                     2 * 1000);
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
 
         // Initialize _reduceFunction.
         _reduceFunction = _scope->createFunction("function(){ "
@@ -153,7 +153,7 @@ namespace mongo {
     BSONObj GroupStage::finalizeResults() {
         if (!_request.finalize.empty()) {
             _scope->exec("$finalize = " + _request.finalize, "$group finalize define", false,
-                         true, true, 100);
+                         true, true, 2 * 1000);
             ScriptingFunction finalizeFunction =
                 _scope->createFunction("function(){ "
                                        "  for(var i=0; i < $arr.length; i++){ "
@@ -169,7 +169,7 @@ namespace mongo {
 
         BSONObj results = _scope->getObject("$arr").getOwned();
 
-        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 100);
+        _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
         _scope->gc();
 
         return results;
