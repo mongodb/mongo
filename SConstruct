@@ -33,6 +33,9 @@ AddOption("--enable-verbose", dest="verbose", action="store_true", default=False
 AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
           help="Use zlib compression")
 
+AddOption("--prefix", dest="prefix", type="string", nargs=1, action="store", default="package",
+          help="Install directory")
+
 AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
           help="Berkeley DB install path, ie, /usr/local")
 
@@ -172,7 +175,7 @@ replacements = {
     '@wiredtiger_includes_decl@': wiredtiger_includes
 }
 
-env.Substfile(
+wtheader = env.Substfile(
     target='wiredtiger.h',
     source=[
         'src/include/wiredtiger.in',
@@ -348,3 +351,11 @@ for ex in examples:
     else:
         env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtdll[1]] + wtlibs)
 
+# Install Target
+#
+prefix = GetOption("prefix")
+env.Alias("install", env.Install(os.path.join(prefix, "bin"), wtbin))
+env.Alias("install", env.Install(os.path.join(prefix, "bin"), wtdll[0])) # Just the dll
+env.Alias("install", env.Install(os.path.join(prefix, "include"), wtheader))
+env.Alias("install", env.Install(os.path.join(prefix, "lib"), wtdll[1])) # Just the import lib
+env.Alias("install", env.Install(os.path.join(prefix, "lib"), wtlib))
