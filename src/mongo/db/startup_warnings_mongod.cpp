@@ -259,9 +259,8 @@ namespace {
                       << startupWarningsLog;
                 log() << "**        We suggest setting it to 'never'"
                       << startupWarningsLog;
-
+                warned = true;
             }
-            warned = true;
         }
         else if (transparentHugePagesEnabledResult.getStatus().code() !=
                  ErrorCodes::NonExistentPath) {
@@ -281,9 +280,8 @@ namespace {
                       << startupWarningsLog;
                 log() << "**        We suggest setting it to 'never'"
                       << startupWarningsLog;
-
+                warned = true;
             }
-            warned = true;
         }
         else if (transparentHugePagesDefragResult.getStatus().code() !=
                  ErrorCodes::NonExistentPath) {
