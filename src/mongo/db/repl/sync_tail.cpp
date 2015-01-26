@@ -119,11 +119,16 @@ namespace repl {
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool SyncTail::syncApply(
-                        OperationContext* txn, const BSONObj &op, bool convertUpdateToUpsert) {
+    bool SyncTail::syncApply(OperationContext* txn,
+                             const BSONObj &op,
+                             bool convertUpdateToUpsert) {
+
         if (inShutdown()) {
             return true;
         }
+
+        // Count each log op application as a separate operation, for reporting purposes
+        txn->getCurOp()->reset();
 
         const char *ns = op.getStringField("ns");
         verify(ns);
@@ -180,7 +185,6 @@ namespace repl {
                 }
 
                 Client::Context ctx(txn, ns);
-                ctx.getClient()->curop()->reset();
 
                 if ( createCollection == 0 &&
                      !isIndexBuild &&
