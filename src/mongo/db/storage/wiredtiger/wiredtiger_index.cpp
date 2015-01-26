@@ -146,9 +146,10 @@ namespace {
                                                                   const IndexDescriptor& desc) {
         str::stream ss;
 
-        // Separate out a prefix and suffix in the default string. User configuration will
-        // override values in the prefix, but not values in the suffix.
-        ss << "type=file,leaf_page_max=16k,";
+        // Separate out a prefix and suffix in the default string. User configuration will override
+        // values in the prefix, but not values in the suffix.  Page sizes are chosen so that index
+        // keys (up to 1024 bytes) will not overflow.
+        ss << "type=file,internal_page_max=16k,leaf_page_max=16k,";
         if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
             ss << "prefix_compression=true,";
         }
