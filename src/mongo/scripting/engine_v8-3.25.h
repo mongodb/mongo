@@ -32,6 +32,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <v8.h>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -94,7 +96,7 @@ namespace mongo {
          * V8Scope is destructed.
          */
         ~ObjTracker() {
-            typename set<TrackedPtr*>::iterator it = _container.begin();
+            typename std::set<TrackedPtr*>::iterator it = _container.begin();
             while (it != _container.end()) {
                 delete *it;
                 _container.erase(it++);
@@ -132,7 +134,7 @@ namespace mongo {
         }
 
         // container for all TrackedPtrs created by this ObjTracker instance
-        set<TrackedPtr*> _container;
+        std::set<TrackedPtr*> _container;
     };
 
     /**
@@ -593,7 +595,7 @@ namespace mongo {
         const BSONObj _obj;
         bool _modified;
         const bool _readOnly;
-        set<string> _removed;
+        std::set<std::string> _removed;
     };
 
     extern ScriptEngine* globalScriptEngine;
