@@ -8,8 +8,6 @@ if (typeof getToolTest === 'undefined') {
  */
 
 (function() {
-  var CURRENT_MONGOD_RELEASE = '2.8';
-
   var toolTest = getToolTest('oplogInformationalFlagTest');
   var commonToolArgs = getCommonToolArguments();
 
@@ -25,7 +23,6 @@ if (typeof getToolTest === 'undefined') {
       expected + "'");
   };
 
-  verifyFlagOutput('--version', CURRENT_MONGOD_RELEASE);
   verifyFlagOutput('--help', 'Usage:');
 
   toolTest.stop();
