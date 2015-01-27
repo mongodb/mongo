@@ -165,8 +165,10 @@ namespace repl {
 
     void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
-    void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
-            BSONObjBuilder* cmdBuilder) {}
+    bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
+            BSONObjBuilder* cmdBuilder) {
+        return true;
+    }
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommandHandshakes(
             std::vector<BSONObj>* handshakes) {}
