@@ -185,6 +185,7 @@ connection_stats = [
     CacheStat('cache_eviction_worker_evicting',
         'eviction worker thread evicting pages'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
+    CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
         'tracked dirty pages in the cache', 'no_scale'),
     CacheStat('cache_pages_inuse',

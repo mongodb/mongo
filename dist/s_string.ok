@@ -73,6 +73,7 @@ Crummey
 CustomersPhone
 DATAITEMs
 DECL
+DECR
 DESC
 DHANDLE
 DLFCN
@@ -397,6 +398,7 @@ agc
 alfred
 alloc
 allocator
+allocators
 allocfile
 allocsize
 amd
