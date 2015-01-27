@@ -28,12 +28,9 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
 		WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
-		conn->cache_bytes_max = conn->cache_size = (uint64_t)cval.val;
+		conn->cache_size = (uint64_t)cval.val;
 		WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
 		conn->cache_overhead = (int)cval.val;
-		if (cval.val != 0)
-			conn->cache_size -=
-			    (conn->cache_size * (uint64_t)cval.val) / 100;
 	} else {
 		WT_RET(__wt_config_gets(
 		    session, cfg, "shared_cache.reserve", &cval));
@@ -145,8 +142,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	cache = conn->cache;
 	stats = &conn->stats;
 
-	WT_STAT_SET(stats, cache_bytes_max, conn->cache_bytes_max);
-	WT_STAT_SET(stats, cache_bytes_max_adjusted, conn->cache_size);
+	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
 	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
 
 	WT_STAT_SET(stats, cache_overhead, conn->cache_overhead);

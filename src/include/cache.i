@@ -90,6 +90,10 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	dirty_inuse = cache->bytes_dirty;
 	bytes_max = conn->cache_size + 1;
 
+	/* Adjust the cache size to take allocation overhead into account. */
+	if (conn->cache_overhead != 0)
+		bytes_max -= (bytes_max * (uint64_t)conn->cache_overhead) / 100;
+
 	/* Calculate the cache full percentage. */
 	*fullp = (int)((100 * bytes_inuse) / bytes_max);
 
@@ -98,6 +102,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	    (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
 	    dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100))
 		WT_RET(__wt_evict_server_wake(session));
+
 	return (0);
 }
 

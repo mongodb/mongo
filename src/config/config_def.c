@@ -82,7 +82,7 @@ static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
 
 static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
-	{ "cache_overhead", "int", "min=0,max=20", NULL },
+	{ "cache_overhead", "int", "min=0,max=30", NULL },
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
 	{ "checkpoint", "category", NULL,
 	     confchk_checkpoint_subconfigs },
@@ -327,7 +327,7 @@ static const WT_CONFIG_CHECK confchk_transaction_sync_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
-	{ "cache_overhead", "int", "min=0,max=20", NULL },
+	{ "cache_overhead", "int", "min=0,max=30", NULL },
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
 	{ "checkpoint", "category", NULL,
 	     confchk_checkpoint_subconfigs },
@@ -377,7 +377,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
-	{ "cache_overhead", "int", "min=0,max=20", NULL },
+	{ "cache_overhead", "int", "min=0,max=30", NULL },
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
 	{ "checkpoint", "category", NULL,
 	     confchk_checkpoint_subconfigs },
@@ -428,7 +428,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
-	{ "cache_overhead", "int", "min=0,max=20", NULL },
+	{ "cache_overhead", "int", "min=0,max=30", NULL },
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
 	{ "checkpoint", "category", NULL,
 	     confchk_checkpoint_subconfigs },
@@ -475,7 +475,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	{ "async", "category", NULL, confchk_async_subconfigs },
 	{ "buffer_alignment", "int", "min=-1,max=1MB", NULL },
-	{ "cache_overhead", "int", "min=0,max=20", NULL },
+	{ "cache_overhead", "int", "min=0,max=30", NULL },
 	{ "cache_size", "int", "min=1MB,max=10TB", NULL },
 	{ "checkpoint", "category", NULL,
 	     confchk_checkpoint_subconfigs },

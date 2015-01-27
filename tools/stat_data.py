@@ -4,7 +4,6 @@ no_scale_per_second_list = [
     'async: maximum work queue length',
     'cache: bytes currently in the cache',
     'cache: maximum bytes configured',
-    'cache: maximum bytes configured, adjusted for overhead',
     'cache: maximum page size at eviction',
     'cache: pages currently held in the cache',
     'cache: percentage overhead',
@@ -58,7 +57,6 @@ no_scale_per_second_list = [
 no_clear_list = [
     'cache: bytes currently in the cache',
     'cache: maximum bytes configured',
-    'cache: maximum bytes configured, adjusted for overhead',
     'cache: pages currently held in the cache',
     'cache: percentage overhead',
     'connection: files currently open',

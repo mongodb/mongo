@@ -155,7 +155,6 @@ struct __wt_connection_stats {
 	WT_STATS cache_bytes_dirty;
 	WT_STATS cache_bytes_inuse;
 	WT_STATS cache_bytes_max;
-	WT_STATS cache_bytes_max_adjusted;
 	WT_STATS cache_bytes_read;
 	WT_STATS cache_bytes_write;
 	WT_STATS cache_eviction_app;
