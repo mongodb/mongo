@@ -347,8 +347,11 @@ namespace mongo {
                                    const std::string& indexNamespace );
 
         // descriptor ownership passes to _setupInMemoryStructures
+        // initFromDisk: Avoids registering a change to undo this operation when set to true.
+        //               You must set this flag if calling this function outside of a UnitOfWork.
         IndexCatalogEntry* _setupInMemoryStructures(OperationContext* txn,
-                                                    IndexDescriptor* descriptor );
+                                                    IndexDescriptor* descriptor,
+                                                    bool initFromDisk);
 
         // Apply a set of transformations to the user-provided index object 'spec' to make it
         // conform to the standard for insertion.  This function adds the 'v' field if it didn't
