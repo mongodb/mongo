@@ -216,9 +216,7 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
-                                                  "dropDatabase",
-                                                  dbname);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", dbname);
 
             result.append( "dropped" , dbname );
 
@@ -522,7 +520,7 @@ namespace mongo {
                     repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
                 }
                 wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "drop", nsToDrop);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", nsToDrop);
             return true;
         }
     } cmdDrop;
@@ -607,7 +605,7 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "create", ns);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", ns);
             return true;
         }
     } cmdCreate;
@@ -748,7 +746,7 @@ namespace mongo {
 
                 result.append( "numChunks" , n );
                 result.append( "md5" , digestToString( d ) );
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "filemd5", dbname);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "filemd5", dbname);
             return true;
         }
 
