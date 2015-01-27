@@ -53,26 +53,22 @@ namespace {
         PartitionedInstanceWideLockStats() { }
 
         void recordAcquisition(LockerId id, ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(id);
-            stats.recordAcquisition(resId, mode);
+            _get(id).recordAcquisition(resId, mode);
         }
 
         void recordWait(LockerId id, ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(id);
-            stats.recordWait(resId, mode);
+            _get(id).recordWait(resId, mode);
         }
 
         void recordWaitTime(LockerId id, ResourceId resId, LockMode mode, uint64_t waitMicros) {
-            LockStats& stats = _get(id);
-            stats.recordWaitTime(resId, mode, waitMicros);
+            _get(id).recordWaitTime(resId, mode, waitMicros);
         }
 
         void recordDeadlock(ResourceId resId, LockMode mode) {
-            LockStats& stats = _get(resId);
-            stats.recordDeadlock(resId, mode);
+            _get(resId).recordDeadlock(resId, mode);
         }
 
-        void report(LockStats* outStats) const {
+        void report(SingleThreadedLockStats* outStats) const {
             for (int i = 0; i < NumPartitions; i++) {
                 outStats->append(_partitions[i].stats);
             }
@@ -87,16 +83,15 @@ namespace {
     private:
 
         // This alignment is a best effort approach to ensure that each partition falls on a
-        // separate page/cache line in order to avoid false sharing. The 4096-byte alignment is
-        // in an effort to play nicely with NUMA.
-        struct MONGO_COMPILER_ALIGN_TYPE(4096) AlignedLockStats {
-            LockStats stats;
+        // separate page/cache line in order to avoid false sharing.
+        struct MONGO_COMPILER_ALIGN_TYPE(128) AlignedLockStats {
+            AtomicLockStats stats;
         };
 
         enum { NumPartitions = 8 };
 
 
-        LockStats& _get(LockerId id) {
+        AtomicLockStats& _get(LockerId id) {
             return _partitions[id % NumPartitions].stats;
         }
 
@@ -198,10 +193,13 @@ namespace {
     }
 
     template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::assertEmpty() const {
+    void LockerImpl<IsForMMAPV1>::assertEmptyAndReset() {
         invariant(!inAWriteUnitOfWork());
         invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
         invariant(_requests.empty());
+
+        // Reset the locking statistics so the object can be reused
+        _stats.reset();
     }
 
     template<bool IsForMMAPV1>
@@ -283,7 +281,7 @@ namespace {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
-        assertEmpty();
+        assertEmptyAndReset();
     }
 
     template<bool IsForMMAPV1>
@@ -339,6 +337,11 @@ namespace {
         LockRequest* globalLockRequest = _requests.find(resourceIdGlobal).objAddr();
         invariant(globalLockRequest->mode == MODE_X);
         invariant(globalLockRequest->recursiveCount == 1);
+
+        // Making this call here will record lock downgrades as acquisitions, which is acceptable
+        globalStats.recordAcquisition(_id, resourceIdGlobal, MODE_S);
+        _stats.recordAcquisition(resourceIdGlobal, MODE_S);
+
         globalLockManager.downgrade(globalLockRequest, MODE_S);
 
         if (IsForMMAPV1) {
@@ -863,7 +866,7 @@ namespace {
         return &globalLockManager;
     }
 
-    void reportGlobalLockingStats(LockStats* outStats) {
+    void reportGlobalLockingStats(SingleThreadedLockStats* outStats) {
         globalStats.report(outStats);
     }
 

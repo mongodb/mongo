@@ -170,6 +170,13 @@ namespace mongo {
 
         // "waitingForLock" section
         infoBuilder.append("waitingForLock", lockerInfo.waitingResource.isValid());
+
+        // "lockStats" section
+        {
+            BSONObjBuilder lockStats(infoBuilder.subobjStart("lockStats"));
+            lockerInfo.stats.report(&lockStats);
+            lockStats.done();
+        }
     }
 
 } // namespace mongo

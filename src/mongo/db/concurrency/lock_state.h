@@ -209,7 +209,7 @@ namespace mongo {
 
         // Per-locker locking statistics. Reported in the slow-query log message and through
         // db.currentOp. Complementary to the per-instance locking statistics.
-        LockStats _stats;
+        SingleThreadedLockStats _stats;
 
         // Delays release of exclusive/intent-exclusive locked resources until the write unit of
         // work completes. Value of 0 means we are not inside a write unit of work.
@@ -234,7 +234,7 @@ namespace mongo {
         virtual bool isWriteLocked() const;
         virtual bool isReadLocked() const;
 
-        virtual void assertEmpty() const;
+        virtual void assertEmptyAndReset();
 
         virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
 

@@ -207,7 +207,7 @@ namespace mongo {
             ResourceId waitingResource;
 
             // Lock timing statistics
-            LockStats stats;
+            SingleThreadedLockStats stats;
         };
 
         virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;
@@ -262,9 +262,12 @@ namespace mongo {
         virtual bool isWriteLocked() const = 0;
         virtual bool isReadLocked() const = 0;
 
-        // This asserts we're not in a WriteUnitOfWork, and there are no requests on the Locker,
-        // so it would be safe to call the destructor or reuse the Locker.
-        virtual void assertEmpty() const = 0;
+        /**
+         * Asserts that the Locker is effectively not in use and resets the locking statistics.
+         * This means, there should be no locks on it, no WUOW, etc, so it would be safe to call
+         * the destructor or reuse the Locker.
+         */
+        virtual void assertEmptyAndReset() = 0;
 
         /**
          * Pending means we are currently trying to get a lock (could be the parallel batch writer
