@@ -40,10 +40,10 @@ func TestKerberosDBConnector(t *testing.T) {
 		}
 
 		if runtime.GOOS == "windows" {
-			opts.Auth.Password = os.Getenv(testutil.WINDOWS_KERBEROS_PASSWORD_ENV)
+			opts.Auth.Password = os.Getenv(testutil.WinKerberosPwdEnv)
 			if opts.Auth.Password == "" {
 				panic(fmt.Sprintf("Need to set %v environment variable to run kerberos tests on windows",
-					testutil.WINDOWS_KERBEROS_PASSWORD_ENV))
+					testutil.WinKerberosPwdEnv))
 			}
 		}
 

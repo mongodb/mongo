@@ -13,7 +13,7 @@ import (
 )
 
 func TestObjectIdBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON ObjectId", t, func() {
 		Convey("that is valid to JSON should produce a json.ObjectId", func() {
@@ -32,7 +32,7 @@ func TestObjectIdBSONToJSON(t *testing.T) {
 }
 
 func TestArraysBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting BSON arrays to JSON arrays", t, func() {
 		Convey("should work for empty arrays", func() {
@@ -79,7 +79,7 @@ func TestArraysBSONToJSON(t *testing.T) {
 }
 
 func TestDateBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	timeNow := time.Now()
 	secs := int64(timeNow.Unix())
@@ -123,7 +123,7 @@ func TestDateBSONToJSON(t *testing.T) {
 }
 
 func TestMaxKeyBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON Maxkey to JSON", t, func() {
 		Convey("should produce a json.MaxKey", func() {
@@ -138,7 +138,7 @@ func TestMaxKeyBSONToJSON(t *testing.T) {
 }
 
 func TestMinKeyBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON Maxkey to JSON", t, func() {
 		Convey("should produce a json.MinKey", func() {
@@ -153,7 +153,7 @@ func TestMinKeyBSONToJSON(t *testing.T) {
 }
 
 func Test64BitIntBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON int64 to JSON", t, func() {
 		Convey("should produce a json.NumberLong", func() {
@@ -169,7 +169,7 @@ func Test64BitIntBSONToJSON(t *testing.T) {
 }
 
 func Test32BitIntBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON int32 integer to JSON", t, func() {
 		Convey("should produce a json.NumberInt", func() {
@@ -185,7 +185,7 @@ func Test32BitIntBSONToJSON(t *testing.T) {
 }
 
 func TestRegExBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON Regular Expression (= /decision/gi) to JSON", t, func() {
 		Convey("should produce a json.RegExp", func() {
@@ -201,7 +201,7 @@ func TestRegExBSONToJSON(t *testing.T) {
 }
 
 func TestUndefinedValueBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON Undefined type to JSON", t, func() {
 		Convey("should produce a json.Undefined", func() {
@@ -216,7 +216,7 @@ func TestUndefinedValueBSONToJSON(t *testing.T) {
 }
 
 func TestDBRefBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting BSON DBRef to JSON", t, func() {
 		Convey("should produce a json.DBRef", func() {
@@ -232,7 +232,7 @@ func TestDBRefBSONToJSON(t *testing.T) {
 }
 
 func TestTimestampBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting a BSON Timestamp to JSON", t, func() {
 		Convey("should produce a json.Timestamp", func() {
@@ -249,7 +249,7 @@ func TestTimestampBSONToJSON(t *testing.T) {
 }
 
 func TestBinaryBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting BSON Binary data to JSON", t, func() {
 		Convey("should produce a json.BinData", func() {
@@ -267,7 +267,7 @@ func TestBinaryBSONToJSON(t *testing.T) {
 }
 
 func TestGenericBytesBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting Go bytes to JSON", t, func() {
 		Convey("should produce a json.BinData with Type=0x00 (Generic)", func() {
@@ -284,7 +284,7 @@ func TestGenericBytesBSONToJSON(t *testing.T) {
 }
 
 func TestUnknownBSONTypeToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting an unknown BSON type to JSON", t, func() {
 		Convey("should produce an error", func() {
@@ -295,7 +295,7 @@ func TestUnknownBSONTypeToJSON(t *testing.T) {
 }
 
 func TestDBPointerBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting BSON DBPointer to JSON", t, func() {
 		Convey("should produce a json.DBPointer", func() {
@@ -311,7 +311,7 @@ func TestDBPointerBSONToJSON(t *testing.T) {
 }
 
 func TestJSCodeBSONToJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Converting BSON Javascript code to JSON", t, func() {
 		Convey("should produce a json.Javascript", func() {

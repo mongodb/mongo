@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	WINDOWS_KERBEROS_PASSWORD_ENV = "MONGODB_KERBEROS_PASSWORD"
+	WinKerberosPwdEnv = "MONGODB_KERBEROS_PASSWORD"
 )
 
 func GetKerberosOptions() (*options.ToolOptions, error) {
@@ -31,10 +31,10 @@ func GetKerberosOptions() (*options.ToolOptions, error) {
 	}
 
 	if runtime.GOOS == "windows" {
-		opts.Auth.Password = os.Getenv(WINDOWS_KERBEROS_PASSWORD_ENV)
+		opts.Auth.Password = os.Getenv(WinKerberosPwdEnv)
 		if opts.Auth.Password == "" {
 			return nil, fmt.Errorf("Need to set %v environment variable to run "+
-				"kerberos tests on windows", WINDOWS_KERBEROS_PASSWORD_ENV)
+				"kerberos tests on windows", WinKerberosPwdEnv)
 		}
 	}
 

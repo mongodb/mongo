@@ -8,7 +8,7 @@ import (
 
 func TestSkipCollection(t *testing.T) {
 
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("With a mongodump that excludes collections 'test' and 'fake'"+
 		" and excludes prefixes 'pre-' and 'no'", t, func() {

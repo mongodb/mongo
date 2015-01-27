@@ -14,7 +14,7 @@ const (
 )
 
 func TestMongoDumpKerberos(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.KERBEROS_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.KerberosTestType)
 
 	Convey("Should be able to run mongodump with Kerberos auth", t, func() {
 		opts, err := testutil.GetKerberosOptions()

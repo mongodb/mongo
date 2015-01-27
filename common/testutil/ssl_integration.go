@@ -5,7 +5,7 @@ import (
 )
 
 func GetSSLOptions() commonOpts.SSL {
-	if HasTestType(SSL_TEST_TYPE) {
+	if HasTestType(SSLTestType) {
 		return commonOpts.SSL{
 			UseSSL:        true,
 			SSLCAFile:     "../common/db/openssl/testdata/ca.pem",

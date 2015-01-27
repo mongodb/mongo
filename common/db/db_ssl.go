@@ -11,7 +11,7 @@ func init() {
 	GetConnectorFuncs = append(GetConnectorFuncs, getSSLConnector)
 }
 
-// Get the right type of connector, based on the options
+// return the SSL DB connector if using SSL, otherwise, return nil.
 func getSSLConnector(opts options.ToolOptions) DBConnector {
 	if opts.SSL.UseSSL {
 		return &openssl.SSLDBConnector{}

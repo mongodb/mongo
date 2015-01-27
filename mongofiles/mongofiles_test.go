@@ -154,7 +154,7 @@ func fileExists(name string) bool {
 // Test that it works whenever valid arguments are passed in and that
 // it barfs whenever invalid ones are passed
 func TestValidArguments(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 
 	Convey("With a MongoFiles instance", t, func() {
 		args := []string{"search", "file"}
@@ -202,7 +202,7 @@ func TestValidArguments(t *testing.T) {
 
 // Test that the output from mongofiles is actually correct
 func TestMongoFilesCommands(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 
 	Convey("Testing the various commands:(get|put|delete|search|list). With a MongoDump instance", t, func() {
 		bytesExpected, err := setUpGridFSTestData()

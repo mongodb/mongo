@@ -8,54 +8,46 @@ import (
 	"strings"
 )
 
+// Query flags
 const (
 	Snapshot = 1 << iota
 	LogReplay
 	Prefetch
 )
 
-type WriteCommandResponse struct {
-	NumAffected       *int                `bson:"n"`
-	Ok                int                 `bson:"ok"`
-	WriteErrors       []WriteCommandError `bson:"writeErrors"`
-	WriteConcernError WriteCommandError   `bson:"writeConcernErrors"`
-}
-
-type WriteCommandError struct {
-	Index  int    `bson:"index"`
-	Code   int    `bson:"code"`
-	Errmsg string `bson:"errmsg"`
-}
-
+// CommandRunner exposes functions that can be run against a server
 type CommandRunner interface {
 	Run(command interface{}, out interface{}, database string) error
-	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, opts int) (DocSource, error)
-	FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, opts int) error
-	Remove(DB, Collection string, Query interface{}) error
+	FindOne(db, collection string, skip int, query interface{}, sort []string, into interface{}, opts int) error
+	Remove(db, collection string, query interface{}) error
 	DatabaseNames() ([]string, error)
-	CollectionNames(dbName string) ([]string, error)
+	CollectionNames(db string) ([]string, error)
 }
 
-func (sp *SessionProvider) Remove(DB, Collection string, Query interface{}) error {
+// Remove removes all documents matched by query q in the db database and c collection.
+func (sp *SessionProvider) Remove(db, c string, q interface{}) error {
 	session, err := sp.GetSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
-
-	_, err = session.DB(DB).C(Collection).RemoveAll(Query)
+	_, err = session.DB(db).C(c).RemoveAll(q)
 	return err
 }
 
-func (sp *SessionProvider) Run(command interface{}, out interface{}, database string) error {
+// Run issues the provided command on the db database and unmarshals its result
+// into out.
+func (sp *SessionProvider) Run(command interface{}, out interface{}, db string) error {
 	session, err := sp.GetSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
-	return session.DB(database).Run(command, out)
+	return session.DB(db).Run(command, out)
 }
 
+// DatabaseNames returns a slice containing the names of all the databases on the
+// connected server.
 func (sp *SessionProvider) DatabaseNames() ([]string, error) {
 	session, err := sp.GetSession()
 	if err != nil {
@@ -65,6 +57,7 @@ func (sp *SessionProvider) DatabaseNames() ([]string, error) {
 	return session.DatabaseNames()
 }
 
+// CollectionNames returns the names of all the collections in the dbName database.
 func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 	session, err := sp.GetSession()
 	if err != nil {
@@ -74,16 +67,8 @@ func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 	return session.DB(dbName).CollectionNames()
 }
 
-func (sp *SessionProvider) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, flags int) (DocSource, error) {
-	session, err := sp.GetSession()
-	if err != nil {
-		return nil, err
-	}
-	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip).Limit(Limit)
-	q = ApplyFlags(q, session, flags)
-	return &CursorDocSource{q.Iter(), session}, nil
-}
-
+// IsReplicaSet returns a boolean which is true if the connected server is part
+// of a replica set. Returns false otherwise.
 func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	session, err := sp.GetSession()
 	if err != nil {
@@ -100,8 +85,7 @@ func (sp *SessionProvider) IsReplicaSet() (bool, error) {
 	return hasSetName || hasHosts, nil
 }
 
-// IsMongos() returns a boolean representing whether the connected server
-// is a mongos along with any error that occurs.
+// IsMongos returns a true if the connected server is a mongos and false otherwise.
 func (sp *SessionProvider) IsMongos() (bool, error) {
 	session, err := sp.GetSession()
 	if err != nil {
@@ -152,6 +136,8 @@ func (sp *SessionProvider) SupportsRepairCursor(db, collection string) (bool, er
 	return true, nil
 }
 
+// SupportsWriteCommands returns true if the connected server supports write
+// commands, returns false otherwise.
 func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	session, err := sp.GetSession()
 	if err != nil {
@@ -198,18 +184,21 @@ func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	return false, nil
 }
 
-func (sp *SessionProvider) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, flags int) error {
+// FindOne retuns the first document in the collection and database that matches
+// the query after skip, sort and query flags are applied.
+func (sp *SessionProvider) FindOne(db, collection string, skip int, query interface{}, sort []string, into interface{}, flags int) error {
 	session, err := sp.GetSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 
-	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip)
+	q := session.DB(db).C(collection).Find(query).Sort(sort...).Skip(skip)
 	q = ApplyFlags(q, session, flags)
 	return q.One(into)
 }
 
+// ApplyFlags applies flags to the given query session.
 func ApplyFlags(q *mgo.Query, session *mgo.Session, flags int) *mgo.Query {
 	if flags&Snapshot > 0 {
 		q = q.Snapshot()

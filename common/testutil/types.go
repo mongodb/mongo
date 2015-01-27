@@ -10,28 +10,28 @@ const (
 	// Integration tests require a mongod running on localhost:33333. If your
 	// mongod uses SSL you need to specify the "ssl" type below, and ditto for
 	// if your mongod requires auth.
-	INTEGRATION_TEST_TYPE = "integration"
+	IntegrationTestType = "integration"
 
 	// Unit tests don't require a real mongod. They may still do file I/O.
-	UNIT_TEST_TYPE = "unit"
+	UnitTestType = "unit"
 
 	// Kerberos tests are a special type of integration test that test tools
 	// with Kerberos authentication against the drivers Kerberos testing cluster
 	// because setting up a KDC every time is too brittle and expensive.
 	// (See https://wiki.mongodb.com/display/DH/Testing+Kerberos)
-	KERBEROS_TEST_TYPE = "kerberos"
+	KerberosTestType = "kerberos"
 
 	// "ssl" and "auth" are used to configure integration tests to run against
 	// different mongod configurations. "ssl" will configure the integration tests
 	// to expect an SSL-enabled mongod on localhost:33333. "auth" will do the same
 	// for an auth-enabled mongod on localhost:33333.
-	SSL_TEST_TYPE  = "ssl"
-	AUTH_TEST_TYPE = "auth"
+	SSLTestType  = "ssl"
+	AuthTestType = "auth"
 )
 
 var (
 	// the types of tests that should be run
-	testTypes = flag.String("test.types", UNIT_TEST_TYPE, "Comma-separated list of the"+
+	testTypes = flag.String("test.types", UnitTestType, "Comma-separated list of the"+
 		" types of tests to be run")
 	// above, split on the comma
 	testTypesParsed []string

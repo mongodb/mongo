@@ -29,36 +29,36 @@ func max(a, b int) int {
 	return b
 }
 
-//init() makes the initial row if this is the first time any data is being written.
-//otherwise, no-op.
+// init() makes the initial row if this is the first time any data is being written.
+// otherwise, no-op.
 func (gw *GridWriter) init() {
 	if len(gw.Grid) <= gw.CurrentRow {
 		gw.Grid = append(gw.Grid, []Cell{})
 	}
 }
 
-//WriteCell writes the given string into the next cell in the current row.
+// WriteCell writes the given string into the next cell in the current row.
 func (gw *GridWriter) WriteCell(data string) {
 	gw.init()
 	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], Cell{data, false})
 }
 
-//WriteCells writes multiple cells by calling WriteCell for each argument.
+// WriteCells writes multiple cells by calling WriteCell for each argument.
 func (gw *GridWriter) WriteCells(data ...string) {
 	for _, s := range data {
 		gw.WriteCell(s)
 	}
 }
 
-//Feed writes the given string into the current cell but allowing the cell contents
-//to extend past the width of the current column, and ends the row.
+// Feed writes the given string into the current cell but allowing the cell contents
+// to extend past the width of the current column, and ends the row.
 func (gw *GridWriter) Feed(data string) {
 	gw.init()
 	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], Cell{data, true})
 	gw.EndRow()
 }
 
-//EndRow terminates the row of cells and begins a new row in the grid.
+// EndRow terminates the row of cells and begins a new row in the grid.
 func (gw *GridWriter) EndRow() {
 	gw.CurrentRow++
 	if len(gw.Grid) <= gw.CurrentRow {
@@ -66,16 +66,16 @@ func (gw *GridWriter) EndRow() {
 	}
 }
 
-//calculateWidths returns an array containing the correct padded size for
-//each column in the grid.
+// calculateWidths returns an array containing the correct padded size for
+// each column in the grid.
 func (gw *GridWriter) calculateWidths() []int {
 	colWidths := []int{}
 
-	//Loop over each column
+	// Loop over each column
 	for j := 0; ; j++ {
 		found := false
 
-		//Examine all the rows at column 'j'
+		// Examine all the rows at column 'j'
 		for i := range gw.Grid {
 			if len(gw.Grid[i]) <= j {
 				continue
@@ -87,18 +87,18 @@ func (gw *GridWriter) calculateWidths() []int {
 			}
 
 			if gw.Grid[i][j].feed {
-				//we're at a row-terminating cell - skip over the rest of this row
+				// we're at a row-terminating cell - skip over the rest of this row
 				continue
 			}
-			//Set the size for the row to be the largest
-			//of all the cells in the column
+			// Set the size for the row to be the largest
+			// of all the cells in the column
 			newMin := max(gw.MinWidth, len(gw.Grid[i][j].contents))
 			if newMin > colWidths[j] {
 				colWidths[j] = newMin
 			}
 		}
-		//This column did not have any data in it at all, so we've hit the
-		//end of the grid - stop.
+		// This column did not have any data in it at all, so we've hit the
+		// end of the grid - stop.
 		if !found {
 			break
 		}
@@ -106,7 +106,7 @@ func (gw *GridWriter) calculateWidths() []int {
 	return colWidths
 }
 
-//Flush writes the fully-formatted grid to the given io.Writer.
+// Flush writes the fully-formatted grid to the given io.Writer.
 func (gw *GridWriter) Flush(w io.Writer) {
 	colWidths := gw.calculateWidths()
 	for i, row := range gw.Grid {
@@ -125,8 +125,8 @@ func (gw *GridWriter) Flush(w io.Writer) {
 	}
 }
 
-//FlushRows writes the fully-formatted grid to the given io.Writer, but
-//gives each row its own Write() call instead of using newlines
+// FlushRows writes the fully-formatted grid to the given io.Writer, but
+// gives each row its own Write() call instead of using newlines.
 func (gw *GridWriter) FlushRows(w io.Writer) {
 	gridBuff := &bytes.Buffer{}
 	gw.Flush(gridBuff)

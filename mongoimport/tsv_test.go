@@ -10,7 +10,7 @@ import (
 )
 
 func TestTSVStreamDocument(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a TSV input reader", t, func() {
 		Convey("integer valued strings should be converted", func() {
 			contents := "1\t2\t3e\n"
@@ -145,7 +145,7 @@ func TestTSVStreamDocument(t *testing.T) {
 }
 
 func TestTSVReadAndValidateHeader(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a TSV input reader", t, func() {
 		Convey("setting the header should read the first line of the TSV", func() {
 			contents := "extraHeader1\textraHeader2\textraHeader3\n"
@@ -158,7 +158,7 @@ func TestTSVReadAndValidateHeader(t *testing.T) {
 }
 
 func TestTSVConvert(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a TSV input reader", t, func() {
 		Convey("calling convert on a TSVConverter should return the expected BSON document", func() {
 			tsvConverter := TSVConverter{

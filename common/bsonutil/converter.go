@@ -54,7 +54,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		n := int64(v)
 		return time.Unix(n/1e3, n%1e3*1e6), nil
 
-	case json.ISODate: //ISODate
+	case json.ISODate: // ISODate
 		n := string(v)
 		return util.FormatDate(n)
 
@@ -113,7 +113,8 @@ func convertKeys(v bson.M) (bson.M, error) {
 }
 
 // ConvertBSONValueToJSON walks through a document or an array and
-// replaces any BSON value with its corresponding extended JSON type.
+// converts any BSON value to its corresponding extended JSON type.
+// It returns the converted JSON document and any error encountered.
 func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	switch v := x.(type) {
 	case nil:

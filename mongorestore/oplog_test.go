@@ -9,7 +9,7 @@ import (
 
 func TestTimestampStringParsing(t *testing.T) {
 
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Testing some possible timestamp strings:", t, func() {
 		Convey("123:456 [should pass]", func() {
@@ -64,7 +64,7 @@ func TestTimestampStringParsing(t *testing.T) {
 
 func TestValidOplogLimitChecking(t *testing.T) {
 
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("With a MongoRestore instance with oplogLimit of 5:0", t, func() {
 		mr := &MongoRestore{

@@ -14,7 +14,7 @@ const ExistsDB = "restore_collection_exists"
 
 func TestCollectionExists(t *testing.T) {
 
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 
 	Convey("With a test mongorestore", t, func() {
 		ssl := testutil.GetSSLOptions()
@@ -79,7 +79,7 @@ func TestCollectionExists(t *testing.T) {
 
 func TestGetDumpAuthVersion(t *testing.T) {
 
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	restore := &MongoRestore{}
 
 	Convey("With a test mongorestore", t, func() {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestExtendedJSON(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Serializing a doc to extended JSON should work", t, func() {
 		x := bson.M{
@@ -34,7 +34,7 @@ func TestExtendedJSON(t *testing.T) {
 }
 
 func TestFieldSelect(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Using makeFieldSelector should return correct projection doc", t, func() {
 		So(makeFieldSelector("a,b"), ShouldResemble, bson.M{"_id": 1, "a": 1, "b": 1})

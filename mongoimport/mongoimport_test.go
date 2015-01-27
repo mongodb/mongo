@@ -86,7 +86,7 @@ func NewMongoImport() (*MongoImport, error) {
 }
 
 func TestMongoImportValidateSettings(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no collection is given", func() {
@@ -304,7 +304,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 }
 
 func TestGetSourceReader(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("Given a mongoimport instance, on calling getSourceReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
@@ -338,7 +338,7 @@ func TestGetSourceReader(t *testing.T) {
 }
 
 func TestGetInputReader(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
@@ -420,7 +420,7 @@ func TestGetInputReader(t *testing.T) {
 }
 
 func TestImportDocuments(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 	Convey("With a mongoimport instance", t, func() {
 		Reset(func() {
 			sessionProvider, err := db.NewSessionProvider(*getBasicToolOptions())

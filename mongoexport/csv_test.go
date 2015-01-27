@@ -9,7 +9,7 @@ import (
 )
 
 func TestWriteCSV(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("With a CSV export output", t, func() {
 		fields := []string{"_id", "x", " y", "z.1.a"}

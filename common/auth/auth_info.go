@@ -1,4 +1,4 @@
-// Package auth provides utilities for performing authentication tasks.
+// Package auth provides utilities for performing tasks related to authentication.
 package auth
 
 import (
@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// GetAuthVersion gets the auth version of the connected server and
-// returns the value as an int along with any errors that occured.
+// GetAuthVersion gets the authentication schema version of the connected server
+// and returns that value as an integer along with any error that occurred.
 func GetAuthVersion(commander db.CommandRunner) (int, error) {
 	results := bson.M{}
 	err := commander.Run(

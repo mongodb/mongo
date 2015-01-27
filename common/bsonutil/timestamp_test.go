@@ -10,7 +10,7 @@ import (
 func TestTimestampValue(t *testing.T) {
 
 	Convey("When converting JSON with Timestamp values", t, func() {
-		testTS := bson.MongoTimestamp(123456<<32 | 55) //TODO submit a pull req to mgo
+		testTS := bson.MongoTimestamp(123456<<32 | 55)
 
 		Convey("works for Timestamp literal", func() {
 

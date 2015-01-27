@@ -8,7 +8,6 @@ import (
 // IsTruthy returns true for values the server will interpret as "true".
 // True values include {}, [], "", true, and any numbers != 0
 func IsTruthy(val interface{}) bool {
-	//first, nil special case
 	if val == nil {
 		return false
 	}
@@ -16,7 +15,6 @@ func IsTruthy(val interface{}) bool {
 		return false
 	}
 
-	//then try some reflect magic
 	v := reflect.ValueOf(val)
 	switch v.Kind() {
 	case reflect.Map, reflect.Slice, reflect.Array, reflect.String, reflect.Struct:

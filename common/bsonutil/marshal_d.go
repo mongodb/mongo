@@ -9,11 +9,11 @@ import (
 
 // MarshalD is a wrapper for bson.D that allows unmarshalling
 // of bson.D with preserved order. Necessary for printing
-// certain database commands
+// certain database commands.
 type MarshalD bson.D
 
 // MarshalJSON makes the MarshalD type usable by
-// the encoding/json package
+// the encoding/json package.
 func (md MarshalD) MarshalJSON() ([]byte, error) {
 	var buff bytes.Buffer
 	buff.WriteString("{")

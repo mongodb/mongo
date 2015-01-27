@@ -13,17 +13,25 @@ import (
 )
 
 type (
-	sessionFlag      uint32
+	sessionFlag uint32
+	// Used to get appropriate the DBConnector(s) based on opts
 	GetConnectorFunc func(opts options.ToolOptions) DBConnector
 )
 
+// Session flags.
 const (
 	None      sessionFlag = 0
 	Monotonic sessionFlag = 1 << iota
 )
 
+// MongoDB enforced limits.
 const (
-	MaxBSONSize     = 16 * 1024 * 1024
+	MaxBSONSize    = 16 * 1024 * 1024     // 16MB - maximum BSON document size
+	MaxMessageSize = 2 * 16 * 1024 * 1024 // 32MB - maximum message size in wire protocol
+)
+
+// Default port for integration tests
+const (
 	DefaultTestPort = "33333"
 )
 
@@ -54,7 +62,7 @@ type SessionProvider struct {
 // Returns a session connected to the database server for which the
 // session provider is configured.
 func (self *SessionProvider) GetSession() (*mgo.Session, error) {
-	//The master session is initialized
+	// The master session is initialized
 	if self.masterSession != nil {
 		return self.masterSession.Copy(), nil
 	}
@@ -93,8 +101,8 @@ func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 	self.flags = flagBits
 }
 
-//NewSessionProvider constructs a session provider but does not attempt to
-//create the initial session.
+// NewSessionProvider constructs a session provider but does not attempt to
+// create the initial session.
 func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	// create the provider
 	provider := &SessionProvider{}

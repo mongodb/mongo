@@ -128,7 +128,7 @@ func (manager *Manager) Put(intent *Intent) {
 			return
 		}
 		if intent.IsUsers() {
-			if intent.BSONPath != "" { //TODO(erf) make this elegant
+			if intent.BSONPath != "" {
 				manager.usersIntent = intent
 			}
 			return

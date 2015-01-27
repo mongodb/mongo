@@ -9,13 +9,15 @@ import (
 	"strings"
 )
 
+// IsNoCmd reeturns true if err indicates a query command is not supported,
+// otherwise, returns false.
 func IsNoCmd(err error) bool {
 	e, ok := err.(*mgo.QueryError)
 	return ok && strings.HasPrefix(e.Message, "no such cmd:")
 }
 
-//buildBsonArray takes a cursor iterator and returns an array of
-//all of its documents as bson.D objects.
+// buildBsonArray takes a cursor iterator and returns an array of
+// all of its documents as bson.D objects.
 func buildBsonArray(iter *mgo.Iter) ([]bson.D, error) {
 	ret := make([]bson.D, 0, 0)
 	index := new(bson.D)
@@ -31,9 +33,9 @@ func buildBsonArray(iter *mgo.Iter) ([]bson.D, error) {
 
 }
 
-//GetIndexes is a helper function that gets the raw index info for a particular
-//collection by using the listIndexes command if available, or by falling back
-//to querying against system.indexes (pre-2.8 systems)
+// GetIndexes returns an iterator to thethe raw index info for a collection by
+// using the listIndexes command if available, or by falling back to querying
+// against system.indexes (pre-2.8 systems).
 func GetIndexes(coll *mgo.Collection) (*mgo.Iter, error) {
 	var cmdResult struct {
 		Cursor struct {

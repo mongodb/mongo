@@ -179,7 +179,7 @@ func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 			panic(fmt.Errorf("couldn't register connection options: %v", err))
 		}
 
-		//Register options that were enabled at compile time with build tags (ssl, sasl)
+		// Register options that were enabled at compile time with build tags (ssl, sasl)
 		for _, optionRegistrationFunction := range ConnectionOptFunctions {
 			if err := optionRegistrationFunction(opts); err != nil {
 				panic(fmt.Errorf("couldn't register command-line options: %v", err))
@@ -325,9 +325,9 @@ See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`
 	return args, nil
 }
 
-//getIntArg returns 3 args: the parsed int value, a bool set to true if a value
-//was consumed from the incoming args array during parsing, and an error
-//value if parsing failed
+// getIntArg returns 3 args: the parsed int value, a bool set to true if a value
+// was consumed from the incoming args array during parsing, and an error
+// value if parsing failed
 func getIntArg(arg flags.SplitArgument, args []string) (int, bool, error) {
 	var rawVal string
 	consumeValue := false
@@ -346,9 +346,9 @@ func getIntArg(arg flags.SplitArgument, args []string) (int, bool, error) {
 	return val, consumeValue, nil
 }
 
-//getStringArg returns 3 args: the parsed string value, a bool set to true if a value
-//was consumed from the incoming args array during parsing, and an error
-//value if parsing failed
+// getStringArg returns 3 args: the parsed string value, a bool set to true if a value
+// was consumed from the incoming args array during parsing, and an error
+// value if parsing failed
 func getStringArg(arg flags.SplitArgument, args []string) (string, bool, error) {
 	value, hasVal := arg.Value()
 	if hasVal {

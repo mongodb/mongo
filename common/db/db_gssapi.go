@@ -11,6 +11,7 @@ func init() {
 	GetConnectorFuncs = append(GetConnectorFuncs, getGSSAPIConnector)
 }
 
+// return the Kerberos DB connector if using SSL, otherwise return nil.
 func getGSSAPIConnector(opts options.ToolOptions) DBConnector {
 	if opts.Auth.Mechanism == "GSSAPI" {
 		return &kerberos.KerberosDBConnector{}

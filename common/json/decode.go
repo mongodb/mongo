@@ -188,9 +188,7 @@ func (d *decodeState) unmarshalBsonD() (out bson.D, err error) {
 	// We decode rv not rv.Elem because the Unmarshaler interface
 	// test must be applied at the top level of the value.
 	out = d.bsonDocument()
-	//return d.document()
 	return out, d.savedError
-	//return d.savedError
 }
 
 func (d *decodeState) unmarshal(v interface{}) (err error) {
@@ -718,7 +716,7 @@ func (d *decodeState) object(v reflect.Value) {
 		} else if v.Kind() == reflect.Slice {
 			kv := reflect.ValueOf(key).Convert(stringType)
 			newDocElem := &bson.DocElem{kv.String(), subv.Interface()}
-			//Slice construction/resizing code is from decodeState.array()
+			// Slice construction/resizing code is from decodeState.array()
 			if i >= v.Cap() {
 				newcap := v.Cap() + v.Cap()/2
 				if newcap < 4 {
@@ -794,7 +792,7 @@ var numberType = reflect.TypeOf(Number(""))
 func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool) {
 	// Check for unmarshaler.
 	if len(item) == 0 {
-		//Empty string given
+		// Empty string given
 		d.saveError(fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into %v", item, v.Type()))
 		return
 	}

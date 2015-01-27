@@ -9,7 +9,7 @@ import (
 func TestIntentManager(t *testing.T) {
 	var manager *Manager
 
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("With an empty IntentManager", t, func() {
 		manager = NewIntentManager()

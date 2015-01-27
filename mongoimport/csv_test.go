@@ -20,7 +20,7 @@ func init() {
 }
 
 func TestCSVStreamDocument(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a CSV input reader", t, func() {
 		Convey("badly encoded CSV should result in a parsing error", func() {
 			contents := `1, 2, foo"bar`
@@ -136,7 +136,7 @@ func TestCSVStreamDocument(t *testing.T) {
 }
 
 func TestCSVReadAndValidateHeader(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	var err error
 	Convey("With a CSV input reader", t, func() {
 		Convey("setting the header should read the first line of the CSV", func() {
@@ -255,7 +255,7 @@ func TestCSVReadAndValidateHeader(t *testing.T) {
 }
 
 func TestCSVConvert(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.UnitTestType)
 	Convey("With a CSV input reader", t, func() {
 		Convey("calling convert on a CSVConverter should return the expected BSON document", func() {
 			csvConverter := CSVConverter{

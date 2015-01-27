@@ -88,7 +88,8 @@ func constructWCObject(writeConcern string) (sessionSafety *mgo.Safe, err error)
 // BuildWriteConcern takes a string and a boolean indicating whether the requested
 // write concern is to be used against a replica set. It then converts the write
 // concern string argument into an mgo.Safe object which can safely be used to
-// set the write concern on a cluster session connection.
+// set the write concern on a cluster session connection. Returns the safety
+// object and any error encountered.
 func BuildWriteConcern(writeConcern string, isReplicaSet bool) (*mgo.Safe, error) {
 	sessionSafety, err := constructWCObject(writeConcern)
 	if err != nil {

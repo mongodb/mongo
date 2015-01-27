@@ -10,7 +10,7 @@ import (
 )
 
 func TestBasicOps(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
 
 	var opts *options.ToolOptions
 	var sourceOpts *SourceOptions

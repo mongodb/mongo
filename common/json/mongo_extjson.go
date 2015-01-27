@@ -76,7 +76,7 @@ var (
 	// object types
 	binDataType     = reflect.TypeOf(BinData{})
 	dateType        = reflect.TypeOf(Date(0))
-	isoDateType		= reflect.TypeOf(ISODate(""))
+	isoDateType     = reflect.TypeOf(ISODate(""))
 	dbRefType       = reflect.TypeOf(DBRef{})
 	maxKeyType      = reflect.TypeOf(MaxKey{})
 	minKeyType      = reflect.TypeOf(MinKey{})
@@ -169,7 +169,7 @@ func stateI(s *scanner, c int) int {
 	switch c {
 	case 'n':
 		s.step = stateIn
-	case 'S' :
+	case 'S':
 		s.step = stateIS
 	default:
 		return s.error(c, "in literal Infinity or ISO (expecting 'n' or 'S')")
@@ -203,7 +203,7 @@ func (d *decodeState) storeExtendedLiteral(item []byte, v reflect.Value, fromQuo
 		}
 	case 'I':
 		switch item[1] {
-		case 'S': //ISODate
+		case 'S': // ISODate
 			d.storeISODate(v)
 		}
 

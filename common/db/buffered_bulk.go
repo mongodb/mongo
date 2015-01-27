@@ -6,10 +6,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-const (
-	MaxMessageSize = 2 * 16 * 1024 * 1024 // max size the drivers allow
-)
-
 // BufferedBulkInserter implements a bufio.Writer-like design for queuing up
 // documents and inserting them in bulk when the given doc limit (or max
 // message size) is reached. Must be flushed at the end to ensure that all
@@ -19,16 +15,14 @@ type BufferedBulkInserter struct {
 	collection      *mgo.Collection
 	continueOnError bool
 	docLimit        int
-
-	byteCount int
-	docCount  int
+	byteCount       int
+	docCount        int
 }
 
 // NewBufferedBulkInserter returns an initialized BufferedBulkInserter
 // for writing.
 func NewBufferedBulkInserter(collection *mgo.Collection, docLimit int,
 	continueOnError bool) *BufferedBulkInserter {
-
 	bb := &BufferedBulkInserter{
 		collection:      collection,
 		continueOnError: continueOnError,
@@ -48,8 +42,8 @@ func (bb *BufferedBulkInserter) resetBulk() {
 	bb.docCount = 0
 }
 
-// Insert buffers a document for bulk insertion. If the buffer is full, the bulk
-// insert is made, returning any errors that occur.
+// Insert adds a document to the buffer for bulk insertion. If the buffer is
+// full, the bulk insert is made, returning any error that occurs.
 func (bb *BufferedBulkInserter) Insert(doc interface{}) error {
 	rawBytes, err := bson.Marshal(doc)
 	if err != nil {
@@ -68,8 +62,7 @@ func (bb *BufferedBulkInserter) Insert(doc interface{}) error {
 	return nil
 }
 
-// Flush sends all buffered documents in one bulk insert
-// then resets the bulk buffer
+// Flush writes all buffered documents in one bulk insert then resets the buffer.
 func (bb *BufferedBulkInserter) Flush() error {
 	if bb.docCount == 0 {
 		return nil
