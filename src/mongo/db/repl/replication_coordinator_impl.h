@@ -137,6 +137,8 @@ namespace repl {
 
         virtual void setMyLastOptime(const OpTime& ts);
 
+        virtual void resetMyLastOptime();
+
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
         virtual OpTime getMyLastOptime() const;

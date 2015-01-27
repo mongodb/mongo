@@ -1,8 +1,8 @@
 // test that the resync command works with replica sets and that one does not need to manually
 // force a replica set resync by deleting all datafiles
-
-// TODO: Remove once test is fixed for SERVER-15704, add "use strict"
-if (false) {
+// Also tests that you can do this from a node that is "too stale"
+(function() {
+    "use strict";
     var replTest = new ReplSetTest({name: 'resync', nodes: 3, oplogSize: 1});
     var nodes = replTest.nodeList();
 
@@ -29,17 +29,27 @@ if (false) {
 
     // create an oplog entry with an insert
     assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 60000 }}));
+    assert.eq(B.foo.findOne().x, 1)
+    
+    // run resync and wait for it to happen
+    assert.commandWorked(b_conn.getDB("admin").runCommand({resync:1}));
+    replTest.awaitReplication();
+    replTest.awaitSecondaryNodes();
+    
+    assert.eq(B.foo.findOne().x, 1)
     replTest.stop(BID);
 
     function hasCycled() {
         var oplog = a_conn.getDB("local").oplog.rs;
-        return oplog.find( { "o.x" : 1 } ).sort( { $natural : 1 } )._addSpecial( "$maxScan" , 10 ).itcount() == 0;
+        return oplog.find( { "o.x" : 1 } ).sort( { $natural : 1 } ).limit(10).itcount() == 0;
     }
 
+    // Make sure the oplog has rolled over on the primary and secondary that is up, 
+    // so when we bring up the other replica it is "too stale"
     for ( var cycleNumber = 0; cycleNumber < 10; cycleNumber++ ) {
         // insert enough to cycle oplog
         var bulk = A.foo.initializeUnorderedBulkOp();
-        for (i=2; i < 10000; i++) {
+        for (var i=2; i < 10000; i++) {
             bulk.insert({x:i});
         }
 
@@ -52,10 +62,9 @@ if (false) {
 
     assert( hasCycled() );
 
-
-
     // bring node B and it will enter recovery mode because its newest oplog entry is too old
     replTest.restart(BID);
+    
     // check that it is in recovery mode
     assert.soon(function() {
         try {
@@ -71,6 +80,8 @@ if (false) {
     assert.commandWorked(b_conn.getDB("admin").runCommand({resync:1}));
     replTest.awaitReplication();
     replTest.awaitSecondaryNodes();
+    assert.eq(B.foo.findOne().x, 1)
 
     replTest.stopSet(15);
-}
+    jsTest.log("success");
+})();

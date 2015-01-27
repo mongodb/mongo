@@ -132,6 +132,8 @@ namespace repl {
 
     void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& ts) {}
 
+    void ReplicationCoordinatorMock::resetMyLastOptime() {}
+
     OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
         // TODO
         return OpTime();
