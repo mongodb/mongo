@@ -192,7 +192,7 @@ namespace mongo {
                 return false;
             }
 
-            {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
                 AutoGetDb autoDB(txn, dbname, MODE_X);
@@ -216,7 +216,9 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            }
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
+                                                  "dropDatabase",
+                                                  dbname);
 
             result.append( "dropped" , dbname );
 
@@ -591,19 +593,21 @@ namespace mongo {
                     !options["capped"].trueValue() || options["size"].isNumber() ||
                         options.hasField("$nExtents"));
 
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            Client::Context ctx(txn, ns);
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
+                Client::Context ctx(txn, ns);
 
-            WriteUnitOfWork wunit(txn);
+                WriteUnitOfWork wunit(txn);
 
-            // Create collection.
-            status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
-            if ( !status.isOK() ) {
-                return appendCommandStatus( result, status );
-            }
+                // Create collection.
+                status =  userCreateNS(txn, ctx.db(), ns.c_str(), options, !fromRepl);
+                if ( !status.isOK() ) {
+                    return appendCommandStatus( result, status );
+                }
 
-            wunit.commit();
+                wunit.commit();
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "create", ns);
             return true;
         }
     } cmdCreate;
