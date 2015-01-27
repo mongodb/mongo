@@ -258,6 +258,11 @@ namespace repl {
         virtual void setMyLastOptime(const OpTime& ts) = 0;
 
         /**
+         * Same as above, but used during places we need to zero our last optime.
+         */
+        virtual void resetMyLastOptime() = 0;
+
+        /**
          * Updates our the message we include in heartbeat responses.
          */
         virtual void setMyHeartbeatMessage(const std::string& msg) = 0;

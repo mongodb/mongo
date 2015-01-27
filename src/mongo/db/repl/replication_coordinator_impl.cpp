@@ -686,6 +686,11 @@ namespace {
         _setMyLastOptime_inlock(&lock, ts, false);
     }
 
+    void ReplicationCoordinatorImpl::resetMyLastOptime() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        _setMyLastOptime_inlock(&lock, OpTime(), true);
+    }
+
     void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
             boost::unique_lock<boost::mutex>* lock, const OpTime& ts, bool isRollbackAllowed) {
         invariant(lock->owns_lock());
