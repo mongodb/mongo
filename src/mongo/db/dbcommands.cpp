@@ -744,8 +744,8 @@ namespace mongo {
 
                 result.append( "numChunks" , n );
                 result.append( "md5" , digestToString( d ) );
-                return true;
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "filemd5", dbname);
+            return true;
         }
 
         void dumpChunks(OperationContext* txn,
