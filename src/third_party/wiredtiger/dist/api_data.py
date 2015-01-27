@@ -309,8 +309,18 @@ connection_runtime_config = [
             ]),
     Config('cache_size', '100MB', r'''
         maximum heap memory to allocate for the cache. A database should
-        configure either a cache_size or a shared_cache not both''',
+        configure either \c cache_size or \c shared_cache but not both''',
         min='1MB', max='10TB'),
+    Config('cache_overhead', '8', r'''
+        assume the heap allocator overhead is the specified percentage, and
+        adjust the cache size by that amount (for example, if the cache size is
+        100GB, a percentage of 10 means WiredTiger limits itself to allocating
+        90GB of memory).  This value is configurable because different heap
+        allocators have different overhead and different workloads will have
+        different heap allocation sizes and patterns, therefore applications
+        may need to adjust this value based on allocator choice and behavior
+        in measured workloads''',
+        min='0', max='30'),
     Config('checkpoint', '', r'''
         periodically checkpoint the database''',
         type='category', subconfig=[

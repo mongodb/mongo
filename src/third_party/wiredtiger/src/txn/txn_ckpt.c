@@ -341,9 +341,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * into the session cache, but we're going to do that eventually anyway.
 	 */
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_DHANDLE_LOCK(session,
-		ret = __checkpoint_apply_all(
-		session, cfg, __wt_checkpoint_list, NULL)));
+	    WT_WITH_TABLE_LOCK(session,
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __checkpoint_apply_all(
+		    session, cfg, __wt_checkpoint_list, NULL))));
 	WT_ERR(ret);
 
 	/*

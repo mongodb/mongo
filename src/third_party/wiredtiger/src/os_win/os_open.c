@@ -214,13 +214,13 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * windows since it is not possible to sync a directory
 	 */
 	if (fh->filehandle != INVALID_HANDLE_VALUE &&
-	    !CloseHandle(fh->filehandle) != 0) {
+	    CloseHandle(fh->filehandle) == 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "CloseHandle: %s", fh->name);
 	}
 
 	if (fh->filehandle_secondary != INVALID_HANDLE_VALUE &&
-	    !CloseHandle(fh->filehandle_secondary) != 0) {
+	    CloseHandle(fh->filehandle_secondary) == 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "CloseHandle: secondary: %s", fh->name);
 	}

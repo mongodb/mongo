@@ -883,6 +883,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	log->write_lsn = slot->slot_end_lsn;
+	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
 	if (F_ISSET(slot, SLOT_CLOSEFH))
 		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
@@ -1651,6 +1652,12 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_sync_cond, 10000);
+	} else if (LF_ISSET(WT_LOG_FLUSH)) {
+		/* Wait for our writes to reach the OS */
+		while (LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
+		    myslot.slot->slot_error == 0)
+			(void)__wt_cond_wait(
+			    session, log->log_write_cond, 10000);
 	}
 err:
 	if (locked)
