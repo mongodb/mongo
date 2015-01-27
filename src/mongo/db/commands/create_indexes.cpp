@@ -149,13 +149,16 @@ namespace mongo {
             Collection* collection = db->getCollection( ns.ns() );
             result.appendBool( "createdCollectionAutomatically", collection == NULL );
             if ( !collection ) {
-                WriteUnitOfWork wunit(txn);
-                collection = db->createCollection( txn, ns.ns() );
-                invariant( collection );
-                if (!fromRepl) {
-                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), BSON("create" << ns.coll()));
-                }
-                wunit.commit();
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    WriteUnitOfWork wunit(txn);
+                    collection = db->createCollection( txn, ns.ns() );
+                    invariant( collection );
+                    if (!fromRepl) {
+                        repl::logOp(txn, "c", (dbname + ".$cmd").c_str(),
+                                    BSON("create" << ns.coll()));
+                    }
+                    wunit.commit();
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
             }
 
             const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);

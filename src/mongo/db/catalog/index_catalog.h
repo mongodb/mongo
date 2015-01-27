@@ -260,12 +260,6 @@ namespace mongo {
              */
             void fail();
 
-            /**
-             * we're stopping the build
-             * do NOT cleanup, leave meta data as is
-             */
-            void abortWithoutCleanup();
-
             IndexCatalogEntry* getEntry() { return _entry; }
 
         private:

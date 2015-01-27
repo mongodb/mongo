@@ -381,16 +381,12 @@ namespace {
           _ns( _catalog->_collection->ns().ns() ),
           _spec( spec.getOwned() ),
           _entry( NULL ),
-          _inProgress( false ),
           _txn(txn) {
 
         invariant( collection );
     }
 
     Status IndexCatalog::IndexBuildBlock::init() {
-        // we do special cleanup until we're far enough in
-        invariant( _inProgress == false );
-
         // need this first for names, etc...
         BSONObj keyPattern = _spec.getObjectField("key");
         IndexDescriptor* descriptor = new IndexDescriptor( _collection,
@@ -406,10 +402,6 @@ namespace {
         Status status = _collection->getCatalogEntry()->prepareForIndexBuild( _txn, descriptor );
         if ( !status.isOK() )
             return status;
-
-        // at this point we can do normal clean up procedure, so we mark ourselves
-        // as in progress.
-        _inProgress = true;
 
         /// ----------   setup in memory structures  ----------------
         const bool initFromDisk = false;
@@ -427,8 +419,6 @@ namespace {
     void IndexCatalog::IndexBuildBlock::fail() {
         fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-        _inProgress = false;
-
         IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
         invariant( entry == _entry );
 
@@ -442,14 +432,7 @@ namespace {
         }
     }
 
-    void IndexCatalog::IndexBuildBlock::abortWithoutCleanup() {
-        _inProgress = false;
-    }
-
     void IndexCatalog::IndexBuildBlock::success() {
-        fassert( 17206, _inProgress );
-        _inProgress = false;
-
         fassert( 17207, _catalog->_collection->ok() );
 
         _catalog->_collection->getCatalogEntry()->indexBuildSuccess( _txn, _indexName );
