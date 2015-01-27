@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	ProgressBarLength   = 24
-	ProgressBarWaitTime = time.Second * 3
+	progressBarLength   = 24
+	progressBarWaitTime = time.Second * 3
 
-	DumpDefaultPermissions = 0755
+	defaultPermissions = 0755
 )
 
 type MongoDump struct {
@@ -75,6 +75,7 @@ func (dump *MongoDump) ValidateOptions() error {
 	return nil
 }
 
+// Init performs preliminary setup operations for MongoDump.
 func (dump *MongoDump) Init() error {
 	err := dump.ValidateOptions()
 	if err != nil {
@@ -98,11 +99,11 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("--repair flag cannot be used on a mongos")
 	}
 	dump.manager = intents.NewIntentManager()
-	dump.progressManager = progress.NewProgressBarManager(log.Writer(0), ProgressBarWaitTime)
+	dump.progressManager = progress.NewProgressBarManager(log.Writer(0), progressBarWaitTime)
 	return nil
 }
 
-// Dump handles some final options checking and executes MongoDump
+// Dump handles some final options checking and executes MongoDump.
 func (dump *MongoDump) Dump() error {
 	var err error
 	if dump.InputOptions.Query != "" {
@@ -125,7 +126,7 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
-		//first make sure this is possible with the connected database
+		// first make sure this is possible with the connected database
 		dump.authVersion, err = auth.GetAuthVersion(dump.sessionProvider)
 		if err != nil {
 			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
@@ -137,7 +138,7 @@ func (dump *MongoDump) Dump() error {
 		}
 	}
 
-	//switch on what kind of execution to do
+	// switch on what kind of execution to do
 	switch {
 	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection == "":
 		err = dump.CreateAllIntents()
@@ -300,7 +301,7 @@ func (dump *MongoDump) DumpIntents() error {
 	return nil
 }
 
-// DumpCollection dumps the specified database's collection
+// DumpCollection dumps the specified database's collection.
 func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
@@ -331,7 +332,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	}
 
 	dbFolder := filepath.Join(dump.OutputOptions.Out, intent.DB)
-	if err = os.MkdirAll(dbFolder, DumpDefaultPermissions); err != nil {
+	if err = os.MkdirAll(dbFolder, defaultPermissions); err != nil {
 		return fmt.Errorf("error creating folder `%v` for dump: %v", dbFolder, err)
 	}
 	outFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.bson", intent.C))
@@ -394,7 +395,7 @@ func (dump *MongoDump) dumpQueryToWriter(
 	bar := &progress.Bar{
 		Name:      intent.Namespace(),
 		Watching:  dumpProgressor,
-		BarLength: ProgressBarLength,
+		BarLength: progressBarLength,
 	}
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
@@ -422,7 +423,7 @@ func (dump *MongoDump) dumpIterToWriter(
 				return
 			}
 
-			//TODO use buffer pool?
+			// TODO use buffer pool?
 			nextCopy := make([]byte, len(raw.Data))
 			copy(nextCopy, raw.Data)
 
@@ -459,7 +460,7 @@ func (dump *MongoDump) dumpIterToWriter(
 }
 
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied
-// to the given the db. Only works with schema version >= 3
+// to the given the db. Only works with an authentication schema version >= 3.
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {

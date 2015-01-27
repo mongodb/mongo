@@ -9,6 +9,7 @@ import (
 	"io"
 )
 
+// Oplog represents a MongoDB oplog document
 type Oplog struct {
 	Timestamp bson.MongoTimestamp `bson:"ts"`
 	HistoryID int64               `bson:"h"`
@@ -51,7 +52,6 @@ func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
 
 	err := dump.sessionProvider.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry, 0)
 	if err != nil {
-		//TODO different error depending on not found vs connection issues
 		return 0, err
 	}
 	return mostRecentOplogEntry.Timestamp, nil
@@ -86,7 +86,7 @@ func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp, out io.Wr
 	}
 	defer session.Close()
 	session.SetSocketTimeout(0)
-	session.SetPrefetch(1.0) //mimic exhaust cursor
+	session.SetPrefetch(1.0) // mimic exhaust cursor
 	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
 	return dump.dumpQueryToWriter(

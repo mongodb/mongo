@@ -1,14 +1,17 @@
 package mongodump
 
+// InputOptions defines the set of options to use in retrieving data from server.
 type InputOptions struct {
 	Query     string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	TableScan bool   `long:"forceTableScan" description:"force a table scan"`
 }
 
+// Name returns a human-readable group name for input options.
 func (_ *InputOptions) Name() string {
 	return "query"
 }
 
+// OutputOptions defines the set of options to writing dump data.
 type OutputOptions struct {
 	Out                        string   `long:"out" short:"o" description:"output directory, or '-' for stdout (defaults to 'dump')" default:"dump" default-mask:"-"`
 	Repair                     bool     `long:"repair" description:"try to recover documents from damaged data files (not supported by all storage engines)"`
@@ -18,6 +21,7 @@ type OutputOptions struct {
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix"`
 }
 
+// Name returns a human-readable group name for output options.
 func (_ *OutputOptions) Name() string {
 	return "output"
 }
