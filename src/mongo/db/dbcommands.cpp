@@ -1495,12 +1495,9 @@ namespace mongo {
         appendCommandStatus(result, retval, errmsg);
 
         // For commands from mongos, append some info to help getLastError(w) work.
-        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-            // Detect mongos connections by looking for setShardVersion to have been run previously
-            // on this connection.
-            if (shardingState.needCollectionMetadata(dbname)) {
-                appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
-            }
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
+                shardingState.enabled()) {
+            appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
         }
         return;
     }
