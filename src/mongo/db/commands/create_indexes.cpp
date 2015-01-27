@@ -192,9 +192,7 @@ namespace mongo {
 
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 uassertStatusOK(indexer.init(specs));
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
-                                                  "createIndexes",
-                                                  ns.ns());
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
             // If we're a background index, replace exclusive db lock with an intent lock, so that
             // other readers and writers can proceed during this phase.  
@@ -246,9 +244,7 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
-                                                  "createIndexes",
-                                                  ns.ns());
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
             result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn) );
 

@@ -123,7 +123,7 @@ namespace mongo {
                     repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), jsobj);
                 }
                 wunit.commit();
-            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(), "dropIndexes", dbname);
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropIndexes", dbname);
             return true;
         }
 

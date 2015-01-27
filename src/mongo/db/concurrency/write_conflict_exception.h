@@ -35,11 +35,13 @@
 #include "mongo/util/assert_util.h"
 
 #define MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN do { int wcr__Attempts = 0; do { try
-#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(OPDBG, OPSTR, NSSTR)        \
+#define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(PTXN, OPSTR, NSSTR)         \
         catch (const ::mongo::WriteConflictException &wce) {            \
-            ++(OPDBG).writeConflicts;                                   \
+            const OperationContext* ptxn = (PTXN);                      \
+            ++ptxn->getCurOp()->debug().writeConflicts;                 \
             wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));         \
             ++wcr__Attempts;                                            \
+            ptxn->recoveryUnit()->commitAndRestart();                   \
             continue;                                                   \
         }                                                               \
         break;                                                          \
