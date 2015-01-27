@@ -338,9 +338,6 @@ namespace mongo {
     }
 
     void MultiIndexBlock::abortWithoutCleanup() {
-        for ( size_t i = 0; i < _indexes.size(); i++ ) {
-            _indexes[i].block->abortWithoutCleanup();
-        }
         _indexes.clear();
         _needToCleanup = false;
     }

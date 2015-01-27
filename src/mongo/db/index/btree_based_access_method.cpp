@@ -298,11 +298,6 @@ namespace mongo {
     }
 
     IndexAccessMethod* BtreeBasedAccessMethod::initiateBulk(OperationContext* txn) {
-        // If there's already data in the index, don't do anything.
-        if (!_newInterface->isEmpty(txn)) {
-            return NULL;
-        }
-
         return new BtreeBasedBulkAccessMethod(txn,
                                               this,
                                               _newInterface.get(),
@@ -315,11 +310,6 @@ namespace mongo {
                                               set<RecordId>* dupsToDrop) {
 
         BtreeBasedBulkAccessMethod* bulk = static_cast<BtreeBasedBulkAccessMethod*>(bulkRaw);
-
-        if (!_newInterface->isEmpty(bulk->getOperationContext())) {
-            return Status(ErrorCodes::InternalError, "trying to commit but has data already");
-        }
-
         return bulk->commit(dupsToDrop, mayInterrupt, dupsAllowed);
     }
 

@@ -34,6 +34,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
@@ -133,7 +134,7 @@ namespace mongo {
 
         scoped_ptr<SortedDataBuilderInterface> builder;
 
-        {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             WriteUnitOfWork wunit(_txn);
 
             if (_isMultiKey) {
@@ -142,7 +143,7 @@ namespace mongo {
 
             builder.reset(_interface->getBulkBuilder(_txn, dupsAllowed));
             wunit.commit();
-        }
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "setting index multikey flag", "");
 
         while (i->more()) {
             if (mayInterrupt) {
