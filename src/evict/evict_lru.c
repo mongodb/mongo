@@ -1305,8 +1305,6 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 		page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
-	WT_ASSERT(session,
-	    !F_ISSET(session, WT_SESSION_INTERNAL) || session->split_gen == 0);
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
