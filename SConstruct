@@ -85,6 +85,8 @@ env = Environment(
     SWIG=swig_binary
 )
 
+env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
+
 useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
 useBdb = GetOption("bdb")
