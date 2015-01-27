@@ -40,10 +40,11 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -189,7 +190,11 @@ namespace mongo {
                 }
             }
 
-            uassertStatusOK(indexer.init(specs));
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                uassertStatusOK(indexer.init(specs));
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
+                                                  "createIndexes",
+                                                  ns.ns());
 
             // If we're a background index, replace exclusive db lock with an intent lock, so that
             // other readers and writers can proceed during this phase.  
@@ -202,6 +207,7 @@ namespace mongo {
                 uassertStatusOK(indexer.insertAllDocumentsInCollection());
             }
             catch (const DBException& e) {
+                invariant(e.getCode() != ErrorCodes::WriteConflict);
                 // Must have exclusive DB lock before we clean up the index build via the
                 // destructor of 'indexer'.
                 if (indexer.getBuildInBackground()) {
@@ -227,7 +233,7 @@ namespace mongo {
                         db->getCollection(ns.ns()));
             }
 
-            {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
 
                 indexer.commit();
@@ -240,7 +246,9 @@ namespace mongo {
                 }
 
                 wunit.commit();
-            }
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn->getCurOp()->debug(),
+                                                  "createIndexes",
+                                                  ns.ns());
 
             result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn) );
 
