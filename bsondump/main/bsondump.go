@@ -71,7 +71,7 @@ func main() {
 	if bsonDumpOpts.Type == "debug" {
 		numFound, err = dumper.Debug()
 	} else {
-		numFound, err = dumper.Dump()
+		numFound, err = dumper.JSON()
 	}
 
 	log.Logf(log.Always, "%v objects found", numFound)

@@ -16,13 +16,23 @@ import (
 )
 
 type BSONDump struct {
-	ToolOptions     *options.ToolOptions
+	// generic mongo tool options
+	ToolOptions *options.ToolOptions
+
+	// BSONDumpOptions defines options used to control how BSON data is displayed
 	BSONDumpOptions *BSONDumpOptions
-	FileName        string
-	Out             io.Writer
-	bsonSource      *db.BSONSource
+
+	// Path to the BSON file
+	FileName string
+
+	// Handle to where the BSON data should be displayed
+	Out io.Writer
+
+	bsonSource *db.BSONSource
 }
 
+// Open opens the relevant file for reading. It returns a
+// non-nil error if it is unable to open the file.
 func (bd *BSONDump) Open() error {
 	file, err := os.Open(bd.FileName)
 	if err != nil {
@@ -32,7 +42,7 @@ func (bd *BSONDump) Open() error {
 	return nil
 }
 
-func dumpDoc(doc *bson.Raw, out io.Writer, pretty bool) error {
+func printJSON(doc *bson.Raw, out io.Writer, pretty bool) error {
 	decodedDoc := bson.M{}
 	err := bson.Unmarshal(doc.Data, &decodedDoc)
 	if err != nil {
@@ -56,15 +66,16 @@ func dumpDoc(doc *bson.Raw, out io.Writer, pretty bool) error {
 	return err
 }
 
-// Dump iterates through the bson file and for each document it finds, prints
-// its JSON representation.
-// Returns the number of documents processed and a non-nil error if one is
+// JSON iterates through the BSON file and for each document it finds,
+// recursively descends into objects and arrays and prints the human readable
+// JSON representation.
+// It returns the number of documents processed and a non-nil error if one is
 // encountered before the end of the file is reached.
-func (bd *BSONDump) Dump() (int, error) {
+func (bd *BSONDump) JSON() (int, error) {
 	numFound := 0
 
 	if bd.bsonSource == nil {
-		panic("Tried to call Dump() before opening file")
+		panic("Tried to call JSON() before opening file")
 	}
 
 	decodedStream := db.NewDecodedBSONSource(bd.bsonSource)
@@ -72,7 +83,7 @@ func (bd *BSONDump) Dump() (int, error) {
 
 	var result bson.Raw
 	for decodedStream.Next(&result) {
-		if err := dumpDoc(&result, bd.Out, bd.BSONDumpOptions.Pretty); err != nil {
+		if err := printJSON(&result, bd.Out, bd.BSONDumpOptions.Pretty); err != nil {
 			log.Logf(log.Always, "unable to dump document %v: %v", numFound+1, err)
 
 			//if objcheck is turned on, stop now. otherwise keep on dumpin'
@@ -93,10 +104,10 @@ func (bd *BSONDump) Dump() (int, error) {
 	return numFound, nil
 }
 
-// Debug iterates through the bson file and for each document it finds,
-// prints a human readable debug representation displaying the type and size
-// of each field, recursively descending into objects and arrays.
-// Returns the number of documents processed and a non-nil error if one is
+// Debug iterates through the BSON file and for each document it finds,
+// recursively descends into objects and arrays and prints a human readable
+// BSON representation containing the type and size of each field.
+// It returns the number of documents processed and a non-nil error if one is
 // encountered before the end of the file is reached.
 func (bd *BSONDump) Debug() (int, error) {
 	numFound := 0
@@ -124,7 +135,7 @@ func (bd *BSONDump) Debug() (int, error) {
 				return numFound, fmt.Errorf("failed to validate bson during objcheck: %v", err)
 			}
 		}
-		err := debugBSON(result, 0, bd.Out)
+		err := printBSON(result, 0, bd.Out)
 		if err != nil {
 			log.Logf(log.Always, "encountered error debugging BSON data: %v", err)
 		}
@@ -141,7 +152,7 @@ func (bd *BSONDump) Debug() (int, error) {
 	return numFound, nil
 }
 
-func debugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
+func printBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 	indent := strings.Repeat("\t", indentLevel)
 	fmt.Fprintf(out, "%v--- new object ---\n", indent)
 	fmt.Fprintf(out, "%v\tsize : %v\n", indent, len(raw.Data))
@@ -166,7 +177,7 @@ func debugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 
 		//For nested objects or arrays, recurse.
 		if rawElem.Value.Kind == 0x03 || rawElem.Value.Kind == 0x04 {
-			err = debugBSON(rawElem.Value, indentLevel+3, out)
+			err = printBSON(rawElem.Value, indentLevel+3, out)
 			if err != nil {
 				return err
 			}

@@ -8,9 +8,14 @@ See http://docs.mongodb.org/manual/reference/program/bsondump/ for more informat
 
 
 type BSONDumpOptions struct {
-	Type     string `long:"type" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
-	ObjCheck bool   `long:"objcheck" description:"validate BSON during processing"`
-	Pretty   bool   `long:"pretty" description:"output JSON formatted to be human-readable"`
+	// Format to display the BSON data file
+	Type string `long:"type" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
+
+	// Validate each BSON document before displaying
+	ObjCheck bool `long:"objcheck" description:"validate BSON during processing"`
+
+	// Display JSON data with indents
+	Pretty bool `long:"pretty" description:"output JSON formatted to be human-readable"`
 }
 
 func (_ *BSONDumpOptions) Name() string {
