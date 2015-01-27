@@ -199,14 +199,12 @@ namespace ReplTests {
                 b.append("host", "localhost");
                 b.appendTimestamp("syncedTo", 0);
                 ReplSource a(&_txn, b.obj());
-                WriteUnitOfWork wunit(&_txn);
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
                     if ( 0 ) {
                         mongo::unittest::log() << "op: " << *i << endl;
                     }
                     a.applyOperation( &_txn, ctx.db(), *i );
                 }
-                wunit.commit();
             }
         }
         void printAll( const char *ns ) {

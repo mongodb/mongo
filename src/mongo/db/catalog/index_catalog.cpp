@@ -110,7 +110,8 @@ namespace mongo {
                                                                _getAccessMethodName(txn,
                                                                                     keyPattern),
                                                                spec );
-            IndexCatalogEntry* entry = _setupInMemoryStructures( txn, descriptor );
+            const bool initFromDisk = true;
+            IndexCatalogEntry* entry = _setupInMemoryStructures( txn, descriptor, initFromDisk );
 
             fassert( 17340, entry->isReady( txn )  );
         }
@@ -126,8 +127,40 @@ namespace mongo {
         return Status::OK();
     }
 
+namespace {
+    class IndexCleanupOnRollback : public RecoveryUnit::Change {
+    public:
+        /**
+         * None of these pointers are owned by this class.
+         */
+        IndexCleanupOnRollback(OperationContext* txn,
+                               Collection* collection,
+                               IndexCatalogEntryContainer* entries,
+                               const IndexDescriptor* desc)
+            : _txn(txn),
+              _collection(collection),
+              _entries(entries),
+              _desc(desc) {
+        }
+
+        virtual void commit() {}
+
+        virtual void rollback() {
+            _entries->remove(_desc);
+            _collection->infoCache()->reset(_txn);
+        }
+
+    private:
+        OperationContext* _txn;
+        Collection* _collection;
+        IndexCatalogEntryContainer* _entries;
+        const IndexDescriptor* _desc;
+    };
+} // namespace
+
     IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
-                                                              IndexDescriptor* descriptor) {
+                                                              IndexDescriptor* descriptor,
+                                                              bool initFromDisk) {
         auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
         auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection->ns().ns(),
@@ -141,6 +174,13 @@ namespace mongo {
 
         IndexCatalogEntry* save = entry.get();
         _entries.add( entry.release() );
+        
+        if (!initFromDisk) {
+            txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(txn,
+                                                                           _collection,
+                                                                           &_entries,
+                                                                           descriptor));
+        }
 
         invariant( save == _entries.find( descriptor ) );
         invariant( save == _entries.find( descriptor->indexName() ) );
@@ -286,65 +326,6 @@ namespace mongo {
         _inProgressIndexes.erase(it);
     }
 
-namespace {
-    class IndexCleanupOnRollback : public RecoveryUnit::Change {
-    public:
-        /**
-         * None of these pointers are owned by this class.
-         */
-        IndexCleanupOnRollback(OperationContext* txn,
-                               Collection* collection,
-                               IndexCatalogEntryContainer* entries,
-                               const IndexDescriptor* desc)
-            : _txn(txn),
-              _collection(collection),
-              _entries(entries),
-              _desc(desc) {
-        }
-
-        virtual void commit() {}
-
-        virtual void rollback() {
-            _entries->remove(_desc);
-            _collection->infoCache()->reset(_txn);
-        }
-
-    private:
-        OperationContext* _txn;
-        Collection* _collection;
-        IndexCatalogEntryContainer* _entries;
-        const IndexDescriptor* _desc;
-    };
-
-    class IndexRemoveChange : public RecoveryUnit::Change {
-    public:
-        IndexRemoveChange(OperationContext* txn,
-                          Collection* collection,
-                          IndexCatalogEntryContainer* entries,
-                          IndexCatalogEntry* entry)
-            : _txn(txn),
-              _collection(collection),
-              _entries(entries),
-              _entry(entry) {
-        }
-
-        virtual void commit() {
-            delete _entry;
-        }
-
-        virtual void rollback() {
-            _entries->add(_entry);
-            _collection->infoCache()->reset(_txn);
-        }
-
-    private:
-        OperationContext* _txn;
-        Collection* _collection;
-        IndexCatalogEntryContainer* _entries;
-        IndexCatalogEntry* _entry;
-    };
-} // namespace
-
     Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
         invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().toString(),
                                                               MODE_X));
@@ -380,11 +361,6 @@ namespace {
         IndexDescriptor* descriptor = entry->descriptor();
         invariant( descriptor );
         invariant( entry == _entries.find( descriptor ) );
-
-        txn->recoveryUnit()->registerChange(new IndexCleanupOnRollback(txn,
-                                                                       _collection,
-                                                                       &_entries,
-                                                                       entry->descriptor()));
 
         status = entry->accessMethod()->initializeAsEmpty(txn);
         if (!status.isOK())
@@ -436,49 +412,33 @@ namespace {
         _inProgress = true;
 
         /// ----------   setup in memory structures  ----------------
-
-        _entry = _catalog->_setupInMemoryStructures(_txn, descriptorCleaner.release());
+        const bool initFromDisk = false;
+        _entry = _catalog->_setupInMemoryStructures(_txn,
+                                                    descriptorCleaner.release(),
+                                                    initFromDisk);
 
         return Status::OK();
     }
 
     IndexCatalog::IndexBuildBlock::~IndexBuildBlock() {
-        if ( !_inProgress ) {
-            // taken care of already when success() is called
-            return;
-        }
-
-        try {
-            fail();
-        }
-        catch ( const AssertionException& exc ) {
-            log() << "exception in ~IndexBuildBlock trying to cleanup: " << exc;
-            log() << " going to fassert to preserve state";
-            fassertFailed( 17345 );
-        }
+        // Don't need to call fail() here, as rollback will clean everything up for us.
     }
 
     void IndexCatalog::IndexBuildBlock::fail() {
-        try {
-            fassert( 17204, _catalog->_collection->ok() ); // defensive
+        fassert( 17204, _catalog->_collection->ok() ); // defensive
 
-            _inProgress = false;
+        _inProgress = false;
 
-            IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
-            invariant( entry == _entry );
+        IndexCatalogEntry* entry = _catalog->_entries.find( _indexName );
+        invariant( entry == _entry );
 
-            if ( entry ) {
-                _catalog->_dropIndex(_txn, entry);
-            }
-            else {
-                _catalog->_deleteIndexFromDisk( _txn,
-                                                _indexName,
-                                                _indexNamespace );
-            }
+        if ( entry ) {
+            _catalog->_dropIndex(_txn, entry);
         }
-        catch (const DBException& exc) {
-            error() << "exception while cleaning up in-progress index build: " << exc.what();
-            fassertFailedWithStatus(17493, exc.toStatus());
+        else {
+            _catalog->_deleteIndexFromDisk( _txn,
+                                            _indexName,
+                                            _indexNamespace );
         }
     }
 
@@ -797,6 +757,36 @@ namespace {
         return _dropIndex(txn, entry);
     }
 
+namespace {
+    class IndexRemoveChange : public RecoveryUnit::Change {
+    public:
+        IndexRemoveChange(OperationContext* txn,
+                          Collection* collection,
+                          IndexCatalogEntryContainer* entries,
+                          IndexCatalogEntry* entry)
+            : _txn(txn),
+              _collection(collection),
+              _entries(entries),
+              _entry(entry) {
+        }
+
+        virtual void commit() {
+            delete _entry;
+        }
+
+        virtual void rollback() {
+            _entries->add(_entry);
+            _collection->infoCache()->reset(_txn);
+        }
+
+    private:
+        OperationContext* _txn;
+        Collection* _collection;
+        IndexCatalogEntryContainer* _entries;
+        IndexCatalogEntry* _entry;
+    };
+} // namespace
+
     Status IndexCatalog::_dropIndex(OperationContext* txn,
                                     IndexCatalogEntry* entry ) {
         /**
@@ -1059,8 +1049,11 @@ namespace {
 
         // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
         // invalid and should not be dereferenced.
-        const bool removed = _entries.remove( oldDesc );
-        invariant( removed );
+        IndexCatalogEntry* oldEntry = _entries.release(oldDesc);
+        txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, 
+                                                                  _collection,
+                                                                  &_entries,
+                                                                  oldEntry));
 
         // Ask the CollectionCatalogEntry for the new index spec.
         BSONObj spec = _collection->getCatalogEntry()->getIndexSpec( txn, indexName ).getOwned();
@@ -1070,11 +1063,12 @@ namespace {
         IndexDescriptor* newDesc = new IndexDescriptor( _collection,
                                                         _getAccessMethodName( txn, keyPattern ),
                                                         spec );
-        const IndexCatalogEntry* entry = _setupInMemoryStructures( txn, newDesc );
-        invariant( entry->isReady( txn ) );
+        const bool initFromDisk = false;
+        const IndexCatalogEntry* newEntry = _setupInMemoryStructures( txn, newDesc, initFromDisk );
+        invariant( newEntry->isReady( txn ) );
 
         // Return the new descriptor.
-        return entry->descriptor();
+        return newEntry->descriptor();
     }
 
     // ---------------------------
