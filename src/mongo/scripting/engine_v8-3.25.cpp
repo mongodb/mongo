@@ -1,5 +1,3 @@
-//engine_v8.cpp
-
 /*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -48,6 +46,12 @@
 using namespace mongoutils;
 
 namespace mongo {
+
+    using std::cout;
+    using std::endl;
+    using std::map;
+    using std::string;
+    using std::stringstream;
 
 #ifndef _MSC_EXTENSIONS
     const int V8Scope::objectDepthLimit;
@@ -351,7 +355,7 @@ namespace mongo {
 
     template <typename _GCState>
     void gcCallback(v8::GCType type, v8::GCCallbackFlags flags) {
-        if (!logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)))
+        if (!shouldLog(logger::LogSeverity::Debug(1)))
              // don't collect stats unless verbose
              return;
 
@@ -499,7 +503,7 @@ namespace mongo {
      */
     std::string V8ScriptEngine::printKnownOps_inlock() {
         stringstream out;
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+        if (shouldLog(logger::LogSeverity::Debug(2))) {
             out << "  known ops: " << endl;
             for(OpIdToScopeMap::iterator iSc = _opToScopeMap.begin();
                 iSc != _opToScopeMap.end(); ++iSc) {
