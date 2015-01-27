@@ -81,7 +81,7 @@ def confirm_does_not_exist(self, uri):
     self.pr('confirm_does_not_exist: ' + uri)
     self.assertRaises(wiredtiger.WiredTigerError,
         lambda: self.session.open_cursor(uri, None))
-    self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
+    self.assertEqual(glob.glob('*' + uri.split(":")[-1] + '*'), [],
         'confirm_does_not_exist: URI exists, file name matching \"' +
         uri.split(":")[1] + '\" found')
 
@@ -203,6 +203,9 @@ def complex_populate_type(self, uri, config, rows, type):
         cursor.set_value(v[0], v[1], v[2], v[3])
         cursor.insert()
     cursor.close()
+
+def complex_populate_index_name(self, uri):
+    return 'index:' + uri.split(":")[1] + ':indx1'
 
 def complex_populate_check_cursor(self, cursor, rows):
     i = 0

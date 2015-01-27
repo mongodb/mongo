@@ -659,7 +659,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	 * cache, it may not have been set.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
-	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
+	btree->maxmempage =
+	    WT_MAX((uint64_t)cval.val, 50 * (uint64_t)btree->maxleafpage);
 	cache_size = S2C(session)->cache_size;
 	if (cache_size > 0)
 		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 2);

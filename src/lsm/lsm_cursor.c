@@ -1429,7 +1429,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_set_key,	/* set-key */
 	    __wt_cursor_set_value,	/* set-value */
 	    __clsm_compare,		/* compare */
-	    __wt_cursor_equal,		/* equals */
+	    __wt_cursor_equals,		/* equals */
 	    __clsm_next,		/* next */
 	    __clsm_prev,		/* prev */
 	    __clsm_reset,		/* reset */

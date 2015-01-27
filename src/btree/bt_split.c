@@ -13,7 +13,7 @@
  * estimate of allocation overhead to every object.
  */
 #define	WT_MEMSIZE_ADD(total, len)	do {				\
-	total += (len) + WT_ALLOC_OVERHEAD;				\
+	total += (len);							\
 } while (0)
 #define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
 	WT_MEMSIZE_ADD(from_decr, len);					\
@@ -728,14 +728,6 @@ __split_multi_inmem(
 	 */
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
-	/*
-	 * XXX Don't allow this page to be evicted immediately.
-	 *
-	 * In some cases involving forced eviction during truncates, a reader
-	 * ends up looking at an evicted page.  This is a temporary workaround.
-	 */
-	page->modify->inmem_split_txn = __wt_txn_new_id(session);
-
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt));
 
@@ -889,8 +881,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	for (i = 0, deleted_entries = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
-		if (next_ref->state == WT_REF_DELETED &&
-		    next_ref->page_del == NULL &&
+		if (__wt_delete_page_skip(session, next_ref) &&
 		    WT_ATOMIC_CAS4(next_ref->state,
 		    WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
@@ -985,6 +976,18 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 					WT_TRET(__split_safe_free(
 					    session, 0, ikey, size));
 					WT_MEMSIZE_ADD(parent_decr, size);
+				}
+				/*
+				 * The page_del structure can be freed
+				 * immediately: it is only read when the ref
+				 * state is WT_REF_DELETED.  The size of the
+				 * structures wasn't added to the parent: don't
+				 * decrement.
+				 */
+				if (next_ref->page_del != NULL) {
+					__wt_free(session,
+					    next_ref->page_del->update_list);
+					__wt_free(session, next_ref->page_del);
 				}
 			}
 

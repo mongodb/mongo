@@ -28,7 +28,8 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirm_does_not_exist, complex_populate, simple_populate
+from helper import confirm_does_not_exist, complex_populate, \
+    complex_populate_index_name, simple_populate
 
 # test_drop.py
 #    session level drop operation
@@ -44,7 +45,7 @@ class test_drop(wttest.WiredTigerTestCase):
     ]
 
     # Populate an object, remove it and confirm it no longer exists.
-    def drop(self, populate, with_cursor):
+    def drop(self, populate, with_cursor, close_session, drop_index):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S' + self.extra_config, 10)
 
@@ -55,19 +56,33 @@ class test_drop(wttest.WiredTigerTestCase):
                 lambda: self.session.drop(uri, None))
             cursor.close()
 
-        self.session.drop(uri, None)
-        confirm_does_not_exist(self, uri)
+        if close_session:
+            self.reopen_conn()
+
+        if drop_index:
+            drop_uri = complex_populate_index_name(self, uri)
+        else:
+            drop_uri = uri
+        self.session.drop(drop_uri, None)
+        confirm_does_not_exist(self, drop_uri)
 
     # Test drop of an object.
     def test_drop(self):
         # Simple file or table object.
-        self.drop(simple_populate, False)
-        self.drop(simple_populate, True)
+        # Try all combinations except dropping the index, the simple
+        # case has no indices.
+        for with_cursor in [False, True]:
+            for close_session in [False, True]:
+                self.drop(simple_populate, with_cursor, close_session, False)
 
         # A complex, multi-file table object.
+        # Try all test combinations.
         if self.uri == "table:":
-            self.drop(complex_populate, False)
-            self.drop(complex_populate, True)
+            for with_cursor in [False, True]:
+                for close_session in [False, True]:
+                    for drop_index in [False, True]:
+                        self.drop(complex_populate, with_cursor,
+                                  close_session, drop_index)
 
     # Test drop of a non-existent object: force succeeds, without force fails.
     def test_drop_dne(self):
@@ -88,7 +103,6 @@ class test_drop(wttest.WiredTigerTestCase):
         self.session.drop(lsmuri, 'force')
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(lsmuri, None))
-
 
 if __name__ == '__main__':
     wttest.run()
