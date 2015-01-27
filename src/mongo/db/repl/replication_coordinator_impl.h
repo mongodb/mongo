@@ -157,7 +157,7 @@ namespace repl {
 
         virtual void signalUpstreamUpdater();
 
-        virtual void prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
+        virtual bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder);
 
         virtual void prepareReplSetUpdatePositionCommandHandshakes(
                 std::vector<BSONObj>* handshakes);

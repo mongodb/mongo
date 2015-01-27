@@ -209,7 +209,10 @@ namespace repl {
                 return Status(ErrorCodes::NodeNotFound,
                               "Need to send handshake before updating position upstream");
             }
-            replCoord->prepareReplSetUpdatePositionCommand(&cmd);
+            // the command could not be created, likely because the node was removed from the set
+            if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
+                return Status::OK();
+            }
         }
         BSONObj res;
 
