@@ -132,7 +132,7 @@ namespace {
                                         const BSONElement& configElement) const {
             BSONObjBuilder ret;
 
-            LockStats stats;
+            SingleThreadedLockStats stats;
             reportGlobalLockingStats(&stats);
 
             stats.report(&ret);

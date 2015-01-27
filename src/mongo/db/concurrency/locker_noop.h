@@ -150,7 +150,7 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual void assertEmpty() const {
+        virtual void assertEmptyAndReset() {
             invariant(false);
         }
 

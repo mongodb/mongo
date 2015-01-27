@@ -35,61 +35,166 @@ namespace mongo {
 
     class BSONObjBuilder;
 
+
+    /**
+     * Operations for manipulating the lock statistics abstracting whether they are atomic or not.
+     */
+    struct CounterOps {
+        static int64_t get(const int64_t& counter) {
+            return counter;
+        }
+
+        static int64_t get(const AtomicInt64& counter) {
+            return counter.load();
+        }
+
+        static void set(int64_t& counter, int64_t value) {
+            counter = value;
+        }
+
+        static void set(AtomicInt64& counter, int64_t value) {
+            counter.store(value);
+        }
+
+        static void add(int64_t& counter, int64_t value) {
+            counter += value;
+        }
+
+        static void add(int64_t& counter, const AtomicInt64& value) {
+            counter += value.load();
+        }
+
+        static void add(AtomicInt64& counter, int64_t value) {
+            counter.addAndFetch(value);
+        }
+    };
+
+
+    /**
+     * Bundle of locking statistics values.
+     */
+    template<typename CounterType>
+    struct LockStatCounters {
+
+        template<typename OtherType>
+        void append(const LockStatCounters<OtherType>& other) {
+            CounterOps::add(numAcquisitions, other.numAcquisitions);
+            CounterOps::add(numWaits, other.numWaits);
+            CounterOps::add(combinedWaitTimeMicros, other.combinedWaitTimeMicros);
+            CounterOps::add(numDeadlocks, other.numDeadlocks);
+        }
+
+        void reset() {
+            CounterOps::set(numAcquisitions, 0);
+            CounterOps::set(numWaits, 0);
+            CounterOps::set(combinedWaitTimeMicros, 0);
+            CounterOps::set(numDeadlocks, 0);
+        }
+
+
+        CounterType numAcquisitions;
+        CounterType numWaits;
+        CounterType combinedWaitTimeMicros;
+        CounterType numDeadlocks;
+    };
+
+
+    /**
+     * Templatized lock statistics management class, which can be specialized with atomic integers
+     * for the global stats and with regular integers for the per-locker stats.
+     */
+    template<typename CounterType>
     class LockStats {
     public:
+        // Declare the type for the lock counters bundle
+        typedef LockStatCounters<CounterType> LockStatCountersType;
 
         /**
-         * Locking statistics for the top level locks.
+         * Initializes the locking statistics with zeroes (calls reset).
          */
-        struct AtomicLockStats {
-            AtomicLockStats() {
-                reset();
-            }
-
-            void append(const AtomicLockStats& other);
-            void reset();
-
-            AtomicInt64 numAcquisitions;
-            AtomicInt64 numWaits;
-            AtomicInt64 combinedWaitTimeMicros;
-            AtomicInt64 numDeadlocks;
-        };
-
-        // Keep the per-mode lock stats next to each other in case we want to do fancy operations
-        // such as atomic operations on 128-bit values.
-        struct PerModeAtomicLockStats {
-            AtomicLockStats stats[LockModesCount];
-        };
-
-
         LockStats();
 
-        void recordAcquisition(ResourceId resId, LockMode mode);
-        void recordWait(ResourceId resId, LockMode mode);
-        void recordWaitTime(ResourceId resId, LockMode mode, uint64_t waitMicros);
-        void recordDeadlock(ResourceId resId, LockMode mode);
+        void recordAcquisition(ResourceId resId, LockMode mode) {
+            CounterOps::add(get(resId, mode).numAcquisitions, 1);
+        }
 
-        PerModeAtomicLockStats& get(ResourceId resId);
+        void recordWait(ResourceId resId, LockMode mode) {
+            CounterOps::add(get(resId, mode).numWaits, 1);
+        }
 
-        void append(const LockStats& other);
+        void recordWaitTime(ResourceId resId, LockMode mode, int64_t waitMicros) {
+            CounterOps::add(get(resId, mode).combinedWaitTimeMicros, waitMicros);
+        }
+
+        void recordDeadlock(ResourceId resId, LockMode mode) {
+            CounterOps::add(get(resId, mode).numDeadlocks, 1);
+        }
+
+        LockStatCountersType& get(ResourceId resId, LockMode mode) {
+            if (resId == resourceIdOplog) {
+                return _oplogStats.modeStats[mode];
+            }
+
+            return _stats[resId.getType()].modeStats[mode];
+        }
+
+        template<typename OtherType>
+        void append(const LockStats<OtherType>& other) {
+            typedef LockStatCounters<OtherType> OtherLockStatCountersType;
+
+            // Append all lock stats
+            for (int i = 0; i < ResourceTypesCount; i++) {
+                for (int mode = 0; mode < LockModesCount; mode++) {
+                    const OtherLockStatCountersType& otherStats = other._stats[i].modeStats[mode];
+                    LockStatCountersType& thisStats = _stats[i].modeStats[mode];
+                    thisStats.append(otherStats);
+                }
+            }
+
+            // Append the oplog stats
+            for (int mode = 0; mode < LockModesCount; mode++) {
+                const OtherLockStatCountersType& otherStats = other._oplogStats.modeStats[mode];
+                LockStatCountersType& thisStats = _oplogStats.modeStats[mode];
+                thisStats.append(otherStats);
+            }
+        }
+
         void report(BSONObjBuilder* builder) const;
         void reset();
 
     private:
+        // Necessary for the append call, which accepts argument of type different than our
+        // template parameter.
+        template<typename T>
+        friend class LockStats;
 
-        void _report(BSONObjBuilder* builder, const PerModeAtomicLockStats& stat) const;
+
+        // Keep the per-mode lock stats next to each other in case we want to do fancy operations
+        // such as atomic operations on 128-bit values.
+        struct PerModeLockStatCounters {
+            LockStatCountersType modeStats[LockModesCount];
+        };
+
+
+        void _report(BSONObjBuilder* builder,
+                     const char* sectionName,
+                     const PerModeLockStatCounters& stat) const;
+
 
         // Split the lock stats per resource type and special-case the oplog so we can collect
         // more detailed stats for it.
-        PerModeAtomicLockStats _stats[ResourceTypesCount];
-        PerModeAtomicLockStats _oplogStats;
+        PerModeLockStatCounters _stats[ResourceTypesCount];
+        PerModeLockStatCounters _oplogStats;
     };
+
+    typedef LockStats<int64_t> SingleThreadedLockStats;
+    typedef LockStats<AtomicInt64> AtomicLockStats;
 
 
     /**
      * Reports instance-wide locking statistics, which can then be converted to BSON or logged.
      */
-    void reportGlobalLockingStats(LockStats* outStats);
+    void reportGlobalLockingStats(SingleThreadedLockStats* outStats);
 
     /**
      * Currently used for testing only.
