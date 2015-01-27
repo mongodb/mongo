@@ -452,12 +452,17 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
-		else
+		else {
+			/*
+			 * Start at the last checkpoint LSN referenced in the
+			 * metadata.  If we see the end of a checkpoint while
+			 * scanning, we will change the full scan to start from
+			 * there.
+			 */
+			r.ckpt_lsn = metafile->ckpt_lsn;
 			WT_ERR(__wt_log_scan(session,
 			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r));
-
-		WT_ASSERT(session,
-		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
+		}
 	}
 
 	/* Scan the metadata to find the live files and their IDs. */

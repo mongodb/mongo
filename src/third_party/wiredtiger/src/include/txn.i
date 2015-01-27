@@ -382,11 +382,8 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (i = 0, s = txn_global->states;
-	    i < session_cnt;
-	    i++, s++)
-		if ((id = s->id) != WT_TXN_NONE &&
-		    TXNID_LT(id, txn->id))
+	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
+		if ((id = s->id) != WT_TXN_NONE && TXNID_LT(id, txn->id))
 			return (0);
 
 	return (1);

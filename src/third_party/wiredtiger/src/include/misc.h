@@ -21,6 +21,7 @@
 #define	WT_GIGABYTE	(1073741824)
 #define	WT_TERABYTE	((uint64_t)1099511627776)
 #define	WT_PETABYTE	((uint64_t)1125899906842624)
+#define	WT_EXABYTE	((uint64_t)1152921504606846976)
 
 /*
  * Number of directory entries can grow dynamically.

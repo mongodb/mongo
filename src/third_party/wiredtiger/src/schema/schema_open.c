@@ -269,6 +269,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 	cursor = NULL;
 	idx = NULL;
+	match = 0;
 
 	/* Build a search key. */
 	tablename = table->name;
@@ -343,6 +344,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 			break;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
+	if (idxname != NULL && !match)
+		ret = WT_NOTFOUND;
 
 	/* If we did a full pass, we won't need to do it again. */
 	if (idxname == NULL) {
@@ -557,6 +560,8 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	/* Otherwise, open it. */
 	WT_ERR(__wt_schema_open_index(
 	    session, table, tend + 1, strlen(tend + 1), indexp));
+	if (tablep != NULL)
+		*tablep = table;
 
 err:	__wt_schema_release_table(session, table);
 	WT_RET(ret);
