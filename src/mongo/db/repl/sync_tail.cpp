@@ -290,6 +290,11 @@ namespace repl {
         }
 
         applyOps(writerVectors);
+
+        if (inShutdown()) {
+            return OpTime();
+        }
+
         OpTime lastOpTime = writeOpsToOplog(txn, ops);
 
         BackgroundSync::get()->notify(txn);
@@ -380,6 +385,10 @@ namespace repl {
             entriesApplied += ops.getDeque().size();
 
             const OpTime lastOpTime = multiApply(txn, ops.getDeque());
+
+            if (inShutdown()) {
+                return;
+            }
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {

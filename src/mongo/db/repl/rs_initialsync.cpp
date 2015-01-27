@@ -186,6 +186,10 @@ namespace {
             LOG(2) << "Applying oplog entries from " << startOpTime.toStringPretty()
                    << " until " << stopOpTime.toStringPretty();
             syncer.oplogApplication(ctx, stopOpTime);
+
+            if (inShutdown()) {
+                return false;
+            }
         }
         catch (const DBException&) {
             log() << "replSet initial sync failed during oplog application phase, and will retry";
