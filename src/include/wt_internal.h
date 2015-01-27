@@ -36,7 +36,9 @@ extern "C" {
 #include <io.h>
 #endif
 #include <limits.h>
-#ifndef _WIN32
+#ifdef _WIN32
+#include <process.h>
+#else
 #include <pthread.h>
 #endif
 #ifdef HAVE_PTHREAD_NP_H
