@@ -1319,6 +1319,94 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 	return (ret);
 }
 
+/*
+ * __wt_cache_wait --
+ *	Wait for space in the cache.
+ */
+int
+__wt_cache_wait(WT_SESSION_IMPL *session, int full)
+{
+	WT_CACHE *cache;
+	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
+	int busy, count;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * If the current transaction is keeping the oldest ID pinned, it is in
+	 * the middle of an operation.	This may prevent the oldest ID from
+	 * moving forward, leading to deadlock, so only evict what we can.
+	 * Otherwise, we are at a transaction boundary and we can work harder
+	 * to make sure there is free space in the cache.
+	 */
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
+	busy = txn_state->id != WT_TXN_NONE ||
+	    session->nhazard > 0 ||
+	    (txn_state->snap_min != WT_TXN_NONE &&
+	    txn_global->current != txn_global->oldest_id);
+	if (busy && full < 100)
+		return (0);
+	count = busy ? 1 : 10;
+
+	for (;;) {
+		/*
+		 * A pathological case: if we're the oldest transaction in the
+		 * system and the eviction server is stuck trying to find space,
+		 * abort the transaction to give up all hazard pointers before
+		 * trying again.
+		 */
+		if (F_ISSET(cache, WT_EVICT_STUCK) &&
+		    __wt_txn_am_oldest(session)) {
+			F_CLR(cache, WT_EVICT_STUCK);
+			WT_STAT_FAST_CONN_INCR(session, txn_fail_cache);
+			return (WT_ROLLBACK);
+		}
+
+		switch (ret = __wt_evict_lru_page(session, 0)) {
+		case 0:
+			if (--count == 0)
+				return (0);
+			break;
+		case EBUSY:
+			continue;
+		case WT_NOTFOUND:
+			break;
+		default:
+			return (ret);
+		}
+
+		WT_RET(__wt_eviction_check(session, &full, 0));
+		if (full < 100)
+			return (0);
+		else if (ret == 0)
+			continue;
+
+		/*
+		 * The cache is still full and no pages were found in the queue
+		 * to evict.  If this transaction is the one holding back the
+		 * oldest ID, we can't wait forever.  We'll block next time we
+		 * are not busy.
+		 */
+		if (busy) {
+			__wt_txn_update_oldest(session);
+			if (txn_state->id == txn_global->oldest_id ||
+			    txn_state->snap_min == txn_global->oldest_id)
+				return (0);
+		}
+
+		/* Wait for the queue to re-populate before trying again. */
+		WT_RET(__wt_cond_wait(session,
+		    S2C(session)->cache->evict_waiter_cond, 100000));
+
+		/* Check if things have changed so that we are busy. */
+		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		    txn_global->current != txn_global->oldest_id)
+			busy = count = 1;
+	}
+}
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_cache_dump --
