@@ -444,6 +444,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
+	WT_RET(__wt_cond_alloc(session, "log write", 0, &log->log_write_cond));
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
@@ -565,6 +566,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
 	WT_TRET(__wt_log_slot_destroy(session));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
 	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);

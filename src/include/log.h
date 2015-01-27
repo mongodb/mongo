@@ -135,6 +135,8 @@ typedef struct {
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;
+	/* Notify any waiting threads when write_lsn is updated. */
+	WT_CONDVAR	*log_write_cond;
 
 	/*
 	 * Consolidation array information
