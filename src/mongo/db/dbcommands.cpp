@@ -1655,7 +1655,7 @@ namespace mongo {
         appendCommandStatus(result, retval, errmsg);
         
         // For commands from mongos, append some info to help getLastError(w) work.
-        if (theReplSet) {
+	if (theReplSet && shardingState.enabled()) {
             // Detect mongos connections by looking for setShardVersion to have been run previously
             // on this connection.
             if (shardingState.needCollectionMetadata(dbname)) {
