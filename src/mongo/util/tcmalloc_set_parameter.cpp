@@ -130,7 +130,7 @@ namespace {
         if (getenv("TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES")) {
             return Status::OK();
         }
-        return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x10000000" /* 256MB */);
+        return tcmallocMaxTotalThreadCacheBytesParameter.setFromString("0x40000000" /* 1024MB */);
     }
 
 }  // namespace
