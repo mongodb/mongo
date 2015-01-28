@@ -19,8 +19,8 @@ import (
 	"sync"
 )
 
+// Input format types accepted by mongoimport.
 const (
-	// Input format types accepted by mongoimport
 	CSV  = "csv"
 	TSV  = "tsv"
 	JSON = "json"
@@ -33,7 +33,7 @@ const (
 	progressBarLength   = 24
 )
 
-// Wrapper for MongoImport functionality
+// Wrapper for mongoimport functionality.
 type MongoImport struct {
 	// generic mongo tool options
 	ToolOptions *options.ToolOptions
@@ -69,15 +69,15 @@ type MongoImport struct {
 type InputReader interface {
 	// StreamDocument takes a boolean indicating if the documents should be streamed
 	// in read order and a channel on which to stream the documents processed from
-	// the underlying reader.  Returns a non-nil error if encountered
+	// the underlying reader.  Returns a non-nil error if encountered.
 	StreamDocument(ordered bool, read chan bson.D) error
 
 	// ReadAndValidateHeader reads the header line from the InputReader and returns
 	// a non-nil error if the fields from the header line are invalid; returns
-	// nil otherwise. No-op for JSON input readers
+	// nil otherwise. No-op for JSON input readers.
 	ReadAndValidateHeader() error
 
-	// embedded io.Reader that tracks number of bytes read, to allow feeding into progress bar
+	// embedded io.Reader that tracks number of bytes read, to allow feeding into progress bar.
 	sizeTracker
 }
 

@@ -49,7 +49,7 @@ type JSONInputReader struct {
 	numDecoders int
 }
 
-// JSONConverter implements the Converter interface for JSON input
+// JSONConverter implements the Converter interface for JSON input.
 type JSONConverter struct {
 	data  []byte
 	index uint64
@@ -136,8 +136,8 @@ func (r *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D) (re
 	return channelQuorumError(jsonErrChan, 2)
 }
 
-// This is required to satisfy the Converter interface for JSON input. It
-// does JSON-specific processing to convert the JSONConverter struct to a bson.D.
+// Convert implements the Converter interface for JSON input. It converts a
+// CSVConverter struct to a BSON document.
 func (c JSONConverter) Convert() (bson.D, error) {
 	document, err := json.UnmarshalBsonD(c.data)
 	if err != nil {

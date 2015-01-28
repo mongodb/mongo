@@ -7,8 +7,7 @@ import (
 	"io"
 )
 
-// CSVInputReader is a struct that implements the InputReader interface for a
-// CSV input source
+// CSVInputReader implements the InputReader interface for CSV input types.
 type CSVInputReader struct {
 
 	// fields is a list of field names in the BSON documents to be imported
@@ -30,14 +29,15 @@ type CSVInputReader struct {
 	sizeTracker
 }
 
-// CSVConverter implements the Converter interface for CSV input
+// CSVConverter implements the Converter interface for CSV input.
 type CSVConverter struct {
 	fields, data []string
 	index        uint64
 }
 
-// NewCSVInputReader returns a CSVInputReader configured to read input from the
-// given io.Reader, extracting the specified fields only.
+// NewCSVInputReader returns a CSVInputReader configured to read data from the
+// given io.Reader, extracting only the specified fields using exactly "numDecoders"
+// goroutines.
 func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInputReader {
 	szCount := &sizeTrackingReader{in, 0}
 	csvReader := csv.NewReader(szCount)
@@ -54,7 +54,7 @@ func NewCSVInputReader(fields []string, in io.Reader, numDecoders int) *CSVInput
 }
 
 // ReadAndValidateHeader reads the header from the underlying reader and validates
-// the header fields. It sets err if validation fails.
+// the header fields. It sets err if the read/validation fails.
 func (r *CSVInputReader) ReadAndValidateHeader() (err error) {
 	fields, err := r.csvReader.Read()
 	if err != nil {
@@ -102,8 +102,8 @@ func (r *CSVInputReader) StreamDocument(ordered bool, readDocs chan bson.D) (ret
 	return channelQuorumError(csvErrChan, 2)
 }
 
-// This is required to satisfy the Converter interface for CSV input. It
-// does CSV-specific processing to convert the CSVConverter struct to a bson.D
+// Convert implements the Converter interface for CSV input. It converts a
+// CSVConverter struct to a BSON document.
 func (c CSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
 		c.fields,

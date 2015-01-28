@@ -2,10 +2,11 @@ package mongoimport
 
 var Usage = `<options> <file>
 
-Import CSV, TSV or JSON data into MongoDB. If no file is provided, the tool reads from stdin.
+Import CSV, TSV or JSON data into MongoDB. If no file is provided, mongoimport reads from stdin.
 
 See http://docs.mongodb.org/manual/reference/program/mongoimport/ for more information.`
 
+// InputOptions defines the set of options for reading input data.
 type InputOptions struct {
 	// Fields is an option to directly specify comma-separated fields to import to CSV.
 	Fields *string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
@@ -31,6 +32,7 @@ func (_ *InputOptions) Name() string {
 	return "input"
 }
 
+// IngestOptions defines the set of options for storing data.
 type IngestOptions struct {
 	// Drops target collection before importing.
 	Drop bool `long:"drop" description:"drop collection before inserting documents"`

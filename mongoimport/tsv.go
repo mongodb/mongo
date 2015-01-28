@@ -57,7 +57,7 @@ func NewTSVInputReader(fields []string, in io.Reader, numDecoders int) *TSVInput
 }
 
 // ReadAndValidateHeader reads the header from the underlying reader and validates
-// the header fields. It sets err if validation fails.
+// the header fields. It sets err if the read/validation fails.
 func (r *TSVInputReader) ReadAndValidateHeader() (err error) {
 	header, err := r.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
@@ -108,8 +108,8 @@ func (r *TSVInputReader) StreamDocument(ordered bool, readDocs chan bson.D) (ret
 	return channelQuorumError(tsvErrChan, 2)
 }
 
-// This is required to satisfy the Converter interface for TSV input. It
-// does TSV-specific processing to convert the TSVConverter struct to a bson.D.
+// Convert implements the Converter interface for TSV input. It converts a
+// CSVConverter struct to a BSON document.
 func (c TSVConverter) Convert() (bson.D, error) {
 	return tokensToBSON(
 		c.fields,

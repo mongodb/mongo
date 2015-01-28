@@ -19,7 +19,7 @@ import (
 // valid BSON document that has been converted by the underlying implementation.
 // If conversion fails, err will be set.
 type Converter interface {
-	Convert() (bson.D, error)
+	Convert() (document bson.D, err error)
 }
 
 // An importWorker reads Converter from the unprocessedDataChan channel and
