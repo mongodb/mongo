@@ -25,11 +25,12 @@ type MongoOplog struct {
 	SessionProviderTo *db.SessionProvider
 }
 
-func (self *MongoOplog) Run() error {
+// Run executes the mongooplog program.
+func (mo *MongoOplog) Run() error {
 
 	// split up the oplog namespace we are using
 	oplogDB, oplogColl, err :=
-		util.SplitAndValidateNamespace(self.SourceOptions.OplogNS)
+		util.SplitAndValidateNamespace(mo.SourceOptions.OplogNS)
 
 	if err != nil {
 		return err
@@ -41,7 +42,7 @@ func (self *MongoOplog) Run() error {
 	}
 
 	// connect to the destination server
-	toSession, err := self.SessionProviderTo.GetSession()
+	toSession, err := mo.SessionProviderTo.GetSession()
 	if err != nil {
 		return fmt.Errorf("error connecting to destination db: %v", err)
 	}
@@ -49,7 +50,7 @@ func (self *MongoOplog) Run() error {
 	toSession.SetSocketTimeout(0)
 
 	// connect to the source server
-	fromSession, err := self.SessionProviderFrom.GetSession()
+	fromSession, err := mo.SessionProviderFrom.GetSession()
 	if err != nil {
 		return fmt.Errorf("error connecting to source db: %v", err)
 	}
@@ -61,16 +62,15 @@ func (self *MongoOplog) Run() error {
 
 	// get the tailing cursor for the source server's oplog
 	tail := buildTailingCursor(fromSession.DB(oplogDB).C(oplogColl),
-		self.SourceOptions)
+		mo.SourceOptions)
 	defer tail.Close()
 
 	// read the cursor dry, applying ops to the destination
 	// server in the process
-	oplogEntry := &OplogEntry{}
-	res := &ApplyOpsResponse{}
+	oplogEntry := &db.Oplog{}
+	res := &db.ApplyOpsResponse{}
 
 	for tail.Next(oplogEntry) {
-
 		// make sure there was no tailing error
 		if err := tail.Err(); err != nil {
 			return fmt.Errorf("error querying oplog: %v", err)
@@ -82,7 +82,7 @@ func (self *MongoOplog) Run() error {
 		}
 
 		// prepare the op to be applied
-		opsToApply := []OplogEntry{*oplogEntry}
+		opsToApply := []db.Oplog{*oplogEntry}
 
 		// apply the operation
 		err := toSession.Run(bson.M{"applyOps": opsToApply}, res)
@@ -98,23 +98,6 @@ func (self *MongoOplog) Run() error {
 	}
 
 	return nil
-}
-
-// TODO: move this to common
-type ApplyOpsResponse struct {
-	Ok     bool   `bson:"ok"`
-	ErrMsg string `bson:"errmsg"`
-}
-
-// TODO: move this to common / merge with the one in mongodump
-type OplogEntry struct {
-	Timestamp bson.MongoTimestamp `bson:"ts" json:"ts"`
-	HistoryID int64               `bson:"h" json:"h"`
-	Version   int                 `bson:"v" json:"v"`
-	Operation string              `bson:"op" json:"op"`
-	Namespace string              `bson:"ns" json:"ns"`
-	Object    bson.M              `bson:"o" json:"o"`
-	Query     bson.M              `bson:"o2" json:"o2"`
 }
 
 // get the cursor for the oplog collection, based on the options

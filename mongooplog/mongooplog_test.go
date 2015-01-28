@@ -71,7 +71,7 @@ func TestBasicOps(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			// insert some "ops" into the oplog to be found and applied
-			op1 := &OplogEntry{
+			op1 := &db.Oplog{
 				Timestamp: bson.MongoTimestamp(1<<63 - 1), // years in the future
 				HistoryID: 100,
 				Version:   2,
@@ -82,7 +82,7 @@ func TestBasicOps(t *testing.T) {
 				},
 			}
 			So(oplogColl.Insert(op1), ShouldBeNil)
-			op2 := &OplogEntry{
+			op2 := &db.Oplog{
 				Timestamp: bson.MongoTimestamp(1<<63 - 1), // years in the future
 				HistoryID: 200,
 				Version:   2,
@@ -96,7 +96,7 @@ func TestBasicOps(t *testing.T) {
 
 			// this one should be filtered out, since it occurred before the
 			// threshold
-			op3 := &OplogEntry{
+			op3 := &db.Oplog{
 				Timestamp: bson.MongoTimestamp(1<<62 - 1), // more than 1 day in the past
 				HistoryID: 300,
 				Version:   2,

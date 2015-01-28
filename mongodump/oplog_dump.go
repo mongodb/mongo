@@ -2,23 +2,13 @@ package mongodump
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 )
-
-// Oplog represents a MongoDB oplog document
-type Oplog struct {
-	Timestamp bson.MongoTimestamp `bson:"ts"`
-	HistoryID int64               `bson:"h"`
-	Version   int                 `bson:"v"`
-	Operation string              `bson:"op"`
-	Namespace string              `bson:"ns"`
-	Object    bson.M              `bson:"o"`
-	Query     bson.M              `bson:"o2"`
-}
 
 // determineOplogCollectionName uses a command to infer
 // the name of the oplog collection in the connected db
@@ -48,7 +38,7 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 
 // getOplogStartTime returns the most recent oplog entry
 func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
-	mostRecentOplogEntry := Oplog{}
+	mostRecentOplogEntry := db.Oplog{}
 
 	err := dump.sessionProvider.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry, 0)
 	if err != nil {
@@ -62,7 +52,7 @@ func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
 // still in the database and making sure it happened at or before the timestamp
 // captured at the start of the dump.
 func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, error) {
-	oldestOplogEntry := Oplog{}
+	oldestOplogEntry := db.Oplog{}
 	err := dump.sessionProvider.FindOne("local", dump.oplogCollection, 0, nil, []string{"+$natural"}, &oldestOplogEntry, 0)
 	if err != nil {
 		return false, fmt.Errorf("unable to read entry from oplog: %v", err)

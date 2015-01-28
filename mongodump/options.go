@@ -8,7 +8,7 @@ Specify a database with -d and a collection with -c to only dump that database o
 
 See http://docs.mongodb.org/manual/reference/program/mongodump/ for more information.`
 
-// InputOptions defines the set of options to use in retrieving data from server.
+// InputOptions defines the set of options to use in retrieving data from the server.
 type InputOptions struct {
 	Query     string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	TableScan bool   `long:"forceTableScan" description:"force a table scan"`

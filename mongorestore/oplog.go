@@ -16,16 +16,6 @@ import (
 
 const OplogMaxCommandSize = 1024 * 1024 * 16.5
 
-type Oplog struct {
-	Timestamp bson.MongoTimestamp `bson:"ts,omitempty"`
-	HistoryID int64               `bson:"h,omitempty"`
-	Version   int                 `bson:"v,omitempty"`
-	Operation string              `bson:"op,omitempty"`
-	Namespace string              `bson:"ns,omitempty"`
-	Object    bson.M              `bson:"o,omitempty"`
-	Query     bson.M              `bson:"o2,omitempty"`
-}
-
 func (restore *MongoRestore) RestoreOplog() error {
 	log.Log(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
@@ -89,7 +79,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 			bufferedBytes = 0
 		}
 
-		entryAsOplog := Oplog{}
+		entryAsOplog := db.Oplog{}
 		err = bson.Unmarshal(rawOplogEntry.Data, &entryAsOplog)
 		if err != nil {
 			return fmt.Errorf("error reading oplog: %v", err)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"io"
 	"sync"
 	"time"
@@ -57,6 +58,23 @@ type SessionProvider struct {
 
 	// flags for generating the master session
 	flags sessionFlag
+}
+
+// ApplyOpsResponse represents the response from an 'applyOps' command.
+type ApplyOpsResponse struct {
+	Ok     bool   `bson:"ok"`
+	ErrMsg string `bson:"errmsg"`
+}
+
+// Oplog represents a MongoDB oplog document.
+type Oplog struct {
+	Timestamp bson.MongoTimestamp `bson:"ts"`
+	HistoryID int64               `bson:"h"`
+	Version   int                 `bson:"v"`
+	Operation string              `bson:"op"`
+	Namespace string              `bson:"ns"`
+	Object    bson.M              `bson:"o"`
+	Query     bson.M              `bson:"o2"`
 }
 
 // Returns a session connected to the database server for which the

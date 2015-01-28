@@ -55,8 +55,8 @@ func main() {
 	opts.ReplicaSetName = setName
 
 	// validate the mongooplog options
-	if err := sourceOpts.Validate(); err != nil {
-		log.Logf(log.Always, "command line error: %v", err)
+	if sourceOpts.From == "" {
+		log.Logf(log.Always, "command line error: need to specify --from")
 		os.Exit(util.ExitBadOptions)
 	}
 
