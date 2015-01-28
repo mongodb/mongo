@@ -30,6 +30,10 @@ var (
 	testPort            = db.DefaultTestPort
 )
 
+const (
+	KerberosDumpDirectory = "dump-kerberos"
+)
+
 func simpleMongoDumpInstance() *MongoDump {
 	ssl := testutil.GetSSLOptions()
 	auth := testutil.GetAuthOptions()
@@ -255,6 +259,43 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 			So(err.Error(), ShouldContainSubstring, "cannot dump using a query without a specified collection")
 		})
 
+	})
+}
+
+func TestMongoDumpKerberos(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.KerberosTestType)
+
+	Convey("Should be able to run mongodump with Kerberos auth", t, func() {
+		opts, err := testutil.GetKerberosOptions()
+
+		So(err, ShouldBeNil)
+
+		mongoDump := MongoDump{
+			ToolOptions:   opts,
+			InputOptions:  &InputOptions{},
+			OutputOptions: &OutputOptions{},
+		}
+
+		mongoDump.OutputOptions.Out = KerberosDumpDirectory
+
+		err = mongoDump.Init()
+		So(err, ShouldBeNil)
+		err = mongoDump.Dump()
+		So(err, ShouldBeNil)
+		path, err := os.Getwd()
+		So(err, ShouldBeNil)
+
+		dumpDir := util.ToUniversalPath(filepath.Join(path, KerberosDumpDirectory))
+		dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, opts.Namespace.DB))
+		So(fileDirExists(dumpDir), ShouldBeTrue)
+		So(fileDirExists(dumpDBDir), ShouldBeTrue)
+
+		dumpCollectionFile := util.ToUniversalPath(filepath.Join(dumpDBDir, opts.Namespace.Collection+".bson"))
+		So(fileDirExists(dumpCollectionFile), ShouldBeTrue)
+
+		countColls, err := countNonIndexBSONFiles(dumpDBDir)
+		So(err, ShouldBeNil)
+		So(countColls, ShouldEqual, 1)
 	})
 }
 
