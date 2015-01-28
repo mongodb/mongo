@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+// BSONDump is a container for the user-specified options and
+// internal state used for running bsondump.
 type BSONDump struct {
 	// generic mongo tool options
 	ToolOptions *options.ToolOptions

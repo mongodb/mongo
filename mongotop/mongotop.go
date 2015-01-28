@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-// MongoTop is a wrapper for the mongotop functionality.
+// MongoTop is a container for the user-specified options and
+// internal state used for running mongotop.
 type MongoTop struct {
 	// Generic mongo tool options
 	Options *options.ToolOptions

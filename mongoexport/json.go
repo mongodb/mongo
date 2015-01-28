@@ -15,7 +15,7 @@ type JSONExportOutput struct {
 	// ArrayOutput when set to true indicates that the output should be written
 	// as a JSON array, where each document is an element in the array.
 	ArrayOutput bool
-	// Pretty when set to true indicates that the output will be written in pretty() mode
+	// Pretty when set to true indicates that the output will be written in pretty mode.
 	PrettyOutput bool
 	Encoder      *json.Encoder
 	Out          io.Writer
@@ -23,7 +23,7 @@ type JSONExportOutput struct {
 }
 
 // NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
-// configured to write data to the given io.Writer
+// configured to write data to the given io.Writer.
 func NewJSONExportOutput(arrayOutput bool, prettyOutput bool, out io.Writer) *JSONExportOutput {
 	return &JSONExportOutput{
 		arrayOutput,
@@ -63,11 +63,12 @@ func (jsonExporter *JSONExportOutput) WriteFooter() error {
 	return nil
 }
 
+// Flush is a no-op for JSON export formats.
 func (jsonExporter *JSONExportOutput) Flush() error {
 	return nil
 }
 
-// ExportDocument converts the given document to extended json, and writes it
+// ExportDocument converts the given document to extended JSON, and writes it
 // to the output.
 func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 	if jsonExporter.ArrayOutput || jsonExporter.PrettyOutput {

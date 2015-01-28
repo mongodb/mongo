@@ -15,6 +15,8 @@ import (
 	"sync"
 )
 
+// MongoRestore is a container for the user-specified options and
+// internal state used for running mongorestore.
 type MongoRestore struct {
 	ToolOptions   *options.ToolOptions
 	InputOptions  *InputOptions

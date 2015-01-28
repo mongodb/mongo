@@ -24,6 +24,8 @@ const (
 	Delete = "delete"
 )
 
+// MongoFiles is a container for the user-specified options and
+// internal state used for running mongofiles.
 type MongoFiles struct {
 	// generic mongo tool options
 	ToolOptions *options.ToolOptions

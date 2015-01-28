@@ -58,7 +58,7 @@ func TestJSONArray(t *testing.T) {
 			err = jsonExporter.WriteFooter()
 			So(err, ShouldBeNil)
 
-			//Unmarshal the whole thing, it should be valid json
+			// Unmarshal the whole thing, it should be valid json
 			fromJSON := []map[string]interface{}{}
 			err = json.Unmarshal(out.Bytes(), &fromJSON)
 			So(err, ShouldBeNil)

@@ -28,6 +28,8 @@ const (
 	defaultPermissions = 0755
 )
 
+// MongoDump is a container for the user-specified options and
+// internal state used for running mongodump.
 type MongoDump struct {
 	// basic mongo tool options
 	ToolOptions   *options.ToolOptions

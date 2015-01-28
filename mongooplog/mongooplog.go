@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// MongoOplog is a container for the user-specified options for running mongooplog.
 type MongoOplog struct {
 	// standard tool options
 	ToolOptions *options.ToolOptions

@@ -12,13 +12,14 @@ import (
 	"strings"
 )
 
+// CSVExportOutput is an implementation of ExportOutput that writes documents to the output in CSV format.
 type CSVExportOutput struct {
 	// Fields is a list of field names in the bson documents to be exported.
 	// A field can also use dot-delimited modifiers to address nested structures,
-	// for example "location.city" or "addresses.0"
+	// for example "location.city" or "addresses.0".
 	Fields []string
 
-	// NumExported maintains a running total of the number of documents written
+	// NumExported maintains a running total of the number of documents written.
 	NumExported int64
 
 	csvWriter *csv.Writer
@@ -34,23 +35,25 @@ func NewCSVExportOutput(fields []string, out io.Writer) *CSVExportOutput {
 	}
 }
 
-// WriteHeader writes a comma-delimited list of fields as the output header row
+// WriteHeader writes a comma-delimited list of fields as the output header row.
 func (csvExporter *CSVExportOutput) WriteHeader() error {
 	csvExporter.csvWriter.Write(csvExporter.Fields)
 	return csvExporter.csvWriter.Error()
 }
 
+// WriteFooter is a no-op for CSV export formats.
 func (csvExporter *CSVExportOutput) WriteFooter() error {
 	// no CSV footer
 	return nil
 }
 
+// Flush writes any pending data to the underlying I/O stream.
 func (csvExporter *CSVExportOutput) Flush() error {
 	csvExporter.csvWriter.Flush()
 	return csvExporter.csvWriter.Error()
 }
 
-// ExportDocument writes a line to output with the CSV representation of a doc.
+// ExportDocument writes a line to output with the CSV representation of a document.
 func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 	rowOut := make([]string, 0, len(csvExporter.Fields))
 	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)

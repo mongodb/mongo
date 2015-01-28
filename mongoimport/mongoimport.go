@@ -33,7 +33,9 @@ const (
 	progressBarLength   = 24
 )
 
-// Wrapper for mongoimport functionality.
+
+// MongoImport is a container for the user-specified options and
+// internal state used for running mongoimport.
 type MongoImport struct {
 	// generic mongo tool options
 	ToolOptions *options.ToolOptions

@@ -17,12 +17,14 @@ import (
 	"strings"
 )
 
+// Output types supported by mongoexport.
 const (
 	CSV  = "csv"
 	JSON = "json"
 )
 
-// Wrapper for mongoexport functionality
+// MongoExport is a container for the user-specified options and
+// internal state used for running mongoexport.
 type MongoExport struct {
 	// generic mongo tool options
 	ToolOptions options.ToolOptions
@@ -38,7 +40,7 @@ type MongoExport struct {
 }
 
 // ExportOutput is an interface that specifies how a document should be formatted
-// and written to an output stream
+// and written to an output stream.
 type ExportOutput interface {
 	// WriteHeader outputs any pre-record headers that are written once
 	// per output file.
@@ -105,8 +107,8 @@ func (exp *MongoExport) ValidateSettings() error {
 	return nil
 }
 
-// getOutputWriter opens and returns an io.WriteCloser for the output specified by the config
-// options, or nil if none is set. The caller is responsible for closing it.
+// GetOutputWriter opens and returns an io.WriteCloser for the output
+// options or nil if none is set. The caller is responsible for closing it.
 func (exp *MongoExport) GetOutputWriter() (io.WriteCloser, error) {
 	if exp.OutputOpts.OutputFile != "" {
 		// If the directory in which the output file is to be
