@@ -120,6 +120,12 @@ namespace mongo {
     }
 
     BackgroundJob* WiredTigerRecordStore::_startBackgroundThread() {
+        if (storageGlobalParams.repair) {
+            LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns()
+                   << " because we are in repair";
+            return NULL;
+        }
+
         if (NamespaceString::oplog(ns())) {
             return new WiredTigerRecordStoreThread(this);
         }
