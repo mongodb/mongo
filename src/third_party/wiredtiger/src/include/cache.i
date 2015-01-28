@@ -175,4 +175,3 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 
 	return (__wt_cache_wait(session, full));
 }
-
