@@ -10,7 +10,7 @@ import (
 )
 
 // shouldSkipCollection returns true when a collection name is excluded
-// by the mongodump options
+// by the mongodump options.
 func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 	for _, excludedCollection := range dump.OutputOptions.ExcludedCollections {
 		if colName == excludedCollection {
@@ -25,13 +25,13 @@ func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 	return false
 }
 
-// outputPath creates a path for the collection to be written to (sans file extension)
+// outputPath creates a path for the collection to be written to (sans file extension).
 func (dump *MongoDump) outputPath(dbName, colName string) string {
 	return filepath.Join(dump.OutputOptions.Out, dbName, colName)
 }
 
 // CreateIntentsForCollection builds an intent for a given collection and
-// puts it into the intent manager
+// puts it into the intent manager.
 func (dump *MongoDump) CreateIntentForCollection(dbName, colName string) error {
 	if dump.shouldSkipCollection(colName) {
 		log.Logf(log.DebugLow, "skipping dump of %v.%v, it is excluded", dbName, colName)
@@ -75,7 +75,7 @@ func (dump *MongoDump) CreateIntentForCollection(dbName, colName string) error {
 func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 	// we must ensure folders for empty databases are still created, for legacy purposes
 	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-	err := os.MkdirAll(dbFolder, DumpDefaultPermissions)
+	err := os.MkdirAll(dbFolder, defaultPermissions)
 	if err != nil {
 		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
 	}
@@ -91,7 +91,6 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 			return err // no context needed
 		}
 	}
-
 	return nil
 }
 
@@ -112,6 +111,5 @@ func (dump *MongoDump) CreateAllIntents() error {
 			return err
 		}
 	}
-
 	return nil
 }

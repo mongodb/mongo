@@ -20,14 +20,14 @@ type Metadata struct {
 	Indexes []interface{} `json:"indexes"`
 }
 
-// IndexDocumentFromDB is used internally to preserve key ordering
+// IndexDocumentFromDB is used internally to preserve key ordering.
 type IndexDocumentFromDB struct {
 	Options bson.M `bson:",inline"`
 	Key     bson.D `bson:"key"`
 }
 
-// This helper gets the metadata for a collection and writes it
-// in readable JSON format
+// dumpMetadataToWriter gets the metadata for a collection and writes it
+// in readable JSON format.
 func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) error {
 	// make a buffered writer for nicer disk i/o
 	w := bufio.NewWriter(writer)
@@ -59,7 +59,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		return fmt.Errorf("failed to get collection options for `%v`: %v", err)
 	}
 	if collectionInfo == nil {
-		//The collection wasn't found, which means it was probably deleted
+		// The collection wasn't found, which means it was probably deleted
 		// between now and the time that collections were listed. Skip it.
 		log.Logf(log.DebugLow, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
 		return nil
@@ -80,7 +80,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// that list as the "indexes" field of the metadata document.
 	log.Logf(log.DebugHigh, "\treading indexes for `%v`", nsID)
 
-	//get the indexes
+	// get the indexes
 	indexesIter, err := db.GetIndexes(collection)
 	if err != nil {
 		return err
