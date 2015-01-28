@@ -157,7 +157,7 @@ __wt_col_append_serial(
 	 * there cannot be a million threads that have done the test but not yet
 	 * completed their modification.
 	 */
-	 WT_RET(__page_write_gen_wrapped_check(page));
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	/* Acquire the page's spinlock, call the worker function. */
 	WT_PAGE_LOCK(session, page);
@@ -215,7 +215,7 @@ __wt_insert_serial(
 	 * there cannot be a million threads that have done the test but not yet
 	 * completed their modification.
 	 */
-	 WT_RET(__page_write_gen_wrapped_check(page));
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	/* Acquire the page's spinlock, call the worker function. */
 	WT_PAGE_LOCK(session, page);
@@ -272,7 +272,7 @@ __wt_update_serial(
 	 * there cannot be a million threads that have done the test but not yet
 	 * completed their modification.
 	 */
-	 WT_RET(__page_write_gen_wrapped_check(page));
+	WT_RET(__page_write_gen_wrapped_check(page));
 
 	ret = __update_serial_func(session, srch_upd, upd);
 

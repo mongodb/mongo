@@ -99,7 +99,7 @@ def output(entry, f):
 \t * there cannot be a million threads that have done the test but not yet
 \t * completed their modification.
 \t */
-\t WT_RET(__page_write_gen_wrapped_check(page));
+\tWT_RET(__page_write_gen_wrapped_check(page));
 ''')
 
     # Call the worker function.
