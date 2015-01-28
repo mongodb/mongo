@@ -423,7 +423,6 @@ func (dump *MongoDump) dumpIterToWriter(
 				return
 			}
 
-			// TODO use buffer pool?
 			nextCopy := make([]byte, len(raw.Data))
 			copy(nextCopy, raw.Data)
 
@@ -459,8 +458,8 @@ func (dump *MongoDump) dumpIterToWriter(
 	return nil
 }
 
-// DumpUsersAndRolesForDB queries and dumps the users and roles tied
-// to the given the db. Only works with an authentication schema version >= 3.
+// DumpUsersAndRolesForDB queries and dumps the users and roles tied to the given
+// database. Only works with an authentication schema version >= 3.
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {

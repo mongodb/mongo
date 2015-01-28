@@ -19,7 +19,7 @@ func (_ *InputOptions) Name() string {
 	return "query"
 }
 
-// OutputOptions defines the set of options to writing dump data.
+// OutputOptions defines the set of options for writing dump data.
 type OutputOptions struct {
 	Out                        string   `long:"out" short:"o" description:"output directory, or '-' for stdout (defaults to 'dump')" default:"dump" default-mask:"-"`
 	Repair                     bool     `long:"repair" description:"try to recover documents from damaged data files (not supported by all storage engines)"`
