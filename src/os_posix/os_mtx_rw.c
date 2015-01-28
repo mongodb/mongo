@@ -95,6 +95,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	wt_rwlock_t *l;
 	uint64_t me;
 	uint16_t val;
+	int pause_cnt;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
@@ -103,8 +104,21 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	l = &rwlock->rwlock;
 	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
 	val = (uint16_t)(me >> 32);
-	while (val != l->s.readers)
-		WT_PAUSE();
+	for (pause_cnt = 0; val != l->s.readers;) {
+		/*
+		 * We failed to get the lock; pause before retrying and if we've
+		 * paused enough, sleep so we don't burn CPU to no purpose. This
+		 * situation happens if there are more threads than cores in the
+		 * system and we're thrashing on shared resources. Regardless,
+		 * don't sleep long, all we need is to schedule the other reader
+		 * threads to complete a few more instructions and increment the
+		 * reader count.
+		 */
+		if (++pause_cnt < 1000)
+			WT_PAUSE();
+		else 
+			__wt_sleep(0, 10);
+	}
 
 	++l->s.readers;
 
