@@ -61,7 +61,7 @@ namespace mongo {
         _abort();
     }
 
-    void RocksRecoveryUnit::beginUnitOfWork() {
+    void RocksRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _depth++;
     }
 
