@@ -34,11 +34,16 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -82,7 +87,8 @@ namespace mongo {
         _myTransactionCount( 0 ),
         _everStartedWrite( false ),
         _currentlySquirreled( false ),
-        _syncing( false ) {
+        _syncing( false ),
+        _noTicketNeeded( false ) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
@@ -95,11 +101,13 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::reportState( BSONObjBuilder* b ) const {
-        b->append( "wt_depth", _depth );
-        b->append( "wt_active", _active );
-        b->append( "wt_everStartedWrite", _everStartedWrite );
-        if ( _active )
-            b->append( "wt_millisSinceCommit", _timer.millis() );
+        b->append("wt_depth", _depth);
+        b->append("wt_active", _active);
+        b->append("wt_everStartedWrite", _everStartedWrite);
+        b->append("wt_hasTicket", _ticket.hasTicket());
+        b->appendNumber("wt_myTransactionCount", static_cast<long long>(_myTransactionCount));
+        if (_active)
+            b->append("wt_millisSinceCommit", _timer.millis());
     }
 
     void WiredTigerRecoveryUnit::_commit() {
@@ -125,10 +133,11 @@ namespace mongo {
         _changes.clear();
     }
 
-    void WiredTigerRecoveryUnit::beginUnitOfWork() {
+    void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         invariant( !_currentlySquirreled );
         _depth++;
         _everStartedWrite = true;
+        _getTicket(opCtx);
     }
 
     void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -176,13 +185,13 @@ namespace mongo {
         fassert( 28575, _active );
     }
 
-    WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
+    WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
         if ( !_session ) {
             _session = _sessionCache->getSession();
         }
 
         if ( !_active ) {
-            _txnOpen();
+            _txnOpen(opCtx);
         }
         return _session;
     }
@@ -196,6 +205,81 @@ namespace mongo {
 
     void WiredTigerRecoveryUnit::setOplogReadTill( const RecordId& loc ) {
         _oplogReadTill = loc;
+    }
+
+    namespace {
+
+
+        class TicketServerParameter : public ServerParameter {
+            MONGO_DISALLOW_COPYING(TicketServerParameter);
+        public:
+            TicketServerParameter(TicketHolder* holder, const std::string& name)
+                : ServerParameter(ServerParameterSet::getGlobal(),
+                                  name,
+                                  true,
+                                  true),
+                  _holder( holder ) {
+            }
+
+            virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
+                b.append(name, _holder->outof());
+            }
+
+            virtual Status set( const BSONElement& newValueElement ) {
+                if (!newValueElement.isNumber())
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << name() << " has to be a number");
+                return _set(newValueElement.numberInt());
+            }
+
+            virtual Status setFromString( const std::string& str ) {
+                int num = 0;
+                Status status = parseNumberFromString(str, &num);
+                if (!status.isOK())
+                    return status;
+                return _set(num);
+            }
+
+            Status _set(int newNum) {
+                if (newNum <= 0) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << name() << " has to be > 0");
+                }
+
+                return _holder->resize(newNum);
+            }
+
+        private:
+            TicketHolder* _holder;
+        };
+
+        TicketHolder openWriteTransaction(128);
+        TicketServerParameter openWriteTransactionParam(&openWriteTransaction,
+                                                        "wiredTigerConcurrentWriteTransactions");
+
+        TicketHolder openReadTransaction(256);
+        TicketServerParameter openReadTransactionParam(&openReadTransaction,
+                                                       "wiredTigerConcurrentReadTransactions");
+
+    }
+
+    void WiredTigerRecoveryUnit::appendGlobalStats(BSONObjBuilder& b) {
+        BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
+        {
+            BSONObjBuilder bbb(bb.subobjStart("write"));
+            bbb.append("out", openWriteTransaction.used());
+            bbb.append("available", openWriteTransaction.available());
+            bbb.append("totalTickets", openWriteTransaction.outof());
+            bbb.done();
+        }
+        {
+            BSONObjBuilder bbb(bb.subobjStart("read"));
+            bbb.append("out", openReadTransaction.used());
+            bbb.append("available", openReadTransaction.available());
+            bbb.append("totalTickets", openReadTransaction.outof());
+            bbb.done();
+        }
+        bb.done();
     }
 
     void WiredTigerRecoveryUnit::_txnClose( bool commit ) {
@@ -213,14 +297,49 @@ namespace mongo {
         }
         _active = false;
         _myTransactionCount++;
+        _ticket.reset(NULL);
     }
 
     uint64_t WiredTigerRecoveryUnit::getMyTransactionCount() const {
         return _myTransactionCount;
     }
 
-    void WiredTigerRecoveryUnit::_txnOpen() {
+    void WiredTigerRecoveryUnit::markNoTicketRequired() {
+        invariant(!_ticket.hasTicket());
+        _noTicketNeeded = true;
+    }
+
+    void WiredTigerRecoveryUnit::_getTicket(OperationContext* opCtx) {
+        // already have a ticket
+        if (_ticket.hasTicket())
+            return;
+
+        if (_noTicketNeeded)
+            return;
+
+        bool writeLocked;
+
+        // If we have a strong lock, waiting for a ticket can cause a deadlock.
+        if (opCtx != NULL &&
+            opCtx->lockState() != NULL) {
+            if (opCtx->lockState()->hasStrongLocks())
+                return;
+            writeLocked = opCtx->lockState()->isWriteLocked();
+        }
+        else {
+            writeLocked = _everStartedWrite;
+        }
+
+        TicketHolder* holder = writeLocked ? &openWriteTransaction : &openReadTransaction;
+
+        holder->waitForTicket();
+        _ticket.reset(holder);
+    }
+
+    void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
         invariant( !_active );
+        _getTicket(opCtx);
+
         WT_SESSION *s = _session->getSession();
         _syncing = _syncing || awaitCommitData.numWaitingForSync.load() > 0;
         invariantWTOK( s->begin_transaction(s, _syncing ? "sync=true" : NULL) );
@@ -247,24 +366,10 @@ namespace mongo {
     WiredTigerCursor::WiredTigerCursor(const std::string& uri,
                                        uint64_t id,
                                        bool forRecordStore,
-                                       WiredTigerRecoveryUnit* ru) {
-        _init( uri, id, forRecordStore, ru );
-    }
-
-    WiredTigerCursor::WiredTigerCursor(const std::string& uri,
-                                       uint64_t id,
-                                       bool forRecordStore,
                                        OperationContext* txn) {
-        _init( uri, id, forRecordStore, WiredTigerRecoveryUnit::get( txn ) );
-    }
-
-    void WiredTigerCursor::_init( const std::string& uri,
-                                  uint64_t id,
-                                  bool forRecordStore,
-                                  WiredTigerRecoveryUnit* ru ) {
         _uriID = id;
-        _ru = ru;
-        _session = _ru->getSession();
+        _ru = WiredTigerRecoveryUnit::get( txn );
+        _session = _ru->getSession(txn);
         _cursor = _session->getCursor( uri, id, forRecordStore );
         if ( !_cursor ) {
             error() << "no cursor for uri: " << uri;
@@ -272,7 +377,6 @@ namespace mongo {
     }
 
     WiredTigerCursor::~WiredTigerCursor() {
-        invariant( _session == _ru->getSession() );
         _session->releaseCursor( _uriID, _cursor );
         _cursor = NULL;
     }

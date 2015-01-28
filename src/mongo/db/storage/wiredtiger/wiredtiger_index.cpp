@@ -193,7 +193,7 @@ namespace {
     int WiredTigerIndex::Create(OperationContext* txn,
                                 const std::string& uri,
                                 const std::string& config) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession()->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession(txn)->getSession();
         LOG(1) << "create uri: " << uri << " config: " << config;
         return s->create(s, uri.c_str(), config.c_str());
     }
@@ -301,7 +301,7 @@ namespace {
             output->append("type", type);
         }
 
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         WT_SESSION* s = session->getSession();
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),
                                                           "statistics=(fast)", output);
@@ -340,7 +340,7 @@ namespace {
     }
 
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         return static_cast<long long>( WiredTigerUtil::getIdentSize( session->getSession(),
                                                                      _uri ) );
     }
@@ -399,7 +399,7 @@ namespace {
         WT_CURSOR* openBulkCursor(WiredTigerIndex* idx) {
             // Open cursors can cause bulk open_cursor to fail with EBUSY.
             // TODO any other cases that could cause EBUSY?
-            WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_txn)->getSession();
+            WiredTigerSession* outerSession = WiredTigerRecoveryUnit::get(_txn)->getSession(_txn);
             outerSession->closeAllCursors();
 
             // Not using cursor cache since we need to set "bulk".
@@ -662,7 +662,7 @@ namespace {
 
             if ( !wt_keeptxnopen() && !_eof ) {
                 // Ensure an active session exists, so any restored cursors will bind to it
-                WiredTigerRecoveryUnit::get(txn)->getSession();
+                WiredTigerRecoveryUnit::get(txn)->getSession(txn);
 
                 _locate(_savedLoc);
             }

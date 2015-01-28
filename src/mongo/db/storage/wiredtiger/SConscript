@@ -30,6 +30,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/elapsed_tracker',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/mongo/processinfo',
+            '$BUILD_DIR/mongo/util/concurrency/ticketholder',
             '$BUILD_DIR/third_party/shim_wiredtiger',
             '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_zlib',
