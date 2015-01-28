@@ -156,6 +156,16 @@ func (restore *MongoRestore) Restore() error {
 	} else {
 		log.Log(log.DebugLow, "mongorestore target is a directory, not a file")
 	}
+	if restore.ToolOptions.Collection != "" &&
+		restore.OutputOptions.NumParallelCollections > 1 &&
+		restore.ToolOptions.BulkWriters == 1 {
+		// handle special parallelization case when we are only restoring one collection
+		// by mapping -j to insertion workers rather than parallel collections
+		log.Logf(log.DebugHigh,
+			"setting number of insertions workers to number of parallel collections (%v)",
+			restore.OutputOptions.NumParallelCollections)
+		restore.ToolOptions.BulkWriters = restore.OutputOptions.NumParallelCollections
+	}
 
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
