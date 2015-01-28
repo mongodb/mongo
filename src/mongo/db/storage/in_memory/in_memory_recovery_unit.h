@@ -45,7 +45,7 @@ namespace mongo {
         InMemoryRecoveryUnit() : _depth(0) {}
         virtual ~InMemoryRecoveryUnit();
 
-        virtual void beginUnitOfWork();
+        virtual void beginUnitOfWork(OperationContext* opCtx);
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 

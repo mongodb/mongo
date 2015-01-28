@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -56,7 +57,7 @@ namespace mongo {
 
         virtual void reportState( BSONObjBuilder* b ) const;
 
-        virtual void beginUnitOfWork();
+        virtual void beginUnitOfWork(OperationContext* opCtx);
 
         virtual void commitUnitOfWork();
 
@@ -81,7 +82,7 @@ namespace mongo {
 
         // ---- WT STUFF
 
-        WiredTigerSession* getSession();
+        WiredTigerSession* getSession(OperationContext* opCtx);
         WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
         bool inActiveTxn() const { return _active; }
         void assertInActiveTxn() const;
@@ -92,15 +93,18 @@ namespace mongo {
         void setOplogReadTill( const RecordId& loc );
         RecordId getOplogReadTill() const { return _oplogReadTill; }
 
+        void markNoTicketRequired();
+
         static WiredTigerRecoveryUnit* get(OperationContext *txn);
 
+        static void appendGlobalStats(BSONObjBuilder& b);
     private:
 
         void _abort();
         void _commit();
 
         void _txnClose( bool commit );
-        void _txnOpen();
+        void _txnOpen(OperationContext* opCtx);
 
         WiredTigerSessionCache* _sessionCache; // not owned
         WiredTigerSession* _session; // owned, but from pool
@@ -116,6 +120,10 @@ namespace mongo {
 
         typedef OwnedPointerVector<Change> Changes;
         Changes _changes;
+
+        bool _noTicketNeeded;
+        void _getTicket(OperationContext* opCtx);
+        TicketHolderReleaser _ticket;
     };
 
     /**
@@ -127,10 +135,7 @@ namespace mongo {
                          uint64_t uriID,
                          bool forRecordStore,
                          OperationContext* txn);
-        WiredTigerCursor(const std::string& uri,
-                         uint64_t uriID,
-                         bool forRecordStore,
-                         WiredTigerRecoveryUnit* ru);
+
         ~WiredTigerCursor();
 
 
@@ -149,11 +154,6 @@ namespace mongo {
         void assertInActiveTxn() const { _ru->assertInActiveTxn(); }
 
     private:
-        void _init( const std::string& uri,
-                    uint64_t uriID,
-                    bool forRecordStore,
-                    WiredTigerRecoveryUnit* ru );
-
         uint64_t _uriID;
         WiredTigerRecoveryUnit* _ru; // not owned
         WiredTigerSession* _session;

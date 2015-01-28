@@ -46,7 +46,7 @@ namespace mongo {
 
     }
 
-    void DurRecoveryUnit::beginUnitOfWork() {
+    void DurRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _startOfUncommittedChangesForLevel.push_back(Indexes(_changes.size(), _writes.size()));
     }
 

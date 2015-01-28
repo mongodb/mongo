@@ -222,7 +222,7 @@ namespace {
         _lock.lock();
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
-            ss << " " << it.key().toString();
+            ss << " " << it.key().toString() << " held in " << modeName(it->mode);
             it.next();
         }
         _lock.unlock();
@@ -784,6 +784,23 @@ namespace {
             invariant(false);
             return MODE_NONE;
         }
+    }
+
+    template<bool IsForMMAPV1>
+    bool LockerImpl<IsForMMAPV1>::hasStrongLocks() const {
+        if (!isLocked()) return false;
+
+        boost::lock_guard<SpinLock> lk(_lock);
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            if (it->mode == MODE_X || it->mode == MODE_S) {
+                return true;
+            }
+
+            it.next();
+        }
+
+        return false;
     }
 
 

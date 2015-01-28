@@ -143,7 +143,7 @@ namespace mongo {
         }
 
         virtual bool isWriteLocked() const {
-            invariant(false);
+            return false;
         }
 
         virtual bool isReadLocked() const {
@@ -168,6 +168,10 @@ namespace mongo {
 
         virtual void setLockPendingParallelWriter(bool newValue) {
             invariant(false);
+        }
+
+        virtual bool hasStrongLocks() const {
+            return false;
         }
 
     };

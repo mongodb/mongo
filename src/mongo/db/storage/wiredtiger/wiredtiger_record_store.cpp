@@ -303,7 +303,7 @@ namespace {
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                                 BSONObjBuilder* extraInfo,
                                                 int infoLevel ) const {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
             session->getSession(),
             "statistics:" + getURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
@@ -447,7 +447,9 @@ namespace {
         invariant( realRecoveryUnit );
         WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
         txn->setRecoveryUnit( new WiredTigerRecoveryUnit( sc ) );
-        WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession()->getSession();
+
+        WiredTigerRecoveryUnit::get(txn)->markNoTicketRequired(); // realRecoveryUnit already has
+        WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
 
         int64_t dataSize = _dataSize.load();
         int64_t numRecords = _numRecords.load();
@@ -783,7 +785,7 @@ namespace {
 
         output->appendNumber( "nrecords", nrecords );
 
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(output->subobjStart(kWiredTigerEngineName));
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(),
@@ -804,7 +806,7 @@ namespace {
             result->appendIntOrLL( "max", _cappedMaxDocs );
             result->appendIntOrLL( "maxSize", static_cast<long long>(_cappedMaxSize / scale) );
         }
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         WT_SESSION* s = session->getSession();
         BSONObjBuilder bob(result->subobjStart(kWiredTigerEngineName));
         {
@@ -1198,7 +1200,7 @@ namespace {
         invariant( _savedRecoveryUnit == txn->recoveryUnit() );
         if ( needRestore || !wt_keeptxnopen() ) {
             // This will ensure an active session exists, so any restored cursors will bind to it
-            invariant(WiredTigerRecoveryUnit::get(txn)->getSession() == _cursor->getSession());
+            invariant(WiredTigerRecoveryUnit::get(txn)->getSession(txn) == _cursor->getSession());
 
             RecordId saved = _lastLoc;
             _locate(_lastLoc, false);

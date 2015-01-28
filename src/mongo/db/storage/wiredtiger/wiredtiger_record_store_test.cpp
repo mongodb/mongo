@@ -100,7 +100,7 @@ namespace mongo {
 
             {
                 WriteUnitOfWork uow(&txn);
-                WT_SESSION* s = ru->getSession()->getSession();
+                WT_SESSION* s = ru->getSession(&txn)->getSession();
                 invariantWTOK( s->create( s, uri.c_str(), config.c_str() ) );
                 uow.commit();
             }
@@ -126,7 +126,7 @@ namespace mongo {
 
             {
                 WriteUnitOfWork uow(&txn);
-                WT_SESSION* s = ru->getSession()->getSession();
+                WT_SESSION* s = ru->getSession(&txn)->getSession();
                 invariantWTOK( s->create( s, uri.c_str(), config.c_str() ) );
                 uow.commit();
             }
@@ -326,14 +326,15 @@ namespace mongo {
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                WT_SESSION* s = ru->getSession()->getSession();
+                WT_SESSION* s = ru->getSession(opCtx.get())->getSession();
                 invariantWTOK( s->create( s, indexUri.c_str(), "" ) );
                 uow.commit();
             }
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ss.storeInto( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(), indexUri );
+                ss.storeInto( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
+                              indexUri );
                 uow.commit();
             }
         }
@@ -341,7 +342,8 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             WiredTigerSizeStorer ss2;
-            ss2.loadFrom( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(), indexUri );
+            ss2.loadFrom( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(opCtx.get()),
+                          indexUri );
             long long numRecords;
             long long dataSize;
             ss2.load( uri, &numRecords, &dataSize );

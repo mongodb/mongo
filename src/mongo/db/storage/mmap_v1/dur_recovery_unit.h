@@ -45,7 +45,7 @@ namespace mongo {
 
         virtual ~DurRecoveryUnit() { }
 
-        virtual void beginUnitOfWork();
+        virtual void beginUnitOfWork(OperationContext* opCtx);
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 

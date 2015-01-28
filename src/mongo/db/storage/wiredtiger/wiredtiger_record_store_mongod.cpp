@@ -33,12 +33,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
 
@@ -67,6 +69,7 @@ namespace mongo {
                 }
 
                 OperationContextImpl txn;
+                checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
 
                 try {
                     Lock::DBLock dbLock(txn.lockState(), _ns.db(), MODE_IX);

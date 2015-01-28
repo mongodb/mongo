@@ -62,7 +62,7 @@ namespace mongo {
                 const BSONElement& configElement) const {
 
         WiredTigerSession* session =
-            checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession();
+            checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession(txn);
         invariant(session);
 
         WT_SESSION* s = session->getSession();
@@ -77,6 +77,8 @@ namespace mongo {
             bob.append("code", static_cast<int>(status.code()));
             bob.append("reason", status.reason());
         }
+
+        WiredTigerRecoveryUnit::appendGlobalStats(bob);
 
         return bob.obj();
     }

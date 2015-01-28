@@ -112,7 +112,7 @@ namespace mongo {
         invariant( _depth == 0 );
     }
 
-    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork() {
+    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
         _depth++;
     }
 

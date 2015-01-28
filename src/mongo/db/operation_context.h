@@ -149,7 +149,7 @@ namespace mongo {
                    _ended(false) {
 
             _txn->lockState()->beginWriteUnitOfWork();
-            _txn->recoveryUnit()->beginUnitOfWork();
+            _txn->recoveryUnit()->beginUnitOfWork(_txn);
         }
 
         ~WriteUnitOfWork() {

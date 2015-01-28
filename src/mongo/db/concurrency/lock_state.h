@@ -244,6 +244,8 @@ namespace mongo {
             _lockPendingParallelWriter = newValue;
         }
 
+        virtual bool hasStrongLocks() const;
+
     private:
 
         bool _batchWriter;

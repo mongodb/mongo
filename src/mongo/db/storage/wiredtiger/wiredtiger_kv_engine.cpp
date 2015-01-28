@@ -224,13 +224,13 @@ namespace mongo {
 
     int64_t WiredTigerKVEngine::getIdentSize( OperationContext* opCtx,
                                               const StringData& ident ) {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
         return WiredTigerUtil::getIdentSize(session->getSession(), _uri(ident) );
     }
 
     Status WiredTigerKVEngine::repairIdent( OperationContext* opCtx,
                                             const StringData& ident ) {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
         session->closeAllCursors();
         string uri = _uri(ident);
         return _salvageIfNeeded(uri.c_str());
@@ -455,7 +455,8 @@ namespace mongo {
     }
 
     bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, const StringData& ident) const {
-        return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession(), _uri(ident));
+        return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx)->getSession(),
+                       _uri(ident));
     }
 
     bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {

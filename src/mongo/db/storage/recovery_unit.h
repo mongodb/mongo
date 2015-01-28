@@ -37,6 +37,7 @@
 namespace mongo {
 
     class BSONObjBuilder;
+    class OperationContext;
 
     /**
      * A RecoveryUnit is responsible for ensuring that data is persisted.
@@ -72,7 +73,7 @@ namespace mongo {
          *
          * TODO see if we can get rid of nested UnitsOfWork.
          */
-        virtual void beginUnitOfWork() = 0;
+        virtual void beginUnitOfWork(OperationContext* opCtx) = 0;
         virtual void commitUnitOfWork() = 0;
         virtual void endUnitOfWork() = 0;
 
