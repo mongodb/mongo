@@ -642,7 +642,10 @@ namespace mongo {
                        > ( serverGlobalParams.slowMS + currentOp->getExpectedLatencyMs() );
 
         if ( logAll || logSlow ) {
-            LOG(0) << currentOp->debug().report( *currentOp ) << endl;
+            Locker::LockerInfo lockerInfo;
+            txn->lockState()->getLockerInfo(&lockerInfo);
+
+            LOG(0) << currentOp->debug().report(*currentOp, lockerInfo.stats);
         }
 
         if (currentOp->shouldDBProfile(executionTime)) {

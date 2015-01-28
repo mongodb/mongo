@@ -493,8 +493,10 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            MONGO_LOG_COMPONENT(0, responseComponent)
-                    << debug.report( currentOp ) << endl;
+            Locker::LockerInfo lockerInfo;
+            txn->lockState()->getLockerInfo(&lockerInfo);
+
+            MONGO_LOG_COMPONENT(0, responseComponent) << debug.report(currentOp, lockerInfo.stats);
         }
 
         if (currentOp.shouldDBProfile(debug.executionTime)) {
