@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
+// List of possible commands for mongofiles.
 const (
-	// list of possible commands for mongofiles
 	List   = "list"
 	Search = "search"
 	Put    = "put"
@@ -36,11 +36,12 @@ type MongoFiles struct {
 
 	// command to run
 	Command string
+
 	// filename in GridFS
 	FileName string
 }
 
-// represents a GridFS file
+// GFSFile represents a GridFS file.
 type GFSFile struct {
 	Id          bson.ObjectId `bson:"_id"`
 	ChunkSize   int           `bson:"chunkSize"`
@@ -51,6 +52,7 @@ type GFSFile struct {
 	ContentType string        `bson:"contentType,omitempty"`
 }
 
+// ValidateCommand ensures the arguments supplied are valid.
 func (mf *MongoFiles) ValidateCommand(args []string) error {
 	// make sure a command is specified and that we don't have
 	// too many arguments
@@ -69,8 +71,8 @@ func (mf *MongoFiles) ValidateCommand(args []string) error {
 			fileName = args[1]
 		}
 	case Search, Put, Get, Delete:
-		// also make sure the supporting argument isn't literally an empty string
-		// for example, mongofiles get ""
+		// also make sure the supporting argument isn't literally an
+		// empty string for example, mongofiles get ""
 		if len(args) == 1 || args[1] == "" {
 			return fmt.Errorf("'%v' argument missing", args[0])
 		}
@@ -89,8 +91,8 @@ func (mf *MongoFiles) ValidateCommand(args []string) error {
 	return nil
 }
 
-// query GridFS for files and display the results
-func (self *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, error) {
+// Query GridFS for files and display the results.
+func (mf *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, error) {
 	display := ""
 
 	cursor := gfs.Find(query).Iter()
@@ -107,24 +109,25 @@ func (self *MongoFiles) findAndDisplay(gfs *mgo.GridFS, query bson.M) (string, e
 	return display, nil
 }
 
-// Return local file (set by --local optional flag) name (or default to self.FileName)
-func (self *MongoFiles) getLocalFileName() string {
-	localFileName := self.StorageOptions.LocalFileName
+// Return the local filename, as specified by the --local flag. Defaults to
+// mf.FileName if not present.
+func (mf *MongoFiles) getLocalFileName() string {
+	localFileName := mf.StorageOptions.LocalFileName
 	if localFileName == "" {
-		localFileName = self.FileName
+		localFileName = mf.FileName
 	}
 	return localFileName
 }
 
 // handle logic for 'get' command
-func (self *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
-	gFile, err := gfs.Open(self.FileName)
+func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
+	gFile, err := gfs.Open(mf.FileName)
 	if err != nil {
-		return "", fmt.Errorf("error opening GridFS file '%s': %v", self.FileName, err)
+		return "", fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
 	}
 	defer gFile.Close()
 
-	localFileName := self.getLocalFileName()
+	localFileName := mf.getLocalFileName()
 	localFile, err := os.Create(localFileName)
 	if err != nil {
 		return "", fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
@@ -140,19 +143,19 @@ func (self *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
 	return fmt.Sprintf("Finished writing to: %s\n", localFileName), nil
 }
 
-// handle logic for 'put' command
-func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
-	localFileName := self.getLocalFileName()
+// handle logic for 'put' command.
+func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
+	localFileName := mf.getLocalFileName()
 
 	var output string
 
 	// check if --replace flag turned on
-	if self.StorageOptions.Replace {
-		err := gfs.Remove(self.FileName)
+	if mf.StorageOptions.Replace {
+		err := gfs.Remove(mf.FileName)
 		if err != nil {
 			return "", err
 		}
-		output = fmt.Sprintf("removed all instances of '%v' from GridFS\n", self.FileName)
+		output = fmt.Sprintf("removed all instances of '%v' from GridFS\n", mf.FileName)
 	}
 
 	localFile, err := os.Open(localFileName)
@@ -160,17 +163,17 @@ func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 		return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
 	}
 	defer localFile.Close()
-	log.Logf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", self.FileName, localFileName)
+	log.Logf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", mf.FileName, localFileName)
 
-	gFile, err := gfs.Create(self.FileName)
+	gFile, err := gfs.Create(mf.FileName)
 	if err != nil {
-		return "", fmt.Errorf("error while creating '%v' in GridFS: %v\n", self.FileName, err)
+		return "", fmt.Errorf("error while creating '%v' in GridFS: %v\n", mf.FileName, err)
 	}
 	defer gFile.Close()
 
 	// set optional mime type
-	if self.StorageOptions.ContentType != "" {
-		gFile.SetContentType(self.StorageOptions.ContentType)
+	if mf.StorageOptions.ContentType != "" {
+		gFile.SetContentType(mf.StorageOptions.ContentType)
 	}
 
 	_, err = io.Copy(gFile, localFile)
@@ -182,30 +185,31 @@ func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 	return output, nil
 }
 
-// Run the mongofiles utility
-func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
-	connUrl := self.ToolOptions.Host
+// Run the mongofiles utility. If displayHost is true, the connected host/port is
+// displayed.
+func (mf *MongoFiles) Run(displayHost bool) (string, error) {
+	connUrl := mf.ToolOptions.Host
 	if connUrl == "" {
 		connUrl = util.DefaultHost
 	}
-	if self.ToolOptions.Port != "" {
-		connUrl = fmt.Sprintf("%s:%s", connUrl, self.ToolOptions.Port)
+	if mf.ToolOptions.Port != "" {
+		connUrl = fmt.Sprintf("%s:%s", connUrl, mf.ToolOptions.Port)
 	}
 
 	// get session
-	session, err := self.SessionProvider.GetSession()
+	session, err := mf.SessionProvider.GetSession()
 	if err != nil {
 		return "", err
 	}
 	defer session.Close()
 
 	// check if we are using a replica set and fall back to w=1 if we aren't (for <= 2.4)
-	isRepl, err := self.SessionProvider.IsReplicaSet()
+	isRepl, err := mf.SessionProvider.IsReplicaSet()
 	if err != nil {
 		return "", fmt.Errorf("error determining if connected to replica set: %v", err)
 	}
 
-	safety, err := db.BuildWriteConcern(self.StorageOptions.WriteConcern, isRepl)
+	safety, err := db.BuildWriteConcern(mf.StorageOptions.WriteConcern, isRepl)
 	if err != nil {
 		return "", fmt.Errorf("error parsing write concern: %v", err)
 	}
@@ -221,65 +225,65 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
 	// it's ok to validate only <db>.<prefix>.chunks (the longer one)
-	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.StorageOptions.DB,
-		self.StorageOptions.GridFSPrefix))
+	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", mf.StorageOptions.DB,
+		mf.StorageOptions.GridFSPrefix))
 
 	if err != nil {
 		return "", err
 	}
 	// get GridFS handle
-	gfs := session.DB(self.StorageOptions.DB).GridFS(self.StorageOptions.GridFSPrefix)
+	gfs := session.DB(mf.StorageOptions.DB).GridFS(mf.StorageOptions.GridFSPrefix)
 
 	var output string
 
-	log.Logf(log.Info, "handling mongofiles '%v' command...", self.Command)
+	log.Logf(log.Info, "handling mongofiles '%v' command...", mf.Command)
 
-	switch self.Command {
+	switch mf.Command {
 
 	case List:
 
 		query := bson.M{}
-		if self.FileName != "" {
-			regex := bson.M{"$regex": "^" + regexp.QuoteMeta(self.FileName)}
+		if mf.FileName != "" {
+			regex := bson.M{"$regex": "^" + regexp.QuoteMeta(mf.FileName)}
 			query = bson.M{"filename": regex}
 		}
 
-		output, err = self.findAndDisplay(gfs, query)
+		output, err = mf.findAndDisplay(gfs, query)
 		if err != nil {
 			return "", err
 		}
 
 	case Search:
 
-		regex := bson.M{"$regex": self.FileName}
+		regex := bson.M{"$regex": mf.FileName}
 		query := bson.M{"filename": regex}
 
-		output, err = self.findAndDisplay(gfs, query)
+		output, err = mf.findAndDisplay(gfs, query)
 		if err != nil {
 			return "", err
 		}
 
 	case Get:
 
-		output, err = self.handleGet(gfs)
+		output, err = mf.handleGet(gfs)
 		if err != nil {
 			return "", err
 		}
 
 	case Put:
 
-		output, err = self.handlePut(gfs)
+		output, err = mf.handlePut(gfs)
 		if err != nil {
 			return "", err
 		}
 
 	case Delete:
 
-		err = gfs.Remove(self.FileName)
+		err = gfs.Remove(mf.FileName)
 		if err != nil {
-			return "", fmt.Errorf("error while removing '%v' from GridFS: %v\n", self.FileName, err)
+			return "", fmt.Errorf("error while removing '%v' from GridFS: %v\n", mf.FileName, err)
 		}
-		output = fmt.Sprintf("successfully deleted all instances of '%v' from GridFS\n", self.FileName)
+		output = fmt.Sprintf("successfully deleted all instances of '%v' from GridFS\n", mf.FileName)
 
 	}
 

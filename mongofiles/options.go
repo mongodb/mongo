@@ -13,6 +13,7 @@ Possible commands include:
 
 See http://docs.mongodb.org/manual/reference/program/mongofiles/ for more information.`
 
+// StorageOptions defines the set of options to use in storing/retrieving data from server.
 type StorageOptions struct {
 	// Specified database to use. defaults to 'test' if none is specified
 	DB string `short:"d" default:"test" default-mask:"-" long:"db" description:"database to use (default is 'test')"`
@@ -34,6 +35,7 @@ type StorageOptions struct {
 	WriteConcern string `long:"writeConcern" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
 }
 
+// Name returns a human-readable group name for storage options.
 func (_ *StorageOptions) Name() string {
 	return "storage"
 }
