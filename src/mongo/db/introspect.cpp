@@ -86,7 +86,11 @@ namespace {
 
         BSONObjBuilder b(profileBufBuilder);
 
-        txn->getCurOp()->debug().append(*txn->getCurOp(), b);
+        {
+            Locker::LockerInfo lockerInfo;
+            txn->lockState()->getLockerInfo(&lockerInfo);
+            txn->getCurOp()->debug().append(*txn->getCurOp(), lockerInfo.stats, b);
+        }
 
         b.appendDate("ts", jsTime());
         b.append("client", txn->getClient()->clientAddress());

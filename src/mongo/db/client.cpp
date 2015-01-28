@@ -449,7 +449,7 @@ namespace {
 
 #define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
-    string OpDebug::report( const CurOp& curop ) const {
+    string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const {
         StringBuilder s;
         if ( iscommand )
             s << "command ";
@@ -519,8 +519,16 @@ namespace {
         s << " numYields:" << curop.numYields();
         
         OPDEBUG_TOSTRING_HELP( nreturned );
-        if ( responseLength > 0 )
+        if (responseLength > 0) {
             s << " reslen:" << responseLength;
+        }
+
+        {
+            BSONObjBuilder locks;
+            lockStats.report(&locks);
+            s << " locks:" << locks.obj().toString();
+        }
+
         s << " " << executionTime << "ms";
         
         return s.str();
@@ -563,7 +571,10 @@ namespace {
 
 #define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
-    void OpDebug::append(const CurOp& curop, BSONObjBuilder& b) const {
+    void OpDebug::append(const CurOp& curop,
+                         const SingleThreadedLockStats& lockStats,
+                         BSONObjBuilder& b) const {
+
         const size_t maxElementSize = 50 * 1024;
 
         b.append( "op" , iscommand ? "command" : opToString( op ) );
@@ -602,11 +613,16 @@ namespace {
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
         OPDEBUG_APPEND_NUMBER( writeConflicts );
-
         b.appendNumber("numYield", curop.numYields());
 
-        if ( ! exceptionInfo.empty() )
-            exceptionInfo.append( b , "exception" , "exceptionCode" );
+        {
+            BSONObjBuilder locks(b.subobjStart("locks"));
+            lockStats.report(&locks);
+        }
+
+        if (!exceptionInfo.empty()) {
+            exceptionInfo.append(b, "exception", "exceptionCode");
+        }
 
         OPDEBUG_APPEND_NUMBER( nreturned );
         OPDEBUG_APPEND_NUMBER( responseLength );

@@ -129,13 +129,17 @@ namespace mongo {
 
         void recordStats();
 
-        std::string report( const CurOp& curop ) const;
+        std::string report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const;
 
         /**
-         * Appends information about the current operation to "builder".  "curop" must be a
-         * reference to the CurOp that owns this OpDebug.
+         * Appends information about the current operation to "builder"
+         *
+         * @param curop reference to the CurOp that owns this OpDebug
+         * @param lockStats lockStats object containing locking information about the operation
          */
-        void append(const CurOp& curop, BSONObjBuilder& builder) const;
+        void append(const CurOp& curop,
+                    const SingleThreadedLockStats& lockStats,
+                    BSONObjBuilder& builder) const;
 
         // -------------------
         
