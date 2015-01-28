@@ -266,10 +266,10 @@ __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_UNUSED(session);
 
 	while (slot->slot_state > WT_LOG_SLOT_DONE)
-		if (++yield_count < 100)
+		if (++yield_count < 1000)
 			__wt_yield();
 		else
-			__wt_sleep(0, 2000);
+			__wt_sleep(0, 200);
 	return (0);
 }
 
