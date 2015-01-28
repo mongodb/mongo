@@ -110,7 +110,8 @@ __col_append_serial_func(WT_SESSION_IMPL *session,
  *	Worker function to add an WT_UPDATE entry in the page array.
  */
 static inline int
-__update_serial_func(WT_SESSION_IMPL *session, WT_UPDATE **upd_entry, WT_UPDATE *upd)
+__update_serial_func(
+    WT_SESSION_IMPL *session, WT_UPDATE **upd_entry, WT_UPDATE *upd)
 {
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
