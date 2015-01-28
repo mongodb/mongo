@@ -16,8 +16,9 @@
 	total += (len);							\
 } while (0)
 #define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
-	WT_MEMSIZE_ADD(from_decr, len);					\
-	WT_MEMSIZE_ADD(to_incr, len);					\
+	size_t __len = (len);						\
+	WT_MEMSIZE_ADD(from_decr, __len);				\
+	WT_MEMSIZE_ADD(to_incr, __len);					\
 } while (0)
 
 /*
