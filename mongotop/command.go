@@ -18,18 +18,18 @@ type FormattableDiff interface {
 	Grid() string
 }
 
-// ServerStatus, LockStats, and ReadWriteLockTimes are structs to contain
-// the raw BSON format of the serverStatus() command, from which the diffs
-// are calculated when using --locks
+// ServerStatus represents the results of the "serverStatus" command.
 type ServerStatus struct {
 	Locks map[string]LockStats `bson:"locks,omitempty"`
 }
 
+// LockStats contains information on time spent acquiring and holding a lock.
 type LockStats struct {
 	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
 }
 
+// ReadWriteLockTimes contains read/write lock times on a database.
 type ReadWriteLockTimes struct {
 	Read       int64 `bson:"R"`
 	Write      int64 `bson:"W"`
@@ -37,7 +37,7 @@ type ReadWriteLockTimes struct {
 	WriteLower int64 `bson:"w"`
 }
 
-// ServerStatusDiff contains a map of the lock time differences for each database
+// ServerStatusDiff contains a map of the lock time differences for each database.
 type ServerStatusDiff struct {
 	// namespace -> lock times
 	Totals map[string]LockDelta `json:"totals"`
@@ -57,19 +57,19 @@ type TopDiff struct {
 	Time   time.Time            `json:"time"`
 }
 
-// Top, NSTopInfo, and TopField are structs to hold raw output of the "top" command.
+// Top holds raw output of the "top" command.
 type Top struct {
 	Totals map[string]NSTopInfo `bson:"totals"`
 }
 
-// Info within the top command about a single namespace.
+// NSTopInfo holds information about a single namespace.
 type NSTopInfo struct {
 	Total TopField `bson:"total" json:"total"`
 	Read  TopField `bson:"readLock" json:"read"`
 	Write TopField `bson:"writeLock" json:"write"`
 }
 
-// TopField contains the timing and counts for a single lock stat within the top command
+// TopField contains the timing and counts for a single lock statistic within the "top" command.
 type TopField struct {
 	Time  int `bson:"time" json:"time"`
 	Count int `bson:"count" json:"count"`
@@ -80,6 +80,7 @@ type sortableTotal struct {
 	Name  string
 	Total int64
 }
+
 type sortableTotals []sortableTotal
 
 func (a sortableTotals) Less(i, j int) bool {
@@ -91,8 +92,8 @@ func (a sortableTotals) Less(i, j int) bool {
 func (a sortableTotals) Len() int      { return len(a) }
 func (a sortableTotals) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
-// Diff takes an older Top sample, and produces a TopDiff representing the
-// deltas of each metric between the two samples.
+// Diff takes an older Top sample, and produces a TopDiff
+// representing the deltas of each metric between the two samples.
 func (top Top) Diff(previous Top) TopDiff {
 	// The diff to eventually return
 	diff := TopDiff{
@@ -125,6 +126,7 @@ func (top Top) Diff(previous Top) TopDiff {
 	return diff
 }
 
+// Grid returns a tabular representation of the TopDiff.
 func (td TopDiff) Grid() string {
 	buf := &bytes.Buffer{}
 	out := &text.GridWriter{ColumnPadding: 4}
@@ -154,6 +156,7 @@ func (td TopDiff) Grid() string {
 	return buf.String()
 }
 
+// JSON returns a JSON representation of the TopDiff.
 func (td TopDiff) JSON() string {
 	bytes, err := json.Marshal(td)
 	if err != nil {
@@ -162,6 +165,7 @@ func (td TopDiff) JSON() string {
 	return string(bytes)
 }
 
+// JSON returns a JSON representation of the ServerStatusDiff.
 func (ssd ServerStatusDiff) JSON() string {
 	bytes, err := json.Marshal(ssd)
 	if err != nil {
@@ -170,6 +174,7 @@ func (ssd ServerStatusDiff) JSON() string {
 	return string(bytes)
 }
 
+// Grid returns a tabular representation of the ServerStatusDiff.
 func (ssd ServerStatusDiff) Grid() string {
 	buf := &bytes.Buffer{}
 	out := &text.GridWriter{ColumnPadding: 4}
@@ -200,6 +205,8 @@ func (ssd ServerStatusDiff) Grid() string {
 	return buf.String()
 }
 
+// Diff takes an older ServerStatus sample, and produces a ServerStatusDiff
+// representing the deltas of each metric between the two samples.
 func (ss ServerStatus) Diff(previous ServerStatus) ServerStatusDiff {
 	// the diff to eventually return
 	diff := ServerStatusDiff{

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Wrapper for the mongotop functionality
+// MongoTop is a wrapper for the mongotop functionality.
 type MongoTop struct {
 	// Generic mongo tool options
 	Options *options.ToolOptions
@@ -67,8 +67,7 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 	return outDiff, nil
 }
 
-// Connect to the database and periodically run a command to collect stats,
-// writing the results to standard out in the specified format.
+// Run executes the mongotop program.
 func (mt *MongoTop) Run() error {
 
 	connURL := mt.Options.Host
