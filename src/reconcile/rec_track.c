@@ -12,8 +12,8 @@
  * Estimated memory cost for a structure on the overflow lists, the size of
  * the structure plus two pointers (assume the average skip list depth is 2).
  */
-#define	WT_OVFL_SIZE(s)							\
-	(sizeof(s) + 2 * sizeof(void *))
+#define	WT_OVFL_SIZE(p, s)						\
+	(sizeof(s) + 2 * sizeof(void *) + (p)->addr_size + (p)->value_size)
 
 /*
  * __ovfl_track_init --
@@ -358,8 +358,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
 			if (F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED))
-				incr += WT_OVFL_SIZE(WT_OVFL_REUSE) +
-				    reuse->addr_size + reuse->value_size;
+				incr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
 
 			F_CLR(reuse,
 			    WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
@@ -369,8 +368,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		*e = (*e)->next[0];
 
 		WT_ASSERT(session, !F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED));
-		decr += WT_OVFL_SIZE(WT_OVFL_REUSE) +
-		    reuse->addr_size + reuse->value_size;
+		decr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
 
 		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 			WT_RET(
@@ -725,8 +723,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 		*e = (*e)->next[0];
 
-		decr += WT_OVFL_SIZE(WT_OVFL_TXNC) +
-		    txnc->addr_size + txnc->value_size;
+		decr += WT_OVFL_SIZE(txnc, WT_OVFL_TXNC);
 
 		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 			WT_RET(
@@ -810,8 +807,8 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, value, value_size);
 	txnc->current = __wt_txn_new_id(session);
 
-	__wt_cache_page_inmem_incr(session, page,
-	    WT_OVFL_SIZE(WT_OVFL_TXNC) + addr_size + value_size);
+	__wt_cache_page_inmem_incr(
+	    session, page, WT_OVFL_SIZE(txnc, WT_OVFL_TXNC));
 
 	/* Insert the new entry into the skiplist. */
 	__ovfl_txnc_skip_search_stack(head, stack, addr, addr_size);
