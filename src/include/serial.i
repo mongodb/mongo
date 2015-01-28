@@ -110,13 +110,8 @@ __col_append_serial_func(WT_SESSION_IMPL *session,
  *	Worker function to add an WT_UPDATE entry in the page array.
  */
 static inline int
-__update_serial_func(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_UPDATE **upd_entry, WT_UPDATE *upd)
+__update_serial_func(WT_SESSION_IMPL *session, WT_UPDATE **upd_entry, WT_UPDATE *upd)
 {
-	WT_DECL_RET;
-	WT_UPDATE *obsolete;
-	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
-
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted,
@@ -128,24 +123,6 @@ __update_serial_func(WT_SESSION_IMPL *session,
 		WT_WRITE_BARRIER();
 	}
 
-	/*
-	 * If there are subsequent WT_UPDATE structures, we're evicting pages
-	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
-	 * structures.  Serialization is needed so only one thread does the
-	 * obsolete check at a time, and to protect updates from disappearing
-	 * under reconciliation.
-	 */
-	if (upd->next != NULL &&
-	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
-		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
-		/* If we can't lock it, don't scan, that's okay. */
-		if (ret != 0)
-			return (0);
-		obsolete = __wt_update_obsolete_check(session, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
-		if (obsolete != NULL)
-			__wt_update_obsolete_free(session, page, obsolete);
-	}
 	return (0);
 }
 
@@ -275,8 +252,8 @@ __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd,
 	WT_UPDATE **updp, size_t upd_size)
 {
-	WT_UPDATE *upd = *updp;
 	WT_DECL_RET;
+	WT_UPDATE *obsolete, *upd = *updp;
 	size_t incr_mem;
 
 	/* Clear references to memory we now own. */
@@ -296,8 +273,7 @@ __wt_update_serial(
 	 */
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
-	ret = __update_serial_func(
-	    session, page, srch_upd, upd);
+	ret = __update_serial_func(session, srch_upd, upd);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {
@@ -317,6 +293,25 @@ __wt_update_serial(
 	incr_mem += upd_size;
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
+
+	/*
+	 * If there are subsequent WT_UPDATE structures, we're evicting pages
+	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
+	 * structures.  Serialization is needed so only one thread does the
+	 * obsolete check at a time, and to protect updates from disappearing
+	 * under reconciliation.
+	 */
+	if (upd->next != NULL &&
+	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
+		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+		/* If we can't lock it, don't scan, that's okay. */
+		if (ret != 0)
+			return (0);
+		obsolete = __wt_update_obsolete_check(session, upd->next);
+		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
+		if (obsolete != NULL)
+			__wt_update_obsolete_free(session, page, obsolete);
+	}
 
 	/* Mark the page dirty after updating the footprint. */
 	__wt_page_modify_set(session, page);
