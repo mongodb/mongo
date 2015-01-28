@@ -861,12 +861,12 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	WT_LSN sync_lsn;
 	size_t write_size;
-	int locked;
+	int locked, yield_count;
 	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	locked = yield_count = 0;
 
 	/* Write the buffered records */
 	if (F_ISSET(slot, SLOT_BUFFERED)) {
@@ -880,8 +880,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * Wait for earlier groups to finish, otherwise there could be holes
 	 * in the log file.
 	 */
-	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
-		__wt_yield();
+	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+		if (++yield_count < 100)
+			__wt_yield();
+		else
+			WT_ERR(__wt_cond_wait(
+			    session, log->log_write_cond, 2000));
+	}
 	log->write_lsn = slot->slot_end_lsn;
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
