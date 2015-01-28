@@ -439,12 +439,31 @@ namespace mongo {
             }
         }
 
+        // If the winning plan produces no results during the ranking period (and, therefore, no
+        // plan produced results during the ranking period), then we will not create a plan cache
+        // entry.
+        if (_alreadyProduced.empty()) {
+            size_t winnerIdx = _ranking->candidateOrder[0];
+            LOG(1) << "Winning plan had zero results. Not caching."
+                   << " ns: " << _collection->ns()
+                   << " " << _query->toStringShort()
+                   << " winner score: " << _ranking->scores[0]
+                   << " winner summary: "
+                   << getPlanSummary(*_candidates[winnerIdx].solution);
+        }
+
         // Store the choice we just made in the cache. In order to do so,
-        //  1) the query must be of a type that is safe to cache, and
-        //  2) two or more plans cannot have tied for the win. Caching in the
-        //  case of ties can cause successive queries of the same shape to use
-        //  a bad index.
-        if (PlanCache::shouldCacheQuery(*_query) && !_ranking->tieForBest) {
+        //  1) the query must be of a type that is safe to cache,
+        //  2) two or more plans cannot have tied for the win. Caching in the case of ties can cause
+        //  successive queries of the same shape to use a bad index.
+        //  3) Furthermore, the winning plan must have returned returned at least one result. Plans
+        //  which return zero results cannot be reliably ranked. Such query shapes are generally
+        //  existence type queries, and a winning plan should get cached once the query finds a
+        //  result.
+        if (PlanCache::shouldCacheQuery(*_query)
+            && !_ranking->tieForBest
+            && !_alreadyProduced.empty()) {
+            // If we're here, then the winning plan qualifies for caching.
             Database* db = cc().database();
             verify(NULL != db);
             Collection* collection = db->getCollection(_query->ns());
