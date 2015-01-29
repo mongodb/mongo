@@ -693,10 +693,19 @@ static int
 __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **e, **head, *txnc;
+	uint64_t oldest_txn;
 	size_t decr;
 	int i;
 
 	head = page->modify->ovfl_track->ovfl_txnc;
+
+	/*
+	 * Take a snapshot of the oldest transaction ID we need to keep alive.
+	 * Since we do two passes through entries in the structure, the normal
+	 * visibility check could give different results as the global ID moves
+	 * forward.
+	 */
+	oldest_txn = S2C(session)->txn_global.oldest_id;
 
 	/*
 	 * Discard any transaction-cache records with transaction IDs earlier
@@ -706,8 +715,8 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * the lowest level), fixing up links.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
-		for (e = &head[i]; *e != NULL;) {
-			if (!__wt_txn_visible_all(session, (*e)->current)) {
+		for (e = &head[i]; (txnc = *e) != NULL;) {
+			if (TXNID_LE(oldest_txn, txnc->current)) {
 				e = &(*e)->next[i];
 				continue;
 			}
@@ -717,7 +726,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
-		if (!__wt_txn_visible_all(session, txnc->current)) {
+		if (TXNID_LE(oldest_txn, txnc->current)) {
 			e = &(*e)->next[0];
 			continue;
 		}
