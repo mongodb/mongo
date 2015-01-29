@@ -137,13 +137,12 @@ namespace mongo {
             for ( size_t i = 0; i < indexNames.size(); i++ ) {
                 BSONObj indexSpec = cce->getIndexSpec( txn, indexNames[i] );
 
-                WorkingSetID wsId = ws->allocate();
-                WorkingSetMember* member = ws->get(wsId);
-                member->state = WorkingSetMember::OWNED_OBJ;
-                member->keyData.clear();
-                member->loc = RecordId();
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec);
-                root->pushBack(*member);
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+                member.keyData.clear();
+                member.loc = RecordId();
+                member.obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
+                root->pushBack(member);
             }
 
             std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name << "."
