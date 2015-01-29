@@ -9,6 +9,7 @@ or use -d and -c to restore a single collection from a single .bson file.
 
 See http://docs.mongodb.org/manual/reference/program/mongorestore/ for more information.`
 
+// InputOptions defines the set of options to use in configuring the restore process.
 type InputOptions struct {
 	Objcheck               bool   `long:"objcheck" description:"validate all objects before inserting"`
 	OplogReplay            bool   `long:"oplogReplay" description:"replay oplog for point-in-time restore"`
@@ -17,10 +18,12 @@ type InputOptions struct {
 	Directory              string `long:"dir" description:"input directory, use '-' for stdin"`
 }
 
+// Name returns a human-readable group name for input options.
 func (_ *InputOptions) Name() string {
 	return "input"
 }
 
+// OutputOptions defines the set of options for restoring dump data.
 type OutputOptions struct {
 	Drop                   bool   `long:"drop" description:"drop each collection before import"`
 	WriteConcern           string `long:"writeConcern" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
@@ -33,6 +36,7 @@ type OutputOptions struct {
 	StopOnError            bool   `long:"stopOnError" description:"stop restoring if an error is encountered on insert (off by default)"`
 }
 
+// Name returns a human-readable group name for output options.
 func (_ *OutputOptions) Name() string {
 	return "restore"
 }

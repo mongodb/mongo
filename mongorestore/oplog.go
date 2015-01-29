@@ -14,8 +14,9 @@ import (
 	"time"
 )
 
-const OplogMaxCommandSize = 1024 * 1024 * 16.5
+const oplogMaxCommandSize = 1024 * 1024 * 16.5
 
+// RestoreOplog attempts to restore a MongoDB oplog.
 func (restore *MongoRestore) RestoreOplog() error {
 	log.Log(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
@@ -52,7 +53,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		Watching:  oplogProgressor,
 		WaitTime:  3 * time.Second,
 		Writer:    log.Writer(0),
-		BarLength: ProgressBarLength,
+		BarLength: progressBarLength,
 		IsBytes:   true,
 	}
 	bar.Start()
@@ -70,7 +71,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	// apply the current buffered ops and reset the buffer.
 	for bsonSource.Next(rawOplogEntry) {
 		entrySize = len(rawOplogEntry.Data)
-		if bufferedBytes+entrySize > OplogMaxCommandSize {
+		if bufferedBytes+entrySize > oplogMaxCommandSize {
 			err = restore.ApplyOps(session, entryArray)
 			if err != nil {
 				return fmt.Errorf("error applying oplog: %v", err)
@@ -117,7 +118,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 }
 
 // ApplyOps is a wrapper for the applyOps database command, we pass in
-// a session to avoid opening a new connection for a few inserts at a time
+// a session to avoid opening a new connection for a few inserts at a time.
 func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{}) error {
 	res := bson.M{}
 	err := session.Run(bson.D{{"applyOps", entries}}, &res)
@@ -131,7 +132,7 @@ func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{
 	return nil
 }
 
-// OplogTimestampIsValid returns whether the given timestamp is allowed to be
+// TimestampBeforeLimit returns true if the given timestamp is allowed to be
 // applied to mongorestore's target database.
 func (restore *MongoRestore) TimestampBeforeLimit(ts bson.MongoTimestamp) bool {
 	if restore.oplogLimit == 0 {

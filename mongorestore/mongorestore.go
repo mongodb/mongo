@@ -46,6 +46,7 @@ type MongoRestore struct {
 	knownCollectionsMutex sync.Mutex
 }
 
+// ParseAndValidateOptions returns a non-nil error if user-supplied options are invalid.
 func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two separate flags,
 	// and we need to be able to see if they're both being used. We default to
@@ -139,6 +140,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	return nil
 }
 
+// Restore runs the mongorestore program.
 func (restore *MongoRestore) Restore() error {
 	err := restore.ParseAndValidateOptions()
 	if err != nil {

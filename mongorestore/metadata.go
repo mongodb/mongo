@@ -14,8 +14,11 @@ import (
 	"strings"
 )
 
-const Users = "users"
-const Roles = "roles"
+// Specially treated restore collection types.
+const (
+	Users = "users"
+	Roles = "roles"
+)
 
 // struct for working with auth versions
 type authVersionPair struct {
@@ -25,6 +28,7 @@ type authVersionPair struct {
 	Server int
 }
 
+// Metadata holds information about a collection's options and indexes.
 type Metadata struct {
 	Options bson.D          `json:"options,omitempty"`
 	Indexes []IndexDocument `json:"indexes"`
@@ -35,6 +39,7 @@ type metaDataMapIndex struct {
 	Indexes []bson.M `json:"indexes"`
 }
 
+// IndexDocument holds information about a collection's index.
 type IndexDocument struct {
 	Options bson.M `bson:",inline"`
 	Key     bson.D `bson:"key"`
@@ -79,7 +84,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	return meta.Options, meta.Indexes, nil
 }
 
-// IndexesFromBSON extracts index information from bson files and preserves order
+// IndexesFromBSON extracts index information from BSON files.
 func (restore *MongoRestore) IndexesFromBSON(intent *intents.Intent, bsonFile string) ([]IndexDocument, error) {
 	log.Logf(log.DebugLow, "scanning %v for indexes on %v collections", bsonFile, intent.C)
 
@@ -116,8 +121,7 @@ func stripDBFromNS(ns string) string {
 	return ns
 }
 
-// CollectionExists wraps mgo's CollectionNames() method to detect if the
-// given intent's collection exists
+// CollectionExists returns true if the given intent's collection exists.
 func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, error) {
 	restore.knownCollectionsMutex.Lock()
 	defer restore.knownCollectionsMutex.Unlock()
@@ -208,6 +212,8 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 	return nil
 }
 
+// LegacyInsertIndex takes in an intent and an index document and attempts to
+// create the index on the "system.indexes" collection.
 func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index IndexDocument) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
@@ -227,6 +233,8 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 	return nil
 }
 
+// CreateCollection creates the collection specified in the intent with the
+// given options.
 func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D) error {
 	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
 		append(bson.D{{"create", intent.C}}, options...),
@@ -253,6 +261,8 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 	return nil
 }
 
+// RestoreUsersOrRoles accepts a collection type (Users or Roles) and restores the intent
+// in the appropriate collection.
 func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *intents.Intent) error {
 	log.Logf(log.Always, "restoring %v from %v", collectionType, intent.BSONPath)
 
@@ -366,9 +376,9 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 }
 
 // GetDumpAuthVersion reads the admin.system.version collection in the dump directory
-// to determine the auth version of the files in the dump. If that collection is not
-// present in the dump, we try to infer the auth version based on its absence.
-// Returns the auth version number and any errors that occur.
+// to determine the authentication version of the files in the dump. If that collection is not
+// present in the dump, we try to infer the authentication version based on its absence.
+// Returns the authentication version number and any errors that occur.
 func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 	// first handle the case where we have no auth version
 	intent := restore.manager.AuthVersion()
@@ -408,9 +418,9 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 	return authVersion, nil
 }
 
-// ValidateAuthVersions compares the auth version of the dump files and the
-// auth version of the target server, and errors with a detailed message
-// if the versions are not compatible.
+// ValidateAuthVersions compares the authentication version of the dump files and the
+// authentication version of the target server, and returns an error if the versions
+// are incompatible.
 func (restore *MongoRestore) ValidateAuthVersions() error {
 	if restore.authVersions.Dump == 2 || restore.authVersions.Dump == 4 {
 		return fmt.Errorf(
@@ -457,8 +467,8 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 
 }
 
-// ShouldRestoreUsersAndRoles returns whether or not MongoRestore should
-// go through the process of handling auth collections.
+// ShouldRestoreUsersAndRoles returns true if mongorestore should go through
+// through the process of restoring collections pertaining to authentication.
 func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
 	// If the user has done anything that would indicate the restoration
 	// of users and roles (i.e. used --restoreDbUsersAndRoles, -d admin, or
@@ -474,8 +484,7 @@ func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
 	return false
 }
 
-// DropCollection takes a collection intent and drops it, returning all
-// errors that occur
+// DropCollection drops the intent's collection.
 func (restore *MongoRestore) DropCollection(intent *intents.Intent) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {

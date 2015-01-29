@@ -11,18 +11,17 @@ import (
 	"strings"
 )
 
-// Filename helpers
-
+// FileType describes the various types of restore documents.
 type FileType uint
 
+// File types constants used by mongorestore.
 const (
 	UnknownFileType FileType = iota
 	BSONFileType
 	MetadataFileType
 )
 
-// GetInfoFromFilename pulls the base collection name and
-// type of file from a .bson/.metadata.json file
+// GetInfoFromFilename pulls the base collection name and FileType from a given file.
 func GetInfoFromFilename(filename string) (string, FileType) {
 	baseFileName := filepath.Base(filename)
 	switch {
@@ -43,10 +42,12 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 	}
 }
 
-func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
-	log.Logf(log.DebugHigh, "using %v as dump root directory", fullpath)
+// CreateAllIntents drills down into a dump folder, creating intents for all of
+// the databases and collections it finds.
+func (restore *MongoRestore) CreateAllIntents(dumpDir string) error {
+	log.Logf(log.DebugHigh, "using %v as dump root directory", dumpDir)
 	foundOplog := false
-	entries, err := readDirWithSymlinks(fullpath)
+	entries, err := readDirWithSymlinks(dumpDir)
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
 	}
@@ -55,7 +56,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 			if err = util.ValidateDBName(entry.Name()); err != nil {
 				return fmt.Errorf("invalid database name '%v': %v", entry.Name(), err)
 			}
-			err = restore.CreateIntentsForDB(entry.Name(), filepath.Join(fullpath, entry.Name()))
+			err = restore.CreateIntentsForDB(entry.Name(), filepath.Join(dumpDir, entry.Name()))
 			if err != nil {
 				return err
 			}
@@ -67,27 +68,27 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 				foundOplog = true
 				restore.manager.Put(&intents.Intent{
 					C:        "oplog",
-					BSONPath: filepath.Join(fullpath, entry.Name()),
+					BSONPath: filepath.Join(dumpDir, entry.Name()),
 					Size:     entry.Size(),
 				})
 			} else {
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
-					filepath.Join(fullpath, entry.Name()))
+					filepath.Join(dumpDir, entry.Name()))
 			}
 		}
 	}
 	if restore.InputOptions.OplogReplay && !foundOplog {
-		return fmt.Errorf("no %v/oplog.bson file to replay; make sure you run mongodump with --oplog", fullpath)
+		return fmt.Errorf("no %v/oplog.bson file to replay; make sure you run mongodump with --oplog", dumpDir)
 	}
 	return nil
 }
 
-// CreateIntentsForDB drills down into a db folder, creating intents
-// for all of the collection dump files it encounters
-func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
+// CreateIntentsForDB drills down into the dir folder, creating intents
+// for all of the collection dump files it finds for the db database.
+func (restore *MongoRestore) CreateIntentsForDB(db, dir string) error {
 
-	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, fullpath)
-	entries, err := ioutil.ReadDir(fullpath)
+	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, dir)
+	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("error reading db folder %v: %v", db, err)
 	}
@@ -95,7 +96,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			log.Logf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
-				filepath.Join(fullpath, entry.Name()))
+				filepath.Join(dir, entry.Name()))
 		} else {
 			collection, fileType := GetInfoFromFilename(entry.Name())
 			switch fileType {
@@ -122,7 +123,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 					DB:       db,
 					C:        collection,
 					Size:     entry.Size(),
-					BSONPath: filepath.Join(fullpath, entry.Name()),
+					BSONPath: filepath.Join(dir, entry.Name()),
 				}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
@@ -131,13 +132,13 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 				intent := &intents.Intent{
 					DB:           db,
 					C:            collection,
-					MetadataPath: filepath.Join(fullpath, entry.Name()),
+					MetadataPath: filepath.Join(dir, entry.Name()),
 				}
 				log.Logf(log.Info, "found collection %v metadata to restore", intent.Namespace())
 				restore.manager.Put(intent)
 			default:
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
-					filepath.Join(fullpath, entry.Name()))
+					filepath.Join(dir, entry.Name()))
 			}
 		}
 	}
@@ -154,12 +155,13 @@ func hasMetadataFiles(files []os.FileInfo) bool {
 	return false
 }
 
-// CreateIntentForCollection builds an intent for the given db and collection name
-// along with a path to a .bson collection file. It searches the .bson's directory
-// for a matching metadata file. This method is not called by CreateIntentsForDB,
+// CreateIntentForCollection builds an intent for the given database and collection name
+// along with a path to a .bson collection file. It searches the file's parent directory
+// for a matching metadata file.
+//
+// This method is not called by CreateIntentsForDB,
 // it is only used in the case where --db and --collection flags are set.
-func (restore *MongoRestore) CreateIntentForCollection(
-	db, collection, fullpath string) error {
+func (restore *MongoRestore) CreateIntentForCollection(db, collection, fullpath string) error {
 
 	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, fullpath)
@@ -234,7 +236,7 @@ func isBSON(path string) bool {
 		// that provides more helpful context to the user
 		return false
 	}
-	return !file.IsDir() 
+	return !file.IsDir()
 }
 
 // handleBSONInsteadOfDirectory updates -d and -c settings based on
@@ -244,7 +246,7 @@ func isBSON(path string) bool {
 // As an example, when the user passes 'dump/mydb/col.bson', this method
 // will infer that 'mydb' is the database and 'col' is the collection name.
 func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
-	// we know we have been given a non-directory, so we should handle it 
+	// we know we have been given a non-directory, so we should handle it
 	// like a bson file and infer as much as we can
 	if restore.ToolOptions.Collection == "" {
 		// if the user did not set -c, use the file name for the collection
