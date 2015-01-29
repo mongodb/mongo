@@ -213,7 +213,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// Restore the regular collections
-	if restore.OutputOptions.NumParallelCollections > 0 {
+	if restore.OutputOptions.NumParallelCollections > 1 {
 		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {
 		// use legacy restoration order if we are single-threaded
