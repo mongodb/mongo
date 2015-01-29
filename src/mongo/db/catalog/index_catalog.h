@@ -359,6 +359,7 @@ namespace mongo {
 
         int _magic;
         Collection* _collection;
+        const int _maxNumIndexesAllowed;
 
         IndexCatalogEntryContainer _entries;
 

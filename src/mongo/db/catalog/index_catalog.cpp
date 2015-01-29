@@ -80,7 +80,9 @@ namespace mongo {
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection )
-        : _magic(INDEX_CATALOG_UNINIT), _collection( collection ) {
+        : _magic(INDEX_CATALOG_UNINIT),
+          _collection( collection ),
+          _maxNumIndexesAllowed(_collection->getCatalogEntry()->getMaxAllowedIndexes()) {
     }
 
     IndexCatalog::~IndexCatalog() {
@@ -615,8 +617,7 @@ namespace {
             }
         }
 
-        if ( _collection->getCatalogEntry()->getTotalIndexCount( txn ) >=
-             _collection->getCatalogEntry()->getMaxAllowedIndexes() ) {
+        if ( numIndexesTotal(txn) >= _maxNumIndexesAllowed ) {
             string s = str::stream() << "add index fails, too many indexes for "
                                      << _collection->ns().ns() << " key:" << key.toString();
             log() << s;
@@ -872,11 +873,20 @@ namespace {
     }
 
     int IndexCatalog::numIndexesTotal( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getTotalIndexCount( txn );
+        int count = _entries.size() + _unfinishedIndexes.size();
+        dassert(_collection->getCatalogEntry()->getTotalIndexCount(txn) == count);
+        return count;
     }
 
     int IndexCatalog::numIndexesReady( OperationContext* txn ) const {
-        return _collection->getCatalogEntry()->getCompletedIndexCount( txn );
+        int count = 0;
+        IndexIterator ii = getIndexIterator(txn, /*includeUnfinished*/false);
+        while (ii.more()) {
+            ii.next();
+            count++;
+        }
+        dassert(_collection->getCatalogEntry()->getCompletedIndexCount(txn) == count);
+        return count;
     }
 
     bool IndexCatalog::haveIdIndex( OperationContext* txn ) const {
