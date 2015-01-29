@@ -34,9 +34,11 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/global_environment_experiment.h"
@@ -129,13 +131,19 @@ namespace mongo {
             invariant(cce);
 
             vector<string> indexNames;
-            cce->getAllIndexes( txn, &indexNames );
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                indexNames.clear();
+                cce->getAllIndexes( txn, &indexNames );
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
             std::auto_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
 
             for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                BSONObj indexSpec = cce->getIndexSpec( txn, indexNames[i] );
+                BSONObj indexSpec;
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    indexSpec = cce->getIndexSpec( txn, indexNames[i] );
+                } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
                 WorkingSetID wsId = ws->allocate();
                 WorkingSetMember* member = ws->get(wsId);
