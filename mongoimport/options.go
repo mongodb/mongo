@@ -43,6 +43,9 @@ type IngestOptions struct {
 	// Indicates that documents will be inserted in the order of their appearance in the input source.
 	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"insert documents in the order of their appearance in the input source"`
 
+	// Sets the number of insertion routines to use
+	NumInsertionWorkers int `short:"j" long:"numInsertionWorkers" description:"number of insert operations to run concurrently (defaults to 1)" default:"1" default-mask:"-"`
+
 	// Forces mongoimport to halt the import operation at the first insert or upsert error.
 	StopOnError bool `long:"stopOnError" description:"stop importing at first insert/upsert error"`
 

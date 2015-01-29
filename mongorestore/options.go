@@ -29,6 +29,7 @@ type OutputOptions struct {
 	KeepIndexVersion       bool   `long:"keepIndexVersion" description:"don't update index version"`
 	MaintainInsertionOrder bool   `long:"maintainInsertionOrder" description:"preserve order of documents during restoration"`
 	NumParallelCollections int    `long:"numParallelCollections" short:"j" description:"number of collections to restore in parallel (4 by default)" default:"4" default-mask:"-"`
+	NumInsertionWorkers    int    `long:"numInsertionWorkersPerCollection" description:"number of insert operations to run concurrently per collection (1 by default)" default:"1" default-mask:"-"`
 	StopOnError            bool   `long:"stopOnError" description:"stop restoring if an error is encountered on insert (off by default)"`
 }
 

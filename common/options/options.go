@@ -56,14 +56,10 @@ type ToolOptions struct {
 
 type HiddenOptions struct {
 	MaxProcs       int
-	BulkWriters    int
 	BulkBufferSize int
 
 	// Specifies the number of threads to use in processing data read from the input source
 	NumDecodingWorkers int
-
-	// Specifies the number of threads to use in sending processed data over to the server
-	NumInsertionWorkers int
 
 	// Deprecated flag for csv writing in mongoexport
 	CSVOutputType bool
@@ -143,7 +139,6 @@ type EnabledOptions struct {
 // Ask for a new instance of tool options
 func New(appName, usageStr string, enabled EnabledOptions) *ToolOptions {
 	hiddenOpts := &HiddenOptions{
-		BulkWriters:    1,
 		BulkBufferSize: 10000,
 	}
 
@@ -305,14 +300,10 @@ See http://dochub.mongodb.org/core/tools-dbpath-deprecated for more information`
 	switch option {
 	case "numThreads":
 		opts.MaxProcs = optionValue
-	case "numInsertionWorkersPerCollection":
-		opts.BulkWriters = optionValue
 	case "batchSize":
 		opts.BulkBufferSize = optionValue
 	case "numDecodingWorkers":
 		opts.NumDecodingWorkers = optionValue
-	case "numInsertionWorkers":
-		opts.NumInsertionWorkers = optionValue
 	default:
 		return args, fmt.Errorf(`unknown option "%v"`, option)
 	}

@@ -168,15 +168,15 @@ func (imp *MongoImport) ValidateSettings(args []string) error {
 	log.Logf(log.DebugLow, "using %v decoding workers", imp.ToolOptions.NumDecodingWorkers)
 
 	// set the number of insertion workers to use for imports
-	if imp.ToolOptions.NumInsertionWorkers <= 0 {
-		imp.ToolOptions.NumInsertionWorkers = 1
+	if imp.IngestOptions.NumInsertionWorkers <= 0 {
+		imp.IngestOptions.NumInsertionWorkers = 1
 	}
 
-	log.Logf(log.DebugLow, "using %v insert workers", imp.ToolOptions.NumInsertionWorkers)
+	log.Logf(log.DebugLow, "using %v insert workers", imp.IngestOptions.NumInsertionWorkers)
 
 	// if --maintainInsertionOrder is set, we can only allow 1 insertion worker
 	if imp.IngestOptions.MaintainInsertionOrder {
-		imp.ToolOptions.NumInsertionWorkers = 1
+		imp.IngestOptions.NumInsertionWorkers = 1
 	}
 
 	// get the number of documents per batch
@@ -356,7 +356,7 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 // into the target collection. It spreads the insert/upsert workload across one
 // or more workers.
 func (imp *MongoImport) ingestDocuments(readDocs chan bson.D) (retErr error) {
-	numInsertionWorkers := imp.ToolOptions.NumInsertionWorkers
+	numInsertionWorkers := imp.IngestOptions.NumInsertionWorkers
 	if numInsertionWorkers <= 0 {
 		numInsertionWorkers = 1
 	}

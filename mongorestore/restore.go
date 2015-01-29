@@ -221,7 +221,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	restore.progressManager.Attach(bar)
 	defer restore.progressManager.Detach(bar)
 
-	MaxInsertThreads := restore.ToolOptions.BulkWriters
+	MaxInsertThreads := restore.OutputOptions.NumInsertionWorkers
 	if restore.OutputOptions.MaintainInsertionOrder {
 		MaxInsertThreads = 1
 	}

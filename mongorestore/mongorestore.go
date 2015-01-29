@@ -122,7 +122,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		restore.tempRolesCol = *restore.ToolOptions.HiddenOptions.TempRolesColl
 	}
 
-	if restore.ToolOptions.HiddenOptions.BulkWriters < 0 {
+	if restore.OutputOptions.NumInsertionWorkers < 0 {
 		return fmt.Errorf(
 			"cannot specify a negative number of insertion workers per collection")
 	}
@@ -160,13 +160,13 @@ func (restore *MongoRestore) Restore() error {
 	}
 	if restore.ToolOptions.Collection != "" &&
 		restore.OutputOptions.NumParallelCollections > 1 &&
-		restore.ToolOptions.BulkWriters == 1 {
+		restore.OutputOptions.NumInsertionWorkers == 1 {
 		// handle special parallelization case when we are only restoring one collection
 		// by mapping -j to insertion workers rather than parallel collections
 		log.Logf(log.DebugHigh,
 			"setting number of insertions workers to number of parallel collections (%v)",
 			restore.OutputOptions.NumParallelCollections)
-		restore.ToolOptions.BulkWriters = restore.OutputOptions.NumParallelCollections
+		restore.OutputOptions.NumInsertionWorkers = restore.OutputOptions.NumParallelCollections
 	}
 
 	switch {
