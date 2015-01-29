@@ -141,13 +141,12 @@ namespace mongo {
                     continue;
                 }
 
-                WorkingSetID wsId = ws->allocate();
-                WorkingSetMember* member = ws->get(wsId);
-                member->state = WorkingSetMember::OWNED_OBJ;
-                member->keyData.clear();
-                member->loc = RecordId();
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-                root->pushBack(*member);
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+                member.keyData.clear();
+                member.loc = RecordId();
+                member.obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+                root->pushBack(member);
             }
 
             std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;

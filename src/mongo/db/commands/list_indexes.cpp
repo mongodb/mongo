@@ -145,13 +145,12 @@ namespace mongo {
                     indexSpec = cce->getIndexSpec( txn, indexNames[i] );
                 } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
-                WorkingSetID wsId = ws->allocate();
-                WorkingSetMember* member = ws->get(wsId);
-                member->state = WorkingSetMember::OWNED_OBJ;
-                member->keyData.clear();
-                member->loc = RecordId();
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec);
-                root->pushBack(*member);
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+                member.keyData.clear();
+                member.loc = RecordId();
+                member.obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
+                root->pushBack(member);
             }
 
             std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name << "."
