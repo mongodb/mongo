@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
@@ -110,34 +109,19 @@ namespace {
         invariant( collection );
         const NamespaceString& ns = collection->ns();
         if (ns == AuthorizationManager::usersCollectionNamespace) {
-            try {
-                Helpers::ensureIndex(txn,
-                                     collection,
-                                     v3SystemUsersKeyPattern,
-                                     true,  // unique
-                                     v3SystemUsersIndexName.c_str());
-            } catch (const DBException& e) {
-                if (e.getCode() == ASSERT_ID_DUPKEY) {
-                    log() << "Duplicate key exception while trying to build unique index on " <<
-                            ns << ".  This is likely due to problems during the upgrade process " <<
-                            endl;
-                }
-                throw;
-            }
+            collection->getIndexCatalog()->createIndexOnEmptyCollection(
+                txn,
+                BSON("name" << v3SystemUsersIndexName
+                  << "ns" << collection->ns().ns()
+                  << "key" << v3SystemUsersKeyPattern
+                  << "unique" << true));
         } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
-            try {
-                Helpers::ensureIndex(txn,
-                                     collection,
-                                     v3SystemRolesKeyPattern,
-                                     true,  // unique
-                                     v3SystemRolesIndexName.c_str());
-            } catch (const DBException& e) {
-                if (e.getCode() == ASSERT_ID_DUPKEY) {
-                    log() << "Duplicate key exception while trying to build unique index on " <<
-                            ns << "." << endl;
-                }
-                throw;
-            }
+            collection->getIndexCatalog()->createIndexOnEmptyCollection(
+                txn,
+                BSON("name" << v3SystemRolesIndexName
+                  << "ns" << collection->ns().ns()
+                  << "key" << v3SystemRolesKeyPattern
+                  << "unique" << true));
         }
     }
 
