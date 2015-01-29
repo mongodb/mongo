@@ -321,7 +321,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BM *bm;
 	WT_OVFL_REUSE **e, **head, *reuse;
-	size_t incr, decr;
+	size_t decr;
 	int i;
 
 	bm = S2BT(session)->bm;
@@ -354,12 +354,9 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * memory footprint change in the reconciliation wrapup code means
 	 * fewer atomic updates and less code overall.
 	 */
-	incr = decr = 0;
+	decr = 0;
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
-			if (F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED))
-				incr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
-
 			F_CLR(reuse,
 			    WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 			e = &(*e)->next[0];
@@ -378,10 +375,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, reuse);
 	}
 
-	if (incr > decr)
-		__wt_cache_page_inmem_incr(session, page, incr - decr);
-	if (decr > incr)
-		__wt_cache_page_inmem_decr(session, page, decr - incr);
+	__wt_cache_page_inmem_decr(session, page, decr);
 	return (0);
 }
 
@@ -433,6 +427,9 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    __ovfl_reuse_verbose(session, page, reuse, "free"));
 		WT_TRET(bm->free(
 		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
+
+		__wt_cache_page_inmem_decr(
+		   session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
 		__wt_free(session, reuse);
 	}
 	return (0);
@@ -526,6 +523,9 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 		reuse->next[i] = *stack[i];
 		*stack[i] = reuse;
 	}
+
+	__wt_cache_page_inmem_incr(
+	    session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "add"));
