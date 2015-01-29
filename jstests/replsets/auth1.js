@@ -70,19 +70,11 @@ assert.eq(r.x, 1);
 slave.setSlaveOk();
 
 function doQueryOn(p) {
-    var err = {};
-    try {
+    var error = assert.throws( function() {
         r = p.getDB("test").foo.findOne();
-    }
-    catch(e) {
-        if (typeof(JSON) != "undefined") {
-            err = JSON.parse(e.message.substring(6));
-        }
-        else if (e.indexOf("13") > 0) {
-            err.code = 13;
-        }
-    }
-    assert.eq(err.code, 13);
+    }, [], "find did not throw, returned: " + tojson(r)).toString();
+    printjson(error);
+    assert.gt(error.indexOf("not authorized for query on test.foo"), -1, "error was non-auth");
 };
 
 doQueryOn(slave);
