@@ -16,8 +16,9 @@
 	total += (len);							\
 } while (0)
 #define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
-	WT_MEMSIZE_ADD(from_decr, len);					\
-	WT_MEMSIZE_ADD(to_incr, len);					\
+	size_t __len = (len);						\
+	WT_MEMSIZE_ADD(from_decr, __len);				\
+	WT_MEMSIZE_ADD(to_incr, __len);					\
 } while (0)
 
 /*
@@ -1108,7 +1109,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
-	WT_UPDATE *upd;
 	size_t page_decr, parent_decr, parent_incr, right_incr;
 	int i;
 
@@ -1255,10 +1255,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 		;
 	WT_MEMSIZE_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
 	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
-	for (upd = moved_ins->upd; upd != NULL; upd = upd->next)
-		WT_MEMSIZE_TRANSFER(page_decr, right_incr,
-		    sizeof(WT_UPDATE) +
-		    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size));
+	WT_MEMSIZE_TRANSFER(page_decr, right_incr,
+	    __wt_update_list_memsize(moved_ins->upd));
 
 	/*
 	 * Allocation operations completed, move the last insert list item from

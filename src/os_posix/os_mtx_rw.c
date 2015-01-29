@@ -116,7 +116,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 		 */
 		if (++pause_cnt < 1000)
 			WT_PAUSE();
-		else 
+		else
 			__wt_sleep(0, 10);
 	}
 

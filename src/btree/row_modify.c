@@ -104,8 +104,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;
 		} else {
-			upd_size = sizeof(WT_UPDATE) +
-			    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
+			upd_size = __wt_update_list_memsize(upd);
 
 			/*
 			 * We are restoring updates that couldn't be evicted,
@@ -175,8 +174,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;
 		} else
-			upd_size = sizeof(WT_UPDATE) +
-			    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
+			upd_size = __wt_update_list_memsize(upd);
 
 		ins->upd = upd;
 		ins_size += upd_size;
@@ -335,11 +333,8 @@ __wt_update_obsolete_free(
 
 	/* Free a WT_UPDATE list. */
 	for (size = 0; upd != NULL; upd = next) {
-		/* Deleted items have a dummy size: don't include that. */
-		size += sizeof(WT_UPDATE) +
-		    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
-
 		next = upd->next;
+		size += WT_UPDATE_MEMSIZE(upd);
 		__wt_free(session, upd);
 	}
 	if (size != 0)

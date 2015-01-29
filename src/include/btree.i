@@ -35,6 +35,8 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
+	WT_ASSERT(session, size < WT_EXABYTE);
+
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD8(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_ADD8(page->memory_footprint, size);
@@ -83,8 +85,10 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 
-	WT_CACHE_DECR(session, cache->bytes_inmem, size);
+	WT_ASSERT(session, size < WT_EXABYTE);
+
 	WT_CACHE_DECR(session, page->memory_footprint, size);
+	WT_CACHE_DECR(session, cache->bytes_inmem, size);
 	if (__wt_page_is_modified(page)) {
 		WT_CACHE_DECR(session, cache->bytes_dirty, size);
 		WT_CACHE_DECR(session, page->modify->bytes_dirty, size);
@@ -179,6 +183,21 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	page->memory_footprint = 0;
 
 	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
+}
+
+/*
+ * __wt_update_list_memsize --
+ *      The size in memory of a list of updates.
+ */
+static inline size_t
+__wt_update_list_memsize(WT_UPDATE *upd)
+{
+	size_t upd_size;
+
+	for (upd_size = 0; upd != NULL; upd = upd->next)
+		upd_size += WT_UPDATE_MEMSIZE(upd);
+
+	return (upd_size);
 }
 
 /*

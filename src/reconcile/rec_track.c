@@ -12,8 +12,8 @@
  * Estimated memory cost for a structure on the overflow lists, the size of
  * the structure plus two pointers (assume the average skip list depth is 2).
  */
-#define	WT_OVFL_SIZE(s)							\
-	(sizeof(s) + 2 * sizeof(void *))
+#define	WT_OVFL_SIZE(p, s)						\
+	(sizeof(s) + 2 * sizeof(void *) + (p)->addr_size + (p)->value_size)
 
 /*
  * __ovfl_track_init --
@@ -321,7 +321,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BM *bm;
 	WT_OVFL_REUSE **e, **head, *reuse;
-	size_t incr, decr;
+	size_t decr;
 	int i;
 
 	bm = S2BT(session)->bm;
@@ -354,13 +354,9 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * memory footprint change in the reconciliation wrapup code means
 	 * fewer atomic updates and less code overall.
 	 */
-	incr = decr = 0;
+	decr = 0;
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
-			if (F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED))
-				incr += WT_OVFL_SIZE(WT_OVFL_REUSE) +
-				    reuse->addr_size + reuse->value_size;
-
 			F_CLR(reuse,
 			    WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 			e = &(*e)->next[0];
@@ -369,8 +365,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		*e = (*e)->next[0];
 
 		WT_ASSERT(session, !F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED));
-		decr += WT_OVFL_SIZE(WT_OVFL_REUSE) +
-		    reuse->addr_size + reuse->value_size;
+		decr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
 
 		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 			WT_RET(
@@ -380,10 +375,8 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, reuse);
 	}
 
-	if (incr > decr)
-		__wt_cache_page_inmem_incr(session, page, incr - decr);
-	if (decr > incr)
-		__wt_cache_page_inmem_decr(session, page, decr - incr);
+	if (decr != 0)
+		__wt_cache_page_inmem_decr(session, page, decr);
 	return (0);
 }
 
@@ -397,6 +390,7 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BM *bm;
 	WT_DECL_RET;
 	WT_OVFL_REUSE **e, **head, *reuse;
+	size_t decr;
 	int i;
 
 	bm = S2BT(session)->bm;
@@ -422,6 +416,7 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Second, discard any overflow record with a just-added flag, clear the
 	 * flags for the next run.
 	 */
+	decr = 0;
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (!F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED)) {
 			F_CLR(reuse, WT_OVFL_REUSE_INUSE);
@@ -435,8 +430,13 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    __ovfl_reuse_verbose(session, page, reuse, "free"));
 		WT_TRET(bm->free(
 		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
+
+		decr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
 		__wt_free(session, reuse);
 	}
+
+	if (decr != 0)
+		__wt_cache_page_inmem_decr(session, page, decr);
 	return (0);
 }
 
@@ -521,6 +521,9 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	reuse->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
 	F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
+
+	__wt_cache_page_inmem_incr(
+	    session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
 
 	/* Insert the new entry into the skiplist. */
 	__ovfl_reuse_skip_search_stack(head, stack, value, value_size);
@@ -695,10 +698,19 @@ static int
 __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **e, **head, *txnc;
+	uint64_t oldest_txn;
 	size_t decr;
 	int i;
 
 	head = page->modify->ovfl_track->ovfl_txnc;
+
+	/*
+	 * Take a snapshot of the oldest transaction ID we need to keep alive.
+	 * Since we do two passes through entries in the structure, the normal
+	 * visibility check could give different results as the global ID moves
+	 * forward.
+	 */
+	oldest_txn = S2C(session)->txn_global.oldest_id;
 
 	/*
 	 * Discard any transaction-cache records with transaction IDs earlier
@@ -708,8 +720,8 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * the lowest level), fixing up links.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
-		for (e = &head[i]; *e != NULL;) {
-			if (!__wt_txn_visible_all(session, (*e)->current)) {
+		for (e = &head[i]; (txnc = *e) != NULL;) {
+			if (TXNID_LE(oldest_txn, txnc->current)) {
 				e = &(*e)->next[i];
 				continue;
 			}
@@ -719,14 +731,13 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
-		if (!__wt_txn_visible_all(session, txnc->current)) {
+		if (TXNID_LE(oldest_txn, txnc->current)) {
 			e = &(*e)->next[0];
 			continue;
 		}
 		*e = (*e)->next[0];
 
-		decr += WT_OVFL_SIZE(WT_OVFL_TXNC) +
-		    txnc->addr_size + txnc->value_size;
+		decr += WT_OVFL_SIZE(txnc, WT_OVFL_TXNC);
 
 		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 			WT_RET(
@@ -810,8 +821,8 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, value, value_size);
 	txnc->current = __wt_txn_new_id(session);
 
-	__wt_cache_page_inmem_incr(session, page,
-	    WT_OVFL_SIZE(WT_OVFL_TXNC) + addr_size + value_size);
+	__wt_cache_page_inmem_incr(
+	    session, page, WT_OVFL_SIZE(txnc, WT_OVFL_TXNC));
 
 	/* Insert the new entry into the skiplist. */
 	__ovfl_txnc_skip_search_stack(head, stack, addr, addr_size);

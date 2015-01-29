@@ -839,6 +839,8 @@ struct __wt_update {
 	 */
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
+#define	WT_UPDATE_MEMSIZE(upd)						\
+	(sizeof(WT_UPDATE) + (WT_UPDATE_DELETED_ISSET(upd) ? 0 : (upd)->size))
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
