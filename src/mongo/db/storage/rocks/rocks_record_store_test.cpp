@@ -136,15 +136,9 @@ namespace mongo {
             ASSERT_OK( rs->updateRecord( t1.get(), loc1, "b", 2, false, NULL ).getStatus() );
             ASSERT_OK( rs->updateRecord( t1.get(), loc2, "B", 2, false, NULL ).getStatus() );
 
-            try {
-                // this should fail
-                rs->updateRecord( t2.get(), loc1, "c", 2, false, NULL );
-                ASSERT( 0 );
-            }
-            catch ( WriteConflictException& dle ) {
-                w2.reset( NULL );
-                t2.reset( NULL );
-            }
+            // this should throw
+            ASSERT_THROWS(rs->updateRecord(t2.get(), loc1, "c", 2, false, NULL),
+                          WriteConflictException);
 
             w1->commit(); // this should succeed
         }
@@ -190,17 +184,11 @@ namespace mongo {
 
             {
                 WriteUnitOfWork w( t2.get() );
-                ASSERT_EQUALS( string("a"), rs->dataFor( t2.get(), loc1 ).data() );
-                try {
-                    // this should fail as our version of loc1 is too old
-                    rs->updateRecord( t2.get(), loc1, "c", 2, false, NULL );
-                    ASSERT( 0 );
-                }
-                catch ( WriteConflictException& dle ) {
-                }
-
+                ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), loc1).data());
+                // this should fail as our version of loc1 is too old
+                ASSERT_THROWS(rs->updateRecord(t2.get(), loc1, "c", 2, false, NULL),
+                              WriteConflictException);
             }
-
         }
     }
 

@@ -121,11 +121,6 @@ namespace mongo {
         rocksdb::DB* getDB() { return _db.get(); }
         const rocksdb::DB* getDB() const { return _db.get(); }
 
-        /**
-         * Returns a ReadOptions object that uses the snapshot contained in opCtx
-         */
-        static rocksdb::ReadOptions readOptionsWithSnapshot( OperationContext* opCtx );
-
     private:
         bool _existsColumnFamily(const StringData& ident);
         Status _createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
