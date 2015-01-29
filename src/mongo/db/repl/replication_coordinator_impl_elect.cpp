@@ -88,7 +88,7 @@ namespace {
         invariant(!_freshnessChecker);
         invariant(!_electCmdRunner);
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         switch (_rsConfigState) {
         case kConfigSteady:
             break;
@@ -129,6 +129,12 @@ namespace {
         }
 
         _freshnessChecker.reset(new FreshnessChecker);
+
+        // This is necessary because the freshnessChecker may call directly into winning an
+        // election, if there are no other MaybeUp nodes.  Winning an election attempts to lock
+        // _mutex again.
+        lk.unlock();
+
         StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _freshnessChecker->start(
                 &_replExecutor,
                 lastOpTimeApplied,
