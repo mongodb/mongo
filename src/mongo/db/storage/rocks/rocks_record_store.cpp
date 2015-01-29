@@ -44,6 +44,7 @@
 #include <rocksdb/slice.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
@@ -222,8 +223,10 @@ namespace mongo {
         return static_cast<int64_t>( storageSize );
     }
 
-    RecordData RocksRecordStore::dataFor( OperationContext* txn, const RecordId& loc) const {
-        return _getDataFor(_db, _columnFamily.get(), txn, loc);
+    RecordData RocksRecordStore::dataFor(OperationContext* txn, const RecordId& loc) const {
+        RecordData rd = _getDataFor(_db, _columnFamily.get(), txn, loc);
+        massert(28605, "Didn't find RecordId in RocksRecordStore", (rd.data() != nullptr));
+        return rd;
     }
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const RecordId& dl ) {
@@ -295,7 +298,7 @@ namespace mongo {
 
         // we do this is a sub transaction in case it aborts
         RocksRecoveryUnit* realRecoveryUnit =
-            dynamic_cast<RocksRecoveryUnit*>(txn->releaseRecoveryUnit());
+            checked_cast<RocksRecoveryUnit*>(txn->releaseRecoveryUnit());
         invariant(realRecoveryUnit);
         txn->setRecoveryUnit(realRecoveryUnit->newRocksRecoveryUnit());
 

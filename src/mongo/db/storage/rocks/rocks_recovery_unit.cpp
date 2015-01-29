@@ -40,6 +40,7 @@
 #include <rocksdb/write_batch.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_transaction.h"
@@ -234,7 +235,7 @@ namespace mongo {
     }
 
     RocksRecoveryUnit* RocksRecoveryUnit::getRocksRecoveryUnit(OperationContext* opCtx) {
-        return dynamic_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
+        return checked_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
     }
 
 }

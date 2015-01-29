@@ -207,12 +207,6 @@ namespace mongo {
 
     // non public api
 
-    rocksdb::ReadOptions RocksEngine::readOptionsWithSnapshot( OperationContext* opCtx ) {
-        rocksdb::ReadOptions options;
-        options.snapshot = dynamic_cast<RocksRecoveryUnit*>( opCtx->recoveryUnit() )->snapshot();
-        return options;
-    }
-
     bool RocksEngine::_existsColumnFamily(const StringData& ident) {
         boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
         return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();

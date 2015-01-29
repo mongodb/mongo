@@ -43,6 +43,7 @@
 #include <rocksdb/iterator.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -120,22 +121,21 @@ namespace mongo {
              * All EOF locs should be considered equal.
              */
             bool pointsToSamePlaceAs(const Cursor& genOther) const {
-                const RocksCursorBase& other = dynamic_cast<const RocksCursorBase&>(genOther);
+                const RocksCursorBase& other = checked_cast<const RocksCursorBase&>(genOther);
 
                 if (isEOF() && other.isEOF()) {
                     return true;
                 } else if (isEOF() || other.isEOF()) {
                     return false;
                 }
-                if (getRecordId() != other.getRecordId()) {
+
+                if (_iterator->key() != other._iterator->key()) {
                     return false;
                 }
 
-                loadKeyIfNeeded();
-                other.loadKeyIfNeeded();
-
-                return _key.getSize() == other._key.getSize() &&
-                       memcmp(_key.getBuffer(), other._key.getBuffer(), _key.getSize()) == 0;
+                // even if keys are equal, record IDs might be different (for unique indexes, since
+                // in non-unique indexes RecordID is already encoded in the key)
+                return getRecordId() == other.getRecordId();
             }
 
             bool locate(const BSONObj& key, const RecordId& loc) {
@@ -580,17 +580,8 @@ namespace mongo {
         KeyString encodedKey(key, _order);
         rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
 
-        bool conflict = !ru->transaction()->registerWrite(_getTransactionID(encodedKey));
-        if (conflict) {
-            if (!dupsAllowed) {
-                // if there is a conflict on a unique key, it means there is a dup key
-                // even if someone else is deleting at the same time, its ok to fail this
-                // insert as a dup key as it a race
-                return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
-            } else {
-                // if dups are allowed, we just throw exception on conflict
-                throw WriteConflictException();
-            }
+        if (!ru->transaction()->registerWrite(_getTransactionID(encodedKey))) {
+            throw WriteConflictException();
         }
 
         std::string currentValue;

@@ -127,8 +127,8 @@ namespace mongo {
             ASSERT_OK(sorted->insert(t1.get(), key3, loc3, false));
             ASSERT_OK(sorted->insert(t2.get(), key4, loc4, false));
 
-            // this should return duplicate key
-            ASSERT_NOT_OK(sorted->insert(t2.get(), key3, loc5, false));
+            // this should throw
+            ASSERT_THROWS(sorted->insert(t2.get(), key3, loc5, false), WriteConflictException);
 
             w1->commit();  // this should succeed
         }
@@ -152,8 +152,8 @@ namespace mongo {
                 w1->commit();
             }
 
-            // this should return duplicate key
-            ASSERT_NOT_OK(sorted->insert(t2.get(), key5, loc3, false));
+            // this should throw
+            ASSERT_THROWS(sorted->insert(t2.get(), key5, loc3, false), WriteConflictException);
         }
     }
 }
