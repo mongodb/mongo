@@ -228,14 +228,13 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * is set before we update the linked list and try again.
 	 */
 	while (!WT_ATOMIC_CAS8(*srch_upd, upd->next, upd)) {
-		WT_RET(__wt_txn_update_check(session, upd->next = *srch_upd));
+		if ((ret = __wt_txn_update_check(
+		    session, upd->next = *srch_upd)) != 0) {
+			/* Free unused memory on error. */
+			__wt_free(session, upd);
+			return (ret);
+		}
 		WT_WRITE_BARRIER();
-	}
-
-	/* Free unused memory on error. */
-	if (ret != 0) {
-		__wt_free(session, upd);
-		return (ret);
 	}
 
 	/*
