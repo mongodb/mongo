@@ -96,6 +96,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	}
 
 	/* Update the cache's information. */
+	__wt_cache_page_inmem_decr(
+	    session, page, (size_t)page->memory_footprint);
 	__wt_cache_page_evict(session, page);
 
 	/*
