@@ -2071,8 +2071,15 @@ namespace {
                  _replExecutor.now(),
                  myOptime);
          _rsConfig = newConfig;
-         log() << "new replica set config in use: " << _rsConfig.toBSON() << rsLog;
+         log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
          _selfIndex = myIndex;
+         if (_selfIndex >= 0) {
+             log() << "This node is " <<
+                 _rsConfig.getMemberAt(_selfIndex).getHostAndPort() << " in the config";
+         }
+         else {
+             log() << "This node is not a member of the config";
+         }
 
          const PostMemberStateUpdateAction action =
              _updateMemberStateFromTopologyCoordinator_inlock();
