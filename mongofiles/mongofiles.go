@@ -221,7 +221,7 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 	session.SetSafe(safety)
 	session.SetSocketTimeout(0)
 
-	if displayConnUrl {
+	if displayHost {
 		log.Logf(log.Always, "connected to: %v\n", connUrl)
 	}
 
