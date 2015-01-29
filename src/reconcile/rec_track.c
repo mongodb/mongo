@@ -335,12 +335,12 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * fixing up skiplist links.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
-		for (e = &head[i]; *e != NULL;) {
-			if (F_ISSET(*e, WT_OVFL_REUSE_INUSE)) {
-				e = &(*e)->next[i];
+		for (e = &head[i]; (reuse = *e) != NULL;) {
+			if (F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
+				e = &reuse->next[i];
 				continue;
 			}
-			*e = (*e)->next[i];
+			*e = reuse->next[i];
 		}
 
 	/*
@@ -359,10 +359,10 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
 			F_CLR(reuse,
 			    WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
-			e = &(*e)->next[0];
+			e = &reuse->next[0];
 			continue;
 		}
-		*e = (*e)->next[0];
+		*e = reuse->next[0];
 
 		WT_ASSERT(session, !F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED));
 		decr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
@@ -404,12 +404,12 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * fixing up skiplist links.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
-		for (e = &head[i]; *e != NULL;) {
-			if (!F_ISSET(*e, WT_OVFL_REUSE_JUST_ADDED)) {
-				e = &(*e)->next[i];
+		for (e = &head[i]; (reuse = *e) != NULL;) {
+			if (!F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED)) {
+				e = &reuse->next[i];
 				continue;
 			}
-			*e = (*e)->next[i];
+			*e = reuse->next[i];
 		}
 
 	/*
@@ -420,10 +420,10 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (!F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED)) {
 			F_CLR(reuse, WT_OVFL_REUSE_INUSE);
-			e = &(*e)->next[0];
+			e = &reuse->next[0];
 			continue;
 		}
-		*e = (*e)->next[0];
+		*e = reuse->next[0];
 
 		if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 			WT_RET(
@@ -722,20 +722,20 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
 		for (e = &head[i]; (txnc = *e) != NULL;) {
 			if (TXNID_LE(oldest_txn, txnc->current)) {
-				e = &(*e)->next[i];
+				e = &txnc->next[i];
 				continue;
 			}
-			*e = (*e)->next[i];
+			*e = txnc->next[i];
 		}
 
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
 		if (TXNID_LE(oldest_txn, txnc->current)) {
-			e = &(*e)->next[0];
+			e = &txnc->next[0];
 			continue;
 		}
-		*e = (*e)->next[0];
+		*e = txnc->next[0];
 
 		decr += WT_OVFL_SIZE(txnc, WT_OVFL_TXNC);
 
