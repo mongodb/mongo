@@ -375,7 +375,8 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, reuse);
 	}
 
-	__wt_cache_page_inmem_decr(session, page, decr);
+	if (decr != 0)
+		__wt_cache_page_inmem_decr(session, page, decr);
 	return (0);
 }
 
@@ -389,6 +390,7 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BM *bm;
 	WT_DECL_RET;
 	WT_OVFL_REUSE **e, **head, *reuse;
+	size_t decr;
 	int i;
 
 	bm = S2BT(session)->bm;
@@ -414,6 +416,7 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Second, discard any overflow record with a just-added flag, clear the
 	 * flags for the next run.
 	 */
+	decr = 0;
 	for (e = &head[0]; (reuse = *e) != NULL;) {
 		if (!F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED)) {
 			F_CLR(reuse, WT_OVFL_REUSE_INUSE);
@@ -428,10 +431,12 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_TRET(bm->free(
 		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
 
-		__wt_cache_page_inmem_decr(
-		   session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
+		decr += WT_OVFL_SIZE(reuse, WT_OVFL_REUSE);
 		__wt_free(session, reuse);
 	}
+
+	if (decr != 0)
+		__wt_cache_page_inmem_decr(session, page, decr);
 	return (0);
 }
 
@@ -517,15 +522,15 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(p, value, value_size);
 	F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
 
+	__wt_cache_page_inmem_incr(
+	    session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
+
 	/* Insert the new entry into the skiplist. */
 	__ovfl_reuse_skip_search_stack(head, stack, value, value_size);
 	for (i = 0; i < skipdepth; ++i) {
 		reuse->next[i] = *stack[i];
 		*stack[i] = reuse;
 	}
-
-	__wt_cache_page_inmem_incr(
-	    session, page, WT_OVFL_SIZE(reuse, WT_OVFL_REUSE));
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "add"));
