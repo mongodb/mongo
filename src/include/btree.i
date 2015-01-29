@@ -126,6 +126,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	size_t size;
+	int i;
 
 	cache = S2C(session)->cache;
 
@@ -138,23 +139,26 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)WT_ATOMIC_SUB8(cache->pages_dirty, 1);
 
 	/*
-	 * It is possible to decrement the footprint of the page without making
-	 * the page dirty (for example when freeing an obsolete update list),
-	 * so the footprint could change between read and decrement, and we
-	 * might attempt to decrement by a different amount than the bytes held
-	 * by the page.
+	 * Take care to read the dirty-byte count once in case we are racing
+	 * with updates.
 	 *
-	 * We catch that by maintaining a per-page dirty size, and fixing the
-	 * cache stats if that is non-zero when the page is discarded.
-	 *
-	 * Also take care that the global size doesn't go negative.  This may
-	 * lead to small accounting errors (particularly on the last page of the
-	 * last file in a checkpoint), but that will come out in the wash when
-	 * the page is evicted.
+	 * We don't have exclusive access, and the page may already be dirty
+	 * (with bytes added to or removed from the page's dirty-byte count).
+	 * If the page dirty-byte count decreases after we take our copy, we
+	 * could underflow the cache and page values, make sure we don't. If
+	 * we try a few times and don't get it done, skip the adjustment. The
+	 * dirty-byte count in the system will be wrong, but remain consistent,
+	 * and we'll fix it up the next time we mark this page clean or when
+	 * we evict it.
 	 */
-	size = WT_MIN(page->memory_footprint, cache->bytes_dirty);
-	(void)WT_ATOMIC_SUB8(cache->bytes_dirty, size);
-	(void)WT_ATOMIC_SUB8(page->modify->bytes_dirty, size);
+	for (i = 0; i < 5; ++i) {
+		size = page->modify->bytes_dirty;
+		if (!WT_ATOMIC_CAS8(page->modify->bytes_dirty, size, 0))
+			continue;
+
+		(void)WT_ATOMIC_SUB8(cache->bytes_dirty, size);
+		break;
+	}
 }
 
 /*
@@ -165,18 +169,11 @@ static inline void
 __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
-	WT_PAGE_MODIFY *mod;
 
 	cache = S2C(session)->cache;
-	mod = page->modify;
 
-	/*
-	 * In rare cases, we may race tracking a page's dirty footprint.
-	 * If so, we will get here with a non-zero dirty_size in the page, and
-	 * we can fix the global stats.
-	 */
-	if (mod != NULL && mod->bytes_dirty != 0)
-		(void)WT_ATOMIC_SUB8(cache->bytes_dirty, mod->bytes_dirty);
+	WT_ASSERT(session,
+	    page->modify == NULL || page->modify->bytes_dirty == 0);
 
 	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
 	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
