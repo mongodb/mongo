@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/storage/snapshot.h"
 
 namespace mongo {
 
@@ -247,6 +248,7 @@ namespace mongo {
          *
          * If a YIELD_AUTO policy is set, then this method may yield.
          */
+        ExecState getNextSnapshotted(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
         ExecState getNext(BSONObj* objOut, RecordId* dlOut);
 
         /**
