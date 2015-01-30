@@ -281,6 +281,18 @@ namespace mongo {
     }
 
     PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, RecordId* dlOut) {
+        Snapshotted<BSONObj> snapshotted;
+        ExecState state = getNextSnapshotted(objOut ? &snapshotted : NULL, dlOut);
+
+        if (objOut) {
+            *objOut = snapshotted.value();
+        }
+
+        return state;
+    }
+
+    PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
+                                                             RecordId* dlOut) {
         if (_killed) { return PlanExecutor::DEAD; }
 
         // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
@@ -330,11 +342,14 @@ namespace mongo {
                             hasRequestedData = false;
                         }
                         else {
-                            *objOut = member->keyData[0].keyData;
+                            // TODO: currently snapshot ids are only associated with documents, and
+                            // not with index keys.
+                            *objOut = Snapshotted<BSONObj>(SnapshotId(),
+                                                           member->keyData[0].keyData);
                         }
                     }
                     else if (member->hasObj()) {
-                        *objOut = member->obj.value();
+                        *objOut = member->obj;
                     }
                     else {
                         _workingSet->free(id);
@@ -378,7 +393,9 @@ namespace mongo {
             else {
                 verify(PlanStage::FAILURE == code);
                 if (NULL != objOut) {
-                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, objOut);
+                    BSONObj statusObj;
+                    WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
+                    *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
                 }
                 return PlanExecutor::FAILURE;
             }
