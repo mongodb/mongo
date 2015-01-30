@@ -229,7 +229,6 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
 retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
-        WT_HAVE_DIAGNOSTIC_YIELD;
 
 	/*
 	 * Use the page's reference hint: it should be correct unless the page
