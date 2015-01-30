@@ -9,14 +9,14 @@
     var conns = replTest.startSet();
     var r = replTest.initiate({ "_id": "resync",
                                 "members": [
-                                    {"_id": 0, "host": nodes[0]},
-                                    {"_id": 1, "host": nodes[1]},
-                                    {"_id": 2, "host": nodes[2]}]
+                                    {"_id": 0, "host": nodes[0], priority:1},
+                                    {"_id": 1, "host": nodes[1], priority:0},
+                                    {"_id": 2, "host": nodes[2], arbiterOnly:true}]
                               });
 
-    // Make sure we have a master
-    var master = replTest.getMaster();
     var a_conn = conns[0];
+    // Make sure we have a master, and it is conns[0]
+    replTest.waitForState(a_conn, ReplSetTest.State.PRIMARY);
     var b_conn = conns[1];
     a_conn.setSlaveOk();
     b_conn.setSlaveOk();
@@ -24,11 +24,9 @@
     var B = b_conn.getDB("test");
     var AID = replTest.getNodeId(a_conn);
     var BID = replTest.getNodeId(b_conn);
-    assert(master == conns[0], "conns[0] assumed to be master");
-    assert(a_conn.host == master.host);
 
     // create an oplog entry with an insert
-    assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 60000 }}));
+    assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 2, wtimeout: 60000 }}));
     assert.eq(B.foo.findOne().x, 1)
     
     // run resync and wait for it to happen
@@ -54,7 +52,7 @@
         }
 
         // wait for secondary to also have its oplog cycle
-        assert.writeOK(bulk.execute({ w: 2, wtimeout : 60000 }));
+        assert.writeOK(bulk.execute({ w: 1, wtimeout : 60000 }));
 
         if ( hasCycled() )
             break;
