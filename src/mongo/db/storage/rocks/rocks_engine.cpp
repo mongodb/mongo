@@ -36,6 +36,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <rocksdb/cache.h>
 #include <rocksdb/comparator.h>
@@ -52,6 +53,7 @@
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/db/storage/rocks/rocks_index.h"
+#include "mongo/platform/endian.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 
@@ -62,16 +64,29 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    namespace {
+        // we encode prefixes in big endian because we want to quickly jump to the max prefix
+        // (iter->SeekToLast())
+        bool extractPrefix(const rocksdb::Slice& slice, uint32_t* prefix) {
+            if (slice.size() < sizeof(uint32_t)) {
+                return false;
+            }
+            *prefix = endian::bigToNative(*reinterpret_cast<const uint32_t*>(slice.data()));
+            return true;
+        }
 
-    const std::string RocksEngine::kOrderingPrefix("indexordering-");
-    const std::string RocksEngine::kCollectionPrefix("collection-");
+        std::string encodePrefix(uint32_t prefix) {
+            uint32_t bigEndianPrefix = endian::nativeToBig(prefix);
+            return std::string(reinterpret_cast<const char*>(&bigEndianPrefix), sizeof(uint32_t));
+        }
+    }  // anonymous namespace
+
+    // first four bytes are the default prefix 0
+    const std::string RocksEngine::kMetadataPrefix("\0\0\0\0metadata-", 12);
 
     RocksEngine::RocksEngine(const std::string& path, bool durable)
-        : _path(path),
-          _durable(durable) {
-
-        { // create block cache
+        : _path(path), _durable(durable) {
+        {  // create block cache
             uint64_t cacheSizeGB = 0;
             ProcessInfo pi;
             unsigned long long memSizeMB = pi.getMemSizeMB();
@@ -84,68 +99,43 @@ namespace mongo {
             }
             _block_cache = rocksdb::NewLRUCache(cacheSizeGB * 1024 * 1024 * 1024LL);
         }
-
-        auto columnFamilyNames = _loadColumnFamilies();       // vector of column family names
-        std::unordered_map<std::string, Ordering> orderings;  // column family name -> Ordering
-        std::set<std::string> collections;                    // set of collection names
-
-        if (columnFamilyNames.empty()) {  // new DB
-            columnFamilyNames.push_back(rocksdb::kDefaultColumnFamilyName);
-        } else {  // existing DB
-            // open DB in read-only mode to load metadata
-            rocksdb::DB* dbReadOnly;
-            auto s = rocksdb::DB::OpenForReadOnly(_dbOptions(), path, &dbReadOnly);
-            ROCKS_STATUS_OK(s);
-            auto itr = dbReadOnly->NewIterator(rocksdb::ReadOptions());
-            orderings = _loadOrderingMetaData(itr);
-            collections = _loadCollections(itr);
-            delete itr;
-            delete dbReadOnly;
-        }
-
-        std::vector<rocksdb::ColumnFamilyDescriptor> columnFamilies;
-        std::set<std::string> toDropColumnFamily;
-
-        for (const auto& cf : columnFamilyNames) {
-            if (cf == rocksdb::kDefaultColumnFamilyName) {
-                columnFamilies.emplace_back(cf, _defaultCFOptions());
-                continue;
-            }
-            auto orderings_iter = orderings.find(cf);
-            auto collections_iter = collections.find(cf);
-            bool isIndex = orderings_iter != orderings.end();
-            bool isCollection = collections_iter != collections.end();
-            invariant(!isIndex || !isCollection);
-            if (isIndex) {
-                columnFamilies.emplace_back(cf, _indexOptions(orderings_iter->second));
-            } else if (isCollection) {
-                columnFamilies.emplace_back(cf, _collectionOptions());
-            } else {
-                // TODO support this from inside of rocksdb, by using
-                // Options::drop_unopened_column_families.
-                // This can happen because write and createColumnFamily are not atomic
-                toDropColumnFamily.insert(cf);
-                columnFamilies.emplace_back(cf, _collectionOptions());
-            }
-        }
-
-        std::vector<rocksdb::ColumnFamilyHandle*> handles;
+        // open DB
         rocksdb::DB* db;
-        auto s = rocksdb::DB::Open(_dbOptions(), path, columnFamilies, &handles, &db);
+        auto s = rocksdb::DB::Open(_options(), path, &db);
         ROCKS_STATUS_OK(s);
-        invariant(handles.size() == columnFamilies.size());
-        for (size_t i = 0; i < handles.size(); ++i) {
-            if (toDropColumnFamily.find(columnFamilies[i].name) != toDropColumnFamily.end()) {
-                db->DropColumnFamily(handles[i]);
-                delete handles[i];
-            } else if (columnFamilyNames[i] == rocksdb::kDefaultColumnFamilyName) {
-                // we will not be needing this
-                delete handles[i];
-            } else {
-                _identColumnFamilyMap[columnFamilies[i].name].reset(handles[i]);
+        _db.reset(db);
+
+        // open iterator
+        boost::scoped_ptr<rocksdb::Iterator> _iter(_db->NewIterator(rocksdb::ReadOptions()));
+
+        // find maxPrefix
+        _maxPrefix = 0;
+        _iter->SeekToLast();
+        if (_iter->Valid()) {
+            // otherwise the DB is empty, so we just keep it at 0
+            bool ok = extractPrefix(_iter->key(), &_maxPrefix);
+            // this is DB corruption here
+            invariant(ok);
+        }
+
+        // load ident to prefix map
+        {
+            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            for (_iter->Seek(kMetadataPrefix);
+                 _iter->Valid() && _iter->key().starts_with(kMetadataPrefix); _iter->Next()) {
+                rocksdb::Slice ident(_iter->key());
+                ident.remove_prefix(kMetadataPrefix.size());
+                // this could throw DBException, which then means DB corruption. We just let it fly
+                // to the caller
+                BSONObj identConfig(_iter->value().data());
+                BSONElement element = identConfig.getField("prefix");
+                // TODO: SERVER-16979 Correctly handle errors returned by RocksDB
+                // This is DB corruption
+                invariant(!element.eoo() || !element.isNumber());
+                uint32_t identPrefix = static_cast<uint32_t>(element.numberInt());
+                _identPrefixMap[StringData(ident.data(), ident.size())] = identPrefix;
             }
         }
-        _db.reset(db);
     }
 
     RocksEngine::~RocksEngine() {}
@@ -154,197 +144,134 @@ namespace mongo {
         return new RocksRecoveryUnit(&_transactionEngine, _db.get(), _durable);
     }
 
-    Status RocksEngine::createRecordStore(OperationContext* opCtx,
-                                          StringData ns,
-                                          StringData ident,
+    Status RocksEngine::createRecordStore(OperationContext* opCtx, StringData ns, StringData ident,
                                           const CollectionOptions& options) {
-        if (_existsColumnFamily(ident)) {
-            return Status::OK();
-        }
-        _db->Put(rocksdb::WriteOptions(), kCollectionPrefix + ident.toString(), rocksdb::Slice());
-        return _createColumnFamily(_collectionOptions(), ident);
+        return _createIdentPrefix(ident);
     }
 
     RecordStore* RocksEngine::getRecordStore(OperationContext* opCtx, StringData ns,
-                                             StringData ident,
-                                             const CollectionOptions& options) {
-        auto columnFamily = _getColumnFamily(ident);
+                                             StringData ident, const CollectionOptions& options) {
         if (options.capped) {
             return new RocksRecordStore(
-                ns, ident, _db.get(), columnFamily, true,
+                ns, ident, _db.get(), _getIdentPrefix(ident), true,
                 options.cappedSize ? options.cappedSize : 4096,  // default size
                 options.cappedMaxDocs ? options.cappedMaxDocs : -1);
         } else {
-            return new RocksRecordStore(ns, ident, _db.get(), columnFamily);
+            return new RocksRecordStore(ns, ident, _db.get(), _getIdentPrefix(ident));
         }
     }
 
     Status RocksEngine::createSortedDataInterface(OperationContext* opCtx, StringData ident,
                                                   const IndexDescriptor* desc) {
-        if (_existsColumnFamily(ident)) {
-            return Status::OK();
-        }
-        auto keyPattern = desc->keyPattern();
-
-        _db->Put(rocksdb::WriteOptions(), kOrderingPrefix + ident.toString(),
-                 rocksdb::Slice(keyPattern.objdata(), keyPattern.objsize()));
-        return _createColumnFamily(_indexOptions(Ordering::make(keyPattern)), ident);
+        return _createIdentPrefix(ident);
     }
 
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
         if (desc->unique()) {
-            return new RocksUniqueIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+            return new RocksUniqueIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
                                         Ordering::make(desc->keyPattern()));
         } else {
-            return new RocksStandardIndex(_db.get(), _getColumnFamily(ident), ident.toString(),
+            return new RocksStandardIndex(_db.get(), _getIdentPrefix(ident), ident.toString(),
                                           Ordering::make(desc->keyPattern()));
         }
     }
 
     Status RocksEngine::dropIdent(OperationContext* opCtx, StringData ident) {
+        // TODO optimize this using CompactionFilterV2
         rocksdb::WriteBatch wb;
-        // TODO is there a more efficient way?
-        wb.Delete(kOrderingPrefix + ident.toString());
-        wb.Delete(kCollectionPrefix + ident.toString());
+        wb.Delete(kMetadataPrefix + ident.toString());
+
+        std::string prefix = _getIdentPrefix(ident);
+        rocksdb::Slice prefixSlice(prefix.data(), prefix.size());
+
+        boost::scoped_ptr<rocksdb::Iterator> _iter(_db->NewIterator(rocksdb::ReadOptions()));
+        for (_iter->Seek(prefixSlice); _iter->Valid() && _iter->key().starts_with(prefixSlice);
+             _iter->Next()) {
+            ROCKS_STATUS_OK(_iter->status());
+            wb.Delete(_iter->key());
+        }
         auto s = _db->Write(rocksdb::WriteOptions(), &wb);
         if (!s.ok()) {
-            return toMongoStatus(s);
+          return toMongoStatus(s);
         }
-        return _dropColumnFamily(ident);
+
+        {
+            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            _identPrefixMap.erase(ident);
+        }
+
+        return Status::OK();
     }
 
-    std::vector<std::string> RocksEngine::getAllIdents( OperationContext* opCtx ) const {
+    bool RocksEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
+        boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+        return _identPrefixMap.find(ident) != _identPrefixMap.end();
+    }
+
+    std::vector<std::string> RocksEngine::getAllIdents(OperationContext* opCtx) const {
         std::vector<std::string> indents;
-        for (auto& entry : _identColumnFamilyMap) {
+        for (auto& entry : _identPrefixMap) {
             indents.push_back(entry.first);
         }
         return indents;
     }
 
     // non public api
-
-    bool RocksEngine::_existsColumnFamily(StringData ident) {
-        boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
-        return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();
-    }
-
-    Status RocksEngine::_createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
-                                            StringData ident) {
-        rocksdb::ColumnFamilyHandle* cf;
-        auto s = _db->CreateColumnFamily(options, ident.toString(), &cf);
-        if (!s.ok()) {
-            return toMongoStatus(s);
-        }
-        boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
-        _identColumnFamilyMap[ident].reset(cf);
-        return Status::OK();
-    }
-
-    Status RocksEngine::_dropColumnFamily(StringData ident) {
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily;
+    Status RocksEngine::_createIdentPrefix(StringData ident) {
+        uint32_t prefix = 0;
         {
-            boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
-            auto cf_iter = _identColumnFamilyMap.find(ident);
-            if (cf_iter == _identColumnFamilyMap.end()) {
-                return Status(ErrorCodes::InternalError, "Not found");
+            boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+            if (_identPrefixMap.find(ident) != _identPrefixMap.end()) {
+                // already exists
+                return Status::OK();
             }
-            columnFamily = cf_iter->second;
-            _identColumnFamilyMap.erase(cf_iter);
+
+            prefix = ++_maxPrefix;
+            _identPrefixMap[ident] = prefix;
         }
-        auto s = _db->DropColumnFamily(columnFamily.get());
+
+        BSONObjBuilder builder;
+        builder.append("prefix", static_cast<int32_t>(prefix));
+        BSONObj config = builder.obj();
+
+        auto s = _db->Put(rocksdb::WriteOptions(), kMetadataPrefix + ident.toString(),
+                          rocksdb::Slice(config.objdata(), config.objsize()));
+
         return toMongoStatus(s);
     }
 
-    boost::shared_ptr<rocksdb::ColumnFamilyHandle> RocksEngine::_getColumnFamily(
-        StringData ident) {
-        {
-            boost::mutex::scoped_lock lk(_identColumnFamilyMapMutex);
-            auto cf_iter = _identColumnFamilyMap.find(ident);
-            invariant(cf_iter != _identColumnFamilyMap.end());
-            return cf_iter->second;
-        }
+    std::string RocksEngine::_getIdentPrefix(StringData ident) {
+        boost::mutex::scoped_lock lk(_identPrefixMapMutex);
+        auto prefixIter = _identPrefixMap.find(ident);
+        invariant(prefixIter != _identPrefixMap.end());
+        return encodePrefix(prefixIter->second);
     }
 
-    std::unordered_map<std::string, Ordering> RocksEngine::_loadOrderingMetaData(
-        rocksdb::Iterator* itr) {
-        std::unordered_map<std::string, Ordering> orderings;
-        for (itr->Seek(kOrderingPrefix); itr->Valid(); itr->Next()) {
-            rocksdb::Slice key(itr->key());
-            if (!key.starts_with(kOrderingPrefix)) {
-                break;
-            }
-            key.remove_prefix(kOrderingPrefix.size());
-            std::string value(itr->value().ToString());
-            orderings.insert({key.ToString(), Ordering::make(BSONObj(value.c_str()))});
-        }
-        ROCKS_STATUS_OK(itr->status());
-        return orderings;
-    }
-
-    std::set<std::string> RocksEngine::_loadCollections(rocksdb::Iterator* itr) {
-        std::set<std::string> collections;
-        for (itr->Seek(kCollectionPrefix); itr->Valid() ; itr->Next()) {
-            rocksdb::Slice key(itr->key());
-            if (!key.starts_with(kCollectionPrefix)) {
-                break;
-            }
-            key.remove_prefix(kCollectionPrefix.size());
-            collections.insert(key.ToString());
-        }
-        ROCKS_STATUS_OK(itr->status());
-        return collections;
-    }
-
-    std::vector<std::string> RocksEngine::_loadColumnFamilies() {
-        std::vector<std::string> names;
-        if (boost::filesystem::exists(_path)) {
-            rocksdb::Status s = rocksdb::DB::ListColumnFamilies(_dbOptions(), _path, &names);
-
-            if (s.IsIOError()) {
-                // DNE, this means the directory exists but is empty, which is fine
-                // because it means no rocks database exists yet
-            } else {
-                ROCKS_STATUS_OK(s);
-            }
-        }
-
-        return names;
-    }
-
-    rocksdb::Options RocksEngine::_dbOptions() {
-        rocksdb::Options options(rocksdb::DBOptions(), _defaultCFOptions());
-
-        options.max_background_compactions = 4;
-        options.max_background_flushes = 4;
-
-        // create the DB if it's not already present
-        options.create_if_missing = true;
-        options.create_missing_column_families = true;
-        options.wal_dir = _path + "/journal";
-        options.max_total_wal_size = 1 << 30;  // 1GB
-
-        return options;
-    }
-
-    rocksdb::ColumnFamilyOptions RocksEngine::_defaultCFOptions() {
-        // TODO pass or set appropriate options for default CF.
-        rocksdb::ColumnFamilyOptions options;
+    rocksdb::Options RocksEngine::_options() const {
+        rocksdb::Options options;
         rocksdb::BlockBasedTableOptions table_options;
         table_options.block_cache = _block_cache;
         table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10));
+        table_options.format_version = 2;
         options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
+
+        options.write_buffer_size = 128 * 1024 * 1024;  // 128MB
         options.max_write_buffer_number = 4;
+        options.max_background_compactions = 8;
+        options.max_background_flushes = 4;
+        options.target_file_size_base = 64 * 1024 * 1024; // 64MB
+        options.soft_rate_limit = 1.1;
+        options.hard_rate_limit = 1.5;
+        options.max_bytes_for_level_base = 512 * 1024 * 1024;  // 512 MB
+        options.max_open_files = 20000;
+
+        // create the DB if it's not already present
+        options.create_if_missing = true;
+        options.wal_dir = _path + "/journal";
+
         return options;
-    }
-
-    rocksdb::ColumnFamilyOptions RocksEngine::_collectionOptions() {
-        return _defaultCFOptions();
-    }
-
-    rocksdb::ColumnFamilyOptions RocksEngine::_indexOptions(const Ordering& order) {
-        return _defaultCFOptions();
     }
 
     Status toMongoStatus( rocksdb::Status s ) {

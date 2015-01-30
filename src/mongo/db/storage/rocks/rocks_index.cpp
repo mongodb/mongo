@@ -100,16 +100,11 @@ namespace mongo {
          */
         class RocksCursorBase : public SortedDataInterface::Cursor {
         public:
-            RocksCursorBase(OperationContext* txn, rocksdb::DB* db,
-                            boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+            RocksCursorBase(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                             bool forward, Ordering order)
-                : _db(db),
-                  _columnFamily(columnFamily),
-                  _forward(forward),
-                  _order(order),
-                  _isKeyCurrent(false) {
+                : _db(db), _prefix(prefix), _forward(forward), _order(order), _isKeyCurrent(false) {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-                _iterator.reset(ru->NewIterator(_columnFamily.get()));
+                _iterator.reset(ru->NewIterator(_prefix));
                 checkStatus();
             }
 
@@ -197,13 +192,13 @@ namespace mongo {
                 if (!_savedEOF) {
                     loadKeyIfNeeded();
                     _savedRecordId = getRecordId();
-                    _iterator.reset();
                 }
+                _iterator.reset();
             }
 
             void restorePosition(OperationContext* txn) {
                 auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-                _iterator.reset(ru->NewIterator(_columnFamily.get()));
+                _iterator.reset(ru->NewIterator(_prefix));
 
                 if (!_savedEOF) {
                     _locate(_savedRecordId);
@@ -285,7 +280,7 @@ namespace mongo {
             }
 
             rocksdb::DB* _db;                                       // not owned
-            boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
+            std::string _prefix;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
             const bool _forward;
             Ordering _order;
@@ -302,10 +297,9 @@ namespace mongo {
 
         class RocksStandardCursor : public RocksCursorBase {
         public:
-            RocksStandardCursor(OperationContext* txn, rocksdb::DB* db,
-                                boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+            RocksStandardCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                                 bool forward, Ordering order)
-                : RocksCursorBase(txn, db, columnFamily, forward, order), _isTypeBitsValid(false) {}
+                : RocksCursorBase(txn, db, prefix, forward, order), _isTypeBitsValid(false) {}
 
             virtual void invalidateCache() {
                 RocksCursorBase::invalidateCache();
@@ -371,10 +365,9 @@ namespace mongo {
 
         class RocksUniqueCursor : public RocksCursorBase {
         public:
-            RocksUniqueCursor(OperationContext* txn, rocksdb::DB* db,
-                              boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+            RocksUniqueCursor(OperationContext* txn, rocksdb::DB* db, std::string prefix,
                               bool forward, Ordering order)
-                : RocksCursorBase(txn, db, columnFamily, forward, order), _recordsIndex(0) {}
+                : RocksCursorBase(txn, db, prefix, forward, order), _recordsIndex(0) {}
 
             virtual void invalidateCache() {
                 RocksCursorBase::invalidateCache();
@@ -504,10 +497,9 @@ namespace mongo {
 
     /// RocksIndexBase
 
-    RocksIndexBase::RocksIndexBase(rocksdb::DB* db,
-                                   boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                   std::string ident, Ordering order)
-        : _db(db), _columnFamily(cf), _ident(std::move(ident)), _order(order) {}
+    RocksIndexBase::RocksIndexBase(rocksdb::DB* db, std::string prefix, std::string ident,
+                                   Ordering order)
+        : _db(db), _prefix(prefix), _ident(std::move(ident)), _order(order) {}
 
     SortedDataBuilderInterface* RocksIndexBase::getBulkBuilder(OperationContext* txn,
                                                                bool dupsAllowed) {
@@ -529,7 +521,7 @@ namespace mongo {
 
     bool RocksIndexBase::isEmpty(OperationContext* txn) {
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        boost::scoped_ptr<rocksdb::Iterator> it(ru->NewIterator(_columnFamily.get()));
+        boost::scoped_ptr<rocksdb::Iterator> it(ru->NewIterator(_prefix));
 
         it->SeekToFirst();
         return !it->Valid();
@@ -541,32 +533,32 @@ namespace mongo {
     }
 
     long long RocksIndexBase::getSpaceUsedBytes(OperationContext* txn) const {
-        // TODO provide GetLiveFilesMetadata() with column family
-        std::vector<rocksdb::LiveFileMetaData> metadata;
-        _db->GetLiveFilesMetaData(&metadata);
-        uint64_t spaceUsedBytes = 0;
-        for (const auto& m : metadata) {
-            if (m.column_family_name == _ident) {
-                spaceUsedBytes += m.size;
+        uint64_t storageSize;
+        std::string nextPrefix(_prefix);
+        // first next lexicographically (assume same size)
+        for (int i = nextPrefix.size() - 1; i >= 0; --i) {
+            nextPrefix[i]++;
+            if (nextPrefix[i] != 0) {
+                break;
             }
         }
-
-        uint64_t walSpaceUsed = 0;
-        _db->GetIntProperty(_columnFamily.get(), "rocksdb.cur-size-all-mem-tables", &walSpaceUsed);
-        return spaceUsedBytes + walSpaceUsed;
+        rocksdb::Range wholeRange(_prefix, nextPrefix);
+        _db->GetApproximateSizes(&wholeRange, 1, &storageSize);
+        return static_cast<long long>(storageSize);
     }
 
-    std::string RocksIndexBase::_getTransactionID(const KeyString& key) const {
-        // TODO optimize in the future
-        return _ident + std::string(key.getBuffer(), key.getSize());
+    std::string RocksIndexBase::_makePrefixedKey(const std::string& prefix,
+                                                 const KeyString& encodedKey) {
+        std::string key(prefix);
+        key.append(encodedKey.getBuffer(), encodedKey.getSize());
+        return key;
     }
 
     /// RocksUniqueIndex
 
-    RocksUniqueIndex::RocksUniqueIndex(rocksdb::DB* db,
-                                       boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                       std::string ident, Ordering order)
-        : RocksIndexBase(db, cf, ident, order) {}
+    RocksUniqueIndex::RocksUniqueIndex(rocksdb::DB* db, std::string prefix, std::string ident,
+                                       Ordering order)
+        : RocksIndexBase(db, prefix, ident, order) {}
 
     Status RocksUniqueIndex::insert(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                                     bool dupsAllowed) {
@@ -575,17 +567,16 @@ namespace mongo {
             return s;
         }
 
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-
         KeyString encodedKey(key, _order);
-        rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
+        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
 
-        if (!ru->transaction()->registerWrite(_getTransactionID(encodedKey))) {
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        if (!ru->transaction()->registerWrite(prefixedKey)) {
             throw WriteConflictException();
         }
 
         std::string currentValue;
-        auto getStatus = ru->Get(_columnFamily.get(), keySlice, &currentValue);
+        auto getStatus = ru->Get(prefixedKey, &currentValue);
         if (!getStatus.ok() && !getStatus.IsNotFound()) {
             // This means that Get() returned an error
             // TODO: SERVER-16979 Correctly handle errors returned by RocksDB
@@ -597,7 +588,7 @@ namespace mongo {
                 value.appendTypeBits(encodedKey.getTypeBits());
             }
             rocksdb::Slice valueSlice(value.getBuffer(), value.getSize());
-            ru->writeBatch()->Put(_columnFamily.get(), keySlice, valueSlice);
+            ru->writeBatch()->Put(prefixedKey, valueSlice);
             return Status::OK();
         }
 
@@ -637,29 +628,29 @@ namespace mongo {
         }
 
         rocksdb::Slice valueVectorSlice(valueVector.getBuffer(), valueVector.getSize());
-        ru->writeBatch()->Put(_columnFamily.get(), keySlice, valueVectorSlice);
+        ru->writeBatch()->Put(prefixedKey, valueVectorSlice);
         return Status::OK();
     }
 
     void RocksUniqueIndex::unindex(OperationContext* txn, const BSONObj& key, const RecordId& loc,
                                    bool dupsAllowed) {
         KeyString encodedKey(key, _order);
-        rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
 
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         // We can't let two threads unindex the same key
-        if (!ru->transaction()->registerWrite(_getTransactionID(encodedKey))) {
+        if (!ru->transaction()->registerWrite(prefixedKey)) {
             throw WriteConflictException();
         }
 
         if (!dupsAllowed) {
-            ru->writeBatch()->Delete(_columnFamily.get(), keySlice);
+            ru->writeBatch()->Delete(prefixedKey);
             return;
         }
 
         // dups are allowed, so we have to deal with a vector of RecordIds.
         std::string currentValue;
-        auto getStatus = ru->Get(_columnFamily.get(), keySlice, &currentValue);
+        auto getStatus = ru->Get(prefixedKey, &currentValue);
         if (!getStatus.ok() && !getStatus.IsNotFound()) {
             // This means that Get() returned an error
             // TODO: SERVER-16979 Correctly handle errors returned by RocksDB
@@ -681,7 +672,7 @@ namespace mongo {
                 if (records.empty() && !br.remaining()) {
                     // This is the common case: we are removing the only loc for this key.
                     // Remove the whole entry.
-                    ru->writeBatch()->Delete(_columnFamily.get(), keySlice);
+                    ru->writeBatch()->Delete(prefixedKey);
                     return;
                 }
 
@@ -710,23 +701,23 @@ namespace mongo {
         }
 
         rocksdb::Slice newValueSlice(newValue.getBuffer(), newValue.getSize());
-        ru->writeBatch()->Put(_columnFamily.get(), keySlice, newValueSlice);
+        ru->writeBatch()->Put(prefixedKey, newValueSlice);
     }
 
     SortedDataInterface::Cursor* RocksUniqueIndex::newCursor(OperationContext* txn,
                                                              int direction) const {
         invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
-        return new RocksUniqueCursor(txn, _db, _columnFamily, direction == 1, _order);
+        return new RocksUniqueCursor(txn, _db, _prefix, direction == 1, _order);
     }
 
     Status RocksUniqueIndex::dupKeyCheck(OperationContext* txn, const BSONObj& key,
                                          const RecordId& loc) {
         KeyString encodedKey(key, _order);
-        rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
+        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
 
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         std::string value;
-        auto getStatus = ru->Get(_columnFamily.get(), keySlice, &value);
+        auto getStatus = ru->Get(prefixedKey, &value);
         if (!getStatus.ok() && !getStatus.IsNotFound()) {
             // This means that Get() returned an error
             // TODO: SERVER-16979 Correctly handle errors returned by RocksDB
@@ -750,10 +741,9 @@ namespace mongo {
     }
 
     /// RocksStandardIndex
-    RocksStandardIndex::RocksStandardIndex(rocksdb::DB* db,
-                                           boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                           std::string ident, Ordering order)
-        : RocksIndexBase(db, cf, ident, order) {}
+    RocksStandardIndex::RocksStandardIndex(rocksdb::DB* db, std::string prefix, std::string ident,
+                                           Ordering order)
+        : RocksIndexBase(db, prefix, ident, order) {}
 
     Status RocksStandardIndex::insert(OperationContext* txn, const BSONObj& key,
                                       const RecordId& loc, bool dupsAllowed) {
@@ -766,9 +756,7 @@ namespace mongo {
         // If we're inserting an index element, this means we already "locked" the RecordId of the
         // document. No need to register write here
         KeyString encodedKey(key, _order, loc);
-        rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
-
-        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
 
         rocksdb::Slice value;
         if (!encodedKey.getTypeBits().isAllZeros()) {
@@ -777,8 +765,8 @@ namespace mongo {
                                encodedKey.getTypeBits().getSize());
         }
 
-        ru->writeBatch()->Put(_columnFamily.get(),
-                              rocksdb::Slice(encodedKey.getBuffer(), encodedKey.getSize()), value);
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        ru->writeBatch()->Put(prefixedKey, value);
 
         return Status::OK();
     }
@@ -790,15 +778,15 @@ namespace mongo {
         // document. No need to register write here
 
         KeyString encodedKey(key, _order, loc);
-        rocksdb::Slice keySlice(encodedKey.getBuffer(), encodedKey.getSize());
+        std::string prefixedKey(_makePrefixedKey(_prefix, encodedKey));
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        ru->writeBatch()->Delete(_columnFamily.get(), keySlice);
+        ru->writeBatch()->Delete(prefixedKey);
     }
 
     SortedDataInterface::Cursor* RocksStandardIndex::newCursor(OperationContext* txn,
                                                                int direction) const {
         invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
-        return new RocksStandardCursor(txn, _db, _columnFamily, direction == 1, _order);
+        return new RocksStandardCursor(txn, _db, _prefix, direction == 1, _order);
     }
 
 

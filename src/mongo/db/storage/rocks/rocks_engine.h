@@ -89,9 +89,8 @@ namespace mongo {
 
         virtual Status dropIdent(OperationContext* opCtx, StringData ident) override;
 
-        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const {
-            return _identColumnFamilyMap.find(ident) != _identColumnFamilyMap.end();;
-        }
+        virtual bool hasIdent(OperationContext* opCtx, StringData ident) const override;
+
         virtual std::vector<std::string> getAllIdents( OperationContext* opCtx ) const override;
 
         virtual bool supportsDocLocking() const override {
@@ -123,22 +122,10 @@ namespace mongo {
         const rocksdb::DB* getDB() const { return _db.get(); }
 
     private:
-        bool _existsColumnFamily(StringData ident);
-        Status _createColumnFamily(const rocksdb::ColumnFamilyOptions& options,
-                                   StringData ident);
-        Status _dropColumnFamily(StringData ident);
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _getColumnFamily(StringData ident);
+        Status _createIdentPrefix(StringData ident);
+        std::string _getIdentPrefix(StringData ident);
 
-        std::unordered_map<std::string, Ordering> _loadOrderingMetaData(rocksdb::Iterator* itr);
-        std::set<std::string> _loadCollections(rocksdb::Iterator* itr);
-        std::vector<std::string> _loadColumnFamilies();
-
-        rocksdb::ColumnFamilyOptions _collectionOptions();
-        rocksdb::ColumnFamilyOptions _indexOptions(const Ordering& order);
-
-        rocksdb::Options _dbOptions();
-
-        rocksdb::ColumnFamilyOptions _defaultCFOptions();
+        rocksdb::Options _options() const;
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
@@ -146,18 +133,18 @@ namespace mongo {
 
         const bool _durable;
 
-        // Default column family is owned by the rocksdb::DB instance.
-        rocksdb::ColumnFamilyHandle* _defaultHandle;
+        // ident prefix map stores mapping from ident to a prefix (uint32_t)
+        mutable boost::mutex _identPrefixMapMutex;
+        typedef StringMap<uint32_t> IdentPrefixMap;
+        IdentPrefixMap _identPrefixMap;
 
-        mutable boost::mutex _identColumnFamilyMapMutex;
-        typedef StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle> > IdentColumnFamilyMap;
-        IdentColumnFamilyMap _identColumnFamilyMap;
+        // protected by _identPrefixMapMutex
+        uint32_t _maxPrefix;
 
         // This is for concurrency control
         RocksTransactionEngine _transactionEngine;
 
-        static const std::string kOrderingPrefix;
-        static const std::string kCollectionPrefix;
+        static const std::string kMetadataPrefix;
     };
 
     Status toMongoStatus( rocksdb::Status s );
