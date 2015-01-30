@@ -149,7 +149,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * we try a few times and don't get it done, skip the adjustment. The
 	 * dirty-byte count in the system will be wrong, but remain consistent,
 	 * and we'll fix it up the next time we mark this page clean or when
-	 * we evict it.
+	 * it's evicted.
 	 */
 	for (i = 0; i < 5; ++i) {
 		size = page->modify->bytes_dirty;
@@ -172,8 +172,17 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	cache = S2C(session)->cache;
 
-	WT_ASSERT(session,
-	    page->modify == NULL || page->modify->bytes_dirty == 0);
+	/*
+	 * We can get here with a non-zero count of dirty bytes in the page:
+	 *	T1 test if page is dirty, returns true
+	 *	T2 reconciles and marks page clean
+	 *	T1 increments page's dirty-byte count
+	 *	T2 evicts page
+	 * It's not an error, but correct the cache's dirty byte count.
+	 */
+	if (page->modify != NULL && page->modify->bytes_dirty != 0)
+		(void)WT_ATOMIC_SUB8(
+		    cache->bytes_dirty, page->modify->bytes_dirty);
 
 	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
 	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
