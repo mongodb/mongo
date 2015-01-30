@@ -601,10 +601,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 
 #if 0
 	/*
-	 * Adjust the parent's memory footprint.  This may look odd, but we
-	 * have already taken the allocation overhead into account, and an
-	 * increment followed by a decrement will cancel out the normal
-	 * adjustment.
+	 * Adjust the parent's memory footprint.
 	 */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
@@ -1020,10 +1017,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
 
 	/*
-	 * Adjust the parent's memory footprint.  This may look odd, but we
-	 * have already taken the allocation overhead into account, and an
-	 * increment followed by a decrement will cancel out the normal
-	 * adjustment.
+	 * Adjust the parent's memory footprint.
 	 */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
