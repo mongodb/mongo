@@ -75,6 +75,52 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 #endif
 
 /*
+ * __wt_cache_page_byte_dirty_decr --
+ *	Decrement the page's dirty byte count, guarding from underflow.
+ */
+static inline void
+__wt_cache_page_byte_dirty_decr(
+    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+	WT_CACHE *cache;
+	size_t decr, orig;
+	int i;
+
+	cache = S2C(session)->cache;
+
+	/*
+	 * We don't have exclusive access and there are ways of decrementing the
+	 * page's dirty byte count by a too-large value. For example:
+	 *	T1: __wt_cache_page_inmem_incr(page, size)
+	 *		page is clean, don't increment dirty byte count
+	 *	T2: mark page dirty
+	 *	T1: __wt_cache_page_inmem_decr(page, size)
+	 *		page is dirty, decrement dirty byte count
+	 * and, of course, the reverse where the page is dirty at the increment
+	 * and clean at the decrement.
+	 *
+	 * The page's dirty-byte value always reflects bytes represented in the
+	 * cache's dirty-byte count, decrement the page/cache as much as we can
+	 * without underflow. If we can't decrement the dirty byte counts after
+	 * few tries, give up: the cache's value will be wrong, but consistent,
+	 * and we'll fix it the next time this page is marked clean, or evicted.
+	 */
+	for (i = 0; i < 5; ++i) {
+		/*
+		 * Take care to read the dirty-byte count only once in case
+		 * we're racing with updates.
+		 */
+		orig = page->modify->bytes_dirty;
+		decr = WT_MIN(size, orig);
+		if (WT_ATOMIC_CAS8(
+		    page->modify->bytes_dirty, orig, orig - decr)) {
+			WT_CACHE_DECR(session, cache->bytes_dirty, decr);
+			break;
+		}
+	}
+}
+
+/*
  * __wt_cache_page_inmem_decr --
  *	Decrement a page's memory footprint in the cache.
  */
@@ -89,15 +135,14 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_CACHE_DECR(session, cache->bytes_inmem, size);
 	WT_CACHE_DECR(session, page->memory_footprint, size);
-	if (__wt_page_is_modified(page)) {
-		WT_CACHE_DECR(session, cache->bytes_dirty, size);
-		WT_CACHE_DECR(session, page->modify->bytes_dirty, size);
-	}
+	if (__wt_page_is_modified(page))
+		__wt_cache_page_byte_dirty_decr(session, page, size);
 }
 
 /*
  * __wt_cache_dirty_incr --
- *	Increment the cache dirty page/byte counts.
+ *	Page switch from clean to dirty: increment the cache dirty page/byte
+ * counts.
  */
 static inline void
 __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -119,46 +164,29 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_cache_dirty_decr --
- *	Decrement the cache dirty page/byte counts.
+ *	Page switch from dirty to clean: decrement the cache dirty page/byte
+ * counts.
  */
 static inline void
 __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
-	size_t size;
-	int i;
+	WT_PAGE_MODIFY *modify;
 
 	cache = S2C(session)->cache;
 
 	if (cache->pages_dirty < 1) {
-		(void)__wt_errx(session,
-		   "cache dirty decrement failed: cache dirty page count went "
-		   "negative");
+		__wt_errx(session,
+		   "cache eviction dirty-page decrement failed: dirty page"
+		   "count went negative");
 		cache->pages_dirty = 0;
 	} else
 		(void)WT_ATOMIC_SUB8(cache->pages_dirty, 1);
 
-	/*
-	 * Take care to read the dirty-byte count once in case we are racing
-	 * with updates.
-	 *
-	 * We don't have exclusive access, and the page may already be dirty
-	 * (with bytes added to or removed from the page's dirty-byte count).
-	 * If the page dirty-byte count decreases after we take our copy, we
-	 * could underflow the cache and page values, make sure we don't. If
-	 * we try a few times and don't get it done, skip the adjustment. The
-	 * dirty-byte count in the system will be wrong, but remain consistent,
-	 * and we'll fix it up the next time we mark this page clean or when
-	 * it's evicted.
-	 */
-	for (i = 0; i < 5; ++i) {
-		size = page->modify->bytes_dirty;
-		if (!WT_ATOMIC_CAS8(page->modify->bytes_dirty, size, 0))
-			continue;
-
-		(void)WT_ATOMIC_SUB8(cache->bytes_dirty, size);
-		break;
-	}
+	modify = page->modify;
+	if (modify != NULL && modify->bytes_dirty != 0)
+		__wt_cache_page_byte_dirty_decr(
+		    session, page, modify->bytes_dirty);
 }
 
 /*
@@ -169,24 +197,25 @@ static inline void
 __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
+	WT_PAGE_MODIFY *modify;
 
 	cache = S2C(session)->cache;
+	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
 	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
 
-	/*
-	 * We can get here with a non-zero count of page dirty bytes in error
-	 * paths, as well as the following race:
-	 *	T1 test if page is dirty, returns true
-	 *	T2 reconciles and marks page clean
-	 *	T1 increments page's dirty-byte count
-	 *	T2 evicts page
-	 * It's not an error, but correct the cache's dirty byte count.
-	 */
-	if (page->modify != NULL && page->modify->bytes_dirty != 0)
-		(void)WT_ATOMIC_SUB8(
-		    cache->bytes_dirty, page->modify->bytes_dirty);
+	/* Update the cache's dirty-byte count. */
+	if (modify != NULL && modify->bytes_dirty != 0) {
+		if (cache->bytes_dirty < modify->bytes_dirty) {
+			__wt_errx(session,
+			   "cache eviction dirty-bytes decrement failed: "
+			   "dirty byte count went negative");
+			cache->bytes_dirty = 0;
+		} else
+			WT_CACHE_DECR(
+			    session, cache->bytes_dirty, modify->bytes_dirty);
+	}
 
 	/* Update pages and bytes evicted. */
 	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
