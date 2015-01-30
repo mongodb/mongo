@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOEXPORT" "1" "March 18, 2014" "2.6" "mongodb-manual"
+.TH "MONGOEXPORT" "1" "January 30, 2015" "3.0" "mongodb-manual"
 .SH NAME
 mongoexport \- MongoDB Export Utility
 .
@@ -46,6 +46,15 @@ data type information. Use \fBmongodump\fP and
 \fBmongorestore\fP as described in http://docs.mongodb.org/manual/core/backups for this
 kind of functionality.
 .SH OPTIONS
+.sp
+Changed in version 3.0.0: \fBmongoexport\fP removed the \fB\-\-dbpath\fP as well as related
+\fB\-\-directoryperdb\fP and \fB\-\-journal\fP options. You must use
+\fBmongoexport\fP while connected to a \fBmongod\fP instance.
+
+.sp
+Changed in version 3.0.0: \fBmongoexport\fP also removed support for writing data to
+\fBtsv\fP files with the \fB\-\-tsv\fP option.
+
 .INDENT 0.0
 .TP
 .B mongoexport
@@ -56,8 +65,8 @@ kind of functionality.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-help, \-h
-Returns information on \fBmongoexport\fP options and usage.
+.B \-\-help
+Returns information on the options and use of \fBmongoexport\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -69,8 +78,10 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs \fBmongoexport\fP in a quiet mode that attempts to limit the amount of
-output. This option suppresses:
+Runs the \fBmongoexport\fP in a quiet mode that attempts to limit the amount
+of output.
+.sp
+This option suppresses:
 .INDENT 7.0
 .IP \(bu 2
 output from \fIdatabase commands\fP
@@ -89,19 +100,22 @@ Returns the \fBmongoexport\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h
-Specifies a resolvable hostname for the \fBmongod\fP to which to
-connect. By default \fBmongoexport\fP attempts to connect to a MongoDB instance
-running on the localhost on port number \fB27017\fP\&.
+.B \-\-host <hostname><:port>, \-h <hostname><:port>
+\fIDefault\fP: localhost:27017
 .sp
-To connect to a replica set, specify the replica set seed name and the
-seed list of set members. Use the following format:
+Specifies a resolvable hostname for the \fBmongod\fP to which to
+connect. By default, the \fBmongoexport\fP attempts to connect to a MongoDB
+instance running on the localhost on port number \fB27017\fP\&.
+.sp
+To connect to a replica set, specify the
+\fBreplSetName\fP and a seed list of set members, as in
+the following:
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-<replica_set_name>/<hostname1><:port>,<hostname2:<port>,...
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -109,20 +123,26 @@ seed list of set members. Use the following format:
 .sp
 You can always connect directly to a single MongoDB instance by
 specifying the host and port number directly.
+.sp
+Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
+enclose the portion of an address and port combination in
+brackets (e.g. \fB[<address>]\fP).
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-port <port>
-Specifies the port number when the MongoDB instance is not running on the
-standard port of \fB27017\fP\&. You may also specify the port number
-using the \fB\-\-host\fP option.
+\fIDefault\fP: 27017
+.sp
+Specifies the TCP port on which the MongoDB instance listens for
+client connections.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support, which allows \fBmongoexport\fP to connect to the MongoDB
-instance using an IPv6 network. All MongoDB programs and processes,
-including \fBmongoexport\fP, disable IPv6 support by default.
+Enables IPv6 support and allows the \fBmongoexport\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -148,6 +168,21 @@ from the Certificate Authority. Specify the file name of the
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -161,8 +196,8 @@ or absolute paths.
 .sp
 This option is required when using the \fI\-\-ssl\fP option to connect
 to a \fBmongod\fP or \fBmongos\fP that has
-\fBsslCAFile\fP enabled \fIwithout\fP
-\fBsslWeakCertificateValidation\fP\&.
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -174,13 +209,13 @@ New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use \fI\-\-sslPEMKeyPassword\fP only if
-the certificate\-key file is encrypted. In all cases, \fBmongoexport\fP will
+\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongoexport\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-\fI\-\-sslPEMKeyPassword\fP, \fBmongoexport\fP will prompt for a passphrase.
-See \fIssl\-certificate\-password\fP\&.
+the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongoexport\fP will prompt for a passphrase. See
+\fIssl\-certificate\-password\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -206,7 +241,7 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBsslAllowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
 warning the use of the invalid certificate.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
@@ -214,97 +249,149 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongoexport\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-sslFIPSMode
 New in version 2.6.
 
 .sp
-Directs \fBmongoexport\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must
-have a FIPS compliant OpenSSL library to use \fI\-\-sslFIPSMode\fP\&.
+Directs the \fBmongoexport\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u
+.B \-\-username <username>, \-u <username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p
+.B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
+.sp
+If you do not specify an argument for \fI\-\-password\fP, \fBmongoexport\fP will
+prompt interactively for a password on the console.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
-New in version 2.4.
-
-.sp
-Specifies the database that holds the user\(aqs credentials.
-If you do not specify an authentication database, \fBmongoexport\fP assumes
-that the database specified as the argument to the \fI\-\-db\fP option
-holds the user\(aqs credentials.
+If you do not specify an authentication database, \fBmongoexport\fP
+assumes that the database specified to export holds the user\(aqs credentials.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
 New in version 2.4.
 
 .sp
-Specifies the authentication mechanism. By default, the authentication
-mechanism is \fBMONGODB\-CR\fP, which is the MongoDB challenge/response
-authentication mechanism. In MongoDB Enterprise, \fBmongoexport\fP also includes
-support for \fBGSSAPI\fP to handle Kerberos authentication. See
-http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
-for more information about Kerberos authentication.
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBmongoexport\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-dbpath <path>
-Specifies the directory of the MongoDB data files. If used, the
-\fI\-\-dbpath\fP option enables \fBmongoexport\fP to attach directly to local data
-files without a running \fBmongod\fP\&. When run with \fI\-\-dbpath\fP,
-\fBmongoexport\fP locks access to the data directory. No \fBmongod\fP can
-access the same path while the process runs.
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-directoryperdb
-When used in conjunction with the corresponding option in
-\fBmongod\fP, allows \fBmongoexport\fP to export data from
-MongoDB instances that have every database\(aqs files saved in discrete
-directories on the disk. This option is only relevant when specifying
-the \fI\-\-dbpath\fP option.
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-journal
-Allows \fBmongoexport\fP operations to use the durability \fIjournal\fP to
-ensure data files remain valid and recoverable. This option is only
-relevant when specifying the \fI\-\-dbpath\fP option.
+.B \-\-db <database>, \-d <database>
+Specifies the name of the database on which to run the \fBmongoexport\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d
-Specifies the name of the database on which to run \fBmongoexport\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-collection <collection>, \-c
+.B \-\-collection <collection>, \-c <collection>
 Specifies the collection to export.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-fields <field1[,field2]>, \-f
+.B \-\-fields <field1[,field2]>, \-f <field1[,field2]>
 Specifies a field or fields to \fIinclude\fP in the export. Use a comma
 separated list of fields to specify multiple fields.
 .sp
-For \fI\-\-csv\fP output formats,
+For \fIcsv\fP output formats,
 \fBmongoexport\fP includes only the specified field(s), and the
 specified field(s) can be a field within a sub\-document.
 .sp
@@ -317,10 +404,11 @@ its fields, not just the specified field within the document.
 .INDENT 0.0
 .TP
 .B \-\-fieldFile <filename>
-As an alternative to \fI\-\-fields\fP, the
+An alternative to \fI\-\-fields\fP\&. The
 \fI\-\-fieldFile\fP option allows you to
 specify in a file the field or fields to \fIinclude\fP in the export and is
-\fBonly valid\fP with the \fI\-\-csv\fP option. The
+\fBonly valid\fP with the \fI\-\-type\fP option
+with value \fBcsv\fP\&. The
 file must have only one field per line, and the line(s) must end with
 the LF character (\fB0x0A\fP).
 .sp
@@ -329,7 +417,7 @@ specified field(s) can be a field within a sub\-document.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-query <JSON>, \-q
+.B \-\-query <JSON>, \-q <JSON>
 Provides a \fIJSON document\fP as a query that optionally limits
 the documents returned in the export. Specify JSON in \fBstrict
 format\fP\&.
@@ -359,7 +447,7 @@ export only the documents with the field \fBa\fP greater than or equal to
 .sp
 .nf
 .ft C
-mongoexport \-d test \-c records \-q "{ a: { \e$gte: 3 } } }" \-\-out exportdir/myRecords.json
+mongoexport \-d test \-c records \-q "{ a: { \e$gte: 3 } }" \-\-out exportdir/myRecords.json
 .ft P
 .fi
 .UNINDENT
@@ -383,18 +471,22 @@ You can sort the results with the \fI\%\-\-sort\fP option to
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-csv
-Changes the export format to a comma\-separated\-values (CSV)
-format. By default \fBmongoexport\fP writes data using one
-\fIJSON\fP document for every MongoDB document.
+.B \-\-type <string>
+\fIDefault\fP: json
 .sp
-If you specify \fI\%\-\-csv\fP, then you must also use either
+New in version 3.0.0.
+
+.sp
+Specifies the file type to export. The default format is \fIJSON\fP,
+bit it is possible to export \fIcsv\fP files.
+.sp
+If you specify \fBcsv\fP, then you must also use either
 the \fI\-\-fields\fP or the \fI\-\-fieldFile\fP option to
 declare the fields to export from the collection.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-out <file>, \-o
+.B \-\-out <file>, \-o <file>
 Specifies a file to write the export to. If you do not specify a file
 name, the \fBmongoexport\fP writes data to standard output
 (e.g. \fBstdout\fP).
@@ -406,6 +498,14 @@ Modifies the output of \fBmongoexport\fP to write the
 entire contents of the export as a single \fIJSON\fP array. By
 default \fBmongoexport\fP writes data using one JSON document
 for every MongoDB document.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-pretty
+New in version 3.0.0.
+
+.sp
+Outputs documents in a pretty\-printed format JSON.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -525,31 +625,6 @@ mongoexport \-\-db sales \-\-collection contacts \-\-out contacts.json \-\-journ
 .fi
 .UNINDENT
 .UNINDENT
-.SS Export Collection Directly From Data Files
-.sp
-The following example exports the collection \fBcontacts\fP from the
-\fBsales\fP database located in the MongoDB data files located at
-\fB/srv/mongodb/\fP\&. This operation writes the export to standard output
-in \fIJSON\fP format.
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-mongoexport \-\-db sales \-\-collection contacts \-\-dbpath /srv/mongodb/
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-\fBWARNING:\fP
-.INDENT 0.0
-.INDENT 3.5
-The above example will only succeed if there is no \fBmongod\fP
-connected to the data files located in the \fB/srv/mongodb/\fP
-directory.
-.UNINDENT
-.UNINDENT
 .SS Export from Remote Host Running with Authentication
 .sp
 The following example exports the collection \fBcontacts\fP from the
@@ -575,8 +650,8 @@ mongoexport \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-p
 preserve all rich \fIBSON\fP data types because \fIJSON\fP can
 only represent a subset of the types supported by BSON. As a result,
 data exported or imported with these tools may lose some measure of
-fidelity. See http://docs.mongodb.org/manual/reference/mongodb\-extended\-json for more
-information.
+fidelity. See the \fBExtended JSON\fP
+reference for more information.
 .UNINDENT
 .UNINDENT
 .sp
@@ -629,6 +704,6 @@ these types and the representations used.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2014, MongoDB, Inc.
+2011-2015
 .\" Generated by docutils manpage writer.
 .

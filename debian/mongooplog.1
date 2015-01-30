@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOOPLOG" "1" "March 18, 2014" "2.6" "mongodb-manual"
+.TH "MONGOOPLOG" "1" "January 30, 2015" "3.0" "mongodb-manual"
 .SH NAME
 mongooplog \- MongoDB Oplog Utility
 .
@@ -78,6 +78,11 @@ http://docs.mongodb.org/manual/core/backups, http://docs.mongodb.org/manual/core
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
+.sp
+Changed in version 3.0.0: \fBmongooplog\fP removed the \fB\-\-dbpath\fP as well as related
+\fB\-\-directoryperdb\fP and \fB\-\-journal\fP options. You must use
+\fBmongooplog\fP while connected to a \fBmongod\fP instance.
+
 .INDENT 0.0
 .TP
 .B mongooplog
@@ -88,8 +93,8 @@ http://docs.mongodb.org/manual/core/backups, http://docs.mongodb.org/manual/core
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-help, \-h
-Returns information on \fBmongooplog\fP options and usage.
+.B \-\-help
+Returns information on the options and use of \fBmongooplog\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -101,13 +106,11 @@ including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .INDENT 0.0
 .TP
 .B \-\-quiet
-Runs \fBmongooplog\fP in a quiet mode that attempts to limit the amount of
-output. This option suppresses:
+Runs the \fBmongooplog\fP in a quiet mode that attempts to limit the amount
+of output.
+.sp
+This option suppresses:
 .INDENT 7.0
-.IP \(bu 2
-output from \fIdatabase commands\fP
-.IP \(bu 2
-replication activity
 .IP \(bu 2
 connection accepted events
 .IP \(bu 2
@@ -121,7 +124,7 @@ Returns the \fBmongooplog\fP release number.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-host <hostname><:port>, \-h
+.B \-\-host <hostname><:port>, \-h <hostname><:port>
 Specifies a resolvable hostname for the \fBmongod\fP instance to
 which \fBmongooplog\fP will apply \fIoplog\fP operations
 retrieved from the server specified by the \fI\-\-from\fP option.
@@ -129,14 +132,14 @@ retrieved from the server specified by the \fI\-\-from\fP option.
 By default \fBmongooplog\fP attempts to connect to a MongoDB instance running
 on the localhost on port number \fB27017\fP\&.
 .sp
-To connect to a replica set, specify the replica set seed name and the
-seed list of set members. Use the following format:
+To connect to a replica set, specify the \fBreplica set name\fP and a seed list of set members. Use the
+following form:
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-<replica_set_name>/<hostname1><:port>,<hostname2:<port>,...
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
 .ft P
 .fi
 .UNINDENT
@@ -157,9 +160,9 @@ port number using the \fI\-\-host\fP command.
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support, which allows \fBmongooplog\fP to connect to the MongoDB
-instance using an IPv6 network. All MongoDB programs and processes,
-including \fBmongooplog\fP, disable IPv6 support by default.
+Enables IPv6 support and allows the \fBmongooplog\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -185,6 +188,21 @@ from the Certificate Authority. Specify the file name of the
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -198,8 +216,8 @@ or absolute paths.
 .sp
 This option is required when using the \fI\-\-ssl\fP option to connect
 to a \fBmongod\fP or \fBmongos\fP that has
-\fBsslCAFile\fP enabled \fIwithout\fP
-\fBsslWeakCertificateValidation\fP\&.
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -211,13 +229,13 @@ New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use \fI\-\-sslPEMKeyPassword\fP only if
-the certificate\-key file is encrypted. In all cases, \fBmongooplog\fP will
+\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongooplog\fP will
 redact the password from all logging and reporting output.
 .sp
 If the private key in the PEM file is encrypted and you do not specify
-\fI\-\-sslPEMKeyPassword\fP, \fBmongooplog\fP will prompt for a passphrase.
-See \fIssl\-certificate\-password\fP\&.
+the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongooplog\fP will prompt for a passphrase. See
+\fIssl\-certificate\-password\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -243,7 +261,7 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBsslAllowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
 warning the use of the invalid certificate.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
@@ -251,30 +269,49 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongooplog\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-sslFIPSMode
 New in version 2.6.
 
 .sp
-Directs \fBmongooplog\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must
-have a FIPS compliant OpenSSL library to use \fI\-\-sslFIPSMode\fP\&.
+Directs the \fBmongooplog\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u
+.B \-\-username <username>, \-u <username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p
+.B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-username\fP and
 \fB\-\-authenticationDatabase\fP options.
+.sp
+If you do not specify an argument for \fI\-\-password\fP, \fBmongooplog\fP will
+prompt interactively for a password on the console.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -283,68 +320,96 @@ New in version 2.4.
 
 .sp
 Specifies the database that holds the user\(aqs credentials.
-If you do not specify an authentication database, \fBmongooplog\fP assumes
-that the database specified as the argument to the \fI\-\-db\fP option
-holds the user\(aqs credentials.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
 New in version 2.4.
 
 .sp
-Specifies the authentication mechanism. By default, the authentication
-mechanism is \fBMONGODB\-CR\fP, which is the MongoDB challenge/response
-authentication mechanism. In MongoDB Enterprise, \fBmongooplog\fP also includes
-support for \fBGSSAPI\fP to handle Kerberos authentication. See
-http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
-for more information about Kerberos authentication.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-dbpath <path>
-Specifies a directory, containing MongoDB data files, to which
-\fBmongooplog\fP will apply operations from the \fIoplog\fP of
-the database specified with the \fI\-\-from\fP
-option.
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
 .sp
-When used, the \fI\-\-dbpath\fP option enables \fBmongo\fP to
-attach directly to local data files and write data without a running
-\fBmongod\fP instance.
+Specifies the authentication mechanism the \fBmongooplog\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
 .sp
-To run with \fI\-\-dbpath\fP, \fBmongooplog\fP needs to restrict
-access to the data directory: as a result, no \fBmongod\fP can be
-access the same path while the process runs.
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-directoryperdb
-When used in conjunction with the corresponding option in
-\fBmongod\fP, allows \fBmongooplog\fP to access data from MongoDB
-instances that use an on\-disk format where every database has a distinct
-directory. This option is only relevant when specifying the
-\fI\-\-dbpath\fP option.
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-journal
-Allows \fBmongooplog\fP operations to use the durability \fIjournal\fP to
-ensure data files remain valid and recoverable. This option is only
-relevant when specifying the \fI\-\-dbpath\fP option.
+.B \-\-db <database>, \-d <database>
+Specifies the name of the database on which to run the \fBmongooplog\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-db <database>, \-d
-Specifies the name of the database on which to run \fBmongooplog\fP\&.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-collection <collection>, \-c
+.B \-\-collection <collection>, \-c <collection>
 Specifies the collection to export.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-seconds <number>, \-s
+.B \-\-seconds <number>, \-s <number>
 Specify a number of seconds of operations for \fBmongooplog\fP to
 pull from the \fIremote host\fP\&. Unless
 specified the default value is \fB86400\fP seconds, or 24 hours.
@@ -366,9 +431,11 @@ localhost interface connected to port \fB27017\fP\&.
 Specify a namespace in the \fI\-\-from\fP host
 where the oplog resides. The default value is \fBlocal.oplog.rs\fP, which
 is the where \fIreplica set\fP members store their operation log.
-However, if you\(aqve copied \fIoplog\fP entries into another database or
-collection, use this option to copy oplog entries stored in another
-location. Namespaces take the form of \fB[database].[collection]\fP\&.
+However, if you\(aqve copied \fIoplog\fP entries into another
+database or collection or are pulling oplog entries from a
+\fBmaster\-slave\fP deployment, use \fI\%\-\-oplogns\fP to
+apply oplog entries stored in another location. Namespaces take the
+form of \fB[database].[collection]\fP\&.
 .UNINDENT
 .SH USE
 .sp
@@ -413,31 +480,9 @@ mongooplog  \-\-from mongodb0.example.net \-\-seconds 43200
 .fi
 .UNINDENT
 .UNINDENT
-.sp
-For the previous two examples, \fBmongooplog\fP migrates entries
-to the \fBmongod\fP process running on the localhost interface
-connected to the \fB27017\fP port. \fBmongooplog\fP can also
-operate directly on MongoDB\(aqs data files if no \fBmongod\fP is
-running on the \fItarget\fP host. Consider the following example:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-mongooplog  \-\-from mongodb0.example.net \-\-dbpath /srv/mongodb \-\-journal
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
-.sp
-Here, \fBmongooplog\fP imports \fIoplog\fP operations from the
-\fBmongod\fP host connected to port \fB27017\fP\&. This migrates
-operations to the MongoDB data files stored in the \fB/srv/mongodb\fP
-directory. Additionally \fBmongooplog\fP will use the durability
-\fIjournal\fP to ensure that the data files remain valid.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2014, MongoDB, Inc.
+2011-2015
 .\" Generated by docutils manpage writer.
 .
