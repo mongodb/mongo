@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGO" "1" "March 18, 2014" "2.6" "mongodb-manual"
+.TH "MONGO" "1" "January 30, 2015" "3.0" "mongodb-manual"
 .SH NAME
 mongo \- MongoDB Shell
 .
@@ -85,6 +85,19 @@ Specifies the name of the host machine where the \fBmongod\fP or
 \fBmongos\fP is running. If this is not specified,
 \fBmongo\fP attempts to connect to a MongoDB process running on
 the localhost.
+.sp
+To connect to a replica set, specify the \fBreplica set name\fP and a seed list of set members. Use the
+following form:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -95,22 +108,24 @@ As a result many options of the shell environment are not available.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-username <username>, \-u
+.B \-\-username <username>, \-u <username>
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fB\-\-password\fP and
 \fB\-\-authenticationDatabase\fP options.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <password>, \-p
+.B \-\-password <password>, \-p <password>
 Specifies a password with which to authenticate to a MongoDB database
-that uses authentication. Use in conjunction with the \fB\-\-username\fP and
-\fB\-\-authenticationDatabase\fP options.
+that uses authentication. Use in conjunction with the \fI\-\-username\fP
+and \fI\-\-authenticationDatabase\fP options. To force \fBmongo\fP to
+prompt for a password, enter the \fI\-\-password\fP option as the
+last option and leave out the argument.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-help, \-h
-Returns information on \fBmongo\fP options and usage.
+Returns information on the options and use of \fBmongo\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -126,9 +141,9 @@ process.
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support, which allows \fBmongo\fP to connect to the MongoDB
-instance using an IPv6 network. All MongoDB programs and processes,
-including \fBmongo\fP, disable IPv6 support by default.
+Enables IPv6 support and allows the \fBmongo\fP to connect to the
+MongoDB instance using an IPv6 network. All MongoDB programs and
+processes disable IPv6 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -163,6 +178,11 @@ mongo 10.8.8.10/test
 .fi
 .UNINDENT
 .UNINDENT
+.sp
+This syntax is the \fIonly\fP way to connect to a specific database.
+.sp
+To specify alternate hosts and a database, you must use this syntax and cannot
+use \fI\-\-host\fP or \fI\-\-port\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -202,28 +222,91 @@ New in version 2.4.
 
 .sp
 Specifies the database that holds the user\(aqs credentials.
-If you do not specify an authentication database, \fBmongo\fP assumes
-that the database specified as the argument to the \fI\-\-db\fP option
-holds the user\(aqs credentials.
+.sp
+If you do not specify a value for \fI\-\-authenticationDatabase\fP, \fBmongo\fP uses the database
+specified in the connection string.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
+\fIDefault\fP: MONGODB\-CR
+.sp
 New in version 2.4.
 
 .sp
-Specifies the authentication mechanism. By default, the authentication
-mechanism is \fBMONGODB\-CR\fP, which is the MongoDB challenge/response
-authentication mechanism. In MongoDB Enterprise, \fBmongo\fP also includes
-support for \fBGSSAPI\fP to handle Kerberos authentication. See
-http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
-for more information about Kerberos authentication.
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBMONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBmongo\fP instance uses to
+authenticate to the \fBmongod\fP or \fBmongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+MONGODB\-CR
+T}	T{
+MongoDB challenge/response authentication.
+T}
+_
+T{
+MONGODB\-X509
+T}	T{
+MongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%MongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%MongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in MongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBmongodb\fP\&.
+.sp
+This option is available only in MongoDB Enterprise.
 .UNINDENT
 .SS SSL Options
 .INDENT 0.0
 .TP
 .B \-\-ssl
-New in version 2.6.
+New in version 2.2.
 
 .sp
 Enables connection to a \fBmongod\fP or \fBmongos\fP that has
@@ -235,17 +318,17 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyFile <filename>
-New in version 2.6.
+New in version 2.4.
 
 .sp
 Specifies the \fB\&.pem\fP file that contains both the SSL certificate
 and key. Specify the file name of the \fB\&.pem\fP file using relative
 or absolute paths.
 .sp
-This option is required when using the \fI\-\-ssl\fP option to connect
+This option is required when using the \fB\-\-ssl\fP option to connect
 to a \fBmongod\fP or \fBmongos\fP that has
-\fBsslCAFile\fP enabled \fIwithout\fP
-\fBsslWeakCertificateValidation\fP\&.
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -253,17 +336,18 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .INDENT 0.0
 .TP
 .B \-\-sslPEMKeyPassword <value>
-New in version 2.6.
+New in version 2.4.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\-\-sslPEMKeyFile\fP). Use \fI\-\-sslPEMKeyPassword\fP only if
-the certificate\-key file is encrypted. In all cases, \fBmongo\fP will
+\fB\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBmongo\fP will
 redact the password from all logging and reporting output.
 .sp
-If the private key in the PEM file is encrypted and you do not specify
-\fI\-\-sslPEMKeyPassword\fP, \fBmongo\fP will prompt for a passphrase.
-See \fIssl\-certificate\-password\fP\&.
+Changed in version 2.6: If the private key in the PEM file is encrypted and you do not
+specify the \fI\-\-sslPEMKeyPassword\fP option, the \fBmongo\fP will prompt for a
+passphrase. See \fIssl\-certificate\-password\fP\&.
+
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -271,7 +355,7 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 .INDENT 0.0
 .TP
 .B \-\-sslCAFile <filename>
-New in version 2.6.
+New in version 2.4.
 
 .sp
 Specifies the \fB\&.pem\fP file that contains the root certificate chain
@@ -280,11 +364,26 @@ from the Certificate Authority. Specify the file name of the
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBmongo\fP shell or any other tool that connects to
+\fBmongos\fP or \fBmongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBmongod\fP and \fBmongos\fP certificates as well as to foreign
+processes posing as valid \fBmongod\fP or \fBmongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslCRLFile <filename>
-New in version 2.6.
+New in version 2.4.
 
 .sp
 Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
@@ -300,12 +399,18 @@ For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tuto
 New in version 2.6.
 
 .sp
-Directs \fBmongo\fP to use the FIPS mode of the installed OpenSSL
-library. Your system must
-have a FIPS compliant OpenSSL library to use \fI\-\-sslFIPSMode\fP\&.
+Directs the \fBmongo\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
 .sp
-The default distribution of MongoDB does not contain support for SSL.
-For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%MongoDB Enterprise\fP\&. See
+http://docs.mongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -315,8 +420,21 @@ New in version 2.6.
 .sp
 Bypasses the validation checks for server certificates and allows
 the use of invalid certificates. When using the
-\fBsslAllowInvalidCertificates\fP setting, MongoDB logs as a
+\fBallowInvalidCertificates\fP setting, MongoDB logs as a
 warning the use of the invalid certificate.
+.sp
+The default distribution of MongoDB does not contain support for SSL.
+For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBmongo\fP to connect to MongoDB instances if the hostname their
+certificates do not match the specified hostname.
 .sp
 The default distribution of MongoDB does not contain support for SSL.
 For more information on MongoDB and SSL, see http://docs.mongodb.org/manual/tutorial/configure\-ssl\&.
@@ -770,9 +888,24 @@ mongo \-\-eval \(aqdb.collection.find().forEach(printjson)\(aq
 .sp
 Use single quotes (e.g. \fB\(aq\fP) to enclose the JavaScript, as well as
 the additional JavaScript required to generate this output.
+.SH ADDITIONAL INFORMATION
+.INDENT 0.0
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/mongo\-shell
+.IP \(bu 2
+http://docs.mongodb.org/manual/reference/method
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/access\-mongo\-shell\-help
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/getting\-started\-with\-the\-mongo\-shell
+.IP \(bu 2
+http://docs.mongodb.org/manual/core/shell\-types
+.IP \(bu 2
+http://docs.mongodb.org/manual/tutorial/write\-scripts\-for\-the\-mongo\-shell
+.UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2014, MongoDB, Inc.
+2011-2015
 .\" Generated by docutils manpage writer.
 .
