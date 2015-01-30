@@ -634,6 +634,10 @@ namespace mongo {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
+            uassert(ErrorCodes::NotMaster,
+                    str::stream() << "Not primary while performing update on " << ns.ns(),
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
+
             Database* db = ctx.db();
             if ( db->getCollection( ns ) ) {
                 // someone else beat us to it, that's ok
