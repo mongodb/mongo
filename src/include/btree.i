@@ -172,8 +172,12 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	cache = S2C(session)->cache;
 
+	/* Update the bytes in-memory to reflect the eviction. */
+	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
+
 	/*
-	 * We can get here with a non-zero count of dirty bytes in the page:
+	 * We can get here with a non-zero count of page dirty bytes in error
+	 * paths, as well as the following race:
 	 *	T1 test if page is dirty, returns true
 	 *	T2 reconciles and marks page clean
 	 *	T1 increments page's dirty-byte count
@@ -184,6 +188,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)WT_ATOMIC_SUB8(
 		    cache->bytes_dirty, page->modify->bytes_dirty);
 
+	/* Update pages and bytes evicted. */
 	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
 	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
 }
