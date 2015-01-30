@@ -129,6 +129,53 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("node has no applied oplog entries"));
     }
 
+    /**
+     * This test checks that an election can happen when only one node is up, and it has the
+     * vote(s) to win.
+     */
+    TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
+        OperationContextReplMock txn;
+        startCapturingLogMessages();
+        assertStartSuccess(
+            BSON("_id" << "mySet" <<
+                 "version" << 1 <<
+                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
+                                         BSON("_id" << 2 << "host" << "node2:12345" <<
+                                              "votes" << 0 << "hidden" << true <<
+                                              "priority" << 0))),
+            HostAndPort("node1", 12345));
+
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+        ASSERT(getReplCoord()->getMemberState().secondary()) <<
+                                                      getReplCoord()->getMemberState().toString();
+
+        getReplCoord()->setMyLastOptime(OpTime(10,0));
+
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        net->scheduleResponse(noi,
+                              net->now(),
+                              ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT(getReplCoord()->getMemberState().primary()) <<
+                                                      getReplCoord()->getMemberState().toString();
+        ASSERT(getReplCoord()->isWaitingForApplierToDrain());
+
+        // Since we're still in drain mode, expect that we report ismaster: false, issecondary:true.
+        IsMasterResponse imResponse;
+        getReplCoord()->fillIsMasterForReplSet(&imResponse);
+        ASSERT_FALSE(imResponse.isMaster()) << imResponse.toBSON().toString();
+        ASSERT_TRUE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+        getReplCoord()->signalDrainComplete(&txn);
+        getReplCoord()->fillIsMasterForReplSet(&imResponse);
+        ASSERT_TRUE(imResponse.isMaster()) << imResponse.toBSON().toString();
+        ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
+    }
+
     TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
         OperationContextReplMock txn;
         startCapturingLogMessages();
