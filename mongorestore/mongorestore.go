@@ -91,11 +91,6 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		}
 	}
 
-	restore.useWriteCommands, err = restore.SessionProvider.SupportsWriteCommands()
-	if err != nil {
-		return err
-	}
-
 	if restore.InputOptions.OplogLimit != "" {
 		if !restore.InputOptions.OplogReplay {
 			return fmt.Errorf("cannot use --oplogLimit without --oplogReplay enabled")

@@ -51,15 +51,13 @@ func (bb *BufferedBulkInserter) Insert(doc interface{}) error {
 	}
 	// flush if we are full
 	if bb.docCount >= bb.docLimit || bb.byteCount+len(rawBytes) > MaxMessageSize {
-		if err := bb.Flush(); err != nil {
-			return fmt.Errorf("error writing bulk insert: %v", err)
-		}
+		err = bb.Flush()
 	}
 	// buffer the document
 	bb.docCount++
 	bb.byteCount += len(rawBytes)
 	bb.bulk.Insert(bson.Raw{Data: rawBytes})
-	return nil
+	return err
 }
 
 // Flush writes all buffered documents in one bulk insert then resets the buffer.
@@ -67,9 +65,9 @@ func (bb *BufferedBulkInserter) Flush() error {
 	if bb.docCount == 0 {
 		return nil
 	}
+	defer bb.resetBulk()
 	if _, err := bb.bulk.Run(); err != nil {
 		return err
 	}
-	bb.resetBulk()
 	return nil
 }
