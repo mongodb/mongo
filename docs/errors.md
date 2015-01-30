@@ -956,7 +956,7 @@ src/mongo/db/ops/update.cpp
 * 10155 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L68) cannot update reserved $ collection
 * 10156 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L72) cannot update system collection: <X> q: <X> u:
 * 16836 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L747) 
-* 16837 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L586) 
+* 16837 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/exec/update.cpp#L502) cannot update the field with array operators while the field is a scalar type
 * 16838 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L804) 
 * 16839 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L810) 
 * 17243 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/ops/update.cpp#L459) could not get runner <X>;
