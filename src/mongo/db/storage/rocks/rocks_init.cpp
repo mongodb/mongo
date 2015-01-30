@@ -35,6 +35,8 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -67,12 +69,38 @@ namespace mongo {
 
             virtual Status validateMetadata(const StorageEngineMetadata& metadata,
                                             const StorageGlobalParams& params) const {
+                const BSONObj& options = metadata.getStorageEngineOptions();
+                BSONElement element = options.getField(kRocksFormatVersionString);
+                if (element.eoo() || !element.isNumber()) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  "Storage engine metadata format not recognized. If you created "
+                                  "this database with older version of mongo, please reload the "
+                                  "database using mongodump and mongorestore");
+                }
+                if (element.numberInt() != kRocksFormatVersion) {
+                    return Status(
+                        ErrorCodes::UnsupportedFormat,
+                        str::stream()
+                            << "Database created with format version " << element.numberInt()
+                            << " and this version only supports format version "
+                            << kRocksFormatVersion
+                            << ". Please reload the database using mongodump and mongorestore");
+                }
                 return Status::OK();
             }
 
             virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
-                return BSONObj();
+                BSONObjBuilder builder;
+                builder.append(kRocksFormatVersionString, kRocksFormatVersion);
+                return builder.obj();
             }
+
+        private:
+            // Current disk format. We bump this number when we change the disk format. MongoDB will
+            // fail to start if the versions don't match. In that case a user needs to run mongodump
+            // and mongorestore.
+            const int kRocksFormatVersion = 1;
+            const std::string kRocksFormatVersionString = "rocksFormatVersion";
         };
     } // namespace
 
