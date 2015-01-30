@@ -285,6 +285,7 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
 
 	/* Increment the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
+	(void)WT_ATOMIC_ADD8(cache->bytes_read, size);
 	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
 
 	*pagep = page;
