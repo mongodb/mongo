@@ -43,7 +43,13 @@ type IndexDocument struct {
 // MetadataFromJSON takes a slice of JSON bytes and unmarshals them into usable
 // collection options and indexes for restoring collections.
 func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []IndexDocument, error) {
+	if len(jsonBytes) == 0 {
+		// skip metadata parsing if the file is empty
+		return nil, nil, nil
+	}
+
 	meta := &Metadata{}
+
 	err := json.Unmarshal(jsonBytes, meta)
 	if err != nil {
 		return nil, nil, err
