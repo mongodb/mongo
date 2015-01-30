@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"strconv"
 	"strings"
 )
 
@@ -144,44 +143,17 @@ func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 		return false, err
 	}
 	defer session.Close()
-	masterDoc := bson.M{}
+	masterDoc := struct {
+		Ok      int `bson:"ok"`
+		MaxWire int `bson:"maxWireVersion"`
+	}{}
 	err = session.Run("isMaster", &masterDoc)
 	if err != nil {
 		return false, err
 	}
-	dbOkValue, hasOk := masterDoc["ok"]
-	dbMinWireVersion, hasMinWireVersion := masterDoc["minWireVersion"]
-	dbMaxWireVersion, hasMaxWireVersion := masterDoc["maxWireVersion"]
-	minWireVersion, ok := dbMinWireVersion.(int)
-	if !ok {
-		return false, nil
-	}
-	maxWireVersion, ok := dbMaxWireVersion.(int)
-	if !ok {
-		return false, nil
-	}
-	var okValue int
-	switch okValueType := dbOkValue.(type) {
-	case int:
-		okValue = dbOkValue.(int)
-	case float64:
-		okValue = int(dbOkValue.(float64))
-	case string:
-		okValue, err = strconv.Atoi(dbOkValue.(string))
-		if err != nil {
-			return false, fmt.Errorf("expected int for ok value, got '%v' (%v)", dbOkValue, okValueType)
-		}
-	default:
-		return false, fmt.Errorf("expected int for ok value, got '%v' (%v)", dbOkValue, okValueType)
-	}
-	// the connected server supports write commands if its minWireVersion <= 2
-	// and its maxWireVersion >= 2
-	if hasOk && okValue == 1 &&
-		hasMinWireVersion && hasMaxWireVersion &&
-		minWireVersion <= 2 && 2 <= maxWireVersion {
-		return true, nil
-	}
-	return false, nil
+	// the connected server supports write commands if
+	// the maxWriteVersion field is present
+	return (masterDoc.Ok == 1 && masterDoc.MaxWire >= 2), nil
 }
 
 // FindOne retuns the first document in the collection and database that matches

@@ -34,11 +34,12 @@ type MongoRestore struct {
 	safety          *mgo.Safe
 	progressManager *progress.Manager
 
-	objCheck     bool
-	oplogLimit   bson.MongoTimestamp
-	useStdin     bool
-	isMongos     bool
-	authVersions authVersionPair
+	objCheck         bool
+	oplogLimit       bson.MongoTimestamp
+	useStdin         bool
+	isMongos         bool
+	useWriteCommands bool
+	authVersions     authVersionPair
 
 	// a map of database names to a list of collection names
 	knownCollections      map[string][]string
@@ -88,6 +89,11 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		if restore.ToolOptions.DB == "" {
 			return fmt.Errorf("cannot do a full restore on a sharded system")
 		}
+	}
+
+	restore.useWriteCommands, err = restore.SessionProvider.SupportsWriteCommands()
+	if err != nil {
+		return err
 	}
 
 	if restore.InputOptions.OplogLimit != "" {
