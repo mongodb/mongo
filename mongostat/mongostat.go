@@ -38,6 +38,9 @@ type MongoStat struct {
 
 	//Mutex to handle safe concurrent adding to or looping over discovered nodes
 	nodesLock sync.RWMutex
+
+	//internal storage of the name the user seeded with, for error checking
+	startNode string
 }
 
 type ConfigShard struct {
@@ -90,7 +93,7 @@ type ClusterMonitor interface {
 	//done is a channel to send an error if one is encountered. A nil value will
 	//be sent on this channel if Monitor() completes with no error.
 	//sleep is the interval to sleep between output dumps.
-	Monitor(maxRows int, done chan error, sleep time.Duration)
+	Monitor(maxRows int, done chan error, sleep time.Duration, startNode string)
 
 	//Update signals the ClusterMonitor implementation to refresh its internal
 	//state using the data contained in the provided StatLine.
@@ -121,7 +124,7 @@ func (cluster *SyncClusterMonitor) Update(statLine StatLine) {
 	cluster.ReportChan <- statLine
 }
 
-func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep time.Duration) {
+func (cluster *SyncClusterMonitor) Monitor(maxRows int, done chan error, sleep time.Duration, _ string) {
 	go func() {
 		rowCount := 0
 		hasData := false
@@ -180,14 +183,16 @@ func (cluster *AsyncClusterMonitor) Update(statLine StatLine) {
 
 //The Async implementation of Monitor() starts the goroutines that listen for incoming stat data,
 //and dump snapshots at a regular interval.
-func (cluster *AsyncClusterMonitor) Monitor(maxRows int, done chan error, sleep time.Duration) {
+func (cluster *AsyncClusterMonitor) Monitor(maxRows int, done chan error, sleep time.Duration, startNode string) {
 	receivedData := false
 	gotFirstStat := make(chan struct{})
 	go func() {
 		for {
 			newStat := <-cluster.ReportChan
 			cluster.updateHostInfo(newStat)
-			if !receivedData {
+
+			//Wait until we get an update from the node the user seeded with
+			if !receivedData && newStat.Key == startNode {
 				receivedData = true
 				if newStat.Error != nil {
 					done <- newStat.Error
@@ -199,9 +204,8 @@ func (cluster *AsyncClusterMonitor) Monitor(maxRows int, done chan error, sleep 
 	}()
 
 	go func() {
-		//Wait for the first bit of data to hit the channel before printing
-		//anything:
-		_ = <-gotFirstStat
+		//Wait for the first bit of data to hit the channel before printing anything:
+		<-gotFirstStat
 		rowCount := 0
 		for {
 			time.Sleep(sleep)
@@ -338,6 +342,10 @@ func (mstat *MongoStat) AddNewNode(fullhost string) error {
 	mstat.nodesLock.Lock()
 	defer mstat.nodesLock.Unlock()
 
+	if len(mstat.Nodes) == 0 {
+		mstat.startNode = fullhost
+	}
+
 	if _, hasKey := mstat.Nodes[fullhost]; !hasKey {
 		log.Logf(log.DebugLow, "adding new host to monitoring: %v", fullhost)
 		//Create a new node monitor for this host.
@@ -369,7 +377,7 @@ func (mstat *MongoStat) Run() error {
 
 	//Channel to wait
 	finished := make(chan error)
-	go mstat.Cluster.Monitor(mstat.StatOptions.RowCount, finished, mstat.SleepInterval)
+	go mstat.Cluster.Monitor(mstat.StatOptions.RowCount, finished, mstat.SleepInterval, mstat.startNode)
 
 	err := <-finished
 	return err
