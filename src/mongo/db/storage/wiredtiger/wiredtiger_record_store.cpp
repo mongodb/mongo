@@ -253,7 +253,7 @@ namespace {
 
     WiredTigerRecordStore::~WiredTigerRecordStore() {
         {
-            boost::mutex::scoped_lock lk(_cappedDeleterMutex);
+            boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
             _shuttingDown = true;
         }
 
@@ -274,7 +274,7 @@ namespace {
     }
 
     bool WiredTigerRecordStore::inShutdown() const {
-        boost::mutex::scoped_lock lk(_cappedDeleterMutex);
+        boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
         return _shuttingDown;
     }
 
@@ -401,7 +401,7 @@ namespace {
             return 0;
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        boost::mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
+        boost::timed_mutex::scoped_lock lock(_cappedDeleterMutex, boost::defer_lock);
 
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.
@@ -417,7 +417,8 @@ namespace {
             // Back pressure needed!
             // We're not actually going to delete anything, but we're going to syncronize
             // on the deleter thread.
-            lock.lock();
+            // Don't wait forever: we're in a transaction, we could block eviction.
+            (void)lock.timed_lock(boost::posix_time::millisec(1000));
             return 0;
         }
         else {
@@ -427,7 +428,9 @@ namespace {
                 if ((_dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
                     return 0;
 
-                lock.lock();
+                // Don't wait forever: we're in a transaction, we could block eviction.
+                if (!lock.timed_lock(boost::posix_time::millisec(1000)))
+                    return 0;
 
                 // If we already waited, let someone else do cleanup unless we are significantly
                 // over the limit.

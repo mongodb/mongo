@@ -75,7 +75,7 @@ namespace mongo {
                     Lock::DBLock dbLock(txn.lockState(), _ns.db(), MODE_IX);
                     Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
                     WriteUnitOfWork wuow(&txn);
-                    boost::mutex::scoped_lock lock(_rs->cappedDeleterMutex());
+                    boost::timed_mutex::scoped_lock lock(_rs->cappedDeleterMutex());
                     int64_t removed = _rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
