@@ -817,6 +817,11 @@ namespace mongo {
 
             // Save state before making changes
             _child->saveState();
+            if (supportsDocLocking()) {
+                // Doc-locking engines require this after saveState() since they don't use
+                // invalidations.
+                WorkingSetCommon::forceFetchAllLocs(_txn, _ws, _collection);
+            }
 
             // Do the update and return.
             BSONObj reFetched;
