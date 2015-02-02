@@ -302,7 +302,7 @@ extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server);
 extern int __wt_cache_wait(WT_SESSION_IMPL *session, int full);
 extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive);
-extern void __wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
+extern void __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern void __wt_log_written_reset(WT_SESSION_IMPL *session);
 extern int __wt_log_get_all_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp, uint32_t *maxid, int active_only);
