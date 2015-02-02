@@ -1,11 +1,9 @@
-/*! @page install Building and installing WiredTiger
+/*! @page build-posix Building and installing WiredTiger on POSIX
 
-This section explains how to build and install the WiredTiger software.
-
-@section github Building using Git and GitHub
+@section posix_github Building using Git and GitHub
 
 Skip this step if you are building from a WiredTiger release package,
-and proceed with @ref building.
+and proceed with @ref posix_building.
 
 To build from the WiredTiger GitHub repository requires
 <a href="http://git-scm.com/">git</a>,
@@ -15,27 +13,24 @@ To build from the WiredTiger GitHub repository requires
 related tools.  The standard options for those tools can be specified
 when configuring and building WiredTiger.
 
-On Windows, <a href="http://www.scons.org">SCons</a> is used, and requires
-the Microsoft Visual C++ compiler in Microsoft Visual Studio to compile.
-
 First, clone the repository:
 
 @code
 git clone git://github.com/wiredtiger/wiredtiger.git
 @endcode
 
-Second, if not on Windows, run \c autogen.sh to create the \c configure script:
+Second, run \c autogen.sh to create the \c configure script:
 
 @code
 cd wiredtiger
 sh autogen.sh
 @endcode
 
-Now proceed with @ref building or @ref building-win32.
+Now proceed with @ref posix_building.
 
-@section building Building WiredTiger
+@section posix_building Building WiredTiger
 
-To build the WiredTiger software on a POSIX-like system, change directory to
+To build the WiredTiger software on a POSIX system, change directory to
 the top-level directory, then configure and build the software:
 
 @code
@@ -63,7 +58,7 @@ and <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a>
 to create the configure script and Makefiles.  The standard options for those
 tools can be specified when configuring and building WiredTiger.
 
-@section installing Installing WiredTiger
+@section posix_installing Installing WiredTiger
 
 The WiredTiger software consists of a library and a single standalone
 utility.
@@ -113,65 +108,7 @@ a different location:
 ./configure --prefix=/c/wiredtiger
 @endcode
 
-@section building-win32 Building on Windows
-
-To build the WiredTiger software on a Windows system, change directory to
-the top-level directory, then build the software:
-
-@code
-cd wiredtiger
-scons
-@endcode
-
-To rebuild from scratch, discard any previous configuration by cleaning
-out the build area:
-
-@code
-scons -c
-@endcode
-
-To see additional configuration options, run:
-
-@code
-scons --help
-@endcode
-
-To build the python language support, a 64-bit version of Python is required.
-The required version is referred to as x86-64 on <a href="www.python.org">Python.org</a>
-or x64 on <a href="http://www.activestate.com/activepython/downloads">ActiveState Python</a>.
-
-@section installing-win32 Installing WiredTiger on Windows
-
-The WiredTiger software consists of a library and a single standalone
-utility.
-
-WiredTiger's distribution follows the GNU Coding Standards installation
-guidelines, and by default WiredTiger builds and installs a static library and dll version of the library.
-
-@code
-file <root directory>/package/bin/
-wt.exe:			x64 standalone executable
-wiredtiger.dll:		x64 dynamically linked library
-
-file <root directory>/package/lib/
-libwiredtiger.lib:	x64 static library
-wiredtiger.lib:		x64 import library for dll
-@endcode
-
-To install WiredTiger:
-
-@code
-scons install
-@endcode
-
-To install WiredTiger's libraries or binaries into alternate locations,
-you can use the --prefix switch.
-
-@code
-scons --prefix=c:\wiredtiger install
-@endcode
-
-@section configure Configuring WiredTiger
+@section posix_configure Configuring WiredTiger
 
 The WiredTiger software supports some additional configuration options:
 
@@ -181,14 +118,14 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 
 @par \c --enable-bzip2
 Configure WiredTiger for <a href="http://www.bzip.org/">bzip2</a>
-compression; see @ref compression for more information. Not available on Windows.
+compression; see @ref compression for more information.
 
 @par \c --enable-diagnostic
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.
 
 @par \c --enable-java
-Build the WiredTiger Java API.  Not available on Windows.
+Build the WiredTiger Java API.
 
 @par \c --enable-leveldb[=basho, hyper, rocksdb]
 Include a Google, Inc. compatible LevelDB API. Optionally, specify \c basho
@@ -196,10 +133,10 @@ to build a version of the LevelDB API compatible with Basho's Riak
 product, specify \c hyper to build a version of the LevelDB API compatible
 with the HyperDex product, and specify \c rocksdb to build a version of the
 LevelDB API compatible with applications using Facebook's RocksDB
-engine. See @ref leveldb for more information.  Not available on Windows.
+engine. See @ref leveldb for more information.
 
 @par \c --enable-python
-Build the WiredTiger <a href="http://www.python.org">Python</a> API. Requires path to swig.exe on Windows.
+Build the WiredTiger <a href="http://www.python.org">Python</a> API.
 
 @par \c --enable-snappy
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
@@ -216,11 +153,11 @@ compression; see @ref compression for more information.
 @par <code>--with-builtins</code>
 Configure WiredTiger to include support for extensions in the main library.
 This avoids requiring additional libraries for supported extensions. Currently
-supported options are \c snappy and \c zlib. Not available on Windows as it is the default.
+supported options are \c snappy and \c zlib.
 
 @par <code>--with-python-prefix</code>
 Configure WiredTiger to install Python libraries to a non-standard Python
-install location.  Not available on Windows.
+install location.
 
 @par <code>--with-spinlock[=pthread, pthread_adaptive, gcc]</code>
 Configure WiredTiger to use a specific mutex type for serialization;
@@ -228,9 +165,9 @@ options are \c pthread (the default, which configures WiredTiger to use
 POSIX 1003.1c pthread mutexes), \c pthread_adaptive (which configures
 WiredTiger to use POSIX 1003.1c pthread mutexes configured to be
 adaptive (where that functionality is available), or \c gcc (which
-configures WiredTiger to use gcc-based spinlocks).  Not available on Windows.
+configures WiredTiger to use gcc-based spinlocks).
 
-@section compiler Changing compiler or loader options
+@section posix_compiler Changing compiler or loader options
 
 To change the compiler or loader behavior during the build, use the
 <code>CC</code>, <code>CFLAGS</code>, <code>LDFLAGS</code>, or
