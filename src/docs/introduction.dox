@@ -25,14 +25,16 @@ right for your project, see:
 
 For more information about building and installing WiredTiger, see:
 
-- @subpage install
-- @subpage leveldb
+- @subpage build-posix
+- @subpage build-windows
 
 For more information about writing WiredTiger applications, see:
 
 - @subpage programming
 - @subpage programming_lang_java
+(The Java API is not available on Windows.)
 - @ref wt "WiredTiger API reference manual"
+- @subpage leveldb
 - @subpage performance
 
 For more information about administrating WiredTiger databases, see:
