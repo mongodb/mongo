@@ -2895,10 +2895,13 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");
 
-	/* Set a reference to the empty leaf page. */
+	/* Create an empty leaf page to insert into. */
 	pindex = WT_INTL_INDEX_COPY(btree->root.page);
 	cbulk->ref = pindex->index[0];
+	WT_RET(__wt_cache_read(session, cbulk->ref));
 	cbulk->leaf = cbulk->ref->page;
+	WT_RET(__wt_page_modify_init(session, cbulk->leaf));
+	__wt_page_only_modify_set(session, cbulk->leaf);
 
 	WT_RET(
 	    __rec_write_init(session, cbulk->ref, 0, NULL, &cbulk->reconcile));
