@@ -45,12 +45,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/background.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -245,21 +245,13 @@ namespace {
 
         }
 
-        _backgroundThread.reset(_startBackgroundThread());
-        if (_backgroundThread) {
-            _backgroundThread->go();
-        }
+        _hasBackgroundThread = WiredTigerKVEngine::initRsOplogBackgroundThread(ns);
     }
 
     WiredTigerRecordStore::~WiredTigerRecordStore() {
         {
             boost::timed_mutex::scoped_lock lk(_cappedDeleterMutex);
             _shuttingDown = true;
-        }
-
-        if (_backgroundThread) {
-            // Need time to wake from sleep,a nd possible delete 1000 docs.
-            invariant(_backgroundThread->wait(10000));
         }
 
         LOG(1) << "~WiredTigerRecordStore for: " << ns();
@@ -406,7 +398,7 @@ namespace {
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.
         }
-        else if(_backgroundThread) {
+        else if(_hasBackgroundThread) {
             // We are foreground, and there is a background thread,
 
             // Check if we need some back pressure.

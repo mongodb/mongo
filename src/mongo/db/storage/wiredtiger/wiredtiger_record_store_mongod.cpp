@@ -1,5 +1,3 @@
-// wiredtiger_record_store_mongod.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -33,26 +31,36 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread/mutex.hpp>
+#include <set>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/client.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
     namespace {
+
+        std::set<NamespaceString> _backgroundThreadNamespaces;
+        boost::mutex _backgroundThreadMutex;
+
         class WiredTigerRecordStoreThread : public BackgroundJob {
         public:
-            WiredTigerRecordStoreThread(WiredTigerRecordStore* rs)
-                : _rs(rs),
-                  _ns(rs->ns()) {
-                _name = std::string("WiredTigerRecordStoreThread for ") + rs->ns();
+            WiredTigerRecordStoreThread(const NamespaceString& ns)
+                : _ns(ns) {
+                _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
             }
 
             virtual std::string name() const {
@@ -72,11 +80,28 @@ namespace mongo {
                 checked_cast<WiredTigerRecoveryUnit*>(txn.recoveryUnit())->markNoTicketRequired();
 
                 try {
-                    Lock::DBLock dbLock(txn.lockState(), _ns.db(), MODE_IX);
+                    ScopedTransaction transaction(&txn, MODE_IX);
+
+                    AutoGetDb autoDb(&txn, _ns.db(), MODE_IX);
+                    Database* db = autoDb.getDb();
+                    if (!db) {
+                        LOG(2) << "no local database yet";
+                        return 0;
+                    }
+
                     Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
+                    Collection* collection = db->getCollection(_ns);
+                    if (!collection) {
+                        LOG(2) << "no collection " << _ns;
+                        return 0;
+                    }
+
+                    Client::Context ctx(&txn, _ns, false);
+                    WiredTigerRecordStore* rs =
+                        checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);
-                    boost::timed_mutex::scoped_lock lock(_rs->cappedDeleterMutex());
-                    int64_t removed = _rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
+                    boost::timed_mutex::scoped_lock lock(rs->cappedDeleterMutex());
+                    int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
                 }
@@ -92,7 +117,7 @@ namespace mongo {
             virtual void run() {
                 Client::initThread(_name.c_str());
 
-                while (!_rs->inShutdown()) {
+                while (!inShutdown()) {
                     int64_t removed = _deleteExcessDocuments();
                     LOG(2) << "WiredTigerRecordStoreThread deleted " << removed;
                     if (removed == 0) {
@@ -113,23 +138,36 @@ namespace mongo {
             }
 
         private:
-            WiredTigerRecordStore* _rs;
             NamespaceString _ns;
             std::string _name;
         };
-    }
 
-    BackgroundJob* WiredTigerRecordStore::_startBackgroundThread() {
+    }  // namespace
+
+    // static
+    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+        if (!NamespaceString::oplog(ns)) {
+            return false;
+        }
+
         if (storageGlobalParams.repair) {
-            LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns()
+            LOG(1) << "not starting WiredTigerRecordStoreThread for " << ns
                    << " because we are in repair";
-            return NULL;
+            return false;
         }
 
-        if (NamespaceString::oplog(ns())) {
-            return new WiredTigerRecordStoreThread(this);
+        boost::mutex::scoped_lock lock(_backgroundThreadMutex);
+        NamespaceString nss(ns);
+        if (_backgroundThreadNamespaces.count(nss)) {
+            log() << "WiredTigerRecordStoreThread " << ns << " already started";
         }
-        return NULL;
+        else {
+            log() << "Starting WiredTigerRecordStoreThread " << ns;
+            BackgroundJob* backgroundThread = new WiredTigerRecordStoreThread(nss);
+            backgroundThread->go();
+            _backgroundThreadNamespaces.insert(nss);
+        }
+        return true;
     }
 
-}
+}  // namespace mongo

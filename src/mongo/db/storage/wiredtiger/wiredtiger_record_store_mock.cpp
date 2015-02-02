@@ -31,12 +31,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 namespace mongo {
 
-    BackgroundJob* WiredTigerRecordStore::_startBackgroundThread() {
-        return NULL;
+    // static
+    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+        return false;
     }
 
-}
+}  // namespace mongo

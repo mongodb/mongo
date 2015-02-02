@@ -51,7 +51,6 @@
 
 namespace mongo {
 
-    class BackgroundJob;
     class RecoveryUnit;
     class WiredTigerCursor;
     class WiredTigerRecoveryUnit;
@@ -258,8 +257,6 @@ namespace mongo {
         static int64_t _makeKey(const RecordId &loc);
         static RecordId _fromKey(int64_t k);
 
-        BackgroundJob* _startBackgroundThread();
-
         void _addUncommitedDiskLoc_inlock( OperationContext* txn, const RecordId& loc );
 
         RecordId _nextId();
@@ -300,7 +297,7 @@ namespace mongo {
         int _sizeStorerCounter;
 
         bool _shuttingDown;
-        boost::scoped_ptr<BackgroundJob> _backgroundThread;
+        bool _hasBackgroundThread;
     };
 
     // WT failpoint to throw write conflict exceptions randomly
