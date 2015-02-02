@@ -4,6 +4,10 @@
         load('jstests/configs/plain_28.config.js');
     }
 
+    if (TestData && TestData.storageEngine === 'wiredTiger'){
+      return
+    }
+
     // Tests that running mongorestore with --keepIndexVersion does not 
     // update the index version, and that running it without 
     // --keepIndexVersion does.
