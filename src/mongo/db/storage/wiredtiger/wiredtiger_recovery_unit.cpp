@@ -84,7 +84,7 @@ namespace mongo {
         _session( NULL ),
         _depth(0),
         _active( false ),
-        _myTransactionCount( 0 ),
+        _myTransactionCount( 1 ),
         _everStartedWrite( false ),
         _currentlySquirreled( false ),
         _syncing( false ),
