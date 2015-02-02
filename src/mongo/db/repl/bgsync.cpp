@@ -127,9 +127,11 @@ namespace {
         // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
         invariant(inShutdown());
         _buffer.clear();
+        _pause = true;
 
         // Wake up producerThread so it notices that we're in shutdown
-        _condvar.notify_all();
+        _appliedBufferCondition.notify_all();
+        _pausedCondition.notify_all();
     }
 
     void BackgroundSync::notify(OperationContext* txn) {
@@ -138,8 +140,7 @@ namespace {
         // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
         if (_buffer.empty()) {
             _appliedBuffer = true;
-            _replCoord->signalDrainComplete(txn);
-            _condvar.notify_all();
+            _appliedBufferCondition.notify_all();
         }
     }
 
@@ -214,7 +215,7 @@ namespace {
 
             // Wait until we've applied the ops we have before we choose a sync target
             while (!_appliedBuffer && !inShutdownStrict()) {
-                _condvar.wait(lock);
+                _appliedBufferCondition.wait(lock);
             }
             if (inShutdownStrict()) {
                 return;
@@ -442,13 +443,14 @@ namespace {
     }
 
     void BackgroundSync::stop() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        boost::lock_guard<boost::mutex> lock(_mutex);
 
         _pause = true;
         _syncSourceHost = HostAndPort();
         _lastOpTimeFetched = OpTime(0,0);
         _lastFetchedHash = 0;
-        _condvar.notify_all();
+        _appliedBufferCondition.notify_all();
+        _pausedCondition.notify_all();
     }
 
     void BackgroundSync::start(OperationContext* txn) {
@@ -465,6 +467,13 @@ namespace {
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
             " " << _lastFetchedHash;
+    }
+
+    void BackgroundSync::waitUntilPaused() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        while (!_pause) {
+            _pausedCondition.wait(lock);
+        }
     }
 
     long long BackgroundSync::getLastAppliedHash() const {
