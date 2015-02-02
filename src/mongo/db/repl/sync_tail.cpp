@@ -528,7 +528,16 @@ namespace {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
-                replCoord->signalDrainComplete(txn);
+                if (replCoord->isWaitingForApplierToDrain()) {
+                    BackgroundSync::get()->waitUntilPaused();
+                    if (peek(&op)) {
+                        // The producer generated a last batch of ops before pausing so return
+                        // false so that we'll come back and apply them before signaling the drain
+                        // is complete.
+                        return false;
+                    }
+                    replCoord->signalDrainComplete(txn);
+                }
                 // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;

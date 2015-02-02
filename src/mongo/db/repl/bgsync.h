@@ -82,6 +82,9 @@ namespace repl {
         void shutdown();
         void notify(OperationContext* txn);
 
+        // Blocks until _pause becomes true from a call to stop() or shutdown()
+        void waitUntilPaused();
+
         virtual ~BackgroundSync() {}
 
         // starts the producer thread
@@ -138,8 +141,9 @@ namespace repl {
 
         // if produce thread should be running
         bool _pause;
+        boost::condition _pausedCondition;
         bool _appliedBuffer;
-        boost::condition _condvar;
+        boost::condition _appliedBufferCondition;
 
         HostAndPort _syncSourceHost;
 
