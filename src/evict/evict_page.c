@@ -490,7 +490,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	if (!exclusive && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
-	    LF_ISSET(WT_SKIP_UPDATE_RESTORE))
+	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
 
 	/*
