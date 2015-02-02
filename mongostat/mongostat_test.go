@@ -67,12 +67,12 @@ func TestStatLine(t *testing.T) {
 		},
 		Locks: map[string]LockStats{
 			".": {
-				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, //locked
+				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, // locked
 				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
 				nil,
 			},
 			"test": {
-				ReadWriteLockTimes{Read: 663190, Write: 379}, //locked
+				ReadWriteLockTimes{Read: 663190, Write: 379}, // locked
 				ReadWriteLockTimes{Read: 200443, Write: 6},   // acquiring
 				nil,
 			},
@@ -163,12 +163,12 @@ func TestStatLine(t *testing.T) {
 		},
 		Locks: map[string]LockStats{
 			".": {
-				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, //locked
+				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, // locked
 				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
 				nil,
 			},
 			"test": {
-				ReadWriteLockTimes{Read: 663190, Write: 500397}, //locked
+				ReadWriteLockTimes{Read: 663190, Write: 500397}, // locked
 				ReadWriteLockTimes{Read: 200443, Write: 6},      // acquiring
 				nil,
 			},
@@ -227,7 +227,7 @@ func TestStatLine(t *testing.T) {
 
 	Convey("StatsLine with non-default interval should calculate average diffs", t, func() {
 		statsLine := NewStatLine(serverStatusOld, serverStatusNew, "", false, 3)
-		//Opcounters and faults are averaged over sample period
+		// Opcounters and faults are averaged over sample period
 		So(statsLine.Insert, ShouldEqual, 3)
 		So(statsLine.Query, ShouldEqual, 1)
 		So(statsLine.Update, ShouldEqual, 2)
@@ -242,7 +242,7 @@ func TestStatLine(t *testing.T) {
 		So(statsLine.QueuedWriters, ShouldEqual, 2)
 		So(statsLine.ActiveReaders, ShouldEqual, 4)
 		So(statsLine.ActiveWriters, ShouldEqual, 6)
-		//NetIn/Out is averaged over sample period
+		// NetIn/Out is averaged over sample period
 		So(statsLine.NetIn, ShouldEqual, 666)
 		So(statsLine.NetOut, ShouldEqual, 1000)
 		So(statsLine.NumConnections, ShouldEqual, 5)

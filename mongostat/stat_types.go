@@ -15,7 +15,7 @@ const (
 	MongosProcess = "mongos"
 )
 
-//Flags to determine cases when to activate/deactivate columns for output
+// Flags to determine cases when to activate/deactivate columns for output.
 const (
 	Always   = 1 << iota // always activate the column
 	Discover             // only active when mongostat is in discover mode
@@ -72,21 +72,25 @@ type ServerStatus struct {
 	WiredTiger         *WiredTiger            `bson:"wiredTiger"`
 }
 
+// WiredTiger stores information related to the WiredTiger storage engine.
 type WiredTiger struct {
 	Transaction TransactionStats `bson:"transaction"`
 	Cache       CacheStats       `bson:"cache"`
 }
 
+// CacheStats stores cache statistics for WiredTiger.
 type CacheStats struct {
 	TrackedDirtyBytes  int64 `bson:"tracked dirty bytes in the cache"`
 	CurrentCachedBytes int64 `bson:"bytes currently in the cache"`
 	MaxBytesConfigured int64 `bson:"maximum bytes configured"`
 }
 
+// TransactionStats stores transaction checkpoints in WiredTiger.
 type TransactionStats struct {
 	TransCheckpoints int64 `bson:"transaction checkpoints"`
 }
 
+// ReplStatus stores data related to replica sets.
 type ReplStatus struct {
 	SetName      interface{} `bson:"setName"`
 	IsMaster     interface{} `bson:"ismaster"`
@@ -98,17 +102,20 @@ type ReplStatus struct {
 	Me           string      `bson:"me"`
 }
 
+// DBRecordStats stores data related to memory operations across databases.
 type DBRecordStats struct {
 	AccessesNotInMemory       int64                     `bson:"accessesNotInMemory"`
 	PageFaultExceptionsThrown int64                     `bson:"pageFaultExceptionsThrown"`
 	DBRecordAccesses          map[string]RecordAccesses `bson:",inline"`
 }
 
+// RecordAccesses stores data related to memory operations scoped to a database.
 type RecordAccesses struct {
 	AccessesNotInMemory       int64 `bson:"accessesNotInMemory"`
 	PageFaultExceptionsThrown int64 `bson:"pageFaultExceptionsThrown"`
 }
 
+// MemStats stores data related to memory statistics.
 type MemStats struct {
 	Bits              int64       `bson:"bits"`
 	Resident          int64       `bson:"resident"`
@@ -118,6 +125,7 @@ type MemStats struct {
 	MappedWithJournal int64       `bson:"mappedWithJournal"`
 }
 
+// FlushStats stores information about memory flushes.
 type FlushStats struct {
 	Flushes      int64     `bson:"flushes"`
 	TotalMs      int64     `bson:"total_ms"`
@@ -126,12 +134,14 @@ type FlushStats struct {
 	LastFinished time.Time `bson:"last_finished"`
 }
 
+// ConnectionStats stores information related to incoming database connections.
 type ConnectionStats struct {
 	Current      int64 `bson:"current"`
 	Available    int64 `bson:"available"`
 	TotalCreated int64 `bson:"totalCreated"`
 }
 
+// DurTiming stores information related to journaling.
 type DurTiming struct {
 	Dt               int64 `bson:"dt"`
 	PrepLogBuffer    int64 `bson:"prepLogBuffer"`
@@ -140,6 +150,7 @@ type DurTiming struct {
 	RemapPrivateView int64 `bson:"remapPrivateView"`
 }
 
+// DurStats stores information related to journaling statistics.
 type DurStats struct {
 	Commits            int64 `bson:"commits"`
 	JournaledMB        int64 `bson:"journaledMB"`
@@ -149,18 +160,22 @@ type DurStats struct {
 	EarlyCommits       int64 `bson:"earlyCommits"`
 	TimeMs             DurTiming
 }
+
+// QueueStats stores the number of queued read/write operations.
 type QueueStats struct {
 	Total   int64 `bson:"total"`
 	Readers int64 `bson:"readers"`
 	Writers int64 `bson:"writers"`
 }
 
+// ClientStats stores the number of active read/write operations.
 type ClientStats struct {
 	Total   int64 `bson:"total"`
 	Readers int64 `bson:"readers"`
 	Writers int64 `bson:"writers"`
 }
 
+// GlobalLockStats stores information related locks in the MMAP storage engine.
 type GlobalLockStats struct {
 	TotalTime     int64        `bson:"totalTime"`
 	LockTime      int64        `bson:"lockTime"`
@@ -168,6 +183,7 @@ type GlobalLockStats struct {
 	ActiveClients *ClientStats `bson:"activeClients"`
 }
 
+// IndexCounterStats stores index statistics.
 type IndexCounterStats struct {
 	Accesses  int64 `bson:"accesses"`
 	Hits      int64 `bson:"hits"`
@@ -176,12 +192,14 @@ type IndexCounterStats struct {
 	MissRatio int64 `bson:"missRatio"`
 }
 
+// NetworkStats stores information related to network traffic.
 type NetworkStats struct {
 	BytesIn     int64 `bson:"bytesIn"`
 	BytesOut    int64 `bson:"bytesOut"`
 	NumRequests int64 `bson:"numRequests"`
 }
 
+// OpcountStats stores information related to comamnds and basic CRUD operations.
 type OpcountStats struct {
 	Insert  int64 `bson:"insert"`
 	Query   int64 `bson:"query"`
@@ -191,6 +209,7 @@ type OpcountStats struct {
 	Command int64 `bson:"command"`
 }
 
+// ReadWriteLockTimes stores time spent holding read/write locks.
 type ReadWriteLockTimes struct {
 	Read       int64 `bson:"R"`
 	Write      int64 `bson:"W"`
@@ -198,6 +217,8 @@ type ReadWriteLockTimes struct {
 	WriteLower int64 `bson:"w"`
 }
 
+// LockStats stores information related to time spent acquiring/holding locks
+// for a given database.
 type LockStats struct {
 	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
@@ -208,22 +229,24 @@ type LockStats struct {
 	AcquireCount *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
 }
 
+// ExtraInfo stores additional platform specific information.
 type ExtraInfo struct {
 	PageFaults *int64 `bson:"page_faults"`
 }
 
-//StatHeader describes a single column for mongostat's terminal output,
-//its formatting, and in which modes it should be displayed
+// StatHeader describes a single column for mongostat's terminal output,
+// its formatting, and in which modes it should be displayed.
 type StatHeader struct {
-	//The text to appear in the column's header cell
+	// The text to appear in the column's header cell
 	HeaderText string
 
-	//Bitmask containing flags to determine if this header is active or not
+	// Bitmask containing flags to determine if this header is active or not
 	ActivateFlags int
 }
 
+// StatHeaders are the complete set of data metrics supported by mongostat.
 var StatHeaders = []StatHeader{
-	{"", Always}, //placeholder for hostname column (blank header text)
+	{"", Always}, // placeholder for hostname column (blank header text)
 	{"insert", Always},
 	{"query", Always},
 	{"update", Always},
@@ -250,15 +273,17 @@ var StatHeaders = []StatHeader{
 	{"time", Always},
 }
 
+// NamespacedLocks stores information on the LockStatus of namespaces.
 type NamespacedLocks map[string]LockStatus
 
+// LockUsage stores information related to a namespace's lock usage.
 type LockUsage struct {
 	Namespace string
 	Reads     int64
 	Writes    int64
 }
 
-type LockUsages []LockUsage
+type lockUsages []LockUsage
 
 func percentageInt64(value, outOf int64) float64 {
 	if value == 0 || outOf == 0 {
@@ -267,24 +292,26 @@ func percentageInt64(value, outOf int64) float64 {
 	return 100 * (float64(value) / float64(outOf))
 }
 
-func (slice LockUsages) Len() int {
+func (slice lockUsages) Len() int {
 	return len(slice)
 }
 
-func (slice LockUsages) Less(i, j int) bool {
+func (slice lockUsages) Less(i, j int) bool {
 	return slice[i].Reads+slice[i].Writes < slice[j].Reads+slice[j].Writes
 }
 
-func (slice LockUsages) Swap(i, j int) {
+func (slice lockUsages) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
+// LockStatus stores a database's lock statistics.
 type LockStatus struct {
 	DBName     string
 	Percentage float64
 	Global     bool
 }
 
+// StatLine is a wrapper for all metrics reported by mongostat for monitored hosts.
 type StatLine struct {
 	Key string
 	// What storage engine is being used for the node with this stat line
@@ -294,20 +321,20 @@ type StatLine struct {
 	IsMongos bool
 	Host     string
 
-	//The time at which this StatLine was generated.
+	// The time at which this StatLine was generated.
 	Time time.Time
 
-	//The last time at which this StatLine was printed to output.
+	// The last time at which this StatLine was printed to output.
 	LastPrinted time.Time
 
-	//Opcounter fields
+	// Opcounter fields
 	Insert, Query, Update, Delete, GetMore, Command int64
 
-	//Cache utilization (wiredtiger only)
+	// Cache utilization (wiredtiger only)
 	CacheDirtyPercent float64
 	CacheUsedPercent  float64
 
-	//Replicated Opcounter fields
+	// Replicated Opcounter fields
 	InsertR, QueryR, UpdateR, DeleteR, GetMoreR, CommandR int64
 	Flushes                                               int64
 	Mapped, Virtual, Resident, NonMapped                  int64
@@ -335,15 +362,15 @@ func parseLocks(stat ServerStatus) map[string]LockUsage {
 }
 
 func computeLockDiffs(prevLocks, curLocks map[string]LockUsage) []LockUsage {
-	lockUsages := LockUsages(make([]LockUsage, 0, len(curLocks)))
+	lockUsages := lockUsages(make([]LockUsage, 0, len(curLocks)))
 	for namespace, curUsage := range curLocks {
 		prevUsage, hasKey := prevLocks[namespace]
 		if !hasKey {
-			//This namespace didn't appear in the previous batch of lock info,
-			//so we can't compute a diff for it - skip it.
+			// This namespace didn't appear in the previous batch of lock info,
+			// so we can't compute a diff for it - skip it.
 			continue
 		}
-		//Calculate diff of lock usage for this namespace and add to the list
+		// Calculate diff of lock usage for this namespace and add to the list
 		lockUsages = append(lockUsages,
 			LockUsage{
 				namespace,
@@ -351,12 +378,12 @@ func computeLockDiffs(prevLocks, curLocks map[string]LockUsage) []LockUsage {
 				curUsage.Writes - prevUsage.Writes,
 			})
 	}
-	//Sort the array in order of least to most locked
+	// Sort the array in order of least to most locked
 	sort.Sort(lockUsages)
 	return lockUsages
 }
 
-//formatOpcount returns a string for mongostat to display replset count
+// formatOpcount returns a string for mongostat to display replset count
 func formatOpcount(opcount, opcountRepl int64, both bool) string {
 	if both {
 		return fmt.Sprintf("%v|%v", opcount, opcountRepl)
@@ -371,25 +398,25 @@ func formatOpcount(opcount, opcountRepl int64, both bool) string {
 	return "*0"
 }
 
-// A LineFormatter formats StatLines for printing
+// A LineFormatter formats StatLines for printing.
 type LineFormatter interface {
 	// FormatLines returns the string representation of the StatLines that
 	// are passed in. It also takes a bool if cluster discovery is active.
 	FormatLines(lines []StatLine, index int, discover bool) string
 }
 
-// Implementation of LineFormatter - converts the StatLines to json
+// Implementation of LineFormatter - converts the StatLines to JSON.
 type JSONLineFormatter struct{}
 
-// Satisfy the LineFormatter interface. Formats the StatLines as json.
+// Satisfy the LineFormatter interface. Formats the StatLines as JSON.
 func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover bool) string {
 
 	lineFlags := getLineFlags(lines)
 
-	// middle ground b/t the StatLines and the json string to be returned
+	// middle ground b/t the StatLines and the JSON string to be returned
 	jsonFormat := map[string]interface{}{}
 
-	// convert each StatLine to json
+	// convert each StatLine to JSON
 	for _, line := range lines {
 		// each line can just be a string->string map (header->value)
 		lineJson := map[string]string{}
@@ -401,8 +428,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			continue
 		}
 
-		// put all the appropriate values into the stat line's json
-		// representation
+		// put all the appropriate values into the stat line's JSON representation
 		lineJson["insert"] = formatOpcount(line.Insert, line.InsertR, false)
 		lineJson["query"] = formatOpcount(line.Query, line.QueryR, false)
 		lineJson["update"] = formatOpcount(line.Update, line.UpdateR, false)
@@ -457,7 +483,7 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 		jsonFormat[line.Host] = lineJson
 	}
 
-	// convert the json format of the lines to a json string to be returned
+	// convert the JSON format of the lines to a json string to be returned
 	linesAsJsonBytes, err := json.Marshal(jsonFormat)
 	if err != nil {
 		return fmt.Sprintf(`{"json error": "%v"}`, err.Error())
@@ -469,17 +495,17 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 // Implementation of LineFormatter - uses a common/text.GridWriter to format
 // the StatLines as a grid.
 type GridLineFormatter struct {
-	//If true, enables printing of headers to output
+	// If true, enables printing of headers to output
 	IncludeHeader bool
 
-	//Number of line outputs to skip between adding in headers
+	// Number of line outputs to skip between adding in headers
 	HeaderInterval int
 
 	// Grid writer
 	Writer *text.GridWriter
 }
 
-//describes which sets of columns are printable in a StatLine
+// describes which sets of columns are printable in a StatLine
 type lineAttributes struct {
 	hasRepl  bool
 	hasAll   bool
@@ -526,7 +552,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 	// in the same order for each snapshot
 	sort.Sort(StatLines(lines))
 
-	//Print the columns that are enabled
+	// Print the columns that are enabled
 	for _, header := range StatHeaders {
 		maskedAttrs := lineFlags & header.ActivateFlags
 		// Only show the header if this column has the "Always" flag, or all
@@ -648,9 +674,9 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 	returnVal := buf.String()
 
 	if !glf.IncludeHeader || index%glf.HeaderInterval != 0 {
-		//Strip out the first line of the formatted output,
-		//which contains the headers. They've been left in up until this point
-		//in order to force the formatting of the columns to be wide enough.
+		// Strip out the first line of the formatted output,
+		// which contains the headers. They've been left in up until this point
+		// in order to force the formatting of the columns to be wide enough.
 		firstNewLinePos := strings.Index(returnVal, "\n")
 		if firstNewLinePos >= 0 {
 			returnVal = returnVal[firstNewLinePos+1:]
@@ -658,7 +684,7 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 	}
 
 	if len(lines) > 1 {
-		//For multi-node stats, add an extra newline to tell each block apart
+		// For multi-node stats, add an extra newline to tell each block apart
 		return "\n" + returnVal
 	}
 	return returnVal
@@ -668,7 +694,7 @@ func diff(newVal, oldVal, sampleTime int64) int64 {
 	return (newVal - oldVal) / sampleTime
 }
 
-//NewStatLine constructs a StatLine object from two ServerStatus objects.
+// NewStatLine constructs a StatLine object from two ServerStatus objects.
 func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs int64) *StatLine {
 	returnVal := &StatLine{
 		Key:       key,
@@ -778,7 +804,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 					}
 				}
 			} else {
-				//Get the entry with the highest lock
+				// Get the entry with the highest lock
 				highestLocked := lockdiffs[len(lockdiffs)-1]
 
 				var timeDiffMillis int64
@@ -786,7 +812,7 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 
 				lockToReport := highestLocked.Writes
 
-				//if the highest locked namespace is not '.'
+				// if the highest locked namespace is not '.'
 				if highestLocked.Namespace != "." {
 					for _, namespaceLockInfo := range lockdiffs {
 						if namespaceLockInfo.Namespace == "." {
@@ -795,8 +821,8 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 					}
 				}
 
-				//lock data is in microseconds and uptime is in milliseconds - so
-				//divide by 1000 so that they units match
+				// lock data is in microseconds and uptime is in milliseconds - so
+				// divide by 1000 so that they units match
 				lockToReport /= 1000
 
 				returnVal.HighestLocked = &LockStatus{

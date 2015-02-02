@@ -6,7 +6,7 @@ Monitor basic MongoDB server statistics.
 
 See http://docs.mongodb.org/manual/reference/program/mongostat/ for more information.`
 
-// Output options for mongostat
+// StatOptions defines the set of options to use for configuring mongostat.
 type StatOptions struct {
 	NoHeaders bool `long:"noheaders" description:"don't output column names"`
 	RowCount  int  `long:"rowcount" short:"n" description:"number of stats lines to print (0 for indefinite)"`
@@ -16,6 +16,7 @@ type StatOptions struct {
 	Json      bool `long:"json" description:"output as JSON rather than a formatted table"`
 }
 
-func (statOpts *StatOptions) Name() string {
+// Name returns a human-readable group name for mongostat options.
+func (_ *StatOptions) Name() string {
 	return "stat"
 }
