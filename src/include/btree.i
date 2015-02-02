@@ -221,8 +221,7 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	WT_PAGE_INDEX *pindex;
 	uint32_t i;
 
-	WT_ASSERT(session,
-	    WT_SESSION_TXN_STATE(session)->snap_min != WT_TXN_NONE);
+	WT_ASSERT(session, session->split_gen != 0);
 
 	/*
 	 * Copy the parent page's index value: the page can split at any time,
