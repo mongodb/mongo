@@ -368,10 +368,12 @@ namespace QueryStageSortTests {
                 WorkingSetMember member;
                 member.state = WorkingSetMember::OWNED_OBJ;
 
-                member.obj = fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}");
+                member.obj = Snapshotted<BSONObj>(SnapshotId(),
+                                                  fromjson("{a: [1,2,3], b:[1,2,3], c:[1,2,3], d:[1,2,3,4]}"));
                 ms->pushBack(member);
 
-                member.obj = fromjson("{a:1, b:1, c:1}");
+                member.obj = Snapshotted<BSONObj>(SnapshotId(),
+                                                  fromjson("{a:1, b:1, c:1}"));
                 ms->pushBack(member);
             }
 

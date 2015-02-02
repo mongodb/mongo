@@ -248,7 +248,7 @@ namespace mongo {
             }
 
             member->state = WorkingSetMember::OWNED_OBJ;
-            member->obj = keyObj;
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj);
             member->keyData.clear();
             member->loc = RecordId();
             return Status::OK();
@@ -262,10 +262,10 @@ namespace mongo {
             if (transformRequiresDetails()) {
                 matchDetails.requestElemMatchKey();
                 verify(NULL != _queryExpression);
-                verify(_queryExpression->matchesBSON(member->obj, &matchDetails));
+                verify(_queryExpression->matchesBSON(member->obj.value(), &matchDetails));
             }
 
-            Status projStatus = transform(member->obj, &bob, &matchDetails);
+            Status projStatus = transform(member->obj.value(), &bob, &matchDetails);
             if (!projStatus.isOK()) {
                 return projStatus;
             }
@@ -349,7 +349,7 @@ namespace mongo {
 
         BSONObj newObj = bob.obj();
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = newObj;
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), newObj);
         member->keyData.clear();
         member->loc = RecordId();
 

@@ -142,7 +142,7 @@ namespace mongo {
                 member->state = WorkingSetMember::OWNED_OBJ;
                 member->keyData.clear();
                 member->loc = RecordId();
-                member->obj = indexSpec;
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec);
                 root->pushBack(*member);
             }
 

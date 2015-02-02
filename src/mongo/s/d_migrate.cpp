@@ -645,7 +645,7 @@ namespace mongo {
                         break;
 
                     RecordId dl = *cloneLocsIter;
-                    BSONObj doc;
+                    Snapshotted<BSONObj> doc;
                     if (!collection->findDoc(txn, dl, &doc)) {
                         // doc was deleted
                         continue;
@@ -655,12 +655,13 @@ namespace mongo {
                     // into consideration the overhead of BSONArray indices, and *always*
                     // append one doc.
                     if (clonedDocsArrayBuilder.arrSize() != 0 &&
-                        clonedDocsArrayBuilder.len() + doc.objsize() + 1024 > BSONObjMaxUserSize) {
+                        (clonedDocsArrayBuilder.len() + doc.value().objsize() + 1024)
+                        > BSONObjMaxUserSize) {
                         isBufferFilled = true; // break out of outer while loop
                         break;
                     }
 
-                    clonedDocsArrayBuilder.append(doc);
+                    clonedDocsArrayBuilder.append(doc.value());
                 }
 
                 _cloneLocs.erase(_cloneLocs.begin(), cloneLocsIter);

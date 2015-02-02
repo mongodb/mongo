@@ -48,14 +48,14 @@ namespace mongo {
         // that it should do a fetch beforehand.
         BSONObj toBSON() const {
             invariant(_wsm->hasObj());
-            return _wsm->obj;
+            return _wsm->obj.value();
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
             // BSONElementIterator does some interesting things with arrays that I don't think
             // SimpleArrayElementIterator does.
             if (_wsm->hasObj()) {
-                return new BSONElementIterator(path, _wsm->obj);
+                return new BSONElementIterator(path, _wsm->obj.value());
             }
 
             // NOTE: This (kind of) duplicates code in WorkingSetMember::getFieldDotted.

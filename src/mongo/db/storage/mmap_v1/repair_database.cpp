@@ -341,7 +341,7 @@ namespace mongo {
                     scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
                     while ( !it->isEOF() ) {
                         RecordId loc = it->getNext();
-                        BSONObj obj = coll->docFor( txn, loc );
+                        BSONObj obj = coll->docFor(txn, loc).value();
 
                         string ns = obj["name"].String();
 
@@ -407,7 +407,7 @@ namespace mongo {
                     RecordId loc = iterator->getNext();
                     invariant( !loc.isNull() );
 
-                    BSONObj doc = originalCollection->docFor( txn, loc );
+                    BSONObj doc = originalCollection->docFor(txn, loc).value();
 
                     WriteUnitOfWork wunit(txn);
                     StatusWith<RecordId> result = tempCollection->insertDocument(txn,

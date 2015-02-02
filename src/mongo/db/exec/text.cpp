@@ -287,11 +287,11 @@ namespace mongo {
         // a yield. If not, then we fetch the document here.
         BSONObj doc;
         if (wsm->hasObj()) {
-            doc = wsm->obj;
+            doc = wsm->obj.value();
         }
         else {
-            doc = _params.index->getCollection()->docFor(_txn, wsm->loc);
-            wsm->obj = doc;
+            wsm->obj = _params.index->getCollection()->docFor(_txn, wsm->loc);
+            doc = wsm->obj.value();
             wsm->keyData.clear();
             wsm->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         }
@@ -327,7 +327,7 @@ namespace mongo {
 
         BSONObj toBSON() const {
             *_fetched = true;
-            return _collection->docFor(_txn, _loc);
+            return _collection->docFor(_txn, _loc).value();
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
@@ -352,7 +352,7 @@ namespace mongo {
 
             // All else fails, fetch.
             *_fetched = true;
-            return new BSONElementIterator(path, _collection->docFor(_txn, _loc));
+            return new BSONElementIterator(path, _collection->docFor(_txn, _loc).value());
         }
 
         virtual void releaseIterator( ElementIterator* iterator ) const {

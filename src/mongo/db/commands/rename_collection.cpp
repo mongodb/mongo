@@ -310,11 +310,12 @@ namespace mongo {
                 while (!sourceIt->isEOF()) {
                     txn->checkForInterrupt();
 
-                    const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
+                    const Snapshotted<BSONObj> obj = sourceColl->docFor(txn, sourceIt->getNext());
 
                     WriteUnitOfWork wunit(txn);
                     // No logOp necessary because the entire renameCollection command is one logOp.
-                    Status status = targetColl->insertDocument(txn, obj, &indexer, true).getStatus();
+                    Status status =
+                        targetColl->insertDocument(txn, obj.value(), &indexer, true).getStatus();
                     if (!status.isOK())
                         return appendCommandStatus(result, status);
                     wunit.commit();

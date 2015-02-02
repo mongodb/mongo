@@ -206,6 +206,8 @@ namespace mongo {
 
         virtual void setRollbackWritesDisabled() {}
 
+        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+
         // -----------------------
 
         void notifyInsert( HeapRecordStoreBtree* rs, const RecordId& loc );

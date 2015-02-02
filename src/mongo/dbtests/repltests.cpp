@@ -189,7 +189,7 @@ namespace ReplTests {
                 RecordIterator* it = coll->getIterator(&_txn);
                 while ( !it->isEOF() ) {
                     RecordId currLoc = it->getNext();
-                    ops.push_back(coll->docFor(&_txn, currLoc));
+                    ops.push_back(coll->docFor(&_txn, currLoc).value());
                 }
                 delete it;
             }
@@ -224,7 +224,7 @@ namespace ReplTests {
             ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
                 RecordId currLoc = it->getNext();
-                ::mongo::log() << coll->docFor(&_txn, currLoc).toString() << endl;
+                ::mongo::log() << coll->docFor(&_txn, currLoc).value().toString() << endl;
             }
             delete it;
         }

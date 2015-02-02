@@ -126,7 +126,7 @@ namespace mongo {
                                              BSONObj* objOut) const {
         BSONObj btreeKeyToUse;
 
-        Status btreeStatus = getBtreeKey(member.obj, &btreeKeyToUse);
+        Status btreeStatus = getBtreeKey(member.obj.value(), &btreeKeyToUse);
         if (!btreeStatus.isOK()) {
             return btreeStatus;
         }

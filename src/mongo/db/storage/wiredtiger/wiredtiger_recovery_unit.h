@@ -78,7 +78,7 @@ namespace mongo {
 
         virtual void setRollbackWritesDisabled() {}
 
-        virtual uint64_t getMyTransactionCount() const;
+        virtual SnapshotId getSnapshotId() const;
 
         // ---- WT STUFF
 

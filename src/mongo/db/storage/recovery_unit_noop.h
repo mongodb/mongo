@@ -56,6 +56,8 @@ namespace mongo {
             return data;
         }
         virtual void setRollbackWritesDisabled() {}
+
+        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
     };
 
 }  // namespace mongo

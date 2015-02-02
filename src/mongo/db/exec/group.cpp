@@ -225,7 +225,7 @@ namespace mongo {
             // add a fetch. We should always get fetched data, and never just key data.
             invariant(member->hasObj());
 
-            Status status = processObject(member->obj);
+            Status status = processObject(member->obj.value());
             if (!status.isOK()) {
                 *out = WorkingSetCommon::allocateStatusMember(_ws, status);
                 return PlanStage::FAILURE;
@@ -247,7 +247,7 @@ namespace mongo {
 
             *out = _ws->allocate();
             WorkingSetMember* member = _ws->get(*out);
-            member->obj = results;
+            member->obj = Snapshotted<BSONObj>(SnapshotId(), results);
             member->state = WorkingSetMember::OWNED_OBJ;
 
             ++_commonStats.advanced;

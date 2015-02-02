@@ -61,7 +61,7 @@ namespace {
             ms->pushBack(PlanStage::NEED_TIME);
             WorkingSetMember wsm;
             wsm.state = WorkingSetMember::OWNED_OBJ;
-            wsm.obj = BSON("x" << i);
+            wsm.obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << i));
             ms->pushBack(wsm);
             ms->pushBack(PlanStage::NEED_TIME);
         }

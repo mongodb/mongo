@@ -89,7 +89,7 @@ namespace mongo {
         _subIterators.popAndDeleteBack();
 
         // TODO: should we ever try and return NEED_FETCH here?
-        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc))) {
+        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc).value())) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
@@ -130,7 +130,7 @@ namespace mongo {
         verify(member->hasObj());
         verify(member->hasLoc());
 
-        if (!_filter->matchesBSON(member->obj)) {
+        if (!_filter->matchesBSON(member->obj.value())) {
             _done = true;
             // RecordId is returned in *out.
             return PlanStage::ADVANCED;

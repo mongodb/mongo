@@ -120,7 +120,7 @@ namespace mongo {
          * Computes the result of applying mods to the document 'oldObj' at RecordId 'loc' in
          * memory, then commits these changes to the database.
          */
-        void transformAndUpdate(BSONObj& oldObj, RecordId& loc);
+        void transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc);
 
         /**
          * Computes the document to insert and inserts it into the collection. Used if the
