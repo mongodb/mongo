@@ -22,7 +22,7 @@ if (typeof getToolTest === 'undefined') {
   db.dropDatabase();
 
   // Create capped collection
-  db.createCollection('rs_test', { capped: true, size: 4 });
+  db.createCollection('rs_test', { capped: true, max: 4 });
 
   // Add a bunch of operations to the fakeoplog
   var tracks = ['Welcome to the Jungle', 'Sweet Child O\' Mine', 'Patience',
