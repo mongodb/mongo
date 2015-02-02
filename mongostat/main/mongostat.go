@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/signals"
+	"github.com/mongodb/mongo-tools/common/text"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
 	"os"
@@ -67,9 +68,14 @@ func main() {
 	}
 
 	var formatter mongostat.LineFormatter
-	formatter = &mongostat.GridLineFormatter{!statOpts.NoHeaders, 10}
 	if statOpts.Json {
 		formatter = &mongostat.JSONLineFormatter{}
+	} else {
+		formatter = &mongostat.GridLineFormatter{
+			IncludeHeader:  !statOpts.NoHeaders,
+			HeaderInterval: 10,
+			Writer:         &text.GridWriter{ColumnPadding: 1},
+		}
 	}
 
 	seedHosts := util.CreateConnectionAddrs(opts.Host, opts.Port)

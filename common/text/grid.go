@@ -19,7 +19,7 @@ type GridWriter struct {
 	MinWidth      int
 	Grid          [][]Cell
 	CurrentRow    int
-	CurrentCol    int
+	colWidths     []int
 }
 
 func max(a, b int) int {
@@ -66,6 +66,26 @@ func (gw *GridWriter) EndRow() {
 	}
 }
 
+// Reset discards any grid data and resets the current row.
+func (gw *GridWriter) Reset() {
+	gw.CurrentRow = 0
+	gw.Grid = [][]Cell{}
+}
+
+// updateWidths sets the column widths in the Grid. For each column in the Grid,
+// it updates the cached width if it's value is less than the current width.
+func (gw *GridWriter) updateWidths(colWidths []int) {
+	if gw.colWidths == nil {
+		gw.colWidths = make([]int, len(colWidths))
+		copy(gw.colWidths, colWidths)
+	}
+	for i, cw := range colWidths {
+		if gw.colWidths[i] < cw {
+			gw.colWidths[i] = cw
+		}
+	}
+}
+
 // calculateWidths returns an array containing the correct padded size for
 // each column in the grid.
 func (gw *GridWriter) calculateWidths() []int {
@@ -109,12 +129,20 @@ func (gw *GridWriter) calculateWidths() []int {
 // Flush writes the fully-formatted grid to the given io.Writer.
 func (gw *GridWriter) Flush(w io.Writer) {
 	colWidths := gw.calculateWidths()
+
+	// invalidate all cached widths if new cells are added/removed
+	if len(gw.colWidths) != len(colWidths) {
+		gw.colWidths = make([]int, len(colWidths))
+		copy(gw.colWidths, colWidths)
+	} else {
+		gw.updateWidths(colWidths)
+	}
+
 	for i, row := range gw.Grid {
 		lastRow := i == (len(gw.Grid) - 1)
 		for j, cell := range row {
 			lastCol := (j == len(row)-1)
-			width := colWidths[j]
-			fmt.Fprintf(w, fmt.Sprintf("%%%vs", width), cell.contents)
+			fmt.Fprintf(w, fmt.Sprintf("%%%vs", gw.colWidths[j]), cell.contents)
 			if gw.ColumnPadding > 0 && !lastCol {
 				fmt.Fprint(w, strings.Repeat(" ", gw.ColumnPadding))
 			}

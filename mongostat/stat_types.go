@@ -474,6 +474,9 @@ type GridLineFormatter struct {
 
 	//Number of line outputs to skip between adding in headers
 	HeaderInterval int
+
+	// Grid writer
+	Writer *text.GridWriter
 }
 
 //describes which sets of columns are printable in a StatLine
@@ -508,14 +511,13 @@ func getLineFlags(lines []StatLine) int {
 // Satisfy the LineFormatter interface. Formats the StatLines as a grid.
 func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover bool) string {
 	buf := &bytes.Buffer{}
-	out := &text.GridWriter{ColumnPadding: 1}
 
 	// Automatically turn on discover-style formatting if more than one host's
 	// output is being displayed (to include things like hostname column)
 	discover = discover || len(lines) > 1
 
 	if discover {
-		out.WriteCell(" ")
+		glf.Writer.WriteCell(" ")
 	}
 
 	lineFlags := getLineFlags(lines)
@@ -535,60 +537,60 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 
 		// Don't write any cell content for blank headers, since they act as placeholders
 		if len(header.HeaderText) > 0 {
-			out.WriteCell(header.HeaderText)
+			glf.Writer.WriteCell(header.HeaderText)
 		}
 	}
-	out.EndRow()
+	glf.Writer.EndRow()
 
 	for _, line := range lines {
 
 		mmap := line.StorageEngine == "mmapv1"
 
 		if discover {
-			out.WriteCell(line.Key)
+			glf.Writer.WriteCell(line.Key)
 		}
 		if line.Error != nil {
-			out.Feed(line.Error.Error())
+			glf.Writer.Feed(line.Error.Error())
 			continue
 		}
 
 		// Write the opcount columns (always active)
-		out.WriteCell(formatOpcount(line.Insert, line.InsertR, false))
-		out.WriteCell(formatOpcount(line.Query, line.QueryR, false))
-		out.WriteCell(formatOpcount(line.Update, line.UpdateR, false))
-		out.WriteCell(formatOpcount(line.Delete, line.DeleteR, false))
-		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
-		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
+		glf.Writer.WriteCell(formatOpcount(line.Insert, line.InsertR, false))
+		glf.Writer.WriteCell(formatOpcount(line.Query, line.QueryR, false))
+		glf.Writer.WriteCell(formatOpcount(line.Update, line.UpdateR, false))
+		glf.Writer.WriteCell(formatOpcount(line.Delete, line.DeleteR, false))
+		glf.Writer.WriteCell(fmt.Sprintf("%v", line.GetMore))
+		glf.Writer.WriteCell(formatOpcount(line.Command, line.CommandR, true))
 
 		if lineFlags&WTOnly > 0 {
 			if line.CacheDirtyPercent < 0 {
-				out.WriteCell("")
+				glf.Writer.WriteCell("")
 			} else {
-				out.WriteCell(fmt.Sprintf("%.1f", line.CacheDirtyPercent*100))
+				glf.Writer.WriteCell(fmt.Sprintf("%.1f", line.CacheDirtyPercent*100))
 			}
 			if line.CacheUsedPercent < 0 {
-				out.WriteCell("")
+				glf.Writer.WriteCell("")
 			} else {
-				out.WriteCell(fmt.Sprintf("%.1f", line.CacheUsedPercent*100))
+				glf.Writer.WriteCell(fmt.Sprintf("%.1f", line.CacheUsedPercent*100))
 			}
 		}
 
-		out.WriteCell(fmt.Sprintf("%v", line.Flushes))
+		glf.Writer.WriteCell(fmt.Sprintf("%v", line.Flushes))
 
 		// Columns for flushes + mapped only show up if mmap columns are active
 		if lineFlags&MMAPOnly > 0 {
 
 			if line.Mapped > 0 {
-				out.WriteCell(text.FormatMegabyteAmount(int64(line.Mapped)))
+				glf.Writer.WriteCell(text.FormatMegabyteAmount(int64(line.Mapped)))
 			} else {
 				//for mongos nodes, Mapped is empty, so write a blank cell.
-				out.WriteCell("")
+				glf.Writer.WriteCell("")
 			}
 		}
 
 		// Columns for Virtual and Resident are always active
-		out.WriteCell(text.FormatMegabyteAmount(int64(line.Virtual)))
-		out.WriteCell(text.FormatMegabyteAmount(int64(line.Resident)))
+		glf.Writer.WriteCell(text.FormatMegabyteAmount(int64(line.Virtual)))
+		glf.Writer.WriteCell(text.FormatMegabyteAmount(int64(line.Resident)))
 
 		if lineFlags&MMAPOnly > 0 {
 			if lineFlags&AllOnly > 0 {
@@ -596,12 +598,12 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 				if line.NonMapped >= 0 { // not mongos, update accordingly
 					nonMappedVal = text.FormatMegabyteAmount(int64(line.NonMapped))
 				}
-				out.WriteCell(nonMappedVal)
+				glf.Writer.WriteCell(nonMappedVal)
 			}
 			if mmap {
-				out.WriteCell(fmt.Sprintf("%v", line.Faults))
+				glf.Writer.WriteCell(fmt.Sprintf("%v", line.Faults))
 			} else {
-				out.WriteCell("n/a")
+				glf.Writer.WriteCell("n/a")
 			}
 		}
 
@@ -610,35 +612,39 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			if line.HighestLocked != nil && !line.IsMongos {
 				lockCell := fmt.Sprintf("%v:%.1f", line.HighestLocked.DBName,
 					line.HighestLocked.Percentage) + "%"
-				out.WriteCell(lockCell)
+				glf.Writer.WriteCell(lockCell)
 			} else {
 				//don't write any lock status for mongos nodes
-				out.WriteCell("")
+				glf.Writer.WriteCell("")
 			}
 		}
 		if lineFlags&MMAPOnly > 0 {
 			if mmap {
-				out.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
+				glf.Writer.WriteCell(fmt.Sprintf("%v", line.IndexMissPercent))
 			} else {
-				out.WriteCell("n/a")
+				glf.Writer.WriteCell("n/a")
 			}
 		}
-		out.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
-		out.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
+		glf.Writer.WriteCell(fmt.Sprintf("%v|%v", line.QueuedReaders, line.QueuedWriters))
+		glf.Writer.WriteCell(fmt.Sprintf("%v|%v", line.ActiveReaders, line.ActiveWriters))
 
-		out.WriteCell(text.FormatBits(line.NetIn))
-		out.WriteCell(text.FormatBits(line.NetOut))
+		glf.Writer.WriteCell(text.FormatBits(line.NetIn))
+		glf.Writer.WriteCell(text.FormatBits(line.NetOut))
 
-		out.WriteCell(fmt.Sprintf("%v", line.NumConnections))
+		glf.Writer.WriteCell(fmt.Sprintf("%v", line.NumConnections))
 		if discover || lineFlags&Repl > 0 { //only show these fields when in discover or repl mode.
-			out.WriteCell(line.ReplSetName)
-			out.WriteCell(line.NodeType)
+			glf.Writer.WriteCell(line.ReplSetName)
+			glf.Writer.WriteCell(line.NodeType)
 		}
 
-		out.WriteCell(fmt.Sprintf("%v", line.Time.Format("15:04:05")))
-		out.EndRow()
+		glf.Writer.WriteCell(fmt.Sprintf("%v", line.Time.Format("15:04:05")))
+		glf.Writer.EndRow()
 	}
-	out.Flush(buf)
+	glf.Writer.Flush(buf)
+
+	// clear the flushed data
+	glf.Writer.Reset()
+
 	returnVal := buf.String()
 
 	if !glf.IncludeHeader || index%glf.HeaderInterval != 0 {
