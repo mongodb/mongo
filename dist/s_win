@@ -26,6 +26,19 @@ win_config()
 	}
 }
 
+win_export()
+{
+	# Build the Windows list of exported symbols.
+	f='../build_win/wiredtiger.def'
+	(echo 'LIBRARY WIREDTIGER'
+	 echo 'EXPORTS'
+	 sed -e '/^$/d' \
+	     -e '/^#/d' \
+	     -e 's/^/    /') < s_export.list > $t
+	 cmp $t $f > /dev/null 2>&1 ||
+	     (echo "Building $f" && rm -f $f && cp $t $f)
+}
+
 win_filelist()
 {
 	f='../build_win/filelist.win'
@@ -65,6 +78,7 @@ win_filelist()
 }
 
 win_config
+win_export
 win_filelist
 
 exit 0

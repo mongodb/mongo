@@ -23,7 +23,7 @@ esac
 
 check()
 {
-	(sed -e '/^#/d' s_symbols.list &&
+	(sed -e '/^#/d' s_export.list &&
 	eval $NM |
 	sed 's/.* //' |
 	egrep -v '^__wt') |
