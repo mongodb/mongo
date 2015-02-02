@@ -73,7 +73,7 @@ func (gw *GridWriter) Reset() {
 }
 
 // updateWidths sets the column widths in the Grid. For each column in the Grid,
-// it updates the cached width if it's value is less than the current width.
+// it updates the cached width if its value is less than the current width.
 func (gw *GridWriter) updateWidths(colWidths []int) {
 	if gw.colWidths == nil {
 		gw.colWidths = make([]int, len(colWidths))
