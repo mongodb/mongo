@@ -73,7 +73,7 @@ struct __wt_cursor_lsm {
  * WT_LSM_CHUNK --
  *	A single chunk (file) in an LSM tree.
  */
-struct __wt_lsm_chunk {
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk */
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
@@ -101,7 +101,7 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_CHUNK_ONDISK	0x04
 #define	WT_LSM_CHUNK_STABLE	0x08
 	uint32_t flags;
-} WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
+};
 
 /*
  * Different types of work units. Used by LSM worker threads to choose which
