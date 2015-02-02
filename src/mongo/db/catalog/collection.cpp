@@ -545,6 +545,7 @@ namespace mongo {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( isCapped() );
 
+        _cursorManager.invalidateAll(false);
         _recordStore->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 

@@ -1212,7 +1212,12 @@ namespace {
                 _lastLoc = RecordId();
             }
             else if ( _loc != saved ) {
-                // old doc deleted, we're ok
+                if (_rs._isCapped) {
+                    // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter()
+                    _eof = true;
+                    return false;
+                }
+                // old doc deleted, bump ahead to the next record
             }
             else {
                 // we found where we left off!
