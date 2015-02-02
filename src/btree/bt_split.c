@@ -162,13 +162,6 @@ __split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
 }
 
 /*
- * Tuning; global variables to allow the binary to be patched, we don't yet have
- * any real understanding of what might be useful to surface to applications.
- */
-static u_int __split_deepen_min_child = 10000;
-static u_int __split_deepen_per_child = 100;
-
-/*
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
@@ -176,11 +169,13 @@ static int
 __split_should_deepen(
     WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *childrenp)
 {
-	WT_PAGE_INDEX *pindex;
+	WT_BTREE *btree;
 	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
 
 	*childrenp = 0;
 
+	btree = S2BT(session);
 	page = ref->page;
 	pindex = WT_INTL_INDEX_COPY(page);
 
@@ -197,8 +192,8 @@ __split_should_deepen(
 	 * we get a significant payback (in the case of a set of large keys,
 	 * splitting won't help).
 	 */
-	if (pindex->entries > __split_deepen_min_child) {
-		*childrenp = pindex->entries / __split_deepen_per_child;
+	if (pindex->entries > btree->split_deepen_min_child) {
+		*childrenp = pindex->entries / btree->split_deepen_per_child;
 		return (1);
 	}
 

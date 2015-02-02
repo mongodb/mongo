@@ -241,6 +241,12 @@ file_config = format_meta + [
         minimum gain before prefix compression will be used on row-store
         leaf pages''',
         min=0),
+    Config('split_deepen_min_child', '0', r'''
+        minimum entries in a page to consider deepening the tree''',
+        type='int', undoc=True),
+    Config('split_deepen_per_child', '0', r'''
+        entries allocated per child when deepening the tree''',
+        type='int', undoc=True),
     Config('split_pct', '75', r'''
         the Btree page split size as a percentage of the maximum Btree
         page size, that is, when a Btree page is split, it will be
