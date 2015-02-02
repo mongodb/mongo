@@ -183,7 +183,7 @@ namespace mongo {
         }
 
         keyData.clear();
-        obj = BSONObj();
+        obj.reset();
         state = WorkingSetMember::INVALID;
     }
 
@@ -232,7 +232,7 @@ namespace mongo {
     bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
         // If our state is such that we have an object, use it.
         if (hasObj()) {
-            *out = obj.getFieldDotted(field);
+            *out = obj.value().getFieldDotted(field);
             return true;
         }
 
@@ -266,7 +266,7 @@ namespace mongo {
         // XXX: Unowned objects count towards current size.
         //      See SERVER-12579
         if (hasObj()) {
-            memUsage += obj.objsize();
+            memUsage += obj.value().objsize();
         }
 
         for (size_t i = 0; i < keyData.size(); ++i) {

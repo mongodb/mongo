@@ -115,7 +115,7 @@ namespace mongo {
         RecordId loc = findOne( txn, collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor(txn, loc);
+        result = collection->docFor(txn, loc).value();
         return true;
     }
 
@@ -188,7 +188,7 @@ namespace mongo {
         RecordId loc = accessMethod->findSingle( txn, query["_id"].wrap() );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor( txn, loc );
+        result = collection->docFor(txn, loc).value();
         return true;
     }
 

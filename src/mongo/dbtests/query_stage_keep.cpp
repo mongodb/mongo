@@ -129,7 +129,7 @@ namespace QueryStageKeep {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* member = ws.get(id);
                 member->state = WorkingSetMember::OWNED_OBJ;
-                member->obj = BSON("x" << 2);
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 2));
                 ws.flagForReview(id);
             }
 
@@ -150,7 +150,7 @@ namespace QueryStageKeep {
                 WorkingSetID id = getNextResult(keep.get());
                 WorkingSetMember* member = ws.get(id);
                 ASSERT_FALSE(ws.isFlagged(id));
-                ASSERT_EQUALS(member->obj["x"].numberInt(), 1);
+                ASSERT_EQUALS(member->obj.value()["x"].numberInt(), 1);
             }
 
             ASSERT(cs->isEOF());
@@ -160,7 +160,7 @@ namespace QueryStageKeep {
                 WorkingSetID id = getNextResult(keep.get());
                 WorkingSetMember* member = ws.get(id);
                 ASSERT(ws.isFlagged(id));
-                ASSERT_EQUALS(member->obj["x"].numberInt(), 2);
+                ASSERT_EQUALS(member->obj.value()["x"].numberInt(), 2);
             }
         }
     };
@@ -195,7 +195,7 @@ namespace QueryStageKeep {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* member = ws.get(id);
                 member->state = WorkingSetMember::OWNED_OBJ;
-                member->obj = BSON("x" << 1);
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
                 ws.flagForReview(id);
                 expectedResultIds.insert(id);
             }
@@ -220,7 +220,7 @@ namespace QueryStageKeep {
                 WorkingSetID id = ws.allocate();
                 WorkingSetMember* member = ws.get(id);
                 member->state = WorkingSetMember::OWNED_OBJ;
-                member->obj = BSON("x" << 1);
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
                 ws.flagForReview(id);
             }
             while ((id = getNextResult(keep.get())) != WorkingSet::INVALID_ID) {

@@ -230,7 +230,7 @@ namespace mongo {
                                                   bool includeBackgroundInProgress) const {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
-            const BSONObj obj = coll->docFor(txn, i.next().info.toRecordId());
+            const BSONObj obj = coll->docFor(txn, i.next().info.toRecordId()).value();
             if ( name == obj.getStringField("name") )
                 return i.pos()-1;
         }

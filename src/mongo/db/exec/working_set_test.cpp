@@ -88,9 +88,9 @@ namespace {
         BSONObj obj = BSON(fieldName << 5);
         // Not truthful since the loc is bogus, but the loc isn't accessed anyway...
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        member->obj = BSONObj(obj.objdata());
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), BSONObj(obj.objdata()));
         ASSERT_TRUE(obj.isOwned());
-        ASSERT_FALSE(member->obj.isOwned());
+        ASSERT_FALSE(member->obj.value().isOwned());
 
         // Get out the field we put in.
         BSONElement elt;
@@ -102,8 +102,8 @@ namespace {
         string fieldName = "x";
 
         BSONObj obj = BSON(fieldName << 5);
-        member->obj = obj;
-        ASSERT_TRUE(member->obj.isOwned());
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), obj);
+        ASSERT_TRUE(member->obj.value().isOwned());
         member->state = WorkingSetMember::OWNED_OBJ;
         BSONElement elt;
         ASSERT_TRUE(member->getFieldDotted(fieldName, &elt));
@@ -164,7 +164,7 @@ namespace {
         WorkingSetID id2 = ws.allocate();
         WorkingSetMember* member2 = ws.get(id2);
         member2->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        member2->obj = BSON("a" << 3);
+        member2->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("a" << 3));
 
         int counter = 0;
         for (WorkingSet::iterator it = ws.begin(); it != ws.end(); ++it) {
@@ -207,7 +207,7 @@ namespace {
 
         WorkingSetMember* member = ws.get(id2);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-        member->obj = BSON("a" << 3);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("a" << 3));
 
         ws.free(id1);
         ws.free(id3);

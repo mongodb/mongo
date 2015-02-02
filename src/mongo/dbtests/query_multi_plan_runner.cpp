@@ -263,7 +263,7 @@ namespace QueryMultiPlanRunner {
             // Check the document returned by the query.
             ASSERT(member->hasObj());
             BSONObj expectedDoc = BSON("_id" << 1 << "a" << 1 << "b" << 1);
-            ASSERT(expectedDoc.woCompare(member->obj) == 0);
+            ASSERT(expectedDoc.woCompare(member->obj.value()) == 0);
 
             // The blocking plan became unblocked, so we should no longer have a backup plan,
             // and the winning plan should still be the index intersection one.

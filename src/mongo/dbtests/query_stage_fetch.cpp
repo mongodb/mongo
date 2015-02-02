@@ -122,8 +122,8 @@ namespace QueryStageFetch {
 
                 mockMember.state = WorkingSetMember::OWNED_OBJ;
                 mockMember.loc = RecordId();
-                mockMember.obj = BSON("foo" << 6);
-                ASSERT_TRUE(mockMember.obj.isOwned());
+                mockMember.obj = Snapshotted<BSONObj>(SnapshotId(), BSON("foo" << 6));
+                ASSERT_TRUE(mockMember.obj.value().isOwned());
                 mockStage->pushBack(mockMember);
             }
 

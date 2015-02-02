@@ -60,6 +60,7 @@ namespace mongo {
 
         virtual void setRollbackWritesDisabled();
 
+        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
     private:
         void commitChanges();
         void pushChangesToDurSubSystem();

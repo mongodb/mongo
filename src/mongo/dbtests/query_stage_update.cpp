@@ -123,7 +123,7 @@ namespace QueryStageUpdate {
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
                     verify(member->hasObj());
-                    out->push_back(member->obj);
+                    out->push_back(member->obj.value());
                 }
             }
         }
@@ -314,7 +314,7 @@ namespace QueryStageUpdate {
                 // Remove locs[targetDocIndex];
                 updateStage->saveState();
                 updateStage->invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
-                BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]);
+                BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
                 ASSERT(!targetDoc.isEmpty());
                 remove(targetDoc);
                 updateStage->restoreState(&_txn);

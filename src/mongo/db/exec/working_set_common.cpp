@@ -43,7 +43,8 @@ namespace mongo {
         if (!member->hasLoc()) { return false; }
 
         // Do the fetch, invalidate the DL.
-        member->obj = collection->docFor(txn, member->loc).getOwned();
+        member->obj = collection->docFor(txn, member->loc);
+        member->obj.setValue(member->obj.value().getOwned() );
 
         member->state = WorkingSetMember::OWNED_OBJ;
         member->loc = RecordId();
@@ -55,6 +56,7 @@ namespace mongo {
                                              WorkingSet* workingSet,
                                              const Collection* collection) {
         invariant(collection);
+        dassert(supportsDocLocking());
 
         for (WorkingSet::iterator it = workingSet->begin(); it != workingSet->end(); ++it) {
             if (WorkingSetMember::LOC_AND_OWNED_OBJ == it->state) {
@@ -74,14 +76,14 @@ namespace mongo {
             // and starts to delete the matching documents, including D. The working set members for
             // D created by the two rejected are still present, but their RecordIds no longer refer
             // to a valid document.
-            BSONObj fetchedDoc;
-            if (!collection->findDoc(txn, it->loc, &fetchedDoc)) {
+            it->obj.reset();
+            if (!collection->findDoc(txn, it->loc, &it->obj)) {
                 // Leftover working set members pointing to old docs can be safely freed.
                 it.free();
                 continue;
             }
 
-            it->obj = fetchedDoc.getOwned();
+            it->obj.setValue(it->obj.value().getOwned() );
             it->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
         }
     }
@@ -140,7 +142,7 @@ namespace mongo {
         WorkingSetID wsid = ws->allocate();
         WorkingSetMember* member = ws->get(wsid);
         member->state = WorkingSetMember::OWNED_OBJ;
-        member->obj = buildMemberStatusObject(status);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), buildMemberStatusObject(status));
 
         return wsid;
     }
@@ -166,11 +168,11 @@ namespace mongo {
         if (!member->hasOwnedObj()) {
             return;
         }
-        BSONObj obj = member->obj;
+        BSONObj obj = member->obj.value();
         if (!isValidStatusMemberObject(obj)) {
             return;
         }
-        *objOut = member->obj;
+        *objOut = obj;
     }
 
     // static
@@ -183,7 +185,7 @@ namespace mongo {
     // static
     Status WorkingSetCommon::getMemberStatus(const WorkingSetMember& member) {
         invariant(member.hasObj());
-        return getMemberObjectStatus(member.obj);
+        return getMemberObjectStatus(member.obj.value());
     }
 
     // static

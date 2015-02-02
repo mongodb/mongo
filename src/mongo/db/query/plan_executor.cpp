@@ -334,7 +334,7 @@ namespace mongo {
                         }
                     }
                     else if (member->hasObj()) {
-                        *objOut = member->obj;
+                        *objOut = member->obj.value();
                     }
                     else {
                         _workingSet->free(id);

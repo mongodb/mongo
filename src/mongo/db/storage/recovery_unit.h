@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -99,7 +100,7 @@ namespace mongo {
          */
         virtual void commitAndRestart() = 0;
 
-        virtual uint64_t getMyTransactionCount() const { return 0; }
+        virtual SnapshotId getSnapshotId() const = 0;
 
         /**
          * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The

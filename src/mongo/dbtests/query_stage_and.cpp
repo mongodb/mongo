@@ -134,7 +134,7 @@ namespace QueryStageAnd {
 
                 WorkingSetMember* member = ws->get(id);
                 ASSERT(member->hasObj());
-                return member->obj;
+                return member->obj.value();
             }
 
             // We failed to produce a result.
@@ -215,9 +215,9 @@ namespace QueryStageAnd {
             getLocs(&data, coll);
             size_t memUsageBefore = ah->getMemUsage();
             for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (coll->docFor(&_txn, *it)["foo"].numberInt() == 15) {
+                if (coll->docFor(&_txn, *it).value()["foo"].numberInt() == 15) {
                     ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
-                    remove(coll->docFor(&_txn, *it));
+                    remove(coll->docFor(&_txn, *it).value());
                     break;
                 }
             }
@@ -318,7 +318,7 @@ namespace QueryStageAnd {
 
             size_t memUsageBefore = ah->getMemUsage();
             for (set<RecordId>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (0 == deletedObj.woCompare(coll->docFor(&_txn, *it))) {
+                if (0 == deletedObj.woCompare(coll->docFor(&_txn, *it).value())) {
                     ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
                     break;
                 }
@@ -340,7 +340,8 @@ namespace QueryStageAnd {
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* wsm = ws.get(id);
-                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(coll->docFor(&_txn, wsm->loc)));
+                ASSERT_NOT_EQUALS(0,
+                                  deletedObj.woCompare(coll->docFor(&_txn, wsm->loc).value()));
                 ++count;
             }
 
@@ -964,7 +965,7 @@ namespace QueryStageAnd {
             // and make sure it shows up in the flagged results.
             ah->saveState();
             ah->invalidate(&_txn, *data.begin(), INVALIDATION_DELETION);
-            remove(coll->docFor(&_txn, *data.begin()));
+            remove(coll->docFor(&_txn, *data.begin()).value());
             ah->restoreState(&_txn);
 
             // Make sure the nuked obj is actually in the flagged data.
@@ -1003,7 +1004,7 @@ namespace QueryStageAnd {
             // not flagged.
             ah->saveState();
             ah->invalidate(&_txn, *it, INVALIDATION_DELETION);
-            remove(coll->docFor(&_txn, *it));
+            remove(coll->docFor(&_txn, *it).value());
             ah->restoreState(&_txn);
 
             // Get all results aside from the two we killed.
@@ -1268,11 +1269,11 @@ namespace QueryStageAnd {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
-                BSONObj thisObj = coll->docFor(&_txn, ws.get(id)->loc);
+                BSONObj thisObj = coll->docFor(&_txn, ws.get(id)->loc).value();
                 ASSERT_EQUALS(7 + count, thisObj["bar"].numberInt());
                 ++count;
                 if (WorkingSet::INVALID_ID != lastId) {
-                    BSONObj lastObj = coll->docFor(&_txn, ws.get(lastId)->loc);
+                    BSONObj lastObj = coll->docFor(&_txn, ws.get(lastId)->loc).value();
                     ASSERT_LESS_THAN(lastObj["bar"].woCompare(thisObj["bar"]), 0);
                 }
                 lastId = id;

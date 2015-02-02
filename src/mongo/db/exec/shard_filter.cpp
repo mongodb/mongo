@@ -97,7 +97,8 @@ namespace mongo {
 
                     // Skip this document with a warning - no shard key should not be possible
                     // unless manually inserting data into a shard
-                    warning() << "no shard key found in document " << member->obj.toString() << " "
+                    warning() << "no shard key found in document "
+                              << member->obj.value().toString() << " "
                               << "for shard key pattern " << _metadata->getKeyPattern() << ", "
                               << "document may have been inserted manually into shard";
                 }

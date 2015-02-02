@@ -154,7 +154,7 @@ namespace mongo {
         // Extract all the geometries out of this document for the near query
         OwnedPointerVector<StoredGeometry> geometriesOwned;
         vector<StoredGeometry*>& geometries = geometriesOwned.mutableVector();
-        extractGeometries(member->obj, nearParams.nearQuery->field, &geometries);
+        extractGeometries(member->obj.value(), nearParams.nearQuery->field, &geometries);
 
         // Compute the minimum distance of all the geometries in the document
         double minDistance = -1;

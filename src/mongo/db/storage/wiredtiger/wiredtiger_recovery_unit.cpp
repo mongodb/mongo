@@ -300,8 +300,9 @@ namespace mongo {
         _ticket.reset(NULL);
     }
 
-    uint64_t WiredTigerRecoveryUnit::getMyTransactionCount() const {
-        return _myTransactionCount;
+    SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
+        // TODO: use actual wiredtiger txn id
+        return SnapshotId(_myTransactionCount);
     }
 
     void WiredTigerRecoveryUnit::markNoTicketRequired() {

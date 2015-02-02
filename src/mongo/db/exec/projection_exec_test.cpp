@@ -83,7 +83,7 @@ namespace {
         // Create working set member.
         WorkingSetMember wsm;
         wsm.state = WorkingSetMember::OWNED_OBJ;
-        wsm.obj = fromjson(objStr);
+        wsm.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson(objStr));
         if (data) {
             wsm.addComputed(data);
         }
@@ -117,7 +117,7 @@ namespace {
         }
 
         // Finally, we compare the projected object.
-        const BSONObj& obj = wsm.obj;
+        const BSONObj& obj = wsm.obj.value();
         BSONObj expectedObj = fromjson(expectedObjStr);
         if (obj != expectedObj) {
             mongoutils::str::stream ss;

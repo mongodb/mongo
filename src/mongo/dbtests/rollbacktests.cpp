@@ -102,7 +102,7 @@ namespace {
         ASSERT( !iter->isEOF() );
         RecordId loc = iter->getNext();
         ASSERT( iter->isEOF() );
-        ASSERT_EQ( data, coll->docFor( txn, loc ) );
+        ASSERT_EQ( data, coll->docFor( txn, loc ).value() );
     }
     void assertEmpty( OperationContext* txn, const NamespaceString& nss ) {
         Collection* coll = dbHolder().get( txn, nss.db() )->getCollection(nss.ns() );

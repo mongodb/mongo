@@ -1,7 +1,7 @@
-// in_memory_recovery_unit.h
+// snapshot.h
 
 /**
-*    Copyright (C) 2014 MongoDB Inc.
+*    Copyright (C) 2015 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,49 +30,60 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
-#include <vector>
-
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    class SortedDataInterface;
-
-    class InMemoryRecoveryUnit : public RecoveryUnit {
+    class SnapshotId {
+        static const uint64_t kNullId = 0;
     public:
-        InMemoryRecoveryUnit() : _depth(0) {}
-        virtual ~InMemoryRecoveryUnit();
-
-        virtual void beginUnitOfWork(OperationContext* opCtx);
-        virtual void commitUnitOfWork();
-        virtual void endUnitOfWork();
-
-        virtual bool awaitCommit() {
-            return true;
+        SnapshotId()
+            : _id(kNullId) {
         }
 
-        virtual void commitAndRestart() {}
-
-        virtual void registerChange(Change* change) {
-            _changes.push_back(ChangePtr(change));
+        // 0 is NULL
+        explicit SnapshotId(uint64_t id)
+            : _id(id) {
+            invariant(id != kNullId);
         }
 
-        virtual void* writingPtr(void* data, size_t len) {
-            invariant(!"don't call writingPtr");
+        bool isNull() const { return _id == kNullId; }
+
+        bool operator==(const SnapshotId& other) const {
+            return _id == other._id;
         }
 
-        virtual void setRollbackWritesDisabled() {}
-
-        virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+        bool operator!=(const SnapshotId& other) const {
+            return _id != other._id;
+        }
 
     private:
-        typedef boost::shared_ptr<Change> ChangePtr;
-        typedef std::vector<ChangePtr> Changes;
-
-        int _depth;
-        Changes _changes;
+        uint64_t _id;
     };
 
+    template<typename T>
+    class Snapshotted {
+    public:
+        Snapshotted()
+            : _id(), _value() {
+        }
+
+        Snapshotted(SnapshotId id, const T& value ) :
+            _id(id), _value(value) {
+        }
+
+        void reset() {
+            *this = Snapshotted();
+        }
+
+        void setValue(const T& t) { _value = t; }
+
+        SnapshotId snapshotId() const { return _id; }
+        const T& value() const { return _value; }
+        T& value() { return _value; }
+
+    private:
+        SnapshotId _id;
+        T _value;
+    };
 }

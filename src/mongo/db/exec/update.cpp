@@ -451,7 +451,7 @@ namespace mongo {
         _specificStats.isDocReplacement = params.driver->isDocReplacement();
     }
 
-    void UpdateStage::transformAndUpdate(BSONObj& oldObj, RecordId& loc) {
+    void UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& loc) {
         const UpdateRequest* request = _params.request;
         UpdateDriver* driver = _params.driver;
         CanonicalQuery* cq = _params.canonicalQuery;
@@ -463,11 +463,10 @@ namespace mongo {
         // is needed to accomodate the new bson layout of the resulting document. In any event,
         // only enable in-place mutations if the underlying storage engine offers support for
         // writing damage events.
-        _doc.reset(
-            oldObj,
-            (_collection->getRecordStore()->updateWithDamagesSupported() ?
-             mutablebson::Document::kInPlaceEnabled :
-             mutablebson::Document::kInPlaceDisabled));
+        _doc.reset(oldObj.value(),
+                   (_collection->getRecordStore()->updateWithDamagesSupported() ?
+                    mutablebson::Document::kInPlaceEnabled :
+                    mutablebson::Document::kInPlaceDisabled));
 
         BSONObj logObj;
 
@@ -485,7 +484,7 @@ namespace mongo {
             matchDetails.requestElemMatchKey();
 
             dassert(cq);
-            verify(cq->root()->matchesBSON(oldObj, &matchDetails));
+            verify(cq->root()->matchesBSON(oldObj.value(), &matchDetails));
 
             string matchedField;
             if (matchDetails.hasElemMatchKey())
@@ -529,7 +528,7 @@ namespace mongo {
                 if (lifecycle)
                     immutableFields = lifecycle->getImmutableFields();
 
-                uassertStatusOK(validate(oldObj,
+                uassertStatusOK(validate(oldObj.value(),
                                          updatedFields,
                                          _doc,
                                          immutableFields,
@@ -546,11 +545,14 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
-                    const RecordData oldRec(oldObj.objdata(), oldObj.objsize());
-                    _collection->updateDocumentWithDamages(_txn, loc, oldRec, source, _damages);
+                    const RecordData oldRec(oldObj.value().objdata(), oldObj.value().objsize());
+                    _collection->updateDocumentWithDamages(_txn, loc,
+                                                           Snapshotted<RecordData>(oldObj.snapshotId(),
+                                                                                   oldRec),
+                                                           source, _damages);
                 }
 
-                newObj = oldObj;
+                newObj = oldObj.value();
                 _specificStats.fastmod = true;
 
             }
@@ -598,6 +600,7 @@ namespace mongo {
                             request->isFromMigration());
             }
 
+            invariant(oldObj.snapshotId() == _txn->recoveryUnit()->getSnapshotId());
             wunit.commit();
         }
 
@@ -755,7 +758,6 @@ namespace mongo {
         if (PlanStage::ADVANCED == status) {
             // Need to get these things from the result returned by the child.
             RecordId loc;
-            BSONObj oldObj;
 
             WorkingSetMember* member = _ws->get(id);
 
@@ -774,37 +776,14 @@ namespace mongo {
             // Updates can't have projections. This means that covering analysis will always add
             // a fetch. We should always get fetched data, and never just key data.
             invariant(member->hasObj());
-            oldObj = member->obj;
 
-            // If the working set member is in the owned obj with loc state, then 'oldObj' may not
-            // be the latest version in the database. In this case, we must refetch the doc from the
-            // collection. We also must be tolerant of the possibility that the doc at the wsm's
-            // RecordId was deleted or updated after being force-fetched.
-            if (WorkingSetMember::LOC_AND_OWNED_OBJ == member->state) {
-                if (!_collection->findDoc(_txn, loc, &oldObj)) {
-                    // The doc was deleted after the force-fetch, so we just move on.
-                    ++_commonStats.needTime;
-                    return PlanStage::NEED_TIME;
-                }
-
-                // We need to make sure that the doc still matches the predicate, as it may have
-                // been updated since being force-fetched.
-                //
-                // 'cq' may be NULL in the case of idhack updates. In this case, doc-level locking
-                // storage engines will look up the key in the _id index and fetch the keyed
-                // document in a single work() cyle. Since yielding cannot happen between these
-                // two events, the OperationContext protects from the doc changing under our feet.
-                CanonicalQuery* cq = _params.canonicalQuery;
-                if (cq && !cq->root()->matchesBSON(oldObj, NULL)) {
-                    ++_commonStats.needTime;
-                    return PlanStage::NEED_TIME;
-                }
-            }
+            Snapshotted<BSONObj> oldObj = member->obj;
 
             // If we're here, then we have retrieved both a RecordId and the corresponding
             // object from the child stage. Since we have the object and the diskloc,
             // we can free the WSM.
             _ws->free(id);
+            member = NULL;
 
             // We fill this with the new locs of moved doc so we don't double-update.
             if (_updatedLocs && _updatedLocs->count(loc) > 0) {
@@ -824,12 +803,29 @@ namespace mongo {
             }
 
             // Do the update and return.
-            BSONObj reFetched;
             uint64_t attempt = 1;
 
             while ( attempt++ ) {
                 try {
-                    transformAndUpdate(reFetched.isEmpty() ? oldObj : reFetched , loc);
+                    if (_txn->recoveryUnit()->getSnapshotId() != oldObj.snapshotId()) {
+                        // our snapshot has changed, refetch
+                        if ( !_collection->findDoc( _txn, loc, &oldObj ) ) {
+                            // document was deleted, we're done here
+                            ++_commonStats.needTime;
+                            return PlanStage::NEED_TIME;
+                        }
+
+                        // we have to re-match the doc as it might not match anymore
+                        if ( _params.canonicalQuery &&
+                             _params.canonicalQuery->root() &&
+                             !_params.canonicalQuery->root()->matchesBSON(oldObj.value(), NULL)) {
+                            // doesn't match predicates anymore!
+                            ++_commonStats.needTime;
+                            return PlanStage::NEED_TIME;
+                        }
+
+                    }
+                    transformAndUpdate(oldObj, loc);
                     break;
                 }
                 catch ( const WriteConflictException& de ) {
@@ -840,6 +836,8 @@ namespace mongo {
 
                     _params.opDebug->writeConflicts++;
 
+                    // This is ok because we re-check all docs and predicates if the snapshot
+                    // changes out from under us in the retry loop above.
                     _txn->recoveryUnit()->commitAndRestart();
 
                     _txn->checkForInterrupt();
@@ -857,19 +855,6 @@ namespace mongo {
                         SwitchToThread();
 #endif
                     }
-
-                    if ( !_collection->findDoc( _txn, loc, &reFetched ) ) {
-                        // document was deleted, we're done here
-                        break;
-                    }
-                    // we have to re-match the doc as it might not match anymore
-                    if ( _params.canonicalQuery &&
-                         _params.canonicalQuery->root() &&
-                         !_params.canonicalQuery->root()->matchesBSON( reFetched, NULL ) ) {
-                        // doesn't match!
-                        break;
-                    }
-                    // now we try again!
                 }
             }
 

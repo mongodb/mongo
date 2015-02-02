@@ -191,7 +191,7 @@ namespace mongo {
 
                     // This is a fetch, but it's OK.  The underlying code won't throw a page fault
                     // exception.
-                    BSONObj obj = collection->docFor(txn, loc);
+                    BSONObj obj = collection->docFor(txn, loc).value();
                     BSONObjIterator j( keyPattern );
                     BSONElement real;
                     for ( int x=0; x <= k; x++ )
