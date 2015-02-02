@@ -18,12 +18,12 @@
  */
 #define	WT_COMPILER_TYPE_ALIGN(x)	__declspec(align(x))
 
-#define	WT_PACKED_STRUCT_BEGIN(name)	\
-	__pragma(pack(push,1))	    	\
+#define	WT_PACKED_STRUCT_BEGIN(name)					\
+	__pragma(pack(push,1))						\
 	struct name {
 
-#define	WT_PACKED_STRUCT_END   		\
-	}; 				\
+#define	WT_PACKED_STRUCT_END						\
+	};								\
 	__pragma(pack(pop))
 
 #define	WT_GCC_FUNC_ATTRIBUTE(x)

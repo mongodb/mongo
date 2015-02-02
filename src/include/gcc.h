@@ -9,9 +9,9 @@
 /* Add GCC-specific attributes to types and function declarations. */
 #define	WT_COMPILER_TYPE_ALIGN(x)	__attribute__((aligned(x)))
 
-#define	WT_PACKED_STRUCT_BEGIN(name) \
+#define	WT_PACKED_STRUCT_BEGIN(name)					\
 	struct __attribute__ ((__packed__)) name {
-#define	WT_PACKED_STRUCT_END \
+#define	WT_PACKED_STRUCT_END						\
 	};
 
 /*
