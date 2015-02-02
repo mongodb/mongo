@@ -548,7 +548,9 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	session = ds->session;
 
 	/* Dump the page metadata. */
-	WT_RET(__debug_page_metadata(ds, page));
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __debug_page_metadata(ds, page));
+	WT_RET(ret);
 
 	/* Dump the page. */
 	switch (page->type) {

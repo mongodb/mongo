@@ -690,7 +690,9 @@ __split_multi_inmem(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
+			WT_WITH_PAGE_INDEX(session,
+			    ret = __wt_col_search(session, recno, ref, &cbt));
+			WT_ERR(ret);
 
 			/* Apply the modification. */
 			WT_ERR(__wt_col_modify(
@@ -714,7 +716,9 @@ __split_multi_inmem(
 			}
 
 			/* Search the page. */
-			WT_ERR(__wt_row_search(session, key, ref, &cbt, 1));
+			WT_WITH_PAGE_INDEX(session,
+			    ret = __wt_row_search(session, key, ref, &cbt, 1));
+			WT_ERR(ret);
 
 			/* Apply the modification. */
 			WT_ERR(
@@ -1364,8 +1368,10 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
-	if ((ret = __split_parent(session, ref, split_ref, 2,
-	    parent_decr, parent_incr, 0, 0, &split_gen)) != 0) {
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __split_parent(session, ref, split_ref, 2,
+	    parent_decr, parent_incr, 0, 0, &split_gen));
+	if (ret != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1517,8 +1523,10 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			    parent_decr, sizeof(WT_IKEY) + ikey->size);
 
 	/* Split into the parent. */
-	WT_ERR(__split_parent(session, ref, ref_new, new_entries,
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __split_parent(session, ref, ref_new, new_entries,
 	    parent_decr, parent_incr, exclusive, 1, &split_gen));
+	WT_ERR(ret);
 
 	__wt_free(session, ref_new);
 

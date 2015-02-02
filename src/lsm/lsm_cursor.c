@@ -97,9 +97,10 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 
 	if (have_primary) {
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
+		    WT_WITH_PAGE_INDEX(session,
 		    ovfl = __wt_btree_size_overflow(
 		    session, hard_limit ?
-		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
+		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size)));
 
 		/* If there was no overflow, we're done. */
 		if (!ovfl)

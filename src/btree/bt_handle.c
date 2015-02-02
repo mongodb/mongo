@@ -99,10 +99,12 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
-		if (creation || root_addr_size == 0)
-			WT_ERR(__btree_tree_open_empty(
+		if (creation || root_addr_size == 0) {
+			WT_WITH_PAGE_INDEX(session,
+			    ret = __btree_tree_open_empty(
 			    session, creation, readonly));
-		else {
+			WT_ERR(ret);
+		} else {
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
 
