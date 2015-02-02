@@ -36,6 +36,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
@@ -98,11 +99,19 @@ namespace mongo {
             }
             RecordId rloc = member->loc;
 
-            // If the working set member is in the owned obj with loc state, then the document may
-            // have already been deleted after-being force-fetched.
-            if (WorkingSetMember::LOC_AND_OWNED_OBJ == member->state) {
+            // If the snapshot changed, then we have to make sure we have the latest copy of the
+            // doc and that it still matches.
+            if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 if (!_collection->findDoc(_txn, rloc, &member->obj)) {
                     // Doc is already deleted. Nothing more to do.
+                    ++_commonStats.needTime;
+                    return PlanStage::NEED_TIME;
+                }
+
+                // Make sure the re-fetched doc still matches the predicate.
+                if (_params.canonicalQuery &&
+                    !_params.canonicalQuery->root()->matchesBSON(member->obj.value(), NULL)) {
+                    // Doesn't match.
                     ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
                 }

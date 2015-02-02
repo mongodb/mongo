@@ -567,6 +567,7 @@ namespace mongo {
             return status;
         }
         invariant(root);
+        deleteStageParams.canonicalQuery = cq.get();
 
         root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
