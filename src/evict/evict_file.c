@@ -94,11 +94,18 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Discard the page, whether clean or dirty.
 			 *
-			 * Clean the page, both to keep statistics correct, and
-			 * to let the page-discard function assert no dirty page
-			 * is ever discarded.
+			 * If we see a dirty page in an ordinary discard (e.g.,
+			 * from sweep), give up: an update must have happened
+			 * since the file was selected for sweeping.
+			 *
+			 * If we're forcing the discard, clean the page, both
+			 * to keep statistics correct, and to let the
+			 * page-discard function assert no dirty page is ever
+			 * discarded.
 			 */
 			if (__wt_page_is_modified(page)) {
+				if (syncop == WT_SYNC_DISCARD)
+					return (EBUSY);
 				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
 			}
@@ -108,8 +115,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * connection close, and in other paths our caller
 			 * should be prepared to deal with this case.
 			 */
-			if (syncop == WT_SYNC_DISCARD &&
-			    page->modify != NULL &&
+			if (syncop == WT_SYNC_DISCARD && page->modify != NULL &&
 			    !__wt_txn_visible_all(session,
 			    page->modify->rec_max_txn))
 				WT_ERR(EBUSY);
