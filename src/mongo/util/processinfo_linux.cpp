@@ -34,8 +34,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <gnu/libc-version.h>
 #include <sys/utsname.h>
+#ifdef __UCLIBC__
+#include <features.h>
+#else
+#include <gnu/libc-version.h>
+#endif
 
 #include "processinfo.h"
 #include "boost/filesystem.hpp"
@@ -435,7 +439,13 @@ namespace mongo {
         
         BSONObjBuilder bExtra;
         bExtra.append( "versionString", LinuxSysHelper::readLineFromFile( "/proc/version" ) );
+#ifdef __UCLIBC__
+        stringstream ss;
+        ss << "uClibc-" << __UCLIBC_MAJOR__ << "." << __UCLIBC_MINOR__ << "." << __UCLIBC_SUBLEVEL__;
+        bExtra.append( "libcVersion", ss.str() );
+#else
         bExtra.append( "libcVersion", gnu_get_libc_version() );
+#endif
         if (!verSig.empty())
             // optional
             bExtra.append( "versionSignature", verSig );
