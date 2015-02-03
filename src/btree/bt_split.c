@@ -723,11 +723,10 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	incr = 0;
 
 	/* In some cases, the underlying WT_REF has not yet been allocated. */
-	if (*refp == NULL) {
+	if (*refp == NULL)
 		WT_RET(__wt_calloc_one(session, refp));
-		incr += sizeof(WT_REF);
-	}
 	ref = *refp;
+	incr += sizeof(WT_REF);
 
 	/*
 	 * Any parent reference must be filled in by our caller; the primary
@@ -1165,9 +1164,9 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	} else
 		WT_ERR(__wt_row_leaf_key(
 		    session, page, &page->pg_row_d[0], key, 1));
-
 	WT_ERR(__wt_row_ikey(
 	    session, 0, key->data, key->size, &child->key.ikey));
+	parent_incr += sizeof(WT_REF) + sizeof(WT_IKEY) + key->size;
 	__wt_scr_free(session, &key);
 
 	/*
@@ -1186,13 +1185,14 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_ERR(__wt_row_ikey(session, 0,
 	    WT_INSERT_KEY(moved_ins), WT_INSERT_KEY_SIZE(moved_ins),
 	    &child->key.ikey));
+	parent_incr +=
+	    sizeof(WT_REF) + sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
 
 	/*
-	 * We're swapping WT_REFs in the parent, adjust the accounting, and
-	 * row store pages may have instantiated keys.
+	 * After the split, we're going to discard the WT_REF, account for the
+	 * change in memory footprint.  Row store pages have keys that may be
+	 * instantiated, check for that.
 	 */
-	parent_incr += sizeof(WT_REF);
-	parent_incr += sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
 	parent_decr += sizeof(WT_REF);
 	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
@@ -1314,7 +1314,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page->modify->inmem_split_txn = __wt_txn_new_id(session);
 
-	/* Update the page accounting. */
+	/*
+	 * Update the page accounting.
+	 *
+	 * XXX
+	 * If we fail to split the parent, the page's accounting will be wrong.
+	 */
 	__wt_cache_page_inmem_decr(session, page, page_decr);
 	__wt_cache_page_inmem_incr(session, right, right_incr);
 
