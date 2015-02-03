@@ -172,13 +172,15 @@ coll.unsetWriteConcern();
 
 //
 // Write concern error
-// NOTE: Non-throwing write concern failures require replication to trigger
+// NOTE: In a replica set write concern is checked after write
 coll.remove({});
-assert.writeError( coll.insert({ foo : "bar" }, { writeConcern : { w : "invalid" } }) );
-if (coll.getMongo().writeMode() == "commands")
-    assert.eq(coll.count(), 0);
-else 
-    assert.eq(coll.count(), 1);
+var wRes = assert.writeError( coll.insert({ foo : "bar" }, { writeConcern : { w : "invalid" } }) );
+var res = assert.commandWorked(db.isMaster());
+var replSet = res.hasOwnProperty("setName");
+if (!replSet && coll.getMongo().writeMode() == "commands")
+    assert.eq(coll.count(), 0, "not-replset || command mode");
+else // compatibility, 
+    assert.eq(coll.count(), 1, "replset || non-command mode");
 
 
 

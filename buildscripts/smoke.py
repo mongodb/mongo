@@ -154,7 +154,7 @@ def buildlogger(cmd, is_global=False):
 
 def clean_dbroot(dbroot="", nokill=False):
     # Clean entire /data/db dir if --with-cleanbb, else clean specific database path.
-    if clean_whole_dbroot and not small_oplog:
+    if clean_whole_dbroot and not (small_oplog or small_oplog_rs):
         dbroot = os.path.normpath(smoke_db_prefix + "/data/db")
     if os.path.exists(dbroot):
         print("clean_dbroot: %s" % dbroot)
@@ -223,7 +223,10 @@ class mongod(NullMongod):
         # SERVER-9137 Added httpinterface parameter to keep previous behavior
         argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
-            argv += ["--master", "--oplogSize", "511"]
+            if self.slave:
+                argv += ['--slave', '--source', 'localhost:' + str(srcport)]
+            else:
+                argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('storage_engine'):
             argv += ["--storageEngine", self.kwargs.get('storage_engine')]
         if self.kwargs.get('wiredtiger_engine_config_string'):
@@ -237,8 +240,6 @@ class mongod(NullMongod):
             for p in params.split(','): argv += ['--setParameter', p]
         if self.kwargs.get('small_oplog_rs'):
             argv += ["--replSet", "foo", "--oplogSize", "511"]
-        if self.slave:
-            argv += ['--slave', '--source', 'localhost:' + str(srcport)]
         if self.kwargs.get('no_journal'):
             argv += ['--nojournal']
         if self.kwargs.get('no_preallocj'):
@@ -342,7 +343,9 @@ class mongod(NullMongod):
             raise(Exception('mongod process exited with non-zero code %d' % retcode))
 
     def wait_for_repl(self):
+        print "Awaiting replicated (w:2, wtimeout:5min) insert (port:" + str(self.port) + ")"
         Connection(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+        print "Replicated write completed -- done wait_for_repl"
 
 class Bug(Exception):
     def __str__(self):
@@ -372,9 +375,7 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave (%s) to catch up to master (%s)" % (slave.port, master.port)
     master.wait_for_repl()
-    print "caught up!"
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
@@ -436,7 +437,7 @@ def skipTest(path):
     basename = os.path.basename(path)
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
-    if small_oplog: # For tests running in parallel
+    if small_oplog or small_oplog_rs: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
                         "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js"]:
             return True
@@ -702,6 +703,8 @@ def run_tests(tests):
 
         if small_oplog:
             slave = mongod(slave=True,
+                           small_oplog=True,
+                           small_oplog_rs=False,
                            storage_engine=storage_engine,
                            wiredtiger_engine_config_string=wiredtiger_engine_config_string,
                            wiredtiger_collection_config_string=wiredtiger_collection_config_string,
@@ -710,8 +713,8 @@ def run_tests(tests):
             slave.start()
         elif small_oplog_rs:
             slave = mongod(slave=True,
-                           small_oplog_rs=small_oplog_rs,
-                           small_oplog=small_oplog,
+                           small_oplog_rs=True,
+                           small_oplog=False,
                            no_journal=no_journal,
                            storage_engine=storage_engine,
                            wiredtiger_engine_config_string=wiredtiger_engine_config_string,
@@ -731,11 +734,23 @@ def run_tests(tests):
                             {'_id': 0, 'host':'localhost:%s' % master.port},
                             {'_id': 1, 'host':'localhost:%s' % slave.port,'priority':0}]}})
 
+            # Wait for primary and secondary to finish initial sync and election
             ismaster = False
             while not ismaster:
                 result = primary.admin.command("ismaster");
                 ismaster = result["ismaster"]
-                time.sleep(1)
+                if not ismaster:
+                    print "waiting for primary to be available ..."
+                    time.sleep(.2)
+            
+            secondaryUp = False
+            sConn = Connection(port=slave.port, slave_okay=True);
+            while not secondaryUp:
+                result = sConn.admin.command("ismaster");
+                secondaryUp = result["secondary"]
+                if not secondaryUp:
+                    print "waiting for secondary to be available ..."
+                    time.sleep(.2)
 
         if small_oplog or small_oplog_rs:
             master.wait_for_repl()
