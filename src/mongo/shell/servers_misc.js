@@ -346,10 +346,3 @@ function startParallelShell( jsCode, port, noConnect ){
 }
 
 var testingReplication = false;
-
-function skipIfTestingReplication(){
-    if (testingReplication) {
-        print("skipIfTestingReplication skipping");
-        quit(0);
-    }
-}
