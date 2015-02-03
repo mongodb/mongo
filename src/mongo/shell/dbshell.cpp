@@ -840,7 +840,10 @@ int _main( int argc, char* argv[], char **envp ) {
                 // Whatever we have now will be in the form:
                 //   CMD ARGS
                 bool wasCmd = false;
-                const string cmd(line, 0, line.find(' '));
+                string cmd;
+                size_t strPos = line.find(' ');
+                if ( strPos != string::npos )
+                    cmd = line.substr( 0, strPos );
 
                 if ( cmd.find("\"") == string::npos ) {
                     try {
