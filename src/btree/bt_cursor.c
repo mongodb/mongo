@@ -935,25 +935,30 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * and we can proceed without concern.
 	 */
 	if (start == NULL) {
-		while (ret == 0) {
+		do {
 			WT_RET(__wt_btcur_remove(stop));
-			WT_RESTART_RETRY(__wt_btcur_prev(stop, 1), ret);
-			if (ret != 0)
-				break;
-			stop->compare = 0;	/* Exact match */
-			WT_RESTART_RETRY(rmfunc(session, stop, 1), ret);
-		}
+			for (;;) {
+				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
+					break;
+				stop->compare = 0;	/* Exact match */
+				if ((ret = rmfunc(session, stop, 1)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
 	} else {
-		WT_RET(__wt_btcur_remove(start));
-		while (ret == 0) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			WT_RESTART_RETRY(__wt_btcur_next(start, 1), ret);
-			if (ret != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			WT_RESTART_RETRY(rmfunc(session, start, 1), ret);
-		}
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (ret = 0;;) {
+				if (stop != NULL &&
+				    __cursor_equals(start, stop))
+					break;
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				start->compare = 0;	/* Exact match */
+				if ((ret = rmfunc(session, start, 1)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
 	}
 
 	WT_RET_NOTFOUND_OK(ret);
@@ -989,30 +994,34 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * refresh the page's modification information.
 	 */
 	if (start == NULL) {
-		WT_RET(__wt_btcur_remove(stop));
-		while (ret == 0) {
-			WT_RESTART_RETRY(__wt_btcur_prev(stop, 1), ret);
-			if (ret != 0)
-				break;
-			stop->compare = 0;	/* Exact match */
-			value = (uint8_t *)stop->iface.value.data;
-			if (*value != 0)
-				WT_RESTART_RETRY(rmfunc(session, stop, 1), ret);
-		}
+		do {
+			WT_RET(__wt_btcur_remove(stop));
+			for (;;) {
+				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
+					break;
+				stop->compare = 0;	/* Exact match */
+				value = (uint8_t *)stop->iface.value.data;
+				if (*value != 0 &&
+				    (ret = rmfunc(session, stop, 1)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
 	} else {
-		WT_RET(__wt_btcur_remove(start));
-		while (ret == 0) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			WT_RESTART_RETRY(__wt_btcur_next(start, 1), ret);
-			if (ret != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			value = (uint8_t *)start->iface.value.data;
-			if (*value != 0)
-				WT_RESTART_RETRY(
-				    rmfunc(session, start, 1), ret);
-		}
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (ret = 0;;) {
+				if (stop != NULL &&
+				    __cursor_equals(start, stop))
+					break;
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				start->compare = 0;	/* Exact match */
+				value = (uint8_t *)start->iface.value.data;
+				if (*value != 0 &&
+				    (ret = rmfunc(session, start, 1)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
 	}
 
 	WT_RET_NOTFOUND_OK(ret);
