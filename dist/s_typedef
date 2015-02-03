@@ -20,8 +20,12 @@ build() {
 
 	l=`ls ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
-	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{' $l | \
-	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
+	egrep -h \
+	    '^[	 ]*(((struct|union)[	 ].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
+	    $l |
+	    sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
+	        -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \
+	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
 		echo "$t $n;"

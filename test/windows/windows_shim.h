@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <direct.h>
 #include <io.h>
+#include <process.h>
 
 #define	inline __inline
 
@@ -66,8 +67,6 @@ int sched_yield(void);
 /*
  * Emulate <unistd.h>
  */
-#define	getpid GetCurrentProcessId
-
 typedef uint32_t useconds_t;
 
 int

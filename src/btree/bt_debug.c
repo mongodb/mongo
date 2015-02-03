@@ -48,7 +48,7 @@ static void __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_tree(WT_SESSION_IMPL *, WT_PAGE *, const char *, uint32_t);
 static void __debug_update(WT_DBG *, WT_UPDATE *, int);
 static void __dmsg(WT_DBG *, const char *, ...)
-	WT_GCC_ATTRIBUTE((format (printf, 2, 3)));
+	WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 static void __dmsg_wrapup(WT_DBG *);
 
 /*
