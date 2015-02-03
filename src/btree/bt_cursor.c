@@ -782,7 +782,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 
 	WT_RET(__cursor_func_init(cbt, 1));
 
-	WT_ERR(__wt_row_random(session, cbt));
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __wt_row_random(session, cbt));
+	WT_ERR(ret);
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else
