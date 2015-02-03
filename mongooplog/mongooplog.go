@@ -86,10 +86,6 @@ func (mo *MongoOplog) Run() error {
 	log.Log(log.DebugLow, "applying oplog entries...")
 
 	for tail.Next(oplogEntry) {
-		// make sure there was no tailing error
-		if err := tail.Err(); err != nil {
-			return fmt.Errorf("error querying oplog: %v", err)
-		}
 
 		// skip noops
 		if oplogEntry.Operation == "n" {
@@ -111,6 +107,11 @@ func (mo *MongoOplog) Run() error {
 		if !res.Ok {
 			return fmt.Errorf("server gave error applying ops: %v", res.ErrMsg)
 		}
+	}
+
+	// make sure there was no tailing error
+	if err := tail.Err(); err != nil {
+		return fmt.Errorf("error querying oplog: %v", err)
 	}
 
 	log.Log(log.DebugLow, "done applying oplog entries")
