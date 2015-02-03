@@ -1004,6 +1004,10 @@ struct __wt_insert_head {
  * already have a split generation, leave it alone.  If our caller is examining
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
+ *
+ * Check that we haven't raced with a split_gen update after publishing: we
+ * rely on the published value not being missed when scanning for the oldest
+ * active split_gen.
  */
 #define	WT_ENTER_PAGE_INDEX(session) do {				\
 	uint64_t __prev_split_gen = (session)->split_gen;		\
