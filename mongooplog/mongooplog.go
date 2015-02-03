@@ -4,6 +4,7 @@ package mongooplog
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
@@ -42,6 +43,8 @@ func (mo *MongoOplog) Run() error {
 		return fmt.Errorf("the oplog namespace must specify a collection")
 	}
 
+	log.Logf(log.DebugLow, "using oplog namespace `%v.%v`", oplogDB, oplogColl)
+
 	// connect to the destination server
 	toSession, err := mo.SessionProviderTo.GetSession()
 	if err != nil {
@@ -50,6 +53,13 @@ func (mo *MongoOplog) Run() error {
 	defer toSession.Close()
 	toSession.SetSocketTimeout(0)
 
+	// purely for logging
+	destServerStr := mo.ToolOptions.Host
+	if mo.ToolOptions.Port != "" {
+		destServerStr = destServerStr + ":" + mo.ToolOptions.Port
+	}
+	log.Logf(log.DebugLow, "successfully connected to destination server `%v`", destServerStr)
+
 	// connect to the source server
 	fromSession, err := mo.SessionProviderFrom.GetSession()
 	if err != nil {
@@ -57,6 +67,8 @@ func (mo *MongoOplog) Run() error {
 	}
 	defer fromSession.Close()
 	fromSession.SetSocketTimeout(0)
+
+	log.Logf(log.DebugLow, "successfully connected to source server `%v`", mo.SourceOptions.From)
 
 	// set slave ok
 	fromSession.SetMode(mgo.Eventual, true)
@@ -71,6 +83,8 @@ func (mo *MongoOplog) Run() error {
 	oplogEntry := &db.Oplog{}
 	res := &db.ApplyOpsResponse{}
 
+	log.Log(log.DebugLow, "applying oplog entries...")
+
 	for tail.Next(oplogEntry) {
 		// make sure there was no tailing error
 		if err := tail.Err(); err != nil {
@@ -79,6 +93,7 @@ func (mo *MongoOplog) Run() error {
 
 		// skip noops
 		if oplogEntry.Operation == "n" {
+			log.Logf(log.DebugHigh, "skipping no-op for namespace `%v`", oplogEntry.Namespace)
 			continue
 		}
 
@@ -97,6 +112,8 @@ func (mo *MongoOplog) Run() error {
 			return fmt.Errorf("server gave error applying ops: %v", res.ErrMsg)
 		}
 	}
+
+	log.Log(log.DebugLow, "done applying oplog entries")
 
 	return nil
 }
