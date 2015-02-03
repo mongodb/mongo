@@ -812,6 +812,7 @@ namespace mongo {
                         if ( !_collection->findDoc( _txn, loc, &oldObj ) ) {
                             // document was deleted, we're done here
                             ++_commonStats.needTime;
+                            _child->restoreState(_txn);
                             return PlanStage::NEED_TIME;
                         }
 
@@ -820,6 +821,7 @@ namespace mongo {
                              _params.canonicalQuery->root() &&
                              !_params.canonicalQuery->root()->matchesBSON(oldObj.value(), NULL)) {
                             // doesn't match predicates anymore!
+                            _child->restoreState(_txn);
                             ++_commonStats.needTime;
                             return PlanStage::NEED_TIME;
                         }
