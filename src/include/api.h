@@ -127,3 +127,7 @@
 #define	ASYNCOP_API_CALL(conn, s, n)					\
 	s = (conn)->default_session;					\
 	API_CALL_NOCONF(s, asyncop, n, NULL, NULL)
+
+#define	WT_RESTART_RETRY(call, ret) do {				\
+	ret = (call);                                                   \
+} while (ret == WT_RESTART)
