@@ -676,6 +676,22 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	leaf_split_size = __wt_split_page_size(btree, btree->maxleafpage);
 
 	/*
+	 * In-memory split configuration.
+	 */
+	if (__wt_config_gets(
+	    session, cfg, "split_deepen_min_child", &cval) == WT_NOTFOUND ||
+	    cval.val == 0)
+		btree->split_deepen_min_child = WT_SPLIT_DEEPEN_MIN_CHILD_DEF;
+	else
+		btree->split_deepen_min_child = (u_int)cval.val;
+	if (__wt_config_gets(
+	    session, cfg, "split_deepen_per_child", &cval) == WT_NOTFOUND ||
+	    cval.val == 0)
+		btree->split_deepen_per_child = WT_SPLIT_DEEPEN_PER_CHILD_DEF;
+	else
+		btree->split_deepen_per_child = (u_int)cval.val;
+
+	/*
 	 * Get the maximum internal/leaf page key/value sizes.
 	 *
 	 * In historic versions of WiredTiger, the maximum internal/leaf page

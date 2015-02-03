@@ -100,7 +100,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
     # Test object creation, recovery, and conversion of address-deleted cells
     # into free pages, but instead of verifying the final object, instantiate
-    # empty pages by a reader the underlying leaf pages are removed.
+    # empty pages by a reader after the underlying leaf pages are removed.
     def test_truncate_address_deleted_empty_page(self):
         # Create the object on disk.
         self.address_deleted()
