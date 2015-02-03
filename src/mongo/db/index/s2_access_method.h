@@ -55,7 +55,7 @@ namespace mongo {
         static BSONObj fixSpec(const BSONObj& specObj);
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         S2IndexingParams _params;
     };

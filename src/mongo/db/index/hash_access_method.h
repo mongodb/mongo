@@ -49,7 +49,7 @@ namespace mongo {
         virtual ~HashAccessMethod() { }
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         // Only one of our fields is hashed.  This is the field name for it.
         std::string _hashedField;

@@ -51,7 +51,7 @@ namespace mongo {
                                           &_hashedField);
     }
 
-    void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
+    void HashAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
         ExpressionKeysPrivate::getHashKeys(obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), keys);
     }
 

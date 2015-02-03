@@ -45,7 +45,7 @@ namespace mongo {
 
     private:
         // Implemented:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         fts::FTSSpec _ftsSpec;
     };

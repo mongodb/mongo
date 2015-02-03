@@ -113,13 +113,10 @@ namespace mongo {
         virtual RecordId findSingle( OperationContext* txn, const BSONObj& key ) const;
 
     protected:
-        // Friends who need getKeys.
         friend class BtreeBasedBulkAccessMethod;
 
         // See below for body.
         class BtreeBasedPrivateUpdateData;
-
-        virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) = 0;
 
         // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
         bool ignoreKeyTooLong(OperationContext* txn);

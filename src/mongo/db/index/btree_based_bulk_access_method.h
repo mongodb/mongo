@@ -137,6 +137,10 @@ namespace mongo {
 
         OperationContext* getOperationContext() { return _txn; }
 
+        virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) const {
+            _real->getKeys(obj, keys);
+        }
+
     private:
         typedef Sorter<BSONObj, RecordId> BSONObjExternalSorter;
 

@@ -56,7 +56,7 @@ namespace mongo {
         // This really gets the 'locs' from the provided obj.
         void getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const;
 
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         TwoDIndexingParams _params;
     };

@@ -65,7 +65,7 @@ namespace mongo {
         }
     }
 
-    void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
+    void BtreeAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
         _keyGenerator->getKeys(obj, keys);
     }
 

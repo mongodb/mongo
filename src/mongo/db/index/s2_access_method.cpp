@@ -103,7 +103,7 @@ namespace mongo {
         return specObj;
     }
 
-    void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
+    void S2AccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
         ExpressionKeysPrivate::getS2Keys(obj, _descriptor->keyPattern(), _params, keys);
     }
 

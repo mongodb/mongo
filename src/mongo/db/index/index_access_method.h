@@ -209,6 +209,11 @@ namespace mongo {
                                    bool mayInterrupt,
                                    bool dupsAllowed,
                                    std::set<RecordId>* dups ) = 0;
+
+        /**
+         * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+         */
+        virtual void getKeys(const BSONObj &obj, BSONObjSet *keys) const = 0;
     };
 
     /**

@@ -56,7 +56,7 @@ namespace mongo {
         virtual ~BtreeAccessMethod() { }
 
     private:
-        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys);
+        virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         // Our keys differ for V0 and V1.
         boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;

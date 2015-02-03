@@ -49,7 +49,7 @@ namespace mongo {
     }
 
     /** Finds the key objects to put in an index */
-    void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) {
+    void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
         ExpressionKeysPrivate::get2DKeys(obj, _params, keys, NULL);
     }
 
