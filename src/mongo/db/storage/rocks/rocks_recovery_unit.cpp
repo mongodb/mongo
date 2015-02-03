@@ -56,7 +56,8 @@ namespace mongo {
           _transaction(transactionEngine),
           _writeBatch(),
           _snapshot(NULL),
-          _depth(0) {}
+          _depth(0),
+          _myTransactionCount(1) {}
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         _abort();
@@ -117,11 +118,14 @@ namespace mongo {
 
     void RocksRecoveryUnit::registerChange(Change* change) { _changes.push_back(change); }
 
+    SnapshotId RocksRecoveryUnit::getSnapshotId() const { return SnapshotId(_myTransactionCount); }
+
     void RocksRecoveryUnit::_releaseSnapshot() {
         if (_snapshot) {
             _db->ReleaseSnapshot(_snapshot);
             _snapshot = nullptr;
         }
+        _myTransactionCount++;
     }
 
     void RocksRecoveryUnit::_commit() {

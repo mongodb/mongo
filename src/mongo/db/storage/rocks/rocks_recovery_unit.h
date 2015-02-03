@@ -80,6 +80,8 @@ namespace mongo {
 
         virtual void setRollbackWritesDisabled() {}
 
+        virtual SnapshotId getSnapshotId() const;
+
         // local api
 
         rocksdb::WriteBatchWithIndex* writeBatch();
@@ -141,6 +143,7 @@ namespace mongo {
         Changes _changes;
 
         int _depth;
+        uint64_t _myTransactionCount;
 
         RecordId _oplogReadTill;
     };
