@@ -4086,7 +4086,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			p = vpack->data;
 			size = vpack->size;
 			vtype = state == WT_CHILD_PROXY ?
-			    WT_CELL_ADDR_DEL : vpack->raw;
+			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, 0);
 		CHILD_RELEASE_ERR(session, hazard, ref);
