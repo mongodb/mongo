@@ -192,7 +192,7 @@ struct __wt_page_modify {
 	uint64_t inmem_split_txn;
 
 	/* Dirty bytes added to the cache. */
-	uint64_t bytes_dirty;
+	size_t bytes_dirty;
 
 	/*
 	 * When pages are reconciled, the result is one or more replacement
@@ -532,7 +532,7 @@ struct __wt_page {
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
-	uint64_t memory_footprint;	/* Memory attached to the page */
+	size_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_IS_INTERNAL(page)					\
 	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
