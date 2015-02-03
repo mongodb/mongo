@@ -114,6 +114,11 @@ env.CppUnitTest('replica_set_config_checks_test',
                     'replmocks'
                 ])
 
+env.CppUnitTest('scatter_gather_test',
+                'scatter_gather_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replmocks'])
+
 env.CppUnitTest('check_quorum_for_config_change_test',
                 'check_quorum_for_config_change_test.cpp',
                 LIBDEPS=[
