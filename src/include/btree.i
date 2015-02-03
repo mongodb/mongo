@@ -922,7 +922,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
 	if ((ret = __wt_evict_page(session, ref)) == 0) {
-		if (page->memory_footprint < btree->maxmempage)
+		if (page->memory_footprint > btree->maxmempage)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
 			/*
