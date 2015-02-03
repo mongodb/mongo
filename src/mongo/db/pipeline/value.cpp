@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/value.h"
 
+#include <cmath>
 #include <boost/functional/hash.hpp>
 #include <boost/scoped_array.hpp>
 
@@ -719,7 +720,7 @@ namespace mongo {
         case NumberLong:
         case NumberInt: {
             const double dbl = getDouble();
-            if (isNaN(dbl)) {
+            if (std::isnan(dbl)) {
                 boost::hash_combine(seed, numeric_limits<double>::quiet_NaN());
             }
             else {

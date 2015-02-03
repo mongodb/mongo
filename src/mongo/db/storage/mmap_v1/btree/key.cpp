@@ -30,8 +30,9 @@
 
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 
+#include <cmath>
+
 #include "mongo/bson/util/builder.h"
-#include "mongo/platform/float_utils.h"
 #include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
@@ -348,7 +349,7 @@ namespace mongo {
             case NumberDouble:
                 {
                     double d = e._numberDouble();
-                    if( isNaN(d) ) {
+                    if( std::isnan(d) ) {
                         traditional(obj);
                         return;
                     }

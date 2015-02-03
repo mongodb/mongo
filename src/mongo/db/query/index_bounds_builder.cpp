@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/index_bounds_builder.h"
 
+#include <cmath>
 #include <limits>
 
 #include "mongo/base/string_data.h"
@@ -359,7 +360,7 @@ namespace mongo {
             }
 
             // Only NaN is <= NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 double nan = dataElt.numberDouble();
                 oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;
@@ -398,7 +399,7 @@ namespace mongo {
             }
 
             // Nothing is < NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -441,7 +442,7 @@ namespace mongo {
             }
 
             // Nothing is > NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
                 return;
             }
@@ -483,7 +484,7 @@ namespace mongo {
             }
 
             // Only NaN is >= NaN.
-            if (isNaN(dataElt.numberDouble())) {
+            if (std::isnan(dataElt.numberDouble())) {
                 double nan = dataElt.numberDouble();
                 oilOut->intervals.push_back(makePointInterval(nan));
                 *tightnessOut = IndexBoundsBuilder::EXACT;

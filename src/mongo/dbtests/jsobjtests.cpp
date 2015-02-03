@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cmath>
 #include <iostream>
 
 #include "mongo/bson/util/builder.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/platform/float_utils.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/log.h"
@@ -458,9 +458,9 @@ namespace JsobjTests {
                 double inf = numeric_limits< double >::infinity();
                 double nan = numeric_limits< double >::quiet_NaN();
                 double nan2 = numeric_limits< double >::signaling_NaN();
-                ASSERT( isNaN(nan) );
-                ASSERT( isNaN(nan2) );
-                ASSERT( !isNaN(inf) );
+                ASSERT( std::isnan(nan) );
+                ASSERT( std::isnan(nan2) );
+                ASSERT( !std::isnan(inf) );
 
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << inf ) ) == 0 );
                 ASSERT( BSON( "a" << inf ).woCompare( BSON( "a" << 1 ) ) > 0 );

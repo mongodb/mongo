@@ -28,12 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cmath>
 #include <limits>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/cstdint.h"
-#include "mongo/platform/float_utils.h"
 #include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
 
@@ -275,16 +275,16 @@ namespace {
     TEST(Double, TestParsingNan) {
         double d = 0;
         ASSERT_OK(parseNumberFromString("NaN", &d));
-        ASSERT_TRUE(isNaN(d));
+        ASSERT_TRUE(std::isnan(d));
     }
 
     TEST(Double, TestParsingInfinity) {
         double d = 0;
         ASSERT_OK(parseNumberFromString("infinity", &d));
-        ASSERT_TRUE(isInf(d));
+        ASSERT_TRUE(std::isinf(d));
         d = 0;
         ASSERT_OK(parseNumberFromString("-Infinity", &d));
-        ASSERT_TRUE(isInf(d));
+        ASSERT_TRUE(std::isinf(d));
     }
 
     TEST(Double, TestParsingNormal) {

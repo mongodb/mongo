@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonelement.h"
 
+#include <cmath>
 #include <boost/functional/hash.hpp>
 
 #include "mongo/base/compare_numbers.h"
@@ -49,8 +50,6 @@ namespace mongo {
     using std::string;
 
     string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
-        int sign;
-
         std::stringstream s;
         if ( includeFieldNames )
             s << '"' << escape( fieldName() ) << "\" : ";
@@ -81,11 +80,11 @@ namespace mongo {
             // This is not valid JSON, but according to RFC-4627, "Numeric values that cannot be
             // represented as sequences of digits (such as Infinity and NaN) are not permitted." so
             // we are accepting the fact that if we have such values we cannot output valid JSON.
-            else if ( mongo::isNaN(number()) ) {
+            else if ( std::isnan(number()) ) {
                 s << "NaN";
             }
-            else if ( mongo::isInf(number(), &sign) ) {
-                s << ( sign == 1 ? "Infinity" : "-Infinity");
+            else if ( std::isinf(number()) ) {
+                s << ( number() > 0 ? "Infinity" : "-Infinity");
             }
             else {
                 StringBuilder ss;
@@ -973,7 +972,7 @@ namespace mongo {
             // equal numbers and is still likely to be different for different numbers.
             // SERVER-16851
             const double dbl = elem.numberDouble();
-            if (isNaN(dbl)) {
+            if (std::isnan(dbl)) {
                 boost::hash_combine(hash, std::numeric_limits<double>::quiet_NaN());
             }
             else {

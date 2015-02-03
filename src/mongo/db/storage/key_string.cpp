@@ -451,7 +451,7 @@ namespace mongo {
 
         // no special cases needed for Inf,
         // see http://en.wikipedia.org/wiki/IEEE_754-1985#Positive_and_negative_infinity
-        if (isNaN(num)) {
+        if (std::isnan(num)) {
             _append(CType::kNumericNaN, invert);
             return;
         }
@@ -596,7 +596,7 @@ namespace mongo {
     }
 
     void KeyString::_appendSmallDouble(double value, bool invert) {
-        dassert(!isNaN(value));
+        dassert(!std::isnan(value));
         dassert(value != 0.0);
 
         uint64_t data;
@@ -613,7 +613,7 @@ namespace mongo {
     }
 
     void KeyString::_appendLargeDouble(double value, bool invert) {
-        dassert(!isNaN(value));
+        dassert(!std::isnan(value));
         dassert(value != 0.0);
 
         uint64_t data;
