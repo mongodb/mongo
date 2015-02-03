@@ -43,6 +43,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -118,6 +119,7 @@ namespace mongo {
 
                     // We can always retry because we only ever modify one document
                     ok = runImpl(txn,
+                                 dbname,
                                  ns,
                                  query,
                                  fields,
@@ -144,6 +146,12 @@ namespace mongo {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
                 Client::Context ctx(txn, ns, false /* don't check version */);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating collection " << ns
+                        << " during findAndModify"));
+                }
                 Database* db = ctx.db();
                 if ( db->getCollection( ns ) ) {
                     // someone else beat us to it, that's ok
@@ -160,6 +168,7 @@ namespace mongo {
 
                 errmsg = "";
                 ok = runImpl(txn,
+                             dbname,
                              ns,
                              query,
                              fields,
@@ -196,6 +205,7 @@ namespace mongo {
         }
 
         static bool runImpl(OperationContext* txn,
+                            const string& dbname,
                             const string& ns,
                             const BSONObj& query,
                             const BSONObj& fields,
@@ -207,8 +217,16 @@ namespace mongo {
                             BSONObjBuilder& result,
                             string& errmsg) {
 
-            Client::WriteContext cx(txn, ns);
-            Collection* collection = cx.getCollection();
+            AutoGetOrCreateDb autoDb(txn, dbname, MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_IX);
+            Client::Context ctx(txn, ns, autoDb.getDb(), autoDb.justCreated());
+
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while running findAndModify in " << ns));
+            }
+
+            Collection* collection = ctx.db()->getCollection(ns);
 
             const WhereCallbackReal whereCallback(txn, StringData(ns));
 
@@ -359,7 +377,7 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper(result, doc, found, fields, whereCallback);
                 if ( found ) {
-                    deleteObjects(txn, cx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
+                    deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
                                   true, true);
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
@@ -394,7 +412,7 @@ namespace mongo {
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
                     UpdateResult res = mongo::update(txn,
-                                                     cx.db(),
+                                                     ctx.db(),
                                                      request,
                                                      &txn->getCurOp()->debug());
 
@@ -409,7 +427,7 @@ namespace mongo {
 
                     if ( !collection ) {
                         // collection created by an upsert
-                        collection = cx.getCollection();
+                        collection = ctx.db()->getCollection(ns);
                     }
 
                     LOG(3) << "update result: "  << res ;

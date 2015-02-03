@@ -40,6 +40,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 
@@ -206,6 +207,12 @@ namespace mongo {
 
             ScopedTransaction scopedXact(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
+
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while truncating collection " << ns));
+            }
 
             Database* db = autoDb.getDb();
             massert(13429, "no such database", db);

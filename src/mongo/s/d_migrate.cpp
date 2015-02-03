@@ -1942,6 +1942,14 @@ namespace mongo {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
                 Client::Context ctx(txn,  ns);
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                    nsToDatabaseSubstring(ns))) {
+                    errmsg = str::stream() << "Not primary during migration: " << ns;
+                    warning() << errmsg;
+                    setState(FAIL);
+                    return;
+                }
+
                 Database* db = ctx.db();
                 Collection* collection = db->getCollection( ns );
                 if ( !collection ) {

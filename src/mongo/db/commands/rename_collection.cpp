@@ -117,6 +117,12 @@ namespace mongo {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
 
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while renaming collection " << source << " to " << target));
+            }
+
             // We stay in source context the whole time. This is mostly to set the CurOp namespace.
             Client::Context ctx(txn, source);
 

@@ -202,6 +202,12 @@ namespace mongo {
                     return true;
                 }
                 Client::Context context(txn, dbname);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while dropping database " << dbname));
+                }
+
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
                 stopIndexBuilds(txn, db, cmdObj);
@@ -501,6 +507,11 @@ namespace mongo {
                     return false;
                 }
                 Client::Context context(txn, nsToDrop);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while dropping collection " << nsToDrop));
+                }
 
                 int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
 
@@ -1039,6 +1050,12 @@ namespace mongo {
             }
 
             Client::Context ctx(txn,  ns);
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while setting collection options on " << ns));
+            }
+
             WriteUnitOfWork wunit(txn);
 
             bool ok = true;
