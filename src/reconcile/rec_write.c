@@ -4008,7 +4008,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
 		addr = ref->addr;
 		child = ref->page;
-		vtype = 0;
 
 		/* Deleted child we don't have to write. */
 		if (state == WT_CHILD_IGNORE) {
@@ -4025,10 +4024,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 		}
-
-		/* Deleted child requiring a proxy cell. */
-		if (state == WT_CHILD_PROXY)
-			vtype = WT_CELL_ADDR_DEL;
 
 		/*
 		 * Modified child.  Empty pages are merged into the parent and
@@ -4079,22 +4074,22 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/*
 		 * Build the value cell, the child page's address.  Addr points
-		 * to an on-page cell or an off-page WT_ADDR structure.   The
-		 * cell type has been set in the case of page deletion requiring
+		 * to an on-page cell or an off-page WT_ADDR structure. There's
+		 * a special cell type in the case of page deletion requiring
 		 * a proxy cell, otherwise use the information from the addr or
 		 * original cell.
 		 */
 		if (__wt_off_page(page, addr)) {
 			p = addr->addr;
 			size = addr->size;
-			if (vtype == 0)
-				vtype = __rec_vtype(addr);
+			vtype = state == WT_CHILD_PROXY ?
+			    WT_CELL_ADDR_DEL : __rec_vtype(addr);
 		} else {
 			__wt_cell_unpack(ref->addr, vpack);
 			p = vpack->data;
 			size = vpack->size;
-			if (vtype == 0)
-				vtype = vpack->raw;
+			vtype = state == WT_CHILD_PROXY ?
+			    WT_CELL_ADDR_DEL : vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, 0);
 		CHILD_RELEASE_ERR(session, hazard, ref);

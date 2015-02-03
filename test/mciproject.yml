@@ -53,7 +53,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            scons.bat --enable-swig=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
+            scons.bat --enable-python=c:\\swigwin-3.0.2\\swig.exe ${smp_command|}
 
             ${test_env_vars|} python ./test/suite/run.py -v 2
 

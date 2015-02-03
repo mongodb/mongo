@@ -98,7 +98,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
-			__wt_rec_page_clean_update(session, ref);
+			__wt_evict_page_clean_update(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_clean);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_clean);
@@ -139,11 +139,11 @@ done:	session->excl_next = 0;
 }
 
 /*
- * __wt_rec_page_clean_update --
+ * __wt_evict_page_clean_update --
  *	Update a clean page's reference on eviction.
  */
 void
-__wt_rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	/*
 	 * Discard the page and update the reference structure; if the page has
