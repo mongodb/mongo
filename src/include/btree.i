@@ -903,10 +903,11 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked;
+	int locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
+	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -922,7 +923,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
 	if ((ret = __wt_evict_page(session, ref)) == 0) {
-		if (page->memory_footprint > btree->maxmempage)
+		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
 			/*
