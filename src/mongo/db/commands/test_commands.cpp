@@ -73,9 +73,10 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
             Database* db = ctx.db();
+
+            WriteUnitOfWork wunit(txn);
             Collection* collection = db->getCollection( ns );
             if ( !collection ) {
                 collection = db->createCollection( txn, ns );
