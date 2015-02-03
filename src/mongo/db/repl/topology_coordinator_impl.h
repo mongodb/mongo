@@ -250,7 +250,8 @@ namespace repl {
         // Sees if a majority number of votes are held by members who are currently "up"
         bool _aMajoritySeemsToBeUp() const;
 
-        // Is otherOpTime close enough to the latest known optime to qualify for an election
+        // Is otherOpTime close enough (within 10 seconds) to the latest known optime to qualify
+        // for an election
         bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime,
                                                  const OpTime& ourLastOpApplied) const;
 
@@ -290,6 +291,7 @@ namespace repl {
          */
         HeartbeatResponseAction _updateHeartbeatDataImpl(
                 int updatedConfigIndex,
+                const MemberState& originalState,
                 Date_t now,
                 const OpTime& lastOpApplied);
 

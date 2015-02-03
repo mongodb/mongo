@@ -545,6 +545,18 @@ namespace {
         receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::Unauthorized);
         ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
+
+        // Having an auth error but with another node up should bring us out of RECOVERING
+        HeartbeatResponseAction action = receiveUpHeartbeat(HostAndPort("h2"),
+                                                            "rs0",
+                                                            MemberState::RS_SECONDARY,
+                                                            OpTime(0, 0),
+                                                            OpTime(2, 0),
+                                                            OpTime(2, 0));
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+        // Test that the heartbeat that brings us from RECOVERING to SECONDARY doesn't initiate
+        // an election (SERVER-17164)
+        ASSERT_NO_ACTION(action.getAction());
     }
 
     TEST_F(TopoCoordTest, ReceiveHeartbeatWhileAbsentFromConfig) {
