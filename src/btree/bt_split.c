@@ -8,17 +8,10 @@
 
 #include "wt_internal.h"
 
-/*
- * Track allocation increments, matching the cache calculations, which add an
- * estimate of allocation overhead to every object.
- */
-#define	WT_MEMSIZE_ADD(total, len)	do {				\
-	total += (len);							\
-} while (0)
-#define	WT_MEMSIZE_TRANSFER(from_decr, to_incr, len) do {		\
+#define	WT_MEM_TRANSFER(from_decr, to_incr, len) do {			\
 	size_t __len = (len);						\
-	WT_MEMSIZE_ADD(from_decr, __len);				\
-	WT_MEMSIZE_ADD(to_incr, __len);					\
+	from_decr += __len;						\
+	to_incr += __len;						\
 } while (0)
 
 /*
@@ -291,10 +284,9 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 			ref->key.ikey = ikey;
 		} else {
 			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
-			WT_MEMSIZE_ADD(*parent_decrp,
-			    sizeof(WT_IKEY) + ikey->size);
+			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
 		}
-		WT_MEMSIZE_ADD(*child_incrp, sizeof(WT_IKEY) + ikey->size);
+		*child_incrp += sizeof(WT_IKEY) + ikey->size;
 	}
 
 	/*
@@ -318,7 +310,7 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 	}
 
 	/* And finally, the WT_REF itself. */
-	WT_MEMSIZE_TRANSFER(*parent_decrp, *child_incrp, sizeof(WT_REF));
+	WT_MEM_TRANSFER(*parent_decrp, *child_incrp, sizeof(WT_REF));
 
 	return (0);
 }
@@ -427,7 +419,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	size = sizeof(WT_PAGE_INDEX) +
 	    (children + SPLIT_CORRECT_2) * sizeof(WT_REF *);
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
-	WT_MEMSIZE_ADD(parent_incr, size);
+	parent_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children + SPLIT_CORRECT_2;
 	alloc_index->index[0] = pindex->index[0];
@@ -436,7 +428,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	for (alloc_refp = alloc_index->index + SPLIT_CORRECT_1,
 	    i = 0; i < children; ++alloc_refp, ++i) {
 		WT_ERR(__wt_calloc_one(session, alloc_refp));
-		WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
+		parent_incr += sizeof(WT_REF);
 	}
 
 	/* Allocate child pages, and connect them into the new page index. */
@@ -461,7 +453,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 			__wt_ref_key(parent, *parent_refp, &p, &size);
 			WT_ERR(
 			    __wt_row_ikey(session, 0, p, size, &ref->key.ikey));
-			WT_MEMSIZE_ADD(parent_incr, sizeof(WT_IKEY) + size);
+			parent_incr += sizeof(WT_IKEY) + size;
 		} else
 			ref->key.recno = (*parent_refp)->key.recno;
 		ref->state = WT_REF_MEM;
@@ -592,30 +584,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_ERR(__split_safe_free(session, 0, pindex, size));
-	WT_MEMSIZE_ADD(parent_decr, size);
+	parent_decr += size;
 
-#if 0
 	/*
-	 * Adjust the parent's memory footprint.  This may look odd, but we
-	 * have already taken the allocation overhead into account, and an
-	 * increment followed by a decrement will cancel out the normal
-	 * adjustment.
+	 * Adjust the parent's memory footprint.
 	 */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
-#else
-	/*
-	 * XXX
-	 * The code to track page sizes is fundamentally flawed in the face of
-	 * splits: for example, we don't add in an overhead allocation constant
-	 * when allocating WT_REF structures as pages are created, but the
-	 * calculations during split assume that correction. For now, ignore
-	 * our carefully calculated values and force the internal page size to
-	 * 5% of its current value.
-	 */
-	size = parent->memory_footprint - (parent->memory_footprint / 20);
-	__wt_cache_page_inmem_decr(session, parent, size);
-#endif
 
 	if (0) {
 err:		__wt_free_ref_index(session, parent, alloc_index, 1);
@@ -750,7 +725,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	/* In some cases, the underlying WT_REF has not yet been allocated. */
 	if (*refp == NULL) {
 		WT_RET(__wt_calloc_one(session, refp));
-		WT_MEMSIZE_ADD(incr, sizeof(WT_REF));
+		incr += sizeof(WT_REF);
 	}
 	ref = *refp;
 
@@ -785,7 +760,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		ikey = multi->key.ikey;
 		WT_RET(__wt_row_ikey(session, 0,
 		    WT_IKEY_DATA(ikey), ikey->size, &ref->key.ikey));
-		WT_MEMSIZE_ADD(incr, sizeof(WT_IKEY) + ikey->size);
+		incr += sizeof(WT_IKEY) + ikey->size;
 		break;
 	default:
 		ref->key.recno = multi->key.recno;
@@ -897,7 +872,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + result_entries * sizeof(WT_REF *);
 	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
-	WT_MEMSIZE_ADD(parent_incr, size);
+	parent_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = result_entries;
 	for (alloc_refp = alloc_index->index, i = 0; i < parent_entries; ++i) {
@@ -971,7 +946,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 					size = sizeof(WT_IKEY) + ikey->size;
 					WT_TRET(__split_safe_free(
 					    session, 0, ikey, size));
-					WT_MEMSIZE_ADD(parent_decr, size);
+					parent_decr += size;
 				}
 				/*
 				 * The page_del structure can be freed
@@ -989,7 +964,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 			WT_TRET(__split_safe_free(
 			    session, 0, next_ref, sizeof(WT_REF)));
-			WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+			parent_decr += sizeof(WT_REF);
 		}
 	}
 
@@ -999,7 +974,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session, exclusive, pindex, size));
-	WT_MEMSIZE_ADD(parent_decr, size);
+	parent_decr += size;
 
 	/*
 	 * Row-store trees where the old version of the page is being discarded:
@@ -1015,10 +990,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		WT_TRET(__split_ovfl_key_cleanup(session, parent, ref));
 
 	/*
-	 * Adjust the parent's memory footprint.  This may look odd, but we
-	 * have already taken the allocation overhead into account, and an
-	 * increment followed by a decrement will cancel out the normal
-	 * adjustment.
+	 * Adjust the parent's memory footprint.
 	 */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
@@ -1204,8 +1176,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_LEAF, 0, 0, 0, &right));
 	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins));
 	WT_ERR(__wt_calloc_one(session, &right->pg_row_ins[0]));
-	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD));
-	WT_MEMSIZE_ADD(right_incr, sizeof(WT_INSERT_HEAD *));
+	right_incr += sizeof(WT_INSERT_HEAD);
+	right_incr += sizeof(WT_INSERT_HEAD *);
 
 	WT_ERR(__wt_calloc_one(session, &split_ref[1]));
 	child = split_ref[1];
@@ -1219,14 +1191,12 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * We're swapping WT_REFs in the parent, adjust the accounting, and
 	 * row store pages may have instantiated keys.
 	 */
-	WT_MEMSIZE_ADD(parent_incr, sizeof(WT_REF));
-	WT_MEMSIZE_ADD(
-	    parent_incr, sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins));
-	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+	parent_incr += sizeof(WT_REF);
+	parent_incr += sizeof(WT_IKEY) + WT_INSERT_KEY_SIZE(moved_ins);
+	parent_decr += sizeof(WT_REF);
 	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
-			WT_MEMSIZE_ADD(
-			    parent_decr, sizeof(WT_IKEY) + ikey->size);
+			parent_decr += sizeof(WT_IKEY) + ikey->size;
 
 	/* The new page is dirty by definition. */
 	WT_ERR(__wt_page_modify_init(session, right));
@@ -1248,10 +1218,10 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == moved_ins; ++i)
 		;
-	WT_MEMSIZE_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
+	WT_MEM_TRANSFER(page_decr, right_incr, sizeof(WT_INSERT) +
 	    (size_t)i * sizeof(WT_INSERT *) + WT_INSERT_KEY_SIZE(moved_ins));
-	WT_MEMSIZE_TRANSFER(page_decr, right_incr,
-	    __wt_update_list_memsize(moved_ins->upd));
+	WT_MEM_TRANSFER(
+	    page_decr, right_incr, __wt_update_list_memsize(moved_ins->upd));
 
 	/*
 	 * Allocation operations completed, move the last insert list item from
@@ -1498,11 +1468,10 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * change in memory footprint.  Row store pages have keys that may be
 	 * instantiated, check for that.
 	 */
-	WT_MEMSIZE_ADD(parent_decr, sizeof(WT_REF));
+	parent_decr += sizeof(WT_REF);
 	if (page->type == WT_PAGE_ROW_LEAF || page->type == WT_PAGE_ROW_INT)
 		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
-			WT_MEMSIZE_ADD(
-			    parent_decr, sizeof(WT_IKEY) + ikey->size);
+			parent_decr += sizeof(WT_IKEY) + ikey->size;
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session,

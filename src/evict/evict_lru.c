@@ -205,11 +205,10 @@ __evict_server(void *arg)
 		    "cache server: exiting with %" PRIu64 " pages in "
 		    "memory and %" PRIu64 " pages evicted",
 		    cache->pages_inmem, cache->pages_evict);
-	if (cache->bytes_inmem != cache->bytes_evict)
+	if (cache->bytes_inmem != 0)
 		__wt_errx(session,
-		    "cache server: exiting with %" PRIu64 " bytes in "
-		    "memory and %" PRIu64 " bytes evicted",
-		    cache->bytes_inmem, cache->bytes_evict);
+		    "cache server: exiting with %" PRIu64 " bytes in memory",
+		    cache->bytes_inmem);
 	if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
 		__wt_errx(session,
 		    "cache server: exiting with %" PRIu64
