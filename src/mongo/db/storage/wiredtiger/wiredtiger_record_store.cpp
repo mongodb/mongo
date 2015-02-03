@@ -1034,7 +1034,7 @@ namespace {
         invariant( c );
         int ret;
         if (loc.isNull()) {
-            ret = _forward ? c->next(c) : c->prev(c);
+            ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
             _eof = (ret == WT_NOTFOUND);
             if (!_eof) invariantWTOK(ret);
             _loc = _curr();
@@ -1045,14 +1045,14 @@ namespace {
 
         c->set_key(c, _makeKey(loc));
         if (exact) {
-            ret = c->search(c);
+            ret = WT_OP_CHECK(c->search(c));
         }
         else {
             // If loc doesn't exist, inexact matches should find the first existing record before
             // it, in the direction of the scan. Note that inexact callers will call _getNext()
             // after locate so they actually return the record *after* the one we seek to.
             int cmp;
-            ret = c->search_near(c, &cmp);
+            ret = WT_OP_CHECK(c->search_near(c, &cmp));
             if ( ret == WT_NOTFOUND ) {
                 _eof = true;
                 _loc = RecordId();
@@ -1062,12 +1062,12 @@ namespace {
             if (_forward) {
                 // return >= loc
                 if (cmp < 0)
-                    ret = c->next(c);
+                    ret = WT_OP_CHECK(c->next(c));
             }
             else {
                 // return <= loc
                 if (cmp > 0)
-                    ret = c->prev(c);
+                    ret = WT_OP_CHECK(c->prev(c));
             }
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
@@ -1105,7 +1105,7 @@ namespace {
 
         RS_ITERATOR_TRACE("_getNext");
         WT_CURSOR *c = _cursor->get();
-        int ret = _forward ? c->next(c) : c->prev(c);
+        int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
         _eof = (ret == WT_NOTFOUND);
         RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof );
         if ( !_eof ) {
@@ -1156,11 +1156,20 @@ namespace {
     void WiredTigerRecordStore::Iterator::saveState() {
         RS_ITERATOR_TRACE("saveState");
 
+        // It must be safe to call saveState() twice in a row without calling restoreState().
+        if (!_txn) return;
+
         // the cursor and recoveryUnit are valid on restore
         // so we just record the recoveryUnit to make sure
         _savedRecoveryUnit = _txn->recoveryUnit();
-        if ( !wt_keeptxnopen() ) {
-            _cursor->reset();
+        if ( _cursor && !wt_keeptxnopen() ) {
+            try {
+                _cursor->reset();
+            }
+            catch (const WriteConflictException& wce) {
+                // Ignore since this is only called when we are about to kill our transaction
+                // anyway.
+            }
         }
 
         if ( _forParallelCollectionScan ) {
