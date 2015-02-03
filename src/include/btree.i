@@ -931,11 +931,11 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_page_release_busy --
- *	Release a reference to a page, fail if busy during forced eviction.
+ * __wt_page_release_evict --
+ *	Attempt to release and immediately evict a page.
  */
 static inline int
-__wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+__wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -943,37 +943,8 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	int locked, too_big;
 
 	btree = S2BT(session);
-
-	/*
-	 * Discard our hazard pointer.  Ignore pages we don't have and the root
-	 * page, which sticks in memory, regardless.
-	 */
-	if (ref == NULL || __wt_ref_is_root(ref))
-		return (0);
 	page = ref->page;
-
-	too_big = (page->memory_footprint < btree->maxmempage) ? 0 : 1;
-
-	/*
-	 * Attempt to evict pages with the special "oldest" read generation.
-	 *
-	 * This is set for pages that grow larger than the configured
-	 * memory_page_max setting, and when we are attempting to scan without
-	 * trashing the cache.
-	 *
-	 * Skip this if eviction is disabled for this operation or this tree,
-	 * or if there is no chance of eviction succeeding for dirty pages due
-	 * to a checkpoint or because we've already tried writing this page and
-	 * it contains an update that isn't stable.  Also skip forced eviction
-	 * if we just did an in-memory split.
-	 */
-	if (LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    (__wt_page_is_modified(page) && (btree->checkpointing ||
-	    !__wt_txn_visible_all(session, page->modify->first_dirty_txn) ||
-	    !__wt_txn_visible_all(session, page->modify->inmem_split_txn))))
-		return (__wt_hazard_clear(session, page));
+	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -982,8 +953,10 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	locked = WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED);
 	WT_TRET(__wt_hazard_clear(session, page));
-	if (!locked)
+	if (!locked) {
+		WT_TRET(EBUSY);
 		return (ret);
+	}
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
 	if ((ret = __wt_evict_page(session, ref)) == 0) {
@@ -1007,12 +980,46 @@ __wt_page_release_busy(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
 /*
  * __wt_page_release --
- *	Release a reference to a page.
+ *	Release a reference to a page, fail if busy during forced eviction.
  */
 static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
-	WT_RET_BUSY_OK(__wt_page_release_busy(session, ref, flags));
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = S2BT(session);
+
+	/*
+	 * Discard our hazard pointer.  Ignore pages we don't have and the root
+	 * page, which sticks in memory, regardless.
+	 */
+	if (ref == NULL || __wt_ref_is_root(ref))
+		return (0);
+	page = ref->page;
+
+	/*
+	 * Attempt to evict pages with the special "oldest" read generation.
+	 *
+	 * This is set for pages that grow larger than the configured
+	 * memory_page_max setting, and when we are attempting to scan without
+	 * trashing the cache.
+	 *
+	 * Skip this if eviction is disabled for this operation or this tree,
+	 * or if there is no chance of eviction succeeding for dirty pages due
+	 * to a checkpoint or because we've already tried writing this page and
+	 * it contains an update that isn't stable.  Also skip forced eviction
+	 * if we just did an in-memory split.
+	 */
+	if (LF_ISSET(WT_READ_NO_EVICT) ||
+	    page->read_gen != WT_READGEN_OLDEST ||
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    (__wt_page_is_modified(page) && (btree->checkpointing ||
+	    !__wt_txn_visible_all(session, page->modify->first_dirty_txn) ||
+	    !__wt_txn_visible_all(session, page->modify->inmem_split_txn))))
+		return (__wt_hazard_clear(session, page));
+
+	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 	return (0);
 }
 
