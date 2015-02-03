@@ -31,6 +31,22 @@ assert.throws(function(){
 
 //
 //
+// Make sure we can't do geo search with invalid point coordinates.
+assert.throws(function(){
+   coll.findOne({ geo : { $within : { $center : [[NaN, 0], 1] } } });
+});
+assert.throws(function(){
+   coll.findOne({ geo : { $within : { $centerSphere : [[NaN, 0], 1] } } });
+});
+assert.throws(function(){
+   coll.findOne({ geo : { $within : { $center : [[Infinity, 0], 1] } } });
+});
+assert.throws(function(){
+   coll.findOne({ geo : { $within : { $centerSphere : [[-Infinity, 0], 1] } } });
+});
+
+//
+//
 // Make sure we can do a $within search with a zero-radius circular region
 assert.writeOK(coll.insert({ geo : [0, 0] }));
 assert.neq(null, coll.findOne({ geo : { $within : { $center : [[0, 0], 0] } } }));
