@@ -88,7 +88,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
 /*
  * Historically, there was only the wiredtiger_strerror call because the POSIX
  * port didn't need anything more complex; Windows requires memory allocation
- * of error strings, so we added the wiredtiger_strerror_r call. Because we
+ * of error strings, so we added the WT_SESSION.strerror method. Because we
  * want wiredtiger_strerror to continue to be as thread-safe as possible, errors
  * are split into three categories: WiredTiger constant strings, system constant
  * strings and Everything Else, and we check constant strings before Everything
@@ -99,8 +99,8 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_err.py. */
  * __wiredtiger_error --
  *\tReturn a constant string for the WiredTiger errors.
  */
-static const char *
-__wiredtiger_error(int error)
+const char *
+__wt_wiredtiger_error(int error)
 {
 \tswitch (error) {
 ''')
@@ -124,36 +124,17 @@ wiredtiger_strerror(int error)
 \tconst char *p;
 
 \t/* Check for a constant string. */
-\tif ((p = __wiredtiger_error(error)) != NULL ||
-\t    (p = __wt_strerror(error)) != NULL)
+\tif ((p = __wt_wiredtiger_error(error)) != NULL)
+\t\treturn (p);
+\tif ((p = __wt_strerror(error)) != NULL)
 \t\treturn (p);
 
 \t/* Else, fill in the non-thread-safe static buffer. */
-\tif (wiredtiger_strerror_r(error, buf, sizeof(buf)) != 0)
-\t\t(void)snprintf(buf, sizeof(buf), "error return: %d", error);
+\tif (snprintf(buf, sizeof(buf), "error return: %d", error) > 0)
+\t\treturn (buf);
 
-\treturn (buf);
-}
-
-/*
- * wiredtiger_strerror_r --
- *\tReturn a string for any error value, thread-safe version.
- */
-int
-wiredtiger_strerror_r(int error, char *buf, size_t buflen)
-{
-\tconst char *p;
-
-\t/* Require at least 2 bytes, printable character and trailing nul. */
-\tif (buflen < 2)
-\t\treturn (ENOMEM);
-
-\t/* Check for a constant string. */
-\tif ((p = __wiredtiger_error(error)) != NULL ||
-\t    (p = __wt_strerror(error)) != NULL)
-\t\treturn (snprintf(buf, buflen, "%s", p) > 0 ? 0 : ENOMEM);
-
-\treturn (__wt_strerror_r(error, buf, buflen));
+\t/* OK, we're done. */
+\treturn ("Unable to return error string");
 }
 ''')
 tfile.close()

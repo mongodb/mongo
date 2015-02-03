@@ -713,6 +713,7 @@ methods = {
         files''',
         type='boolean'),
 ]),
+'session.strerror' : Method([]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([
