@@ -48,6 +48,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -94,6 +95,12 @@ namespace mongo {
             // ns used so locking individually requires more analysis
             ScopedTransaction scopedXact(txn, MODE_X);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
+
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while applying ops to database " << dbname));
+            }
 
             // Preconditions check reads the database state, so needs to be done locked
             if ( cmdObj["preCondition"].type() == Array ) {

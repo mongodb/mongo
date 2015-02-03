@@ -46,6 +46,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/log.h"
 
@@ -75,6 +76,14 @@ namespace mongo {
 
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+
+            if (!request.isFromReplication() &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                nsString.db())) {
+                uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while creating collection " << nsString.ns()
+                    << " during upsert"));
+            }
 
             WriteUnitOfWork wuow(txn);
             collection = db->createCollection(txn, nsString.ns());

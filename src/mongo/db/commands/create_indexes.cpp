@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -141,6 +142,12 @@ namespace mongo {
             // Note: createIndexes command does not currently respect shard versioning.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while creating indexes in " << ns.ns()));
+            }
+
             Database* db = dbHolder().get(txn, ns.db());
             if (!db) {
                 db = dbHolder().openDb(txn, ns.db());
@@ -202,6 +209,11 @@ namespace mongo {
             if (indexer.getBuildInBackground()) {
                 txn->recoveryUnit()->commitAndRestart();
                 dbLock.relockWithMode(MODE_IX);
+                if (!fromRepl &&
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                        << "Not primary while creating background indexes in " << ns.ns()));
+                }
             }
             try {
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);

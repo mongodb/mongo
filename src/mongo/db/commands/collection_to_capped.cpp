@@ -39,6 +39,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
@@ -174,6 +175,13 @@ namespace {
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
 
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while cloning collection " << from << " to " << to
+                    << " (as capped)"));
+            }
+
             Database* const db = autoDb.getDb();
 
             Status status = cloneCollectionAsCapped(txn, db, from, to, size, temp, true);
@@ -224,8 +232,16 @@ namespace {
                  BSONObjBuilder& result,
                  bool fromRepl ) {
 
+            const std::string ns = parseNsCollectionRequired(dbname, jsobj);
+
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
+
+            if (!fromRepl &&
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
+                    << "Not primary while converting " << ns << " to a capped collection"));
+            }
 
             Database* const db = autoDb.getDb();
             if (!db) {
