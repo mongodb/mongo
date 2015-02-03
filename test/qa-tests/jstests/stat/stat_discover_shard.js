@@ -20,6 +20,8 @@ assert(statOutputPortCheck(shardPorts), "--discover against a mongos sees all sh
 
 st.stop();
 
-assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "mongostat --discover against a sharded cluster shouldn't error when the cluster goes down");
+// FIXME currently, on windows, stopMongoProgramByPid doesn't terminiate a process in a way that it can control it's exit code
+// so the return of stopMongoProgramByPid will probably be 1 in either case.
+assert.eq(_isWindows() ? 1 : exitCodeStopped, stopMongoProgramByPid(pid), "mongostat --discover against a sharded cluster shouldn't error when the cluster goes down");
 
 }());

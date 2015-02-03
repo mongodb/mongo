@@ -21,14 +21,16 @@ pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--port", port[0]].co
 
 sleep(1000);
 
-assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit with a 'stopped' code");
+// FIXME currently, on windows, stopMongoProgramByPid doesn't terminiate a process in a way that it can control it's exit code
+// so the return of stopMongoProgramByPid will probably be 1 in either case.
+assert.eq(_isWindows() ? 1 : exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit with a 'stopped' code");
 
 pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--port", port[0]].concat(commonToolArgs));
 
 
 sleep(1100);
 
-assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit with a 'stopped' code");
+assert.eq(_isWindows() ? 1 : exitCodeStopped, stopMongoProgramByPid(pid), "stopping should cause mongostat exit with a 'stopped' code");
 
 x = startMongoProgramNoConnect.apply(null, ["mongostat", "--port", port[0] - 1, "--rowcount", 1].concat(commonToolArgs));
 
@@ -36,7 +38,7 @@ assert.neq(exitCodeSuccess, x, "can't connect causes an error exit code");
 
 pid = startMongoProgramNoConnect.apply(null, ["mongostat", "--rowcount", "-1"].concat(commonToolArgs))
 
-sleep(100);
+sleep(200);
 
 assert.eq(exitCodeBadOptions, stopMongoProgramByPid(pid), "mongostat --rowcount specified with bad input: negative value")
 
@@ -62,6 +64,6 @@ MongoRunner.stopMongod(port[0]);
 
 sleep(7000); // 1 second for the current sleep time, 5 seconds for the connection timeout, 1 second for fuzz
 
-assert.eq(exitCodeStopped, stopMongoProgramByPid(pid), "mongostat shouldn't error out when the server goes down");
+assert.eq(_isWindows() ? 1 : exitCodeStopped, stopMongoProgramByPid(pid), "mongostat shouldn't error out when the server goes down");
 
 }());
