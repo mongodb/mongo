@@ -948,7 +948,11 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	} else {
 		do {
 			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
+			/*
+			 * Reset ret each time through so that we don't loop
+			 * forever in the cursor equals case.
+			 */
+			for (ret = 0;;) {
 				if (stop != NULL &&
 				    __cursor_equals(start, stop))
 					break;
@@ -1009,7 +1013,11 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	} else {
 		do {
 			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
+			/*
+			 * Reset ret each time through so that we don't loop
+			 * forever in the cursor equals case.
+			 */
+			for (ret = 0;;) {
 				if (stop != NULL &&
 				    __cursor_equals(start, stop))
 					break;
