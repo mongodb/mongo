@@ -30,21 +30,20 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
-#include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <string>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/client/parallel.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
-#include "mongo/s/request.h"
 
 namespace mongo {
 
-    class ShardedClientCursor : boost::noncopyable {
+    class QueryMessage;
+
+
+    class ShardedClientCursor {
+        MONGO_DISALLOW_COPYING(ShardedClientCursor);
     public:
         ShardedClientCursor( QueryMessage& q , ParallelSortClusteredCursor * cursor );
         virtual ~ShardedClientCursor();
@@ -57,14 +56,6 @@ namespace mongo {
         int getTotalSent() const;
 
         /**
-         * Sends queries to the shards, gather the result for this batch and sends the response
-         * to the socket.
-         *
-         * @return whether there is more data left
-         */
-        bool sendNextBatchAndReply( Request& r );
-
-        /**
          * Sends queries to the shards and gather the result for this batch.
          *
          * @param r The request object from the client
@@ -75,7 +66,7 @@ namespace mongo {
          *
          * @return true if this is not the final batch.
          */
-        bool sendNextBatch( Request& r, int ntoreturn, BufBuilder& buffer, int& docCount );
+        bool sendNextBatch(int ntoreturn, BufBuilder& buffer, int& docCount);
 
         void accessed();
         /** @return idle time in ms */

@@ -213,7 +213,7 @@ namespace mongo {
             BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
             int docCount = 0;
             const int startFrom = cc->getTotalSent();
-            bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+            bool hasMore = cc->sendNextBatch(q.ntoreturn, buffer, docCount);
 
             if ( hasMore ) {
                 LOG(5) << "storing cursor : " << cc->getId() << endl;
@@ -661,7 +661,7 @@ namespace mongo {
             BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
             int docCount = 0;
             const int startFrom = cursor->getTotalSent();
-            bool hasMore = cursor->sendNextBatch( r, ntoreturn, buffer, docCount );
+            bool hasMore = cursor->sendNextBatch(ntoreturn, buffer, docCount);
 
             if ( hasMore ) {
                 // still more data

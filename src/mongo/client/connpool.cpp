@@ -39,7 +39,6 @@
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/s/shard.h"
 
 namespace mongo {
 

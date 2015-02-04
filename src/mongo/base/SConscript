@@ -5,61 +5,34 @@ Import("env")
 env.Command(['error_codes.h', 'error_codes.cpp'], ['generate_error_codes.py', 'error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
-env.Library('base', ['error_codes.cpp',
-                     'global_initializer.cpp',
-                     'global_initializer_registerer.cpp',
-                     'init.cpp',
-                     'initializer.cpp',
-                     'initializer_context.cpp',
-                     'initializer_dependency_graph.cpp',
-                     'validate_locale.cpp',
-                     'make_string_vector.cpp',
-                     'parse_number.cpp',
-                     'status.cpp',
-                     'string_data.cpp',
-                     ],
-                     LIBDEPS=[
-                     '$BUILD_DIR/mongo/quick_exit',
+env.Library('base',
+            ['error_codes.cpp',
+             'global_initializer.cpp',
+             'global_initializer_registerer.cpp',
+             'init.cpp',
+             'initializer.cpp',
+             'initializer_context.cpp',
+             'initializer_dependency_graph.cpp',
+             'validate_locale.cpp',
+             'make_string_vector.cpp',
+             'parse_number.cpp',
+             'status.cpp',
+             'string_data.cpp',
+            ],
+            LIBDEPS=['$BUILD_DIR/mongo/quick_exit',
                      '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                     ])
+            ])
 
-env.CppUnitTest('initializer_dependency_graph_test',
-                ['initializer_dependency_graph_test.cpp'],
-                LIBDEPS=['base'])
-
-env.CppUnitTest('initializer_test',
-                ['initializer_test.cpp'],
-                LIBDEPS=['base'])
-
-env.CppUnitTest('owned_pointer_vector_test',
-                ['owned_pointer_vector_test.cpp'],
-                LIBDEPS=['base'])
-
-env.CppUnitTest('owned_pointer_map_test',
-                ['owned_pointer_map_test.cpp'],
-                LIBDEPS=['base'])
-
-env.CppUnitTest('parse_number_test',
-                ['parse_number_test.cpp'],
-                LIBDEPS=['base'])
-
-env.CppUnitTest('status_test',
-                'status_test.cpp',
-                LIBDEPS=['base'])
-
-env.CppUnitTest('encoded_value_storage_test',
-                'encoded_value_storage_test.cpp')
-
-env.CppUnitTest('data_view_test',
-                'data_view_test.cpp')
-
-env.CppUnitTest('data_cursor_test',
-                'data_cursor_test.cpp')
-
-env.CppUnitTest('counter_test',
-                'counter_test.cpp',
-                LIBDEPS=['base'])
-
-env.CppUnitTest('string_data_test',
-                'string_data_test.cpp',
-                LIBDEPS=['$BUILD_DIR/mongo/unittest/unittest'])
+env.CppUnitTest('base_test',
+                ['initializer_dependency_graph_test.cpp',
+                 'initializer_test.cpp',
+                 'owned_pointer_vector_test.cpp',
+                 'owned_pointer_map_test.cpp',
+                 'parse_number_test.cpp',
+                 'status_test.cpp',
+                 'encoded_value_storage_test.cpp',
+                 'data_view_test.cpp',
+                 'data_cursor_test.cpp',
+                 'counter_test.cpp',
+                 'string_data_test.cpp'
+                ])

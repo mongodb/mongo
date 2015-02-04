@@ -37,7 +37,6 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/export_macros.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
@@ -180,7 +179,7 @@ namespace mongo {
      * There is a deprecated legacy mode as well which effectively does a merge-sort across a number
      * of servers, but does not correctly enforce versioning (used only in mapreduce).
      */
-    class MONGO_CLIENT_API ParallelSortClusteredCursor {
+    class ParallelSortClusteredCursor {
     public:
 
         ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );

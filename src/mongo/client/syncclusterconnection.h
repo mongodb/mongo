@@ -53,7 +53,7 @@ namespace mongo {
      * The class checks if a command is read or write style, and sends to a single
      * node if a read lock command and to all in two phases with a write style command.
      */
-    class MONGO_CLIENT_API SyncClusterConnection : public DBClientBase {
+    class SyncClusterConnection : public DBClientBase {
     public:
 
         using DBClientBase::query;
@@ -195,7 +195,7 @@ namespace mongo {
                                                            int batchSize ) = 0;
     };
 
-    class MONGO_CLIENT_API UpdateNotTheSame : public UserException {
+    class UpdateNotTheSame : public UserException {
     public:
         UpdateNotTheSame( int code , const std::string& msg , const std::vector<std::string>& addrs , const std::vector<BSONObj>& lastErrors )
             : UserException( code , msg ) , _addrs( addrs ) , _lastErrors( lastErrors ) {

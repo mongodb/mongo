@@ -44,7 +44,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/max_time.h"
@@ -140,18 +139,7 @@ namespace mongo {
         return now - _lastAccessMillis;
     }
 
-    bool ShardedClientCursor::sendNextBatchAndReply( Request& r ){
-        BufBuilder buffer( INIT_REPLY_BUFFER_SIZE );
-        int docCount = 0;
-        bool hasMore = sendNextBatch( r, _ntoreturn, buffer, docCount );
-        replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
-                _totalSent, hasMore ? getId() : 0 );
-
-        return hasMore;
-    }
-
-    bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ,
-            BufBuilder& buffer, int& docCount ) {
+    bool ShardedClientCursor::sendNextBatch(int ntoreturn, BufBuilder& buffer, int& docCount) {
         uassert( 10191 ,  "cursor already done" , ! _done );
 
         int maxSize = 1024 * 1024;

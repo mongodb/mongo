@@ -38,7 +38,6 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
-#include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine_v8.h"

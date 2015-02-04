@@ -1577,7 +1577,6 @@ namespace mongo {
                     while ( i.more() ) {
                         BSONElement e = i.next();
                         string shard = e.fieldName();
-//                        BSONObj res = e.embeddedObjectUserCheck();
                         servers.insert( shard );
                     }
                 }
