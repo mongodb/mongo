@@ -48,7 +48,7 @@ static void __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_tree(WT_SESSION_IMPL *, WT_PAGE *, const char *, uint32_t);
 static void __debug_update(WT_DBG *, WT_UPDATE *, int);
 static void __dmsg(WT_DBG *, const char *, ...)
-	WT_GCC_ATTRIBUTE((format (printf, 2, 3)));
+	WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 static void __dmsg_wrapup(WT_DBG *);
 
 /*
@@ -548,7 +548,9 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	session = ds->session;
 
 	/* Dump the page metadata. */
-	WT_RET(__debug_page_metadata(ds, page));
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __debug_page_metadata(ds, page));
+	WT_RET(ret);
 
 	/* Dump the page. */
 	switch (page->type) {

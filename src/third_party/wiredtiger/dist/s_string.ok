@@ -881,6 +881,7 @@ poptable
 pos
 posint
 posix
+pragmas
 pre
 prealloc
 preload

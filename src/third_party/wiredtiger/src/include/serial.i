@@ -245,6 +245,9 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 */
 	__wt_cache_page_inmem_incr(session, page, upd_size);
 
+	/* Mark the page dirty after updating the footprint. */
+	__wt_page_modify_set(session, page);
+
 	/*
 	 * If there are subsequent WT_UPDATE structures, we're evicting pages
 	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
@@ -263,9 +266,6 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 		if (obsolete != NULL)
 			__wt_update_obsolete_free(session, page, obsolete);
 	}
-
-	/* Mark the page dirty after updating the footprint. */
-	__wt_page_modify_set(session, page);
 
 	return (0);
 }

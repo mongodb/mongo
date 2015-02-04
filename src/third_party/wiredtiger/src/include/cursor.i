@@ -164,8 +164,11 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 
 	dhandle = session->dhandle;
 
+	/* If we close a handle with a time of death set, clear it. */
 	WT_ASSERT(session, dhandle->session_inuse > 0);
-	(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+	if (WT_ATOMIC_SUB4(dhandle->session_inuse, 1) == 0 &&
+	    dhandle->timeofdeath != 0)
+		dhandle->timeofdeath = 0;
 }
 
 /*

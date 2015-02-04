@@ -192,7 +192,7 @@ struct __wt_page_modify {
 	uint64_t inmem_split_txn;
 
 	/* Dirty bytes added to the cache. */
-	uint64_t bytes_dirty;
+	size_t bytes_dirty;
 
 	/*
 	 * When pages are reconciled, the result is one or more replacement
@@ -532,7 +532,7 @@ struct __wt_page {
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
-	uint64_t memory_footprint;	/* Memory attached to the page */
+	size_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_IS_INTERNAL(page)					\
 	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
@@ -759,11 +759,11 @@ struct __wt_col {
  * with RLE counts greater than 1 when reading the page.  We can do a binary
  * search in this array, then an offset calculation to find the cell.
  */
-struct __wt_col_rle {
+WT_PACKED_STRUCT_BEGIN(__wt_col_rle)
 	uint64_t recno;			/* Record number of first repeat. */
 	uint64_t rle;			/* Repeat count. */
 	uint32_t indx;			/* Slot of entry in col_var.d */
-} WT_GCC_ATTRIBUTE((packed));
+WT_PACKED_STRUCT_END
 
 /*
  * WT_COL_PTR, WT_COL_PTR_SET --
@@ -827,7 +827,7 @@ struct __wt_ikey {
  * is done for an entry, WT_UPDATE structures are formed into a forward-linked
  * list.
  */
-struct __wt_update {
+WT_PACKED_STRUCT_BEGIN(__wt_update)
 	uint64_t txnid;			/* update transaction */
 
 	WT_UPDATE *next;		/* forward-linked list */
@@ -846,7 +846,7 @@ struct __wt_update {
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\
 	((void *)((uint8_t *)(upd) + sizeof(WT_UPDATE)))
-} WT_GCC_ATTRIBUTE((packed));
+};
 
 /*
  * WT_INSERT --
@@ -1004,11 +1004,18 @@ struct __wt_insert_head {
  * already have a split generation, leave it alone.  If our caller is examining
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
+ *
+ * Check that we haven't raced with a split_gen update after publishing: we
+ * rely on the published value not being missed when scanning for the oldest
+ * active split_gen.
  */
 #define	WT_ENTER_PAGE_INDEX(session) do {				\
 	uint64_t __prev_split_gen = (session)->split_gen;		\
 	if (__prev_split_gen == 0)					\
-		WT_PUBLISH((session)->split_gen, S2C(session)->split_gen)
+		do {                                                    \
+			WT_PUBLISH((session)->split_gen,                \
+			    S2C(session)->split_gen);                   \
+		} while ((session)->split_gen != S2C(session)->split_gen)
 
 #define	WT_LEAVE_PAGE_INDEX(session)					\
 	if (__prev_split_gen == 0)					\

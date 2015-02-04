@@ -448,15 +448,15 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 			continue;
 		cache = entry->cache;
 		++entries;
-		new = cache->bytes_evict;
+		new = cache->bytes_read;
 		/* Handle wrapping of eviction requests. */
-		if (new >= cache->cp_saved_evict)
-			cache->cp_current_evict = new - cache->cp_saved_evict;
+		if (new >= cache->cp_saved_read)
+			cache->cp_current_read = new - cache->cp_saved_read;
 		else
-			cache->cp_current_evict = new;
-		cache->cp_saved_evict = new;
-		if (cache->cp_current_evict > highest)
-			highest = cache->cp_current_evict;
+			cache->cp_current_read = new;
+		cache->cp_saved_read = new;
+		if (cache->cp_current_read > highest)
+			highest = cache->cp_current_read;
 	}
 	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
@@ -501,7 +501,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		reserved = cache->cp_reserved;
 		adjusted = 0;
 
-		read_pressure = cache->cp_current_evict / highest;
+		read_pressure = cache->cp_current_read / highest;
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count));

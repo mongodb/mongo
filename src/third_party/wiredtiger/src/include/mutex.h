@@ -68,15 +68,15 @@ struct __wt_rwlock {
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
-typedef volatile int
-    WT_SPINLOCK WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
+typedef volatile int WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT)
+    WT_SPINLOCK;
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
 	SPINLOCK_TYPE == SPINLOCK_MSVC ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
-typedef struct {
+typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	wt_mutex_t lock;
 
 	uint64_t counter;		/* Statistics: counter */
@@ -85,7 +85,7 @@ typedef struct {
 	int8_t id;			/* Statistics: current holder ID */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
-} WT_SPINLOCK WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
+} WT_SPINLOCK;
 
 #else
 
