@@ -1,6 +1,10 @@
 # -*- mode: python; -*-
 import re
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
 import textwrap
 import distutils.sysconfig
 
@@ -10,33 +14,51 @@ if not os.sys.platform == "win32":
     print ("SConstruct is only supported for Windows, use build_posix for other platforms")
     Exit(1)
 
-AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
-          help="Berkeley DB install path, ie, /usr/local")
+# Command line options
+#
+AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=False,
+          help="Link with the MSVCRT DLL version")
 
-AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
-          help="Use zlib compression")
+AddOption("--enable-attach", dest="attach", action="store_true", default=False,
+          help="Configure for debugger attach on failure.")
+
+AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default=False,
+          help="Configure WiredTiger to perform various run-time diagnostic tests. DO NOT configure this option in production environments.")
+
+AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action="store",
+          help="Build Python extension, specify location of swig.exe binary")
 
 AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="store",
           help="Use snappy compression")
 
-AddOption("--enable-swig", dest="swig", type="string", nargs=1, action="store",
-          help="Build python extension, specify location of swig.exe binary")
+AddOption("--enable-verbose", dest="verbose", action="store_true", default=False,
+          help="Configure WiredTiger to support the verbose configuration string to wiredtiger_open")
 
-AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=False,
-          help="Link with the MSVCRT DLL version")
+AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
+          help="Use zlib compression")
 
+AddOption("--prefix", dest="prefix", type="string", nargs=1, action="store", default="package",
+          help="Install directory")
+
+AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
+          help="Berkeley DB install path, ie, /usr/local")
+
+# Get the swig binary from the command line option since SCONS cannot find it automatically
+#
+swig_binary = GetOption("lang-python")
+
+# Initialize environment
+#
 env = Environment(
     CPPPATH = ["#/src/include/",
                "#/build_win",
                "#/test/windows",
                "#/.",
-               distutils.sysconfig.get_python_inc()
            ],
-    #CPPDEFINES = ["HAVE_DIAGNOSTIC", "HAVE_VERBOSE"],
     CFLAGS = [
         "/Z7", # Generate debugging symbols
         "/wd4090", # Ignore warning about mismatched const qualifiers
-        "/wd4996", 
+        "/wd4996",
         "/W3", # Warning level 3
         "/we4013", # Error on undefined functions
         "/TC", # Compile as C code
@@ -59,16 +81,11 @@ env = Environment(
         "/DYNAMICBASE",
         "/NXCOMPAT",
         ],
-    LIBPATH=[ distutils.sysconfig.PREFIX + r"\libs"],
     tools=["default", "swig", "textfile"],
-    SWIGFLAGS=['-python',
-               "-threads",
-               "-O",
-               "-nodefaultctor",
-               "-nodefaultdtor"
-    ],
-    SWIG=GetOption("swig")
+    SWIG=swig_binary
 )
+
+env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 
 useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
@@ -109,7 +126,24 @@ if useBdb:
 
 env = conf.Finish()
 
+# Configure build environment variables
+#
+if GetOption("attach"):
+    env.Append(CPPDEFINES = ["HAVE_ATTACH"])
 
+if GetOption("diagnostic"):
+    env.Append(CPPDEFINES = ["HAVE_DIAGNOSTIC"])
+
+if GetOption("lang-python"):
+    env.Append(LIBPATH=[distutils.sysconfig.PREFIX + r"\libs"])
+    env.Append(CPPPATH=[distutils.sysconfig.get_python_inc()])
+
+if GetOption("verbose"):
+    env.Append(CPPDEFINES = ["HAVE_VERBOSE"])
+
+
+# Build WiredTiger.h file
+#
 version_file = 'build_posix/aclocal/version-set.m4'
 
 VERSION_MAJOR = None
@@ -147,7 +181,7 @@ replacements = {
     '@wiredtiger_includes_decl@': wiredtiger_includes
 }
 
-env.Substfile(
+wtheader = env.Substfile(
     target='wiredtiger.h',
     source=[
         'src/include/wiredtiger.in',
@@ -170,11 +204,27 @@ if useZlib:
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
 
-wtlib = env.Library("wiredtiger", wtsources)
+wt_objs = [env.Object(a) for a in wtsources]
+
+# Static Library - libwiredtiger.lib
+#
+wtlib = env.Library(
+    target="libwiredtiger",
+    source=wt_objs, LIBS=wtlibs)
 
 env.Depends(wtlib, [filelistfile, version_file])
 
-env.Program("wt", [
+# Dynamically Loaded Library - wiredtiger.dll
+#
+wtdll = env.SharedLibrary(
+    target="wiredtiger",
+    source=wt_objs + ['build_win/wiredtiger.def'], LIBS=wtlibs)
+
+env.Depends(wtdll, [filelistfile, version_file])
+
+Default(wtlib, wtdll)
+
+wtbin = env.Program("wt", [
     "src/utilities/util_backup.c",
     "src/utilities/util_cpyright.c",
     "src/utilities/util_compact.c",
@@ -198,27 +248,48 @@ env.Program("wt", [
     "src/utilities/util_write.c"],
     LIBS=[wtlib] + wtlibs)
 
-if GetOption("swig"):
-    swiglib = env.SharedLibrary('_wiredtiger',
+Default(wtbin)
+
+# Python SWIG wrapper for WiredTiger
+if GetOption("lang-python"):
+    # Check that this version of python is 64-bit
+    #
+    if sys.maxsize < 2**32:
+        print "The Python Interpreter must be 64-bit in order to build the python bindings"
+        Exit(1)
+
+    pythonEnv = env.Clone()
+    pythonEnv.Append(SWIGFLAGS=[
+            "-python",
+            "-threads",
+            "-O",
+            "-nodefaultctor",
+            "-nodefaultdtor",
+            ])
+
+    swiglib = pythonEnv.SharedLibrary('_wiredtiger',
                       [ 'lang\python\wiredtiger.i'],
                       SHLIBSUFFIX=".pyd",
-                      LIBS=[wtlib])
+                      LIBS=[wtlib] + wtlibs)
 
-    copySwig = env.Command(
+    copySwig = pythonEnv.Command(
         'lang/python/wiredtiger/__init__.py',
         'lang/python/wiredtiger.py',
         Copy('$TARGET', '$SOURCE'))
-    env.Depends(copySwig, swiglib)
+    pythonEnv.Depends(copySwig, swiglib)
 
-    env.Install('lang/python/wiredtiger/', swiglib)
+    swiginstall = pythonEnv.Install('lang/python/wiredtiger/', swiglib)
+
+    Default(swiginstall, copySwig)
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",
         ["test/windows/windows_shim.c"])
 
-env.Program("t_bloom",
+t = env.Program("t_bloom",
     "test/bloom/test_bloom.c",
-    LIBS=[wtlib])
+    LIBS=[wtlib] + wtlibs)
+Default(t)
 
 #env.Program("t_checkpoint",
     #["test/checkpoint/checkpointer.c",
@@ -226,9 +297,10 @@ env.Program("t_bloom",
     #"test/checkpoint/workers.c"],
     #LIBS=[wtlib])
 
-env.Program("t_huge",
+t = env.Program("t_huge",
     "test/huge/huge.c",
-    LIBS=[wtlib])
+    LIBS=[wtlib] + wtlibs)
+Default(t)
 
 #env.Program("t_fops",
     #["test/fops/file.c",
@@ -241,7 +313,7 @@ if useBdb:
 
     benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
 
-    benv.Program("t_format",
+    t = benv.Program("t_format",
         ["test/format/backup.c",
         "test/format/bdb.c",
         "test/format/bulk.c",
@@ -252,7 +324,8 @@ if useBdb:
         "test/format/t.c",
         "test/format/util.c",
         "test/format/wts.c"],
-         LIBS=[wtlib, shim, "libdb61"])
+         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
+    Default(t)
 
 #env.Program("t_thread",
     #["test/thread/file.c",
@@ -265,13 +338,14 @@ if useBdb:
     #["test/salvage/salvage.c"],
     #LIBS=[wtlib])
 
-env.Program("wtperf", [
+t = env.Program("wtperf", [
     "bench/wtperf/config.c",
     "bench/wtperf/misc.c",
     "bench/wtperf/track.c",
     "bench/wtperf/wtperf.c",
     ],
-    LIBS=[wtlib, shim] )
+    LIBS=[wtlib, shim]  + wtlibs)
+Default(t)
 
 examples = [
     "ex_access",
@@ -293,9 +367,52 @@ examples = [
     "ex_thread",
     ]
 
-for ex in examples:
-    if(ex in ['ex_async', 'ex_thread']):
-        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim])
-    else:
-        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib])
+# WiredTiger Smoke Test suppor
+# Runs each test in a custom temporary directory
+#
+def run_smoke_test(x):
+    print "Running Smoke Test: " + x
 
+    # Make temp dir
+    temp_dir = tempfile.mkdtemp(prefix="wt_home")
+
+    try:
+        # Set WT_HOME environment variable for test
+        os.environ["WIREDTIGER_HOME"] = temp_dir
+
+        # Run the test
+        ret = subprocess.call(x);
+        if( ret != 0):
+            sys.stderr.write("Bad exit code %d\n" % (ret))
+            raise Exception()
+
+    finally:
+        # Clean directory
+        #
+        shutil.rmtree(temp_dir)
+
+def builder_smoke_test(target, source, env):
+    run_smoke_test(source[0].abspath)
+    return None
+
+env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
+
+for ex in examples:
+    if(ex in ['ex_all', 'ex_async', 'ex_thread']):
+        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
+        Default(exp)
+        env.Alias("check", env.SmokeTest(exp))
+    else:
+        exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtdll[1]] + wtlibs)
+        Default(exp)
+        if not ex == 'ex_log':
+            env.Alias("check", env.SmokeTest(exp))
+
+# Install Target
+#
+prefix = GetOption("prefix")
+env.Alias("install", env.Install(os.path.join(prefix, "bin"), wtbin))
+env.Alias("install", env.Install(os.path.join(prefix, "bin"), wtdll[0])) # Just the dll
+env.Alias("install", env.Install(os.path.join(prefix, "include"), wtheader))
+env.Alias("install", env.Install(os.path.join(prefix, "lib"), wtdll[1])) # Just the import lib
+env.Alias("install", env.Install(os.path.join(prefix, "lib"), wtlib))

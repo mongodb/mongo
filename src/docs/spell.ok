@@ -1,5 +1,6 @@
 personal_ws-1.1 en 200
 ACM
+ActiveState
 APIs
 Adler's
 Atomicity
@@ -64,6 +65,7 @@ Riak
 RocksDB
 Roelofs
 Rrx
+SCons
 Seward's
 SiH
 TXT
@@ -161,6 +163,7 @@ destructors
 dev
 distclean
 dl
+dll
 dlp
 dontlock
 dp
@@ -181,6 +184,7 @@ env
 eof
 erlang
 errno
+exe
 fadvise
 failchk
 fd's
@@ -371,6 +375,7 @@ sHq
 scalable
 scanf
 schemas
+scons
 selectable
 seqname
 seqno

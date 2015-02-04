@@ -12,7 +12,7 @@ static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
-static int __btree_tree_open_empty(WT_SESSION_IMPL *, int, int);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
 
 /*
  * __wt_btree_open --
@@ -100,8 +100,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
 		if (creation || root_addr_size == 0)
-			WT_ERR(__btree_tree_open_empty(
-			    session, creation, readonly));
+			WT_ERR(__btree_tree_open_empty(session, creation));
 		else {
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
@@ -391,16 +390,17 @@ err:		__wt_buf_free(session, &dsk);
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_PAGE *root, *leaf;
+	WT_PAGE *leaf, *root;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref;
 
 	btree = S2BT(session);
 	root = leaf = NULL;
+	ref = NULL;
 
 	/*
 	 * Newly created objects can be used for cursor inserts or for bulk
@@ -414,13 +414,10 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 	}
 
 	/*
-	 * A note about empty trees: the initial tree is a root page and a leaf
-	 * page.  We need a pair of pages instead of just a single page because
-	 * we can reconcile the leaf page while the root stays pinned in memory.
-	 * If the pair is evicted without being modified, that's OK, nothing is
-	 * ever written.
-	 *
-	 * Create the root and leaf pages.
+	 * A note about empty trees: the initial tree is a single root page.
+	 * It has a single reference to a leaf page, marked deleted.  The leaf
+	 * page will be created by the first update.  If the root is evicted
+	 * without being modified, that's OK, nothing is ever written.
 	 *
 	 * !!!
 	 * Be cautious about changing the order of updates in this code: to call
@@ -437,10 +434,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		pindex = WT_INTL_INDEX_COPY(root);
 		ref = pindex->index[0];
 		ref->home = root;
-		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
-		ref->page = leaf;
+		ref->page = NULL;
 		ref->addr = NULL;
-		ref->state = WT_REF_MEM;
+		ref->state = WT_REF_DELETED;
 		ref->key.recno = 1;
 		break;
 	case BTREE_ROW:
@@ -451,48 +447,20 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation, int readonly)
 		pindex = WT_INTL_INDEX_COPY(root);
 		ref = pindex->index[0];
 		ref->home = root;
-		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
-		ref->page = leaf;
+		ref->page = NULL;
 		ref->addr = NULL;
-		ref->state = WT_REF_MEM;
+		ref->state = WT_REF_DELETED;
 		WT_ERR(__wt_row_ikey_incr(
 		    session, root, 0, "", 1, &ref->key.ikey));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	/*
-	 * Mark the leaf page dirty: we didn't create an entirely valid root
-	 * page (specifically, the root page's disk address isn't set, and it's
-	 * the act of reconciling the leaf page that makes it work, we don't
-	 * try and use the original disk address of modified pages).  We could
-	 * get around that by leaving the leaf page clean and building a better
-	 * root page, but then we get into trouble because a checkpoint marks
-	 * the root page dirty to force a write, and without reconciling the
-	 * leaf page we won't realize there's no records to write, we'll write
-	 * a root page, which isn't correct for an empty tree.
-	 *
-	 * Earlier versions of this code kept the leaf page clean, but with the
-	 * "empty" flag set in the leaf page's modification structure; in that
-	 * case, checkpoints works (forced reconciliation of a root with a
-	 * single "empty" page wouldn't write any blocks). That version had
-	 * memory leaks because the eviction code didn't correctly handle pages
-	 * that were "clean" (and so never reconciled), yet "modified" with an
-	 * "empty" flag.  The goal of this code is to mimic a real tree that
-	 * simply has no records, for whatever reason, and trust reconciliation
-	 * to figure out it's empty and not write any blocks.
-	 *
-	 * We do not set the tree's modified flag because the checkpoint code
-	 * skips unmodified files in closing checkpoints (checkpoints that
-	 * don't require a write unless the file is actually dirty).  There's
-	 * no need to reconcile this file unless the application does a real
-	 * checkpoint or it's actually modified.
-	 *
-	 * Only do this for a live tree, not for checkpoints.  If we open an
-	 * empty checkpoint, the leaf page cannot be dirty or eviction may try
-	 * to write it, which will fail because checkpoints are read-only.
-	 */
-	if (!readonly) {
+	/* Bulk loads require a leaf page for reconciliation: create it now. */
+	if (F_ISSET(btree, WT_BTREE_BULK)) {
+		WT_ERR(__wt_btree_new_leaf_page(session, &leaf));
+		ref->page = leaf;
+		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_page_modify_init(session, leaf));
 		__wt_page_only_modify_set(session, leaf);
 	}
@@ -674,6 +642,22 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree->split_pct = (int)cval.val;
 	intl_split_size = __wt_split_page_size(btree, btree->maxintlpage);
 	leaf_split_size = __wt_split_page_size(btree, btree->maxleafpage);
+
+	/*
+	 * In-memory split configuration.
+	 */
+	if (__wt_config_gets(
+	    session, cfg, "split_deepen_min_child", &cval) == WT_NOTFOUND ||
+	    cval.val == 0)
+		btree->split_deepen_min_child = WT_SPLIT_DEEPEN_MIN_CHILD_DEF;
+	else
+		btree->split_deepen_min_child = (u_int)cval.val;
+	if (__wt_config_gets(
+	    session, cfg, "split_deepen_per_child", &cval) == WT_NOTFOUND ||
+	    cval.val == 0)
+		btree->split_deepen_per_child = WT_SPLIT_DEEPEN_PER_CHILD_DEF;
+	else
+		btree->split_deepen_per_child = (u_int)cval.val;
 
 	/*
 	 * Get the maximum internal/leaf page key/value sizes.

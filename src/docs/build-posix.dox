@@ -1,11 +1,9 @@
-/*! @page install Building and installing WiredTiger
+/*! @page build-posix Building and installing WiredTiger on POSIX
 
-This section explains how to build and install the WiredTiger software.
-
-@section github Building using Git and GitHub
+@section posix_github Building using Git and GitHub
 
 Skip this step if you are building from a WiredTiger release package,
-and proceed with @ref building.
+and proceed with @ref posix_building.
 
 To build from the WiredTiger GitHub repository requires
 <a href="http://git-scm.com/">git</a>,
@@ -28,11 +26,11 @@ cd wiredtiger
 sh autogen.sh
 @endcode
 
-Now proceed with @ref building.
+Now proceed with @ref posix_building.
 
-@section building Building WiredTiger
+@section posix_building Building WiredTiger
 
-To build the WiredTiger software on a POSIX-like system, change directory to
+To build the WiredTiger software on a POSIX system, change directory to
 the top-level directory, then configure and build the software:
 
 @code
@@ -60,7 +58,7 @@ and <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a>
 to create the configure script and Makefiles.  The standard options for those
 tools can be specified when configuring and building WiredTiger.
 
-@section installing Installing WiredTiger
+@section posix_installing Installing WiredTiger
 
 The WiredTiger software consists of a library and a single standalone
 utility.
@@ -110,7 +108,7 @@ a different location:
 ./configure --prefix=/c/wiredtiger
 @endcode
 
-@section configure Configuring WiredTiger
+@section posix_configure Configuring WiredTiger
 
 The WiredTiger software supports some additional configuration options:
 
@@ -169,7 +167,7 @@ WiredTiger to use POSIX 1003.1c pthread mutexes configured to be
 adaptive (where that functionality is available), or \c gcc (which
 configures WiredTiger to use gcc-based spinlocks).
 
-@section compiler Changing compiler or loader options
+@section posix_compiler Changing compiler or loader options
 
 To change the compiler or loader behavior during the build, use the
 <code>CC</code>, <code>CFLAGS</code>, <code>LDFLAGS</code>, or
