@@ -58,7 +58,9 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -124,6 +126,11 @@ namespace mongo {
             // XXX: can probably take dblock instead
             scoped_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
             scoped_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
+            uassert(ErrorCodes::NotMaster,
+                    str::stream() << "Not primary while cloning collection " << from_collection.ns()
+                                  << " to " << to_collection.ns(),
+                    !logForRepl ||
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(_dbName));
 
             // Make sure database still exists after we resume from the temp release
             Database* db = dbHolder().openDb(txn, _dbName);
@@ -278,6 +285,13 @@ namespace mongo {
             _conn->query(stdx::function<void(DBClientCursorBatchIterator &)>(f), from_collection,
                          query, 0, options);
         }
+
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while cloning collection " << from_collection.ns()
+                              << " to " << to_collection.ns() << " with filter "
+                              << query.toString(),
+                !logForRepl ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
     }
 
     void Cloner::copyIndexes(OperationContext* txn,
@@ -304,6 +318,13 @@ namespace mongo {
                 indexesToBuild.push_back(fixindex(to_collection.db().toString(), *it));
             }
         }
+
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while copying indexes from " << from_collection.ns()
+                              << " to " << to_collection.ns() << " (Cloner)",
+                !logForRepl ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
+
 
         if (indexesToBuild.empty())
             return;
@@ -367,6 +388,11 @@ namespace mongo {
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbWrite(txn->lockState(), dbname, MODE_X);
+
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
+                !logForRepl ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname));
 
         Database* db = dbHolder().openDb(txn, dbname);
 
@@ -535,6 +561,12 @@ namespace mongo {
                 toClone.push_back( collection.getOwned() );
             }
         }
+
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while cloning database " << opts.fromDB
+                              << " (after getting list of collections to clone)",
+                !opts.logForRepl ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
 
         if ( opts.syncData ) {
             for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
