@@ -400,6 +400,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 
 	btree = S2BT(session);
 	root = leaf = NULL;
+	ref = NULL;
 
 	/*
 	 * Newly created objects can be used for cursor inserts or for bulk
