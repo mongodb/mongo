@@ -31,6 +31,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -425,12 +426,25 @@ namespace mongo {
         // the "inner" executor. This is bad, and hopefully can be fixed down the line with the
         // unification of agg and query.
         //
+        // The CachedPlanStage is another special case. It needs to update the plan cache from
+        // its destructor. It needs to know whether it has been killed so that it can avoid
+        // touching a potentially invalid plan cache in this case.
+        //
         // TODO: get rid of this code block.
-        if (STAGE_PIPELINE_PROXY == _root->stageType()) {
-            PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(_root.get());
-            shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
-            if (childExec) {
-                childExec->kill();
+        {
+            PlanStage* foundStage = getStageByType(_root.get(), STAGE_PIPELINE_PROXY);
+            if (foundStage) {
+                PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(foundStage);
+                shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
+                if (childExec) {
+                    childExec->kill();
+                }
+            }
+
+            foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
+            if (foundStage) {
+                CachedPlanStage* cacheStage = static_cast<CachedPlanStage*>(foundStage);
+                cacheStage->kill();
             }
         }
     }
