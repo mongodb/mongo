@@ -192,7 +192,7 @@ struct __wt_page_modify {
 	uint64_t inmem_split_txn;
 
 	/* Dirty bytes added to the cache. */
-	uint64_t bytes_dirty;
+	size_t bytes_dirty;
 
 	/*
 	 * When pages are reconciled, the result is one or more replacement
@@ -532,7 +532,7 @@ struct __wt_page {
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
 
-	uint64_t memory_footprint;	/* Memory attached to the page */
+	size_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_IS_INTERNAL(page)					\
 	((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
@@ -1004,11 +1004,18 @@ struct __wt_insert_head {
  * already have a split generation, leave it alone.  If our caller is examining
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
+ *
+ * Check that we haven't raced with a split_gen update after publishing: we
+ * rely on the published value not being missed when scanning for the oldest
+ * active split_gen.
  */
 #define	WT_ENTER_PAGE_INDEX(session) do {				\
 	uint64_t __prev_split_gen = (session)->split_gen;		\
 	if (__prev_split_gen == 0)					\
-		WT_PUBLISH((session)->split_gen, S2C(session)->split_gen)
+		do {                                                    \
+			WT_PUBLISH((session)->split_gen,                \
+			    S2C(session)->split_gen);                   \
+		} while ((session)->split_gen != S2C(session)->split_gen)
 
 #define	WT_LEAVE_PAGE_INDEX(session)					\
 	if (__prev_split_gen == 0)					\
