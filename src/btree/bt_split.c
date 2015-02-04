@@ -685,9 +685,7 @@ __split_multi_inmem(
 			recno = WT_INSERT_RECNO(skip->ins);
 
 			/* Search the page. */
-			WT_WITH_PAGE_INDEX(session,
-			    ret = __wt_col_search(session, recno, ref, &cbt));
-			WT_ERR(ret);
+			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
 
 			/* Apply the modification. */
 			WT_ERR(__wt_col_modify(
@@ -711,9 +709,7 @@ __split_multi_inmem(
 			}
 
 			/* Search the page. */
-			WT_WITH_PAGE_INDEX(session,
-			    ret = __wt_row_search(session, key, ref, &cbt, 1));
-			WT_ERR(ret);
+			WT_ERR(__wt_row_search(session, key, ref, &cbt, 1));
 
 			/* Apply the modification. */
 			WT_ERR(
@@ -1065,8 +1061,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		 */
 		uint64_t __a, __b;
 		__a = parent->memory_footprint;
-		WT_WITH_PAGE_INDEX(session,
-		    ret = __split_deepen(session, parent, children));
+		ret = __split_deepen(session, parent, children);
 		__b = parent->memory_footprint;
 		if (__b * 2 >= __a)
 			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
@@ -1363,10 +1358,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
-	WT_WITH_PAGE_INDEX(session,
-	    ret = __split_parent(session, ref, split_ref, 2,
-	    parent_decr, parent_incr, 0, 0, &split_gen));
-	if (ret != 0) {
+	if ((ret = __split_parent(session, ref, split_ref, 2,
+	    parent_decr, parent_incr, 0, 0, &split_gen)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1518,10 +1511,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			    parent_decr, sizeof(WT_IKEY) + ikey->size);
 
 	/* Split into the parent. */
-	WT_WITH_PAGE_INDEX(session,
-	    ret = __split_parent(session, ref, ref_new, new_entries,
+	WT_ERR(__split_parent(session, ref, ref_new, new_entries,
 	    parent_decr, parent_incr, exclusive, 1, &split_gen));
-	WT_ERR(ret);
 
 	__wt_free(session, ref_new);
 

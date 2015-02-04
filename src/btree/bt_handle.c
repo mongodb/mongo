@@ -99,18 +99,15 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
-		if (creation || root_addr_size == 0) {
-			WT_WITH_PAGE_INDEX(session,
-			    ret = __btree_tree_open_empty(
+		if (creation || root_addr_size == 0)
+			WT_ERR(__btree_tree_open_empty(
 			    session, creation, readonly));
-			WT_ERR(ret);
-		} else {
+		else {
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
 
 			/* Warm the cache, if possible. */
-			WT_WITH_PAGE_INDEX(session,
-			    ret = __btree_preload(session));
+			ret = __btree_preload(session);
 			WT_ERR(ret);
 
 			/* Get the last record number in a column-store file. */
