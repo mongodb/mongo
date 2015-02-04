@@ -440,8 +440,11 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * Root pages are special, splits have to be done, we can't put it off
 	 * as the parent's problem any more.
 	 */
-	if (__wt_ref_is_root(ref))
-		return (__rec_root_write(session, page, flags));
+	if (__wt_ref_is_root(ref)) {
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __rec_root_write(session, page, flags));
+		return (ret);
+	}
 
 	/*
 	 * Otherwise, mark the page's parent dirty.
@@ -504,6 +507,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ILLEGAL_VALUE(session);
 	}
 
+	WT_ASSERT(session, session->split_gen != 0);
 	pindex = WT_INTL_INDEX_COPY(next);
 	for (i = 0; i < mod->mod_multi_entries; ++i) {
 		WT_ERR(__wt_multi_to_ref(session,

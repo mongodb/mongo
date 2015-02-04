@@ -42,7 +42,8 @@ __split_oldest_gen(WT_SESSION_IMPL *session)
  *	Add a new entry into the session's split stash list.
  */
 static int
-__split_stash_add(WT_SESSION_IMPL *session, void *p, size_t len)
+__split_stash_add(
+    WT_SESSION_IMPL *session, uint64_t split_gen, void *p, size_t len)
 {
 	WT_SPLIT_STASH *stash;
 
@@ -53,7 +54,7 @@ __split_stash_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	    session->split_stash_cnt + 1, &session->split_stash));
 
 	stash = session->split_stash + session->split_stash_cnt++;
-	stash->split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
+	stash->split_gen = split_gen;
 	stash->p = p;
 	stash->len = len;
 
@@ -143,14 +144,14 @@ __wt_split_stash_discard_all(
  *	it to be freed otherwise.
  */
 static int
-__split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
+__split_safe_free(WT_SESSION_IMPL *session,
+    uint64_t split_gen, int exclusive, void *p, size_t s)
 {
 	/*
 	 * We have swapped something in a page: if we don't have exclusive
 	 * access, check whether there are other threads in the same tree.
 	 */
-	if (!exclusive &&
-	    __split_oldest_gen(session) == S2C(session)->split_gen + 1)
+	if (!exclusive && __split_oldest_gen(session) > split_gen)
 		exclusive = 1;
 
 	if (exclusive) {
@@ -158,7 +159,7 @@ __split_safe_free(WT_SESSION_IMPL *session, int exclusive, void *p, size_t s)
 		return (0);
 	}
 
-	return (__split_stash_add(session, p, s));
+	return (__split_stash_add(session, split_gen, p, s));
 }
 
 /*
@@ -380,6 +381,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	WT_REF **alloc_refp;
 	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
+	uint64_t split_gen;
 	uint32_t chunk, i, j, remain, slots;
 	int panic;
 	void *p;
@@ -514,6 +516,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 * needs to be paid.
 	 */
 	WT_INTL_INDEX_SET(parent, alloc_index);
+	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -583,7 +586,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 * be using the new index.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_ERR(__split_safe_free(session, 0, pindex, size));
+	WT_ERR(__split_safe_free(session, split_gen, 0, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -784,7 +787,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
     uint32_t new_entries, size_t parent_decr, size_t parent_incr,
-    int exclusive, int ref_discard)
+    int exclusive, int ref_discard, uint64_t *split_genp)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -792,6 +795,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_PAGE_INDEX *alloc_index, *pindex;
 	WT_REF **alloc_refp, *next_ref, *parent_ref;
 	size_t size;
+	uint64_t split_gen;
 	uint32_t children, i, j;
 	uint32_t deleted_entries, parent_entries, result_entries;
 	int complete, hazard, locked;
@@ -898,6 +902,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * to threads descending the tree.
 	 */
 	WT_INTL_INDEX_SET(parent, alloc_index);
+	split_gen = *split_genp = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -944,7 +949,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 				if (ikey != NULL) {
 					size = sizeof(WT_IKEY) + ikey->size;
 					WT_TRET(__split_safe_free(
-					    session, 0, ikey, size));
+					    session, split_gen, 0, ikey, size));
 					parent_decr += size;
 				}
 				/*
@@ -962,7 +967,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 			}
 
 			WT_TRET(__split_safe_free(
-			    session, 0, next_ref, sizeof(WT_REF)));
+			    session, split_gen, 0, next_ref, sizeof(WT_REF)));
 			parent_decr += sizeof(WT_REF);
 		}
 	}
@@ -972,7 +977,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * Add it to the session discard list, to be freed when it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__split_safe_free(session, exclusive, pindex, size));
+	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1027,8 +1032,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		 */
 		uint64_t __a, __b;
 		__a = parent->memory_footprint;
-		WT_WITH_PAGE_INDEX(session,
-		    ret = __split_deepen(session, parent, children));
+		ret = __split_deepen(session, parent, children);
 		__b = parent->memory_footprint;
 		if (__b * 2 >= __a)
 			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
@@ -1076,6 +1080,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_PAGE *page, *right;
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	size_t page_decr, parent_decr, parent_incr, right_incr;
+	uint64_t split_gen;
 	int i;
 
 	*splitp = 0;
@@ -1328,8 +1333,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
-	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_decr, parent_incr, 0, 0)) != 0) {
+	if ((ret = __split_parent(session, ref, split_ref, 2,
+	    parent_decr, parent_incr, 0, 0, &split_gen)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1366,8 +1371,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	 if (ikey != NULL)
 		WT_TRET(__split_safe_free(
-		    session, 0, ikey, sizeof(WT_IKEY) + ikey->size));
-	WT_TRET(__split_safe_free(session, 0, ref, sizeof(WT_REF)));
+		    session, split_gen, 0, ikey, sizeof(WT_IKEY) + ikey->size));
+	WT_TRET(__split_safe_free(session, split_gen, 0, ref, sizeof(WT_REF)));
 
 	/*
 	 * A note on error handling: if we completed the split, return success,
@@ -1450,6 +1455,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_PAGE_MODIFY *mod;
 	WT_REF **ref_new;
 	size_t parent_decr, parent_incr;
+	uint64_t split_gen;
 	uint32_t i, new_entries;
 
 	page = ref->page;
@@ -1479,8 +1485,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			parent_decr += sizeof(WT_IKEY) + ikey->size;
 
 	/* Split into the parent. */
-	WT_ERR(__split_parent(session,
-	    ref, ref_new, new_entries, parent_decr, parent_incr, exclusive, 1));
+	WT_ERR(__split_parent(session, ref, ref_new, new_entries,
+	    parent_decr, parent_incr, exclusive, 1, &split_gen));
 
 	__wt_free(session, ref_new);
 
@@ -1503,9 +1509,10 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * safe.
 	 */
 	if (ikey != NULL)
-		WT_TRET(__split_safe_free(
-		    session, exclusive, ikey, sizeof(WT_IKEY) + ikey->size));
-	WT_TRET(__split_safe_free(session, exclusive, ref, sizeof(WT_REF)));
+		WT_TRET(__split_safe_free(session, split_gen, exclusive,
+		    ikey, sizeof(WT_IKEY) + ikey->size));
+	WT_TRET(__split_safe_free(session, split_gen, exclusive,
+	    ref, sizeof(WT_REF)));
 
 	/*
 	 * A note on error handling: if we completed the split, return success,
