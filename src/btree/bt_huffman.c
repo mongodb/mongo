@@ -128,6 +128,30 @@ static const struct __wt_huffman_table __wt_huffman_nytenglish[] = {
 static int __wt_huffman_read(WT_SESSION_IMPL *,
     WT_CONFIG_ITEM *, struct __wt_huffman_table **, u_int *, u_int *);
 
+#define	WT_HUFFMAN_CONFIG_VALID(str, len)				\
+	(WT_STRING_CASE_MATCH("english", (str), (len)) ||		\
+	    WT_PREFIX_MATCH((str), "utf8") || WT_PREFIX_MATCH((str), "utf16"))
+
+/*
+ * __btree_huffman_config --
+ *	Verify the key or value strings passed in.
+ */
+static int
+__btree_huffman_config(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *key_conf, WT_CONFIG_ITEM *value_conf)
+{
+	if (key_conf->len != 0 &&
+	    !WT_HUFFMAN_CONFIG_VALID(key_conf->str, key_conf->len))
+		WT_RET_MSG(
+		    session, EINVAL, "illegal Huffman key configuration");
+	if (value_conf->len != 0 &&
+	    !WT_HUFFMAN_CONFIG_VALID(value_conf->str, value_conf->len))
+		WT_RET_MSG(
+		    session, EINVAL, "illegal Huffman value configuration");
+	return (0);
+
+}
+
 /*
  * __wt_btree_huffman_open --
  *	Configure Huffman encoding for the tree.
@@ -150,6 +174,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	    __wt_config_gets_none(session, cfg, "huffman_value", &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
+	WT_RET(__btree_huffman_config(session, &key_conf, &value_conf));
 
 	switch (btree->type) {		/* Check file type compatibility. */
 	case BTREE_COL_FIX:
@@ -311,6 +336,8 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		tp->frequency = (uint32_t)frequency;
 	}
 
+	if (ret == EOF)
+		ret = 0;
 	*entriesp = lineno - 1;
 	*tablep = table;
 
