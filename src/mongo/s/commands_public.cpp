@@ -2731,9 +2731,79 @@ namespace mongo {
             return ok;
         }
 
-        class CmdListCollections : public PublicGridCommand {
+        /**
+         * Template algorithm for commands that operate by passing through commands to
+         * the shard primary, and then fall back to an aggregation on the shard primary
+         * if the command isn't available.  This is primarily an abstraction of the implementation
+         * of listCollections and listIndexes.
+         */
+        class ListPassthroughWithAggFallbackCommand : public PublicGridCommand {
+        protected:
+            explicit ListPassthroughWithAggFallbackCommand(const char* name) :
+                PublicGridCommand(name) {
+            }
+
+            bool run(OperationContext* txn, const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string& errmsg,
+                     BSONObjBuilder& result,
+                     bool) {
+                DBConfigPtr conf = grid.getDBConfig(dbName , false);
+                if (!conf) {
+                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
+                    return false;
+                }
+
+                BSONObj cmdResultObj;
+                BSONObjBuilder listCmdResultBuilder;
+                if (passthrough(conf, cmdObj, listCmdResultBuilder)) {
+                    cmdResultObj = listCmdResultBuilder.done();
+                }
+                else {
+                    BSONObj listCmdResult = listCmdResultBuilder.done();
+                    Status status = getStatusFromCommandResult(listCmdResult);
+                    invariant(!status.isOK());
+                    if (ErrorCodes::CommandNotFound != status) {
+                        result.appendElements(listCmdResult);
+                        return false;
+                    }
+
+                    const BSONObj aggCmdObj = buildAggregationEquivalent(dbName, cmdObj);
+                    LOG(1) << "Falling back due to old shard server version from " << cmdObj <<
+                        " to " << aggCmdObj;
+                    BSONObjBuilder aggCmdResultBuilder;
+                    if (passthrough(conf, aggCmdObj, aggCmdResultBuilder)) {
+                        cmdResultObj = aggCmdResultBuilder.obj();
+                    }
+                    else {
+                        result.appendElements(aggCmdResultBuilder.done());
+                        return false;
+                    }
+                }
+                invariant(cmdResultObj["ok"].trueValue());  // passthrough() would have returned
+                                                            // false, otherwise.
+                Status status = storePossibleCursor(conf->getPrimary().getConnString(),
+                                                    cmdResultObj);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
+                }
+                result.appendElements(cmdResultObj);
+                return true;
+            }
+
+        private:
+            /**
+             * Returns a BSON object describing the aggregation command to run on a 2.6 mongod
+             * if that mongod doesn't support the command described by cmdObj directly.
+             */
+            virtual BSONObj buildAggregationEquivalent(
+                    const std::string& dbName, const BSONObj& cmdObj) = 0;
+        };
+
+        class CmdListCollections : public ListPassthroughWithAggFallbackCommand {
         public:
-            CmdListCollections() : PublicGridCommand( "listCollections" ) {}
+            CmdListCollections() : ListPassthroughWithAggFallbackCommand( "listCollections" ) {}
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
@@ -2742,63 +2812,83 @@ namespace mongo {
                 out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
 
-            bool run(OperationContext* txn, const string& dbName,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result,
-                     bool) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
+        private:
+            virtual BSONObj buildAggregationEquivalent(
+                    const std::string& dbName, const BSONObj& cmdObj) {
+                static const long long defaultBatchSize = std::numeric_limits<long long>::max();
+                long long batchSize;
+                uassertStatusOK(parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
+                const BSONElement filterElt = cmdObj["filter"];
+                if (!filterElt.eoo() && filterElt.type() != Object) {
+                    uasserted(ErrorCodes::TypeMismatch,
+                              str::stream() << "\"filter\" must be of type Object, not " <<
+                              typeName(filterElt.type()));
                 }
 
-                bool retval = passthrough( conf, cmdObj, result );
-
-                Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),
-                                                               result.asTempObj());
-                if (!storeCursorStatus.isOK()) {
-                    return appendCommandStatus(result, storeCursorStatus);
+                BSONObjBuilder aggCmdObjBuilder;
+                aggCmdObjBuilder <<
+                    "aggregate" << "system.namespaces" <<
+                    "cursor" << BSON("batchSize" << batchSize);
+                {
+                    BSONArrayBuilder pipelineBuilder(aggCmdObjBuilder.subarrayStart("pipeline"));
+                    pipelineBuilder <<
+                        // Filter out namespaces with "$" in their name.  These are always indexes,
+                        // except for the master/slave oplog local.oplog.$main; however mongos
+                        // cannot be used to observe the contents of nodes' local databases, so we
+                        // make no exception for it here.
+                        BSON("$match" <<
+                             BSON("name" << BSONRegEx("^[^$]*$"))) <<
+                        // Sort by name, for consistency with listCollections behavior on mongod.
+                        BSON("$sort" <<
+                             BSON("name" << 1)) <<
+                        // Remove the database name qualification of the namespace name.
+                        BSON("$project" <<
+                             BSON("name" <<
+                                  BSON("$substr" <<
+                                       BSON_ARRAY("$name" <<
+                                                  static_cast<long long>(1 + dbName.size()) <<
+                                                  -1)) <<
+                                  "options" << 1));
+                    if (!filterElt.eoo()) {
+                        pipelineBuilder << BSON("$match" << filterElt.Obj());
+                    }
                 }
-
-                return retval;
+                return aggCmdObjBuilder.obj();
             }
         } cmdListCollections;
 
-        class CmdListIndexes : public PublicGridCommand {
+        class CmdListIndexes : public ListPassthroughWithAggFallbackCommand {
         public:
-            CmdListIndexes() : PublicGridCommand( "listIndexes" ) {}
+            CmdListIndexes() : ListPassthroughWithAggFallbackCommand( "listIndexes" ) {}
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                string ns = parseNs( dbname, cmdObj );
                 ActionSet actions;
                 actions.addAction(ActionType::listIndexes);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
 
-            bool run(OperationContext* txn, const string& dbName,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result,
-                     bool) {
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if (!conf) {
-                    errmsg = str::stream() << "Failed to load db sharding metadata for " << dbName;
-                    return false;
-                }
+        private:
+            virtual BSONObj buildAggregationEquivalent(
+                    const std::string& dbName, const BSONObj& cmdObj) {
+                const BSONElement firstElement = cmdObj.firstElement();
+                uassert(28606,
+                        str::stream() <<
+                        "Argument to listIndexes must be a non-empty String, but found " <<
+                        firstElement.toString(false) << " with type " <<
+                        typeName(firstElement.type()),
+                        (firstElement.type() == String &&
+                         NamespaceString::validCollectionName(firstElement.valueStringData())));
 
-                bool retval = passthrough( conf, cmdObj, result );
+                static const long long defaultBatchSize = std::numeric_limits<long long>::max();
+                long long batchSize;
+                uassertStatusOK(parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
 
-                Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),
-                                                               result.asTempObj());
-                if (!storeCursorStatus.isOK()) {
-                    return appendCommandStatus(result, storeCursorStatus);
-                }
-
-                return retval;
+                return BSON(
+                        "aggregate" << "system.indexes" <<
+                        "cursor" << BSON("batchSize" << batchSize) <<
+                        "pipeline" << BSON_ARRAY(
+                                BSON("$match" << BSON("ns" << parseNs(dbName, cmdObj)))));
             }
         } cmdListIndexes;
 
