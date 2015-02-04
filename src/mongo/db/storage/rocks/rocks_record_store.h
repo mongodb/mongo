@@ -220,6 +220,7 @@ namespace mongo {
             bool _eof;
             const RecordId _readUntilForOplog;
             RecordId _curr;
+            RecordId _lastLoc;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 

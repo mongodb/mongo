@@ -497,11 +497,9 @@ namespace mongo {
         return new Iterator(txn, _db, _columnFamily, _cappedVisibilityManager, dir, start);
     }
 
-    std::vector<RecordIterator*> RocksRecordStore::getManyIterators( OperationContext* txn ) const {
-        // AFB: any way to get the split point keys for the bottom layer of the lsm tree?
-        std::vector<RecordIterator*> iterators;
-        iterators.push_back( getIterator( txn ) );
-        return iterators;
+    std::vector<RecordIterator*> RocksRecordStore::getManyIterators(OperationContext* txn) const {
+        return {new Iterator(txn, _db, _columnFamily, _cappedVisibilityManager,
+                             CollectionScanParams::FORWARD, RecordId())};
     }
 
     Status RocksRecordStore::truncate( OperationContext* txn ) {
@@ -810,6 +808,7 @@ namespace mongo {
         }
 
         _checkStatus();
+        _lastLoc = toReturn;
         return toReturn;
     }
 
@@ -819,6 +818,7 @@ namespace mongo {
 
     void RocksRecordStore::Iterator::saveState() {
         _iterator.reset();
+        _txn = nullptr;
     }
 
     bool RocksRecordStore::Iterator::restoreState(OperationContext* txn) {
@@ -829,7 +829,30 @@ namespace mongo {
 
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         _iterator.reset(ru->NewIterator(_cf.get()));
-        _locate(_curr);
+
+        RecordId saved = _lastLoc;
+        _locate(_lastLoc);
+
+        if (_eof) {
+            _lastLoc = RecordId();
+        } else if (_curr != saved) {
+            // _cappedVisibilityManager is not-null when isCapped == true
+            if (_cappedVisibilityManager.get() && saved != RecordId()) {
+                // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter().
+                // It is important that we error out in this case so that consumers don't
+                // silently get 'holes' when scanning capped collections. We don't make
+                // this guarantee for normal collections so it is ok to skip ahead in that case.
+                _eof = true;
+                return false;
+            }
+            // lastLoc was either deleted or never set (yielded before first call to getNext()),
+            // so bump ahead to the next record.
+        } else {
+            // we found where we left off! we advanced to the next one
+            getNext();
+            _lastLoc = saved;
+        }
+
         return true;
     }
 
