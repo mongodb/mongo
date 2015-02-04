@@ -782,7 +782,9 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 
 	WT_RET(__cursor_func_init(cbt, 1));
 
-	WT_ERR(__wt_row_random(session, cbt));
+	WT_WITH_PAGE_INDEX(session,
+	    ret = __wt_row_random(session, cbt));
+	WT_ERR(ret);
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else
@@ -948,7 +950,11 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	} else {
 		do {
 			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
+			/*
+			 * Reset ret each time through so that we don't loop
+			 * forever in the cursor equals case.
+			 */
+			for (ret = 0;;) {
 				if (stop != NULL &&
 				    __cursor_equals(start, stop))
 					break;
@@ -1009,7 +1015,11 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	} else {
 		do {
 			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
+			/*
+			 * Reset ret each time through so that we don't loop
+			 * forever in the cursor equals case.
+			 */
+			for (ret = 0;;) {
 				if (stop != NULL &&
 				    __cursor_equals(start, stop))
 					break;

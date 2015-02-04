@@ -366,8 +366,13 @@ recno_chk:	if (recno != vs->record_total + 1)
 				goto celltype_err;
 			break;
 		case WT_PAGE_COL_VAR:
-		case WT_PAGE_ROW_LEAF:
 			if (unpack->raw != WT_CELL_ADDR_LEAF &&
+			    unpack->raw != WT_CELL_ADDR_LEAF_NO)
+				goto celltype_err;
+			break;
+		case WT_PAGE_ROW_LEAF:
+			if (unpack->raw != WT_CELL_ADDR_DEL &&
+			    unpack->raw != WT_CELL_ADDR_LEAF &&
 			    unpack->raw != WT_CELL_ADDR_LEAF_NO)
 				goto celltype_err;
 			break;
