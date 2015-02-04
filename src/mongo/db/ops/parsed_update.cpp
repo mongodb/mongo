@@ -107,10 +107,14 @@ namespace mongo {
 
     bool ParsedUpdate::canYield() const {
         return !_request->isGod() &&
-            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() && (
-            _canonicalQuery.get() ?
-            !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
-            !LiteParsedQuery::isQueryIsolated(_request->getQuery()));
+            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() &&
+            !isIsolated();
+    }
+
+    bool ParsedUpdate::isIsolated() const {
+        return _canonicalQuery.get()
+            ? QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC)
+            : LiteParsedQuery::isQueryIsolated(_request->getQuery());
     }
 
     bool ParsedUpdate::hasParsedQuery() const {
