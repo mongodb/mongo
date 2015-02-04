@@ -1204,12 +1204,16 @@ namespace {
                 _lastLoc = RecordId();
             }
             else if ( _loc != saved ) {
-                if (_rs._isCapped) {
-                    // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter()
+                if (_rs._isCapped && _lastLoc != RecordId()) {
+                    // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter().
+                    // It is important that we error out in this case so that consumers don't
+                    // silently get 'holes' when scanning capped collections. We don't make 
+                    // this guarantee for normal collections so it is ok to skip ahead in that case.
                     _eof = true;
                     return false;
                 }
-                // old doc deleted, bump ahead to the next record
+                // lastLoc was either deleted or never set (yielded before first call to getNext()),
+                // so bump ahead to the next record.
             }
             else {
                 // we found where we left off!
