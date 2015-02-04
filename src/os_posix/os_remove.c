@@ -22,7 +22,8 @@ __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 
 	conn = S2C(session);
 	fh = NULL;
-	bucket = __wt_hash_city64(name, strlen(name));
+	bucket = __wt_hash_city64(name, strlen(name)) %
+	    WT_HASH_ARRAY_SIZE;
 
 	/*
 	 * Check if the file is open: it's an error if it is, since a higher
