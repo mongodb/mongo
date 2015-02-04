@@ -13,7 +13,8 @@
 
     assert.eq(coll.getIndexes().length, 2);
 
-    var res = coll.runCommand('compact');
+    // force:true is for replset passthroughs
+    var res = coll.runCommand('compact', {force:true});
     // Some storage engines (for example, inMemoryExperiment) do not support the compact command.
     if (res.code == 115) { // CommandNotSupported
         return;
