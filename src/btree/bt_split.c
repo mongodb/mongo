@@ -520,7 +520,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
-	__split_verify_intl_key_order(session, parent);
+	WT_WITH_PAGE_INDEX(session,
+	    __split_verify_intl_key_order(session, parent));
 #endif
 
 	/*
@@ -551,7 +552,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		if (!WT_PAGE_IS_INTERNAL(child))
 			continue;
 #ifdef HAVE_DIAGNOSTIC
-		__split_verify_intl_key_order(session, child);
+		WT_WITH_PAGE_INDEX(session,
+		    __split_verify_intl_key_order(session, child));
 #endif
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			/*
