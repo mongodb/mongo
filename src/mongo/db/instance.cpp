@@ -594,7 +594,9 @@ namespace mongo {
                     //  If DB doesn't exist, don't implicitly create it in Client::Context
                     break;
                 }
-                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(),
+                                              ns.ns(),
+                                              parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
                 Client::Context ctx(txn, ns);
 
                 //  The common case: no implicit collection creation
@@ -707,7 +709,9 @@ namespace mongo {
                     break;
                 }
 
-                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(),
+                                              ns.ns(),
+                                              parsedDelete.isIsolated() ? MODE_X : MODE_IX);
                 Client::Context ctx(txn, ns);
 
                 PlanExecutor* rawExec;

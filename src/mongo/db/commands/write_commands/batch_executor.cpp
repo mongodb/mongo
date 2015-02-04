@@ -1249,7 +1249,7 @@ namespace mongo {
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(),
                                          nsString.ns(),
-                                         MODE_IX);
+                                         parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
             ///////////////////////////////////////////
 
             if (!checkIsMasterForDatabase(nsString, result)) {
@@ -1390,7 +1390,9 @@ namespace mongo {
                     break;
                 }
 
-                Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(),
+                                              nss.ns(),
+                                              parsedDelete.isIsolated() ? MODE_X : MODE_IX);
 
                 // getExecutorDelete() also checks if writes are allowed.
                 if (!checkIsMasterForDatabase(nss, result)) {
