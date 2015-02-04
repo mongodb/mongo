@@ -95,6 +95,34 @@ struct __wt_named_extractor {
 } while (0)
 
 /*
+ * Macros to ensure the block is inserted or removed from both the
+ * main queue and the hashed queue.
+ */
+#define	WT_CONN_BLOCK_INSERT(conn, block, bucket) do {			\
+	TAILQ_INSERT_HEAD(&(conn)->blockqh, block, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashq);	\
+} while (0)
+
+#define	WT_CONN_BLOCK_REMOVE(conn, block, bucket) do {			\
+	TAILQ_REMOVE(&(conn)->blockqh, block, q);			\
+	TAILQ_REMOVE(&(conn)->blockhash[bucket], block, hashq);		\
+} while (0)
+
+/*
+ * Macros to ensure the file handle is inserted or removed from both the
+ * main queue and the hashed queue.
+ */
+#define	WT_CONN_FILE_INSERT(conn, fh, bucket) do {			\
+	TAILQ_INSERT_TAIL(&(conn)->fhqh, fh, q);			\
+	TAILQ_INSERT_TAIL(&(conn)->fhhash[bucket], fh, hashq);		\
+} while (0)
+
+#define	WT_CONN_FILE_REMOVE(conn, fh, bucket) do {			\
+	TAILQ_REMOVE(&(conn)->fhqh, fh, q);				\
+	TAILQ_REMOVE(&(conn)->fhhash[bucket], fh, hashq);		\
+} while (0)
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -162,11 +190,13 @@ struct __wt_connection_impl {
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
+	TAILQ_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
 	WT_SPINLOCK block_lock;		/* Locked: block manager list */
+	TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
 	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
 	u_int open_btree_count;		/* Locked: open writable btree count */
