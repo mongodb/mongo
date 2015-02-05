@@ -44,10 +44,13 @@ class test_split(wttest.WiredTigerTestCase):
     uri = 'file:' + name
 
     def test_split_simple(self):
-        self.session.create(self.uri, 'key_format=S,value_format=S,allocation_size=4KB,leaf_page_max=4KB,split_pct=75')
+        self.session.create(self.uri,
+            'key_format=S,value_format=S,' +
+            'allocation_size=4KB,leaf_page_max=4KB,split_pct=75')
         cursor = self.session.open_cursor(self.uri, None)
 
-        # Create a 4KB page (more than 3KB): 40 records w / 10 byte keys and 81 byte values
+        # Create a 4KB page (more than 3KB): 40 records w / 10 byte keys
+        # and 81 byte values.
         for i in range(40):
             cursor.set_key('%09d' % i)
             cursor.set_value(8 * ('%010d' % i))
