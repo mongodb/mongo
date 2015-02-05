@@ -85,9 +85,9 @@ class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
             self.reopen_conn()
 
         # Check for these values via a log cursor
-	c = self.session.open_cursor("log:", None)
+        c = self.session.open_cursor("log:", None)
         count = 0
-	while c.next() == 0:
+        while c.next() == 0:
             # lsn.file, lsn.offset, opcount
             keys = c.get_key()
             # txnid, rectype, optype, fileid, logrec_key, logrec_value
