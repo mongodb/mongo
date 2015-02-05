@@ -335,7 +335,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(session, page, ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) {
 			WT_ASSERT(session, ref->key.recno > recno);
 			recno = ref->key.recno;
 		} WT_INTL_FOREACH_END;
@@ -347,7 +347,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_last);
 
 		first = 1;
-		WT_INTL_FOREACH_BEGIN(session, page, ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) {
 			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
@@ -520,8 +520,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_WITH_PAGE_INDEX(session,
-	    __split_verify_intl_key_order(session, parent));
+	__split_verify_intl_key_order(session, parent);
 #endif
 
 	/*
@@ -552,10 +551,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		if (!WT_PAGE_IS_INTERNAL(child))
 			continue;
 #ifdef HAVE_DIAGNOSTIC
-		WT_WITH_PAGE_INDEX(session,
-		    __split_verify_intl_key_order(session, child));
+		__split_verify_intl_key_order(session, child);
 #endif
-		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
+		WT_INTL_FOREACH_BEGIN_SAFE(session, child, child_ref) {
 			/*
 			 * The page's parent reference may not be wrong, as we
 			 * opened up access from the top of the tree already,
@@ -908,8 +906,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_WITH_PAGE_INDEX(session,
-	    __split_verify_intl_key_order(session, parent));
+	__split_verify_intl_key_order(session, parent);
 #endif
 
 	/*
