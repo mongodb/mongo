@@ -239,6 +239,8 @@ add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
 js_engine_choices = ['v8-3.12', 'v8-3.25', 'none']
 add_option( "js-engine", "JavaScript scripting engine implementation", 1, False,
            type='choice', default=js_engine_choices[0], choices=js_engine_choices)
+add_option( "server-js", "Build mongod without JavaScript support", 1, False,
+           type='choice', choices=["on", "off"], const="on", default="on")
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
 add_option( "use-glibcxx-debug",
@@ -516,10 +518,15 @@ noshell = has_option( "noshell" )
 
 jsEngine = get_option( "js-engine")
 
+serverJs = get_option( "server-js" ) == "on"
+
 usev8 = (jsEngine != 'none')
 
 v8version = jsEngine[3:] if jsEngine.startswith('v8-') else 'none'
 v8suffix = '' if v8version == '3.12' else '-' + v8version
+
+if not serverJs and not usev8:
+    print("Warning: --server-js=off is not needed with --js-engine=none")
 
 # The Scons 'default' tool enables a lot of tools that we don't actually need to enable.
 # On platforms like Solaris, it actually does the wrong thing by enabling the sunstudio
@@ -2407,6 +2414,7 @@ Export("env")
 Export("get_option")
 Export("has_option use_system_version_of_library")
 Export("mongoCodeVersion")
+Export("serverJs")
 Export("usev8")
 Export("v8version v8suffix")
 Export("boostSuffix")

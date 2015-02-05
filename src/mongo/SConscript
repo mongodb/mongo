@@ -9,6 +9,7 @@ from buildscripts import utils
 Import("env")
 Import("has_option")
 Import("get_option")
+Import("serverJs")
 Import("usev8")
 Import("v8suffix")
 Import("darwin windows solaris linux nix")
@@ -548,6 +549,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='scripting_none',
+    source=[
+        'scripting/engine_none.cpp',
+    ],
+    LIBDEPS=[
+        'bson_template_evaluator',
+        'scripting_common',
+    ],
+)
+
 env.Library('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
             LIBDEPS=['bson'])
 env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evaluator_test.cpp'],
@@ -574,11 +586,28 @@ else:
     env.Library(
         target='scripting',
         source=[
-            'scripting/engine_none.cpp',
         ],
         LIBDEPS=[
-            'bson_template_evaluator',
-            'scripting_common',
+            'scripting_none',
+        ],
+    )
+
+if serverJs:
+    env.Library(
+        target='scripting_server',
+        source=[
+        ],
+        LIBDEPS=[
+            'scripting',
+        ],
+    )
+else:
+    env.Library(
+        target='scripting_server',
+        source=[
+        ],
+        LIBDEPS=[
+            'scripting_none',
         ],
     )
 
@@ -945,7 +974,7 @@ serveronlyLibdeps = ["coreshard",
                      "global_optime",
                      "index_key_validate",
                      'range_deleter',
-                     'scripting',
+                     'scripting_server',
                      "update_index_data",
                      's/metadata',
                      's/batch_write_types',
@@ -1226,7 +1255,7 @@ coreShellFiles = [ "shell/bench.cpp",
                    "shell/mk_wcwidth.cpp",
                    "shell/shell_options_init.cpp" ]
 
-if not has_option('noshell'):
+if not has_option('noshell') and usev8:
     env.Library("shell_core", coreShellFiles,
                 LIBDEPS=['clientandshell',
                          'db/index/external_key_generator',
@@ -1251,6 +1280,8 @@ if not has_option('noshell'):
                  ])
 
     shellEnv.Install( '#/', mongo_shell )
+else:
+    shellEnv = None
 
 #  ----  INSTALL -------
 
