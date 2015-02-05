@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn10.py
+# test_cursor07.py
 # Log cursors
 #
 
@@ -36,11 +36,16 @@ from wiredtiger import wiredtiger_open, stat
 from wtscenario import multiply_scenarios, number_scenarios
 import wttest
 
-class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
+class test_cursor07(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
-    tablename = 'test_txn10'
+    tablename = 'test_cursor07'
     uri = 'table:' + tablename
     nkeys = 5
+
+    scenarios = [
+        ('regular', dict(reopen=False)),
+        ('reopen', dict(reopen=True))
+    ]
 
     # Overrides WiredTigerTestCase - add logging
     def setUpConnectionOpen(self, dir):
@@ -76,8 +81,10 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
         c.close()
 
-        # Need to reopen the connection
-        self.reopen_conn()
+        if self.reopen:
+            self.reopen_conn()
+        else:
+            self.KNOWN_FAILURE("log cursor without reopening connection")
 
         # Check for these values via a log cursor
 	c = self.session.open_cursor("log:", None)
