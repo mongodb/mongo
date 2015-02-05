@@ -595,9 +595,14 @@ namespace mongo {
         // Note: this is for blocking sockets only.
         SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
 
-        // Disable session caching (see SERVER-10261)
-        SSL_CTX_set_session_cache_mode(*context, SSL_SESS_CACHE_OFF);
- 
+        massert(28606,
+                mongoutils::str::stream() << "can't store ssl session id context: " <<
+                    getSSLErrorMessage(ERR_get_error()),
+                SSL_CTX_set_session_id_context(
+                    *context,
+                    static_cast<unsigned char*>(static_cast<void*>(context)),
+                    sizeof(*context)));
+
         // Use the clusterfile for internal outgoing SSL connections if specified 
         if (context == &_clientContext && !params.clusterfile.empty()) {
             EVP_set_pw_prompt("Enter cluster certificate passphrase");
