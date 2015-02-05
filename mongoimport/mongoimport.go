@@ -33,7 +33,6 @@ const (
 	progressBarLength   = 24
 )
 
-
 // MongoImport is a container for the user-specified options and
 // internal state used for running mongoimport.
 type MongoImport struct {
@@ -95,6 +94,7 @@ func (imp *MongoImport) ValidateSettings(args []string) error {
 		return fmt.Errorf("invalid database name: %v", err)
 	}
 
+	imp.InputOptions.Type = strings.ToLower(imp.InputOptions.Type)
 	// use JSON as default input type
 	if imp.InputOptions.Type == "" {
 		imp.InputOptions.Type = JSON

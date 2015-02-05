@@ -78,6 +78,8 @@ func (exp *MongoExport) ValidateSettings() error {
 		return err
 	}
 
+	exp.OutputOpts.Type = strings.ToLower(exp.OutputOpts.Type)
+
 	if exp.ToolOptions.HiddenOptions.CSVOutputType {
 		log.Log(log.Always, "csv flag is deprecated; please use --type=csv instead")
 		exp.OutputOpts.Type = CSV

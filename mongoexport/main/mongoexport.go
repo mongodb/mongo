@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		log.Logf(log.Always, "error validating settings: %v", err)
 		log.Logf(log.Always, "try 'mongoexport --help' for more information")
-		os.Exit(util.ExitError)
+		os.Exit(util.ExitBadOptions)
 	}
 
 	writer, err := exporter.GetOutputWriter()
