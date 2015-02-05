@@ -27,7 +27,6 @@
     assert.eq('string', typeof(res.cursor.ns));
     collObj = res.cursor.firstBatch.filter(function(c) { return c.name === "foo"; })[0];
     assert(collObj);
-    assert.eq('object', typeof(collObj.options));
 
     //
     // Test basic usage with DBCommandCursor.
@@ -57,7 +56,8 @@
     assert.commandWorked(mydb.createCollection("bar", {temp: true}));
     assert.eq(1, cursorCountMatching(getListCollectionsCursor(),
                                      function(c) { return c.name === "foo" &&
-                                                          c.options.temp === undefined; }));
+                                                          (c.options === undefined ||
+                                                           c.options.temp === undefined); }));
     assert.eq(1, cursorCountMatching(getListCollectionsCursor(),
                                      function(c) { return c.name === "bar" &&
                                                           c.options.temp === true; }));
